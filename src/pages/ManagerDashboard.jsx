@@ -157,34 +157,45 @@ export default function ManagerDashboard() {
 
   // ✅ Approve flow (export FIRST then approve)
   async function approve(jobId) {
-    setActionLoadingId(jobId);
-    setErr("");
-    setInfo("");
-    try {
-      const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
-        body: { job_id: jobId },
-      });
+  setActionLoadingId(jobId);
+  setErr("");
+  setInfo("");
 
-      if (fnErr) throw fnErr;
-      if (data?.ok !== true && !data?.skipped) {
-        throw new Error(data?.error || "Export to Google Sheet failed.");
-      }
+  try {
+    const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+    if (sessErr) throw sessErr;
 
-      const { error } = await supabase
-        .from("jobs")
-        .update({ status: "approved", locked: true })
-        .eq("id", jobId);
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) throw new Error("No session token (manager). Please re-login.");
 
-      if (error) throw error;
+    const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
+      body: { job_id: jobId },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-      setInfo(data?.skipped ? "Approved. Export skipped (already exported)." : "Approved and exported.");
-      await load();
-    } catch (e) {
-      setErr(e?.message || "Approve failed (not exported).");
-    } finally {
-      setActionLoadingId(null);
+    if (fnErr) throw fnErr;
+    if (data?.ok !== true && !data?.skipped) {
+      throw new Error(data?.error || "Export to Google Sheet failed.");
     }
+
+    const { error } = await supabase
+      .from("jobs")
+      .update({ status: "approved", locked: true })
+      .eq("id", jobId);
+
+    if (error) throw error;
+
+    setInfo(data?.skipped ? "Approved. Export skipped (already exported)." : "Approved and exported.");
+    await load();
+  } catch (e) {
+    setErr(e?.message || "Approve failed.");
+  } finally {
+    setActionLoadingId(null);
   }
+}
+
 
   function renderJobCard(j) {
     const electrician = profiles.get(j.user_id);

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -7,13 +7,13 @@ export default function Login() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
 
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login"); // login | signup
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState(""); // ✅ new
 
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(""); // success/info
   const [errorMsg, setErrorMsg] = useState("");
 
   const isSignup = mode === "signup";
@@ -21,56 +21,83 @@ export default function Login() {
   const canSubmit = useMemo(() => {
     if (!email.trim() || !password) return false;
     if (isSignup && fullName.trim().length < 2) return false;
-    return true;
-  }, [email, password, fullName, isSignup]);
 
-  // If already logged in, route to proper dashboard
-  useEffect(() => {
-    if (!user) return;
-    if (role === "manager") navigate("/manager", { replace: true });
-    else navigate("/", { replace: true });
+    // phone optional; if you want it required, uncomment:
+    // if (isSignup && phone.trim().length < 7) return false;
+
+    return true;
+  }, [email, password, fullName, phone, isSignup]);
+
+  React.useEffect(() => {
+    if (user) {
+      if (role === "manager") navigate("/manager", { replace: true });
+      else navigate("/", { replace: true });
+    }
   }, [user, role, navigate]);
+
+  function normalizePhone(raw) {
+    // Very light normalization; keeps + and digits
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    // allow +, digits, spaces, dashes, parentheses
+    // you can tighten validation later if needed
+    return s;
+  }
+
+  async function ensureProfile(userId, name, phoneRaw) {
+    const phoneNorm = normalizePhone(phoneRaw);
+
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        id: userId,
+        full_name: name || null,
+        phone: phoneNorm || null, // ✅ store here
+        role: "electrician",
+      },
+      { onConflict: "id" }
+    );
+
+    if (error) {
+      console.warn("[Login] ensureProfile error:", error);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMsg("");
-    setMessage("");
-    if (!canSubmit || loading) return;
+    if (!canSubmit) return;
 
     setLoading(true);
     try {
       if (isSignup) {
-        // Store full_name in user metadata so the DB trigger can auto-create profiles correctly
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: {
-            data: {
-              full_name: fullName.trim()
-            }
-          }
         });
         if (error) throw error;
 
-        // If email confirmation is enabled, Supabase may return no session until confirmed.
-        if (!data?.session) {
-          setMessage("Signup successful. Please check your email to confirm, then log in.");
-          setMode("login");
-          setPassword("");
-          return;
+        const createdUser = data?.user;
+        if (createdUser?.id) {
+          await ensureProfile(createdUser.id, fullName.trim(), phone);
         }
 
-        // If session exists, AuthContext will redirect automatically
-        setMessage("Signup successful. Redirecting…");
+        // If email confirmation is enabled, session may be null until confirmed.
+        if (!data?.session) {
+          setErrorMsg("Signup successful. Check your email to confirm, then log in.");
+          setMode("login");
+          setPassword("");
+          setLoading(false);
+          return;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
-          password
+          password,
         });
         if (error) throw error;
-
-        // AuthContext will redirect automatically
       }
+
+      // AuthContext will redirect
     } catch (err) {
       setErrorMsg(err?.message || "Authentication failed.");
     } finally {
@@ -88,16 +115,29 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10 }}>
           {isSignup && (
-            <label style={styles.label}>
-              Full name
-              <input
-                style={styles.input}
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g., Simon B."
-                autoComplete="name"
-              />
-            </label>
+            <>
+              <label style={styles.label}>
+                Full name
+                <input
+                  style={styles.input}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g., Simon B."
+                  autoComplete="name"
+                />
+              </label>
+
+              <label style={styles.label}>
+                Phone (with country code)
+                <input
+                  style={styles.input}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g., +1 514 555 1234"
+                  autoComplete="tel"
+                />
+              </label>
+            </>
           )}
 
           <label style={styles.label}>
@@ -125,7 +165,6 @@ export default function Login() {
           </label>
 
           {errorMsg && <div style={styles.error}>{errorMsg}</div>}
-          {message && <div style={styles.success}>{message}</div>}
 
           <button disabled={!canSubmit || loading} style={styles.primaryBtn}>
             {loading ? "Please wait…" : isSignup ? "Sign up" : "Log in"}
@@ -133,11 +172,7 @@ export default function Login() {
 
           <button
             type="button"
-            onClick={() => {
-              setErrorMsg("");
-              setMessage("");
-              setMode(isSignup ? "login" : "signup");
-            }}
+            onClick={() => setMode(isSignup ? "login" : "signup")}
             style={styles.linkBtn}
           >
             {isSignup ? "Already have an account? Log in" : "No account? Sign up"}
@@ -158,7 +193,7 @@ const styles = {
     display: "grid",
     placeItems: "center",
     background: "#f5f5f5",
-    padding: 16
+    padding: 16,
   },
   card: {
     width: "100%",
@@ -167,7 +202,7 @@ const styles = {
     border: "1px solid #eee",
     borderRadius: 14,
     padding: 18,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.04)"
+    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
   label: { display: "grid", gap: 6, fontSize: 13, color: "#555" },
   input: {
@@ -175,7 +210,7 @@ const styles = {
     borderRadius: 10,
     padding: "10px 12px",
     fontSize: 14,
-    outline: "none"
+    outline: "none",
   },
   primaryBtn: {
     background: "#1565c0",
@@ -185,7 +220,8 @@ const styles = {
     padding: "10px 12px",
     fontSize: 14,
     fontWeight: 700,
-    cursor: "pointer"
+    cursor: "pointer",
+    opacity: 1,
   },
   linkBtn: {
     background: "transparent",
@@ -194,7 +230,7 @@ const styles = {
     padding: 0,
     cursor: "pointer",
     fontWeight: 700,
-    fontSize: 13
+    fontSize: 13,
   },
   error: {
     background: "rgba(220,20,60,0.08)",
@@ -202,14 +238,6 @@ const styles = {
     color: "crimson",
     padding: 10,
     borderRadius: 10,
-    fontSize: 13
+    fontSize: 13,
   },
-  success: {
-    background: "rgba(76,175,80,0.10)",
-    border: "1px solid rgba(76,175,80,0.25)",
-    color: "#2e7d32",
-    padding: 10,
-    borderRadius: 10,
-    fontSize: 13
-  }
 };
