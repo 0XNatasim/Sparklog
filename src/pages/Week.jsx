@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import "dayjs/locale/en";
@@ -27,6 +27,12 @@ function formatHoursHM(hours) {
 export default function Week() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Manager can view an employee week via: /week?employee=<uuid>
+  const employeeIdParam = searchParams.get("employee");
+  const isManagerViewingEmployee = role === "manager" && Boolean(employeeIdParam);
+  const effectiveUserId = isManagerViewingEmployee ? employeeIdParam : user?.id;
 
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,11 +42,18 @@ export default function Week() {
     setErr("");
     setLoading(true);
     try {
+      if (!effectiveUserId) {
+        setJobs([]);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("jobs")
         .select("*")
-        .eq("user_id", user?.id)
-        .order("job_date", { ascending: false });
+        .eq("user_id", effectiveUserId)
+        .order("job_date", { ascending: false })
+        .order("updated_at", { ascending: false });
 
       if (error) throw error;
       setJobs(data || []);
@@ -52,10 +65,9 @@ export default function Week() {
   }
 
   useEffect(() => {
-    if (!user?.id) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   const weekly = useMemo(() => {
     const map = new Map();
@@ -85,43 +97,46 @@ export default function Week() {
       w.otCount += 1;
     }
 
-    return Array.from(map.values()).sort((a, b) =>
-      b.start.isAfter(a.start) ? 1 : -1
-    );
+    return Array.from(map.values()).sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
   }, [jobs]);
 
+  // Topbar targets
   const formPath = role === "manager" ? "/manager" : "/";
 
   return (
     <div style={styles.page}>
       {/* TOPBAR */}
       <div style={styles.topbar}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 900 }}>Week Summary</div>
-          <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
+        <div style={styles.brandBlock}>
+          <div style={{ fontSize: 18, fontWeight: 900 }}>Week</div>
+          <div style={{ fontSize: 12, color: "#666" }}>
+            {user?.email}
+            {role ? (
+              <>
+                <br />
+                role: {role}
+              </>
+            ) : null}
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {/* Form */}
-          <button
-            onClick={() => navigate(formPath)}
-            style={styles.linkBtn}
-            type="button"
-          >
+        <div style={styles.nav}>
+          <button onClick={() => navigate(formPath)} style={styles.linkBtn} type="button">
             Form
           </button>
 
-          {/* Week */}
+          <Link to="/history" style={styles.link}>
+            History
+          </Link>
+
           <span style={styles.activeLink}>Week</span>
 
-          {/* Manager */}
           {role === "manager" && (
             <Link to="/manager" style={styles.link}>
               Manager
             </Link>
           )}
 
-          {/* Logout */}
           <button onClick={signOut} style={styles.secondaryBtn}>
             Logout
           </button>
@@ -133,17 +148,13 @@ export default function Week() {
         {loading && <div style={styles.card}>Loading…</div>}
         {err && <div style={styles.error}>{err}</div>}
 
-        {!loading && !err && weekly.length === 0 && (
-          <div style={styles.card}>No data yet.</div>
-        )}
+        {!loading && !err && weekly.length === 0 && <div style={styles.card}>No data yet.</div>}
 
         {!loading &&
           !err &&
           weekly.map((w, idx) => (
             <div key={idx} style={styles.card}>
-              <div style={styles.weekHeader}>
-                Week {w.start.isoWeek()}
-              </div>
+              <div style={styles.weekHeader}>Week {w.start.isoWeek()}</div>
 
               <div style={styles.weekLine}>
                 {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")}
@@ -151,13 +162,13 @@ export default function Week() {
 
               <div style={styles.stats}>
                 <span>
-                  ⏱ <b>{formatHoursHM(w.totalHours)}</b>
+                  <b>{formatHoursHM(w.totalHours)}</b>
                 </span>
                 <span>
-                  🚗 <b>{w.totalKm}</b> km
+                  <b>{w.totalKm}</b> km
                 </span>
                 <span>
-                  📄 <b>{w.otCount}</b> OT
+                  <b>{w.otCount}</b> OT
                 </span>
               </div>
             </div>
@@ -171,19 +182,26 @@ const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
   container: { maxWidth: 900, margin: "0 auto" },
 
+  // ✅ responsive topbar like other pages
   topbar: {
     maxWidth: 900,
     margin: "0 auto 12px auto",
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  brandBlock: { display: "grid", gap: 2 },
+  nav: {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
 
-  link: {
-    color: "#1565c0",
-    fontWeight: 900,
-    textDecoration: "none",
-  },
+  link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
   linkBtn: {
     background: "transparent",
     border: "none",
@@ -193,11 +211,7 @@ const styles = {
     padding: 0,
     fontSize: 14,
   },
-  activeLink: {
-    fontWeight: 900,
-    color: "#111",
-    fontSize: 14,
-  },
+  activeLink: { fontWeight: 900, color: "#111", fontSize: 14 },
 
   card: {
     background: "#fff",
@@ -208,23 +222,10 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
 
-  weekHeader: {
-    fontWeight: 900,
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  weekLine: {
-    fontSize: 13,
-    color: "#555",
-    marginBottom: 10,
-  },
+  weekHeader: { fontWeight: 900, fontSize: 15, marginBottom: 4 },
+  weekLine: { fontSize: 13, color: "#555", marginBottom: 10 },
 
-  stats: {
-    display: "flex",
-    gap: 16,
-    fontSize: 14,
-    flexWrap: "wrap",
-  },
+  stats: { display: "flex", gap: 16, fontSize: 14, flexWrap: "wrap" },
 
   secondaryBtn: {
     background: "#f5f5f5",

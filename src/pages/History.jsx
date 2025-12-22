@@ -94,7 +94,6 @@ export default function History() {
 
   // ✅ Electrician OPEN = navigate to form edit mode (only for saved & unlocked)
   function openJob(job) {
-    // Your ElectricianForm already supports ?edit=<job_uuid>
     navigate(`/?edit=${job.id}`);
   }
 
@@ -121,47 +120,47 @@ export default function History() {
   }
 
   function canOpen(job) {
-    // Only electricians can open/edit; must be saved and not locked
     return role !== "manager" && job.status === "saved" && job.locked === false;
   }
 
   function canDelete(job) {
-    // Same rule as open (safe + prevents deleting submitted/approved)
     return role !== "manager" && job.status === "saved" && job.locked === false;
   }
 
   return (
     <div style={styles.page}>
+      {/* ✅ TOPBAR: Title and menu on SAME ROW; email+role BELOW */}
       <div style={styles.topbar}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 900 }}>History</div>
+        <div style={styles.topRow}>
+          <div style={styles.title}>History</div>
 
-          <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
+          <div style={styles.menu}>
+            <button onClick={() => navigate(formPath)} style={styles.linkBtn} type="button">
+              Form
+            </button>
 
-          {/* ✅ role UNDER email (mobile-friendly) */}
-          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-            Role: <b>{fmtRoleLabel(role)}</b>
+            <Link to="/week" style={styles.link}>
+              Week
+            </Link>
+
+            {role === "manager" && (
+              <Link to="/manager" style={styles.link}>
+                Manager
+              </Link>
+            )}
+
+            <button onClick={signOut} style={styles.secondaryBtn}>
+              Logout
+            </button>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button onClick={() => navigate(formPath)} style={styles.linkBtn} type="button">
-            Form
-          </button>
-
-          <Link to="/week" style={styles.link}>
-            Week
-          </Link>
-
-          {role === "manager" && (
-            <Link to="/manager" style={styles.link}>
-              Manager
-            </Link>
-          )}
-
-          <button onClick={signOut} style={styles.secondaryBtn}>
-            Logout
-          </button>
+        {/* ✅ email + role BELOW menu (prevents overlap on mobile) */}
+        <div style={styles.subRow}>
+          <div style={styles.email}>{user?.email}</div>
+          <div style={styles.roleLine}>
+            Role: <b>{fmtRoleLabel(role)}</b>
+          </div>
         </div>
       </div>
 
@@ -223,7 +222,6 @@ export default function History() {
                         <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
                           <span style={{ ...styles.badge, ...badgeStyle(j.status) }}>{j.status}</span>
 
-                          {/* ✅ Open + Delete actions (electrician only, saved & unlocked) */}
                           {(showOpen || showDelete) && (
                             <div style={{ display: "flex", gap: 8 }}>
                               {showOpen && (
@@ -273,13 +271,39 @@ export default function History() {
 const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
   container: { maxWidth: 980, margin: "0 auto" },
+
+  // ✅ changed topbar structure
   topbar: {
     maxWidth: 980,
     margin: "0 auto 12px auto",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+    display: "grid",
+    gap: 6,
   },
+  topRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  title: { fontSize: 18, fontWeight: 900 },
+
+  menu: {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+
+  subRow: {
+    display: "grid",
+    gap: 2,
+    fontSize: 12,
+    color: "#666",
+  },
+  email: { wordBreak: "break-word" },
+  roleLine: {},
+
   link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
   linkBtn: {
     background: "transparent",
@@ -315,6 +339,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    flexWrap: "wrap",
   },
   metrics: {
     display: "flex",
