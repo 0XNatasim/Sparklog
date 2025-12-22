@@ -6,9 +6,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
 
 function badgeStyle(status) {
-  if (status === "saved") return { background: "#1565c0", color: "#fff" }; // blue
-  if (status === "submitted") return { background: "#4caf50", color: "#fff" }; // green
-  if (status === "approved") return { background: "#111", color: "#fff" }; // black
+  if (status === "saved") return { background: "#1565c0", color: "#fff" };
+  if (status === "submitted") return { background: "#4caf50", color: "#fff" };
+  if (status === "approved") return { background: "#111", color: "#fff" };
   return { background: "#eee", color: "#111" };
 }
 
@@ -72,10 +72,10 @@ export default function ManagerDashboard() {
 
       if (jobErr) throw jobErr;
 
-      // ✅ include phone so manager can see it when selecting an employee
+      // ✅ include phone + email if you store it in profiles (recommended)
       const { data: profileRows, error: profErr } = await supabase
         .from("profiles")
-        .select("id, role, full_name, phone");
+        .select("id, role, full_name, phone, email");
 
       if (profErr) throw profErr;
 
@@ -85,7 +85,7 @@ export default function ManagerDashboard() {
       setProfiles(m);
       setJobs(jobRows || []);
     } catch (e) {
-      setErr(e?.message || "Failed to load dashboard.");
+      setErr(e?.message || "Failed to load manager.");
     } finally {
       setLoading(false);
     }
@@ -128,8 +128,16 @@ export default function ManagerDashboard() {
       const electrician = profiles.get(j.user_id);
       const electricianName = electrician?.full_name || "";
       const electricianPhone = electrician?.phone || "";
+      const electricianEmail = electrician?.email || "";
 
-      const haystack = [j.ot || "", j.job_date || "", j.status || "", electricianName, electricianPhone]
+      const haystack = [
+        j.ot || "",
+        j.job_date || "",
+        j.status || "",
+        electricianName,
+        electricianPhone,
+        electricianEmail,
+      ]
         .join(" ")
         .toLowerCase();
 
@@ -153,20 +161,13 @@ export default function ManagerDashboard() {
 
   const selectedEmployee = useMemo(() => {
     if (employeeId === "all") return null;
-    return profiles.get(employeeId) || null;
+    const p = profiles.get(employeeId);
+    const name = p?.full_name || `User ${String(employeeId).slice(0, 8)}…`;
+    const phone = p?.phone || "";
+    const email = p?.email || "";
+    return { id: employeeId, name, phone, email };
   }, [employeeId, profiles]);
 
-  const selectedEmployeeName = useMemo(() => {
-    if (!selectedEmployee) return null;
-    return selectedEmployee?.full_name || `User ${String(employeeId).slice(0, 8)}…`;
-  }, [selectedEmployee, employeeId]);
-
-  const selectedEmployeePhone = useMemo(() => {
-    if (!selectedEmployee) return null;
-    return selectedEmployee?.phone || null;
-  }, [selectedEmployee]);
-
-  // ✅ Approve flow (export FIRST then approve)
   async function approve(jobId) {
     setActionLoadingId(jobId);
     setErr("");
@@ -181,9 +182,7 @@ export default function ManagerDashboard() {
 
       const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
         body: { job_id: jobId },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
       if (fnErr) throw fnErr;
@@ -211,25 +210,24 @@ export default function ManagerDashboard() {
     const electrician = profiles.get(j.user_id);
     const electricianName = electrician?.full_name || `User ${String(j.user_id).slice(0, 8)}…`;
 
-    // total depart->fin (no seconds)
+    // total depart->fin
     const d1 = makeDayjsFromJob(j.job_date, j.depart);
     const d2 = makeDayjsFromJob(j.job_date, j.fin);
     const totalHours = hoursBetween(d1, d2);
     const totalLabel = formatHours(totalHours);
     const kmLabel = j.km_aller ?? 0;
 
-    // Updated: no seconds
     const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
 
-    // ✅ Approve only if submitted
     const canApprove = j.status === "submitted";
 
     return (
       <div key={j.id} style={styles.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <div style={{ display: "grid", gap: 6, width: "100%" }}>
-            <div style={styles.headerRow}>
-              <div style={{ fontWeight: 900, fontSize: 15 }}>
+        {/* Header row (responsive) */}
+        <div style={styles.cardTop}>
+          <div style={{ minWidth: 0 }}>
+            <div style={styles.otLine}>
+              <div style={styles.otTitle}>
                 OT: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
               </div>
 
@@ -243,16 +241,16 @@ export default function ManagerDashboard() {
               </div>
             </div>
 
-            <div style={{ color: "#555", fontSize: 13 }}>
+            <div style={styles.subLine}>
               Electrician: <b>{electricianName}</b>
             </div>
 
-            <div style={{ color: "#555", fontSize: 13 }}>
+            <div style={styles.subLine}>
               Depart: {fmtTimeHHmm(j.depart)} • Arrival: {fmtTimeHHmm(j.arrivee)} • End: {fmtTimeHHmm(j.fin)}
             </div>
           </div>
 
-          <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
+          <div style={styles.cardRight}>
             <span style={{ ...styles.badge, ...badgeStyle(j.status) }}>{j.status}</span>
 
             {canApprove && (
@@ -260,19 +258,18 @@ export default function ManagerDashboard() {
                 disabled={actionLoadingId === j.id}
                 onClick={() => approve(j.id)}
                 style={styles.primaryBtn}
-                title="Approve (export first)"
               >
                 {actionLoadingId === j.id ? "Working…" : "Approve"}
               </button>
             )}
 
-            <div style={{ fontSize: 12, color: "#666" }}>
+            <div style={styles.lockLine}>
               Locked: <b>{j.locked ? "true" : "false"}</b>
             </div>
           </div>
         </div>
 
-        <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>Updated: {updatedLabel}</div>
+        <div style={styles.updatedLine}>Updated: {updatedLabel}</div>
       </div>
     );
   }
@@ -280,12 +277,12 @@ export default function ManagerDashboard() {
   return (
     <div style={styles.page}>
       <div style={styles.topbar}>
-        <div>
+        <div style={styles.brandBlock}>
           <div style={{ fontSize: 18, fontWeight: 900 }}>Manager</div>
           <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={styles.nav}>
           <Link to="/" style={styles.link}>
             Form
           </Link>
@@ -303,7 +300,7 @@ export default function ManagerDashboard() {
 
       <div style={styles.container}>
         <div style={styles.filtersCard}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          <div style={styles.pillsRow}>
             <div style={styles.pill}>
               All: <b>{counts.all}</b>
             </div>
@@ -318,14 +315,8 @@ export default function ManagerDashboard() {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "260px 200px 1fr",
-              gap: 10,
-              marginTop: 12,
-            }}
-          >
+          {/* Responsive filters grid */}
+          <div style={styles.filtersGrid}>
             <select
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
@@ -360,25 +351,19 @@ export default function ManagerDashboard() {
             />
           </div>
 
-          {employeeId !== "all" && (
-            <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          {selectedEmployee && (
+            <div style={styles.selectedRow}>
               <div style={{ fontSize: 13, color: "#555" }}>
-                Selected electrician: <b>{selectedEmployeeName}</b>
-                {selectedEmployeePhone ? (
+                Selected electrician: <b>{selectedEmployee.name}</b>
+                {selectedEmployee.phone ? (
                   <>
                     {" "}
-                    • Phone: <b>{selectedEmployeePhone}</b>
+                    • Phone: <b>{selectedEmployee.phone}</b>
                   </>
-                ) : (
-                  <>
-                    {" "}
-                    • Phone: <b>—</b>
-                  </>
-                )}
+                ) : null}
               </div>
 
-              {/* ✅ bouton Week visible seulement quand un employé est sélectionné */}
-              <Link to={`/week?employee=${employeeId}`} style={styles.weekBtn}>
+              <Link to={`/week?employee=${selectedEmployee.id}`} style={styles.weekBtn}>
                 Week
               </Link>
             </div>
@@ -427,13 +412,27 @@ export default function ManagerDashboard() {
 const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
   container: { maxWidth: 1100, margin: "0 auto" },
+
+  // ✅ Topbar responsive
   topbar: {
     maxWidth: 1100,
     margin: "0 auto 12px auto",
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap", // key for mobile
   },
+  brandBlock: { display: "grid", gap: 2 },
+
+  nav: {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap", // key
+    justifyContent: "flex-end",
+  },
+
   link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
 
   filtersCard: {
@@ -444,6 +443,13 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
     marginBottom: 10,
   },
+
+  pillsRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 10,
+    alignItems: "center",
+  },
   pill: {
     background: "#f5f5f5",
     border: "1px solid #eee",
@@ -452,6 +458,15 @@ const styles = {
     fontSize: 12,
     color: "#111",
   },
+
+  // ✅ Filters responsive: 1 column on mobile automatically
+  filtersGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 10,
+    marginTop: 12,
+  },
+
   select: {
     border: "1px solid #eee",
     borderRadius: 10,
@@ -459,6 +474,7 @@ const styles = {
     fontSize: 14,
     outline: "none",
     background: "#fff",
+    width: "100%",
   },
   input: {
     border: "1px solid #eee",
@@ -466,6 +482,16 @@ const styles = {
     padding: "10px 12px",
     fontSize: 14,
     outline: "none",
+    width: "100%",
+  },
+
+  selectedRow: {
+    marginTop: 10,
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
 
   weekBtn: {
@@ -479,9 +505,95 @@ const styles = {
     display: "inline-block",
   },
 
+  // ✅ Cards responsive layout
+  card: {
+    background: "#fff",
+    border: "1px solid #eee",
+    borderRadius: 14,
+    padding: 14,
+    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+  },
+
+  cardTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap", // key
+    alignItems: "flex-start",
+  },
+
+  otLine: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
+  otTitle: { fontWeight: 900, fontSize: 15 },
+
+  metrics: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  metricPill: {
+    fontSize: 12,
+    color: "#111",
+    background: "#f5f5f5",
+    border: "1px solid #eee",
+    borderRadius: 999,
+    padding: "4px 8px",
+    whiteSpace: "nowrap",
+  },
+
+  subLine: { color: "#555", fontSize: 13 },
+
+  cardRight: {
+    display: "grid",
+    justifyItems: "end",
+    gap: 8,
+    marginLeft: "auto",
+  },
+
+  lockLine: { fontSize: 12, color: "#666" },
+
+  updatedLine: { marginTop: 10, fontSize: 12, color: "#666" },
+
+  badge: {
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontWeight: 900,
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+
+  primaryBtn: {
+    background: "#1565c0",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 13,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  secondaryBtn: {
+    background: "#f5f5f5",
+    color: "#111",
+    border: "1px solid #eee",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 13,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
   twoCol: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
     gap: 12,
     alignItems: "start",
   },
@@ -514,64 +626,6 @@ const styles = {
     color: "#666",
   },
 
-  card: {
-    background: "#fff",
-    border: "1px solid #eee",
-    borderRadius: 14,
-    padding: 14,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
-  },
-
-  headerRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  metrics: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-  metricPill: {
-    fontSize: 12,
-    color: "#111",
-    background: "#f5f5f5",
-    border: "1px solid #eee",
-    borderRadius: 999,
-    padding: "4px 8px",
-    whiteSpace: "nowrap",
-  },
-
-  badge: {
-    padding: "6px 10px",
-    borderRadius: 999,
-    fontWeight: 900,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  primaryBtn: {
-    background: "#1565c0",
-    color: "#fff",
-    border: "none",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  secondaryBtn: {
-    background: "#f5f5f5",
-    color: "#111",
-    border: "1px solid #eee",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
   error: {
     marginBottom: 10,
     background: "rgba(220,20,60,0.08)",
