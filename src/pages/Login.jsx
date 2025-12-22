@@ -7,7 +7,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
 
-  const [mode, setMode] = useState("login"); // login | signup
+  const [mode, setMode] = useState("login"); // "login" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -25,49 +25,43 @@ export default function Login() {
     }
   }, [user, role, navigate]);
 
-  function normalizePhoneToE164(raw) {
-    // Goal: store phone as E.164 (+15145551234). Keep it simple but consistent.
-    // Accept inputs like:
-    //  - +1 514 555 1234
-    //  - (514) 555-1234
-    //  - 1-514-555-1234
-    //  - 5145551234  (assume Canada/US +1)
-    const s = String(raw || "").trim();
-    if (!s) return "";
-
-    // Keep digits and leading '+'
-    const hasPlus = s.startsWith("+");
-    const digits = s.replace(/[^\d]/g, "");
-    if (!digits) return "";
-
-    // If user typed +, trust they included country code
-    if (hasPlus) return `+${digits}`;
-
-    // If 11 digits starting with 1, treat as +1XXXXXXXXXX
-    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-
-    // If 10 digits, assume +1
-    if (digits.length === 10) return `+1${digits}`;
-
-    // Otherwise, return digits as-is (still better than random formatting),
-    // but ideally you'd enforce E.164 in UI/validation.
-    return `+${digits}`;
-  }
-
   const canSubmit = useMemo(() => {
     if (!email.trim() || !password) return false;
+    if (isSignup && fullName.trim().length < 2) return false;
 
-    if (isSignup) {
-      if (fullName.trim().length < 2) return false;
-
-      // Require phone on signup (recommended since you explicitly added it)
-      const phoneE164 = normalizePhoneToE164(phone);
-      // minimal sanity: + + 11..15 digits (E.164 max is 15)
-      if (!/^\+\d{11,15}$/.test(phoneE164)) return false;
-    }
+    // Phone optional; if you want it required, uncomment:
+    // if (isSignup && phone.trim().length < 7) return false;
 
     return true;
   }, [email, password, fullName, phone, isSignup]);
+
+  function normalizePhone(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+
+    // keep: +, digits, space, dash, parentheses
+    // (light normalization; you can make stricter later)
+    return s;
+  }
+
+  async function ensureProfile(userId, name, phoneRaw, emailValue) {
+    const phoneNorm = normalizePhone(phoneRaw);
+
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        id: userId,
+        full_name: name || null,
+        phone: phoneNorm || null,
+        email: emailValue || null, // ✅ store email in profiles
+        role: "electrician",
+      },
+      { onConflict: "id" }
+    );
+
+    if (error) {
+      console.warn("[Login] ensureProfile error:", error);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -75,29 +69,27 @@ export default function Login() {
     if (!canSubmit) return;
 
     setLoading(true);
-
     try {
       if (isSignup) {
-        const phoneE164 = normalizePhoneToE164(phone);
-
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: {
-            // ✅ This is the important part:
-            // store phone/full_name/role in user_metadata so your DB trigger can copy to profiles
-            data: {
-              full_name: fullName.trim(),
-              phone: phoneE164,
-              role: "electrician",
-            },
-          },
         });
-
         if (error) throw error;
 
-        // If email confirmation is enabled, session can be null until confirmed.
-        // Do NOT upsert profiles here — let the trigger handle it reliably.
+        const createdUser = data?.user;
+
+        // ✅ Create/Upsert profile immediately (even if email confirmation is enabled)
+        if (createdUser?.id) {
+          await ensureProfile(
+            createdUser.id,
+            fullName.trim(),
+            phone,
+            createdUser.email || email.trim()
+          );
+        }
+
+        // If email confirmation is enabled, session is null until user confirms.
         if (!data?.session) {
           setErrorMsg("Signup successful. Check your email to confirm, then log in.");
           setMode("login");
@@ -113,7 +105,7 @@ export default function Login() {
         if (error) throw error;
       }
 
-      // AuthContext will redirect
+      // AuthContext will redirect after session updates.
     } catch (err) {
       setErrorMsg(err?.message || "Authentication failed.");
     } finally {
@@ -152,10 +144,6 @@ export default function Login() {
                   placeholder="e.g., +1 514 555 1234"
                   autoComplete="tel"
                 />
-                <div style={styles.helper}>
-                  Format saved as:{" "}
-                  <b>{phone ? normalizePhoneToE164(phone) : "—"}</b>
-                </div>
               </label>
             </>
           )}
@@ -192,7 +180,10 @@ export default function Login() {
 
           <button
             type="button"
-            onClick={() => setMode(isSignup ? "login" : "signup")}
+            onClick={() => {
+              setErrorMsg("");
+              setMode(isSignup ? "login" : "signup");
+            }}
             style={styles.linkBtn}
           >
             {isSignup ? "Already have an account? Log in" : "No account? Sign up"}
@@ -221,7 +212,6 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
   label: { display: "grid", gap: 6, fontSize: 13, color: "#555" },
-  helper: { fontSize: 12, color: "#777" },
   input: {
     border: "1px solid #eee",
     borderRadius: 10,

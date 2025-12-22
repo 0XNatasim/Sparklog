@@ -29,7 +29,7 @@ function makeDayjsFromJob(job_date, timeStr) {
 
 function toHHmmLabelFromFormatHours(formatHoursResult) {
   // formatHoursResult is a string like "2.75" (per your current lib)
-  // We convert "2.75" => 2h45
+  // Convert "2.75" => 2h45
   const num = Number(String(formatHoursResult).replace(",", "."));
   if (!Number.isFinite(num) || num <= 0) return "0h00";
   const totalMinutes = Math.round(num * 60);
@@ -50,9 +50,12 @@ export default function History() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   async function load() {
     setErr("");
+    setInfo("");
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -89,13 +92,50 @@ export default function History() {
 
   const formPath = role === "manager" ? "/manager" : "/";
 
+  // ✅ Electrician OPEN = navigate to form edit mode (only for saved & unlocked)
+  function openJob(job) {
+    // Your ElectricianForm already supports ?edit=<job_uuid>
+    navigate(`/?edit=${job.id}`);
+  }
+
+  // ✅ Electrician DELETE (only for saved & unlocked)
+  async function deleteJob(jobId) {
+    const ok = window.confirm("Delete this job? This cannot be undone.");
+    if (!ok) return;
+
+    setActionLoadingId(jobId);
+    setErr("");
+    setInfo("");
+
+    try {
+      const { error } = await supabase.from("jobs").delete().eq("id", jobId);
+      if (error) throw error;
+
+      setInfo("Job deleted.");
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Delete failed.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  function canOpen(job) {
+    // Only electricians can open/edit; must be saved and not locked
+    return role !== "manager" && job.status === "saved" && job.locked === false;
+  }
+
+  function canDelete(job) {
+    // Same rule as open (safe + prevents deleting submitted/approved)
+    return role !== "manager" && job.status === "saved" && job.locked === false;
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.topbar}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 900 }}>History</div>
 
-          {/* ✅ email line */}
           <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
 
           {/* ✅ role UNDER email (mobile-friendly) */}
@@ -128,6 +168,7 @@ export default function History() {
       <div style={styles.container}>
         {loading && <div style={styles.card}>Loading…</div>}
         {err && <div style={styles.error}>{err}</div>}
+        {info && <div style={styles.info}>{info}</div>}
 
         {!loading && !err && grouped.length === 0 && <div style={styles.card}>No jobs yet.</div>}
 
@@ -145,13 +186,16 @@ export default function History() {
                   const d2 = makeDayjsFromJob(j.job_date, j.fin);
                   const totalHours = hoursBetween(d1, d2);
 
-                  // keep your lib but display as hhmm (2h45)
                   const totalLabelRaw = formatHours(totalHours);
                   const totalHHmm = toHHmmLabelFromFormatHours(totalLabelRaw);
 
                   const kmLabel = j.km_aller ?? 0;
 
                   const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
+
+                  const showOpen = canOpen(j);
+                  const showDelete = canDelete(j);
+                  const busy = actionLoadingId === j.id;
 
                   return (
                     <div key={j.id} style={styles.card}>
@@ -178,6 +222,36 @@ export default function History() {
 
                         <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
                           <span style={{ ...styles.badge, ...badgeStyle(j.status) }}>{j.status}</span>
+
+                          {/* ✅ Open + Delete actions (electrician only, saved & unlocked) */}
+                          {(showOpen || showDelete) && (
+                            <div style={{ display: "flex", gap: 8 }}>
+                              {showOpen && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => openJob(j)}
+                                  style={styles.openBtn}
+                                  title="Open this saved job to edit"
+                                  type="button"
+                                >
+                                  {busy ? "…" : "OPEN"}
+                                </button>
+                              )}
+
+                              {showDelete && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => deleteJob(j.id)}
+                                  style={styles.deleteBtn}
+                                  title="Delete this saved job"
+                                  type="button"
+                                >
+                                  {busy ? "…" : "DELETE"}
+                                </button>
+                              )}
+                            </div>
+                          )}
+
                           <div style={{ fontSize: 12, color: "#666" }}>
                             Locked: <b>{j.locked ? "true" : "false"}</b>
                           </div>
@@ -267,6 +341,27 @@ const styles = {
     letterSpacing: 0.3,
   },
 
+  openBtn: {
+    background: "#f5f5f5",
+    color: "#111",
+    border: "1px solid #eee",
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  deleteBtn: {
+    background: "rgba(220,20,60,0.10)",
+    color: "crimson",
+    border: "1px solid rgba(220,20,60,0.25)",
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
   secondaryBtn: {
     background: "#f5f5f5",
     color: "#111",
@@ -277,11 +372,21 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   error: {
     marginBottom: 10,
     background: "rgba(220,20,60,0.08)",
     border: "1px solid rgba(220,20,60,0.2)",
     color: "crimson",
+    padding: 10,
+    borderRadius: 10,
+    fontSize: 13,
+  },
+  info: {
+    marginBottom: 10,
+    background: "rgba(21,101,192,0.08)",
+    border: "1px solid rgba(21,101,192,0.2)",
+    color: "#0d47a1",
     padding: 10,
     borderRadius: 10,
     fontSize: 13,
