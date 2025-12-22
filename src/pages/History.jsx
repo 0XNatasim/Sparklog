@@ -1,3 +1,4 @@
+// src/pages/History.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -17,13 +18,29 @@ function badgeStyle(status) {
 
 function fmtTimeHHmm(t) {
   if (!t) return "—";
-  return String(t).slice(0, 5); // HH:mm
+  return String(t).slice(0, 5);
 }
 
 function makeDayjsFromJob(job_date, timeStr) {
   if (!job_date || !timeStr) return null;
   const d = dayjs(`${job_date}T${timeStr}`);
   return d.isValid() ? d : null;
+}
+
+function toHHmmLabelFromFormatHours(formatHoursResult) {
+  // formatHoursResult is a string like "2.75" (per your current lib)
+  // We convert "2.75" => 2h45
+  const num = Number(String(formatHoursResult).replace(",", "."));
+  if (!Number.isFinite(num) || num <= 0) return "0h00";
+  const totalMinutes = Math.round(num * 60);
+  const hh = Math.floor(totalMinutes / 60);
+  const mm = totalMinutes % 60;
+  return `${hh}h${String(mm).padStart(2, "0")}`;
+}
+
+function fmtRoleLabel(role) {
+  if (!role) return "—";
+  return String(role);
 }
 
 export default function History() {
@@ -33,12 +50,9 @@ export default function History() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [info, setInfo] = useState("");
-  const [actionId, setActionId] = useState(null);
 
   async function load() {
     setErr("");
-    setInfo("");
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -75,57 +89,30 @@ export default function History() {
 
   const formPath = role === "manager" ? "/manager" : "/";
 
-  function openJob(jobId) {
-    navigate(`/?edit=${jobId}`);
-  }
-
-  async function deleteJob(jobId, otLabel) {
-    const ok = window.confirm(
-      `Delete this SAVED job?\n\nOT: ${otLabel}\n\nThis cannot be undone.`
-    );
-    if (!ok) return;
-
-    setActionId(jobId);
-    setErr("");
-    setInfo("");
-
-    try {
-      const { error } = await supabase.from("jobs").delete().eq("id", jobId);
-      if (error) throw error;
-
-      setInfo("Job deleted.");
-      await load();
-    } catch (e) {
-      setErr(e?.message || "Delete failed.");
-    } finally {
-      setActionId(null);
-    }
-  }
-
   return (
     <div style={styles.page}>
       <div style={styles.topbar}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 900 }}>History</div>
+
+          {/* ✅ email line */}
           <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
+
+          {/* ✅ role UNDER email (mobile-friendly) */}
+          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+            Role: <b>{fmtRoleLabel(role)}</b>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {/* Form */}
-          <button
-            onClick={() => navigate(formPath)}
-            style={styles.linkBtn}
-            type="button"
-          >
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button onClick={() => navigate(formPath)} style={styles.linkBtn} type="button">
             Form
           </button>
 
-          {/* Week */}
           <Link to="/week" style={styles.link}>
             Week
           </Link>
 
-          {/* Manager */}
           {role === "manager" && (
             <Link to="/manager" style={styles.link}>
               Manager
@@ -141,11 +128,8 @@ export default function History() {
       <div style={styles.container}>
         {loading && <div style={styles.card}>Loading…</div>}
         {err && <div style={styles.error}>{err}</div>}
-        {info && <div style={styles.info}>{info}</div>}
 
-        {!loading && !err && grouped.length === 0 && (
-          <div style={styles.card}>No jobs yet.</div>
-        )}
+        {!loading && !err && grouped.length === 0 && <div style={styles.card}>No jobs yet.</div>}
 
         {!loading &&
           !err &&
@@ -160,14 +144,14 @@ export default function History() {
                   const d1 = makeDayjsFromJob(j.job_date, j.depart);
                   const d2 = makeDayjsFromJob(j.job_date, j.fin);
                   const totalHours = hoursBetween(d1, d2);
-                  const totalLabel = formatHours(totalHours);
+
+                  // keep your lib but display as hhmm (2h45)
+                  const totalLabelRaw = formatHours(totalHours);
+                  const totalHHmm = toHHmmLabelFromFormatHours(totalLabelRaw);
+
                   const kmLabel = j.km_aller ?? 0;
 
-                  const updatedLabel = j.updated_at
-                    ? dayjs(j.updated_at).format("DD MMM HH:mm")
-                    : "—";
-
-                  const isSaved = j.status === "saved" && j.locked === false;
+                  const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
 
                   return (
                     <div key={j.id} style={styles.card}>
@@ -178,7 +162,7 @@ export default function History() {
 
                             <div style={styles.metrics}>
                               <span style={styles.metricPill}>
-                                Total: <b>{totalLabel}</b> h
+                                Total: <b>{totalHHmm}</b>
                               </span>
                               <span style={styles.metricPill}>
                                 KM: <b>{kmLabel}</b>
@@ -190,29 +174,6 @@ export default function History() {
                             Depart: {fmtTimeHHmm(j.depart)} • Arrival: {fmtTimeHHmm(j.arrivee)} • End:{" "}
                             {fmtTimeHHmm(j.fin)}
                           </div>
-
-                          {/* Actions for SAVED only */}
-                          {isSaved && (
-                            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                              <button
-                                onClick={() => openJob(j.id)}
-                                style={styles.primaryBtn}
-                                disabled={actionId === j.id}
-                                title="Open this job in the form to edit"
-                              >
-                                OPEN
-                              </button>
-
-                              <button
-                                onClick={() => deleteJob(j.id, j.ot)}
-                                style={styles.dangerBtn}
-                                disabled={actionId === j.id}
-                                title="Delete this saved job"
-                              >
-                                {actionId === j.id ? "Deleting…" : "DELETE"}
-                              </button>
-                            </div>
-                          )}
                         </div>
 
                         <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
@@ -223,9 +184,7 @@ export default function History() {
                         </div>
                       </div>
 
-                      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-                        Updated: {updatedLabel}
-                      </div>
+                      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>Updated: {updatedLabel}</div>
                     </div>
                   );
                 })}
@@ -240,7 +199,6 @@ export default function History() {
 const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
   container: { maxWidth: 980, margin: "0 auto" },
-
   topbar: {
     maxWidth: 980,
     margin: "0 auto 12px auto",
@@ -248,7 +206,6 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
   linkBtn: {
     background: "transparent",
@@ -285,14 +242,12 @@ const styles = {
     justifyContent: "space-between",
     gap: 12,
   },
-
   metrics: {
     display: "flex",
     gap: 8,
     flexWrap: "wrap",
     justifyContent: "flex-end",
   },
-
   metricPill: {
     fontSize: 12,
     color: "#111",
@@ -312,28 +267,6 @@ const styles = {
     letterSpacing: 0.3,
   },
 
-  primaryBtn: {
-    background: "#1565c0",
-    color: "#fff",
-    border: "none",
-    borderRadius: 10,
-    padding: "8px 12px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-
-  dangerBtn: {
-    background: "crimson",
-    color: "#fff",
-    border: "none",
-    borderRadius: 10,
-    padding: "8px 12px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-
   secondaryBtn: {
     background: "#f5f5f5",
     color: "#111",
@@ -344,22 +277,11 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
-
   error: {
     marginBottom: 10,
     background: "rgba(220,20,60,0.08)",
     border: "1px solid rgba(220,20,60,0.2)",
     color: "crimson",
-    padding: 10,
-    borderRadius: 10,
-    fontSize: 13,
-  },
-
-  info: {
-    marginBottom: 10,
-    background: "rgba(76,175,80,0.10)",
-    border: "1px solid rgba(76,175,80,0.25)",
-    color: "#2e7d32",
     padding: 10,
     borderRadius: 10,
     fontSize: 13,

@@ -72,9 +72,10 @@ export default function ManagerDashboard() {
 
       if (jobErr) throw jobErr;
 
+      // ✅ include phone so manager can see it when selecting an employee
       const { data: profileRows, error: profErr } = await supabase
         .from("profiles")
-        .select("id, role, full_name");
+        .select("id, role, full_name, phone");
 
       if (profErr) throw profErr;
 
@@ -126,8 +127,9 @@ export default function ManagerDashboard() {
 
       const electrician = profiles.get(j.user_id);
       const electricianName = electrician?.full_name || "";
+      const electricianPhone = electrician?.phone || "";
 
-      const haystack = [j.ot || "", j.job_date || "", j.status || "", electricianName]
+      const haystack = [j.ot || "", j.job_date || "", j.status || "", electricianName, electricianPhone]
         .join(" ")
         .toLowerCase();
 
@@ -149,53 +151,61 @@ export default function ManagerDashboard() {
     return { saved, submitted };
   }, [filtered, employeeId]);
 
-  const selectedEmployeeName = useMemo(() => {
+  const selectedEmployee = useMemo(() => {
     if (employeeId === "all") return null;
-    const p = profiles.get(employeeId);
-    return p?.full_name || `User ${String(employeeId).slice(0, 8)}…`;
+    return profiles.get(employeeId) || null;
   }, [employeeId, profiles]);
+
+  const selectedEmployeeName = useMemo(() => {
+    if (!selectedEmployee) return null;
+    return selectedEmployee?.full_name || `User ${String(employeeId).slice(0, 8)}…`;
+  }, [selectedEmployee, employeeId]);
+
+  const selectedEmployeePhone = useMemo(() => {
+    if (!selectedEmployee) return null;
+    return selectedEmployee?.phone || null;
+  }, [selectedEmployee]);
 
   // ✅ Approve flow (export FIRST then approve)
   async function approve(jobId) {
-  setActionLoadingId(jobId);
-  setErr("");
-  setInfo("");
+    setActionLoadingId(jobId);
+    setErr("");
+    setInfo("");
 
-  try {
-    const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
-    if (sessErr) throw sessErr;
+    try {
+      const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+      if (sessErr) throw sessErr;
 
-    const accessToken = sessionData?.session?.access_token;
-    if (!accessToken) throw new Error("No session token (manager). Please re-login.");
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("No session token (manager). Please re-login.");
 
-    const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
-      body: { job_id: jobId },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+      const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
+        body: { job_id: jobId },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-    if (fnErr) throw fnErr;
-    if (data?.ok !== true && !data?.skipped) {
-      throw new Error(data?.error || "Export to Google Sheet failed.");
+      if (fnErr) throw fnErr;
+      if (data?.ok !== true && !data?.skipped) {
+        throw new Error(data?.error || "Export to Google Sheet failed.");
+      }
+
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: "approved", locked: true })
+        .eq("id", jobId);
+
+      if (error) throw error;
+
+      setInfo(data?.skipped ? "Approved. Export skipped (already exported)." : "Approved and exported.");
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Approve failed.");
+    } finally {
+      setActionLoadingId(null);
     }
-
-    const { error } = await supabase
-      .from("jobs")
-      .update({ status: "approved", locked: true })
-      .eq("id", jobId);
-
-    if (error) throw error;
-
-    setInfo(data?.skipped ? "Approved. Export skipped (already exported)." : "Approved and exported.");
-    await load();
-  } catch (e) {
-    setErr(e?.message || "Approve failed.");
-  } finally {
-    setActionLoadingId(null);
   }
-}
-
 
   function renderJobCard(j) {
     const electrician = profiles.get(j.user_id);
@@ -205,7 +215,7 @@ export default function ManagerDashboard() {
     const d1 = makeDayjsFromJob(j.job_date, j.depart);
     const d2 = makeDayjsFromJob(j.job_date, j.fin);
     const totalHours = hoursBetween(d1, d2);
-    const totalLabel = formatHours(totalHours); // e.g. "2.50" (selon ton lib)
+    const totalLabel = formatHours(totalHours);
     const kmLabel = j.km_aller ?? 0;
 
     // Updated: no seconds
@@ -274,12 +284,16 @@ export default function ManagerDashboard() {
           <div style={{ fontSize: 18, fontWeight: 900 }}>Manager</div>
           <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
         </div>
+
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link to="/manager" style={styles.link}>
-            Manager
+          <Link to="/" style={styles.link}>
+            Form
           </Link>
           <Link to="/history" style={styles.link}>
             History
+          </Link>
+          <Link to="/manager" style={styles.link}>
+            Manager
           </Link>
           <button onClick={signOut} style={styles.secondaryBtn}>
             Logout
@@ -350,6 +364,17 @@ export default function ManagerDashboard() {
             <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <div style={{ fontSize: 13, color: "#555" }}>
                 Selected electrician: <b>{selectedEmployeeName}</b>
+                {selectedEmployeePhone ? (
+                  <>
+                    {" "}
+                    • Phone: <b>{selectedEmployeePhone}</b>
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    • Phone: <b>—</b>
+                  </>
+                )}
               </div>
 
               {/* ✅ bouton Week visible seulement quand un employé est sélectionné */}

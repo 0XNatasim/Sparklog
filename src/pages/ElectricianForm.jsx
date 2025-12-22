@@ -1,3 +1,4 @@
+// src/pages/ElectricianForm.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -9,38 +10,21 @@ import { TextField } from "@mui/material";
 
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { hoursBetween } from "../lib/time";
 
-// ✅ minutes between two dayjs times
-function minutesBetween(start, end) {
-  if (!start || !end) return null;
-  const s = dayjs(start);
-  const e = dayjs(end);
-  if (!s.isValid() || !e.isValid()) return null;
-
-  // If end < start (rare), treat as invalid
-  const diff = e.diff(s, "minute");
-  if (diff < 0) return null;
-  return diff;
+function fmtRoleLabel(role) {
+  if (!role) return "—";
+  return String(role);
 }
 
-function disableMinutesNotQuarter(value, view) {
-  if (view === "minutes") {
-    return value % 15 !== 0;
-  }
-  return false;
-}
-
-// ✅ format minutes as H.MM (minutes base-60)
-function formatHoursMinutesDecimal(totalMinutes) {
-  if (totalMinutes === null || totalMinutes === undefined) return "—";
-  if (!Number.isFinite(totalMinutes)) return "—";
-
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-
-  // always 2 digits for minutes
-  const mm = String(mins).padStart(2, "0");
-  return `${hours}.${mm}`;
+function toHHmmFromHoursDecimal(hoursDecimal) {
+  // hoursDecimal like 2.75 => "2h45"
+  const h = Number(hoursDecimal);
+  if (!Number.isFinite(h) || h <= 0) return "0h00";
+  const totalMinutes = Math.round(h * 60);
+  const hh = Math.floor(totalMinutes / 60);
+  const mm = totalMinutes % 60;
+  return `${hh}h${String(mm).padStart(2, "0")}`;
 }
 
 export default function ElectricianForm() {
@@ -54,22 +38,20 @@ export default function ElectricianForm() {
   const [depart, setDepart] = useState(null);
   const [arrivee, setArrivee] = useState(null);
   const [fin, setFin] = useState(null);
-
-  // ✅ KM empty by default
-  const [km, setKm] = useState(""); // string, so it can be ""
+  const [km, setKm] = useState(""); // ✅ empty by default
 
   const [loadedJob, setLoadedJob] = useState(null);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
-  // ✅ duration in minutes
-  const totalMinutes = useMemo(() => minutesBetween(depart, fin), [depart, fin]);
-
   const isEditing = Boolean(editId);
-  const isDraftEditable = loadedJob
-    ? loadedJob.status === "saved" && loadedJob.locked === false
-    : true;
+  const isDraftEditable = loadedJob ? loadedJob.status === "saved" && loadedJob.locked === false : true;
+  const inputsDisabled = loading || (isEditing && !isDraftEditable);
+
+  // Calculate total hours between depart and fin
+  const hoursDecimal = useMemo(() => hoursBetween(depart, fin), [depart, fin]);
+  const hoursHHmm = useMemo(() => toHHmmFromHoursDecimal(hoursDecimal), [hoursDecimal]);
 
   const canSubmit = useMemo(() => {
     if (!jobDate || !dayjs(jobDate).isValid()) return false;
@@ -77,6 +59,7 @@ export default function ElectricianForm() {
     return true;
   }, [jobDate, ot]);
 
+  // Load job when editing
   useEffect(() => {
     let cancelled = false;
 
@@ -85,6 +68,7 @@ export default function ElectricianForm() {
         setLoadedJob(null);
         setMsg("");
         setErr("");
+        setKm("");
         return;
       }
 
@@ -92,13 +76,8 @@ export default function ElectricianForm() {
       setErr("");
       setMsg("");
       try {
-        const { data, error } = await supabase
-          .from("jobs")
-          .select("*")
-          .eq("id", editId)
-          .single();
+        const { data, error } = await supabase.from("jobs").select("*").eq("id", editId).single();
         if (error) throw error;
-
         if (cancelled) return;
 
         setLoadedJob(data);
@@ -109,12 +88,9 @@ export default function ElectricianForm() {
         setArrivee(data.arrivee ? dayjs(`${data.job_date}T${data.arrivee}`) : null);
         setFin(data.fin ? dayjs(`${data.job_date}T${data.fin}`) : null);
 
-        // ✅ keep KM empty if null/undefined/0? (here we keep exact value if present)
-        setKm(
-          data.km_aller === null || data.km_aller === undefined
-            ? ""
-            : String(data.km_aller)
-        );
+        // ✅ keep KM empty if null/0
+        const kmVal = data.km_aller ?? null;
+        setKm(kmVal ? String(kmVal) : "");
       } catch (e) {
         if (!cancelled) setErr(e?.message || "Failed to load draft.");
       } finally {
@@ -129,14 +105,6 @@ export default function ElectricianForm() {
   }, [editId]);
 
   function buildPayload(nextStatus) {
-    // ✅ convert km string -> int (or null)
-    const kmNum =
-      km === "" || km === null || km === undefined
-        ? null
-        : Number.isFinite(Number(km))
-        ? parseInt(km, 10)
-        : null;
-
     return {
       user_id: user.id,
       job_date: dayjs(jobDate).format("YYYY-MM-DD"),
@@ -144,7 +112,7 @@ export default function ElectricianForm() {
       depart: depart ? dayjs(depart).format("HH:mm:ss") : null,
       arrivee: arrivee ? dayjs(arrivee).format("HH:mm:ss") : null,
       fin: fin ? dayjs(fin).format("HH:mm:ss") : null,
-      km_aller: kmNum,
+      km_aller: km === "" ? null : Number.isFinite(Number(km)) ? parseInt(km, 10) : null,
       status: nextStatus,
       locked: nextStatus === "submitted",
     };
@@ -165,9 +133,7 @@ export default function ElectricianForm() {
         if (error) throw error;
         setMsg("Draft updated.");
       } else {
-        const { error } = await supabase
-          .from("jobs")
-          .upsert(payload, { onConflict: "user_id,job_date,ot" });
+        const { error } = await supabase.from("jobs").upsert(payload, { onConflict: "user_id,job_date,ot" });
         if (error) throw error;
         setMsg("Draft saved.");
       }
@@ -195,9 +161,7 @@ export default function ElectricianForm() {
         if (error) throw error;
         setMsg("Submitted for approval.");
       } else {
-        const { error } = await supabase
-          .from("jobs")
-          .upsert(payload, { onConflict: "user_id,job_date,ot" });
+        const { error } = await supabase.from("jobs").upsert(payload, { onConflict: "user_id,job_date,ot" });
         if (error) throw error;
         setMsg("Submitted for approval.");
       }
@@ -210,23 +174,39 @@ export default function ElectricianForm() {
     }
   }
 
-  const inputsDisabled = loading || (isEditing && !isDraftEditable);
-
   return (
     <div style={styles.page}>
       <div style={styles.topbar}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800 }}>SparkLog</div>
-          <div style={{ fontSize: 12, color: "#666" }}>
-            {fullName ? fullName : user?.email} • role: {role || "—"}
+
+          {/* ✅ email line */}
+          <div style={{ fontSize: 12, color: "#666" }}>{fullName ? fullName : user?.email}</div>
+
+          {/* ✅ role UNDER (mobile-friendly) */}
+          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+            Role: <b>{fmtRoleLabel(role)}</b>
           </div>
         </div>
+
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link to="/history" style={styles.link}>History</Link>
+          <Link to="/" style={styles.link}>
+            Form
+          </Link>
+          <Link to="/week" style={styles.link}>
+            Week
+          </Link>
+          <Link to="/history" style={styles.link}>
+            History
+          </Link>
           {role === "manager" && (
-            <Link to="/manager" style={styles.link}>Manager</Link>
+            <Link to="/manager" style={styles.link}>
+              Manager
+            </Link>
           )}
-          <button onClick={signOut} style={styles.secondaryBtn}>Logout</button>
+          <button onClick={signOut} style={styles.secondaryBtn}>
+            Logout
+          </button>
         </div>
       </div>
 
@@ -266,11 +246,11 @@ export default function ElectricianForm() {
               <div style={styles.field}>
                 <div style={styles.label}>Departure</div>
                 <TimePicker
-                 value={depart}
-                 onChange={(v) => setDepart(v)}
-                 minutesStep={15}
-                 shouldDisableTime={disableMinutesNotQuarter}
-                 slotProps={{ textField: { size: "small", fullWidth: true } }}
+                  value={depart}
+                  onChange={(v) => setDepart(v)}
+                  disabled={inputsDisabled}
+                  minutesStep={15} // ✅ 15 min only
+                  slotProps={{ textField: { size: "small", fullWidth: true } }}
                 />
               </div>
 
@@ -280,7 +260,7 @@ export default function ElectricianForm() {
                   value={arrivee}
                   onChange={(v) => setArrivee(v)}
                   disabled={inputsDisabled}
-                  minutesStep={15}   // ✅ 15-min increments
+                  minutesStep={15} // ✅ 15 min only
                   slotProps={{ textField: { size: "small", fullWidth: true } }}
                 />
               </div>
@@ -291,7 +271,7 @@ export default function ElectricianForm() {
                   value={fin}
                   onChange={(v) => setFin(v)}
                   disabled={inputsDisabled}
-                  minutesStep={15}   // ✅ 15-min increments
+                  minutesStep={15} // ✅ 15 min only
                   slotProps={{ textField: { size: "small", fullWidth: true } }}
                 />
               </div>
@@ -307,15 +287,13 @@ export default function ElectricianForm() {
                 onChange={(e) => setKm(e.target.value)}
                 disabled={inputsDisabled}
                 inputProps={{ min: 0 }}
-                placeholder="" // ✅ empty look
+                placeholder=""
               />
             </div>
 
             <div style={styles.field}>
               <div style={styles.label}>Calculated hours</div>
-              <div style={styles.hoursBox}>
-                {formatHoursMinutesDecimal(totalMinutes)} h
-              </div>
+              <div style={styles.hoursBox}>{hoursHHmm}</div>
             </div>
           </div>
         </LocalizationProvider>
@@ -343,7 +321,7 @@ const styles = {
     margin: "0 auto 12px auto",
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center"
+    alignItems: "center",
   },
   link: { color: "#1565c0", fontWeight: 800, textDecoration: "none" },
   notice: {
@@ -354,7 +332,7 @@ const styles = {
     borderRadius: 12,
     padding: 12,
     color: "#0d47a1",
-    fontSize: 13
+    fontSize: 13,
   },
   card: {
     maxWidth: 980,
@@ -363,7 +341,7 @@ const styles = {
     border: "1px solid #eee",
     borderRadius: 14,
     padding: 16,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.04)"
+    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
   h1: { fontSize: 18, fontWeight: 800, marginBottom: 12 },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
@@ -371,7 +349,7 @@ const styles = {
     gridColumn: "1 / -1",
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
-    gap: 12
+    gap: 12,
   },
   field: { display: "grid", gap: 6 },
   label: { fontSize: 12, color: "#555", fontWeight: 700 },
@@ -380,7 +358,7 @@ const styles = {
     borderRadius: 10,
     padding: "10px 12px",
     fontSize: 14,
-    outline: "none"
+    outline: "none",
   },
   hoursBox: {
     border: "1px solid #eee",
@@ -388,7 +366,7 @@ const styles = {
     padding: "10px 12px",
     fontSize: 14,
     fontWeight: 800,
-    color: "#111"
+    color: "#111",
   },
   actions: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 },
   primaryBtn: {
@@ -399,7 +377,7 @@ const styles = {
     padding: "10px 12px",
     fontSize: 14,
     fontWeight: 800,
-    cursor: "pointer"
+    cursor: "pointer",
   },
   secondaryBtn: {
     background: "#f5f5f5",
@@ -409,7 +387,7 @@ const styles = {
     padding: "10px 12px",
     fontSize: 14,
     fontWeight: 800,
-    cursor: "pointer"
+    cursor: "pointer",
   },
   error: {
     marginTop: 12,
@@ -418,7 +396,7 @@ const styles = {
     color: "crimson",
     padding: 10,
     borderRadius: 10,
-    fontSize: 13
+    fontSize: 13,
   },
   success: {
     marginTop: 12,
@@ -427,6 +405,6 @@ const styles = {
     color: "#2e7d32",
     padding: 10,
     borderRadius: 10,
-    fontSize: 13
-  }
+    fontSize: 13,
+  },
 };
