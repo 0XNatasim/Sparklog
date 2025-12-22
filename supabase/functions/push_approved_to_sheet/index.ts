@@ -53,10 +53,16 @@ serve(async (req) => {
     const appsScriptToken = Deno.env.get("APPS_SCRIPT_TOKEN") ?? "";
 
     if (!supabaseUrl || !serviceRole) {
-      return json({ ok: false, error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }, 500);
+      return json(
+        { ok: false, error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" },
+        500
+      );
     }
     if (!anonKey) {
-      return json({ ok: false, error: "Missing SUPABASE_ANON_KEY (needed to identify approver)" }, 500);
+      return json(
+        { ok: false, error: "Missing SUPABASE_ANON_KEY (needed to identify approver)" },
+        500
+      );
     }
     if (!appsScriptUrl || !appsScriptToken) {
       return json(
@@ -133,17 +139,18 @@ serve(async (req) => {
       return json({ ok: true, skipped: true, reason: "already_exported" }, 200);
     }
 
-    // Get electrician profile + email
+    // Get electrician profile + email (+ phone)
     const [{ data: prof }, userAuthRes] = await Promise.all([
       admin
         .from("profiles")
-        .select("full_name")
+        .select("full_name, phone") // ✅ NEW: include phone
         .eq("id", job.user_id)
         .maybeSingle(),
       admin.auth.admin.getUserById(job.user_id),
     ]);
 
     const electrician_name = (prof?.full_name || "").trim();
+    const electrician_phone = (prof?.phone || "").trim(); // ✅ NEW
     const electrician_email = userAuthRes?.data?.user?.email || "";
 
     const approvedAtDate = new Date();
@@ -155,14 +162,15 @@ serve(async (req) => {
       status: "approved", // row in sheet represents an approved record
       job_date: job.job_date,
       ot: job.ot,
-      depart: job.depart ? String(job.depart).slice(0, 5) : "",   // HH:mm
+      depart: job.depart ? String(job.depart).slice(0, 5) : "", // HH:mm
       arrivee: job.arrivee ? String(job.arrivee).slice(0, 5) : "", // HH:mm
-      fin: job.fin ? String(job.fin).slice(0, 5) : "",           // HH:mm
+      fin: job.fin ? String(job.fin).slice(0, 5) : "", // HH:mm
       km_aller: job.km_aller ?? "",
       electrician_name,
       electrician_email,
-      approved_at: approved_at_label,      // ✅ "20 Dec 14:09" Montreal time
-      approved_by: approved_by_value,      // ✅ ALWAYS the manager (from token)
+      electrician_phone, // ✅ NEW: send phone to sheet
+      approved_at: approved_at_label, // ✅ "20 Dec 14:09" Montreal time
+      approved_by: approved_by_value, // ✅ ALWAYS the manager (from token)
     };
 
     console.log("[push] job_id:", job.id);
