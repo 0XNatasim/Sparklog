@@ -92,12 +92,12 @@ export default function History() {
 
   const formPath = role === "manager" ? "/manager" : "/";
 
-  // ✅ Electrician OPEN = navigate to form edit mode (only for saved & unlocked)
+  // ✅ OPEN = navigate to form edit mode (only for saved & unlocked AND owner)
   function openJob(job) {
     navigate(`/?edit=${job.id}`);
   }
 
-  // ✅ Electrician DELETE (only for saved & unlocked)
+  // ✅ DELETE (only for saved & unlocked AND owner)
   async function deleteJob(jobId) {
     const ok = window.confirm("Delete this job? This cannot be undone.");
     if (!ok) return;
@@ -119,12 +119,19 @@ export default function History() {
     }
   }
 
+  // ✅ KEY FIX:
+  // - Manager can NOT open/delete other people's jobs
+  // - But YOU can open/delete YOUR OWN jobs even if your role is "manager"
+  function isOwner(job) {
+    return Boolean(user?.id) && job.user_id === user.id;
+  }
+
   function canOpen(job) {
-    return role !== "manager" && job.status === "saved" && job.locked === false;
+    return isOwner(job) && job.status === "saved" && job.locked === false;
   }
 
   function canDelete(job) {
-    return role !== "manager" && job.status === "saved" && job.locked === false;
+    return isOwner(job) && job.status === "saved" && job.locked === false;
   }
 
   return (
