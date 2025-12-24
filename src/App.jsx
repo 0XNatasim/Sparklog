@@ -1,9 +1,10 @@
+// src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Login from "./pages/Login";
-import ElectricianForm from "./pages/ElectricianForm";
+import EmployeeForm from "./pages/EmployeeForm";
 import History from "./pages/History";
 import Week from "./pages/Week";
 import ManagerDashboard from "./pages/ManagerDashboard";
@@ -15,12 +16,12 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<Login />} />
 
-        {/* Electrician default */}
+        {/* Employee default */}
         <Route
           path="/"
           element={
             <ProtectedRoute>
-              <ElectricianForm />
+              <EmployeeForm />
             </ProtectedRoute>
           }
         />
@@ -35,7 +36,7 @@ export default function App() {
           }
         />
 
-        {/* Week summary (electrician + manager can access; manager will get employee dropdown) */}
+        {/* Week summary (employee + manager can access; manager will get employee dropdown) */}
         <Route
           path="/week"
           element={

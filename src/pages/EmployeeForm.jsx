@@ -1,4 +1,4 @@
-// src/pages/ElectricianForm.jsx
+// src/pages/EmployeeForm.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -27,7 +27,7 @@ function toHHmmFromHoursDecimal(hoursDecimal) {
   return `${hh}h${String(mm).padStart(2, "0")}`;
 }
 
-export default function ElectricianForm() {
+export default function EmployeeForm() {
   const { user, role, fullName, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();

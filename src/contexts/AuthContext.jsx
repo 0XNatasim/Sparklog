@@ -12,11 +12,11 @@ async function fetchRoleForUser(userId) {
 
   if (error) {
     console.warn("[Auth] fetchRole error:", error);
-    return { role: "electrician", full_name: null };
+    return { role: "Employee", full_name: null };
   }
-  if (!data) return { role: "electrician", full_name: null };
+  if (!data) return { role: "Employee", full_name: null };
 
-  return { role: data.role || "electrician", full_name: data.full_name || null };
+  return { role: data.role || "Employee", full_name: data.full_name || null };
 }
 
 export function AuthProvider({ children }) {

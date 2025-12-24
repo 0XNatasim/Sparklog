@@ -1,3 +1,4 @@
+// supabase/functions/push_approved_to_sheet/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -139,19 +140,19 @@ serve(async (req) => {
       return json({ ok: true, skipped: true, reason: "already_exported" }, 200);
     }
 
-    // Get electrician profile + email (+ phone)
+    // Get employee profile + email (+ phone)
     const [{ data: prof }, userAuthRes] = await Promise.all([
       admin
         .from("profiles")
-        .select("full_name, phone") // ✅ NEW: include phone
+        .select("full_name, phone")
         .eq("id", job.user_id)
         .maybeSingle(),
       admin.auth.admin.getUserById(job.user_id),
     ]);
 
-    const electrician_name = (prof?.full_name || "").trim();
-    const electrician_phone = (prof?.phone || "").trim(); // ✅ NEW
-    const electrician_email = userAuthRes?.data?.user?.email || "";
+    const employee_name = (prof?.full_name || "").trim();
+    const employee_phone = (prof?.phone || "").trim();
+    const employee_email = userAuthRes?.data?.user?.email || "";
 
     const approvedAtDate = new Date();
     const approved_at_label = formatMontrealShort(approvedAtDate);
@@ -159,18 +160,18 @@ serve(async (req) => {
     const payload = {
       token: appsScriptToken,
       job_id: job.id,
-      status: "approved", // row in sheet represents an approved record
+      status: "approved",
       job_date: job.job_date,
       ot: job.ot,
       depart: job.depart ? String(job.depart).slice(0, 5) : "", // HH:mm
       arrivee: job.arrivee ? String(job.arrivee).slice(0, 5) : "", // HH:mm
       fin: job.fin ? String(job.fin).slice(0, 5) : "", // HH:mm
       km_aller: job.km_aller ?? "",
-      electrician_name,
-      electrician_email,
-      electrician_phone, // ✅ NEW: send phone to sheet
-      approved_at: approved_at_label, // ✅ "20 Dec 14:09" Montreal time
-      approved_by: approved_by_value, // ✅ ALWAYS the manager (from token)
+      employee_name,
+      employee_email,
+      employee_phone,
+      approved_at: approved_at_label,
+      approved_by: approved_by_value,
     };
 
     console.log("[push] job_id:", job.id);
@@ -211,13 +212,13 @@ serve(async (req) => {
       );
     }
 
-    // Mark as exported (frontend still changes status to approved after export)
+    // Mark as exported
     const { error: markErr } = await admin
       .from("jobs")
       .update({
         exported_to_sheet: true,
         exported_at: approvedAtDate.toISOString(),
-        exported_by: approverId, // ✅ manager id
+        exported_by: approverId,
       })
       .eq("id", job.id);
 

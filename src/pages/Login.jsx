@@ -53,7 +53,7 @@ export default function Login() {
         full_name: name || null,
         phone: phoneNorm || null,
         email: emailValue || null, // ✅ store email in profiles
-        role: "electrician",
+        role: "Employee",
       },
       { onConflict: "id" }
     );

@@ -1,3 +1,4 @@
+// src/pages/ManagerDashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
@@ -125,18 +126,18 @@ export default function ManagerDashboard() {
 
       if (!q) return true;
 
-      const electrician = profiles.get(j.user_id);
-      const electricianName = electrician?.full_name || "";
-      const electricianPhone = electrician?.phone || "";
-      const electricianEmail = electrician?.email || "";
+      const employee = profiles.get(j.user_id);
+      const employeeName = employee?.full_name || "";
+      const employeePhone = employee?.phone || "";
+      const employeeEmail = employee?.email || "";
 
       const haystack = [
         j.ot || "",
         j.job_date || "",
         j.status || "",
-        electricianName,
-        electricianPhone,
-        electricianEmail,
+        employeeName,
+        employeePhone,
+        employeeEmail,
       ]
         .join(" ")
         .toLowerCase();
@@ -207,8 +208,8 @@ export default function ManagerDashboard() {
   }
 
   function renderJobCard(j) {
-    const electrician = profiles.get(j.user_id);
-    const electricianName = electrician?.full_name || `User ${String(j.user_id).slice(0, 8)}…`;
+    const employee = profiles.get(j.user_id);
+    const employeeName = employee?.full_name || `User ${String(j.user_id).slice(0, 8)}…`;
 
     // total depart->fin
     const d1 = makeDayjsFromJob(j.job_date, j.depart);
@@ -242,7 +243,7 @@ export default function ManagerDashboard() {
             </div>
 
             <div style={styles.subLine}>
-              Electrician: <b>{electricianName}</b>
+              Employee: <b>{employeeName}</b>
             </div>
 
             <div style={styles.subLine}>
@@ -354,7 +355,7 @@ export default function ManagerDashboard() {
           {selectedEmployee && (
             <div style={styles.selectedRow}>
               <div style={{ fontSize: 13, color: "#555" }}>
-                Selected electrician: <b>{selectedEmployee.name}</b>
+                Selected employee: <b>{selectedEmployee.name}</b>
                 {selectedEmployee.phone ? (
                   <>
                     {" "}
