@@ -52,8 +52,23 @@ function splitWeekBucketsFromDailyTotals(dayHoursMap) {
   const hours_15x = Math.min(WEEKLY_OT_FIRST_TIER_HOURS, overtime_total);
   const hours_2x = Math.max(0, overtime_total - WEEKLY_OT_FIRST_TIER_HOURS);
 
-  return { hours_1x, hours_15x, hours_2x, overtime_total };
+  return { hours_1x, hours_15x, hours_2x };
 }
+
+function BucketInline({ label, value }) {
+  return (
+    <span style={stylesInline.bucketWrap}>
+      <span style={stylesInline.bucketLabel}>{label}</span>
+      <span style={stylesInline.bucketValue}>{value}</span>
+    </span>
+  );
+}
+
+const stylesInline = {
+  bucketWrap: { display: "inline-flex", gap: 8, alignItems: "baseline", whiteSpace: "nowrap" },
+  bucketLabel: { color: "#555", fontWeight: 800 },
+  bucketValue: { color: "#111", fontWeight: 900 },
+};
 
 export default function Week() {
   const { user, role, signOut } = useAuth();
@@ -120,16 +135,12 @@ export default function Week() {
           start: weekStart,
           end: weekStart.endOf("isoWeek"),
           totalKm: 0,
-          otCount: 0,
-
-          // Aggregate by day (critical for correct daily overtime)
           dayHours: new Map(), // "YYYY-MM-DD" -> hours
         });
       }
 
       const w = map.get(key);
       w.totalKm += km;
-      w.otCount += 1;
 
       const dayKey = dayjs(j.job_date).format("YYYY-MM-DD");
       const prev = w.dayHours.get(dayKey) || 0;
@@ -147,7 +158,6 @@ export default function Week() {
         start: w.start,
         end: w.end,
         totalKm: w.totalKm,
-        otCount: w.otCount,
         totalHours,
         hours1x: hours_1x,
         hours15x: hours_15x,
@@ -163,8 +173,8 @@ export default function Week() {
       {/* TOPBAR */}
       <div style={styles.topbar}>
         <div style={styles.brandBlock}>
-          <div style={{ fontSize: 18, fontWeight: 900 }}>Week</div>
-          <div style={{ fontSize: 12, color: "#666" }}>
+          <div style={styles.pageTitle}>Week</div>
+          <div style={styles.subText}>
             {user?.email}
             {role ? (
               <>
@@ -176,7 +186,6 @@ export default function Week() {
         </div>
 
         <div style={styles.nav}>
-          {/* ✅ Form always goes to Form page */}
           <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
             Form
           </button>
@@ -211,49 +220,41 @@ export default function Week() {
           weekly.map((w, idx) => {
             const weekNum = w.start.isoWeek();
             const rangeLeft = `${w.start.format("DD MMM")} → ${w.end.format("DD MMM YYYY")}`;
-            const totalLabel = formatHoursHM(w.totalHours);
 
             return (
               <div key={idx} style={styles.weekCard}>
-                {/* Left */}
-                <div style={styles.leftCol}>
-                  <div style={styles.weekTitleRow}>
-                    <div style={styles.weekTitle}>Week {weekNum}</div>
-                  </div>
+                {/* Row 1 */}
+                <div style={styles.row}>
+                  <div style={styles.leftStrong}>Week {weekNum}</div>
 
-                  <div style={styles.rangeLine}>{rangeLeft}</div>
-
-                  <div style={styles.bottomLine}>
-                    <span style={styles.bottomItem}>
-                      Total: <b>{totalLabel}</b>
-                    </span>
-                    <span style={styles.bottomItem}>
-                      <b>{w.totalKm}</b> km
-                    </span>
+                  <div style={styles.rightInline}>
+                    <BucketInline label="1x:" value={formatHoursHM(w.hours1x)} />
                   </div>
                 </div>
 
-                {/* Right */}
-                <div style={styles.rightCol}>
-                  <div style={styles.rightTop}>
-                    <span style={styles.otPill}>
-                      <b>{w.otCount}</b> OT
+                {/* Row 2 */}
+                <div style={styles.row}>
+                  <div style={styles.leftMuted}>{rangeLeft}</div>
+
+                  <div style={styles.rightInline}>
+                    <BucketInline label="1.5x:" value={formatHoursHM(w.hours15x)} />
+                  </div>
+                </div>
+
+                {/* Row 3 */}
+                <div style={styles.row}>
+                  <div style={styles.leftTotals}>
+                    <span>
+                      Total: <b>{formatHoursHM(w.totalHours)}</b>
+                    </span>
+                    <span style={styles.dot}>•</span>
+                    <span>
+                      <b>{w.totalKm}</b> km
                     </span>
                   </div>
 
-                  <div style={styles.bucketRow}>
-                    <span style={styles.bucketLabel}>1x:</span>
-                    <span style={styles.bucketValue}>{formatHoursHM(w.hours1x)}</span>
-                  </div>
-
-                  <div style={styles.bucketRow}>
-                    <span style={styles.bucketLabel}>1.5x:</span>
-                    <span style={styles.bucketValue}>{formatHoursHM(w.hours15x)}</span>
-                  </div>
-
-                  <div style={styles.bucketRow}>
-                    <span style={styles.bucketLabel}>2.0x:</span>
-                    <span style={styles.bucketValue}>{formatHoursHM(w.hours2x)}</span>
+                  <div style={styles.rightInline}>
+                    <BucketInline label="2.0x:" value={formatHoursHM(w.hours2x)} />
                   </div>
                 </div>
               </div>
@@ -278,6 +279,9 @@ const styles = {
     flexWrap: "wrap",
   },
   brandBlock: { display: "grid", gap: 2 },
+  pageTitle: { fontSize: 18, fontWeight: 900 },
+  subText: { fontSize: 12, color: "#666" },
+
   nav: {
     display: "flex",
     gap: 10,
@@ -307,79 +311,45 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
 
+  // Compact, left-aligned card. Multipliers are close to the left content.
   weekCard: {
     background: "#fff",
     border: "1px solid #eee",
     borderRadius: 14,
-    padding: 16,
+    padding: 18,
     marginBottom: 12,
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-
-    gap: 14,
-    alignItems: "start",
+    gap: 8,
   },
 
-  // Responsive: stack on small widths
-  leftCol: {
-    minWidth: 0,
-    display: "grid",
-    gap: 6,
-  },
-
-  weekTitleRow: {
+  row: {
     display: "flex",
     alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  weekTitle: { fontWeight: 900, fontSize: 16, color: "#111" },
-
-  rangeLine: { fontSize: 13, color: "#555" },
-
-  bottomLine: {
-    display: "flex",
-    gap: 14,
+    justifyContent: "flex-start",
+    gap: 16,
     flexWrap: "wrap",
-    alignItems: "center",
-    marginTop: 2,
+  },
+
+  leftStrong: { fontWeight: 900, fontSize: 16, color: "#111", minWidth: 240 },
+  leftMuted: { fontSize: 13, color: "#555", minWidth: 240 },
+
+  leftTotals: {
     fontSize: 13,
     color: "#111",
-  },
-  bottomItem: { whiteSpace: "nowrap" },
-
-  rightCol: {
-    display: "grid",
-    gap: 8,
-    justifyItems: "end",
-  },
-
-  rightTop: {
-    width: "100%",
     display: "flex",
-    justifyContent: "flex-end",
+    gap: 10,
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    minWidth: 240,
   },
-  otPill: {
-    background: "#f5f5f5",
-    border: "1px solid #eee",
-    borderRadius: 999,
-    padding: "6px 10px",
-    fontSize: 12,
-    color: "#111",
-    whiteSpace: "nowrap",
-  },
+  dot: { color: "#999" },
 
-  bucketRow: {
-    width: "100%",
+  // Keep multipliers near the left block, not pushed to the far right.
+  rightInline: {
     display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    fontSize: 13,
+    alignItems: "baseline",
   },
-  bucketLabel: { color: "#555", fontWeight: 800 },
-  bucketValue: { fontWeight: 900, color: "#111", whiteSpace: "nowrap" },
 
   secondaryBtn: {
     background: "#f5f5f5",
@@ -401,7 +371,4 @@ const styles = {
     borderRadius: 10,
     fontSize: 13,
   },
-
-  // Mobile override (no media queries inline; we do it with auto-fit instead)
-  // If you want true responsive stacking, tell me and I’ll convert weekCard to auto-fit.
 };
