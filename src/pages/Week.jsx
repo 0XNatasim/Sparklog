@@ -100,9 +100,6 @@ export default function Week() {
     return Array.from(map.values()).sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
   }, [jobs]);
 
-  // Topbar targets
-  const formPath = role === "manager" ? "/manager" : "/";
-
   return (
     <div style={styles.page}>
       {/* TOPBAR */}
@@ -121,7 +118,8 @@ export default function Week() {
         </div>
 
         <div style={styles.nav}>
-          <button onClick={() => navigate(formPath)} style={styles.linkBtn} type="button">
+          {/* ✅ FIX: Form always goes to the form page */}
+          <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
             Form
           </button>
 
@@ -182,7 +180,6 @@ const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
   container: { maxWidth: 900, margin: "0 auto" },
 
-  // ✅ responsive topbar like other pages
   topbar: {
     maxWidth: 900,
     margin: "0 auto 12px auto",

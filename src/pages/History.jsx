@@ -1,4 +1,3 @@
-// src/pages/History.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -90,8 +89,6 @@ export default function History() {
     return Array.from(map.entries());
   }, [jobs]);
 
-  const formPath = role === "manager" ? "/manager" : "/";
-
   // ✅ OPEN = navigate to form edit mode (only for saved & unlocked AND owner)
   function openJob(job) {
     navigate(`/?edit=${job.id}`);
@@ -142,7 +139,8 @@ export default function History() {
           <div style={styles.title}>History</div>
 
           <div style={styles.menu}>
-            <button onClick={() => navigate(formPath)} style={styles.linkBtn} type="button">
+            {/* ✅ FIX: Form always goes to the form page */}
+            <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
               Form
             </button>
 
@@ -279,7 +277,6 @@ const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
   container: { maxWidth: 980, margin: "0 auto" },
 
-  // ✅ changed topbar structure
   topbar: {
     maxWidth: 980,
     margin: "0 auto 12px auto",
