@@ -79,22 +79,38 @@ export default function History() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  function sumHoursForJobs(list) {
+    let total = 0;
+    for (const j of list) {
+      const d1 = makeDayjsFromJob(j.job_date, j.depart);
+      const d2 = makeDayjsFromJob(j.job_date, j.fin);
+      total += hoursBetween(d1, d2) || 0;
+    }
+    return total;
+  }
+
   const grouped = useMemo(() => {
     const map = new Map();
+
     for (const j of jobs) {
       const key = dayjs(j.job_date).format("YYYY-MM-DD");
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(j);
     }
-    return Array.from(map.entries());
+
+    return Array.from(map.entries()).map(([date, list]) => {
+      const totalHours = sumHoursForJobs(list);
+      const totalHHmm = toHHmmLabelFromFormatHours(formatHours(totalHours));
+      return { date, list, totalHours, totalHHmm };
+    });
   }, [jobs]);
 
-  // ✅ OPEN = navigate to form edit mode (only for saved & unlocked AND owner)
+  // OPEN = navigate to form edit mode (only for saved & unlocked AND owner)
   function openJob(job) {
     navigate(`/?edit=${job.id}`);
   }
 
-  // ✅ DELETE (only for saved & unlocked AND owner)
+  // DELETE (only for saved & unlocked AND owner)
   async function deleteJob(jobId) {
     const ok = window.confirm("Delete this job? This cannot be undone.");
     if (!ok) return;
@@ -116,9 +132,6 @@ export default function History() {
     }
   }
 
-  // ✅ KEY FIX:
-  // - Manager can NOT open/delete other people's jobs
-  // - But YOU can open/delete YOUR OWN jobs even if your role is "manager"
   function isOwner(job) {
     return Boolean(user?.id) && job.user_id === user.id;
   }
@@ -133,13 +146,13 @@ export default function History() {
 
   return (
     <div style={styles.page}>
-      {/* ✅ TOPBAR: Title and menu on SAME ROW; email+role BELOW */}
+      {/* TOPBAR */}
       <div style={styles.topbar}>
         <div style={styles.topRow}>
           <div style={styles.title}>History</div>
 
           <div style={styles.menu}>
-            {/* ✅ FIX: Form always goes to the form page */}
+            {/* ✅ Form always goes to Form page */}
             <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
               Form
             </button>
@@ -160,7 +173,7 @@ export default function History() {
           </div>
         </div>
 
-        {/* ✅ email + role BELOW menu (prevents overlap on mobile) */}
+        {/* email + role BELOW menu */}
         <div style={styles.subRow}>
           <div style={styles.email}>{user?.email}</div>
           <div style={styles.roleLine}>
@@ -178,14 +191,17 @@ export default function History() {
 
         {!loading &&
           !err &&
-          grouped.map(([date, list]) => (
-            <div key={date} style={{ marginBottom: 14 }}>
+          grouped.map((g) => (
+            <div key={g.date} style={{ marginBottom: 14 }}>
               <div style={{ marginBottom: 10 }}>
-                <div style={styles.dateHeader}>{dayjs(date).format("DD MMM YYYY")}</div>
+                {/* ✅ Daily total hours beside the date */}
+                <div style={styles.dateHeader}>
+                  {dayjs(g.date).format("DD MMM YYYY")} • <b>{g.totalHHmm}</b>
+                </div>
               </div>
 
               <div style={{ display: "grid", gap: 10 }}>
-                {list.map((j) => {
+                {g.list.map((j) => {
                   const d1 = makeDayjsFromJob(j.job_date, j.depart);
                   const d2 = makeDayjsFromJob(j.job_date, j.fin);
                   const totalHours = hoursBetween(d1, d2);
@@ -194,7 +210,6 @@ export default function History() {
                   const totalHHmm = toHHmmLabelFromFormatHours(totalLabelRaw);
 
                   const kmLabel = j.km_aller ?? 0;
-
                   const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
 
                   const showOpen = canOpen(j);

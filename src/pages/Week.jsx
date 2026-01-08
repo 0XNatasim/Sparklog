@@ -10,10 +10,24 @@ import { hoursBetween } from "../lib/time";
 dayjs.extend(isoWeek);
 dayjs.locale("en");
 
+// ===== Overtime rules =====
+// Daily: first 8h at 1.0x, remainder is overtime.
+// Weekly overtime tiering (across accumulated daily overtime):
+// - first 1 overtime hour in the week => 1.5x
+// - remaining overtime hours in that week => 2.0x
+const DAILY_REGULAR_HOURS = 8;
+const WEEKLY_OT_FIRST_TIER_HOURS = 1;
+
 function makeDayjsFromJob(job_date, timeStr) {
   if (!job_date || !timeStr) return null;
   const d = dayjs(`${job_date}T${timeStr}`);
   return d.isValid() ? d : null;
+}
+
+function roundToQuarterHour(hours) {
+  const h = Number(hours);
+  if (!Number.isFinite(h) || h <= 0) return 0;
+  return Math.round(h * 4) / 4; // 0.25h increments
 }
 
 function formatHoursHM(hours) {
@@ -22,6 +36,23 @@ function formatHoursHM(hours) {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return `${h}h${String(m).padStart(2, "0")}`;
+}
+
+function splitWeekBucketsFromDailyTotals(dayHoursMap) {
+  // dayHoursMap: Map("YYYY-MM-DD" -> totalHoursThatDay)
+  let hours_1x = 0;
+  let overtime_total = 0;
+
+  for (const raw of dayHoursMap.values()) {
+    const dayHours = roundToQuarterHour(raw);
+    hours_1x += Math.min(DAILY_REGULAR_HOURS, dayHours);
+    overtime_total += Math.max(0, dayHours - DAILY_REGULAR_HOURS);
+  }
+
+  const hours_15x = Math.min(WEEKLY_OT_FIRST_TIER_HOURS, overtime_total);
+  const hours_2x = Math.max(0, overtime_total - WEEKLY_OT_FIRST_TIER_HOURS);
+
+  return { hours_1x, hours_15x, hours_2x, overtime_total };
 }
 
 export default function Week() {
@@ -73,9 +104,12 @@ export default function Week() {
     const map = new Map();
 
     for (const j of jobs) {
+      // If you want payroll-only week stats, uncomment this:
+      // if (j.status !== "approved") continue;
+
       const d1 = makeDayjsFromJob(j.job_date, j.depart);
       const d2 = makeDayjsFromJob(j.job_date, j.fin);
-      const hours = hoursBetween(d1, d2) || 0;
+      const hours = roundToQuarterHour(hoursBetween(d1, d2) || 0);
       const km = j.km_aller ?? 0;
 
       const weekStart = dayjs(j.job_date).startOf("isoWeek");
@@ -85,19 +119,45 @@ export default function Week() {
         map.set(key, {
           start: weekStart,
           end: weekStart.endOf("isoWeek"),
-          totalHours: 0,
           totalKm: 0,
           otCount: 0,
+
+          // Aggregate by day first (critical for correct daily overtime)
+          dayHours: new Map(), // "YYYY-MM-DD" -> hours
         });
       }
 
       const w = map.get(key);
-      w.totalHours += hours;
       w.totalKm += km;
       w.otCount += 1;
+
+      const dayKey = dayjs(j.job_date).format("YYYY-MM-DD");
+      const prev = w.dayHours.get(dayKey) || 0;
+      w.dayHours.set(dayKey, prev + hours);
     }
 
-    return Array.from(map.values()).sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
+    const out = [];
+    for (const w of map.values()) {
+      let totalHours = 0;
+      for (const h of w.dayHours.values()) totalHours += roundToQuarterHour(h);
+
+      const { hours_1x, hours_15x, hours_2x, overtime_total } =
+        splitWeekBucketsFromDailyTotals(w.dayHours);
+
+      out.push({
+        start: w.start,
+        end: w.end,
+        totalKm: w.totalKm,
+        otCount: w.otCount,
+        totalHours,
+        hours1x: hours_1x,
+        hours15x: hours_15x,
+        hours2x: hours_2x,
+        overtimeTotal: overtime_total,
+      });
+    }
+
+    return out.sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
   }, [jobs]);
 
   return (
@@ -118,7 +178,7 @@ export default function Week() {
         </div>
 
         <div style={styles.nav}>
-          {/* ✅ FIX: Form always goes to the form page */}
+          {/* ✅ Form always goes to Form page */}
           <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
             Form
           </button>
@@ -160,11 +220,25 @@ export default function Week() {
 
               <div style={styles.stats}>
                 <span>
-                  <b>{formatHoursHM(w.totalHours)}</b>
+                  Total: <b>{formatHoursHM(w.totalHours)}</b>
                 </span>
+
+                <span>
+                  1x: <b>{formatHoursHM(w.hours1x)}</b>
+                </span>
+
+                <span>
+                  OT 1.5x: <b>{formatHoursHM(w.hours15x)}</b>
+                </span>
+
+                <span>
+                  OT 2.0x: <b>{formatHoursHM(w.hours2x)}</b>
+                </span>
+
                 <span>
                   <b>{w.totalKm}</b> km
                 </span>
+
                 <span>
                   <b>{w.otCount}</b> OT
                 </span>
