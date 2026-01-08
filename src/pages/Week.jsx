@@ -39,6 +39,7 @@ function formatHoursHM(hours) {
 }
 
 function splitWeekBucketsFromDailyTotals(dayHoursMap) {
+  // dayHoursMap: Map("YYYY-MM-DD" -> totalHoursThatDay)
   let hours_1x = 0;
   let overtime_total = 0;
 
@@ -51,7 +52,7 @@ function splitWeekBucketsFromDailyTotals(dayHoursMap) {
   const hours_15x = Math.min(WEEKLY_OT_FIRST_TIER_HOURS, overtime_total);
   const hours_2x = Math.max(0, overtime_total - WEEKLY_OT_FIRST_TIER_HOURS);
 
-  return { hours_1x, hours_15x, hours_2x };
+  return { hours_1x, hours_15x, hours_2x, overtime_total };
 }
 
 export default function Week() {
@@ -119,12 +120,16 @@ export default function Week() {
           start: weekStart,
           end: weekStart.endOf("isoWeek"),
           totalKm: 0,
+          otCount: 0,
+
+          // Aggregate by day (critical for correct daily overtime)
           dayHours: new Map(), // "YYYY-MM-DD" -> hours
         });
       }
 
       const w = map.get(key);
       w.totalKm += km;
+      w.otCount += 1;
 
       const dayKey = dayjs(j.job_date).format("YYYY-MM-DD");
       const prev = w.dayHours.get(dayKey) || 0;
@@ -142,6 +147,7 @@ export default function Week() {
         start: w.start,
         end: w.end,
         totalKm: w.totalKm,
+        otCount: w.otCount,
         totalHours,
         hours1x: hours_1x,
         hours15x: hours_15x,
@@ -170,6 +176,7 @@ export default function Week() {
         </div>
 
         <div style={styles.nav}>
+          {/* ✅ Form always goes to Form page */}
           <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
             Form
           </button>
@@ -204,36 +211,50 @@ export default function Week() {
           weekly.map((w, idx) => {
             const weekNum = w.start.isoWeek();
             const rangeLeft = `${w.start.format("DD MMM")} → ${w.end.format("DD MMM YYYY")}`;
+            const totalLabel = formatHoursHM(w.totalHours);
 
             return (
               <div key={idx} style={styles.weekCard}>
-                {/* Row 1 */}
-                <div style={styles.r1l}>Week {weekNum}</div>
-                <div style={styles.r1r}>
-                  <span style={styles.bucketLabel}>1x:</span>
-                  <span style={styles.bucketValue}>{formatHoursHM(w.hours1x)}</span>
+                {/* Left */}
+                <div style={styles.leftCol}>
+                  <div style={styles.weekTitleRow}>
+                    <div style={styles.weekTitle}>Week {weekNum}</div>
+                  </div>
+
+                  <div style={styles.rangeLine}>{rangeLeft}</div>
+
+                  <div style={styles.bottomLine}>
+                    <span style={styles.bottomItem}>
+                      Total: <b>{totalLabel}</b>
+                    </span>
+                    <span style={styles.bottomItem}>
+                      <b>{w.totalKm}</b> km
+                    </span>
+                  </div>
                 </div>
 
-                {/* Row 2 */}
-                <div style={styles.r2l}>{rangeLeft}</div>
-                <div style={styles.r2r}>
-                  <span style={styles.bucketLabel}>1.5x:</span>
-                  <span style={styles.bucketValue}>{formatHoursHM(w.hours15x)}</span>
-                </div>
+                {/* Right */}
+                <div style={styles.rightCol}>
+                  <div style={styles.rightTop}>
+                    <span style={styles.otPill}>
+                      <b>{w.otCount}</b> OT
+                    </span>
+                  </div>
 
-                {/* Row 3 */}
-                <div style={styles.r3l}>
-                  <span>
-                    Total: <b>{formatHoursHM(w.totalHours)}</b>
-                  </span>
-                  <span style={{ opacity: 0.4 }}> </span>
-                  <span>
-                    <b>{w.totalKm}</b> km
-                  </span>
-                </div>
-                <div style={styles.r3r}>
-                  <span style={styles.bucketLabel}>2.0x:</span>
-                  <span style={styles.bucketValue}>{formatHoursHM(w.hours2x)}</span>
+                  <div style={styles.bucketRow}>
+                    <span style={styles.bucketLabel}>1x:</span>
+                    <span style={styles.bucketValue}>{formatHoursHM(w.hours1x)}</span>
+                  </div>
+
+                  <div style={styles.bucketRow}>
+                    <span style={styles.bucketLabel}>1.5x:</span>
+                    <span style={styles.bucketValue}>{formatHoursHM(w.hours15x)}</span>
+                  </div>
+
+                  <div style={styles.bucketRow}>
+                    <span style={styles.bucketLabel}>2.0x:</span>
+                    <span style={styles.bucketValue}>{formatHoursHM(w.hours2x)}</span>
+                  </div>
                 </div>
               </div>
             );
@@ -286,41 +307,77 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
 
-  // === Card layout matching your reference ===
   weekCard: {
     background: "#fff",
     border: "1px solid #eee",
     borderRadius: 14,
-    padding: 18,
+    padding: 16,
     marginBottom: 12,
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
-
     display: "grid",
-    gridTemplateColumns: "1fr 220px",
-    gridTemplateRows: "auto auto auto",
-    columnGap: 24,
-    rowGap: 8,
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+
+    gap: 14,
     alignItems: "start",
   },
 
-  // Left column rows
-  r1l: { gridColumn: "1", gridRow: "1", fontWeight: 900, fontSize: 16, color: "#111" },
-  r2l: { gridColumn: "1", gridRow: "2", fontSize: 13, color: "#555" },
-  r3l: {
-    gridColumn: "1",
-    gridRow: "3",
+  // Responsive: stack on small widths
+  leftCol: {
+    minWidth: 0,
+    display: "grid",
+    gap: 6,
+  },
+
+  weekTitleRow: {
     display: "flex",
-    gap: 16,
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  weekTitle: { fontWeight: 900, fontSize: 16, color: "#111" },
+
+  rangeLine: { fontSize: 13, color: "#555" },
+
+  bottomLine: {
+    display: "flex",
+    gap: 14,
     flexWrap: "wrap",
+    alignItems: "center",
+    marginTop: 2,
     fontSize: 13,
     color: "#111",
   },
+  bottomItem: { whiteSpace: "nowrap" },
 
-  // Right column rows (label/value aligned)
-  r1r: { gridColumn: "2", gridRow: "1", ...bucketRow },
-  r2r: { gridColumn: "2", gridRow: "2", ...bucketRow },
-  r3r: { gridColumn: "2", gridRow: "3", ...bucketRow },
+  rightCol: {
+    display: "grid",
+    gap: 8,
+    justifyItems: "end",
+  },
 
+  rightTop: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "flex-end",
+  },
+  otPill: {
+    background: "#f5f5f5",
+    border: "1px solid #eee",
+    borderRadius: 999,
+    padding: "6px 10px",
+    fontSize: 12,
+    color: "#111",
+    whiteSpace: "nowrap",
+  },
+
+  bucketRow: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    fontSize: 13,
+  },
   bucketLabel: { color: "#555", fontWeight: 800 },
   bucketValue: { fontWeight: 900, color: "#111", whiteSpace: "nowrap" },
 
@@ -344,13 +401,7 @@ const styles = {
     borderRadius: 10,
     fontSize: 13,
   },
-};
 
-const bucketRow = {
-  width: "100%",
-  display: "flex",
-  alignItems: "baseline",
-  justifyContent: "space-between",
-  gap: 12,
-  fontSize: 13,
+  // Mobile override (no media queries inline; we do it with auto-fit instead)
+  // If you want true responsive stacking, tell me and I’ll convert weekCard to auto-fit.
 };
