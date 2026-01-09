@@ -27,8 +27,6 @@ function makeDayjsFromJob(job_date, timeStr) {
 }
 
 function toHHmmLabelFromFormatHours(formatHoursResult) {
-  // formatHoursResult is a string like "2.75" (per your current lib)
-  // Convert "2.75" => 2h45
   const num = Number(String(formatHoursResult).replace(",", "."));
   if (!Number.isFinite(num) || num <= 0) return "0h00";
   const totalMinutes = Math.round(num * 60);
@@ -105,12 +103,10 @@ export default function History() {
     });
   }, [jobs]);
 
-  // OPEN = navigate to form edit mode (only for saved & unlocked AND owner)
   function openJob(job) {
     navigate(`/?edit=${job.id}`);
   }
 
-  // DELETE (only for saved & unlocked AND owner)
   async function deleteJob(jobId) {
     const ok = window.confirm("Delete this job? This cannot be undone.");
     if (!ok) return;
@@ -148,40 +144,42 @@ export default function History() {
     <div style={styles.page}>
       {/* TOPBAR */}
       <div style={styles.topbar}>
-        <div style={styles.topRow}>
-          <div style={styles.title}>History</div>
-
-          <div style={styles.menu}>
-            {/* ✅ Form always goes to Form page */}
-            <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
-              Form
-            </button>
-
-            <Link to="/week" style={styles.link}>
-              Week
-            </Link>
-
-            {role === "manager" && (
-              <Link to="/manager" style={styles.link}>
-                Manager
-              </Link>
-            )}
-
-            <button onClick={signOut} style={styles.secondaryBtn}>
-              Logout
-            </button>
-          </div>
-        </div>
-
-        {/* email + role BELOW menu */}
-        <div style={styles.subRow}>
-          <div style={styles.email}>{user?.email}</div>
-          <div style={styles.roleLine}>
+        <div style={styles.brandBlock}>
+          <div style={styles.pageTitle}>History</div>
+          <div style={styles.subText}>
+            {user?.email}
+            <br />
             Role: <b>{fmtRoleLabel(role)}</b>
           </div>
         </div>
+
+        <div style={styles.nav}>
+          {/* ✅ Form always goes to Form page */}
+          <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
+            Form
+          </button>
+
+          {/* ✅ Active item on this page */}
+          <span style={styles.activeLink}>History</span>
+
+          {/* ✅ Week should be a link on History page */}
+          <Link to="/week" style={styles.link}>
+            Week
+          </Link>
+
+          {role === "manager" && (
+            <Link to="/manager" style={styles.link}>
+              Manager
+            </Link>
+          )}
+
+          <button onClick={signOut} style={styles.secondaryBtn}>
+            Logout
+          </button>
+        </div>
       </div>
 
+      {/* CONTENT */}
       <div style={styles.container}>
         {loading && <div style={styles.card}>Loading…</div>}
         {err && <div style={styles.error}>{err}</div>}
@@ -194,7 +192,6 @@ export default function History() {
           grouped.map((g) => (
             <div key={g.date} style={{ marginBottom: 14 }}>
               <div style={{ marginBottom: 10 }}>
-                {/* ✅ Daily total hours beside the date */}
                 <div style={styles.dateHeader}>
                   {dayjs(g.date).format("DD MMM YYYY")} • <b>{g.totalHHmm}</b>
                 </div>
@@ -295,33 +292,23 @@ const styles = {
   topbar: {
     maxWidth: 980,
     margin: "0 auto 12px auto",
-    display: "grid",
-    gap: 6,
-  },
-  topRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    flexWrap: "wrap",
   },
-  title: { fontSize: 18, fontWeight: 900 },
+  brandBlock: { display: "grid", gap: 2 },
+  pageTitle: { fontSize: 18, fontWeight: 900 },
+  subText: { fontSize: 12, color: "#666" },
 
-  menu: {
+  nav: {
     display: "flex",
     gap: 10,
     alignItems: "center",
     flexWrap: "wrap",
     justifyContent: "flex-end",
   },
-
-  subRow: {
-    display: "grid",
-    gap: 2,
-    fontSize: 12,
-    color: "#666",
-  },
-  email: { wordBreak: "break-word" },
-  roleLine: {},
 
   link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
   linkBtn: {
@@ -333,6 +320,7 @@ const styles = {
     padding: 0,
     fontSize: 14,
   },
+  activeLink: { fontWeight: 900, color: "#111", fontSize: 14 },
 
   dateHeader: {
     display: "inline-block",
