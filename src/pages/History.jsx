@@ -9,9 +9,9 @@ import { hoursBetween, formatHours } from "../lib/time";
 dayjs.locale("en");
 
 function badgeStyle(status) {
-  if (status === "saved") return { background: "#1565c0", color: "#fff" }; // blue
-  if (status === "submitted") return { background: "#4caf50", color: "#fff" }; // green
-  if (status === "approved") return { background: "#111", color: "#fff" }; // black
+  if (status === "saved") return { background: "#1565c0", color: "#fff" };
+  if (status === "submitted") return { background: "#4caf50", color: "#fff" };
+  if (status === "approved") return { background: "#111", color: "#fff" };
   return { background: "#eee", color: "#111" };
 }
 
@@ -35,9 +35,10 @@ function toHHmmLabelFromFormatHours(formatHoursResult) {
   return `${hh}h${String(mm).padStart(2, "0")}`;
 }
 
-function fmtRoleLabel(role) {
-  if (!role) return "—";
-  return String(role);
+function kmTotal(job) {
+  const a = Number(job?.km_aller ?? 0) || 0;
+  const r = Number(job?.km_retour ?? 0) || 0;
+  return a + r;
 }
 
 export default function History() {
@@ -87,6 +88,12 @@ export default function History() {
     return total;
   }
 
+  function sumKmForJobs(list) {
+    let total = 0;
+    for (const j of list) total += kmTotal(j);
+    return Math.round(total * 100) / 100;
+  }
+
   const grouped = useMemo(() => {
     const map = new Map();
 
@@ -99,7 +106,8 @@ export default function History() {
     return Array.from(map.entries()).map(([date, list]) => {
       const totalHours = sumHoursForJobs(list);
       const totalHHmm = toHHmmLabelFromFormatHours(formatHours(totalHours));
-      return { date, list, totalHours, totalHHmm };
+      const totalKm = sumKmForJobs(list);
+      return { date, list, totalHours, totalHHmm, totalKm };
     });
   }, [jobs]);
 
@@ -149,20 +157,18 @@ export default function History() {
           <div style={styles.subText}>
             {user?.email}
             <br />
-            Role: <b>{fmtRoleLabel(role)}</b>
+            role: {role}
           </div>
         </div>
 
+        {/* ✅ unified order: Form History Week Manager Logout */}
         <div style={styles.nav}>
-          {/* ✅ Form always goes to Form page */}
           <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
             Form
           </button>
 
-          {/* ✅ Active item on this page */}
           <span style={styles.activeLink}>History</span>
 
-          {/* ✅ Week should be a link on History page */}
           <Link to="/week" style={styles.link}>
             Week
           </Link>
@@ -192,8 +198,9 @@ export default function History() {
           grouped.map((g) => (
             <div key={g.date} style={{ marginBottom: 14 }}>
               <div style={{ marginBottom: 10 }}>
+                {/* ✅ Date header now includes total hours AND total KM */}
                 <div style={styles.dateHeader}>
-                  {dayjs(g.date).format("DD MMM YYYY")} • <b>{g.totalHHmm}</b>
+                  {dayjs(g.date).format("DD MMM YYYY")} • <b>{g.totalHHmm}</b> • <b>{g.totalKm}</b> km
                 </div>
               </div>
 
@@ -206,7 +213,10 @@ export default function History() {
                   const totalLabelRaw = formatHours(totalHours);
                   const totalHHmm = toHHmmLabelFromFormatHours(totalLabelRaw);
 
-                  const kmLabel = j.km_aller ?? 0;
+                  const a = Number(j.km_aller ?? 0) || 0;
+                  const r = Number(j.km_retour ?? 0) || 0;
+                  const km = a + r;
+
                   const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
 
                   const showOpen = canOpen(j);
@@ -224,8 +234,12 @@ export default function History() {
                               <span style={styles.metricPill}>
                                 Total: <b>{totalHHmm}</b>
                               </span>
+
                               <span style={styles.metricPill}>
-                                KM: <b>{kmLabel}</b>
+                                KM: <b>{km}</b>
+                                {r > 0 ? (
+                                  <span style={{ fontWeight: 700, color: "#555" }}> (A: {a} / R: {r})</span>
+                                ) : null}
                               </span>
                             </div>
                           </div>
@@ -246,7 +260,6 @@ export default function History() {
                                   disabled={busy}
                                   onClick={() => openJob(j)}
                                   style={styles.openBtn}
-                                  title="Open this saved job to edit"
                                   type="button"
                                 >
                                   {busy ? "…" : "OPEN"}
@@ -258,7 +271,6 @@ export default function History() {
                                   disabled={busy}
                                   onClick={() => deleteJob(j.id)}
                                   style={styles.deleteBtn}
-                                  title="Delete this saved job"
                                   type="button"
                                 >
                                   {busy ? "…" : "DELETE"}

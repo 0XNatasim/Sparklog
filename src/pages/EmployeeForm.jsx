@@ -1,313 +1,349 @@
-// src/pages/EmployeeForm.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { TimePicker } from "@mui/x-date-pickers/TimePicker";
-import { TextField } from "@mui/material";
-
+import "dayjs/locale/en";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { hoursBetween } from "../lib/time";
+import { hoursBetween, formatHours } from "../lib/time";
 
-function fmtRoleLabel(role) {
-  if (!role) return "—";
-  return String(role);
+dayjs.locale("en");
+
+function fmtTimeHHmm(t) {
+  if (!t) return "";
+  return String(t).slice(0, 5);
 }
 
-function toHHmmFromHoursDecimal(hoursDecimal) {
-  // hoursDecimal like 2.75 => "2h45"
-  const h = Number(hoursDecimal);
-  if (!Number.isFinite(h) || h <= 0) return "0h00";
-  const totalMinutes = Math.round(h * 60);
+function makeDayjsFromJob(job_date, timeStr) {
+  if (!job_date || !timeStr) return null;
+  const d = dayjs(`${job_date}T${timeStr}`);
+  return d.isValid() ? d : null;
+}
+
+function toHHmmLabelFromFormatHours(formatHoursResult) {
+  const num = Number(String(formatHoursResult).replace(",", "."));
+  if (!Number.isFinite(num) || num <= 0) return "0h00";
+  const totalMinutes = Math.round(num * 60);
   const hh = Math.floor(totalMinutes / 60);
   const mm = totalMinutes % 60;
   return `${hh}h${String(mm).padStart(2, "0")}`;
 }
 
+function normalizeNumber(value) {
+  // accepts "", "12", "12.5", "12,5" etc.
+  if (value === "" || value === null || value === undefined) return null;
+  const n = Number(String(value).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function EmployeeForm() {
-  const { user, role, fullName, signOut } = useAuth();
+  const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const editId = searchParams.get("edit"); // job UUID
 
-  const [jobDate, setJobDate] = useState(dayjs());
-  const [ot, setOt] = useState("");
-  const [depart, setDepart] = useState(null);
-  const [arrivee, setArrivee] = useState(null);
-  const [fin, setFin] = useState(null);
-  const [km, setKm] = useState(""); // ✅ empty by default
+  const editId = searchParams.get("edit");
 
-  const [loadedJob, setLoadedJob] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
 
-  const isEditing = Boolean(editId);
-  const isDraftEditable = loadedJob ? loadedJob.status === "saved" && loadedJob.locked === false : true;
-  const inputsDisabled = loading || (isEditing && !isDraftEditable);
+  // Form fields
+  const [job_date, setJobDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [ot, setOt] = useState("");
+  const [depart, setDepart] = useState("07:00");
+  const [arrivee, setArrivee] = useState("08:00");
+  const [fin, setFin] = useState("16:00");
 
-  // Calculate total hours between depart and fin
-  const hoursDecimal = useMemo(() => hoursBetween(depart, fin), [depart, fin]);
-  const hoursHHmm = useMemo(() => toHHmmFromHoursDecimal(hoursDecimal), [hoursDecimal]);
+  const [km_aller, setKmAller] = useState("");   // store as string for input UX
+  const [hasReturnKm, setHasReturnKm] = useState(false);
+  const [km_retour, setKmRetour] = useState(""); // only used if hasReturnKm
 
-  const canSubmit = useMemo(() => {
-    if (!jobDate || !dayjs(jobDate).isValid()) return false;
-    if (!ot.trim()) return false;
-    return true;
-  }, [jobDate, ot]);
+  const [locked, setLocked] = useState(false);
+  const [status, setStatus] = useState("saved");
 
-  // Load job when editing
+  const departDj = useMemo(() => makeDayjsFromJob(job_date, depart), [job_date, depart]);
+  const finDj = useMemo(() => makeDayjsFromJob(job_date, fin), [job_date, fin]);
+
+  const hoursDecimal = useMemo(() => hoursBetween(departDj, finDj) || 0, [departDj, finDj]);
+  const hoursLabel = useMemo(() => toHHmmLabelFromFormatHours(formatHours(hoursDecimal)), [hoursDecimal]);
+
+  async function loadEdit() {
+    if (!editId || !user?.id) return;
+
+    setErr("");
+    setInfo("");
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("id", editId)
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new Error("Job not found.");
+      if (data.user_id !== user.id) throw new Error("Not authorized.");
+
+      setJobDate(data.job_date || dayjs().format("YYYY-MM-DD"));
+      setOt(data.ot || "");
+      setDepart(fmtTimeHHmm(data.depart) || "07:00");
+      setArrivee(fmtTimeHHmm(data.arrivee) || "08:00");
+      setFin(fmtTimeHHmm(data.fin) || "16:00");
+
+      // KM (aller + optional retour)
+      const aller = data.km_aller ?? "";
+      const retour = data.km_retour ?? null;
+
+      setKmAller(aller === null || aller === undefined ? "" : String(aller));
+      setHasReturnKm(retour !== null && retour !== undefined && String(retour) !== "");
+      setKmRetour(retour === null || retour === undefined ? "" : String(retour));
+
+      setLocked(Boolean(data.locked));
+      setStatus(data.status || "saved");
+    } catch (e) {
+      setErr(e?.message || "Failed to load job.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    let cancelled = false;
+    loadEdit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, user?.id]);
 
-    async function loadJob() {
-      if (!editId) {
-        setLoadedJob(null);
-        setMsg("");
-        setErr("");
-        setKm("");
-        return;
-      }
-
-      setLoading(true);
-      setErr("");
-      setMsg("");
-      try {
-        const { data, error } = await supabase.from("jobs").select("*").eq("id", editId).single();
-        if (error) throw error;
-        if (cancelled) return;
-
-        setLoadedJob(data);
-
-        setJobDate(dayjs(data.job_date));
-        setOt(data.ot || "");
-        setDepart(data.depart ? dayjs(`${data.job_date}T${data.depart}`) : null);
-        setArrivee(data.arrivee ? dayjs(`${data.job_date}T${data.arrivee}`) : null);
-        setFin(data.fin ? dayjs(`${data.job_date}T${data.fin}`) : null);
-
-        // ✅ keep KM empty if null/0
-        const kmVal = data.km_aller ?? null;
-        setKm(kmVal ? String(kmVal) : "");
-      } catch (e) {
-        if (!cancelled) setErr(e?.message || "Failed to load draft.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    loadJob();
-    return () => {
-      cancelled = true;
-    };
-  }, [editId]);
-
-  function buildPayload(nextStatus) {
-    return {
-      user_id: user.id,
-      job_date: dayjs(jobDate).format("YYYY-MM-DD"),
-      ot: ot.trim(),
-      depart: depart ? dayjs(depart).format("HH:mm:ss") : null,
-      arrivee: arrivee ? dayjs(arrivee).format("HH:mm:ss") : null,
-      fin: fin ? dayjs(fin).format("HH:mm:ss") : null,
-      km_aller: km === "" ? null : Number.isFinite(Number(km)) ? parseInt(km, 10) : null,
-      status: nextStatus,
-      locked: nextStatus === "submitted",
-    };
-  }
-
-  async function saveDraft() {
+  async function saveJob(nextStatus = "saved") {
     setErr("");
-    setMsg("");
-    if (!canSubmit) return setErr("Please provide Work Date and OT number.");
-    if (isEditing && !isDraftEditable) return setErr("This entry is not editable.");
-
+    setInfo("");
     setLoading(true);
-    try {
-      const payload = buildPayload("saved");
 
-      if (isEditing) {
+    try {
+      const kmAllerNum = normalizeNumber(km_aller) ?? 0;
+      const kmRetourNum = hasReturnKm ? (normalizeNumber(km_retour) ?? 0) : null;
+
+      const payload = {
+        user_id: user.id,
+        job_date,
+        ot,
+        depart,
+        arrivee,
+        fin,
+
+        km_aller: kmAllerNum,
+        km_retour: kmRetourNum, // null if unchecked
+
+        status: nextStatus,
+        locked: nextStatus !== "saved",
+      };
+
+      if (editId) {
         const { error } = await supabase.from("jobs").update(payload).eq("id", editId);
         if (error) throw error;
-        setMsg("Draft updated.");
+        setInfo("Job updated.");
       } else {
-        const { error } = await supabase.from("jobs").upsert(payload, { onConflict: "user_id,job_date,ot" });
+        const { error } = await supabase.from("jobs").insert(payload);
         if (error) throw error;
-        setMsg("Draft saved.");
+        setInfo("Job saved.");
       }
 
-      navigate("/history");
+      setStatus(nextStatus);
+      setLocked(nextStatus !== "saved");
     } catch (e) {
-      setErr(e?.message || "Failed to save draft.");
+      setErr(e?.message || "Save failed.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function submit() {
-    setErr("");
-    setMsg("");
-    if (!canSubmit) return setErr("Please provide Work Date and OT number.");
-    if (isEditing && !isDraftEditable) return setErr("This entry is not editable.");
-
-    setLoading(true);
-    try {
-      const payload = buildPayload("submitted");
-
-      if (isEditing) {
-        const { error } = await supabase.from("jobs").update(payload).eq("id", editId);
-        if (error) throw error;
-        setMsg("Submitted for approval.");
-      } else {
-        const { error } = await supabase.from("jobs").upsert(payload, { onConflict: "user_id,job_date,ot" });
-        if (error) throw error;
-        setMsg("Submitted for approval.");
-      }
-
-      navigate("/history");
-    } catch (e) {
-      setErr(e?.message || "Failed to submit.");
-    } finally {
-      setLoading(false);
-    }
+  function onToggleReturnKm(checked) {
+    setHasReturnKm(checked);
+    if (!checked) setKmRetour("");
   }
 
   return (
     <div style={styles.page}>
+      {/* TOPBAR */}
       <div style={styles.topbar}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>SparkLog</div>
-
-          {/* ✅ email line */}
-          <div style={{ fontSize: 12, color: "#666" }}>{fullName ? fullName : user?.email}</div>
-
-          {/* ✅ role UNDER (mobile-friendly) */}
-          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-            Role: <b>{fmtRoleLabel(role)}</b>
+        <div style={styles.brandBlock}>
+          <div style={styles.pageTitle}>Form</div>
+          <div style={styles.subText}>
+            {user?.email}
+            <br />
+            role: {role}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link to="/" style={styles.link}>
-            Form
-          </Link>
-          <Link to="/week" style={styles.link}>
-            Week
-          </Link>
+        {/* Menu order: Form History Week Manager Logout */}
+        <div style={styles.nav}>
+          <span style={styles.activeLink}>Form</span>
+
           <Link to="/history" style={styles.link}>
             History
           </Link>
+
+          <Link to="/week" style={styles.link}>
+            Week
+          </Link>
+
           {role === "manager" && (
             <Link to="/manager" style={styles.link}>
               Manager
             </Link>
           )}
+
           <button onClick={signOut} style={styles.secondaryBtn}>
             Logout
           </button>
         </div>
       </div>
 
-      {isEditing && loadedJob && !isDraftEditable && (
-        <div style={styles.notice}>
-          This entry is <b>{loadedJob.status}</b> and cannot be edited.
-        </div>
-      )}
+      <div style={styles.container}>
+        {err && <div style={styles.error}>{err}</div>}
+        {info && <div style={styles.info}>{info}</div>}
+        {loading && <div style={styles.card}>Loading…</div>}
 
-      <div style={styles.card}>
-        <div style={styles.h1}>{isEditing ? "Edit Draft" : "New Work Log"}</div>
-
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <div style={styles.formGrid}>
+        <div style={styles.card}>
+          <div style={styles.grid}>
             <div style={styles.field}>
-              <div style={styles.label}>Work date *</div>
-              <DatePicker
-                value={jobDate}
-                onChange={(v) => setJobDate(v)}
-                disabled={inputsDisabled}
-                slotProps={{ textField: { size: "small", fullWidth: true } }}
+              <div style={styles.label}>Date</div>
+              <input
+                type="date"
+                value={job_date}
+                onChange={(e) => setJobDate(e.target.value)}
+                style={styles.input}
+                disabled={locked}
               />
             </div>
 
             <div style={styles.field}>
-              <div style={styles.label}>Work order (OT) *</div>
+              <div style={styles.label}>Work order (OT)</div>
               <input
-                style={styles.input}
                 value={ot}
                 onChange={(e) => setOt(e.target.value)}
-                placeholder="e.g., #12345"
-                disabled={inputsDisabled}
+                placeholder="ex: 12345"
+                style={styles.input}
+                disabled={locked}
               />
             </div>
 
-            <div style={styles.row3}>
-              <div style={styles.field}>
-                <div style={styles.label}>Departure</div>
-                <TimePicker
-                  value={depart}
-                  onChange={(v) => setDepart(v)}
-                  disabled={inputsDisabled}
-                  minutesStep={15} // ✅ 15 min only
-                  slotProps={{ textField: { size: "small", fullWidth: true } }}
-                />
-              </div>
-
-              <div style={styles.field}>
-                <div style={styles.label}>Arrival</div>
-                <TimePicker
-                  value={arrivee}
-                  onChange={(v) => setArrivee(v)}
-                  disabled={inputsDisabled}
-                  minutesStep={15} // ✅ 15 min only
-                  slotProps={{ textField: { size: "small", fullWidth: true } }}
-                />
-              </div>
-
-              <div style={styles.field}>
-                <div style={styles.label}>End</div>
-                <TimePicker
-                  value={fin}
-                  onChange={(v) => setFin(v)}
-                  disabled={inputsDisabled}
-                  minutesStep={15} // ✅ 15 min only
-                  slotProps={{ textField: { size: "small", fullWidth: true } }}
-                />
-              </div>
+            <div style={styles.field}>
+              <div style={styles.label}>Depart</div>
+              <input
+                type="time"
+                value={depart}
+                onChange={(e) => setDepart(e.target.value)}
+                style={styles.input}
+                disabled={locked}
+              />
             </div>
 
             <div style={styles.field}>
-              <div style={styles.label}>Kilometers (one-way)</div>
-              <TextField
-                size="small"
-                fullWidth
+              <div style={styles.label}>Arrival</div>
+              <input
+                type="time"
+                value={arrivee}
+                onChange={(e) => setArrivee(e.target.value)}
+                style={styles.input}
+                disabled={locked}
+              />
+            </div>
+
+            <div style={styles.field}>
+              <div style={styles.label}>End</div>
+              <input
+                type="time"
+                value={fin}
+                onChange={(e) => setFin(e.target.value)}
+                style={styles.input}
+                disabled={locked}
+              />
+            </div>
+
+            {/* KM aller */}
+            <div style={styles.field}>
+              <div style={styles.label}>KM (aller)</div>
+              <input
                 type="number"
-                value={km}
-                onChange={(e) => setKm(e.target.value)}
-                disabled={inputsDisabled}
-                inputProps={{ min: 0 }}
-                placeholder=""
+                value={km_aller}
+                onChange={(e) => setKmAller(e.target.value)}
+                style={styles.input}
+                disabled={locked}
+                placeholder="0"
               />
             </div>
 
+            {/* ✅ Checkbox + conditional return KM */}
             <div style={styles.field}>
-              <div style={styles.label}>Calculated hours</div>
-              <div style={styles.hoursBox}>{hoursHHmm}</div>
+              <div style={styles.label}>Return trip?</div>
+              <label style={styles.checkboxRow}>
+                <input
+                  type="checkbox"
+                  checked={hasReturnKm}
+                  onChange={(e) => onToggleReturnKm(e.target.checked)}
+                  disabled={locked}
+                />
+                <span style={{ fontSize: 13, color: "#111", fontWeight: 800 }}>
+                  Add KM return
+                </span>
+              </label>
+
+              {hasReturnKm && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ ...styles.label, marginBottom: 6 }}>KM (retour)</div>
+                  <input
+                    type="number"
+                    value={km_retour}
+                    onChange={(e) => setKmRetour(e.target.value)}
+                    style={styles.input}
+                    disabled={locked}
+                    placeholder="0"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div style={styles.field}>
+              <div style={styles.label}>Total hours</div>
+              <div style={styles.readonlyBox}>{hoursLabel}</div>
+            </div>
+
+            <div style={styles.field}>
+              <div style={styles.label}>Status</div>
+              <div style={styles.readonlyBox}>{status}</div>
             </div>
           </div>
-        </LocalizationProvider>
 
-        {err && <div style={styles.error}>{err}</div>}
-        {msg && <div style={styles.success}>{msg}</div>}
+          <div style={styles.actions}>
+            <button
+              type="button"
+              style={styles.primaryBtn}
+              disabled={loading || locked}
+              onClick={() => saveJob("saved")}
+            >
+              Save
+            </button>
 
-        <div style={styles.actions}>
-          <button disabled={inputsDisabled} onClick={saveDraft} style={styles.secondaryBtn}>
-            {loading ? "Saving…" : "Save Draft"}
-          </button>
-          <button disabled={inputsDisabled} onClick={submit} style={styles.primaryBtn}>
-            {loading ? "Submitting…" : "Submit"}
-          </button>
+            <button
+              type="button"
+              style={styles.secondaryBtn}
+              disabled={loading || locked}
+              onClick={() => saveJob("submitted")}
+            >
+              Submit
+            </button>
+
+            {editId && (
+              <button type="button" style={styles.ghostBtn} onClick={() => navigate("/")} disabled={loading}>
+                New job
+              </button>
+            )}
+          </div>
+
+          {locked && (
+            <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
+              This job is locked ({status}). You can only edit when it is <b>saved</b> and unlocked.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -316,67 +352,86 @@ export default function EmployeeForm() {
 
 const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
+  container: { maxWidth: 980, margin: "0 auto" },
+
   topbar: {
     maxWidth: 980,
     margin: "0 auto 12px auto",
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
   },
-  link: { color: "#1565c0", fontWeight: 800, textDecoration: "none" },
-  notice: {
-    maxWidth: 980,
-    margin: "0 auto 12px auto",
-    background: "rgba(21,101,192,0.08)",
-    border: "1px solid rgba(21,101,192,0.2)",
-    borderRadius: 12,
-    padding: 12,
-    color: "#0d47a1",
-    fontSize: 13,
+  brandBlock: { display: "grid", gap: 2 },
+  pageTitle: { fontSize: 18, fontWeight: 900 },
+  subText: { fontSize: 12, color: "#666" },
+
+  nav: {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
+  link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
+  activeLink: { fontWeight: 900, color: "#111", fontSize: 14 },
+
   card: {
-    maxWidth: 980,
-    margin: "0 auto",
     background: "#fff",
     border: "1px solid #eee",
     borderRadius: 14,
     padding: 16,
+    marginBottom: 12,
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
-  h1: { fontSize: 18, fontWeight: 800, marginBottom: 12 },
-  formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-  row3: {
-    gridColumn: "1 / -1",
+
+  grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
     gap: 12,
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   },
   field: { display: "grid", gap: 6 },
-  label: { fontSize: 12, color: "#555", fontWeight: 700 },
+  label: { fontSize: 12, color: "#666", fontWeight: 800 },
+
   input: {
     border: "1px solid #eee",
     borderRadius: 10,
     padding: "10px 12px",
     fontSize: 14,
     outline: "none",
+    width: "100%",
   },
-  hoursBox: {
+  readonlyBox: {
     border: "1px solid #eee",
     borderRadius: 10,
     padding: "10px 12px",
     fontSize: 14,
-    fontWeight: 800,
+    background: "#f8f8f8",
+    fontWeight: 900,
     color: "#111",
   },
-  actions: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 },
+
+  checkboxRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "10px 12px",
+    border: "1px solid #eee",
+    borderRadius: 10,
+    background: "#fff",
+  },
+
+  actions: { display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" },
+
   primaryBtn: {
     background: "#1565c0",
     color: "#fff",
-    border: "none",
+    border: "1px solid #1565c0",
     borderRadius: 10,
     padding: "10px 12px",
-    fontSize: 14,
-    fontWeight: 800,
+    fontSize: 13,
+    fontWeight: 900,
     cursor: "pointer",
   },
   secondaryBtn: {
@@ -385,12 +440,23 @@ const styles = {
     border: "1px solid #eee",
     borderRadius: 10,
     padding: "10px 12px",
-    fontSize: 14,
-    fontWeight: 800,
+    fontSize: 13,
+    fontWeight: 900,
     cursor: "pointer",
   },
+  ghostBtn: {
+    background: "transparent",
+    color: "#1565c0",
+    border: "1px solid #e0e0e0",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 13,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+
   error: {
-    marginTop: 12,
+    marginBottom: 10,
     background: "rgba(220,20,60,0.08)",
     border: "1px solid rgba(220,20,60,0.2)",
     color: "crimson",
@@ -398,11 +464,11 @@ const styles = {
     borderRadius: 10,
     fontSize: 13,
   },
-  success: {
-    marginTop: 12,
-    background: "rgba(76,175,80,0.10)",
-    border: "1px solid rgba(76,175,80,0.25)",
-    color: "#2e7d32",
+  info: {
+    marginBottom: 10,
+    background: "rgba(21,101,192,0.08)",
+    border: "1px solid rgba(21,101,192,0.2)",
+    color: "#0d47a1",
     padding: 10,
     borderRadius: 10,
     fontSize: 13,

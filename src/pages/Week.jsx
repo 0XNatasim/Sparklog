@@ -27,7 +27,7 @@ function makeDayjsFromJob(job_date, timeStr) {
 function roundToQuarterHour(hours) {
   const h = Number(hours);
   if (!Number.isFinite(h) || h <= 0) return 0;
-  return Math.round(h * 4) / 4; // 0.25h increments
+  return Math.round(h * 4) / 4;
 }
 
 function formatHoursHM(hours) {
@@ -63,12 +63,17 @@ function RightBucket({ label, value }) {
   );
 }
 
+function kmTotal(job) {
+  const a = Number(job?.km_aller ?? 0) || 0;
+  const r = Number(job?.km_retour ?? 0) || 0;
+  return a + r;
+}
+
 export default function Week() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Manager can view an employee week via: /week?employee=<uuid>
   const employeeIdParam = searchParams.get("employee");
   const isManagerViewingEmployee = role === "manager" && Boolean(employeeIdParam);
   const effectiveUserId = isManagerViewingEmployee ? employeeIdParam : user?.id;
@@ -112,13 +117,12 @@ export default function Week() {
     const map = new Map();
 
     for (const j of jobs) {
-      // If you want payroll-only week stats, uncomment:
+      // If you only want approved payroll data, uncomment:
       // if (j.status !== "approved") continue;
 
       const d1 = makeDayjsFromJob(j.job_date, j.depart);
       const d2 = makeDayjsFromJob(j.job_date, j.fin);
       const hours = roundToQuarterHour(hoursBetween(d1, d2) || 0);
-      const km = j.km_aller ?? 0;
 
       const weekStart = dayjs(j.job_date).startOf("isoWeek");
       const key = weekStart.format("YYYY-[W]WW");
@@ -128,12 +132,14 @@ export default function Week() {
           start: weekStart,
           end: weekStart.endOf("isoWeek"),
           totalKm: 0,
-          dayHours: new Map(), // "YYYY-MM-DD" -> hours
+          dayHours: new Map(),
         });
       }
 
       const w = map.get(key);
-      w.totalKm += km;
+
+      // ✅ include km_retour if present
+      w.totalKm += kmTotal(j);
 
       const dayKey = dayjs(j.job_date).format("YYYY-MM-DD");
       const prev = w.dayHours.get(dayKey) || 0;
@@ -150,7 +156,7 @@ export default function Week() {
       out.push({
         start: w.start,
         end: w.end,
-        totalKm: w.totalKm,
+        totalKm: Math.round(w.totalKm * 100) / 100,
         totalHours,
         hours1x: hours_1x,
         hours15x: hours_15x,
@@ -163,7 +169,6 @@ export default function Week() {
 
   return (
     <div style={styles.page}>
-      {/* TOPBAR */}
       <div style={styles.topbar}>
         <div style={styles.brandBlock}>
           <div style={styles.pageTitle}>Week</div>
@@ -178,6 +183,7 @@ export default function Week() {
           </div>
         </div>
 
+        {/* ✅ unified order: Form History Week Manager Logout */}
         <div style={styles.nav}>
           <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
             Form
@@ -201,7 +207,6 @@ export default function Week() {
         </div>
       </div>
 
-      {/* CONTENT */}
       <div style={styles.container}>
         {loading && <div style={styles.card}>Loading…</div>}
         {err && <div style={styles.error}>{err}</div>}
@@ -216,7 +221,6 @@ export default function Week() {
 
             return (
               <div key={idx} style={styles.weekCard}>
-                {/* Left column */}
                 <div style={styles.left}>
                   <div style={styles.weekTitle}>Week {weekNum}</div>
                   <div style={styles.rangeLine}>{rangeLeft}</div>
@@ -232,7 +236,6 @@ export default function Week() {
                   </div>
                 </div>
 
-                {/* Right column (kept close + aligned) */}
                 <div style={styles.right}>
                   <RightBucket label="1x:" value={formatHoursHM(w.hours1x)} />
                   <RightBucket label="1.5x:" value={formatHoursHM(w.hours15x)} />
@@ -292,8 +295,6 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
 
-  // ✅ Always 2 columns (desktop + mobile)
-  // Right column is narrow and close to the left (not floating to far right).
   weekCard: {
     background: "#fff",
     border: "1px solid #eee",
@@ -321,11 +322,7 @@ const styles = {
   },
   dot: { color: "#999" },
 
-  right: {
-    display: "grid",
-    gap: 10,
-    alignContent: "start",
-  },
+  right: { display: "grid", gap: 10, alignContent: "start" },
 
   bucketRow: {
     display: "flex",
