@@ -39,7 +39,6 @@ function formatHoursHM(hours) {
 }
 
 function splitWeekBucketsFromDailyTotals(dayHoursMap) {
-  // dayHoursMap: Map("YYYY-MM-DD" -> totalHoursThatDay)
   let hours_1x = 0;
   let overtime_total = 0;
 
@@ -55,20 +54,14 @@ function splitWeekBucketsFromDailyTotals(dayHoursMap) {
   return { hours_1x, hours_15x, hours_2x };
 }
 
-function BucketInline({ label, value }) {
+function RightBucket({ label, value }) {
   return (
-    <span style={stylesInline.bucketWrap}>
-      <span style={stylesInline.bucketLabel}>{label}</span>
-      <span style={stylesInline.bucketValue}>{value}</span>
-    </span>
+    <div style={styles.bucketRow}>
+      <span style={styles.bucketLabel}>{label}</span>
+      <span style={styles.bucketValue}>{value}</span>
+    </div>
   );
 }
-
-const stylesInline = {
-  bucketWrap: { display: "inline-flex", gap: 8, alignItems: "baseline", whiteSpace: "nowrap" },
-  bucketLabel: { color: "#555", fontWeight: 800 },
-  bucketValue: { color: "#111", fontWeight: 900 },
-};
 
 export default function Week() {
   const { user, role, signOut } = useAuth();
@@ -223,27 +216,12 @@ export default function Week() {
 
             return (
               <div key={idx} style={styles.weekCard}>
-                {/* Row 1 */}
-                <div style={styles.row}>
-                  <div style={styles.leftStrong}>Week {weekNum}</div>
+                {/* Left column */}
+                <div style={styles.left}>
+                  <div style={styles.weekTitle}>Week {weekNum}</div>
+                  <div style={styles.rangeLine}>{rangeLeft}</div>
 
-                  <div style={styles.rightInline}>
-                    <BucketInline label="1x:" value={formatHoursHM(w.hours1x)} />
-                  </div>
-                </div>
-
-                {/* Row 2 */}
-                <div style={styles.row}>
-                  <div style={styles.leftMuted}>{rangeLeft}</div>
-
-                  <div style={styles.rightInline}>
-                    <BucketInline label="1.5x:" value={formatHoursHM(w.hours15x)} />
-                  </div>
-                </div>
-
-                {/* Row 3 */}
-                <div style={styles.row}>
-                  <div style={styles.leftTotals}>
+                  <div style={styles.totalLine}>
                     <span>
                       Total: <b>{formatHoursHM(w.totalHours)}</b>
                     </span>
@@ -252,10 +230,13 @@ export default function Week() {
                       <b>{w.totalKm}</b> km
                     </span>
                   </div>
+                </div>
 
-                  <div style={styles.rightInline}>
-                    <BucketInline label="2.0x:" value={formatHoursHM(w.hours2x)} />
-                  </div>
+                {/* Right column (kept close + aligned) */}
+                <div style={styles.right}>
+                  <RightBucket label="1x:" value={formatHoursHM(w.hours1x)} />
+                  <RightBucket label="1.5x:" value={formatHoursHM(w.hours15x)} />
+                  <RightBucket label="2.0x:" value={formatHoursHM(w.hours2x)} />
                 </div>
               </div>
             );
@@ -311,7 +292,8 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
 
-  // Compact, left-aligned card. Multipliers are close to the left content.
+  // ✅ Always 2 columns (desktop + mobile)
+  // Right column is narrow and close to the left (not floating to far right).
   weekCard: {
     background: "#fff",
     border: "1px solid #eee",
@@ -320,36 +302,41 @@ const styles = {
     marginBottom: 12,
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
     display: "grid",
-    gap: 8,
+    gridTemplateColumns: "minmax(0, 1fr) 140px",
+    columnGap: 16,
+    alignItems: "start",
   },
 
-  row: {
-    display: "flex",
-    alignItems: "baseline",
-    justifyContent: "flex-start",
-    gap: 16,
-    flexWrap: "wrap",
-  },
+  left: { minWidth: 0, display: "grid", gap: 8 },
+  weekTitle: { fontWeight: 900, fontSize: 16, color: "#111" },
+  rangeLine: { fontSize: 13, color: "#555" },
 
-  leftStrong: { fontWeight: 900, fontSize: 16, color: "#111", minWidth: 240 },
-  leftMuted: { fontSize: 13, color: "#555", minWidth: 240 },
-
-  leftTotals: {
+  totalLine: {
     fontSize: 13,
     color: "#111",
     display: "flex",
     gap: 10,
     alignItems: "baseline",
     flexWrap: "wrap",
-    minWidth: 240,
   },
   dot: { color: "#999" },
 
-  // Keep multipliers near the left block, not pushed to the far right.
-  rightInline: {
+  right: {
+    display: "grid",
+    gap: 10,
+    alignContent: "start",
+  },
+
+  bucketRow: {
     display: "flex",
     alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 10,
+    fontSize: 13,
+    width: "100%",
   },
+  bucketLabel: { color: "#555", fontWeight: 800 },
+  bucketValue: { color: "#111", fontWeight: 900, whiteSpace: "nowrap" },
 
   secondaryBtn: {
     background: "#f5f5f5",
