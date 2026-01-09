@@ -276,7 +276,7 @@ export default function EmployeeForm() {
                     onChange={(e) => onToggleReturnKm(e.target.checked)}
                     disabled={disableInputs}
                   />
-                  <span style={styles.kmCheckText}>Add KM return</span>
+                  <span style={styles.kmCheckText}></span>
                 </label>
 
                 <input
