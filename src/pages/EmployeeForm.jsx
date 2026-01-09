@@ -29,7 +29,6 @@ function toHHmmLabelFromFormatHours(formatHoursResult) {
 }
 
 function normalizeNumber(value) {
-  // accepts "", "12", "12.5", "12,5" etc.
   if (value === "" || value === null || value === undefined) return null;
   const n = Number(String(value).replace(",", "."));
   return Number.isFinite(n) ? n : null;
@@ -53,9 +52,9 @@ export default function EmployeeForm() {
   const [arrivee, setArrivee] = useState("08:00");
   const [fin, setFin] = useState("16:00");
 
-  const [km_aller, setKmAller] = useState("");   // store as string for input UX
+  const [km_aller, setKmAller] = useState(""); // string for input UX
   const [hasReturnKm, setHasReturnKm] = useState(false);
-  const [km_retour, setKmRetour] = useState(""); // only used if hasReturnKm
+  const [km_retour, setKmRetour] = useState(""); // always rendered, but disabled unless checked
 
   const [locked, setLocked] = useState(false);
   const [status, setStatus] = useState("saved");
@@ -74,12 +73,7 @@ export default function EmployeeForm() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("id", editId)
-        .single();
-
+      const { data, error } = await supabase.from("jobs").select("*").eq("id", editId).single();
       if (error) throw error;
       if (!data) throw new Error("Job not found.");
       if (data.user_id !== user.id) throw new Error("Not authorized.");
@@ -90,13 +84,13 @@ export default function EmployeeForm() {
       setArrivee(fmtTimeHHmm(data.arrivee) || "08:00");
       setFin(fmtTimeHHmm(data.fin) || "16:00");
 
-      // KM (aller + optional retour)
       const aller = data.km_aller ?? "";
       const retour = data.km_retour ?? null;
 
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
-      setHasReturnKm(retour !== null && retour !== undefined && String(retour) !== "");
-      setKmRetour(retour === null || retour === undefined ? "" : String(retour));
+      const hasRetour = retour !== null && retour !== undefined && String(retour) !== "";
+      setHasReturnKm(hasRetour);
+      setKmRetour(hasRetour ? String(retour) : "");
 
       setLocked(Boolean(data.locked));
       setStatus(data.status || "saved");
@@ -111,6 +105,11 @@ export default function EmployeeForm() {
     loadEdit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
+
+  function onToggleReturnKm(checked) {
+    setHasReturnKm(checked);
+    if (!checked) setKmRetour(""); // clear when disabled
+  }
 
   async function saveJob(nextStatus = "saved") {
     setErr("");
@@ -128,10 +127,8 @@ export default function EmployeeForm() {
         depart,
         arrivee,
         fin,
-
         km_aller: kmAllerNum,
-        km_retour: kmRetourNum, // null if unchecked
-
+        km_retour: kmRetourNum,
         status: nextStatus,
         locked: nextStatus !== "saved",
       };
@@ -155,10 +152,7 @@ export default function EmployeeForm() {
     }
   }
 
-  function onToggleReturnKm(checked) {
-    setHasReturnKm(checked);
-    if (!checked) setKmRetour("");
-  }
+  const disableInputs = locked || loading;
 
   return (
     <div style={styles.page}>
@@ -200,7 +194,6 @@ export default function EmployeeForm() {
       <div style={styles.container}>
         {err && <div style={styles.error}>{err}</div>}
         {info && <div style={styles.info}>{info}</div>}
-        {loading && <div style={styles.card}>Loading…</div>}
 
         <div style={styles.card}>
           <div style={styles.grid}>
@@ -211,7 +204,7 @@ export default function EmployeeForm() {
                 value={job_date}
                 onChange={(e) => setJobDate(e.target.value)}
                 style={styles.input}
-                disabled={locked}
+                disabled={disableInputs}
               />
             </div>
 
@@ -222,7 +215,7 @@ export default function EmployeeForm() {
                 onChange={(e) => setOt(e.target.value)}
                 placeholder="ex: 12345"
                 style={styles.input}
-                disabled={locked}
+                disabled={disableInputs}
               />
             </div>
 
@@ -233,7 +226,7 @@ export default function EmployeeForm() {
                 value={depart}
                 onChange={(e) => setDepart(e.target.value)}
                 style={styles.input}
-                disabled={locked}
+                disabled={disableInputs}
               />
             </div>
 
@@ -244,7 +237,7 @@ export default function EmployeeForm() {
                 value={arrivee}
                 onChange={(e) => setArrivee(e.target.value)}
                 style={styles.input}
-                disabled={locked}
+                disabled={disableInputs}
               />
             </div>
 
@@ -255,11 +248,10 @@ export default function EmployeeForm() {
                 value={fin}
                 onChange={(e) => setFin(e.target.value)}
                 style={styles.input}
-                disabled={locked}
+                disabled={disableInputs}
               />
             </div>
 
-            {/* KM aller */}
             <div style={styles.field}>
               <div style={styles.label}>KM (aller)</div>
               <input
@@ -267,39 +259,40 @@ export default function EmployeeForm() {
                 value={km_aller}
                 onChange={(e) => setKmAller(e.target.value)}
                 style={styles.input}
-                disabled={locked}
+                disabled={disableInputs}
                 placeholder="0"
               />
             </div>
 
-            {/* ✅ Checkbox + conditional return KM */}
+            {/* ✅ Single row: checkbox + input (no extra block/box) */}
             <div style={styles.field}>
-              <div style={styles.label}>Return trip?</div>
-              <label style={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={hasReturnKm}
-                  onChange={(e) => onToggleReturnKm(e.target.checked)}
-                  disabled={locked}
-                />
-                <span style={{ fontSize: 13, color: "#111", fontWeight: 800 }}>
-                  Add KM return
-                </span>
-              </label>
+              <div style={styles.label}>KM (retour)</div>
 
-              {hasReturnKm && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ ...styles.label, marginBottom: 6 }}>KM (retour)</div>
+              <div style={styles.kmReturnRow}>
+                <label style={styles.kmCheck}>
                   <input
-                    type="number"
-                    value={km_retour}
-                    onChange={(e) => setKmRetour(e.target.value)}
-                    style={styles.input}
-                    disabled={locked}
-                    placeholder="0"
+                    type="checkbox"
+                    checked={hasReturnKm}
+                    onChange={(e) => onToggleReturnKm(e.target.checked)}
+                    disabled={disableInputs}
                   />
-                </div>
-              )}
+                  <span style={styles.kmCheckText}>Add KM return</span>
+                </label>
+
+                <input
+                  type="number"
+                  value={km_retour}
+                  onChange={(e) => setKmRetour(e.target.value)}
+                  placeholder="0"
+                  disabled={disableInputs || !hasReturnKm}
+                  style={{
+                    ...styles.input,
+                    margin: 0,
+                    opacity: hasReturnKm ? 1 : 0.45,
+                    background: hasReturnKm ? "#fff" : "#f8f8f8",
+                  }}
+                />
+              </div>
             </div>
 
             <div style={styles.field}>
@@ -314,19 +307,14 @@ export default function EmployeeForm() {
           </div>
 
           <div style={styles.actions}>
-            <button
-              type="button"
-              style={styles.primaryBtn}
-              disabled={loading || locked}
-              onClick={() => saveJob("saved")}
-            >
+            <button type="button" style={styles.primaryBtn} disabled={disableInputs} onClick={() => saveJob("saved")}>
               Save
             </button>
 
             <button
               type="button"
               style={styles.secondaryBtn}
-              disabled={loading || locked}
+              disabled={disableInputs}
               onClick={() => saveJob("submitted")}
             >
               Submit
@@ -402,6 +390,7 @@ const styles = {
     outline: "none",
     width: "100%",
   },
+
   readonlyBox: {
     border: "1px solid #eee",
     borderRadius: 10,
@@ -412,15 +401,24 @@ const styles = {
     color: "#111",
   },
 
-  checkboxRow: {
-    display: "flex",
+  // ✅ Single-row layout: checkbox + input (stable UI)
+  kmReturnRow: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr",
+    gap: 10,
+    alignItems: "center",
+  },
+  kmCheck: {
+    display: "inline-flex",
     alignItems: "center",
     gap: 10,
     padding: "10px 12px",
     border: "1px solid #eee",
     borderRadius: 10,
     background: "#fff",
+    whiteSpace: "nowrap",
   },
+  kmCheckText: { fontSize: 13, color: "#111", fontWeight: 800 },
 
   actions: { display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" },
 
