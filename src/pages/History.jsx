@@ -107,12 +107,28 @@ export default function History() {
       const totalHours = sumHoursForJobs(list);
       const totalHHmm = toHHmmLabelFromFormatHours(formatHours(totalHours));
       const totalKm = sumKmForJobs(list);
-      return { date, list, totalHours, totalHHmm, totalKm };
+      return { date, list, totalHHmm, totalKm };
     });
   }, [jobs]);
 
   function openJob(job) {
     navigate(`/?edit=${job.id}`);
+  }
+
+  function isOwner(job) {
+    return Boolean(user?.id) && job.user_id === user.id;
+  }
+
+  function canOpen(job) {
+    return isOwner(job) && job.status === "saved" && job.locked === false;
+  }
+
+  function canDelete(job) {
+    return isOwner(job) && job.status === "saved" && job.locked === false;
+  }
+
+  function canSubmit(job) {
+    return isOwner(job) && job.status === "saved" && job.locked === false;
   }
 
   async function deleteJob(jobId) {
@@ -136,16 +152,29 @@ export default function History() {
     }
   }
 
-  function isOwner(job) {
-    return Boolean(user?.id) && job.user_id === user.id;
-  }
+  async function submitJob(jobId) {
+    const ok = window.confirm("Submit this job? After submit it will be locked.");
+    if (!ok) return;
 
-  function canOpen(job) {
-    return isOwner(job) && job.status === "saved" && job.locked === false;
-  }
+    setActionLoadingId(jobId);
+    setErr("");
+    setInfo("");
 
-  function canDelete(job) {
-    return isOwner(job) && job.status === "saved" && job.locked === false;
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: "submitted", locked: true })
+        .eq("id", jobId);
+
+      if (error) throw error;
+
+      setInfo("Job submitted.");
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Submit failed.");
+    } finally {
+      setActionLoadingId(null);
+    }
   }
 
   return (
@@ -161,7 +190,7 @@ export default function History() {
           </div>
         </div>
 
-        {/* ✅ unified order: Form History Week Manager Logout */}
+        {/* unified order: Form History Week Manager Logout */}
         <div style={styles.nav}>
           <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
             Form
@@ -185,7 +214,6 @@ export default function History() {
         </div>
       </div>
 
-      {/* CONTENT */}
       <div style={styles.container}>
         {loading && <div style={styles.card}>Loading…</div>}
         {err && <div style={styles.error}>{err}</div>}
@@ -198,7 +226,6 @@ export default function History() {
           grouped.map((g) => (
             <div key={g.date} style={{ marginBottom: 14 }}>
               <div style={{ marginBottom: 10 }}>
-                {/* ✅ Date header now includes total hours AND total KM */}
                 <div style={styles.dateHeader}>
                   {dayjs(g.date).format("DD MMM YYYY")} • <b>{g.totalHHmm}</b> • <b>{g.totalKm}</b> km
                 </div>
@@ -221,6 +248,8 @@ export default function History() {
 
                   const showOpen = canOpen(j);
                   const showDelete = canDelete(j);
+                  const showSubmit = canSubmit(j);
+
                   const busy = actionLoadingId === j.id;
 
                   return (
@@ -253,8 +282,8 @@ export default function History() {
                         <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
                           <span style={{ ...styles.badge, ...badgeStyle(j.status) }}>{j.status}</span>
 
-                          {(showOpen || showDelete) && (
-                            <div style={{ display: "flex", gap: 8 }}>
+                          {(showOpen || showDelete || showSubmit) && (
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                               {showOpen && (
                                 <button
                                   disabled={busy}
@@ -263,6 +292,18 @@ export default function History() {
                                   type="button"
                                 >
                                   {busy ? "…" : "OPEN"}
+                                </button>
+                              )}
+
+                              {/* ✅ NEW: submit directly from history */}
+                              {showSubmit && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => submitJob(j.id)}
+                                  style={styles.submitBtn}
+                                  type="button"
+                                >
+                                  {busy ? "…" : "SUBMIT"}
                                 </button>
                               )}
 
@@ -389,6 +430,16 @@ const styles = {
     background: "#f5f5f5",
     color: "#111",
     border: "1px solid #eee",
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  submitBtn: {
+    background: "rgba(76, 175, 80, 0.12)",
+    color: "#1b5e20",
+    border: "1px solid rgba(76, 175, 80, 0.28)",
     borderRadius: 10,
     padding: "8px 10px",
     fontSize: 12,
