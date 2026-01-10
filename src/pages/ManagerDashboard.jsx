@@ -1,4 +1,3 @@
-// src/pages/ManagerDashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
@@ -26,7 +25,7 @@ function debounce(fn, delay) {
 
 function fmtTimeHHmm(t) {
   if (!t) return "—";
-  return String(t).slice(0, 5); // HH:mm
+  return String(t).slice(0, 5);
 }
 
 function makeDayjsFromJob(job_date, timeStr) {
@@ -40,13 +39,6 @@ function weekKeyFromDate(dateStr) {
   return ws.format("YYYY-[W]WW");
 }
 
-function weekLabelFromKey(key) {
-  // key like 2026-W02 (because format "YYYY-[W]WW")
-  // We'll reconstruct by taking the first day of iso week:
-  // Using "YYYY-[W]WW" parsing is not built-in; instead we keep date sources elsewhere.
-  return key;
-}
-
 export default function ManagerDashboard() {
   const { user, signOut } = useAuth();
 
@@ -56,8 +48,7 @@ export default function ManagerDashboard() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
-  // actionLoadingId can be jobId or "week:<weekKey>"
-  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null); // jobId or "week:<key>"
 
   // Filters
   const [employeeId, setEmployeeId] = useState("all");
@@ -65,7 +56,7 @@ export default function ManagerDashboard() {
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
 
-  // NEW: when employee is selected, manager can pick a week to bulk-approve
+  // Bulk approve week (only when employee selected)
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
   const setSearchDebounced = useMemo(
@@ -93,6 +84,7 @@ export default function ManagerDashboard() {
 
       if (jobErr) throw jobErr;
 
+      // ✅ Make sure we actually fetch the fields you want in Sheets
       const { data: profileRows, error: profErr } = await supabase
         .from("profiles")
         .select("id, role, full_name, phone, email");
@@ -122,7 +114,7 @@ export default function ManagerDashboard() {
 
     const arr = Array.from(ids).map((id) => {
       const p = profiles.get(id);
-      const label = p?.full_name?.trim() || `User ${String(id).slice(0, 8)}…`;
+      const label = p?.full_name?.trim() || p?.email?.trim() || `User ${String(id).slice(0, 8)}…`;
       return { id, label };
     });
 
@@ -142,7 +134,6 @@ export default function ManagerDashboard() {
     return jobs.filter((j) => {
       if (employeeId !== "all" && j.user_id !== employeeId) return false;
       if (statusFilter !== "all" && j.status !== statusFilter) return false;
-
       if (!q) return true;
 
       const employee = profiles.get(j.user_id);
@@ -150,14 +141,7 @@ export default function ManagerDashboard() {
       const employeePhone = employee?.phone || "";
       const employeeEmail = employee?.email || "";
 
-      const haystack = [
-        j.ot || "",
-        j.job_date || "",
-        j.status || "",
-        employeeName,
-        employeePhone,
-        employeeEmail,
-      ]
+      const haystack = [j.ot || "", j.job_date || "", j.status || "", employeeName, employeePhone, employeeEmail]
         .join(" ")
         .toLowerCase();
 
@@ -175,35 +159,27 @@ export default function ManagerDashboard() {
       if (j.status === "saved") saved.push(j);
       if (j.status === "submitted") submitted.push(j);
     }
-
     return { saved, submitted };
   }, [filtered, employeeId]);
 
   const selectedEmployee = useMemo(() => {
     if (employeeId === "all") return null;
     const p = profiles.get(employeeId);
-    const name = p?.full_name || `User ${String(employeeId).slice(0, 8)}…`;
+    const name = p?.full_name || p?.email || `User ${String(employeeId).slice(0, 8)}…`;
     const phone = p?.phone || "";
     const email = p?.email || "";
     return { id: employeeId, name, phone, email };
   }, [employeeId, profiles]);
 
-  // NEW: week options for the selected employee (based on submitted jobs)
   const weekOptions = useMemo(() => {
     if (!split) return [];
     const m = new Map();
 
-    // derive from submitted jobs only (because approve-week is for submitted)
     for (const j of split.submitted) {
       const ws = dayjs(j.job_date).startOf("isoWeek");
       const key = ws.format("YYYY-[W]WW");
       if (!m.has(key)) {
-        m.set(key, {
-          key,
-          start: ws,
-          end: ws.endOf("isoWeek"),
-          count: 0,
-        });
+        m.set(key, { key, start: ws, end: ws.endOf("isoWeek"), count: 0 });
       }
       m.get(key).count += 1;
     }
@@ -211,17 +187,11 @@ export default function ManagerDashboard() {
     return Array.from(m.values()).sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
   }, [split]);
 
-  // NEW: ensure selectedWeekKey stays valid when employee changes
   useEffect(() => {
-    if (!selectedEmployee) {
+    if (!selectedEmployee || weekOptions.length === 0) {
       setSelectedWeekKey("latest");
       return;
     }
-    if (weekOptions.length === 0) {
-      setSelectedWeekKey("latest");
-      return;
-    }
-    // default to most recent week that has submitted jobs
     setSelectedWeekKey(weekOptions[0].key);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmployee?.id]);
@@ -230,9 +200,18 @@ export default function ManagerDashboard() {
     if (!split || !selectedEmployee) return [];
     if (weekOptions.length === 0) return [];
     if (!selectedWeekKey || selectedWeekKey === "latest") return split.submitted;
-
     return split.submitted.filter((j) => weekKeyFromDate(j.job_date) === selectedWeekKey);
   }, [split, selectedEmployee, selectedWeekKey, weekOptions.length]);
+
+  // ✅ helper: build identity payload for Sheets
+  function getEmployeeIdentity(userId) {
+    const p = profiles.get(userId);
+    return {
+      employee_full_name: p?.full_name || "",
+      employee_email: p?.email || "",
+      employee_phone: p?.phone || "",
+    };
+  }
 
   async function approve(jobId) {
     setActionLoadingId(jobId);
@@ -240,14 +219,20 @@ export default function ManagerDashboard() {
     setInfo("");
 
     try {
+      const job = jobs.find((x) => x.id === jobId);
+      if (!job) throw new Error("Job not found in list.");
+
       const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
       if (sessErr) throw sessErr;
 
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error("No session token (manager). Please re-login.");
 
+      const identity = getEmployeeIdentity(job.user_id);
+
+      // ✅ send identity fields again so Sheets has name/email/phone
       const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
-        body: { job_id: jobId },
+        body: { job_id: jobId, ...identity },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
@@ -256,11 +241,7 @@ export default function ManagerDashboard() {
         throw new Error(data?.error || "Export to Google Sheet failed.");
       }
 
-      const { error } = await supabase
-        .from("jobs")
-        .update({ status: "approved", locked: true })
-        .eq("id", jobId);
-
+      const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
       if (error) throw error;
 
       setInfo(data?.skipped ? "Approved. Export skipped (already exported)." : "Approved and exported.");
@@ -272,17 +253,15 @@ export default function ManagerDashboard() {
     }
   }
 
-  // NEW: approve ALL submitted jobs in the chosen week (only when employee selected)
   async function approveWeekAll() {
     if (!selectedEmployee) return;
 
     const list = submittedForSelectedWeek;
     if (!list || list.length === 0) return;
 
-    const key = selectedWeekKey === "latest" ? "latest" : selectedWeekKey;
     const label =
       selectedWeekKey === "latest"
-        ? "the current selection"
+        ? "the selected period"
         : `Week ${dayjs(list[0].job_date).isoWeek()} (${dayjs(list[0].job_date).startOf("isoWeek").format("DD MMM")} → ${dayjs(
             list[0].job_date
           )
@@ -293,7 +272,7 @@ export default function ManagerDashboard() {
     const ok = window.confirm(`Approve ALL submitted jobs for ${selectedEmployee.name} in ${label}?\n\nCount: ${list.length}`);
     if (!ok) return;
 
-    const actionKey = `week:${key}`;
+    const actionKey = `week:${selectedWeekKey === "latest" ? "latest" : selectedWeekKey}`;
     setActionLoadingId(actionKey);
     setErr("");
     setInfo("");
@@ -308,10 +287,12 @@ export default function ManagerDashboard() {
       let approvedCount = 0;
       let skippedCount = 0;
 
-      // sequential to keep ordering + simpler error handling
+      // ✅ identity is same for all jobs (same employee)
+      const identity = getEmployeeIdentity(selectedEmployee.id);
+
       for (const j of list) {
         const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
-          body: { job_id: j.id },
+          body: { job_id: j.id, ...identity },
           headers: { Authorization: `Bearer ${accessToken}` },
         });
 
@@ -320,11 +301,7 @@ export default function ManagerDashboard() {
           throw new Error(data?.error || `Export failed for OT ${j.ot} (${j.job_date}).`);
         }
 
-        const { error } = await supabase
-          .from("jobs")
-          .update({ status: "approved", locked: true })
-          .eq("id", j.id);
-
+        const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", j.id);
         if (error) throw error;
 
         approvedCount += 1;
@@ -347,13 +324,16 @@ export default function ManagerDashboard() {
 
   function renderJobCard(j) {
     const employee = profiles.get(j.user_id);
-    const employeeName = employee?.full_name || `User ${String(j.user_id).slice(0, 8)}…`;
+    const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
 
     const d1 = makeDayjsFromJob(j.job_date, j.depart);
     const d2 = makeDayjsFromJob(j.job_date, j.fin);
     const totalHours = hoursBetween(d1, d2);
     const totalLabel = formatHours(totalHours);
-    const kmLabel = j.km_aller ?? 0;
+
+    const kmA = Number(j.km_aller ?? 0) || 0;
+    const kmR = Number(j.km_retour ?? 0) || 0;
+    const kmLabel = kmA + kmR;
 
     const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
     const canApprove = j.status === "submitted";
@@ -369,7 +349,7 @@ export default function ManagerDashboard() {
 
               <div style={styles.metrics}>
                 <span style={styles.metricPill}>
-                  Total: <b>{totalLabel}</b> h
+                  Total: <b>{totalLabel}</b>
                 </span>
                 <span style={styles.metricPill}>
                   KM: <b>{kmLabel}</b>
@@ -379,6 +359,18 @@ export default function ManagerDashboard() {
 
             <div style={styles.subLine}>
               Employee: <b>{employeeName}</b>
+              {employee?.phone ? (
+                <>
+                  {" "}
+                  • Phone: <b>{employee.phone}</b>
+                </>
+              ) : null}
+              {employee?.email ? (
+                <>
+                  {" "}
+                  • Email: <b>{employee.email}</b>
+                </>
+              ) : null}
             </div>
 
             <div style={styles.subLine}>
@@ -416,7 +408,6 @@ export default function ManagerDashboard() {
           <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
         </div>
 
-        {/* unified order: Form History Week Manager Logout */}
         <div style={styles.nav}>
           <Link to="/" style={styles.link}>
             Form
@@ -452,7 +443,7 @@ export default function ManagerDashboard() {
           </div>
 
           <div style={styles.filtersGrid}>
-            <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} style={styles.select} title="Choose employee">
+            <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} style={styles.select}>
               <option value="all">All employees</option>
               {employeeOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -461,7 +452,7 @@ export default function ManagerDashboard() {
               ))}
             </select>
 
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={styles.select} title="Status filter">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={styles.select}>
               <option value="all">All statuses</option>
               <option value="saved">saved</option>
               <option value="submitted">submitted</option>
@@ -486,21 +477,24 @@ export default function ManagerDashboard() {
                     • Phone: <b>{selectedEmployee.phone}</b>
                   </>
                 ) : null}
+                {selectedEmployee.email ? (
+                  <>
+                    {" "}
+                    • Email: <b>{selectedEmployee.email}</b>
+                  </>
+                ) : null}
               </div>
 
-              {/* RIGHT SIDE actions (only when employee selected) */}
               <div style={styles.selectedActions}>
                 <Link to={`/week?employee=${selectedEmployee.id}`} style={styles.weekBtn}>
                   Week
                 </Link>
 
-                {/* Week selector + Approve all */}
                 <select
                   value={weekOptions.length === 0 ? "latest" : selectedWeekKey}
                   onChange={(e) => setSelectedWeekKey(e.target.value)}
                   style={styles.weekSelect}
                   disabled={weekOptions.length === 0}
-                  title="Choose week to approve"
                 >
                   {weekOptions.length === 0 ? (
                     <option value="latest">No submitted weeks</option>
@@ -521,9 +515,10 @@ export default function ManagerDashboard() {
                     ...styles.approveAllBtn,
                     opacity: bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0 ? 0.6 : 1,
                     cursor:
-                      bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0 ? "not-allowed" : "pointer",
+                      bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0
+                        ? "not-allowed"
+                        : "pointer",
                   }}
-                  title="Approve all submitted jobs for this employee in the selected week"
                 >
                   {bulkBusy ? "Working…" : `Approve week (${submittedForSelectedWeek.length})`}
                 </button>
@@ -605,12 +600,7 @@ const styles = {
     marginBottom: 10,
   },
 
-  pillsRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 10,
-    alignItems: "center",
-  },
+  pillsRow: { display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" },
   pill: {
     background: "#f5f5f5",
     border: "1px solid #eee",
@@ -653,7 +643,6 @@ const styles = {
     flexWrap: "wrap",
     justifyContent: "space-between",
   },
-
   selectedActions: {
     display: "flex",
     gap: 10,
@@ -703,30 +692,12 @@ const styles = {
     boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
 
-  cardTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 12,
-    flexWrap: "wrap",
-    alignItems: "flex-start",
-  },
+  cardTop: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" },
 
-  otLine: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-
+  otLine: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" },
   otTitle: { fontWeight: 900, fontSize: 15 },
 
-  metrics: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
+  metrics: { display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" },
   metricPill: {
     fontSize: 12,
     color: "#111",
@@ -739,12 +710,7 @@ const styles = {
 
   subLine: { color: "#555", fontSize: 13 },
 
-  cardRight: {
-    display: "grid",
-    justifyItems: "end",
-    gap: 8,
-    marginLeft: "auto",
-  },
+  cardRight: { display: "grid", justifyItems: "end", gap: 8, marginLeft: "auto" },
 
   lockLine: { fontSize: 12, color: "#666" },
   updatedLine: { marginTop: 10, fontSize: 12, color: "#666" },
@@ -780,12 +746,7 @@ const styles = {
     cursor: "pointer",
   },
 
-  twoCol: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: 12,
-    alignItems: "start",
-  },
+  twoCol: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, alignItems: "start" },
   col: { display: "grid", gap: 10 },
   colHeader: {
     display: "flex",
@@ -807,13 +768,7 @@ const styles = {
     fontSize: 12,
     fontWeight: 900,
   },
-  emptyCard: {
-    background: "#fff",
-    border: "1px dashed #ddd",
-    borderRadius: 14,
-    padding: 14,
-    color: "#666",
-  },
+  emptyCard: { background: "#fff", border: "1px dashed #ddd", borderRadius: 14, padding: 14, color: "#666" },
 
   error: {
     marginBottom: 10,
