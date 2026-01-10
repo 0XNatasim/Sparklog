@@ -49,7 +49,7 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
-  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [actionLoadingKey, setActionLoadingKey] = useState(null); // can be jobId or "day:YYYY-MM-DD"
 
   async function load() {
     setErr("");
@@ -107,7 +107,13 @@ export default function History() {
       const totalHours = sumHoursForJobs(list);
       const totalHHmm = toHHmmLabelFromFormatHours(formatHours(totalHours));
       const totalKm = sumKmForJobs(list);
-      return { date, list, totalHHmm, totalKm };
+
+      // day-submittable ids: saved + unlocked
+      const submittableIds = list
+        .filter((x) => x.status === "saved" && x.locked === false)
+        .map((x) => x.id);
+
+      return { date, list, totalHHmm, totalKm, submittableIds };
     });
   }, [jobs]);
 
@@ -135,7 +141,7 @@ export default function History() {
     const ok = window.confirm("Delete this job? This cannot be undone.");
     if (!ok) return;
 
-    setActionLoadingId(jobId);
+    setActionLoadingKey(jobId);
     setErr("");
     setInfo("");
 
@@ -148,7 +154,7 @@ export default function History() {
     } catch (e) {
       setErr(e?.message || "Delete failed.");
     } finally {
-      setActionLoadingId(null);
+      setActionLoadingKey(null);
     }
   }
 
@@ -156,16 +162,12 @@ export default function History() {
     const ok = window.confirm("Submit this job? After submit it will be locked.");
     if (!ok) return;
 
-    setActionLoadingId(jobId);
+    setActionLoadingKey(jobId);
     setErr("");
     setInfo("");
 
     try {
-      const { error } = await supabase
-        .from("jobs")
-        .update({ status: "submitted", locked: true })
-        .eq("id", jobId);
-
+      const { error } = await supabase.from("jobs").update({ status: "submitted", locked: true }).eq("id", jobId);
       if (error) throw error;
 
       setInfo("Job submitted.");
@@ -173,7 +175,31 @@ export default function History() {
     } catch (e) {
       setErr(e?.message || "Submit failed.");
     } finally {
-      setActionLoadingId(null);
+      setActionLoadingKey(null);
+    }
+  }
+
+  async function submitDay(dateKey, ids) {
+    if (!ids || ids.length === 0) return;
+
+    const ok = window.confirm(`Submit all saved jobs for ${dayjs(dateKey).format("DD MMM YYYY")}?`);
+    if (!ok) return;
+
+    const actionKey = `day:${dateKey}`;
+    setActionLoadingKey(actionKey);
+    setErr("");
+    setInfo("");
+
+    try {
+      const { error } = await supabase.from("jobs").update({ status: "submitted", locked: true }).in("id", ids);
+      if (error) throw error;
+
+      setInfo(`Day submitted (${ids.length} job(s)).`);
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Submit day failed.");
+    } finally {
+      setActionLoadingKey(null);
     }
   }
 
@@ -223,116 +249,134 @@ export default function History() {
 
         {!loading &&
           !err &&
-          grouped.map((g) => (
-            <div key={g.date} style={{ marginBottom: 14 }}>
-              <div style={{ marginBottom: 10 }}>
-                <div style={styles.dateHeader}>
-                  {dayjs(g.date).format("DD MMM YYYY")} • <b>{g.totalHHmm}</b> • <b>{g.totalKm}</b> km
+          grouped.map((g) => {
+            const dayActionKey = `day:${g.date}`;
+            const dayBusy = actionLoadingKey === dayActionKey;
+            const dayCanSubmit = g.submittableIds.length > 0;
+
+            return (
+              <div key={g.date} style={{ marginBottom: 14 }}>
+                {/* ✅ Day header row with SUBMIT DAY button */}
+                <div style={styles.dayHeaderRow}>
+                  <div style={styles.dateHeader}>
+                    {dayjs(g.date).format("DD MMM YYYY")} • <b>{g.totalHHmm}</b> • <b>{g.totalKm}</b> km
+                  </div>
+
+                  {dayCanSubmit && (
+                    <button
+                      type="button"
+                      disabled={dayBusy}
+                      onClick={() => submitDay(g.date, g.submittableIds)}
+                      style={styles.submitDayBtn}
+                      title="Submit all saved jobs for this day"
+                    >
+                      {dayBusy ? "…" : "SUBMIT DAY"}
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: "grid", gap: 10 }}>
+                  {g.list.map((j) => {
+                    const d1 = makeDayjsFromJob(j.job_date, j.depart);
+                    const d2 = makeDayjsFromJob(j.job_date, j.fin);
+                    const totalHours = hoursBetween(d1, d2);
+
+                    const totalLabelRaw = formatHours(totalHours);
+                    const totalHHmm = toHHmmLabelFromFormatHours(totalLabelRaw);
+
+                    const a = Number(j.km_aller ?? 0) || 0;
+                    const r = Number(j.km_retour ?? 0) || 0;
+                    const km = a + r;
+
+                    const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
+
+                    const showOpen = canOpen(j);
+                    const showDelete = canDelete(j);
+                    const showSubmit = canSubmit(j);
+
+                    const busy = actionLoadingKey === j.id;
+
+                    return (
+                      <div key={j.id} style={styles.card}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                          <div style={{ display: "grid", gap: 6, width: "100%" }}>
+                            <div style={styles.headerRow}>
+                              <div style={{ fontWeight: 900, fontSize: 15 }}>OT: {j.ot}</div>
+
+                              <div style={styles.metrics}>
+                                <span style={styles.metricPill}>
+                                  Total: <b>{totalHHmm}</b>
+                                </span>
+
+                                <span style={styles.metricPill}>
+                                  KM: <b>{km}</b>
+                                  {r > 0 ? (
+                                    <span style={{ fontWeight: 700, color: "#555" }}> (A: {a} / R: {r})</span>
+                                  ) : null}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div style={{ color: "#555", fontSize: 13 }}>
+                              Depart: {fmtTimeHHmm(j.depart)} • Arrival: {fmtTimeHHmm(j.arrivee)} • End:{" "}
+                              {fmtTimeHHmm(j.fin)}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
+                            <span style={{ ...styles.badge, ...badgeStyle(j.status) }}>{j.status}</span>
+
+                            {(showOpen || showDelete || showSubmit) && (
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                {showOpen && (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => openJob(j)}
+                                    style={styles.openBtn}
+                                    type="button"
+                                  >
+                                    {busy ? "…" : "OPEN"}
+                                  </button>
+                                )}
+
+                                {showSubmit && (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => submitJob(j.id)}
+                                    style={styles.submitBtn}
+                                    type="button"
+                                  >
+                                    {busy ? "…" : "SUBMIT"}
+                                  </button>
+                                )}
+
+                                {showDelete && (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => deleteJob(j.id)}
+                                    style={styles.deleteBtn}
+                                    type="button"
+                                  >
+                                    {busy ? "…" : "DELETE"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            <div style={{ fontSize: 12, color: "#666" }}>
+                              Locked: <b>{j.locked ? "true" : "false"}</b>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>Updated: {updatedLabel}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-
-              <div style={{ display: "grid", gap: 10 }}>
-                {g.list.map((j) => {
-                  const d1 = makeDayjsFromJob(j.job_date, j.depart);
-                  const d2 = makeDayjsFromJob(j.job_date, j.fin);
-                  const totalHours = hoursBetween(d1, d2);
-
-                  const totalLabelRaw = formatHours(totalHours);
-                  const totalHHmm = toHHmmLabelFromFormatHours(totalLabelRaw);
-
-                  const a = Number(j.km_aller ?? 0) || 0;
-                  const r = Number(j.km_retour ?? 0) || 0;
-                  const km = a + r;
-
-                  const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
-
-                  const showOpen = canOpen(j);
-                  const showDelete = canDelete(j);
-                  const showSubmit = canSubmit(j);
-
-                  const busy = actionLoadingId === j.id;
-
-                  return (
-                    <div key={j.id} style={styles.card}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                        <div style={{ display: "grid", gap: 6, width: "100%" }}>
-                          <div style={styles.headerRow}>
-                            <div style={{ fontWeight: 900, fontSize: 15 }}>OT: {j.ot}</div>
-
-                            <div style={styles.metrics}>
-                              <span style={styles.metricPill}>
-                                Total: <b>{totalHHmm}</b>
-                              </span>
-
-                              <span style={styles.metricPill}>
-                                KM: <b>{km}</b>
-                                {r > 0 ? (
-                                  <span style={{ fontWeight: 700, color: "#555" }}> (A: {a} / R: {r})</span>
-                                ) : null}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div style={{ color: "#555", fontSize: 13 }}>
-                            Depart: {fmtTimeHHmm(j.depart)} • Arrival: {fmtTimeHHmm(j.arrivee)} • End:{" "}
-                            {fmtTimeHHmm(j.fin)}
-                          </div>
-                        </div>
-
-                        <div style={{ display: "grid", justifyItems: "end", gap: 8 }}>
-                          <span style={{ ...styles.badge, ...badgeStyle(j.status) }}>{j.status}</span>
-
-                          {(showOpen || showDelete || showSubmit) && (
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                              {showOpen && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() => openJob(j)}
-                                  style={styles.openBtn}
-                                  type="button"
-                                >
-                                  {busy ? "…" : "OPEN"}
-                                </button>
-                              )}
-
-                              {/* ✅ NEW: submit directly from history */}
-                              {showSubmit && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() => submitJob(j.id)}
-                                  style={styles.submitBtn}
-                                  type="button"
-                                >
-                                  {busy ? "…" : "SUBMIT"}
-                                </button>
-                              )}
-
-                              {showDelete && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() => deleteJob(j.id)}
-                                  style={styles.deleteBtn}
-                                  type="button"
-                                >
-                                  {busy ? "…" : "DELETE"}
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          <div style={{ fontSize: 12, color: "#666" }}>
-                            Locked: <b>{j.locked ? "true" : "false"}</b>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>Updated: {updatedLabel}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+            );
+          })}
       </div>
     </div>
   );
@@ -375,6 +419,15 @@ const styles = {
   },
   activeLink: { fontWeight: 900, color: "#111", fontSize: 14 },
 
+  dayHeaderRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 10,
+  },
+
   dateHeader: {
     display: "inline-block",
     fontWeight: 800,
@@ -384,6 +437,18 @@ const styles = {
     background: "#f1f1f1",
     border: "1px solid #e0e0e0",
     borderRadius: 999,
+  },
+
+  submitDayBtn: {
+    background: "rgba(76, 175, 80, 0.12)",
+    color: "#1b5e20",
+    border: "1px solid rgba(76, 175, 80, 0.28)",
+    borderRadius: 10,
+    padding: "8px 12px",
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   },
 
   card: {
