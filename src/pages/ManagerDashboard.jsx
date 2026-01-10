@@ -2,9 +2,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
+
+dayjs.extend(isoWeek);
 
 function badgeStyle(status) {
   if (status === "saved") return { background: "#1565c0", color: "#fff" };
@@ -32,6 +35,18 @@ function makeDayjsFromJob(job_date, timeStr) {
   return d.isValid() ? d : null;
 }
 
+function weekKeyFromDate(dateStr) {
+  const ws = dayjs(dateStr).startOf("isoWeek");
+  return ws.format("YYYY-[W]WW");
+}
+
+function weekLabelFromKey(key) {
+  // key like 2026-W02 (because format "YYYY-[W]WW")
+  // We'll reconstruct by taking the first day of iso week:
+  // Using "YYYY-[W]WW" parsing is not built-in; instead we keep date sources elsewhere.
+  return key;
+}
+
 export default function ManagerDashboard() {
   const { user, signOut } = useAuth();
 
@@ -40,6 +55,8 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+
+  // actionLoadingId can be jobId or "week:<weekKey>"
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
   // Filters
@@ -47,6 +64,9 @@ export default function ManagerDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
+
+  // NEW: when employee is selected, manager can pick a week to bulk-approve
+  const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
   const setSearchDebounced = useMemo(
     () =>
@@ -73,7 +93,6 @@ export default function ManagerDashboard() {
 
       if (jobErr) throw jobErr;
 
-      // ✅ include phone + email if you store it in profiles (recommended)
       const { data: profileRows, error: profErr } = await supabase
         .from("profiles")
         .select("id, role, full_name, phone, email");
@@ -169,6 +188,52 @@ export default function ManagerDashboard() {
     return { id: employeeId, name, phone, email };
   }, [employeeId, profiles]);
 
+  // NEW: week options for the selected employee (based on submitted jobs)
+  const weekOptions = useMemo(() => {
+    if (!split) return [];
+    const m = new Map();
+
+    // derive from submitted jobs only (because approve-week is for submitted)
+    for (const j of split.submitted) {
+      const ws = dayjs(j.job_date).startOf("isoWeek");
+      const key = ws.format("YYYY-[W]WW");
+      if (!m.has(key)) {
+        m.set(key, {
+          key,
+          start: ws,
+          end: ws.endOf("isoWeek"),
+          count: 0,
+        });
+      }
+      m.get(key).count += 1;
+    }
+
+    return Array.from(m.values()).sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
+  }, [split]);
+
+  // NEW: ensure selectedWeekKey stays valid when employee changes
+  useEffect(() => {
+    if (!selectedEmployee) {
+      setSelectedWeekKey("latest");
+      return;
+    }
+    if (weekOptions.length === 0) {
+      setSelectedWeekKey("latest");
+      return;
+    }
+    // default to most recent week that has submitted jobs
+    setSelectedWeekKey(weekOptions[0].key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmployee?.id]);
+
+  const submittedForSelectedWeek = useMemo(() => {
+    if (!split || !selectedEmployee) return [];
+    if (weekOptions.length === 0) return [];
+    if (!selectedWeekKey || selectedWeekKey === "latest") return split.submitted;
+
+    return split.submitted.filter((j) => weekKeyFromDate(j.job_date) === selectedWeekKey);
+  }, [split, selectedEmployee, selectedWeekKey, weekOptions.length]);
+
   async function approve(jobId) {
     setActionLoadingId(jobId);
     setErr("");
@@ -207,11 +272,83 @@ export default function ManagerDashboard() {
     }
   }
 
+  // NEW: approve ALL submitted jobs in the chosen week (only when employee selected)
+  async function approveWeekAll() {
+    if (!selectedEmployee) return;
+
+    const list = submittedForSelectedWeek;
+    if (!list || list.length === 0) return;
+
+    const key = selectedWeekKey === "latest" ? "latest" : selectedWeekKey;
+    const label =
+      selectedWeekKey === "latest"
+        ? "the current selection"
+        : `Week ${dayjs(list[0].job_date).isoWeek()} (${dayjs(list[0].job_date).startOf("isoWeek").format("DD MMM")} → ${dayjs(
+            list[0].job_date
+          )
+            .startOf("isoWeek")
+            .endOf("isoWeek")
+            .format("DD MMM YYYY")})`;
+
+    const ok = window.confirm(`Approve ALL submitted jobs for ${selectedEmployee.name} in ${label}?\n\nCount: ${list.length}`);
+    if (!ok) return;
+
+    const actionKey = `week:${key}`;
+    setActionLoadingId(actionKey);
+    setErr("");
+    setInfo("");
+
+    try {
+      const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+      if (sessErr) throw sessErr;
+
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error("No session token (manager). Please re-login.");
+
+      let approvedCount = 0;
+      let skippedCount = 0;
+
+      // sequential to keep ordering + simpler error handling
+      for (const j of list) {
+        const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
+          body: { job_id: j.id },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (fnErr) throw fnErr;
+        if (data?.ok !== true && !data?.skipped) {
+          throw new Error(data?.error || `Export failed for OT ${j.ot} (${j.job_date}).`);
+        }
+
+        const { error } = await supabase
+          .from("jobs")
+          .update({ status: "approved", locked: true })
+          .eq("id", j.id);
+
+        if (error) throw error;
+
+        approvedCount += 1;
+        if (data?.skipped) skippedCount += 1;
+      }
+
+      setInfo(
+        skippedCount > 0
+          ? `Approved ${approvedCount} job(s). Export skipped for ${skippedCount} (already exported).`
+          : `Approved ${approvedCount} job(s) and exported.`
+      );
+
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Approve week failed.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   function renderJobCard(j) {
     const employee = profiles.get(j.user_id);
     const employeeName = employee?.full_name || `User ${String(j.user_id).slice(0, 8)}…`;
 
-    // total depart->fin
     const d1 = makeDayjsFromJob(j.job_date, j.depart);
     const d2 = makeDayjsFromJob(j.job_date, j.fin);
     const totalHours = hoursBetween(d1, d2);
@@ -219,12 +356,10 @@ export default function ManagerDashboard() {
     const kmLabel = j.km_aller ?? 0;
 
     const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
-
     const canApprove = j.status === "submitted";
 
     return (
       <div key={j.id} style={styles.card}>
-        {/* Header row (responsive) */}
         <div style={styles.cardTop}>
           <div style={{ minWidth: 0 }}>
             <div style={styles.otLine}>
@@ -255,11 +390,7 @@ export default function ManagerDashboard() {
             <span style={{ ...styles.badge, ...badgeStyle(j.status) }}>{j.status}</span>
 
             {canApprove && (
-              <button
-                disabled={actionLoadingId === j.id}
-                onClick={() => approve(j.id)}
-                style={styles.primaryBtn}
-              >
+              <button disabled={actionLoadingId === j.id} onClick={() => approve(j.id)} style={styles.primaryBtn}>
                 {actionLoadingId === j.id ? "Working…" : "Approve"}
               </button>
             )}
@@ -275,6 +406,8 @@ export default function ManagerDashboard() {
     );
   }
 
+  const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
+
   return (
     <div style={styles.page}>
       <div style={styles.topbar}>
@@ -283,6 +416,7 @@ export default function ManagerDashboard() {
           <div style={{ fontSize: 12, color: "#666" }}>{user?.email}</div>
         </div>
 
+        {/* unified order: Form History Week Manager Logout */}
         <div style={styles.nav}>
           <Link to="/" style={styles.link}>
             Form
@@ -290,9 +424,10 @@ export default function ManagerDashboard() {
           <Link to="/history" style={styles.link}>
             History
           </Link>
-          <Link to="/manager" style={styles.link}>
-            Manager
+          <Link to="/week" style={styles.link}>
+            Week
           </Link>
+          <span style={styles.activeLink}>Manager</span>
           <button onClick={signOut} style={styles.secondaryBtn}>
             Logout
           </button>
@@ -316,14 +451,8 @@ export default function ManagerDashboard() {
             </div>
           </div>
 
-          {/* Responsive filters grid */}
           <div style={styles.filtersGrid}>
-            <select
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              style={styles.select}
-              title="Choose employee"
-            >
+            <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} style={styles.select} title="Choose employee">
               <option value="all">All employees</option>
               {employeeOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -332,12 +461,7 @@ export default function ManagerDashboard() {
               ))}
             </select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={styles.select}
-              title="Status filter"
-            >
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={styles.select} title="Status filter">
               <option value="all">All statuses</option>
               <option value="saved">saved</option>
               <option value="submitted">submitted</option>
@@ -348,7 +472,7 @@ export default function ManagerDashboard() {
               value={searchLive}
               onChange={(e) => setSearchLive(e.target.value)}
               style={styles.input}
-              placeholder="Search OT number (fast)…"
+              placeholder="Search OT / date / employee…"
             />
           </div>
 
@@ -364,9 +488,46 @@ export default function ManagerDashboard() {
                 ) : null}
               </div>
 
-              <Link to={`/week?employee=${selectedEmployee.id}`} style={styles.weekBtn}>
-                Week
-              </Link>
+              {/* RIGHT SIDE actions (only when employee selected) */}
+              <div style={styles.selectedActions}>
+                <Link to={`/week?employee=${selectedEmployee.id}`} style={styles.weekBtn}>
+                  Week
+                </Link>
+
+                {/* Week selector + Approve all */}
+                <select
+                  value={weekOptions.length === 0 ? "latest" : selectedWeekKey}
+                  onChange={(e) => setSelectedWeekKey(e.target.value)}
+                  style={styles.weekSelect}
+                  disabled={weekOptions.length === 0}
+                  title="Choose week to approve"
+                >
+                  {weekOptions.length === 0 ? (
+                    <option value="latest">No submitted weeks</option>
+                  ) : (
+                    weekOptions.map((w) => (
+                      <option key={w.key} value={w.key}>
+                        Week {w.start.isoWeek()} • {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")} ({w.count})
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={approveWeekAll}
+                  disabled={bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0}
+                  style={{
+                    ...styles.approveAllBtn,
+                    opacity: bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0 ? 0.6 : 1,
+                    cursor:
+                      bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0 ? "not-allowed" : "pointer",
+                  }}
+                  title="Approve all submitted jobs for this employee in the selected week"
+                >
+                  {bulkBusy ? "Working…" : `Approve week (${submittedForSelectedWeek.length})`}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -414,7 +575,6 @@ const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
   container: { maxWidth: 1100, margin: "0 auto" },
 
-  // ✅ Topbar responsive
   topbar: {
     maxWidth: 1100,
     margin: "0 auto 12px auto",
@@ -422,7 +582,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    flexWrap: "wrap", // key for mobile
+    flexWrap: "wrap",
   },
   brandBlock: { display: "grid", gap: 2 },
 
@@ -430,11 +590,11 @@ const styles = {
     display: "flex",
     gap: 10,
     alignItems: "center",
-    flexWrap: "wrap", // key
+    flexWrap: "wrap",
     justifyContent: "flex-end",
   },
-
   link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
+  activeLink: { fontWeight: 900, color: "#111", fontSize: 14 },
 
   filtersCard: {
     background: "#fff",
@@ -460,7 +620,6 @@ const styles = {
     color: "#111",
   },
 
-  // ✅ Filters responsive: 1 column on mobile automatically
   filtersGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -495,6 +654,14 @@ const styles = {
     justifyContent: "space-between",
   },
 
+  selectedActions: {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+
   weekBtn: {
     background: "#1565c0",
     color: "#fff",
@@ -504,9 +671,30 @@ const styles = {
     fontWeight: 900,
     textDecoration: "none",
     display: "inline-block",
+    whiteSpace: "nowrap",
   },
 
-  // ✅ Cards responsive layout
+  weekSelect: {
+    border: "1px solid #eee",
+    borderRadius: 10,
+    padding: "8px 10px",
+    fontSize: 13,
+    outline: "none",
+    background: "#fff",
+    maxWidth: 360,
+  },
+
+  approveAllBtn: {
+    background: "rgba(76, 175, 80, 0.12)",
+    color: "#1b5e20",
+    border: "1px solid rgba(76, 175, 80, 0.28)",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 13,
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+  },
+
   card: {
     background: "#fff",
     border: "1px solid #eee",
@@ -519,7 +707,7 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     gap: 12,
-    flexWrap: "wrap", // key
+    flexWrap: "wrap",
     alignItems: "flex-start",
   },
 
@@ -559,7 +747,6 @@ const styles = {
   },
 
   lockLine: { fontSize: 12, color: "#666" },
-
   updatedLine: { marginTop: 10, fontSize: 12, color: "#666" },
 
   badge: {
@@ -581,6 +768,7 @@ const styles = {
     fontWeight: 900,
     cursor: "pointer",
   },
+
   secondaryBtn: {
     background: "#f5f5f5",
     color: "#111",
