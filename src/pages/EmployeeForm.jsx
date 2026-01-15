@@ -41,7 +41,10 @@ export default function EmployeeForm() {
 
   const editId = searchParams.get("edit");
 
-  const [loading, setLoading] = useState(false);
+  // Split loading states (prevents weird UX / “nothing happens”)
+  const [loadingEdit, setLoadingEdit] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
@@ -53,8 +56,6 @@ export default function EmployeeForm() {
   const [fin, setFin] = useState("16:00");
 
   const [km_aller, setKmAller] = useState(""); // string for input UX
-  const [hasReturnKm, setHasReturnKm] = useState(false);
-  const [km_retour, setKmRetour] = useState(""); // always rendered, but disabled unless checked
 
   const [locked, setLocked] = useState(false);
   const [status, setStatus] = useState("saved");
@@ -70,7 +71,7 @@ export default function EmployeeForm() {
 
     setErr("");
     setInfo("");
-    setLoading(true);
+    setLoadingEdit(true);
 
     try {
       const { data, error } = await supabase.from("jobs").select("*").eq("id", editId).single();
@@ -85,19 +86,14 @@ export default function EmployeeForm() {
       setFin(fmtTimeHHmm(data.fin) || "16:00");
 
       const aller = data.km_aller ?? "";
-      const retour = data.km_retour ?? null;
-
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
-      const hasRetour = retour !== null && retour !== undefined && String(retour) !== "";
-      setHasReturnKm(hasRetour);
-      setKmRetour(hasRetour ? String(retour) : "");
 
       setLocked(Boolean(data.locked));
       setStatus(data.status || "saved");
     } catch (e) {
       setErr(e?.message || "Failed to load job.");
     } finally {
-      setLoading(false);
+      setLoadingEdit(false);
     }
   }
 
@@ -106,19 +102,21 @@ export default function EmployeeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
 
-  function onToggleReturnKm(checked) {
-    setHasReturnKm(checked);
-    if (!checked) setKmRetour(""); // clear when disabled
-  }
-
   async function saveJob(nextStatus = "saved") {
+    if (!user?.id) {
+      setErr("Not signed in.");
+      return;
+    }
+
+    // Prevent double-taps on mobile
+    if (saving) return;
+
     setErr("");
     setInfo("");
-    setLoading(true);
+    setSaving(true);
 
     try {
       const kmAllerNum = normalizeNumber(km_aller) ?? 0;
-      const kmRetourNum = hasReturnKm ? (normalizeNumber(km_retour) ?? 0) : null;
 
       const payload = {
         user_id: user.id,
@@ -128,31 +126,40 @@ export default function EmployeeForm() {
         arrivee,
         fin,
         km_aller: kmAllerNum,
-        km_retour: kmRetourNum,
+        // KM retour removed
         status: nextStatus,
         locked: nextStatus !== "saved",
       };
 
       if (editId) {
+        // Update existing
         const { error } = await supabase.from("jobs").update(payload).eq("id", editId);
         if (error) throw error;
-        setInfo("Job updated.");
-      } else {
-        const { error } = await supabase.from("jobs").insert(payload);
-        if (error) throw error;
-        setInfo("Job saved.");
-      }
 
-      setStatus(nextStatus);
-      setLocked(nextStatus !== "saved");
+        setInfo(nextStatus === "submitted" ? "Job submitted." : "Job updated.");
+        setStatus(nextStatus);
+        setLocked(nextStatus !== "saved");
+      } else {
+        // Insert new + return id, then go to edit mode so future saves are updates
+        const { data, error } = await supabase.from("jobs").insert(payload).select("id").single();
+        if (error) throw error;
+        if (!data?.id) throw new Error("Insert succeeded but no id returned.");
+
+        setInfo(nextStatus === "submitted" ? "Job saved and submitted." : "Job saved.");
+        setStatus(nextStatus);
+        setLocked(nextStatus !== "saved");
+
+        // IMPORTANT: navigate to edit view to avoid “saved but feels like nothing happened”
+        navigate(`/form?edit=${data.id}`, { replace: true });
+      }
     } catch (e) {
       setErr(e?.message || "Save failed.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
-  const disableInputs = locked || loading;
+  const disableInputs = locked || loadingEdit || saving;
 
   return (
     <div style={styles.page}>
@@ -264,37 +271,6 @@ export default function EmployeeForm() {
               />
             </div>
 
-            {/* ✅ Single row: checkbox + input (no extra block/box) */}
-            <div style={styles.field}>
-              <div style={styles.label}>KM (retour)</div>
-
-              <div style={styles.kmReturnRow}>
-                <label style={styles.kmCheck}>
-                  <input
-                    type="checkbox"
-                    checked={hasReturnKm}
-                    onChange={(e) => onToggleReturnKm(e.target.checked)}
-                    disabled={disableInputs}
-                  />
-                  <span style={styles.kmCheckText}></span>
-                </label>
-
-                <input
-                  type="number"
-                  value={km_retour}
-                  onChange={(e) => setKmRetour(e.target.value)}
-                  placeholder="0"
-                  disabled={disableInputs || !hasReturnKm}
-                  style={{
-                    ...styles.input,
-                    margin: 0,
-                    opacity: hasReturnKm ? 1 : 0.45,
-                    background: hasReturnKm ? "#fff" : "#f8f8f8",
-                  }}
-                />
-              </div>
-            </div>
-
             <div style={styles.field}>
               <div style={styles.label}>Total hours</div>
               <div style={styles.readonlyBox}>{hoursLabel}</div>
@@ -308,7 +284,7 @@ export default function EmployeeForm() {
 
           <div style={styles.actions}>
             <button type="button" style={styles.primaryBtn} disabled={disableInputs} onClick={() => saveJob("saved")}>
-              Save
+              {saving ? "Saving..." : "Save"}
             </button>
 
             <button
@@ -317,11 +293,11 @@ export default function EmployeeForm() {
               disabled={disableInputs}
               onClick={() => saveJob("submitted")}
             >
-              Submit
+              {saving ? "Submitting..." : "Submit"}
             </button>
 
             {editId && (
-              <button type="button" style={styles.ghostBtn} onClick={() => navigate("/")} disabled={loading}>
+              <button type="button" style={styles.ghostBtn} onClick={() => navigate("/form")} disabled={loadingEdit || saving}>
                 New job
               </button>
             )}
@@ -400,25 +376,6 @@ const styles = {
     fontWeight: 900,
     color: "#111",
   },
-
-  // ✅ Single-row layout: checkbox + input (stable UI)
-  kmReturnRow: {
-    display: "grid",
-    gridTemplateColumns: "auto 1fr",
-    gap: 10,
-    alignItems: "center",
-  },
-  kmCheck: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "10px 12px",
-    border: "1px solid #eee",
-    borderRadius: 10,
-    background: "#fff",
-    whiteSpace: "nowrap",
-  },
-  kmCheckText: { fontSize: 13, color: "#111", fontWeight: 800 },
 
   actions: { display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" },
 
