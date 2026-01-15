@@ -2,78 +2,69 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import "dayjs/locale/en";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween } from "../lib/time";
 
 dayjs.extend(isoWeek);
+dayjs.extend(customParseFormat);
 dayjs.locale("en");
 
-// ===== Overtime rules =====
-// Daily: first 8h at 1.0x, remainder is overtime.
-// Weekly overtime tiering (across accumulated daily overtime):
-// - first 1 overtime hour in the week => 1.5x
-// - remaining overtime hours in that week => 2.0x
-const DAILY_REGULAR_HOURS = 8;
-const WEEKLY_OT_FIRST_TIER_HOURS = 1;
+/**
+ * job_date can be:
+ * - "YYYY-MM-DD" (date)
+ * - ISO string timestamp
+ * - sometimes other date-ish formats
+ */
+function parseJobDate(job_date) {
+  if (!job_date) return null;
 
-function makeDayjsFromJob(job_date, timeStr) {
-  if (!job_date || !timeStr) return null;
-  const d = dayjs(`${job_date}T${timeStr}`);
+  // Common formats we may encounter
+  const formats = [
+    "YYYY-MM-DD",
+    "YYYY-MM-DDTHH:mm:ssZ",
+    "YYYY-MM-DDTHH:mm:ss.SSSZ",
+    "DD MMM YYYY",
+  ];
+
+  // Try strict parse first
+  for (const f of formats) {
+    const d = dayjs(job_date, f, true);
+    if (d.isValid()) return d;
+  }
+
+  // Fallback to dayjs native parse
+  const d = dayjs(job_date);
   return d.isValid() ? d : null;
 }
 
-function roundToQuarterHour(hours) {
-  const h = Number(hours);
-  if (!Number.isFinite(h) || h <= 0) return 0;
-  return Math.round(h * 4) / 4;
+function makeDayTime(job_date, timeStr) {
+  const d = parseJobDate(job_date);
+  if (!d || !timeStr) return null;
+  const t = String(timeStr).slice(0, 5);
+  const dt = dayjs(`${d.format("YYYY-MM-DD")}T${t}`);
+  return dt.isValid() ? dt : null;
 }
 
-function formatHoursHM(hours) {
-  if (!hours || hours <= 0) return "0h00";
-  const totalMinutes = Math.round(hours * 60);
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function formatHoursHM(hoursFloat) {
+  const totalMinutes = Math.round((hoursFloat || 0) * 60);
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return `${h}h${String(m).padStart(2, "0")}`;
 }
 
-function splitWeekBucketsFromDailyTotals(dayHoursMap) {
-  let hours_1x = 0;
-  let overtime_total = 0;
-
-  for (const raw of dayHoursMap.values()) {
-    const dayHours = roundToQuarterHour(raw);
-    hours_1x += Math.min(DAILY_REGULAR_HOURS, dayHours);
-    overtime_total += Math.max(0, dayHours - DAILY_REGULAR_HOURS);
-  }
-
-  const hours_15x = Math.min(WEEKLY_OT_FIRST_TIER_HOURS, overtime_total);
-  const hours_2x = Math.max(0, overtime_total - WEEKLY_OT_FIRST_TIER_HOURS);
-
-  return { hours_1x, hours_15x, hours_2x };
-}
-
-function RightBucket({ label, value }) {
-  return (
-    <div style={styles.bucketRow}>
-      <span style={styles.bucketLabel}>{label}</span>
-      <span style={styles.bucketValue}>{value}</span>
-    </div>
-  );
-}
-
-function kmTotal(job) {
-  const a = Number(job?.km_aller ?? 0) || 0;
-  const r = Number(job?.km_retour ?? 0) || 0;
-  return a + r;
-}
-
 export default function Week() {
-  const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const { user, role, signOut } = useAuth();
   const [searchParams] = useSearchParams();
 
+  // Manager can view an employee week via: /week?employee=<uuid>
   const employeeIdParam = searchParams.get("employee");
   const isManagerViewingEmployee = role === "manager" && Boolean(employeeIdParam);
   const effectiveUserId = isManagerViewingEmployee ? employeeIdParam : user?.id;
@@ -102,7 +93,8 @@ export default function Week() {
       if (error) throw error;
       setJobs(data || []);
     } catch (e) {
-      setErr(e?.message || "Failed to load weekly summary.");
+      setErr(e?.message || "Failed to load weekly data.");
+      setJobs([]);
     } finally {
       setLoading(false);
     }
@@ -113,82 +105,103 @@ export default function Week() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveUserId]);
 
+  /**
+   * Build daily totals first (so we can compute OT per day),
+   * then aggregate into weeks.
+   */
   const weekly = useMemo(() => {
-    const map = new Map();
+    // dailyMap: key=YYYY-MM-DD -> { date, hours, km }
+    const dailyMap = new Map();
 
     for (const j of jobs) {
-      // If you only want approved payroll data, uncomment:
-      // if (j.status !== "approved") continue;
+      // Only count jobs that have depart/fin + valid date
+      const d = parseJobDate(j.job_date);
+      if (!d) continue;
 
-      const d1 = makeDayjsFromJob(j.job_date, j.depart);
-      const d2 = makeDayjsFromJob(j.job_date, j.fin);
-      const hours = roundToQuarterHour(hoursBetween(d1, d2) || 0);
+      const d1 = makeDayTime(j.job_date, j.depart);
+      const d2 = makeDayTime(j.job_date, j.fin);
+      if (!d1 || !d2) continue;
 
-      const weekStart = dayjs(j.job_date).startOf("isoWeek");
-      const key = weekStart.format("YYYY-[W]WW");
+      const hours = hoursBetween(d1, d2) || 0;
 
-      if (!map.has(key)) {
-        map.set(key, {
+      // km: include aller + retour when present
+      const kmAller = Number(j.km_aller ?? 0) || 0;
+      const kmRetour = Number(j.km_retour ?? 0) || 0;
+      const km = kmAller + kmRetour;
+
+      const dayKey = d.format("YYYY-MM-DD");
+
+      if (!dailyMap.has(dayKey)) {
+        dailyMap.set(dayKey, { date: d, hours: 0, km: 0 });
+      }
+      const day = dailyMap.get(dayKey);
+      day.hours += hours;
+      day.km += km;
+    }
+
+    // weeklyMap: key=weekStart YYYY-MM-DD -> buckets
+    const weeklyMap = new Map();
+
+    for (const day of dailyMap.values()) {
+      const weekStart = day.date.startOf("isoWeek");
+      const weekKey = weekStart.format("YYYY-MM-DD"); // robust, unique
+
+      const regular = clamp(day.hours, 0, 8);
+      const overtime = Math.max(day.hours - 8, 0);
+
+      if (!weeklyMap.has(weekKey)) {
+        weeklyMap.set(weekKey, {
           start: weekStart,
           end: weekStart.endOf("isoWeek"),
+          regularHours: 0,
+          overtimeHours: 0,
           totalKm: 0,
-          dayHours: new Map(),
         });
       }
 
-      const w = map.get(key);
-
-      // ✅ include km_retour if present
-      w.totalKm += kmTotal(j);
-
-      const dayKey = dayjs(j.job_date).format("YYYY-MM-DD");
-      const prev = w.dayHours.get(dayKey) || 0;
-      w.dayHours.set(dayKey, prev + hours);
+      const w = weeklyMap.get(weekKey);
+      w.regularHours += regular;
+      w.overtimeHours += overtime;
+      w.totalKm += day.km;
     }
 
-    const out = [];
-    for (const w of map.values()) {
-      let totalHours = 0;
-      for (const h of w.dayHours.values()) totalHours += roundToQuarterHour(h);
+    // Convert to array, compute OT split
+    const arr = Array.from(weeklyMap.values()).map((w) => {
+      const ot15 = Math.min(w.overtimeHours, 1); // first hour at 1.5x
+      const ot20 = Math.max(w.overtimeHours - 1, 0);
 
-      const { hours_1x, hours_15x, hours_2x } = splitWeekBucketsFromDailyTotals(w.dayHours);
+      return {
+        ...w,
+        ot15,
+        ot20,
+        totalHours: w.regularHours + w.overtimeHours,
+      };
+    });
 
-      out.push({
-        start: w.start,
-        end: w.end,
-        totalKm: Math.round(w.totalKm * 100) / 100,
-        totalHours,
-        hours1x: hours_1x,
-        hours15x: hours_15x,
-        hours2x: hours_2x,
-      });
-    }
-
-    return out.sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
+    // Sort newest week first
+    arr.sort((a, b) => (a.start.isAfter(b.start) ? -1 : 1));
+    return arr;
   }, [jobs]);
+
+  async function handleLogout() {
+    await signOut();
+    navigate("/login");
+  }
 
   return (
     <div style={styles.page}>
+      {/* TOPBAR */}
       <div style={styles.topbar}>
         <div style={styles.brandBlock}>
-          <div style={styles.pageTitle}>Week</div>
-          <div style={styles.subText}>
-            {user?.email}
-            {role ? (
-              <>
-                <br />
-                role: {role}
-              </>
-            ) : null}
-          </div>
+          <div style={styles.title}>Week</div>
+          <div style={styles.subTitle}>{user?.email}</div>
+          <div style={styles.subTitle}>role: {role}</div>
         </div>
 
-        {/* ✅ unified order: Form History Week Manager Logout */}
         <div style={styles.nav}>
-          <button onClick={() => navigate("/")} style={styles.linkBtn} type="button">
+          <Link to="/form" style={styles.link}>
             Form
-          </button>
-
+          </Link>
           <Link to="/history" style={styles.link}>
             History
           </Link>
@@ -201,12 +214,13 @@ export default function Week() {
             </Link>
           )}
 
-          <button onClick={signOut} style={styles.secondaryBtn}>
+          <button onClick={handleLogout} style={styles.secondaryBtn}>
             Logout
           </button>
         </div>
       </div>
 
+      {/* CONTENT */}
       <div style={styles.container}>
         {loading && <div style={styles.card}>Loading…</div>}
         {err && <div style={styles.error}>{err}</div>}
@@ -215,35 +229,42 @@ export default function Week() {
 
         {!loading &&
           !err &&
-          weekly.map((w, idx) => {
-            const weekNum = w.start.isoWeek();
-            const rangeLeft = `${w.start.format("DD MMM")} → ${w.end.format("DD MMM YYYY")}`;
-
-            return (
-              <div key={idx} style={styles.weekCard}>
-                <div style={styles.left}>
-                  <div style={styles.weekTitle}>Week {weekNum}</div>
-                  <div style={styles.rangeLine}>{rangeLeft}</div>
+          weekly.map((w) => (
+            <div key={w.start.format("YYYY-MM-DD")} style={styles.card}>
+              <div style={styles.cardGrid}>
+                {/* LEFT */}
+                <div style={styles.leftBlock}>
+                  <div style={styles.weekHeader}>Week {w.start.isoWeek()}</div>
+                  <div style={styles.weekLine}>
+                    {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")}
+                  </div>
 
                   <div style={styles.totalLine}>
-                    <span>
-                      Total: <b>{formatHoursHM(w.totalHours)}</b>
-                    </span>
-                    <span style={styles.dot}>•</span>
-                    <span>
-                      <b>{w.totalKm}</b> km
-                    </span>
+                    Total: <b>{formatHoursHM(w.totalHours)}</b> <span style={styles.dot}>•</span>{" "}
+                    <b>{Math.round(w.totalKm)}</b> km
                   </div>
                 </div>
 
-                <div style={styles.right}>
-                  <RightBucket label="1x:" value={formatHoursHM(w.hours1x)} />
-                  <RightBucket label="1.5x:" value={formatHoursHM(w.hours15x)} />
-                  <RightBucket label="2.0x:" value={formatHoursHM(w.hours2x)} />
+                {/* RIGHT */}
+                <div style={styles.rightBlock}>
+                  <div style={styles.bucketRow}>
+                    <span style={styles.bucketLabel}>1x:</span>
+                    <span style={styles.bucketValue}>{formatHoursHM(w.regularHours)}</span>
+                  </div>
+
+                  <div style={styles.bucketRow}>
+                    <span style={styles.bucketLabel}>1.5x:</span>
+                    <span style={styles.bucketValue}>{formatHoursHM(w.ot15)}</span>
+                  </div>
+
+                  <div style={styles.bucketRow}>
+                    <span style={styles.bucketLabel}>2.0x:</span>
+                    <span style={styles.bucketValue}>{formatHoursHM(w.ot20)}</span>
+                  </div>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
       </div>
     </div>
   );
@@ -251,10 +272,10 @@ export default function Week() {
 
 const styles = {
   page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
-  container: { maxWidth: 980, margin: "0 auto" },
+  container: { maxWidth: 900, margin: "0 auto" },
 
   topbar: {
-    maxWidth: 980,
+    maxWidth: 900,
     margin: "0 auto 12px auto",
     display: "flex",
     alignItems: "center",
@@ -263,8 +284,8 @@ const styles = {
     flexWrap: "wrap",
   },
   brandBlock: { display: "grid", gap: 2 },
-  pageTitle: { fontSize: 18, fontWeight: 900 },
-  subText: { fontSize: 12, color: "#666" },
+  title: { fontSize: 34, fontWeight: 900, lineHeight: 1.05 },
+  subTitle: { fontSize: 14, color: "rgba(0,0,0,0.55)" },
 
   nav: {
     display: "flex",
@@ -273,67 +294,38 @@ const styles = {
     flexWrap: "wrap",
     justifyContent: "flex-end",
   },
-
   link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
-  linkBtn: {
-    background: "transparent",
-    border: "none",
-    color: "#1565c0",
-    fontWeight: 900,
-    cursor: "pointer",
-    padding: 0,
-    fontSize: 14,
-  },
   activeLink: { fontWeight: 900, color: "#111", fontSize: 14 },
 
   card: {
     background: "#fff",
     border: "1px solid #eee",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
     marginBottom: 12,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
   },
 
-  weekCard: {
-    background: "#fff",
-    border: "1px solid #eee",
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 12,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+  // 2-column layout that stays 2 columns on mobile
+  cardGrid: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) 140px",
-    columnGap: 16,
-    alignItems: "start",
+    gridTemplateColumns: "1fr auto",
+    gap: 16,
+    alignItems: "center",
   },
 
-  left: { minWidth: 0, display: "grid", gap: 8 },
-  weekTitle: { fontWeight: 900, fontSize: 16, color: "#111" },
-  rangeLine: { fontSize: 13, color: "#555" },
+  leftBlock: { display: "grid", gap: 6 },
+  rightBlock: { display: "grid", gap: 6, minWidth: 140 },
 
-  totalLine: {
-    fontSize: 13,
-    color: "#111",
-    display: "flex",
-    gap: 10,
-    alignItems: "baseline",
-    flexWrap: "wrap",
-  },
-  dot: { color: "#999" },
+  weekHeader: { fontSize: 22, fontWeight: 900 },
+  weekLine: { fontSize: 16, color: "rgba(0,0,0,0.6)" },
 
-  right: { display: "grid", gap: 10, alignContent: "start" },
+  totalLine: { fontSize: 16, color: "rgba(0,0,0,0.85)" },
+  dot: { margin: "0 8px", color: "rgba(0,0,0,0.35)" },
 
-  bucketRow: {
-    display: "flex",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 10,
-    fontSize: 13,
-    width: "100%",
-  },
-  bucketLabel: { color: "#555", fontWeight: 800 },
-  bucketValue: { color: "#111", fontWeight: 900, whiteSpace: "nowrap" },
+  bucketRow: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 },
+  bucketLabel: { fontWeight: 900, color: "rgba(0,0,0,0.6)" },
+  bucketValue: { fontWeight: 900, fontSize: 18 },
 
   secondaryBtn: {
     background: "#f5f5f5",
