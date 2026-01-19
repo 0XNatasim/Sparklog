@@ -126,11 +126,11 @@ export default function History() {
   }
 
   function canOpen(job) {
-    return isOwner(job) && job.status === "saved" && job.locked === false;
+    return isOwner(job) && (job.status === "saved" || job.status === "updated")    && job.locked === false;
   }
 
   function canDelete(job) {
-    return isOwner(job) && job.status === "saved" && job.locked === false;
+    return isOwner(job) && (job.status === "saved" || job.status === "updated")    && job.locked === false;
   }
 
   function canSubmit(job) {

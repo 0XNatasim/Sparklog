@@ -34,6 +34,11 @@ function normalizeNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Editable statuses (draft states)
+function isEditableStatus(s) {
+  return s === "saved" || s === "updated";
+}
+
 export default function EmployeeForm() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
@@ -41,7 +46,7 @@ export default function EmployeeForm() {
 
   const editId = searchParams.get("edit");
 
-  // Split loading states (prevents weird UX / “nothing happens”)
+  // Split loading states (prevents “nothing happens” feeling)
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -54,17 +59,21 @@ export default function EmployeeForm() {
   const [depart, setDepart] = useState("07:00");
   const [arrivee, setArrivee] = useState("08:00");
   const [fin, setFin] = useState("16:00");
-
   const [km_aller, setKmAller] = useState(""); // string for input UX
 
   const [locked, setLocked] = useState(false);
-  const [status, setStatus] = useState("saved");
+
+  // NEW: status starts empty/new until you actually save
+  const [status, setStatus] = useState(""); // "", "saved", "updated", "submitted", "approved"
+  const statusLabel = editId ? (status || "saved") : "new";
 
   const departDj = useMemo(() => makeDayjsFromJob(job_date, depart), [job_date, depart]);
   const finDj = useMemo(() => makeDayjsFromJob(job_date, fin), [job_date, fin]);
-
   const hoursDecimal = useMemo(() => hoursBetween(departDj, finDj) || 0, [departDj, finDj]);
-  const hoursLabel = useMemo(() => toHHmmLabelFromFormatHours(formatHours(hoursDecimal)), [hoursDecimal]);
+  const hoursLabel = useMemo(
+    () => toHHmmLabelFromFormatHours(formatHours(hoursDecimal)),
+    [hoursDecimal]
+  );
 
   async function loadEdit() {
     if (!editId || !user?.id) return;
@@ -88,8 +97,12 @@ export default function EmployeeForm() {
       const aller = data.km_aller ?? "";
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
 
-      setLocked(Boolean(data.locked));
-      setStatus(data.status || "saved");
+      const s = (data.status || "saved").trim();
+      setStatus(s);
+
+      // Only lock when NOT editable
+      const shouldLock = Boolean(data.locked) || !isEditableStatus(s);
+      setLocked(shouldLock);
     } catch (e) {
       setErr(e?.message || "Failed to load job.");
     } finally {
@@ -102,13 +115,25 @@ export default function EmployeeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
 
-  async function saveJob(nextStatus = "saved") {
+  async function saveDraft() {
+    await saveJob("draft");
+  }
+
+  async function submitJob() {
+    await saveJob("submit");
+  }
+
+  /**
+   * Centralized save:
+   * - New job + Save => status "saved"
+   * - Existing job + Save => status "updated" (if it was editable)
+   * - Submit => status "submitted" + locked
+   */
+  async function saveJob(mode /* "draft" | "submit" */) {
     if (!user?.id) {
       setErr("Not signed in.");
       return;
     }
-
-    // Prevent double-taps on mobile
     if (saving) return;
 
     setErr("");
@@ -118,6 +143,23 @@ export default function EmployeeForm() {
     try {
       const kmAllerNum = normalizeNumber(km_aller) ?? 0;
 
+      let nextStatus = "saved";
+
+      if (mode === "submit") {
+        nextStatus = "submitted";
+      } else {
+        // draft save
+        if (!editId) {
+          nextStatus = "saved";
+        } else {
+          // if already editable (saved/updated), saving again becomes "updated"
+          const current = (status || "saved").trim();
+          nextStatus = isEditableStatus(current) ? "updated" : current;
+        }
+      }
+
+      const nextLocked = nextStatus === "submitted"; // lock only on submit (approval/export locks elsewhere)
+
       const payload = {
         user_id: user.id,
         job_date,
@@ -126,19 +168,17 @@ export default function EmployeeForm() {
         arrivee,
         fin,
         km_aller: kmAllerNum,
-        // KM retour removed
         status: nextStatus,
-        locked: nextStatus !== "saved",
+        locked: nextLocked,
       };
 
       if (editId) {
-        // Update existing
         const { error } = await supabase.from("jobs").update(payload).eq("id", editId);
         if (error) throw error;
 
         setInfo(nextStatus === "submitted" ? "Job submitted." : "Job updated.");
         setStatus(nextStatus);
-        setLocked(nextStatus !== "saved");
+        setLocked(nextLocked);
       } else {
         // Insert new + return id, then go to edit mode so future saves are updates
         const { data, error } = await supabase.from("jobs").insert(payload).select("id").single();
@@ -147,9 +187,9 @@ export default function EmployeeForm() {
 
         setInfo(nextStatus === "submitted" ? "Job saved and submitted." : "Job saved.");
         setStatus(nextStatus);
-        setLocked(nextStatus !== "saved");
+        setLocked(nextLocked);
 
-        // IMPORTANT: navigate to edit view to avoid “saved but feels like nothing happened”
+        // Move into edit mode (avoids “saved but feels like nothing happened”)
         navigate(`/form?edit=${data.id}`, { replace: true });
       }
     } catch (e) {
@@ -160,6 +200,11 @@ export default function EmployeeForm() {
   }
 
   const disableInputs = locked || loadingEdit || saving;
+
+  async function handleLogout() {
+    await signOut();
+    navigate("/login");
+  }
 
   return (
     <div style={styles.page}>
@@ -192,7 +237,7 @@ export default function EmployeeForm() {
             </Link>
           )}
 
-          <button onClick={signOut} style={styles.secondaryBtn}>
+          <button onClick={handleLogout} style={styles.secondaryBtn}>
             Logout
           </button>
         </div>
@@ -278,26 +323,26 @@ export default function EmployeeForm() {
 
             <div style={styles.field}>
               <div style={styles.label}>Status</div>
-              <div style={styles.readonlyBox}>{status}</div>
+              <div style={styles.readonlyBox}>{statusLabel}</div>
             </div>
           </div>
 
           <div style={styles.actions}>
-            <button type="button" style={styles.primaryBtn} disabled={disableInputs} onClick={() => saveJob("saved")}>
-              {saving ? "Saving..." : "Save"}
+            <button type="button" style={styles.primaryBtn} disabled={disableInputs} onClick={saveDraft}>
+              {saving ? "Saving…" : "Save"}
             </button>
 
-            <button
-              type="button"
-              style={styles.secondaryBtn}
-              disabled={disableInputs}
-              onClick={() => saveJob("submitted")}
-            >
-              {saving ? "Submitting..." : "Submit"}
+            <button type="button" style={styles.secondaryBtn} disabled={disableInputs} onClick={submitJob}>
+              {saving ? "Submitting…" : "Submit"}
             </button>
 
             {editId && (
-              <button type="button" style={styles.ghostBtn} onClick={() => navigate("/form")} disabled={loadingEdit || saving}>
+              <button
+                type="button"
+                style={styles.ghostBtn}
+                onClick={() => navigate("/form")}
+                disabled={loadingEdit || saving}
+              >
                 New job
               </button>
             )}
@@ -305,7 +350,7 @@ export default function EmployeeForm() {
 
           {locked && (
             <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-              This job is locked ({status}). You can only edit when it is <b>saved</b> and unlocked.
+              This job is locked ({statusLabel}). You can only edit when it is <b>saved</b> or <b>updated</b> and unlocked.
             </div>
           )}
         </div>
@@ -401,8 +446,8 @@ const styles = {
   },
   ghostBtn: {
     background: "transparent",
-    color: "#1565c0",
-    border: "1px solid #e0e0e0",
+    color: "#111",
+    border: "1px dashed #ddd",
     borderRadius: 10,
     padding: "10px 12px",
     fontSize: 13,
@@ -421,9 +466,9 @@ const styles = {
   },
   info: {
     marginBottom: 10,
-    background: "rgba(21,101,192,0.08)",
-    border: "1px solid rgba(21,101,192,0.2)",
-    color: "#0d47a1",
+    background: "rgba(25,118,210,0.08)",
+    border: "1px solid rgba(25,118,210,0.2)",
+    color: "#1565c0",
     padding: 10,
     borderRadius: 10,
     fontSize: 13,
