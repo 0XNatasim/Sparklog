@@ -3,6 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 
+function EyeIcon({ open }) {
+  return open ? (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  ) : (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
@@ -10,6 +25,9 @@ export default function Login() {
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
 
@@ -25,15 +43,14 @@ export default function Login() {
     }
   }, [user, role, navigate]);
 
+  const passwordsMatch = !isSignup || password === confirmPassword;
+
   const canSubmit = useMemo(() => {
     if (!email.trim() || !password) return false;
     if (isSignup && fullName.trim().length < 2) return false;
-
-    // Phone optional; if you want it required, uncomment:
-    // if (isSignup && phone.trim().length < 7) return false;
-
+    if (isSignup && password !== confirmPassword) return false;
     return true;
-  }, [email, password, fullName, phone, isSignup]);
+  }, [email, password, confirmPassword, fullName, phone, isSignup]);
 
   function normalizePhone(raw) {
     const s = String(raw || "").trim();
@@ -162,15 +179,42 @@ export default function Login() {
 
           <label style={styles.label}>
             Password
-            <input
-              style={styles.input}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              type="password"
-              autoComplete={isSignup ? "new-password" : "current-password"}
-            />
+            <div style={styles.passwordWrap}>
+              <input
+                style={styles.passwordInput}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                type={showPassword ? "text" : "password"}
+                autoComplete={isSignup ? "new-password" : "current-password"}
+              />
+              <button type="button" style={styles.eyeBtn} onClick={() => setShowPassword(v => !v)}>
+                <EyeIcon open={showPassword} />
+              </button>
+            </div>
           </label>
+
+          {isSignup && (
+            <label style={styles.label}>
+              Confirm password
+              <div style={styles.passwordWrap}>
+                <input
+                  style={styles.passwordInput}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  type={showConfirm ? "text" : "password"}
+                  autoComplete="new-password"
+                />
+                <button type="button" style={styles.eyeBtn} onClick={() => setShowConfirm(v => !v)}>
+                  <EyeIcon open={showConfirm} />
+                </button>
+              </div>
+              {confirmPassword && !passwordsMatch && (
+                <span style={{ color: "crimson", fontSize: 12 }}>Passwords do not match</span>
+              )}
+            </label>
+          )}
 
           {errorMsg && <div style={styles.error}>{errorMsg}</div>}
 
@@ -182,6 +226,10 @@ export default function Login() {
             type="button"
             onClick={() => {
               setErrorMsg("");
+              setPassword("");
+              setConfirmPassword("");
+              setShowPassword(false);
+              setShowConfirm(false);
               setMode(isSignup ? "login" : "signup");
             }}
             style={styles.linkBtn}
@@ -238,6 +286,31 @@ const styles = {
     cursor: "pointer",
     fontWeight: 700,
     fontSize: 13,
+  },
+  passwordWrap: {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+  },
+  passwordInput: {
+    flex: 1,
+    border: "1px solid #eee",
+    borderRadius: 10,
+    padding: "10px 40px 10px 12px",
+    fontSize: 14,
+    outline: "none",
+    width: "100%",
+  },
+  eyeBtn: {
+    position: "absolute",
+    right: 10,
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    color: "#999",
+    display: "flex",
+    alignItems: "center",
+    padding: 0,
   },
   error: {
     background: "rgba(220,20,60,0.08)",
