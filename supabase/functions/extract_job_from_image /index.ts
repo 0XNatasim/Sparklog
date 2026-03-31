@@ -28,6 +28,7 @@ serve(async (req) => {
 
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
     if (!anthropicApiKey) {
+      console.log("[extract] missing ANTHROPIC_API_KEY");
       return json({ ok: false, error: "Missing ANTHROPIC_API_KEY" }, 500);
     }
 
@@ -41,6 +42,7 @@ serve(async (req) => {
       : "";
 
     if (!token) {
+      console.log("[extract] missing auth token");
       return json({ ok: false, error: "Missing Authorization bearer token" }, 401);
     }
 
@@ -50,15 +52,21 @@ serve(async (req) => {
 
     const { data: callerUserRes, error: callerUserErr } = await caller.auth.getUser();
     if (callerUserErr || !callerUserRes?.user) {
+      console.log("[extract] invalid session:", callerUserErr?.message);
       return json({ ok: false, error: "Invalid session token" }, 401);
     }
+
+    console.log("[extract] auth ok, user:", callerUserRes.user.id);
 
     const body = await req.json().catch(() => ({}));
     const { image_base64, mime_type } = body;
 
     if (!image_base64) {
+      console.log("[extract] missing image_base64");
       return json({ ok: false, error: "Missing image_base64" }, 400);
     }
+
+    console.log("[extract] calling Claude, mime_type:", mime_type);
 
     const validMime = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     const mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" =
