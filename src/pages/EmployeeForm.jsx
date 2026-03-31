@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
@@ -62,6 +62,8 @@ export default function EmployeeForm() {
   const [km_aller, setKmAller] = useState(""); // string for input UX
 
   const [locked, setLocked] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const imageInputRef = useRef(null);
 
   // NEW: status starts empty/new until you actually save
   const [status, setStatus] = useState(""); // "", "saved", "updated", "submitted", "approved"
@@ -196,6 +198,57 @@ export default function EmployeeForm() {
       setErr(e?.message || "Save failed.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleExtractFromImage(e) {
+    const file = e.target.files?.[0];
+    // Reset input so the same file can be re-selected if needed
+    e.target.value = "";
+    if (!file) return;
+
+    setErr("");
+    setInfo("");
+    setExtracting(true);
+
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          // result is "data:<mime>;base64,<data>" — strip the prefix
+          const result = reader.result;
+          resolve(result.split(",")[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("Not signed in.");
+
+      const { data, error } = await supabase.functions.invoke("extract_job_from_image", {
+        body: { image_base64: base64, mime_type: file.type },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (error) throw new Error(error.message || "Extraction failed.");
+      if (!data?.ok) throw new Error(data?.error || "Extraction failed.");
+
+      const d = data.data || {};
+
+      if (d.job_date) setJobDate(d.job_date);
+      if (d.ot) setOt(String(d.ot));
+      if (d.depart) setDepart(d.depart);
+      if (d.arrivee) setArrivee(d.arrivee);
+      if (d.fin) setFin(d.fin);
+      if (d.km_aller !== null && d.km_aller !== undefined) setKmAller(String(d.km_aller));
+
+      setInfo("Fields filled from image. Please review before saving.");
+    } catch (e) {
+      setErr(e?.message || "Failed to extract from image.");
+    } finally {
+      setExtracting(false);
     }
   }
 
@@ -335,6 +388,26 @@ export default function EmployeeForm() {
             <button type="button" style={styles.secondaryBtn} disabled={disableInputs} onClick={submitJob}>
               {saving ? "Submitting…" : "Submit"}
             </button>
+
+            {!locked && (
+              <>
+                <button
+                  type="button"
+                  style={styles.ghostBtn}
+                  disabled={disableInputs || extracting}
+                  onClick={() => imageInputRef.current?.click()}
+                >
+                  {extracting ? "Extracting…" : "Auto-fill from photo"}
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleExtractFromImage}
+                />
+              </>
+            )}
 
             {editId && (
               <button
