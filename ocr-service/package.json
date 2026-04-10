@@ -1,0 +1,27 @@
+{
+  "name": "sparklog-ocr",
+  "version": "1.0.0",
+  "description": "OCR service for Sparklog image autofill",
+  "type": "module",
+  "main": "server.ts",
+  "scripts": {
+    "start": "tsx server.ts",
+    "dev": "tsx watch server.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "sharp": "^0.33.5",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
