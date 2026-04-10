@@ -203,7 +203,6 @@ export default function EmployeeForm() {
 
   async function handleExtractFromImage(e) {
     const file = e.target.files?.[0];
-    // Reset input so the same file can be re-selected if needed
     e.target.value = "";
     if (!file) return;
 
@@ -214,35 +213,50 @@ export default function EmployeeForm() {
     try {
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
+
         reader.onload = () => {
-          // result is "data:<mime>;base64,<data>" — strip the prefix
           const result = reader.result;
+          if (typeof result !== "string" || !result.includes(",")) {
+            reject(new Error("Failed to read image file."));
+            return;
+          }
+
           resolve(result.split(",")[1]);
         };
-        reader.onerror = reject;
+
+        reader.onerror = () => reject(new Error("Failed to read image file."));
         reader.readAsDataURL(file);
       });
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error("Not signed in.");
+      const response = await fetch(
+        "https://sparklog-ocr.onrender.com/extract_job_from_image",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image_base64: base64,
+          }),
+        }
+      );
 
-      const { data, error } = await supabase.functions.invoke("extract_job_from_image", {
-        body: { image_base64: base64, mime_type: file.type },
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const data = await response.json();
 
-      if (error) throw new Error(error.message || "Extraction failed.");
-      if (!data?.ok) throw new Error(data?.error || "Extraction failed.");
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || "Extraction failed.");
+      }
 
       const d = data.data || {};
 
-      if (d.job_date) setJobDate(d.job_date);
+      if (d.job_date) setJobDate(String(d.job_date));
       if (d.ot) setOt(String(d.ot));
-      if (d.depart) setDepart(d.depart);
-      if (d.arrivee) setArrivee(d.arrivee);
-      if (d.fin) setFin(d.fin);
-      if (d.km_aller !== null && d.km_aller !== undefined) setKmAller(String(d.km_aller));
+      if (d.depart) setDepart(String(d.depart));
+      if (d.arrivee) setArrivee(String(d.arrivee));
+      if (d.fin) setFin(String(d.fin));
+      if (d.km_aller !== null && d.km_aller !== undefined) {
+        setKmAller(String(d.km_aller));
+      }
 
       setInfo("Fields filled from image. Please review before saving.");
     } catch (e) {
@@ -261,7 +275,6 @@ export default function EmployeeForm() {
 
   return (
     <div style={styles.page}>
-      {/* TOPBAR */}
       <div style={styles.topbar}>
         <div style={styles.brandBlock}>
           <div style={styles.pageTitle}>Form</div>
@@ -272,7 +285,6 @@ export default function EmployeeForm() {
           </div>
         </div>
 
-        {/* Menu order: Form History Week Manager Logout */}
         <div style={styles.nav}>
           <span style={styles.activeLink}>Form</span>
 
