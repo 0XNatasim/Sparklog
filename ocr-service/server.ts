@@ -4,9 +4,11 @@ import { extractJobFromImageBuffer } from "./extract_job_from_image.ts";
 
 const app = express();
 
+const allowedOrigin = process.env.CORS_ORIGIN || "*";
+
 app.use(
   cors({
-    origin: "*",
+    origin: allowedOrigin,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info"],
   })
