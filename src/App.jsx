@@ -54,6 +54,14 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/form"
+          element={
+            <ProtectedRoute>
+              <EmployeeForm />
+            </ProtectedRoute>
+          }
+        />
 
         {/* History */}
         <Route
