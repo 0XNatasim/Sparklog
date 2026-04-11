@@ -30,6 +30,9 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 10000);
 
     async function bootstrap() {
       if (isBootstrappedRef.current) return;
@@ -44,6 +47,7 @@ export function AuthProvider({ children }) {
 
       if (!cancelled) {
         setUser(sessionUser);
+        setLoading(false);
         if (sessionUser) {
           const r = await fetchRoleForUser(sessionUser.id);
           if (!cancelled) {
@@ -54,7 +58,6 @@ export function AuthProvider({ children }) {
           setRole(null);
           setFullName(null);
         }
-        setLoading(false);
       }
 
       // StrictMode-safe: clean up any prior subscription before creating a new one
@@ -66,6 +69,7 @@ export function AuthProvider({ children }) {
       const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
         const nextUser = session?.user ?? null;
         setUser(nextUser);
+        setLoading(false);
 
         if (nextUser) {
           const r = await fetchRoleForUser(nextUser.id);
@@ -75,8 +79,6 @@ export function AuthProvider({ children }) {
           setRole(null);
           setFullName(null);
         }
-
-        setLoading(false);
       });
 
       subscriptionRef.current = sub?.subscription ?? null;
@@ -86,6 +88,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       cancelled = true;
+      clearTimeout(fallbackTimer);
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe?.();
         subscriptionRef.current = null;

@@ -91,6 +91,13 @@ export default function Login() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/login`,
+            data: {
+              full_name: fullName.trim(),
+              phone: normalizePhone(phone),
+            },
+          },
         });
         if (error) throw error;
 
@@ -108,7 +115,9 @@ export default function Login() {
 
         // If email confirmation is enabled, session is null until user confirms.
         if (!data?.session) {
-          setErrorMsg("Signup successful. Check your email to confirm, then log in.");
+          setErrorMsg(
+            "Signup successful. Check your email inbox/spam to confirm, then log in."
+          );
           setMode("login");
           setPassword("");
           setLoading(false);

@@ -10,15 +10,32 @@ import Week from "./pages/Week";
 import ManagerDashboard from "./pages/ManagerDashboard";
 
 export default function App() {
+  React.useEffect(() => {
+    // Migrate old hash-based URLs (e.g. /#/form) to BrowserRouter paths.
+    const hash = window.location.hash || "";
+    if (hash.startsWith("#/")) {
+      const nextPath = hash.slice(1); // "/form"
+      window.history.replaceState(null, "", nextPath);
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
 
-        {/* Employee default */}
+        {/* Employee form (supports both "/" and "/form") */}
         <Route
           path="/"
+          element={
+            <ProtectedRoute>
+              <EmployeeForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/form"
           element={
             <ProtectedRoute>
               <EmployeeForm />
