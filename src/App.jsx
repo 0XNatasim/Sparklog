@@ -16,9 +16,17 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<Login />} />
 
-        {/* Employee default */}
+        {/* Employee form (supports both "/" and "/form") */}
         <Route
           path="/"
+          element={
+            <ProtectedRoute>
+              <EmployeeForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/form"
           element={
             <ProtectedRoute>
               <EmployeeForm />
