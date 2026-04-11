@@ -82,21 +82,37 @@ function parseArrivee(text: string): string | null {
   }
 
   const times = extractAllTimes(normalized);
-  return times[times.length - 1] ?? times[0] ?? null;
+  return times[0] ?? null;
 }
 
 function parseDistance(text: string): number | null {
   const normalized = normalizeWhitespace(text);
 
-  const candidates = [...normalized.matchAll(/\b(\d{1,4}(?:[.,]\d{1,2})?)\b/g)]
-    .map((m) => m[1])
-    .map((value) => normalizeFrenchNumber(value))
+  const contextual = normalized.match(
+    /Distance\s*parcourue[\s\S]{0,120}?(\d{1,5}(?:[.,]\d{1,2})?)/i
+  );
+
+  const candidates = [
+    ...(contextual ? [contextual[1]] : []),
+    ...[...normalized.matchAll(/\b(\d{1,5}(?:[.,]\d{1,2})?)\b/g)].map((m) => m[1]),
+  ]
+    .map((raw) => {
+      const parsed = normalizeFrenchNumber(raw);
+      if (parsed === null) return null;
+
+      // OCR can collapse "129,00" -> "12900". Recover common case.
+      if (parsed > 1000 && parsed <= 100000 && /^(\d{3,})00$/.test(raw.replace(/[^\d]/g, ""))) {
+        return parsed / 100;
+      }
+
+      return parsed;
+    })
     .filter((value): value is number => value !== null)
     .filter((value) => value > 0 && value < 1000);
 
   if (!candidates.length) return null;
 
-  return Math.max(...candidates);
+  return candidates[0];
 }
 
 async function preprocessWholeImage(imageBuffer: Buffer): Promise<Buffer> {
@@ -203,13 +219,15 @@ export async function extractJobFromImageBuffer(
       cropZone(preprocessed, zones.distance_block, 4),
     ]);
 
-  const [otText, departText, arriveeText, distanceText] = await Promise.all([
+  const [fullText, otText, departText, arriveeText, distanceText] = await Promise.all([
+    ocrBuffer(preprocessed),
     ocrBuffer(otBuffer),
     ocrBuffer(departBuffer),
     ocrBuffer(arriveeBuffer),
     ocrBuffer(distanceBuffer),
   ]);
 
+  console.log("[ocr] fullText:", fullText);
   console.log("[ocr] otText:", otText);
   console.log("[ocr] departText:", departText);
   console.log("[ocr] arriveeText:", arriveeText);
@@ -221,8 +239,8 @@ export async function extractJobFromImageBuffer(
     job_date: departParsed.job_date,
     ot: parseOt(otText),
     depart: departParsed.depart,
-    arrivee: parseArrivee(arriveeText),
+    arrivee: parseArrivee(`${arriveeText}\n${fullText}\n${departText}`),
     fin: departParsed.fin,
-    km_aller: parseDistance(distanceText),
+    km_aller: parseDistance(`${distanceText}\n${fullText}`),
   };
 }
