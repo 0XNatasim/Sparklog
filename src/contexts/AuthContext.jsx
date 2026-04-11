@@ -24,6 +24,7 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [fullName, setFullName] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
 
   const subscriptionRef = useRef(null);
   const isBootstrappedRef = useRef(false);
@@ -40,8 +41,28 @@ export function AuthProvider({ children }) {
 
       setLoading(true);
 
-      const { data, error } = await supabase.auth.getSession();
-      if (error) console.warn("[Auth] getSession error:", error);
+      let data = null;
+      let error = null;
+      try {
+        const result = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Supabase session request timed out.")), 8000)
+          ),
+        ]);
+        data = result?.data ?? null;
+        error = result?.error ?? null;
+      } catch (e) {
+        error = e;
+      }
+
+      if (error) {
+        const msg = error instanceof Error ? error.message : "Failed to reach Supabase auth.";
+        console.warn("[Auth] getSession error:", msg);
+        setAuthError(msg);
+      } else {
+        setAuthError("");
+      }
 
       const sessionUser = data?.session?.user ?? null;
 
@@ -70,6 +91,7 @@ export function AuthProvider({ children }) {
         const nextUser = session?.user ?? null;
         setUser(nextUser);
         setLoading(false);
+        setAuthError("");
 
         if (nextUser) {
           const r = await fetchRoleForUser(nextUser.id);
@@ -102,11 +124,12 @@ export function AuthProvider({ children }) {
       role,
       fullName,
       loading,
+      authError,
       async signOut() {
         await supabase.auth.signOut();
       }
     }),
-    [user, role, fullName, loading]
+    [user, role, fullName, loading, authError]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
