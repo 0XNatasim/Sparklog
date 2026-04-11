@@ -7,6 +7,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
 
 dayjs.locale("en");
+const OCR_URL =
+  import.meta.env.VITE_OCR_URL || "https://sparklog-ocr.onrender.com/extract_job_from_image";
 
 function fmtTimeHHmm(t) {
   if (!t) return "";
@@ -228,23 +230,45 @@ export default function EmployeeForm() {
         reader.readAsDataURL(file);
       });
 
-      const response = await fetch(
-        "https://sparklog-ocr.onrender.com/extract_job_from_image",
-        {
+      let data = null;
+
+      try {
+        const response = await fetch(OCR_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             image_base64: base64,
+            mime_type: file.type || "image/jpeg",
           }),
+        });
+
+        data = await response.json();
+        if (!response.ok || !data?.ok) {
+          throw new Error(data?.error || "Extraction failed.");
         }
-      );
+      } catch (renderErr) {
+        console.warn("[OCR] Render OCR failed, trying Supabase Edge Function:", renderErr);
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke(
+          "extract_job_from_image",
+          {
+            body: {
+              image_base64: base64,
+              mime_type: file.type || "image/jpeg",
+            },
+          }
+        );
 
-      const data = await response.json();
+        if (edgeError || !edgeData?.ok) {
+          throw new Error(
+            edgeError?.message ||
+              edgeData?.error ||
+              "Extraction failed (Render OCR + Supabase fallback)."
+          );
+        }
 
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "Extraction failed.");
+        data = edgeData;
       }
 
       const d = data.data || {};
