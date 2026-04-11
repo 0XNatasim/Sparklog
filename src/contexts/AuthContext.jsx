@@ -30,6 +30,9 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 10000);
 
     async function bootstrap() {
       if (isBootstrappedRef.current) return;
@@ -86,6 +89,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       cancelled = true;
+      clearTimeout(fallbackTimer);
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe?.();
         subscriptionRef.current = null;
