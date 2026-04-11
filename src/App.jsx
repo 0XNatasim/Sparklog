@@ -1,6 +1,6 @@
 // src/App.jsx
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Login from "./pages/Login";
@@ -20,7 +20,7 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
@@ -28,6 +28,34 @@ export default function App() {
         {/* Employee form (supports both "/" and "/form") */}
         <Route
           path="/"
+          element={<Navigate to="/form" replace />}
+        />
+        <Route
+          path="/form"
+          element={
+            <ProtectedRoute>
+              <EmployeeForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/form"
+          element={
+            <ProtectedRoute>
+              <EmployeeForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/form"
+          element={
+            <ProtectedRoute>
+              <EmployeeForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/form"
           element={
             <ProtectedRoute>
               <EmployeeForm />
@@ -76,6 +104,6 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
