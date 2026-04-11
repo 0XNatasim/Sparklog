@@ -21,7 +21,7 @@ function normalizeWhitespace(input: string): string {
   return input
     .replace(/\r/g, "")
     .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n{2,}/g, "\n")
     .trim();
 }
 
@@ -73,24 +73,30 @@ function parseDepartAndFin(text: string): {
 
 function parseArrivee(text: string): string | null {
   const normalized = normalizeWhitespace(text);
+
+  const labeledMatch = normalized.match(
+    /Heure d['’]arriv(?:e|é)e(?:\s*\(info\))?[\s\S]*?\b([01]\d|2[0-3]):([0-5]\d)\b/i
+  );
+  if (labeledMatch) {
+    return `${labeledMatch[1]}:${labeledMatch[2]}`;
+  }
+
   const times = extractAllTimes(normalized);
-  return times[0] ?? null;
+  return times[times.length - 1] ?? times[0] ?? null;
 }
 
 function parseDistance(text: string): number | null {
   const normalized = normalizeWhitespace(text);
 
-  const labelMatch = normalized.match(
-    /distance\s+parcourue[\s\S]*?(\d{1,4}(?:[.,]\d{1,2})?)/i
-  );
-  if (labelMatch?.[1]) {
-    return normalizeFrenchNumber(labelMatch[1]);
-  }
+  const candidates = [...normalized.matchAll(/\b(\d{1,4}(?:[.,]\d{1,2})?)\b/g)]
+    .map((m) => m[1])
+    .map((value) => normalizeFrenchNumber(value))
+    .filter((value): value is number => value !== null)
+    .filter((value) => value > 0 && value < 1000);
 
-  const fallbackMatch = normalized.match(/\b(\d{1,4}(?:[.,]\d{1,2})?)\b/);
-  if (!fallbackMatch?.[1]) return null;
+  if (!candidates.length) return null;
 
-  return normalizeFrenchNumber(fallbackMatch[1]);
+  return Math.max(...candidates);
 }
 
 async function preprocessWholeImage(imageBuffer: Buffer): Promise<Buffer> {
@@ -135,16 +141,16 @@ function buildZones(width: number, height: number): {
       height: Math.round(height * 0.34),
     },
     arrivee_block: {
-      left: Math.round(width * 0.06),
-      top: Math.round(height * 0.47),
-      width: Math.round(width * 0.88),
+      left: Math.round(width * 0.08),
+      top: Math.round(height * 0.49),
+      width: Math.round(width * 0.82),
       height: Math.round(height * 0.16),
     },
     distance_block: {
-      left: Math.round(width * 0.06),
-      top: Math.round(height * 0.61),
-      width: Math.round(width * 0.88),
-      height: Math.round(height * 0.22),
+      left: Math.round(width * 0.10),
+      top: Math.round(height * 0.73),
+      width: Math.round(width * 0.52),
+      height: Math.round(height * 0.11),
     },
   };
 }
@@ -193,8 +199,8 @@ export async function extractJobFromImageBuffer(
     await Promise.all([
       cropZone(preprocessed, zones.ot, 3),
       cropZone(preprocessed, zones.depart_block, 2),
-      cropZone(preprocessed, zones.arrivee_block, 2),
-      cropZone(preprocessed, zones.distance_block, 2),
+      cropZone(preprocessed, zones.arrivee_block, 3),
+      cropZone(preprocessed, zones.distance_block, 4),
     ]);
 
   const [otText, departText, arriveeText, distanceText] = await Promise.all([
@@ -203,6 +209,11 @@ export async function extractJobFromImageBuffer(
     ocrBuffer(arriveeBuffer),
     ocrBuffer(distanceBuffer),
   ]);
+
+  console.log("[ocr] otText:", otText);
+  console.log("[ocr] departText:", departText);
+  console.log("[ocr] arriveeText:", arriveeText);
+  console.log("[ocr] distanceText:", distanceText);
 
   const departParsed = parseDepartAndFin(departText);
 
