@@ -41,6 +41,27 @@ function isEditableStatus(s) {
   return s === "saved" || s === "updated";
 }
 
+// Reject a promise if it doesn't settle within `ms` — prevents the save button
+// from getting stuck forever when the Supabase project is paused/unreachable.
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s. Please retry.`)),
+      ms
+    );
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
+  });
+}
+
 export default function EmployeeForm() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
@@ -177,7 +198,11 @@ export default function EmployeeForm() {
       };
 
       if (editId) {
-        const { error } = await supabase.from("jobs").update(payload).eq("id", editId);
+        const { error } = await withTimeout(
+          supabase.from("jobs").update(payload).eq("id", editId),
+          15000,
+          "Save"
+        );
         if (error) throw error;
 
         setInfo(nextStatus === "submitted" ? "Job submitted." : "Job updated.");
@@ -185,7 +210,11 @@ export default function EmployeeForm() {
         setLocked(nextLocked);
       } else {
         // Insert new + return id, then go to edit mode so future saves are updates
-        const { data, error } = await supabase.from("jobs").insert(payload).select("id").single();
+        const { data, error } = await withTimeout(
+          supabase.from("jobs").insert(payload).select("id").single(),
+          15000,
+          "Save"
+        );
         if (error) throw error;
         if (!data?.id) throw new Error("Insert succeeded but no id returned.");
 
