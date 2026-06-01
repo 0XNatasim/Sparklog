@@ -253,6 +253,30 @@ export default function ManagerDashboard() {
     }
   }
 
+  async function unlock(jobId) {
+    const ok = window.confirm("Unlock this job so the employee can edit it?");
+    if (!ok) return;
+
+    setActionLoadingId(jobId);
+    setErr("");
+    setInfo("");
+
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: "updated", locked: false })
+        .eq("id", jobId);
+      if (error) throw error;
+
+      setInfo("Job unlocked. Employee can now edit it.");
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Unlock failed.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   async function approveWeekAll() {
     if (!selectedEmployee) return;
 
@@ -384,6 +408,12 @@ export default function ManagerDashboard() {
             {canApprove && (
               <button disabled={actionLoadingId === j.id} onClick={() => approve(j.id)} style={styles.primaryBtn}>
                 {actionLoadingId === j.id ? "Working…" : "Approve"}
+              </button>
+            )}
+
+            {j.locked === true && j.status !== "approved" && (
+              <button disabled={actionLoadingId === j.id} onClick={() => unlock(j.id)} style={styles.secondaryBtn}>
+                {actionLoadingId === j.id ? "Working…" : "Unlock"}
               </button>
             )}
 
