@@ -11,11 +11,11 @@ import ManagerDashboard from "./pages/ManagerDashboard";
 
 export default function App() {
   React.useEffect(() => {
-    // Migrate old hash-based URLs (e.g. /#/form) to BrowserRouter paths.
-    const hash = window.location.hash || "";
-    if (hash.startsWith("#/")) {
-      const nextPath = hash.slice(1); // "/form"
-      window.history.replaceState(null, "", nextPath);
+    // If the user landed on a non-root path (e.g. /form from a stale bookmark),
+    // collapse it to "/" so HashRouter takes over cleanly.
+    const { pathname, hash, search } = window.location;
+    if (pathname !== "/" && !hash) {
+      window.history.replaceState(null, "", `/${search}${hash}`);
     }
   }, []);
 
@@ -29,38 +29,6 @@ export default function App() {
         <Route
           path="/"
           element={<Navigate to="/form" replace />}
-        />
-        <Route
-          path="/form"
-          element={
-            <ProtectedRoute>
-              <EmployeeForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/form"
-          element={
-            <ProtectedRoute>
-              <EmployeeForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/form"
-          element={
-            <ProtectedRoute>
-              <EmployeeForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/form"
-          element={
-            <ProtectedRoute>
-              <EmployeeForm />
-            </ProtectedRoute>
-          }
         />
         <Route
           path="/form"
