@@ -261,24 +261,8 @@ export default function EmployeeForm() {
 
       let data = null;
 
+      // Primary: Supabase Edge Function (Claude vision) — fast, no cold start
       try {
-        const response = await fetch(OCR_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            image_base64: base64,
-            mime_type: file.type || "image/jpeg",
-          }),
-        });
-
-        data = await response.json();
-        if (!response.ok || !data?.ok) {
-          throw new Error(data?.error || "Extraction failed.");
-        }
-      } catch (renderErr) {
-        console.warn("[OCR] Render OCR failed, trying Supabase Edge Function:", renderErr);
         const { data: edgeData, error: edgeError } = await supabase.functions.invoke(
           "extract_job_from_image",
           {
@@ -290,14 +274,33 @@ export default function EmployeeForm() {
         );
 
         if (edgeError || !edgeData?.ok) {
-          throw new Error(
-            edgeError?.message ||
-              edgeData?.error ||
-              "Extraction failed (Render OCR + Supabase fallback)."
-          );
+          throw new Error(edgeError?.message || edgeData?.error || "Edge extraction failed.");
         }
 
         data = edgeData;
+      } catch (edgeErr) {
+        // Fallback: Render Tesseract OCR (slower, no LLM)
+        console.warn("[OCR] Supabase Edge Function failed, trying Render OCR:", edgeErr);
+        const response = await fetch(OCR_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image_base64: base64,
+            mime_type: file.type || "image/jpeg",
+          }),
+        });
+
+        const fallbackData = await response.json();
+        if (!response.ok || !fallbackData?.ok) {
+          throw new Error(
+            fallbackData?.error ||
+              "Extraction failed (Claude vision + Render OCR fallback)."
+          );
+        }
+
+        data = fallbackData;
       }
 
       const d = data.data || {};
