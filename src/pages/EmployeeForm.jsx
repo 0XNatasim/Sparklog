@@ -261,47 +261,24 @@ export default function EmployeeForm() {
 
       let data = null;
 
-      // Primary: Supabase Edge Function (Claude vision) — fast, no cold start
-      try {
-        const { data: edgeData, error: edgeError } = await supabase.functions.invoke(
-          "extract_job_from_image",
-          {
-            body: {
-              image_base64: base64,
-              mime_type: file.type || "image/jpeg",
-            },
-          }
-        );
+      // Render Tesseract OCR — no LLM, screenshots have a fixed layout
+      const response = await fetch(OCR_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image_base64: base64,
+          mime_type: file.type || "image/jpeg",
+        }),
+      });
 
-        if (edgeError || !edgeData?.ok) {
-          throw new Error(edgeError?.message || edgeData?.error || "Edge extraction failed.");
-        }
-
-        data = edgeData;
-      } catch (edgeErr) {
-        // Fallback: Render Tesseract OCR (slower, no LLM)
-        console.warn("[OCR] Supabase Edge Function failed, trying Render OCR:", edgeErr);
-        const response = await fetch(OCR_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            image_base64: base64,
-            mime_type: file.type || "image/jpeg",
-          }),
-        });
-
-        const fallbackData = await response.json();
-        if (!response.ok || !fallbackData?.ok) {
-          throw new Error(
-            fallbackData?.error ||
-              "Extraction failed (Claude vision + Render OCR fallback)."
-          );
-        }
-
-        data = fallbackData;
+      const ocrData = await response.json();
+      if (!response.ok || !ocrData?.ok) {
+        throw new Error(ocrData?.error || "OCR extraction failed.");
       }
+
+      data = ocrData;
 
       const d = data.data || {};
 
