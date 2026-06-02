@@ -86,7 +86,7 @@ Example: {"job_date":"2024-12-15","ot":"OT-12345","depart":"07:00","arrivee":"08
         "X-Title": "SparkLog OCR",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp:free",
+        model: "meta-llama/llama-3.2-11b-vision-instruct:free",
         max_tokens: 256,
         messages: [
           {
