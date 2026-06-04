@@ -118,7 +118,7 @@ export default function History() {
   }, [jobs]);
 
   function openJob(job) {
-    navigate(`/?edit=${job.id}`);
+    navigate(`/form?edit=${job.id}`);
   }
 
   function isOwner(job) {
