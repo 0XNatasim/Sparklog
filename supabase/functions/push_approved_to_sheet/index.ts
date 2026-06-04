@@ -17,6 +17,18 @@ function json(data: unknown, status = 200) {
 }
 
 // "20 Dec 14:09" en heure Montréal
+function formatHeures(depart?: string | null, fin?: string | null) {
+  if (!depart || !fin) return "";
+  const [dh, dm] = String(depart).split(":").map(Number);
+  const [fh, fm] = String(fin).split(":").map(Number);
+  if ([dh, dm, fh, fm].some((n) => Number.isNaN(n))) return "";
+  let mins = fh * 60 + fm - (dh * 60 + dm);
+  if (mins < 0) mins += 24 * 60;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}h${String(m).padStart(2, "0")}`;
+}
+
 function formatMontrealShort(d: Date) {
   const parts = new Intl.DateTimeFormat("en", {
     timeZone: "America/Toronto",
@@ -166,6 +178,10 @@ serve(async (req) => {
       depart: job.depart ? String(job.depart).slice(0, 5) : "", // HH:mm
       arrivee: job.arrivee ? String(job.arrivee).slice(0, 5) : "", // HH:mm
       fin: job.fin ? String(job.fin).slice(0, 5) : "", // HH:mm
+      heures: formatHeures(
+        job.depart ? String(job.depart).slice(0, 5) : "",
+        job.fin ? String(job.fin).slice(0, 5) : ""
+      ),
       km_aller: job.km_aller ?? "",
       employee_name,
       employee_email,
