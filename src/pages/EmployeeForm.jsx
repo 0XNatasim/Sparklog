@@ -7,8 +7,41 @@ import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
 
 dayjs.locale("en");
-const OCR_URL =
-  import.meta.env.VITE_OCR_URL || "https://sparklog-ocr.onrender.com/extract_job_from_image";
+
+function parseExtractedText(text) {
+  const out = {};
+
+  const ot = text.match(/OT[\s\-_:]*(\d{4,8})/i);
+  if (ot) out.ot = ot[1];
+
+  const dates = [...text.matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)];
+  if (dates.length) {
+    const [, dd, mm, yyyy] = dates[0];
+    out.job_date = `${yyyy}-${mm}-${dd}`;
+  }
+
+  const labelTime = (labelRegex) => {
+    const m = text.match(labelRegex);
+    if (!m) return null;
+    const tail = text.slice(m.index, m.index + 200);
+    const t = tail.match(/\b([01]?\d|2[0-3])[:hH]([0-5]\d)\b/);
+    return t ? `${String(t[1]).padStart(2, "0")}:${t[2]}` : null;
+  };
+
+  const depart = labelTime(/Heure\s+de\s+d[eé]but/i);
+  if (depart) out.depart = depart;
+
+  const fin = labelTime(/Heure\s+de\s+fin/i);
+  if (fin) out.fin = fin;
+
+  const arrivee = labelTime(/Heure\s+d['’]?\s*arriv[eé]e/i);
+  if (arrivee) out.arrivee = arrivee;
+
+  const km = text.match(/Distance\s+parcourue[^0-9]*?(\d+(?:[.,]\d+)?)/i);
+  if (km) out.km_aller = Math.round(parseFloat(km[1].replace(",", ".")));
+
+  return out;
+}
 
 function fmtTimeHHmm(t) {
   if (!t) return "";
@@ -242,45 +275,9 @@ export default function EmployeeForm() {
     setExtracting(true);
 
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = () => {
-          const result = reader.result;
-          if (typeof result !== "string" || !result.includes(",")) {
-            reject(new Error("Failed to read image file."));
-            return;
-          }
-
-          resolve(result.split(",")[1]);
-        };
-
-        reader.onerror = () => reject(new Error("Failed to read image file."));
-        reader.readAsDataURL(file);
-      });
-
-      let data = null;
-
-      // Render Tesseract OCR — no LLM, screenshots have a fixed layout
-      const response = await fetch(OCR_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          image_base64: base64,
-          mime_type: file.type || "image/jpeg",
-        }),
-      });
-
-      const ocrData = await response.json();
-      if (!response.ok || !ocrData?.ok) {
-        throw new Error(ocrData?.error || "OCR extraction failed.");
-      }
-
-      data = ocrData;
-
-      const d = data.data || {};
+      const { default: Tesseract } = await import("tesseract.js");
+      const { data: ocr } = await Tesseract.recognize(file, "fra+eng");
+      const d = parseExtractedText(ocr?.text || "");
 
       if (d.job_date) setJobDate(String(d.job_date));
       if (d.ot) setOt(String(d.ot));
