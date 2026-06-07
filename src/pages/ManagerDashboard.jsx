@@ -58,8 +58,20 @@ export default function ManagerDashboard() {
   // Filters (applied server-side)
   const [employeeId, setEmployeeId] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [weekFilter, setWeekFilter] = useState(""); // native <input type="week"> format: "YYYY-Www"
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
+
+  function weekFilterRange(w) {
+    if (!w) return null;
+    const m = /^(\d{4})-W(\d{2})$/.exec(w);
+    if (!m) return null;
+    const d = dayjs().year(Number(m[1])).isoWeek(Number(m[2]));
+    return {
+      start: d.startOf("isoWeek").format("YYYY-MM-DD"),
+      end: d.endOf("isoWeek").format("YYYY-MM-DD"),
+    };
+  }
 
   // Bulk approve week (only when employee selected)
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
@@ -84,15 +96,23 @@ export default function ManagerDashboard() {
       .order("updated_at", { ascending: false });
     if (employeeId !== "all") q = q.eq("user_id", employeeId);
     if (statusFilter !== "all") q = q.eq("status", statusFilter);
+    const range = weekFilterRange(weekFilter);
+    if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
     return q;
   }
 
   async function loadCounts() {
-    const base = supabase.from("jobs").select("id", { head: true, count: "exact" });
+    const range = weekFilterRange(weekFilter);
+    const base = (() => {
+      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
+      if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
+      return q;
+    })();
     const scoped = (status) => {
       let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
       if (employeeId !== "all") q = q.eq("user_id", employeeId);
       if (status) q = q.eq("status", status);
+      if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
       return q;
     };
     const [all, saved, submitted, approved] = await Promise.all([
@@ -156,7 +176,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, statusFilter]);
+  }, [employeeId, statusFilter, weekFilter]);
 
   // Employee options come from profiles (managers can read all), not from
   // the loaded jobs page — otherwise pagination would hide employees.
@@ -531,11 +551,25 @@ export default function ManagerDashboard() {
             </select>
 
             <input
+              type="week"
+              value={weekFilter}
+              onChange={(e) => setWeekFilter(e.target.value)}
+              style={styles.input}
+              title="Filter by ISO week"
+            />
+
+            <input
               value={searchLive}
               onChange={(e) => setSearchLive(e.target.value)}
               style={styles.input}
               placeholder="Search OT / date / employee…"
             />
+
+            {weekFilter && (
+              <button type="button" onClick={() => setWeekFilter("")} style={styles.secondaryBtn}>
+                Clear week
+              </button>
+            )}
           </div>
 
           {selectedEmployee && (
