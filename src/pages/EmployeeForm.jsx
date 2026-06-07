@@ -265,6 +265,61 @@ export default function EmployeeForm() {
     }
   }
 
+  // Resize/compress an image File to a JPEG Blob under ~1 MB so it fits the
+  // ocr.space free-tier upload cap. Keeps aspect ratio; max edge 1600px.
+  async function compressImage(file, maxEdge = 1600, quality = 0.7) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = url;
+      });
+      const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      return await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
+      );
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  // Try ocr.space (better numeric accuracy than client Tesseract). Returns
+  // raw text, or throws so the caller can fall back to Tesseract.
+  async function ocrSpaceExtract(file) {
+    const apiKey = import.meta.env.VITE_OCR_SPACE_API_KEY || "helloworld";
+    const blob = await compressImage(file);
+    const fd = new FormData();
+    fd.append("file", blob, "job.jpg");
+    fd.append("language", "fre");
+    fd.append("OCREngine", "2");
+    fd.append("scale", "true");
+    fd.append("isTable", "true");
+
+    const res = await fetch("https://api.ocr.space/parse/image", {
+      method: "POST",
+      headers: { apikey: apiKey },
+      body: fd,
+    });
+    if (!res.ok) throw new Error(`ocr.space HTTP ${res.status}`);
+    const json = await res.json();
+    if (json?.IsErroredOnProcessing) {
+      throw new Error(
+        Array.isArray(json.ErrorMessage) ? json.ErrorMessage.join("; ") : String(json.ErrorMessage || "ocr.space error")
+      );
+    }
+    const text = (json?.ParsedResults || []).map((r) => r?.ParsedText || "").join("\n");
+    if (!text.trim()) throw new Error("ocr.space returned no text");
+    return text;
+  }
+
   async function handleExtractFromImage(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -275,9 +330,19 @@ export default function EmployeeForm() {
     setExtracting(true);
 
     try {
-      const { default: Tesseract } = await import("tesseract.js");
-      const { data: ocr } = await Tesseract.recognize(file, "fra+eng");
-      const d = parseExtractedText(ocr?.text || "");
+      let text = "";
+      let source = "ocr.space";
+      try {
+        text = await ocrSpaceExtract(file);
+      } catch (apiErr) {
+        console.warn("ocr.space failed, falling back to Tesseract:", apiErr);
+        const { default: Tesseract } = await import("tesseract.js");
+        const { data: ocr } = await Tesseract.recognize(file, "fra+eng");
+        text = ocr?.text || "";
+        source = "tesseract";
+      }
+
+      const d = parseExtractedText(text);
 
       if (d.job_date) setJobDate(String(d.job_date));
       if (d.ot) setOt(String(d.ot));
@@ -288,7 +353,7 @@ export default function EmployeeForm() {
         setKmAller(String(d.km_aller));
       }
 
-      setInfo("Fields filled from image. Please review before saving.");
+      setInfo(`Fields filled from image (${source}). Please review before saving.`);
     } catch (e) {
       setErr(e?.message || "Failed to extract from image.");
     } finally {
