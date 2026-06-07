@@ -42,15 +42,20 @@ function weekKeyFromDate(dateStr) {
 export default function ManagerDashboard() {
   const { user, signOut } = useAuth();
 
+  const PAGE_SIZE = 200;
+
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [counts, setCounts] = useState({ all: 0, saved: 0, submitted: 0, approved: 0 });
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
   const [actionLoadingId, setActionLoadingId] = useState(null); // jobId or "week:<key>"
 
-  // Filters
+  // Filters (applied server-side)
   const [employeeId, setEmployeeId] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchLive, setSearchLive] = useState("");
@@ -71,24 +76,50 @@ export default function ManagerDashboard() {
     setSearchDebounced(searchLive);
   }, [searchLive, setSearchDebounced]);
 
+  function buildJobsQuery() {
+    let q = supabase
+      .from("jobs")
+      .select("*")
+      .order("job_date", { ascending: false })
+      .order("updated_at", { ascending: false });
+    if (employeeId !== "all") q = q.eq("user_id", employeeId);
+    if (statusFilter !== "all") q = q.eq("status", statusFilter);
+    return q;
+  }
+
+  async function loadCounts() {
+    const base = supabase.from("jobs").select("id", { head: true, count: "exact" });
+    const scoped = (status) => {
+      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
+      if (employeeId !== "all") q = q.eq("user_id", employeeId);
+      if (status) q = q.eq("status", status);
+      return q;
+    };
+    const [all, saved, submitted, approved] = await Promise.all([
+      employeeId === "all" ? base : scoped(null),
+      scoped("saved"),
+      scoped("submitted"),
+      scoped("approved"),
+    ]);
+    setCounts({
+      all: all.count || 0,
+      saved: saved.count || 0,
+      submitted: submitted.count || 0,
+      approved: approved.count || 0,
+    });
+  }
+
   async function load() {
     setErr("");
     setInfo("");
     setLoading(true);
     try {
-      const { data: jobRows, error: jobErr } = await supabase
-        .from("jobs")
-        .select("*")
-        .order("job_date", { ascending: false })
-        .order("updated_at", { ascending: false });
-
+      const { data: jobRows, error: jobErr } = await buildJobsQuery().range(0, PAGE_SIZE - 1);
       if (jobErr) throw jobErr;
 
-      // ✅ Make sure we actually fetch the fields you want in Sheets
       const { data: profileRows, error: profErr } = await supabase
         .from("profiles")
         .select("id, role, full_name, phone, email");
-
       if (profErr) throw profErr;
 
       const m = new Map();
@@ -96,6 +127,8 @@ export default function ManagerDashboard() {
 
       setProfiles(m);
       setJobs(jobRows || []);
+      setHasMore((jobRows || []).length === PAGE_SIZE);
+      await loadCounts();
     } catch (e) {
       setErr(e?.message || "Failed to load manager.");
     } finally {
@@ -103,51 +136,60 @@ export default function ManagerDashboard() {
     }
   }
 
+  async function loadMore() {
+    setLoadingMore(true);
+    setErr("");
+    try {
+      const from = jobs.length;
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await buildJobsQuery().range(from, to);
+      if (error) throw error;
+      setJobs((prev) => [...prev, ...(data || [])]);
+      setHasMore((data || []).length === PAGE_SIZE);
+    } catch (e) {
+      setErr(e?.message || "Failed to load more.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [employeeId, statusFilter]);
 
+  // Employee options come from profiles (managers can read all), not from
+  // the loaded jobs page — otherwise pagination would hide employees.
   const employeeOptions = useMemo(() => {
-    const ids = new Set();
-    for (const j of jobs) ids.add(j.user_id);
-
-    const arr = Array.from(ids).map((id) => {
-      const p = profiles.get(id);
+    const arr = [];
+    profiles.forEach((p, id) => {
+      if (p?.role === "manager") return;
       const label = p?.full_name?.trim() || p?.email?.trim() || `User ${String(id).slice(0, 8)}…`;
-      return { id, label };
+      arr.push({ id, label });
     });
-
     arr.sort((a, b) => a.label.localeCompare(b.label));
     return arr;
-  }, [jobs, profiles]);
+  }, [profiles]);
 
-  const counts = useMemo(() => {
-    const c = { all: jobs.length, saved: 0, submitted: 0, approved: 0 };
-    for (const j of jobs) c[j.status] = (c[j.status] || 0) + 1;
-    return c;
-  }, [jobs]);
-
+  // Text search stays client-side, scoped to the loaded page.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-
+    if (!q) return jobs;
     return jobs.filter((j) => {
-      if (employeeId !== "all" && j.user_id !== employeeId) return false;
-      if (statusFilter !== "all" && j.status !== statusFilter) return false;
-      if (!q) return true;
-
       const employee = profiles.get(j.user_id);
-      const employeeName = employee?.full_name || "";
-      const employeePhone = employee?.phone || "";
-      const employeeEmail = employee?.email || "";
-
-      const haystack = [j.ot || "", j.job_date || "", j.status || "", employeeName, employeePhone, employeeEmail]
+      const haystack = [
+        j.ot || "",
+        j.job_date || "",
+        j.status || "",
+        employee?.full_name || "",
+        employee?.phone || "",
+        employee?.email || "",
+      ]
         .join(" ")
         .toLowerCase();
-
       return haystack.includes(q);
     });
-  }, [jobs, profiles, employeeId, statusFilter, search]);
+  }, [jobs, profiles, search]);
 
   const split = useMemo(() => {
     if (employeeId === "all") return null;
@@ -589,6 +631,14 @@ export default function ManagerDashboard() {
           <div style={{ display: "grid", gap: 10 }}>
             {filtered.map(renderJobCard)}
             {filtered.length === 0 && <div style={styles.card}>No results.</div>}
+          </div>
+        )}
+
+        {!loading && hasMore && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+            <button onClick={loadMore} disabled={loadingMore} style={styles.secondaryBtn}>
+              {loadingMore ? "Loading…" : `Load more (${jobs.length} loaded)`}
+            </button>
           </div>
         )}
       </div>
