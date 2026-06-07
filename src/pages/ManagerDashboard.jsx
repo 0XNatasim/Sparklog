@@ -163,7 +163,6 @@ export default function ManagerDashboard() {
   const employeeOptions = useMemo(() => {
     const arr = [];
     profiles.forEach((p, id) => {
-      if (p?.role === "manager") return;
       const label = p?.full_name?.trim() || p?.email?.trim() || `User ${String(id).slice(0, 8)}…`;
       arr.push({ id, label });
     });
