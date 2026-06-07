@@ -255,6 +255,7 @@ Secrets are private keys your functions need to work. Go to **Project Settings �
 |---|---|
 | `VITE_SUPABASE_URL` | Your Supabase project URL (Project Settings → API) |
 | `VITE_SUPABASE_ANON_KEY` | Your Supabase anon/public key (Project Settings → API) |
+| `VITE_OCR_SPACE_API_KEY` | (Optional) Free key from [ocr.space/ocrapi](https://ocr.space/ocrapi). If omitted, the app uses the public `helloworld` test key (heavily rate-limited) and falls back to in-browser Tesseract on failure. |
 
 7. Click **Deploy** — Render gives you a public URL when it's done
 
