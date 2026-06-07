@@ -174,6 +174,24 @@ create policy "jobs: own update unlocked"
 create policy "jobs: own delete unlocked"
   on public.jobs for delete
   using (auth.uid() = user_id and locked = false);
+
+-- JOBS: managers can update any job (approve / unlock).
+-- Without this, manager approvals silently fail at the DB after the
+-- Google Sheets export already ran, desyncing the row's status.
+create policy "jobs: manager update all"
+  on public.jobs for update
+  using (get_my_role() = 'manager')
+  with check (get_my_role() = 'manager');
+```
+
+### Indexes (keeps the dashboard fast as the table grows)
+
+```sql
+create index if not exists jobs_user_date_idx
+  on public.jobs (user_id, job_date desc);
+
+create index if not exists jobs_status_date_idx
+  on public.jobs (status, job_date desc);
 ```
 
 ---
