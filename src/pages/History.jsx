@@ -107,7 +107,7 @@ export default function History() {
       const totalKm = sumKmForJobs(list);
 
       const submittableIds = list
-        .filter((x) => x.status === "saved" && x.locked === false)
+        .filter((x) => (x.status === "saved" || x.status === "updated") && x.locked === false)
         .map((x) => x.id);
 
       return { date, list, totalHHmm, totalKm, submittableIds };
@@ -128,7 +128,7 @@ export default function History() {
     return isOwner(job) && (job.status === "saved" || job.status === "updated") && job.locked === false;
   }
   function canSubmit(job) {
-    return isOwner(job) && job.status === "saved" && job.locked === false;
+    return isOwner(job) && (job.status === "saved" || job.status === "updated") && job.locked === false;
   }
 
   async function deleteJob(jobId) {
