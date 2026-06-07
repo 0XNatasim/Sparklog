@@ -10,11 +10,12 @@ SparkLog is a mobile-friendly app for field employees and managers to track work
 ## What you need before starting
 
 - A free [Supabase](https://supabase.com) account (the database and backend)
-- A free [Render](https://render.com) account (hosts the website)
-- A [GitHub](https://github.com) account (to connect your code to Render)
-- An [Anthropic](https://console.anthropic.com) API key (for the auto-fill from photo feature)
+- A free [Vercel](https://vercel.com) or [Render](https://render.com) account (hosts the website)
+- A [GitHub](https://github.com) account (to connect your code to your host)
+- A free [ocr.space](https://ocr.space/ocrapi) API key (powers the auto-fill from photo feature)
 - A Google account (for the Google Sheets export)
 - [Node.js](https://nodejs.org) installed on your computer (only needed if running locally)
+- _(Optional / legacy)_ An [Anthropic](https://console.anthropic.com) API key — only needed if you re-enable the original Claude-Vision OCR Edge Function. The app uses ocr.space by default and falls back to in-browser Tesseract; the Anthropic path is dead code unless you wire it back into `EmployeeForm.jsx`.
 
 ---
 
@@ -213,12 +214,14 @@ Edge Functions are small backend scripts that run on Supabase's servers.
 Name: `push_approved_to_sheet`
 Code: copy from `supabase/functions/push_approved_to_sheet/index.ts`
 
-### Function 2 — `extract_job_from_image`
+### Function 2 — `extract_job_from_image` _(optional / legacy)_
 
 Name: `extract_job_from_image`
 Code: copy from `supabase/functions/extract_job_from_image/index.ts`
 
-### Disable JWT verification on both functions
+This Edge Function is the original Claude-Vision-based OCR path. It is **not used** by the current frontend, which calls [ocr.space](https://ocr.space/ocrapi) directly from the browser and falls back to in-browser Tesseract. You only need to deploy it if you intend to re-wire the frontend to use Claude Vision.
+
+### Disable JWT verification on the functions you deploy
 
 For each function, open its settings (gear icon) and turn **Verify JWT** **off**. The functions handle authentication themselves.
 
@@ -232,24 +235,33 @@ Secrets are private keys your functions need to work. Go to **Project Settings �
 
 | Secret name | Where to get it |
 |---|---|
-| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `APPS_SCRIPT_URL` | From Step 8 below |
 | `APPS_SCRIPT_TOKEN` | A password you invent — must match what you set in Apps Script |
+| `ANTHROPIC_API_KEY` _(optional / legacy)_ | Only needed if you re-enable the `extract_job_from_image` Edge Function. OCR runs in the browser against ocr.space by default — skip unless you wire Claude Vision back in. |
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically — you do not need to add those.
 
 ---
 
-## Step 7 — Deploy the frontend on Render
+## Step 7 — Deploy the frontend (Vercel or Render)
 
+Either host works — it's a static Vite build. Vercel is the current primary; Render still works via the included `render.yaml`.
+
+**Vercel**
 1. Push this repo to your GitHub account
-2. Go to [render.com](https://render.com) and sign in
-3. Click **New → Static Site**
-4. Connect your GitHub repo
-5. Render will auto-detect the settings from `render.yaml`. If it doesn't, set:
-   - **Build command:** `npm run build`
-   - **Publish directory:** `dist`
-6. Add these two environment variables under **Environment**:
+2. Go to [vercel.com](https://vercel.com) → **Add New → Project** → import the repo
+3. Framework preset: **Vite**. Build command `npm run build`, output dir `dist`
+4. Add the environment variables below under **Settings → Environment Variables**
+5. Click **Deploy**
+
+**Render (alternative)**
+1. Push this repo to your GitHub account
+2. Go to [render.com](https://render.com) → **New → Static Site** → connect repo
+3. Render auto-detects from `render.yaml`. If not: build `npm run build`, publish `dist`
+4. Add the environment variables below under **Environment**
+5. Click **Deploy**
+
+Environment variables (same on either host):
 
 | Key | Value |
 |---|---|
@@ -257,7 +269,7 @@ Secrets are private keys your functions need to work. Go to **Project Settings �
 | `VITE_SUPABASE_ANON_KEY` | Your Supabase anon/public key (Project Settings → API) |
 | `VITE_OCR_SPACE_API_KEY` | (Optional) Free key from [ocr.space/ocrapi](https://ocr.space/ocrapi). If omitted, the app uses the public `helloworld` test key (heavily rate-limited) and falls back to in-browser Tesseract on failure. |
 
-7. Click **Deploy** — Render gives you a public URL when it's done
+After deploy, your host gives you a public URL. Re-deploy after changing env vars so Vite bakes the new values into the bundle.
 
 ---
 
