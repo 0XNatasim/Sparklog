@@ -11,6 +11,7 @@ import { hoursBetween } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/use-t";
 
 dayjs.extend(isoWeek);
 dayjs.extend(customParseFormat);
@@ -53,6 +54,7 @@ function isNonEmptyOT(ot) {
 export default function Week() {
   const { user, role } = useAuth();
   const [searchParams] = useSearchParams();
+  const t = useT();
 
   const employeeIdParam = searchParams.get("employee");
   const isManagerViewingEmployee = role === "manager" && Boolean(employeeIdParam);
@@ -82,7 +84,7 @@ export default function Week() {
       if (error) throw error;
       setJobs(data || []);
     } catch (e) {
-      setErr(e?.message || "Failed to load weekly data.");
+      setErr(e?.message || t("week.errors.failedLoad"));
       setJobs([]);
     } finally {
       setLoading(false);
@@ -165,16 +167,16 @@ export default function Week() {
   }
 
   return (
-    <AppShell title="Week">
+    <AppShell title={t("week.title")}>
       <div className="space-y-3">
-        {loading && <Card><CardContent className="p-4 text-sm">Loading…</CardContent></Card>}
+        {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {err}
           </div>
         )}
         {!loading && !err && weekly.length === 0 && (
-          <Card><CardContent className="p-4 text-sm text-muted-foreground">No data yet.</CardContent></Card>
+          <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("week.empty")}</CardContent></Card>
         )}
 
         {!loading && !err && weekly.map((w) => {
@@ -194,20 +196,20 @@ export default function Week() {
                   "cursor-pointer transition-colors",
                   isOpen ? "border-primary/40" : ""
                 )}
-                title="Click to open weekly recap"
+                title={t("week.openTitle")}
               >
                 <CardContent className="p-4">
                   <div className="grid grid-cols-[1fr_auto] items-center gap-4">
                     <div className="grid gap-1.5">
                       <div className="flex items-center gap-2 text-xl font-extrabold">
-                        Week {w.start.isoWeek()}
+                        {t("week.weekNum", { num: w.start.isoWeek() })}
                         {isOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")}
                       </div>
                       <div className="text-sm">
-                        Total: <b>{formatHoursHM(w.totalHours)}</b>
+                        {t("week.total")}: <b>{formatHoursHM(w.totalHours)}</b>
                         <span className="mx-2 text-muted-foreground">•</span>
                         <b>{Math.round(w.totalKm)}</b> km
                       </div>
@@ -215,15 +217,15 @@ export default function Week() {
 
                     <div className="grid gap-1.5 min-w-[140px]">
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="font-bold text-muted-foreground">1x:</span>
+                        <span className="font-bold text-muted-foreground">{t("week.regular")}:</span>
                         <span className="font-bold text-lg">{formatHoursHM(w.regularHours)}</span>
                       </div>
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="font-bold text-muted-foreground">1.5x:</span>
+                        <span className="font-bold text-muted-foreground">{t("week.ot15")}:</span>
                         <span className="font-bold text-lg">{formatHoursHM(w.ot15)}</span>
                       </div>
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="font-bold text-muted-foreground">2.0x:</span>
+                        <span className="font-bold text-muted-foreground">{t("week.ot20")}:</span>
                         <span className="font-bold text-lg">{formatHoursHM(w.ot20)}</span>
                       </div>
                     </div>
@@ -235,7 +237,7 @@ export default function Week() {
                 <Card>
                   <CardContent className="p-3 grid gap-2">
                     {w.dayKeys.length === 0 && (
-                      <div className="text-sm text-muted-foreground p-2">No days found for this week.</div>
+                      <div className="text-sm text-muted-foreground p-2">{t("week.noDays")}</div>
                     )}
                     {w.dayKeys.map((dayKey) => {
                       const day = dailyByKey.get(dayKey);
@@ -254,7 +256,7 @@ export default function Week() {
                               <b>{Math.round(day.km)}</b> km
                             </span>
                             <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
-                              OT x<b>{day.otCount}</b>
+                              {t("week.otCountLabel")}<b>{day.otCount}</b>
                             </span>
                           </div>
                         </div>

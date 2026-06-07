@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/use-t";
 
 export default function Login() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
+  const t = useT();
 
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -96,9 +99,7 @@ export default function Login() {
         }
 
         if (!data?.session) {
-          setErrorMsg(
-            "Signup successful. Check your email inbox/spam to confirm, then log in."
-          );
+          setErrorMsg(t("auth.signupCheckEmail"));
           setMode("login");
           setPassword("");
           setLoading(false);
@@ -112,7 +113,7 @@ export default function Login() {
         if (error) throw error;
       }
     } catch (err) {
-      setErrorMsg(err?.message || "Authentication failed.");
+      setErrorMsg(err?.message || t("auth.failed"));
     } finally {
       setLoading(false);
     }
@@ -120,14 +121,15 @@ export default function Login() {
 
   return (
     <div className="min-h-screen grid place-items-center bg-background text-foreground p-4">
-      <div className="absolute right-4 top-4">
+      <div className="absolute right-4 top-4 flex items-center gap-1">
         <ThemeToggle />
+        <LanguageToggle />
       </div>
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl">SparkLog</CardTitle>
+          <CardTitle className="text-2xl">{t("auth.title")}</CardTitle>
           <CardDescription>
-            {isSignup ? "Create your account" : "Log in to your account"}
+            {isSignup ? t("auth.descSignup") : t("auth.descLogin")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -135,23 +137,23 @@ export default function Login() {
             {isSignup && (
               <>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="fullName">Full name</Label>
+                  <Label htmlFor="fullName">{t("auth.fullName")}</Label>
                   <Input
                     id="fullName"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g., Simon B."
+                    placeholder={t("auth.fullNamePlaceholder")}
                     autoComplete="name"
                   />
                 </div>
 
                 <div className="grid gap-1.5">
-                  <Label htmlFor="phone">Phone (with country code)</Label>
+                  <Label htmlFor="phone">{t("auth.phone")}</Label>
                   <Input
                     id="phone"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g., +1 514 555 1234"
+                    placeholder={t("auth.phonePlaceholder")}
                     autoComplete="tel"
                   />
                 </div>
@@ -159,19 +161,19 @@ export default function Login() {
             )}
 
             <div className="grid gap-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
+                placeholder={t("auth.emailPlaceholder")}
                 type="email"
                 autoComplete="email"
               />
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -186,7 +188,7 @@ export default function Login() {
                   type="button"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPassword((v) => !v)}
-                  aria-label="Toggle password visibility"
+                  aria-label={t("auth.togglePasswordVisibility")}
                 >
                   {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </button>
@@ -195,7 +197,7 @@ export default function Login() {
 
             {isSignup && (
               <div className="grid gap-1.5">
-                <Label htmlFor="confirm">Confirm password</Label>
+                <Label htmlFor="confirm">{t("auth.confirmPassword")}</Label>
                 <div className="relative">
                   <Input
                     id="confirm"
@@ -210,13 +212,13 @@ export default function Login() {
                     type="button"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onClick={() => setShowConfirm((v) => !v)}
-                    aria-label="Toggle confirm password visibility"
+                    aria-label={t("auth.toggleConfirmVisibility")}
                   >
                     {showConfirm ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                   </button>
                 </div>
                 {confirmPassword && !passwordsMatch && (
-                  <span className="text-xs text-destructive">Passwords do not match</span>
+                  <span className="text-xs text-destructive">{t("auth.passwordsDoNotMatch")}</span>
                 )}
               </div>
             )}
@@ -228,7 +230,7 @@ export default function Login() {
             )}
 
             <Button disabled={!canSubmit || loading} type="submit" className="mt-1">
-              {loading ? "Please wait…" : isSignup ? "Sign up" : "Log in"}
+              {loading ? t("common.pleaseWait") : isSignup ? t("auth.signupButton") : t("auth.loginButton")}
             </Button>
 
             <Button
@@ -243,7 +245,7 @@ export default function Login() {
                 setMode(isSignup ? "login" : "signup");
               }}
             >
-              {isSignup ? "Already have an account? Log in" : "No account? Sign up"}
+              {isSignup ? t("auth.haveAccount") : t("auth.noAccount")}
             </Button>
           </form>
         </CardContent>

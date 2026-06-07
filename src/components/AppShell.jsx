@@ -3,8 +3,10 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/use-t";
 
 function NavItem({ to, children }) {
   return (
@@ -28,6 +30,7 @@ function NavItem({ to, children }) {
 export default function AppShell({ title, children }) {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const t = useT();
 
   async function handleLogout() {
     await signOut();
@@ -48,28 +51,29 @@ export default function AppShell({ title, children }) {
           </div>
 
           <nav className="flex flex-wrap items-center gap-1">
-            <NavItem to="/form">Form</NavItem>
-            <NavItem to="/history">History</NavItem>
-            <NavItem to="/week">Week</NavItem>
-            {role === "manager" && <NavItem to="/manager">Manager</NavItem>}
+            <NavItem to="/form">{t("nav.form")}</NavItem>
+            <NavItem to="/history">{t("nav.history")}</NavItem>
+            <NavItem to="/week">{t("nav.week")}</NavItem>
+            {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
 
             <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
 
             <ThemeToggle />
+            <LanguageToggle />
 
             <div className="hidden text-xs text-muted-foreground sm:block">
               <div className="font-medium text-foreground">{user?.email}</div>
-              <div>role: {role}</div>
+              <div>{t("nav.role")}: {role}</div>
             </div>
 
-            <Button variant="ghost" size="sm" onClick={handleLogout} title="Sign out">
+            <Button variant="ghost" size="sm" onClick={handleLogout} title={t("nav.signOut")}>
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Logout</span>
+              <span className="hidden sm:inline">{t("nav.logout")}</span>
             </Button>
           </nav>
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-2 text-xs text-muted-foreground sm:hidden">
-          {user?.email} • role: {role}
+          {user?.email} • {t("nav.role")}: {role}
         </div>
       </header>
 

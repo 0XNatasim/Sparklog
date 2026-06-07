@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
+import { useT } from "@/lib/use-t";
 
 dayjs.locale("en");
 
@@ -103,6 +104,7 @@ export default function EmployeeForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const t = useT();
 
   const editId = searchParams.get("edit");
 
@@ -144,8 +146,8 @@ export default function EmployeeForm() {
     try {
       const { data, error } = await supabase.from("jobs").select("*").eq("id", editId).single();
       if (error) throw error;
-      if (!data) throw new Error("Job not found.");
-      if (data.user_id !== user.id) throw new Error("Not authorized.");
+      if (!data) throw new Error(t("form.errors.notFound"));
+      if (data.user_id !== user.id) throw new Error(t("form.errors.notAuthorized"));
 
       setJobDate(data.job_date || dayjs().format("YYYY-MM-DD"));
       setOt(data.ot || "");
@@ -162,7 +164,7 @@ export default function EmployeeForm() {
       const shouldLock = Boolean(data.locked) || !isEditableStatus(s);
       setLocked(shouldLock);
     } catch (e) {
-      setErr(e?.message || "Failed to load job.");
+      setErr(e?.message || t("form.errors.failedLoad"));
     } finally {
       setLoadingEdit(false);
     }
@@ -183,7 +185,7 @@ export default function EmployeeForm() {
 
   async function saveJob(mode) {
     if (!user?.id) {
-      setErr("Not signed in.");
+      setErr(t("form.errors.notSignedIn"));
       return;
     }
     if (saving) return;
@@ -230,7 +232,7 @@ export default function EmployeeForm() {
         );
         if (error) throw error;
 
-        setInfo(nextStatus === "submitted" ? "Job submitted." : "Job updated.");
+        setInfo(nextStatus === "submitted" ? t("form.toasts.submitted") : t("form.toasts.updated"));
         setStatus(nextStatus);
         setLocked(nextLocked);
       } else {
@@ -240,16 +242,16 @@ export default function EmployeeForm() {
           "Save"
         );
         if (error) throw error;
-        if (!data?.id) throw new Error("Insert succeeded but no id returned.");
+        if (!data?.id) throw new Error(t("form.errors.insertNoId"));
 
-        setInfo(nextStatus === "submitted" ? "Job saved and submitted." : "Job saved.");
+        setInfo(nextStatus === "submitted" ? t("form.toasts.savedAndSubmitted") : t("form.toasts.saved"));
         setStatus(nextStatus);
         setLocked(nextLocked);
 
         navigate(`/form?edit=${data.id}`, { replace: true });
       }
     } catch (e) {
-      setErr(e?.message || "Save failed.");
+      setErr(e?.message || t("form.errors.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -339,9 +341,9 @@ export default function EmployeeForm() {
         setKmAller(String(d.km_aller));
       }
 
-      setInfo(`Fields filled from image (${source}). Please review before saving.`);
+      setInfo(t("form.toasts.filledFromImage", { source }));
     } catch (e) {
-      setErr(e?.message || "Failed to extract from image.");
+      setErr(e?.message || t("form.errors.extractFailed"));
     } finally {
       setExtracting(false);
     }
@@ -351,7 +353,7 @@ export default function EmployeeForm() {
   const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
   return (
-    <AppShell title="Form">
+    <AppShell title={t("form.title")}>
       <div className="space-y-3">
         {err && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -367,15 +369,15 @@ export default function EmployeeForm() {
         <Card>
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-muted-foreground">Status</div>
+              <div className="text-sm font-semibold text-muted-foreground">{t("form.status")}</div>
               <Badge variant={badgeVariant} className="uppercase tracking-wide">
-                {statusLabel}
+                {t(`status.${statusLabel}`)}
               </Badge>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="date">Date</Label>
+                <Label htmlFor="date">{t("form.date")}</Label>
                 <Input
                   id="date"
                   type="date"
@@ -386,18 +388,18 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="ot">Work order (OT)</Label>
+                <Label htmlFor="ot">{t("form.ot")}</Label>
                 <Input
                   id="ot"
                   value={ot}
                   onChange={(e) => setOt(e.target.value)}
-                  placeholder="ex: 12345"
+                  placeholder={t("form.otPlaceholder")}
                   disabled={disableInputs}
                 />
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="depart">Depart</Label>
+                <Label htmlFor="depart">{t("form.depart")}</Label>
                 <Input
                   id="depart"
                   type="time"
@@ -408,7 +410,7 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="arrivee">Arrival</Label>
+                <Label htmlFor="arrivee">{t("form.arrival")}</Label>
                 <Input
                   id="arrivee"
                   type="time"
@@ -419,7 +421,7 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="fin">End</Label>
+                <Label htmlFor="fin">{t("form.end")}</Label>
                 <Input
                   id="fin"
                   type="time"
@@ -430,7 +432,7 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="km">KM (aller)</Label>
+                <Label htmlFor="km">{t("form.kmAller")}</Label>
                 <Input
                   id="km"
                   type="number"
@@ -442,7 +444,7 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label>Total hours</Label>
+                <Label>{t("form.totalHours")}</Label>
                 <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm font-bold">
                   {hoursLabel}
                 </div>
@@ -451,11 +453,11 @@ export default function EmployeeForm() {
 
             <div className="flex flex-wrap gap-2 pt-2">
               <Button type="button" disabled={disableInputs} onClick={saveDraft}>
-                {saving ? "Saving…" : "Save"}
+                {saving ? t("common.saving") : t("form.buttons.save")}
               </Button>
 
               <Button type="button" variant="secondary" disabled={disableInputs} onClick={submitJob}>
-                {saving ? "Submitting…" : "Submit"}
+                {saving ? t("common.submitting") : t("form.buttons.submit")}
               </Button>
 
               {!locked && (
@@ -466,7 +468,7 @@ export default function EmployeeForm() {
                     disabled={disableInputs || extracting}
                     onClick={() => imageInputRef.current?.click()}
                   >
-                    {extracting ? "Extracting…" : "Auto-fill from photo"}
+                    {extracting ? t("common.extracting") : t("form.buttons.autofill")}
                   </Button>
                   <input
                     ref={imageInputRef}
@@ -485,15 +487,18 @@ export default function EmployeeForm() {
                   onClick={() => navigate("/form")}
                   disabled={loadingEdit || saving}
                 >
-                  New job
+                  {t("form.buttons.newJob")}
                 </Button>
               )}
             </div>
 
             {locked && (
               <div className="text-xs text-muted-foreground">
-                This job is locked ({statusLabel}). You can only edit when it is <b>saved</b> or{" "}
-                <b>updated</b> and unlocked.
+                {t("form.lockedNotice", {
+                  status: t(`status.${statusLabel}`),
+                  saved: t("status.saved"),
+                  updated: t("status.updated"),
+                })}
               </div>
             )}
           </CardContent>
