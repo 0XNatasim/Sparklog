@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
+import { useT } from "@/lib/use-t";
 
 dayjs.extend(isoWeek);
 
@@ -41,6 +42,7 @@ function weekKeyFromDate(dateStr) {
 
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
+  const t = useT();
 
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState(new Map());
@@ -142,7 +144,7 @@ export default function ManagerDashboard() {
       setHasMore((jobRows || []).length === PAGE_SIZE);
       await loadCounts();
     } catch (e) {
-      setErr(e?.message || "Failed to load manager.");
+      setErr(e?.message || t("manager.errors.failedLoad"));
     } finally {
       setLoading(false);
     }
@@ -159,7 +161,7 @@ export default function ManagerDashboard() {
       setJobs((prev) => [...prev, ...(data || [])]);
       setHasMore((data || []).length === PAGE_SIZE);
     } catch (e) {
-      setErr(e?.message || "Failed to load more.");
+      setErr(e?.message || t("manager.errors.failedMore"));
     } finally {
       setLoadingMore(false);
     }
@@ -257,12 +259,12 @@ export default function ManagerDashboard() {
     setErr(""); setInfo("");
     try {
       const job = jobs.find((x) => x.id === jobId);
-      if (!job) throw new Error("Job not found in list.");
+      if (!job) throw new Error(t("manager.errors.jobNotFound"));
 
       const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
       if (sessErr) throw sessErr;
       const accessToken = sessionData?.session?.access_token;
-      if (!accessToken) throw new Error("No session token (manager). Please re-login.");
+      if (!accessToken) throw new Error(t("manager.errors.noSession"));
 
       const identity = getEmployeeIdentity(job.user_id);
 
@@ -272,23 +274,23 @@ export default function ManagerDashboard() {
       });
       if (fnErr) throw fnErr;
       if (data?.ok !== true && !data?.skipped) {
-        throw new Error(data?.error || "Export to Google Sheet failed.");
+        throw new Error(data?.error || t("manager.errors.exportFailed"));
       }
 
       const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
       if (error) throw error;
 
-      setInfo(data?.skipped ? "Approved. Export skipped (already exported)." : "Approved and exported.");
+      setInfo(data?.skipped ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
       await load();
     } catch (e) {
-      setErr(e?.message || "Approve failed.");
+      setErr(e?.message || t("manager.errors.approveFailed"));
     } finally {
       setActionLoadingId(null);
     }
   }
 
   async function unlock(jobId) {
-    const ok = window.confirm("Unlock this job so the employee can edit it?");
+    const ok = window.confirm(t("manager.confirm.unlock"));
     if (!ok) return;
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
@@ -298,10 +300,10 @@ export default function ManagerDashboard() {
         .update({ status: "updated", locked: false })
         .eq("id", jobId);
       if (error) throw error;
-      setInfo("Job unlocked. Employee can now edit it.");
+      setInfo(t("manager.toasts.unlocked"));
       await load();
     } catch (e) {
-      setErr(e?.message || "Unlock failed.");
+      setErr(e?.message || t("manager.errors.unlockFailed"));
     } finally {
       setActionLoadingId(null);
     }
@@ -314,10 +316,10 @@ export default function ManagerDashboard() {
 
     const label =
       selectedWeekKey === "latest"
-        ? "the selected period"
-        : `Week ${dayjs(list[0].job_date).isoWeek()} (${dayjs(list[0].job_date).startOf("isoWeek").format("DD MMM")} → ${dayjs(list[0].job_date).startOf("isoWeek").endOf("isoWeek").format("DD MMM YYYY")})`;
+        ? t("manager.confirm.selectedPeriod")
+        : `${t("manager.weekShort")} ${dayjs(list[0].job_date).isoWeek()} (${dayjs(list[0].job_date).startOf("isoWeek").format("DD MMM")} → ${dayjs(list[0].job_date).startOf("isoWeek").endOf("isoWeek").format("DD MMM YYYY")})`;
 
-    const ok = window.confirm(`Approve ALL submitted jobs for ${selectedEmployee.name} in ${label}?\n\nCount: ${list.length}`);
+    const ok = window.confirm(t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length }));
     if (!ok) return;
 
     const actionKey = `week:${selectedWeekKey === "latest" ? "latest" : selectedWeekKey}`;
@@ -328,7 +330,7 @@ export default function ManagerDashboard() {
       const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
       if (sessErr) throw sessErr;
       const accessToken = sessionData?.session?.access_token;
-      if (!accessToken) throw new Error("No session token (manager). Please re-login.");
+      if (!accessToken) throw new Error(t("manager.errors.noSession"));
 
       let approvedCount = 0;
       let skippedCount = 0;
@@ -342,7 +344,7 @@ export default function ManagerDashboard() {
         });
         if (fnErr) throw fnErr;
         if (data?.ok !== true && !data?.skipped) {
-          throw new Error(data?.error || `Export failed for OT ${j.ot} (${j.job_date}).`);
+          throw new Error(data?.error || t("manager.errors.exportFailedFor", { ot: j.ot, date: j.job_date }));
         }
 
         const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", j.id);
@@ -354,12 +356,12 @@ export default function ManagerDashboard() {
 
       setInfo(
         skippedCount > 0
-          ? `Approved ${approvedCount} job(s). Export skipped for ${skippedCount} (already exported).`
-          : `Approved ${approvedCount} job(s) and exported.`
+          ? t("manager.toasts.approvedManySkipped", { count: approvedCount, skipped: skippedCount })
+          : t("manager.toasts.approvedManyExported", { count: approvedCount })
       );
       await load();
     } catch (e) {
-      setErr(e?.message || "Approve week failed.");
+      setErr(e?.message || t("manager.errors.approveWeekFailed"));
     } finally {
       setActionLoadingId(null);
     }
@@ -388,52 +390,52 @@ export default function ManagerDashboard() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-bold">
-                  OT: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
+                  {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
-                    Total: <b>{totalLabel}</b>
+                    {t("history.totalLabel")}: <b>{totalLabel}</b>
                   </span>
                   <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
-                    KM: <b>{kmLabel}</b>
+                    {t("history.km")}: <b>{kmLabel}</b>
                   </span>
                 </div>
               </div>
 
               <div className="text-xs text-muted-foreground">
-                Employee: <b className="text-foreground">{employeeName}</b>
-                {employee?.phone ? <> • Phone: <b className="text-foreground">{employee.phone}</b></> : null}
-                {employee?.email ? <> • Email: <b className="text-foreground">{employee.email}</b></> : null}
+                {t("manager.employee")}: <b className="text-foreground">{employeeName}</b>
+                {employee?.phone ? <> • {t("manager.phone")}: <b className="text-foreground">{employee.phone}</b></> : null}
+                {employee?.email ? <> • {t("manager.email")}: <b className="text-foreground">{employee.email}</b></> : null}
               </div>
 
               <div className="text-xs text-muted-foreground">
-                Depart: {fmtTimeHHmm(j.depart)} • Arrival: {fmtTimeHHmm(j.arrivee)} • End: {fmtTimeHHmm(j.fin)}
+                {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
               </div>
             </div>
 
             <div className="ml-auto grid justify-items-end gap-2">
               <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
-                {j.status}
+                {t(`status.${j.status}`)}
               </Badge>
 
               {canApprove && (
                 <Button size="sm" disabled={actionLoadingId === j.id} onClick={() => approve(j.id)}>
-                  {actionLoadingId === j.id ? "Working…" : "Approve"}
+                  {actionLoadingId === j.id ? t("common.working") : t("manager.approve")}
                 </Button>
               )}
 
               {j.locked === true && j.status !== "approved" && (
                 <Button size="sm" variant="secondary" disabled={actionLoadingId === j.id} onClick={() => unlock(j.id)}>
-                  {actionLoadingId === j.id ? "Working…" : "Unlock"}
+                  {actionLoadingId === j.id ? t("common.working") : t("manager.unlock")}
                 </Button>
               )}
 
               <div className="text-xs text-muted-foreground">
-                Locked: <b className="text-foreground">{j.locked ? "true" : "false"}</b>
+                {t("history.locked")}: <b className="text-foreground">{j.locked ? t("common.yes") : t("common.no")}</b>
               </div>
             </div>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">Updated: {updatedLabel}</div>
+          <div className="mt-2 text-xs text-muted-foreground">{t("history.updated")}: {updatedLabel}</div>
         </CardContent>
       </Card>
     );
@@ -442,56 +444,56 @@ export default function ManagerDashboard() {
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
   return (
-    <AppShell title="Manager">
+    <AppShell title={t("manager.title")}>
       <div className="space-y-3">
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
-                All: <b>{counts.all}</b>
+                {t("manager.counts.all")}: <b>{counts.all}</b>
               </span>
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
-                Saved: <b>{counts.saved}</b>
+                {t("manager.counts.saved")}: <b>{counts.saved}</b>
               </span>
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
-                Submitted: <b>{counts.submitted}</b>
+                {t("manager.counts.submitted")}: <b>{counts.submitted}</b>
               </span>
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
-                Approved: <b>{counts.approved}</b>
+                {t("manager.counts.approved")}: <b>{counts.approved}</b>
               </span>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <Select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-                <option value="all">All employees</option>
+                <option value="all">{t("manager.filters.allEmployees")}</option>
                 {employeeOptions.map((opt) => (
                   <option key={opt.id} value={opt.id}>{opt.label}</option>
                 ))}
               </Select>
 
               <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">All statuses</option>
-                <option value="saved">saved</option>
-                <option value="submitted">submitted</option>
-                <option value="approved">approved</option>
+                <option value="all">{t("manager.filters.allStatuses")}</option>
+                <option value="saved">{t("status.saved")}</option>
+                <option value="submitted">{t("status.submitted")}</option>
+                <option value="approved">{t("status.approved")}</option>
               </Select>
 
               <Input
                 type="week"
                 value={weekFilter}
                 onChange={(e) => setWeekFilter(e.target.value)}
-                title="Filter by ISO week"
+                title={t("manager.filters.weekTitle")}
               />
 
               <Input
                 value={searchLive}
                 onChange={(e) => setSearchLive(e.target.value)}
-                placeholder="Search OT / date / employee…"
+                placeholder={t("manager.filters.searchPlaceholder")}
               />
 
               {weekFilter && (
                 <Button type="button" variant="secondary" onClick={() => setWeekFilter("")}>
-                  Clear week
+                  {t("manager.filters.clearWeek")}
                 </Button>
               )}
             </div>
@@ -499,14 +501,14 @@ export default function ManagerDashboard() {
             {selectedEmployee && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
                 <div className="text-xs text-muted-foreground">
-                  Selected employee: <b className="text-foreground">{selectedEmployee.name}</b>
-                  {selectedEmployee.phone ? <> • Phone: <b className="text-foreground">{selectedEmployee.phone}</b></> : null}
-                  {selectedEmployee.email ? <> • Email: <b className="text-foreground">{selectedEmployee.email}</b></> : null}
+                  {t("manager.selectedEmployee")}: <b className="text-foreground">{selectedEmployee.name}</b>
+                  {selectedEmployee.phone ? <> • {t("manager.phone")}: <b className="text-foreground">{selectedEmployee.phone}</b></> : null}
+                  {selectedEmployee.email ? <> • {t("manager.email")}: <b className="text-foreground">{selectedEmployee.email}</b></> : null}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button asChild size="sm">
-                    <Link to={`/week?employee=${selectedEmployee.id}`}>Week</Link>
+                    <Link to={`/week?employee=${selectedEmployee.id}`}>{t("nav.week")}</Link>
                   </Button>
 
                   <Select
@@ -516,11 +518,11 @@ export default function ManagerDashboard() {
                     className="max-w-xs"
                   >
                     {weekOptions.length === 0 ? (
-                      <option value="latest">No submitted weeks</option>
+                      <option value="latest">{t("manager.noSubmittedWeeks")}</option>
                     ) : (
                       weekOptions.map((w) => (
                         <option key={w.key} value={w.key}>
-                          Week {w.start.isoWeek()} • {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")} ({w.count})
+                          {t("manager.weekShort")} {w.start.isoWeek()} • {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")} ({w.count})
                         </option>
                       ))
                     )}
@@ -532,7 +534,7 @@ export default function ManagerDashboard() {
                     onClick={approveWeekAll}
                     disabled={bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0}
                   >
-                    {bulkBusy ? "Working…" : `Approve week (${submittedForSelectedWeek.length})`}
+                    {bulkBusy ? t("common.working") : t("manager.approveWeek", { count: submittedForSelectedWeek.length })}
                   </Button>
                 </div>
               </div>
@@ -540,7 +542,7 @@ export default function ManagerDashboard() {
           </CardContent>
         </Card>
 
-        {loading && <Card><CardContent className="p-4 text-sm">Loading…</CardContent></Card>}
+        {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {err}
@@ -556,23 +558,23 @@ export default function ManagerDashboard() {
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <div className="grid gap-2">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                Saved
+                {t("manager.savedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.saved.length}</span>
               </div>
               {split.saved.map(renderJobCard)}
               {split.saved.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">No saved jobs.</CardContent></Card>
+                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noSaved")}</CardContent></Card>
               )}
             </div>
 
             <div className="grid gap-2">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                Submitted
+                {t("manager.submittedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.submitted.length}</span>
               </div>
               {split.submitted.map(renderJobCard)}
               {split.submitted.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">No submitted jobs.</CardContent></Card>
+                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noSubmitted")}</CardContent></Card>
               )}
             </div>
           </div>
@@ -582,7 +584,7 @@ export default function ManagerDashboard() {
           <div className="grid gap-2">
             {filtered.map(renderJobCard)}
             {filtered.length === 0 && (
-              <Card><CardContent className="p-4 text-sm text-muted-foreground">No results.</CardContent></Card>
+              <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noResults")}</CardContent></Card>
             )}
           </div>
         )}
@@ -590,7 +592,7 @@ export default function ManagerDashboard() {
         {!loading && hasMore && (
           <div className="flex justify-center pt-2">
             <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : `Load more (${jobs.length} loaded)`}
+              {loadingMore ? t("common.loading") : t("manager.loadMore", { loaded: jobs.length })}
             </Button>
           </div>
         )}

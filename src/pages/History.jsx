@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
+import { useT } from "@/lib/use-t";
 
 dayjs.locale("en");
 
@@ -42,6 +43,7 @@ function kmTotal(job) {
 export default function History() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const t = useT();
 
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +66,7 @@ export default function History() {
       if (error) throw error;
       setJobs(data || []);
     } catch (e) {
-      setErr(e?.message || "Failed to load history.");
+      setErr(e?.message || t("history.errors.failedLoad"));
     } finally {
       setLoading(false);
     }
@@ -132,34 +134,34 @@ export default function History() {
   }
 
   async function deleteJob(jobId) {
-    const ok = window.confirm("Delete this job? This cannot be undone.");
+    const ok = window.confirm(t("history.confirm.delete"));
     if (!ok) return;
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
     try {
       const { error } = await supabase.from("jobs").delete().eq("id", jobId);
       if (error) throw error;
-      setInfo("Job deleted.");
+      setInfo(t("history.toasts.deleted"));
       await load();
     } catch (e) {
-      setErr(e?.message || "Delete failed.");
+      setErr(e?.message || t("history.errors.deleteFailed"));
     } finally {
       setActionLoadingKey(null);
     }
   }
 
   async function submitJob(jobId) {
-    const ok = window.confirm("Submit this job? After submit it will be locked.");
+    const ok = window.confirm(t("history.confirm.submit"));
     if (!ok) return;
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
     try {
       const { error } = await supabase.from("jobs").update({ status: "submitted", locked: true }).eq("id", jobId);
       if (error) throw error;
-      setInfo("Job submitted.");
+      setInfo(t("history.toasts.submitted"));
       await load();
     } catch (e) {
-      setErr(e?.message || "Submit failed.");
+      setErr(e?.message || t("history.errors.submitFailed"));
     } finally {
       setActionLoadingKey(null);
     }
@@ -167,7 +169,7 @@ export default function History() {
 
   async function submitDay(dateKey, ids) {
     if (!ids || ids.length === 0) return;
-    const ok = window.confirm(`Submit all saved jobs for ${dayjs(dateKey).format("DD MMM YYYY")}?`);
+    const ok = window.confirm(t("history.confirm.submitDay", { date: dayjs(dateKey).format("DD MMM YYYY") }));
     if (!ok) return;
     const actionKey = `day:${dateKey}`;
     setActionLoadingKey(actionKey);
@@ -175,20 +177,20 @@ export default function History() {
     try {
       const { error } = await supabase.from("jobs").update({ status: "submitted", locked: true }).in("id", ids);
       if (error) throw error;
-      setInfo(`Day submitted (${ids.length} job(s)).`);
+      setInfo(t("history.toasts.daySubmitted", { count: ids.length }));
       await load();
     } catch (e) {
-      setErr(e?.message || "Submit day failed.");
+      setErr(e?.message || t("history.errors.submitDayFailed"));
     } finally {
       setActionLoadingKey(null);
     }
   }
 
   return (
-    <AppShell title="History">
+    <AppShell title={t("history.title")}>
       <div className="space-y-3">
         {loading && (
-          <Card><CardContent className="p-4 text-sm">Loading…</CardContent></Card>
+          <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
         )}
         {err && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -202,7 +204,7 @@ export default function History() {
         )}
 
         {!loading && !err && grouped.length === 0 && (
-          <Card><CardContent className="p-4 text-sm text-muted-foreground">No jobs yet.</CardContent></Card>
+          <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("history.empty")}</CardContent></Card>
         )}
 
         {!loading && !err && grouped.map((g) => {
@@ -223,9 +225,9 @@ export default function History() {
                     size="sm"
                     disabled={dayBusy}
                     onClick={() => submitDay(g.date, g.submittableIds)}
-                    title="Submit all saved jobs for this day"
+                    title={t("history.submitDayTitle")}
                   >
-                    {dayBusy ? "…" : "SUBMIT DAY"}
+                    {dayBusy ? "…" : t("history.submitDay")}
                   </Button>
                 )}
               </div>
@@ -256,53 +258,53 @@ export default function History() {
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-sm font-bold">OT: {j.ot}</div>
+                              <div className="text-sm font-bold">{t("common.otLabel")}: {j.ot}</div>
                               <div className="flex flex-wrap gap-1.5">
                                 <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
-                                  Total: <b>{totalHHmm}</b>
+                                  {t("common.totalShort")}: <b>{totalHHmm}</b>
                                 </span>
                                 <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
-                                  KM: <b>{km}</b>
-                                  {r > 0 ? <span className="font-semibold text-muted-foreground"> (A: {a} / R: {r})</span> : null}
+                                  {t("common.kmShort")}: <b>{km}</b>
+                                  {r > 0 ? <span className="font-semibold text-muted-foreground"> ({t("common.outboundShort")}: {a} / {t("common.returnShort")}: {r})</span> : null}
                                 </span>
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Depart: {fmtTimeHHmm(j.depart)} • Arrival: {fmtTimeHHmm(j.arrivee)} • End: {fmtTimeHHmm(j.fin)}
+                              {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
                             </div>
                           </div>
 
                           <div className="grid justify-items-end gap-2">
                             <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
-                              {j.status}
+                              {t(`status.${j.status}`)}
                             </Badge>
 
                             {(showOpen || showDelete || showSubmit) && (
                               <div className="flex flex-wrap justify-end gap-1.5">
                                 {showOpen && (
                                   <Button size="sm" variant="secondary" disabled={busy} onClick={() => openJob(j)}>
-                                    {busy ? "…" : "OPEN"}
+                                    {busy ? "…" : t("history.open")}
                                   </Button>
                                 )}
                                 {showSubmit && (
                                   <Button size="sm" variant="success" disabled={busy} onClick={() => submitJob(j.id)}>
-                                    {busy ? "…" : "SUBMIT"}
+                                    {busy ? "…" : t("history.submit")}
                                   </Button>
                                 )}
                                 {showDelete && (
                                   <Button size="sm" variant="destructive" disabled={busy} onClick={() => deleteJob(j.id)}>
-                                    {busy ? "…" : "DELETE"}
+                                    {busy ? "…" : t("history.delete")}
                                   </Button>
                                 )}
                               </div>
                             )}
 
                             <div className="text-xs text-muted-foreground">
-                              Locked: <b className="text-foreground">{j.locked ? "true" : "false"}</b>
+                              {t("history.locked")}: <b className="text-foreground">{j.locked ? t("common.yes") : t("common.no")}</b>
                             </div>
                           </div>
                         </div>
-                        <div className="mt-2 text-xs text-muted-foreground">Updated: {updatedLabel}</div>
+                        <div className="mt-2 text-xs text-muted-foreground">{t("history.updated")}: {updatedLabel}</div>
                       </CardContent>
                     </Card>
                   );

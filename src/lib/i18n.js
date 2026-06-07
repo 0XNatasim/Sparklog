@@ -172,6 +172,16 @@ export const dictionaries = {
     "status.approved": "approved",
     "status.updated": "updated",
     "status.new": "new",
+
+    // common labels
+    "common.totalShort": "Total",
+    "common.kmShort": "KM",
+    "common.locked": "Locked",
+    "common.updated": "Updated",
+    "common.otLabel": "OT",
+    "common.week": "Week",
+    "common.outboundShort": "O",
+    "common.returnShort": "R",
   },
   fr: {
     "common.appName": "SparkLog",
@@ -335,6 +345,15 @@ export const dictionaries = {
     "status.approved": "approuvé",
     "status.updated": "mis à jour",
     "status.new": "nouveau",
+
+    "common.totalShort": "Total",
+    "common.kmShort": "KM",
+    "common.locked": "Verrouillé",
+    "common.updated": "Mis à jour",
+    "common.otLabel": "OT",
+    "common.week": "Semaine",
+    "common.outboundShort": "A",
+    "common.returnShort": "R",
   },
 };
 
