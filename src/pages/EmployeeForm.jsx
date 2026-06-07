@@ -1,10 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
+import AppShell from "@/components/AppShell";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { statusBadgeVariant } from "@/lib/status";
 
 dayjs.locale("en");
 
@@ -69,13 +76,10 @@ function normalizeNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Editable statuses (draft states)
 function isEditableStatus(s) {
   return s === "saved" || s === "updated";
 }
 
-// Reject a promise if it doesn't settle within `ms` — prevents the save button
-// from getting stuck forever when the Supabase project is paused/unreachable.
 function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -96,33 +100,30 @@ function withTimeout(promise, ms, label) {
 }
 
 export default function EmployeeForm() {
-  const { user, role, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const editId = searchParams.get("edit");
 
-  // Split loading states (prevents “nothing happens” feeling)
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
-  // Form fields
   const [job_date, setJobDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [ot, setOt] = useState("");
   const [depart, setDepart] = useState("07:00");
   const [arrivee, setArrivee] = useState("08:00");
   const [fin, setFin] = useState("16:00");
-  const [km_aller, setKmAller] = useState(""); // string for input UX
+  const [km_aller, setKmAller] = useState("");
 
   const [locked, setLocked] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
 
-  // NEW: status starts empty/new until you actually save
-  const [status, setStatus] = useState(""); // "", "saved", "updated", "submitted", "approved"
+  const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
 
   const departDj = useMemo(() => makeDayjsFromJob(job_date, depart), [job_date, depart]);
@@ -158,7 +159,6 @@ export default function EmployeeForm() {
       const s = (data.status || "saved").trim();
       setStatus(s);
 
-      // Only lock when NOT editable
       const shouldLock = Boolean(data.locked) || !isEditableStatus(s);
       setLocked(shouldLock);
     } catch (e) {
@@ -181,13 +181,7 @@ export default function EmployeeForm() {
     await saveJob("submit");
   }
 
-  /**
-   * Centralized save:
-   * - New job + Save => status "saved"
-   * - Existing job + Save => status "updated" (if it was editable)
-   * - Submit => status "submitted" + locked
-   */
-  async function saveJob(mode /* "draft" | "submit" */) {
+  async function saveJob(mode) {
     if (!user?.id) {
       setErr("Not signed in.");
       return;
@@ -206,17 +200,15 @@ export default function EmployeeForm() {
       if (mode === "submit") {
         nextStatus = "submitted";
       } else {
-        // draft save
         if (!editId) {
           nextStatus = "saved";
         } else {
-          // if already editable (saved/updated), saving again becomes "updated"
           const current = (status || "saved").trim();
           nextStatus = isEditableStatus(current) ? "updated" : current;
         }
       }
 
-      const nextLocked = nextStatus === "submitted"; // lock only on submit (approval/export locks elsewhere)
+      const nextLocked = nextStatus === "submitted";
 
       const payload = {
         user_id: user.id,
@@ -242,7 +234,6 @@ export default function EmployeeForm() {
         setStatus(nextStatus);
         setLocked(nextLocked);
       } else {
-        // Insert new + return id, then go to edit mode so future saves are updates
         const { data, error } = await withTimeout(
           supabase.from("jobs").insert(payload).select("id").single(),
           15000,
@@ -255,7 +246,6 @@ export default function EmployeeForm() {
         setStatus(nextStatus);
         setLocked(nextLocked);
 
-        // Move into edit mode (avoids “saved but feels like nothing happened”)
         navigate(`/form?edit=${data.id}`, { replace: true });
       }
     } catch (e) {
@@ -265,8 +255,6 @@ export default function EmployeeForm() {
     }
   }
 
-  // Resize/compress an image File to a JPEG Blob under ~1 MB so it fits the
-  // ocr.space free-tier upload cap. Keeps aspect ratio; max edge 1600px.
   async function compressImage(file, maxEdge = 1600, quality = 0.7) {
     const url = URL.createObjectURL(file);
     try {
@@ -291,8 +279,6 @@ export default function EmployeeForm() {
     }
   }
 
-  // Try ocr.space (better numeric accuracy than client Tesseract). Returns
-  // raw text, or throws so the caller can fall back to Tesseract.
   async function ocrSpaceExtract(file) {
     const apiKey = import.meta.env.VITE_OCR_SPACE_API_KEY || "helloworld";
     const blob = await compressImage(file);
@@ -362,295 +348,157 @@ export default function EmployeeForm() {
   }
 
   const disableInputs = locked || loadingEdit || saving;
-
-  async function handleLogout() {
-    await signOut();
-    navigate("/login");
-  }
+  const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
   return (
-    <div style={styles.page}>
-      <div style={styles.topbar}>
-        <div style={styles.brandBlock}>
-          <div style={styles.pageTitle}>Form</div>
-          <div style={styles.subText}>
-            {user?.email}
-            <br />
-            role: {role}
+    <AppShell title="Form">
+      <div className="space-y-3">
+        {err && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {err}
           </div>
-        </div>
-
-        <div style={styles.nav}>
-          <span style={styles.activeLink}>Form</span>
-
-          <Link to="/history" style={styles.link}>
-            History
-          </Link>
-
-          <Link to="/week" style={styles.link}>
-            Week
-          </Link>
-
-          {role === "manager" && (
-            <Link to="/manager" style={styles.link}>
-              Manager
-            </Link>
-          )}
-
-          <button onClick={handleLogout} style={styles.secondaryBtn}>
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div style={styles.container}>
-        {err && <div style={styles.error}>{err}</div>}
-        {info && <div style={styles.info}>{info}</div>}
-
-        <div style={styles.card}>
-          <div style={styles.grid}>
-            <div style={styles.field}>
-              <div style={styles.label}>Date</div>
-              <input
-                type="date"
-                value={job_date}
-                onChange={(e) => setJobDate(e.target.value)}
-                style={styles.input}
-                disabled={disableInputs}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <div style={styles.label}>Work order (OT)</div>
-              <input
-                value={ot}
-                onChange={(e) => setOt(e.target.value)}
-                placeholder="ex: 12345"
-                style={styles.input}
-                disabled={disableInputs}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <div style={styles.label}>Depart</div>
-              <input
-                type="time"
-                value={depart}
-                onChange={(e) => setDepart(e.target.value)}
-                style={styles.input}
-                disabled={disableInputs}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <div style={styles.label}>Arrival</div>
-              <input
-                type="time"
-                value={arrivee}
-                onChange={(e) => setArrivee(e.target.value)}
-                style={styles.input}
-                disabled={disableInputs}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <div style={styles.label}>End</div>
-              <input
-                type="time"
-                value={fin}
-                onChange={(e) => setFin(e.target.value)}
-                style={styles.input}
-                disabled={disableInputs}
-              />
-            </div>
-
-            <div style={styles.field}>
-              <div style={styles.label}>KM (aller)</div>
-              <input
-                type="number"
-                value={km_aller}
-                onChange={(e) => setKmAller(e.target.value)}
-                style={styles.input}
-                disabled={disableInputs}
-                placeholder="0"
-              />
-            </div>
-
-            <div style={styles.field}>
-              <div style={styles.label}>Total hours</div>
-              <div style={styles.readonlyBox}>{hoursLabel}</div>
-            </div>
-
-            <div style={styles.field}>
-              <div style={styles.label}>Status</div>
-              <div style={styles.readonlyBox}>{statusLabel}</div>
-            </div>
+        )}
+        {info && (
+          <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+            {info}
           </div>
+        )}
 
-          <div style={styles.actions}>
-            <button type="button" style={styles.primaryBtn} disabled={disableInputs} onClick={saveDraft}>
-              {saving ? "Saving…" : "Save"}
-            </button>
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-muted-foreground">Status</div>
+              <Badge variant={badgeVariant} className="uppercase tracking-wide">
+                {statusLabel}
+              </Badge>
+            </div>
 
-            <button type="button" style={styles.secondaryBtn} disabled={disableInputs} onClick={submitJob}>
-              {saving ? "Submitting…" : "Submit"}
-            </button>
-
-            {!locked && (
-              <>
-                <button
-                  type="button"
-                  style={styles.ghostBtn}
-                  disabled={disableInputs || extracting}
-                  onClick={() => imageInputRef.current?.click()}
-                >
-                  {extracting ? "Extracting…" : "Auto-fill from photo"}
-                </button>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={handleExtractFromImage}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={job_date}
+                  onChange={(e) => setJobDate(e.target.value)}
+                  disabled={disableInputs}
                 />
-              </>
-            )}
+              </div>
 
-            {editId && (
-              <button
-                type="button"
-                style={styles.ghostBtn}
-                onClick={() => navigate("/form")}
-                disabled={loadingEdit || saving}
-              >
-                New job
-              </button>
-            )}
-          </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="ot">Work order (OT)</Label>
+                <Input
+                  id="ot"
+                  value={ot}
+                  onChange={(e) => setOt(e.target.value)}
+                  placeholder="ex: 12345"
+                  disabled={disableInputs}
+                />
+              </div>
 
-          {locked && (
-            <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-              This job is locked ({statusLabel}). You can only edit when it is <b>saved</b> or <b>updated</b> and unlocked.
+              <div className="grid gap-1.5">
+                <Label htmlFor="depart">Depart</Label>
+                <Input
+                  id="depart"
+                  type="time"
+                  value={depart}
+                  onChange={(e) => setDepart(e.target.value)}
+                  disabled={disableInputs}
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="arrivee">Arrival</Label>
+                <Input
+                  id="arrivee"
+                  type="time"
+                  value={arrivee}
+                  onChange={(e) => setArrivee(e.target.value)}
+                  disabled={disableInputs}
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="fin">End</Label>
+                <Input
+                  id="fin"
+                  type="time"
+                  value={fin}
+                  onChange={(e) => setFin(e.target.value)}
+                  disabled={disableInputs}
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="km">KM (aller)</Label>
+                <Input
+                  id="km"
+                  type="number"
+                  value={km_aller}
+                  onChange={(e) => setKmAller(e.target.value)}
+                  disabled={disableInputs}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label>Total hours</Label>
+                <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm font-bold">
+                  {hoursLabel}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button type="button" disabled={disableInputs} onClick={saveDraft}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+
+              <Button type="button" variant="secondary" disabled={disableInputs} onClick={submitJob}>
+                {saving ? "Submitting…" : "Submit"}
+              </Button>
+
+              {!locked && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={disableInputs || extracting}
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    {extracting ? "Extracting…" : "Auto-fill from photo"}
+                  </Button>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleExtractFromImage}
+                  />
+                </>
+              )}
+
+              {editId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => navigate("/form")}
+                  disabled={loadingEdit || saving}
+                >
+                  New job
+                </Button>
+              )}
+            </div>
+
+            {locked && (
+              <div className="text-xs text-muted-foreground">
+                This job is locked ({statusLabel}). You can only edit when it is <b>saved</b> or{" "}
+                <b>updated</b> and unlocked.
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </AppShell>
   );
 }
-
-const styles = {
-  page: { minHeight: "100vh", background: "#f5f5f5", padding: 16 },
-  container: { maxWidth: 980, margin: "0 auto" },
-
-  topbar: {
-    maxWidth: 980,
-    margin: "0 auto 12px auto",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    flexWrap: "wrap",
-  },
-  brandBlock: { display: "grid", gap: 2 },
-  pageTitle: { fontSize: 18, fontWeight: 900 },
-  subText: { fontSize: 12, color: "#666" },
-
-  nav: {
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-  link: { color: "#1565c0", fontWeight: 900, textDecoration: "none" },
-  activeLink: { fontWeight: 900, color: "#111", fontSize: 14 },
-
-  card: {
-    background: "#fff",
-    border: "1px solid #eee",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
-  },
-
-  grid: {
-    display: "grid",
-    gap: 12,
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  },
-  field: { display: "grid", gap: 6 },
-  label: { fontSize: 12, color: "#666", fontWeight: 800 },
-
-  input: {
-    border: "1px solid #eee",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 14,
-    outline: "none",
-    width: "100%",
-  },
-
-  readonlyBox: {
-    border: "1px solid #eee",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 14,
-    background: "#f8f8f8",
-    fontWeight: 900,
-    color: "#111",
-  },
-
-  actions: { display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" },
-
-  primaryBtn: {
-    background: "#1565c0",
-    color: "#fff",
-    border: "1px solid #1565c0",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  secondaryBtn: {
-    background: "#f5f5f5",
-    color: "#111",
-    border: "1px solid #eee",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-  ghostBtn: {
-    background: "transparent",
-    color: "#111",
-    border: "1px dashed #ddd",
-    borderRadius: 10,
-    padding: "10px 12px",
-    fontSize: 13,
-    fontWeight: 900,
-    cursor: "pointer",
-  },
-
-  error: {
-    marginBottom: 10,
-    background: "rgba(220,20,60,0.08)",
-    border: "1px solid rgba(220,20,60,0.2)",
-    color: "crimson",
-    padding: 10,
-    borderRadius: 10,
-    fontSize: 13,
-  },
-  info: {
-    marginBottom: 10,
-    background: "rgba(25,118,210,0.08)",
-    border: "1px solid rgba(25,118,210,0.2)",
-    color: "#1565c0",
-    padding: 10,
-    borderRadius: 10,
-    fontSize: 13,
-  },
-};
