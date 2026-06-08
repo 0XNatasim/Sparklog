@@ -50,10 +50,17 @@ export default function AppShell({ children }) {
             Messier Connexion
           </div>
 
-          <div className="ml-auto flex items-center gap-1">
-            <ThemeToggle />
-            <LanguageToggle />
-            <Button variant="ghost" size="icon" onClick={handleLogout} title={t("nav.signOut")} aria-label={t("nav.signOut")}>
+          <div className="ml-auto flex items-center gap-0">
+            <ThemeToggle className="h-8 w-8" />
+            <LanguageToggle className="h-8 w-8" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleLogout}
+              title={t("nav.signOut")}
+              aria-label={t("nav.signOut")}
+            >
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
