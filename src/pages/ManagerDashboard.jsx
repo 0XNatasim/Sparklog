@@ -199,11 +199,13 @@ export default function ManagerDashboard() {
     if (employeeId === "all") return null;
     const saved = [];
     const submitted = [];
+    const approved = [];
     for (const j of filtered) {
       if (j.status === "saved") saved.push(j);
-      if (j.status === "submitted") submitted.push(j);
+      else if (j.status === "submitted") submitted.push(j);
+      else if (j.status === "approved") approved.push(j);
     }
-    return { saved, submitted };
+    return { saved, submitted, approved };
   }, [filtered, employeeId]);
 
   const selectedEmployee = useMemo(() => {
@@ -576,7 +578,7 @@ export default function ManagerDashboard() {
         )}
 
         {!loading && employeeId !== "all" && split && (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div className="grid gap-2">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.savedSection")}
@@ -596,6 +598,17 @@ export default function ManagerDashboard() {
               {split.submitted.map(renderJobCard)}
               {split.submitted.length === 0 && (
                 <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noSubmitted")}</CardContent></Card>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
+                {t("status.approved")}
+                <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.approved.length}</span>
+              </div>
+              {split.approved.map(renderJobCard)}
+              {split.approved.length === 0 && (
+                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">—</CardContent></Card>
               )}
             </div>
           </div>
