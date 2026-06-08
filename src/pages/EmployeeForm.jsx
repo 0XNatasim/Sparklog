@@ -116,9 +116,9 @@ export default function EmployeeForm() {
 
   const [job_date, setJobDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [ot, setOt] = useState("");
-  const [depart, setDepart] = useState("07:00");
-  const [arrivee, setArrivee] = useState("08:00");
-  const [fin, setFin] = useState("16:00");
+  const [depart, setDepart] = useState("");
+  const [arrivee, setArrivee] = useState("");
+  const [fin, setFin] = useState("");
   const [km_aller, setKmAller] = useState("");
 
   const [locked, setLocked] = useState(false);
@@ -151,9 +151,9 @@ export default function EmployeeForm() {
 
       setJobDate(data.job_date || dayjs().format("YYYY-MM-DD"));
       setOt(data.ot || "");
-      setDepart(fmtTimeHHmm(data.depart) || "07:00");
-      setArrivee(fmtTimeHHmm(data.arrivee) || "08:00");
-      setFin(fmtTimeHHmm(data.fin) || "16:00");
+      setDepart(fmtTimeHHmm(data.depart) || "");
+      setArrivee(fmtTimeHHmm(data.arrivee) || "");
+      setFin(fmtTimeHHmm(data.fin) || "");
 
       const aller = data.km_aller ?? "";
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
@@ -171,7 +171,22 @@ export default function EmployeeForm() {
   }
 
   useEffect(() => {
-    loadEdit();
+    if (editId) {
+      loadEdit();
+    } else {
+      // "New job" — reset form to empty defaults so previous job's data
+      // doesn't bleed into the next entry.
+      setJobDate(dayjs().format("YYYY-MM-DD"));
+      setOt("");
+      setDepart("");
+      setArrivee("");
+      setFin("");
+      setKmAller("");
+      setStatus("");
+      setLocked(false);
+      setErr("");
+      setInfo("");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
 
