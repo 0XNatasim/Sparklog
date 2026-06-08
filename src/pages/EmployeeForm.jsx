@@ -475,19 +475,21 @@ export default function EmployeeForm() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <Button type="button" disabled={disableInputs} onClick={saveDraft}>
+            <div className="flex flex-nowrap items-center gap-1.5 pt-2">
+              <Button type="button" size="sm" className="text-xs" disabled={disableInputs} onClick={saveDraft}>
                 {saving ? t("common.saving") : t("form.buttons.save")}
               </Button>
 
-              <Button type="button" variant="secondary" disabled={disableInputs} onClick={submitJob}>
+              <Button type="button" size="sm" variant="secondary" className="text-xs" disabled={disableInputs} onClick={submitJob}>
                 {saving ? t("common.submitting") : t("form.buttons.submit")}
               </Button>
 
               {editId && (
                 <Button
                   type="button"
+                  size="sm"
                   variant="ghost"
+                  className="text-xs"
                   onClick={() => navigate("/form")}
                   disabled={loadingEdit || saving}
                 >
@@ -499,8 +501,9 @@ export default function EmployeeForm() {
                 <>
                   <Button
                     type="button"
+                    size="sm"
                     variant="outline"
-                    className="ml-auto"
+                    className="ml-auto text-xs"
                     disabled={disableInputs || extracting}
                     onClick={() => imageInputRef.current?.click()}
                   >
