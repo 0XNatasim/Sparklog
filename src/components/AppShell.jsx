@@ -27,7 +27,7 @@ function NavItem({ to, children }) {
   );
 }
 
-export default function AppShell({ title, children }) {
+export default function AppShell({ children }) {
   const { role, signOut } = useAuth();
   const navigate = useNavigate();
   const t = useT();
@@ -40,14 +40,13 @@ export default function AppShell({ title, children }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-baseline gap-3">
-            <Link to="/form" className="text-lg font-extrabold tracking-tight">
-              SparkLog
-            </Link>
-            {title && (
-              <span className="text-sm font-semibold text-muted-foreground">{title}</span>
-            )}
+        <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
+          <Link to="/form" className="text-lg font-extrabold tracking-tight">
+            SparkLog
+          </Link>
+
+          <div className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 text-base font-bold tracking-tight sm:block">
+            Messier Connexion
           </div>
 
           <nav className="flex flex-wrap items-center gap-1">
@@ -64,6 +63,9 @@ export default function AppShell({ title, children }) {
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+        <div className="mx-auto max-w-6xl px-4 pb-2 text-center text-sm font-bold sm:hidden">
+          Messier Connexion
         </div>
       </header>
 

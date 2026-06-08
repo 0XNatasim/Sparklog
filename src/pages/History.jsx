@@ -187,7 +187,7 @@ export default function History() {
   }
 
   return (
-    <AppShell title={t("history.title")}>
+    <AppShell>
       <div className="space-y-3">
         {loading && (
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>

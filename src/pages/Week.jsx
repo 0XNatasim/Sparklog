@@ -167,7 +167,7 @@ export default function Week() {
   }
 
   return (
-    <AppShell title={t("week.title")}>
+    <AppShell>
       <div className="space-y-3">
         {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (

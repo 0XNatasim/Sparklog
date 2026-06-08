@@ -377,7 +377,7 @@ export default function EmployeeForm() {
   const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
   return (
-    <AppShell title={t("form.title")}>
+    <AppShell>
       <div className="space-y-3">
         {err && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
