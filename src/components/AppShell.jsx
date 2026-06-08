@@ -28,7 +28,7 @@ function NavItem({ to, children }) {
 }
 
 export default function AppShell({ title, children }) {
-  const { user, role, signOut } = useAuth();
+  const { role, signOut } = useAuth();
   const navigate = useNavigate();
   const t = useT();
 
@@ -55,25 +55,15 @@ export default function AppShell({ title, children }) {
             <NavItem to="/history">{t("nav.history")}</NavItem>
             <NavItem to="/week">{t("nav.week")}</NavItem>
             {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
+          </nav>
 
-            <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
-
+          <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
             <LanguageToggle />
-
-            <div className="hidden text-xs text-muted-foreground sm:block">
-              <div className="font-medium text-foreground">{user?.email}</div>
-              <div>{t("nav.role")}: {role}</div>
-            </div>
-
-            <Button variant="ghost" size="sm" onClick={handleLogout} title={t("nav.signOut")}>
+            <Button variant="ghost" size="icon" onClick={handleLogout} title={t("nav.signOut")} aria-label={t("nav.signOut")}>
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">{t("nav.logout")}</span>
             </Button>
-          </nav>
-        </div>
-        <div className="mx-auto max-w-6xl px-4 pb-2 text-xs text-muted-foreground sm:hidden">
-          {user?.email} • {t("nav.role")}: {role}
+          </div>
         </div>
       </header>
 
