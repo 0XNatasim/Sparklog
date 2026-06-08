@@ -40,21 +40,15 @@ export default function AppShell({ children }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
-        <div className="relative mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
+        {/* Top row: brand left, business name centered, controls right */}
+        <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <Link to="/form" className="text-lg font-extrabold tracking-tight">
             SparkLog
           </Link>
 
-          <div className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 text-base font-bold tracking-tight sm:block">
+          <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-bold tracking-tight">
             Messier Connexion
           </div>
-
-          <nav className="flex flex-wrap items-center gap-1">
-            <NavItem to="/form">{t("nav.form")}</NavItem>
-            <NavItem to="/history">{t("nav.history")}</NavItem>
-            <NavItem to="/week">{t("nav.week")}</NavItem>
-            {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
-          </nav>
 
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
@@ -64,9 +58,14 @@ export default function AppShell({ children }) {
             </Button>
           </div>
         </div>
-        <div className="mx-auto max-w-6xl px-4 pb-2 text-center text-sm font-bold sm:hidden">
-          Messier Connexion
-        </div>
+
+        {/* Second row: nav tabs */}
+        <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-1 px-4 pb-3">
+          <NavItem to="/form">{t("nav.form")}</NavItem>
+          <NavItem to="/history">{t("nav.history")}</NavItem>
+          <NavItem to="/week">{t("nav.week")}</NavItem>
+          {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
+        </nav>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-4">{children}</main>
