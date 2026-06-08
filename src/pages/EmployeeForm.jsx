@@ -475,7 +475,7 @@ export default function EmployeeForm() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <Button type="button" disabled={disableInputs} onClick={saveDraft}>
                 {saving ? t("common.saving") : t("form.buttons.save")}
               </Button>
@@ -484,11 +484,23 @@ export default function EmployeeForm() {
                 {saving ? t("common.submitting") : t("form.buttons.submit")}
               </Button>
 
+              {editId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => navigate("/form")}
+                  disabled={loadingEdit || saving}
+                >
+                  {t("form.buttons.newJob")}
+                </Button>
+              )}
+
               {!locked && (
                 <>
                   <Button
                     type="button"
                     variant="outline"
+                    className="ml-auto"
                     disabled={disableInputs || extracting}
                     onClick={() => imageInputRef.current?.click()}
                   >
@@ -502,17 +514,6 @@ export default function EmployeeForm() {
                     onChange={handleExtractFromImage}
                   />
                 </>
-              )}
-
-              {editId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => navigate("/form")}
-                  disabled={loadingEdit || saving}
-                >
-                  {t("form.buttons.newJob")}
-                </Button>
               )}
             </div>
 
