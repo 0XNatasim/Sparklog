@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/components/language-provider";
 import { useT } from "@/lib/use-t";
 
-export function LanguageToggle() {
+export function LanguageToggle({ className } = {}) {
   const { language, setLanguage } = useLanguage();
   const t = useT();
   const target = language === "fr" ? "en" : "fr";
@@ -12,14 +12,13 @@ export function LanguageToggle() {
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size="icon"
+      className={className}
       onClick={() => setLanguage(target)}
       aria-label={t("nav.toggleLanguage")}
       title={t("nav.toggleLanguage")}
-      className="gap-1"
     >
       <Languages className="h-4 w-4" />
-      <span className="text-xs font-bold uppercase">{target}</span>
     </Button>
   );
 }

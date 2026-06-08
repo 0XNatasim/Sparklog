@@ -187,7 +187,7 @@ export default function History() {
   }
 
   return (
-    <AppShell title={t("history.title")}>
+    <AppShell>
       <div className="space-y-3">
         {loading && (
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
@@ -254,57 +254,54 @@ export default function History() {
 
                   return (
                     <Card key={j.id}>
-                      <CardContent className="p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1 space-y-1.5">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-sm font-bold">{t("common.otLabel")}: {j.ot}</div>
-                              <div className="flex flex-wrap gap-1.5">
-                                <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
-                                  {t("common.totalShort")}: <b>{totalHHmm}</b>
-                                </span>
-                                <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
-                                  {t("common.kmShort")}: <b>{km}</b>
-                                  {r > 0 ? <span className="font-semibold text-muted-foreground"> ({t("common.outboundShort")}: {a} / {t("common.returnShort")}: {r})</span> : null}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
-                            </div>
-                          </div>
-
-                          <div className="grid justify-items-end gap-2">
-                            <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
-                              {t(`status.${j.status}`)}
-                            </Badge>
-
-                            {(showOpen || showDelete || showSubmit) && (
-                              <div className="flex flex-wrap justify-end gap-1.5">
-                                {showOpen && (
-                                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => openJob(j)}>
-                                    {busy ? "…" : t("history.open")}
-                                  </Button>
-                                )}
-                                {showSubmit && (
-                                  <Button size="sm" variant="success" disabled={busy} onClick={() => submitJob(j.id)}>
-                                    {busy ? "…" : t("history.submit")}
-                                  </Button>
-                                )}
-                                {showDelete && (
-                                  <Button size="sm" variant="destructive" disabled={busy} onClick={() => deleteJob(j.id)}>
-                                    {busy ? "…" : t("history.delete")}
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-
-                            <div className="text-xs text-muted-foreground">
-                              {t("history.locked")}: <b className="text-foreground">{j.locked ? t("common.yes") : t("common.no")}</b>
-                            </div>
-                          </div>
+                      <CardContent className="space-y-3 p-4">
+                        {/* Header row: OT + status */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-sm font-bold">{t("common.otLabel")}: {j.ot}</div>
+                          <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
+                            {t(`status.${j.status}`)}
+                          </Badge>
                         </div>
-                        <div className="mt-2 text-xs text-muted-foreground">{t("history.updated")}: {updatedLabel}</div>
+
+                        {/* Metric pills + updated time on the same row */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
+                            {t("common.totalShort")}: <b>{totalHHmm}</b>
+                          </span>
+                          <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
+                            {t("common.kmShort")}: <b>{km}</b>
+                            {r > 0 ? <span className="font-semibold text-muted-foreground"> ({t("common.outboundShort")}: {a} / {t("common.returnShort")}: {r})</span> : null}
+                          </span>
+                          <span className="ml-auto text-xs text-muted-foreground">
+                            {t("history.updated")}: {updatedLabel}
+                          </span>
+                        </div>
+
+                        {/* Times */}
+                        <div className="text-xs text-muted-foreground">
+                          {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
+                        </div>
+
+                        {/* Action buttons */}
+                        {(showOpen || showDelete || showSubmit) && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {showOpen && (
+                              <Button size="sm" variant="secondary" disabled={busy} onClick={() => openJob(j)}>
+                                {busy ? "…" : t("history.open")}
+                              </Button>
+                            )}
+                            {showSubmit && (
+                              <Button size="sm" variant="success" disabled={busy} onClick={() => submitJob(j.id)}>
+                                {busy ? "…" : t("history.submit")}
+                              </Button>
+                            )}
+                            {showDelete && (
+                              <Button size="sm" variant="destructive" disabled={busy} onClick={() => deleteJob(j.id)}>
+                                {busy ? "…" : t("history.delete")}
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );

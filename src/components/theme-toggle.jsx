@@ -3,7 +3,7 @@ import { Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme-provider";
 
-export function ThemeToggle() {
+export function ThemeToggle({ className } = {}) {
   const { theme, setTheme } = useTheme();
 
   // Determine current resolved mode
@@ -21,6 +21,7 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
+      className={className}
       onClick={toggle}
       aria-label="Toggle theme"
       title="Toggle light/dark"

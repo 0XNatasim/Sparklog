@@ -467,7 +467,7 @@ export default function ManagerDashboard() {
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
   return (
-    <AppShell title={t("manager.title")}>
+    <AppShell>
       <div className="space-y-3">
         <Card>
           <CardContent className="p-4 space-y-3">

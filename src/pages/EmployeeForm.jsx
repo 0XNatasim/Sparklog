@@ -116,9 +116,9 @@ export default function EmployeeForm() {
 
   const [job_date, setJobDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [ot, setOt] = useState("");
-  const [depart, setDepart] = useState("07:00");
-  const [arrivee, setArrivee] = useState("08:00");
-  const [fin, setFin] = useState("16:00");
+  const [depart, setDepart] = useState("");
+  const [arrivee, setArrivee] = useState("");
+  const [fin, setFin] = useState("");
   const [km_aller, setKmAller] = useState("");
 
   const [locked, setLocked] = useState(false);
@@ -151,9 +151,9 @@ export default function EmployeeForm() {
 
       setJobDate(data.job_date || dayjs().format("YYYY-MM-DD"));
       setOt(data.ot || "");
-      setDepart(fmtTimeHHmm(data.depart) || "07:00");
-      setArrivee(fmtTimeHHmm(data.arrivee) || "08:00");
-      setFin(fmtTimeHHmm(data.fin) || "16:00");
+      setDepart(fmtTimeHHmm(data.depart) || "");
+      setArrivee(fmtTimeHHmm(data.arrivee) || "");
+      setFin(fmtTimeHHmm(data.fin) || "");
 
       const aller = data.km_aller ?? "";
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
@@ -171,7 +171,22 @@ export default function EmployeeForm() {
   }
 
   useEffect(() => {
-    loadEdit();
+    if (editId) {
+      loadEdit();
+    } else {
+      // "New job" — reset form to empty defaults so previous job's data
+      // doesn't bleed into the next entry.
+      setJobDate(dayjs().format("YYYY-MM-DD"));
+      setOt("");
+      setDepart("");
+      setArrivee("");
+      setFin("");
+      setKmAller("");
+      setStatus("");
+      setLocked(false);
+      setErr("");
+      setInfo("");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
 
@@ -251,7 +266,16 @@ export default function EmployeeForm() {
         navigate(`/form?edit=${data.id}`, { replace: true });
       }
     } catch (e) {
-      setErr(e?.message || t("form.errors.saveFailed"));
+      // Postgres unique_violation = "23505". Map it to a friendly message
+      // since the raw "duplicate key value violates unique constraint…" is
+      // useless to an employee.
+      const code = e?.code || e?.cause?.code;
+      const msg = String(e?.message || "");
+      if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
+        setErr(t("form.errors.duplicateOt", { ot: ot || "" }));
+      } else {
+        setErr(e?.message || t("form.errors.saveFailed"));
+      }
     } finally {
       setSaving(false);
     }
@@ -353,7 +377,7 @@ export default function EmployeeForm() {
   const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
   return (
-    <AppShell title={t("form.title")}>
+    <AppShell>
       <div className="space-y-3">
         {err && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
