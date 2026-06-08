@@ -266,7 +266,16 @@ export default function EmployeeForm() {
         navigate(`/form?edit=${data.id}`, { replace: true });
       }
     } catch (e) {
-      setErr(e?.message || t("form.errors.saveFailed"));
+      // Postgres unique_violation = "23505". Map it to a friendly message
+      // since the raw "duplicate key value violates unique constraint…" is
+      // useless to an employee.
+      const code = e?.code || e?.cause?.code;
+      const msg = String(e?.message || "");
+      if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
+        setErr(t("form.errors.duplicateOt", { ot: ot || "" }));
+      } else {
+        setErr(e?.message || t("form.errors.saveFailed"));
+      }
     } finally {
       setSaving(false);
     }
