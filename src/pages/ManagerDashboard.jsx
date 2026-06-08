@@ -268,7 +268,7 @@ export default function ManagerDashboard() {
 
       const identity = getEmployeeIdentity(job.user_id);
 
-      const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
+      const { data, error: fnErr } = await invokeWithTimeout("push_approved_to_sheet", {
         body: { job_id: jobId, ...identity },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -309,6 +309,15 @@ export default function ManagerDashboard() {
     }
   }
 
+  async function invokeWithTimeout(name, options, ms = 30000) {
+    return await Promise.race([
+      supabase.functions.invoke(name, options),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`${name} timed out after ${ms / 1000}s`)), ms)
+      ),
+    ]);
+  }
+
   async function approveWeekAll() {
     if (!selectedEmployee) return;
     const list = submittedForSelectedWeek;
@@ -334,26 +343,38 @@ export default function ManagerDashboard() {
 
       let approvedCount = 0;
       let skippedCount = 0;
+      const failures = [];
 
       const identity = getEmployeeIdentity(selectedEmployee.id);
 
-      for (const j of list) {
-        const { data, error: fnErr } = await supabase.functions.invoke("push_approved_to_sheet", {
-          body: { job_id: j.id, ...identity },
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (fnErr) throw fnErr;
-        if (data?.ok !== true && !data?.skipped) {
-          throw new Error(data?.error || t("manager.errors.exportFailedFor", { ot: j.ot, date: j.job_date }));
+      for (let i = 0; i < list.length; i++) {
+        const j = list[i];
+        setInfo(`${i + 1} / ${list.length}…`);
+        try {
+          const { data, error: fnErr } = await invokeWithTimeout("push_approved_to_sheet", {
+            body: { job_id: j.id, ...identity },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (fnErr) throw fnErr;
+          if (data?.ok !== true && !data?.skipped) {
+            throw new Error(data?.error || t("manager.errors.exportFailedFor", { ot: j.ot, date: j.job_date }));
+          }
+
+          const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", j.id);
+          if (error) throw error;
+
+          approvedCount += 1;
+          if (data?.skipped) skippedCount += 1;
+        } catch (jobErr) {
+          failures.push({ ot: j.ot, date: j.job_date, message: jobErr?.message || String(jobErr) });
         }
-
-        const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", j.id);
-        if (error) throw error;
-
-        approvedCount += 1;
-        if (data?.skipped) skippedCount += 1;
       }
 
+      if (failures.length > 0) {
+        setErr(
+          `${failures.length} job(s) failed: ${failures.map((f) => `OT ${f.ot} (${f.date})`).join(", ")}`
+        );
+      }
       setInfo(
         skippedCount > 0
           ? t("manager.toasts.approvedManySkipped", { count: approvedCount, skipped: skippedCount })
