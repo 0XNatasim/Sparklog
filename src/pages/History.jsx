@@ -263,14 +263,17 @@ export default function History() {
                           </Badge>
                         </div>
 
-                        {/* Metric pills */}
-                        <div className="flex flex-wrap gap-1.5">
+                        {/* Metric pills + updated time on the same row */}
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
                             {t("common.totalShort")}: <b>{totalHHmm}</b>
                           </span>
                           <span className="inline-block rounded-full border bg-muted px-2 py-0.5 text-xs">
                             {t("common.kmShort")}: <b>{km}</b>
                             {r > 0 ? <span className="font-semibold text-muted-foreground"> ({t("common.outboundShort")}: {a} / {t("common.returnShort")}: {r})</span> : null}
+                          </span>
+                          <span className="ml-auto text-xs text-muted-foreground">
+                            {t("history.updated")}: {updatedLabel}
                           </span>
                         </div>
 
@@ -299,12 +302,6 @@ export default function History() {
                             )}
                           </div>
                         )}
-
-                        {/* Meta */}
-                        <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-                          <span>{t("history.locked")}: <b className="text-foreground">{j.locked ? t("common.yes") : t("common.no")}</b></span>
-                          <span>{t("history.updated")}: {updatedLabel}</span>
-                        </div>
                       </CardContent>
                     </Card>
                   );
