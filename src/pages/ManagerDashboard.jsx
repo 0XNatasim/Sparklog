@@ -408,57 +408,65 @@ export default function ManagerDashboard() {
 
     return (
       <Card key={j.id}>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-bold">
-                  {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
-                    {t("history.totalLabel")}: <b>{totalLabel}</b>
-                  </span>
-                  <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
-                    {t("history.km")}: <b>{kmLabel}</b>
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-xs text-muted-foreground">
-                {t("manager.employee")}: <b className="text-foreground">{employeeName}</b>
-                {employee?.phone ? <> • {t("manager.phone")}: <b className="text-foreground">{employee.phone}</b></> : null}
-                {employee?.email ? <> • {t("manager.email")}: <b className="text-foreground">{employee.email}</b></> : null}
-              </div>
-
-              <div className="text-xs text-muted-foreground">
-                {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
-              </div>
+        <CardContent className="p-3">
+          {/* Mobile: stacked. Desktop: single-row inline list. */}
+          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
+            {/* OT + date */}
+            <div className="text-sm font-bold md:w-36 md:shrink-0">
+              {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
             </div>
 
-            <div className="ml-auto grid justify-items-end gap-2">
-              <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
-                {t(`status.${j.status}`)}
-              </Badge>
+            {/* Employee — phone + email in a hover tooltip */}
+            <div
+              className="text-xs text-muted-foreground md:min-w-0 md:flex-1 md:truncate"
+              title={[employee?.phone, employee?.email].filter(Boolean).join(" • ")}
+            >
+              <span className="font-semibold text-foreground">{employeeName}</span>
+              <span className="md:hidden">
+                {employee?.phone ? <> • {employee.phone}</> : null}
+                {employee?.email ? <> • {employee.email}</> : null}
+              </span>
+            </div>
 
+            {/* Metric pills */}
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
+                {t("history.totalLabel")}: <b>{totalLabel}</b>
+              </span>
+              <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
+                {t("history.km")}: <b>{kmLabel}</b>
+              </span>
+            </div>
+
+            {/* Status badge */}
+            <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
+              {t(`status.${j.status}`)}
+            </Badge>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-1.5">
               {canApprove && (
                 <Button size="sm" disabled={actionLoadingId === j.id} onClick={() => approve(j.id)}>
                   {actionLoadingId === j.id ? t("common.working") : t("manager.approve")}
                 </Button>
               )}
-
               {j.locked === true && j.status !== "approved" && (
                 <Button size="sm" variant="secondary" disabled={actionLoadingId === j.id} onClick={() => unlock(j.id)}>
                   {actionLoadingId === j.id ? t("common.working") : t("manager.unlock")}
                 </Button>
               )}
+            </div>
 
-              <div className="text-xs text-muted-foreground">
-                {t("history.locked")}: <b className="text-foreground">{j.locked ? t("common.yes") : t("common.no")}</b>
-              </div>
+            {/* Updated — pushed to the right on desktop */}
+            <div className="text-xs text-muted-foreground md:ml-auto">
+              {updatedLabel}
             </div>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">{t("history.updated")}: {updatedLabel}</div>
+
+          {/* Times — always visible as a subtle second line */}
+          <div className="mt-1.5 text-xs text-muted-foreground">
+            {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
+          </div>
         </CardContent>
       </Card>
     );
