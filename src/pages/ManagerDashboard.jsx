@@ -205,6 +205,10 @@ export default function ManagerDashboard() {
       else if (j.status === "submitted") submitted.push(j);
       else if (j.status === "approved") approved.push(j);
     }
+    // Submitted is ordered ascending by date so the oldest job (next to
+    // approve) sits at the top of the column. Saved/approved keep the
+    // default descending order from the query.
+    submitted.reverse();
     return { saved, submitted, approved };
   }, [filtered, employeeId]);
 
@@ -586,7 +590,7 @@ export default function ManagerDashboard() {
         )}
 
         {!loading && employeeId !== "all" && split && (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
             <div className="grid gap-2">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.savedSection")}
