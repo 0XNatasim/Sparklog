@@ -497,7 +497,7 @@ export default function EmployeeForm() {
                 </Button>
               )}
 
-              {!locked && (
+              {!locked && !editId && (
                 <>
                   <Button
                     type="button"
