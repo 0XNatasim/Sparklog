@@ -598,9 +598,6 @@ export default function ManagerDashboard() {
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.saved.length}</span>
               </div>
               {split.saved.map(renderJobCard)}
-              {split.saved.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noSaved")}</CardContent></Card>
-              )}
             </div>
 
             <div className="flex flex-col gap-2 self-start">
@@ -609,9 +606,6 @@ export default function ManagerDashboard() {
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.submitted.length}</span>
               </div>
               {split.submitted.map(renderJobCard)}
-              {split.submitted.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noSubmitted")}</CardContent></Card>
-              )}
             </div>
 
             <div className="flex flex-col gap-2 self-start">
@@ -620,9 +614,6 @@ export default function ManagerDashboard() {
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.approved.length}</span>
               </div>
               {split.approved.map(renderJobCard)}
-              {split.approved.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">—</CardContent></Card>
-              )}
             </div>
           </div>
         )}
