@@ -90,7 +90,10 @@ export default function ManagerDashboard() {
       .order("job_date", { ascending: false })
       .order("updated_at", { ascending: false });
     if (employeeId !== "all") q = q.eq("user_id", employeeId);
-    if (statusFilter !== "all") q = q.eq("status", statusFilter);
+    // When an employee is selected the UI splits into Saved / Submitted /
+    // Approved columns, so ignore the status dropdown there — otherwise
+    // the other two columns are always empty.
+    if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
     const range = weekFilterRange(weekFilter);
     if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
     return q;
@@ -205,6 +208,10 @@ export default function ManagerDashboard() {
       else if (j.status === "submitted") submitted.push(j);
       else if (j.status === "approved") approved.push(j);
     }
+    // Submitted is ordered ascending by date so the oldest job (next to
+    // approve) sits at the top of the column. Saved/approved keep the
+    // default descending order from the query.
+    submitted.reverse();
     return { saved, submitted, approved };
   }, [filtered, employeeId]);
 
@@ -408,57 +415,63 @@ export default function ManagerDashboard() {
 
     return (
       <Card key={j.id}>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-bold">
-                  {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
-                    {t("history.totalLabel")}: <b>{totalLabel}</b>
-                  </span>
-                  <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
-                    {t("history.km")}: <b>{kmLabel}</b>
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-xs text-muted-foreground">
-                {t("manager.employee")}: <b className="text-foreground">{employeeName}</b>
-                {employee?.phone ? <> • {t("manager.phone")}: <b className="text-foreground">{employee.phone}</b></> : null}
-                {employee?.email ? <> • {t("manager.email")}: <b className="text-foreground">{employee.email}</b></> : null}
-              </div>
-
-              <div className="text-xs text-muted-foreground">
-                {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
-              </div>
+        <CardContent className="p-3">
+          {/* Mobile: stacked. Desktop: single-row inline list. */}
+          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
+            {/* OT + date */}
+            <div className="text-sm font-bold md:w-36 md:shrink-0">
+              {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
             </div>
 
-            <div className="ml-auto grid justify-items-end gap-2">
-              <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
-                {t(`status.${j.status}`)}
-              </Badge>
+            {/* Employee · phone · email — one line, no labels */}
+            <div
+              className="text-xs text-muted-foreground md:min-w-0 md:flex-1 md:truncate"
+              title={[employee?.phone, employee?.email].filter(Boolean).join(" • ")}
+            >
+              <span className="font-semibold text-foreground">{employeeName}</span>
+              {employee?.phone ? <> • {employee.phone}</> : null}
+              {employee?.email ? <> • {employee.email}</> : null}
+            </div>
 
+            {/* Metric pills */}
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
+                {t("history.totalLabel")}: <b>{totalLabel}</b>
+              </span>
+              <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">
+                {t("history.km")}: <b>{kmLabel}</b>
+              </span>
+            </div>
+
+            {/* Status badge */}
+            <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
+              {t(`status.${j.status}`)}
+            </Badge>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-1.5">
               {canApprove && (
                 <Button size="sm" disabled={actionLoadingId === j.id} onClick={() => approve(j.id)}>
                   {actionLoadingId === j.id ? t("common.working") : t("manager.approve")}
                 </Button>
               )}
-
               {j.locked === true && j.status !== "approved" && (
                 <Button size="sm" variant="secondary" disabled={actionLoadingId === j.id} onClick={() => unlock(j.id)}>
                   {actionLoadingId === j.id ? t("common.working") : t("manager.unlock")}
                 </Button>
               )}
+            </div>
 
-              <div className="text-xs text-muted-foreground">
-                {t("history.locked")}: <b className="text-foreground">{j.locked ? t("common.yes") : t("common.no")}</b>
-              </div>
+            {/* Updated — pushed to the right on desktop */}
+            <div className="text-xs text-muted-foreground md:ml-auto">
+              {updatedLabel}
             </div>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">{t("history.updated")}: {updatedLabel}</div>
+
+          {/* Times — always visible as a subtle second line */}
+          <div className="mt-1.5 text-xs text-muted-foreground">
+            {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
+          </div>
         </CardContent>
       </Card>
     );
@@ -578,44 +591,40 @@ export default function ManagerDashboard() {
         )}
 
         {!loading && employeeId !== "all" && split && (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <div className="grid gap-2">
+          <>
+            {/* Three small standalone header cards, above the columns */}
+            <div className="grid grid-cols-3 gap-3">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.savedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.saved.length}</span>
               </div>
-              {split.saved.map(renderJobCard)}
-              {split.saved.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noSaved")}</CardContent></Card>
-              )}
-            </div>
-
-            <div className="grid gap-2">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.submittedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.submitted.length}</span>
               </div>
-              {split.submitted.map(renderJobCard)}
-              {split.submitted.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noSubmitted")}</CardContent></Card>
-              )}
-            </div>
-
-            <div className="grid gap-2">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("status.approved")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.approved.length}</span>
               </div>
-              {split.approved.map(renderJobCard)}
-              {split.approved.length === 0 && (
-                <Card className="border-dashed"><CardContent className="p-4 text-sm text-muted-foreground">—</CardContent></Card>
-              )}
             </div>
-          </div>
+
+            {/* Three columns of job cards (no inner headers) */}
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
+              <div className="flex flex-col gap-2 self-start">
+                {split.saved.map(renderJobCard)}
+              </div>
+              <div className="flex flex-col gap-2 self-start">
+                {split.submitted.map(renderJobCard)}
+              </div>
+              <div className="flex flex-col gap-2 self-start">
+                {split.approved.map(renderJobCard)}
+              </div>
+            </div>
+          </>
         )}
 
         {!loading && employeeId === "all" && (
-          <div className="grid gap-2">
+          <div className="flex flex-col gap-2 self-start">
             {filtered.map(renderJobCard)}
             {filtered.length === 0 && (
               <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noResults")}</CardContent></Card>
