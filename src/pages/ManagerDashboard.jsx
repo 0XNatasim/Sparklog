@@ -591,31 +591,36 @@ export default function ManagerDashboard() {
         )}
 
         {!loading && employeeId !== "all" && split && (
-          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-            <div className="flex flex-col gap-2 self-start">
+          <>
+            {/* Three small standalone header cards, above the columns */}
+            <div className="grid grid-cols-3 gap-3">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.savedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.saved.length}</span>
               </div>
-              {split.saved.map(renderJobCard)}
-            </div>
-
-            <div className="flex flex-col gap-2 self-start">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.submittedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.submitted.length}</span>
               </div>
-              {split.submitted.map(renderJobCard)}
-            </div>
-
-            <div className="flex flex-col gap-2 self-start">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("status.approved")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.approved.length}</span>
               </div>
-              {split.approved.map(renderJobCard)}
             </div>
-          </div>
+
+            {/* Three columns of job cards (no inner headers) */}
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
+              <div className="flex flex-col gap-2 self-start">
+                {split.saved.map(renderJobCard)}
+              </div>
+              <div className="flex flex-col gap-2 self-start">
+                {split.submitted.map(renderJobCard)}
+              </div>
+              <div className="flex flex-col gap-2 self-start">
+                {split.approved.map(renderJobCard)}
+              </div>
+            </div>
+          </>
         )}
 
         {!loading && employeeId === "all" && (
