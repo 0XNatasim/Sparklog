@@ -90,7 +90,10 @@ export default function ManagerDashboard() {
       .order("job_date", { ascending: false })
       .order("updated_at", { ascending: false });
     if (employeeId !== "all") q = q.eq("user_id", employeeId);
-    if (statusFilter !== "all") q = q.eq("status", statusFilter);
+    // When an employee is selected the UI splits into Saved / Submitted /
+    // Approved columns, so ignore the status dropdown there — otherwise
+    // the other two columns are always empty.
+    if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
     const range = weekFilterRange(weekFilter);
     if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
     return q;
@@ -420,16 +423,14 @@ export default function ManagerDashboard() {
               {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
             </div>
 
-            {/* Employee — phone + email in a hover tooltip */}
+            {/* Employee · phone · email — one line, no labels */}
             <div
               className="text-xs text-muted-foreground md:min-w-0 md:flex-1 md:truncate"
               title={[employee?.phone, employee?.email].filter(Boolean).join(" • ")}
             >
               <span className="font-semibold text-foreground">{employeeName}</span>
-              <span className="md:hidden">
-                {employee?.phone ? <> • {employee.phone}</> : null}
-                {employee?.email ? <> • {employee.email}</> : null}
-              </span>
+              {employee?.phone ? <> • {employee.phone}</> : null}
+              {employee?.email ? <> • {employee.email}</> : null}
             </div>
 
             {/* Metric pills */}
@@ -591,7 +592,7 @@ export default function ManagerDashboard() {
 
         {!loading && employeeId !== "all" && split && (
           <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-            <div className="grid gap-2">
+            <div className="flex flex-col gap-2 self-start">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.savedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.saved.length}</span>
@@ -602,7 +603,7 @@ export default function ManagerDashboard() {
               )}
             </div>
 
-            <div className="grid gap-2">
+            <div className="flex flex-col gap-2 self-start">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("manager.submittedSection")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.submitted.length}</span>
@@ -613,7 +614,7 @@ export default function ManagerDashboard() {
               )}
             </div>
 
-            <div className="grid gap-2">
+            <div className="flex flex-col gap-2 self-start">
               <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
                 {t("status.approved")}
                 <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.approved.length}</span>
@@ -627,7 +628,7 @@ export default function ManagerDashboard() {
         )}
 
         {!loading && employeeId === "all" && (
-          <div className="grid gap-2">
+          <div className="flex flex-col gap-2 self-start">
             {filtered.map(renderJobCard)}
             {filtered.length === 0 && (
               <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noResults")}</CardContent></Card>
