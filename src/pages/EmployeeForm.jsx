@@ -121,6 +121,9 @@ export default function EmployeeForm() {
   const [fin, setFin] = useState("");
   const [km_aller, setKmAller] = useState("");
 
+  // dirty = the form has unsaved changes. Reset on load/save, set on edit.
+  const [dirty, setDirty] = useState(false);
+
   const [locked, setLocked] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
@@ -163,6 +166,7 @@ export default function EmployeeForm() {
 
       const shouldLock = Boolean(data.locked) || !isEditableStatus(s);
       setLocked(shouldLock);
+      setDirty(false);
     } catch (e) {
       setErr(e?.message || t("form.errors.failedLoad"));
     } finally {
@@ -186,6 +190,7 @@ export default function EmployeeForm() {
       setLocked(false);
       setErr("");
       setInfo("");
+      setDirty(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
@@ -250,6 +255,7 @@ export default function EmployeeForm() {
         setInfo(nextStatus === "submitted" ? t("form.toasts.submitted") : t("form.toasts.updated"));
         setStatus(nextStatus);
         setLocked(nextLocked);
+        setDirty(false);
       } else {
         const { data, error } = await withTimeout(
           supabase.from("jobs").insert(payload).select("id").single(),
@@ -262,6 +268,7 @@ export default function EmployeeForm() {
         setInfo(nextStatus === "submitted" ? t("form.toasts.savedAndSubmitted") : t("form.toasts.saved"));
         setStatus(nextStatus);
         setLocked(nextLocked);
+        setDirty(false);
 
         navigate(`/form?edit=${data.id}`, { replace: true });
       }
@@ -406,7 +413,7 @@ export default function EmployeeForm() {
                   id="date"
                   type="date"
                   value={job_date}
-                  onChange={(e) => setJobDate(e.target.value)}
+                  onChange={(e) => { setJobDate(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
                 />
               </div>
@@ -416,7 +423,7 @@ export default function EmployeeForm() {
                 <Input
                   id="ot"
                   value={ot}
-                  onChange={(e) => setOt(e.target.value)}
+                  onChange={(e) => { setOt(e.target.value); setDirty(true); }}
                   placeholder={t("form.otPlaceholder")}
                   disabled={disableInputs}
                 />
@@ -428,7 +435,7 @@ export default function EmployeeForm() {
                   id="depart"
                   type="time"
                   value={depart}
-                  onChange={(e) => setDepart(e.target.value)}
+                  onChange={(e) => { setDepart(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
                 />
               </div>
@@ -439,7 +446,7 @@ export default function EmployeeForm() {
                   id="arrivee"
                   type="time"
                   value={arrivee}
-                  onChange={(e) => setArrivee(e.target.value)}
+                  onChange={(e) => { setArrivee(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
                 />
               </div>
@@ -450,7 +457,7 @@ export default function EmployeeForm() {
                   id="fin"
                   type="time"
                   value={fin}
-                  onChange={(e) => setFin(e.target.value)}
+                  onChange={(e) => { setFin(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
                 />
               </div>
@@ -461,7 +468,7 @@ export default function EmployeeForm() {
                   id="km"
                   type="number"
                   value={km_aller}
-                  onChange={(e) => setKmAller(e.target.value)}
+                  onChange={(e) => { setKmAller(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
                   placeholder="0"
                 />
@@ -476,9 +483,11 @@ export default function EmployeeForm() {
             </div>
 
             <div className="flex flex-nowrap items-center gap-1.5 pt-2">
-              <Button type="button" size="sm" className="text-xs" disabled={disableInputs} onClick={saveDraft}>
-                {saving ? t("common.saving") : t("form.buttons.save")}
-              </Button>
+              {dirty && (
+                <Button type="button" size="sm" className="text-xs" disabled={disableInputs} onClick={saveDraft}>
+                  {saving ? t("common.saving") : t("form.buttons.save")}
+                </Button>
+              )}
 
               <Button type="button" size="sm" variant="secondary" className="text-xs" disabled={disableInputs} onClick={submitJob}>
                 {saving ? t("common.submitting") : t("form.buttons.submit")}
