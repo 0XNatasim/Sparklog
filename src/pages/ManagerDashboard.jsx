@@ -350,40 +350,24 @@ export default function ManagerDashboard() {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error(t("manager.errors.noSession"));
 
-      let approvedCount = 0;
-      let skippedCount = 0;
-      const failures = [];
-
-      const identity = getEmployeeIdentity(selectedEmployee.id);
-
-      for (let i = 0; i < list.length; i++) {
-        const j = list[i];
-        setInfo(`${i + 1} / ${list.length}…`);
-        try {
-          const { data, error: fnErr } = await invokeWithTimeout("push_approved_to_sheet", {
-            body: { job_id: j.id, ...identity },
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-          if (fnErr) throw fnErr;
-          if (data?.ok !== true && !data?.skipped) {
-            throw new Error(data?.error || t("manager.errors.exportFailedFor", { ot: j.ot, date: j.job_date }));
-          }
-
-          const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", j.id);
-          if (error) throw error;
-
-          approvedCount += 1;
-          if (data?.skipped) skippedCount += 1;
-        } catch (jobErr) {
-          failures.push({ ot: j.ot, date: j.job_date, message: jobErr?.message || String(jobErr) });
-        }
+      // One invoke for the whole batch — the Edge Function fans out to
+      // Apps Script in a single POST and updates all DB rows at once.
+      const { data, error: fnErr } = await invokeWithTimeout(
+        "push_approved_batch",
+        {
+          body: { job_ids: list.map((j) => j.id) },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        },
+        60000
+      );
+      if (fnErr) throw fnErr;
+      if (data?.ok !== true) {
+        throw new Error(data?.error || t("manager.errors.approveWeekFailed"));
       }
 
-      if (failures.length > 0) {
-        setErr(
-          `${failures.length} job(s) failed: ${failures.map((f) => `OT ${f.ot} (${f.date})`).join(", ")}`
-        );
-      }
+      const approvedCount = Number(data?.exported || 0);
+      const skippedCount = Number(data?.skipped || 0);
+
       setInfo(
         skippedCount > 0
           ? t("manager.toasts.approvedManySkipped", { count: approvedCount, skipped: skippedCount })
