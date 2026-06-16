@@ -318,6 +318,104 @@ export default function ManagerDashboard() {
     }
   }
 
+  // Payroll CSV: one row per approved job for the selected employee, scoped
+  // to the picked week if any. Hours in decimal so the payroll software can
+  // sum directly. Detailed format — easy to re-pivot or trim columns later
+  // once we know the exact Desjardins import template.
+  function downloadPayrollCsv() {
+    if (!selectedEmployee) return;
+    const range = weekFilterRange(weekFilter);
+    const rows = jobs.filter((j) => {
+      if (j.user_id !== selectedEmployee.id) return false;
+      if (j.status !== "approved") return false;
+      if (range && (j.job_date < range.start || j.job_date > range.end)) return false;
+      return true;
+    });
+
+    const employee = profiles.get(selectedEmployee.id);
+    const header = [
+      "employee_name",
+      "employee_email",
+      "employee_phone",
+      "ccq_number",
+      "week_iso",
+      "job_date",
+      "weekday",
+      "ot",
+      "depart",
+      "arrivee",
+      "fin",
+      "hours_decimal",
+      "hours_hhmm",
+      "km",
+    ];
+
+    function decimalHours(depart, fin) {
+      if (!depart || !fin) return 0;
+      const [dh, dm] = String(depart).slice(0, 5).split(":").map(Number);
+      const [fh, fm] = String(fin).slice(0, 5).split(":").map(Number);
+      if ([dh, dm, fh, fm].some((n) => Number.isNaN(n))) return 0;
+      let mins = fh * 60 + fm - (dh * 60 + dm);
+      if (mins < 0) mins += 24 * 60;
+      return Math.round((mins / 60) * 100) / 100;
+    }
+
+    function fmtHHmm(decimal) {
+      if (!Number.isFinite(decimal) || decimal <= 0) return "0h00";
+      const total = Math.round(decimal * 60);
+      const h = Math.floor(total / 60);
+      const m = total % 60;
+      return `${h}h${String(m).padStart(2, "0")}`;
+    }
+
+    const csvRows = rows
+      .slice()
+      .sort((a, b) => (a.job_date < b.job_date ? -1 : a.job_date > b.job_date ? 1 : 0))
+      .map((j) => {
+        const dec = decimalHours(j.depart, j.fin);
+        const km = (Number(j.km_aller ?? 0) || 0) + (Number(j.km_retour ?? 0) || 0);
+        return [
+          employee?.full_name || "",
+          employee?.email || "",
+          employee?.phone || "",
+          employee?.ccq_number || "",
+          dayjs(j.job_date).format("YYYY-[W]WW"),
+          j.job_date,
+          dayjs(j.job_date).format("dddd"),
+          j.ot || "",
+          j.depart ? String(j.depart).slice(0, 5) : "",
+          j.arrivee ? String(j.arrivee).slice(0, 5) : "",
+          j.fin ? String(j.fin).slice(0, 5) : "",
+          dec.toFixed(2),
+          fmtHHmm(dec),
+          km,
+        ];
+      });
+
+    function esc(v) {
+      const s = String(v ?? "");
+      return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }
+
+    // BOM so Excel / Desjardins opens UTF-8 with accents correctly; ;-separated
+    // because that's what fr-CA spreadsheets default to.
+    const csv =
+      "﻿" +
+      [header.join(";"), ...csvRows.map((r) => r.map(esc).join(";"))].join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const weekTag = range ? weekFilter : "all";
+    const safeName = (employee?.full_name || "employee").replace(/[^\w-]+/g, "_");
+    a.href = url;
+    a.download = `sparklog_payroll_${safeName}_${weekTag}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   async function invokeWithTimeout(name, options, ms = 30000) {
     return await Promise.race([
       supabase.functions.invoke(name, options),
@@ -578,6 +676,16 @@ export default function ManagerDashboard() {
                     disabled={bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0}
                   >
                     {bulkBusy ? t("common.working") : t("manager.approveWeek", { count: submittedForSelectedWeek.length })}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={downloadPayrollCsv}
+                    disabled={!selectedEmployee}
+                    title={t("manager.downloadCsvTitle")}
+                  >
+                    {t("manager.downloadCsv")}
                   </Button>
                 </div>
               </div>
