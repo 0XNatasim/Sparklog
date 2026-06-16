@@ -136,7 +136,7 @@ export default function ManagerDashboard() {
 
       const { data: profileRows, error: profErr } = await supabase
         .from("profiles")
-        .select("id, role, full_name, phone, email");
+        .select("id, role, full_name, phone, email, ccq_number");
       if (profErr) throw profErr;
 
       const m = new Map();
@@ -641,10 +641,38 @@ export default function ManagerDashboard() {
 
             {selectedEmployee && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                <div className="text-xs text-muted-foreground">
-                  {t("manager.selectedEmployee")}: <b className="text-foreground">{selectedEmployee.name}</b>
-                  {selectedEmployee.phone ? <> • {t("manager.phone")}: <b className="text-foreground">{selectedEmployee.phone}</b></> : null}
-                  {selectedEmployee.email ? <> • {t("manager.email")}: <b className="text-foreground">{selectedEmployee.email}</b></> : null}
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {t("manager.selectedEmployee")}: <b className="text-foreground">{selectedEmployee.name}</b>
+                    {selectedEmployee.phone ? <> • {t("manager.phone")}: <b className="text-foreground">{selectedEmployee.phone}</b></> : null}
+                    {selectedEmployee.email ? <> • {t("manager.email")}: <b className="text-foreground">{selectedEmployee.email}</b></> : null}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span>CCQ#:</span>
+                    <Input
+                      value={profiles.get(selectedEmployee.id)?.ccq_number || ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setProfiles((prev) => {
+                          const next = new Map(prev);
+                          const p = next.get(selectedEmployee.id) || { id: selectedEmployee.id };
+                          next.set(selectedEmployee.id, { ...p, ccq_number: v });
+                          return next;
+                        });
+                      }}
+                      onBlur={async (e) => {
+                        const v = e.target.value.trim() || null;
+                        const { error } = await supabase
+                          .from("profiles")
+                          .update({ ccq_number: v })
+                          .eq("id", selectedEmployee.id);
+                        if (error) setErr(error.message);
+                        else setInfo("CCQ# saved.");
+                      }}
+                      placeholder="—"
+                      className="h-7 w-28 text-xs"
+                    />
+                  </span>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-2">
