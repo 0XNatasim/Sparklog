@@ -407,14 +407,37 @@ export default function ManagerDashboard() {
               {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
             </div>
 
-            {/* Employee · phone · email — one line, no labels */}
+            {/* Employee · phone · email — one line, no labels.
+                Phone is a tel: link, email is a mailto: link. */}
             <div
               className="text-xs text-muted-foreground md:min-w-0 md:flex-1 md:truncate"
               title={[employee?.phone, employee?.email].filter(Boolean).join(" • ")}
             >
               <span className="font-semibold text-foreground">{employeeName}</span>
-              {employee?.phone ? <> • {employee.phone}</> : null}
-              {employee?.email ? <> • {employee.email}</> : null}
+              {employee?.phone ? (
+                <>
+                  {" • "}
+                  <a
+                    href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}
+                    className="text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {employee.phone}
+                  </a>
+                </>
+              ) : null}
+              {employee?.email ? (
+                <>
+                  {" • "}
+                  <a
+                    href={`mailto:${employee.email}`}
+                    className="text-primary hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {employee.email}
+                  </a>
+                </>
+              ) : null}
             </div>
 
             {/* Metric pills */}
