@@ -371,6 +371,8 @@ export default function EmployeeForm() {
       if (d.km_aller !== null && d.km_aller !== undefined) {
         setKmAller(String(d.km_aller));
       }
+      // Auto-fill populated the form — mark dirty so Save appears
+      setDirty(true);
 
       setInfo(t("form.toasts.filledFromImage", { source }));
     } catch (e) {
