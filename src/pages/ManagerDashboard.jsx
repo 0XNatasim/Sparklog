@@ -48,6 +48,7 @@ export default function ManagerDashboard() {
   const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showEmployees, setShowEmployees] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [counts, setCounts] = useState({ all: 0, saved: 0, submitted: 0, approved: 0 });
   const [err, setErr] = useState("");
@@ -602,6 +603,15 @@ export default function ManagerDashboard() {
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
                 {t("manager.counts.approved")}: <b>{counts.approved}</b>
               </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="ml-auto"
+                onClick={() => setShowEmployees((v) => !v)}
+              >
+                {showEmployees ? t("manager.hideEmployees") : t("manager.showEmployees")}
+              </Button>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -731,6 +741,80 @@ export default function ManagerDashboard() {
           <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {info}
           </div>
+        )}
+
+        {showEmployees && (
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+                      <th className="px-3 py-2">{t("manager.tbl.name")}</th>
+                      <th className="px-3 py-2">{t("manager.tbl.phone")}</th>
+                      <th className="px-3 py-2">{t("manager.tbl.email")}</th>
+                      <th className="px-3 py-2">CCQ#</th>
+                      <th className="px-3 py-2">{t("manager.tbl.role")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employeeOptions.map((opt) => {
+                      const p = profiles.get(opt.id) || {};
+                      const updateField = (field) => async (e) => {
+                        const v = e.target.value.trim() || null;
+                        if ((p[field] || null) === v) return;
+                        const { error } = await supabase
+                          .from("profiles")
+                          .update({ [field]: v })
+                          .eq("id", opt.id);
+                        if (error) setErr(error.message);
+                        else setInfo(`${field} saved.`);
+                      };
+                      const setLocal = (field, v) =>
+                        setProfiles((prev) => {
+                          const next = new Map(prev);
+                          next.set(opt.id, { ...(next.get(opt.id) || { id: opt.id }), [field]: v });
+                          return next;
+                        });
+                      return (
+                        <tr key={opt.id} className="border-b last:border-b-0">
+                          <td className="px-3 py-2">
+                            <Input
+                              value={p.full_name || ""}
+                              onChange={(e) => setLocal("full_name", e.target.value)}
+                              onBlur={updateField("full_name")}
+                              className="h-8"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={p.phone || ""}
+                              onChange={(e) => setLocal("phone", e.target.value)}
+                              onBlur={updateField("phone")}
+                              className="h-8"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{p.email || ""}</td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={p.ccq_number || ""}
+                              onChange={(e) => setLocal("ccq_number", e.target.value)}
+                              onBlur={updateField("ccq_number")}
+                              className="h-8 w-28"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{p.role || "employee"}</td>
+                        </tr>
+                      );
+                    })}
+                    {employeeOptions.length === 0 && (
+                      <tr><td colSpan={5} className="px-3 py-4 text-center text-sm text-muted-foreground">—</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {!loading && employeeId !== "all" && split && (
