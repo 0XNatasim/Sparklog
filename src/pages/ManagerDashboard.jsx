@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -49,6 +50,7 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showEmployees, setShowEmployees] = useState(false);
+  const datePickerRef = useRef(null);
   const [hasMore, setHasMore] = useState(false);
   const [counts, setCounts] = useState({ all: 0, saved: 0, submitted: 0, approved: 0 });
   const [err, setErr] = useState("");
@@ -629,12 +631,44 @@ export default function ManagerDashboard() {
                 <option value="approved">{t("status.approved")}</option>
               </Select>
 
-              <Input
-                type="week"
-                value={weekFilter}
-                onChange={(e) => setWeekFilter(e.target.value)}
-                title={t("manager.filters.weekTitle")}
-              />
+              <div className="flex items-center gap-1">
+                <Input
+                  type="week"
+                  value={weekFilter}
+                  onChange={(e) => setWeekFilter(e.target.value)}
+                  title={t("manager.filters.weekTitle")}
+                  className="flex-1"
+                />
+                {/* Calendar icon: pick a date → auto-derive that date's ISO week */}
+                <input
+                  type="date"
+                  value=""
+                  className="sr-only"
+                  ref={(el) => (datePickerRef.current = el)}
+                  onChange={(e) => {
+                    const d = e.target.value;
+                    if (!d) return;
+                    setWeekFilter(dayjs(d).format("YYYY-[W]WW"));
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => {
+                    const el = datePickerRef.current;
+                    if (!el) return;
+                    if (typeof el.showPicker === "function") el.showPicker();
+                    else el.click();
+                  }}
+                  title={t("manager.filters.pickDate")}
+                  aria-label={t("manager.filters.pickDate")}
+                >
+                  <Calendar className="h-4 w-4" />
+                </Button>
+              </div>
 
               <Input
                 value={searchLive}
@@ -788,7 +822,7 @@ export default function ManagerDashboard() {
           </Card>
         )}
 
-        {!loading && employeeId !== "all" && split && (
+        {!showEmployees && !loading && employeeId !== "all" && split && (
           <>
             {/* Three small standalone header cards, above the columns */}
             <div className="grid grid-cols-3 gap-3">
@@ -821,7 +855,7 @@ export default function ManagerDashboard() {
           </>
         )}
 
-        {!loading && employeeId === "all" && (
+        {!showEmployees && !loading && employeeId === "all" && (
           <div className="flex flex-col gap-2 self-start">
             {filtered.map(renderJobCard)}
             {filtered.length === 0 && (
@@ -830,7 +864,7 @@ export default function ManagerDashboard() {
           </div>
         )}
 
-        {!loading && hasMore && (
+        {!showEmployees && !loading && hasMore && (
           <div className="flex justify-center pt-2">
             <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? t("common.loading") : t("manager.loadMore", { loaded: jobs.length })}
