@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar } from "lucide-react";
+import { Calendar, Phone, Mail, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -325,17 +325,18 @@ export default function ManagerDashboard() {
   // to the picked week if any. Hours in decimal so the payroll software can
   // sum directly. Detailed format — easy to re-pivot or trim columns later
   // once we know the exact Desjardins import template.
-  function downloadPayrollCsv() {
-    if (!selectedEmployee) return;
+  function downloadPayrollCsv(employeeIdArg) {
+    const targetId = employeeIdArg || selectedEmployee?.id;
+    if (!targetId) return;
     const range = weekFilterRange(weekFilter);
     const rows = jobs.filter((j) => {
-      if (j.user_id !== selectedEmployee.id) return false;
+      if (j.user_id !== targetId) return false;
       if (j.status !== "approved") return false;
       if (range && (j.job_date < range.start || j.job_date > range.end)) return false;
       return true;
     });
 
-    const employee = profiles.get(selectedEmployee.id);
+    const employee = profiles.get(targetId);
     const header = [
       "employee_name",
       "employee_email",
@@ -761,6 +762,7 @@ export default function ManagerDashboard() {
                       <th className="px-3 py-2">{t("manager.tbl.email")}</th>
                       <th className="px-3 py-2">CCQ#</th>
                       <th className="px-3 py-2">{t("manager.tbl.role")}</th>
+                      <th className="px-3 py-2 text-right">CSV</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -792,14 +794,38 @@ export default function ManagerDashboard() {
                             />
                           </td>
                           <td className="px-3 py-2">
-                            <Input
-                              value={p.phone || ""}
-                              onChange={(e) => setLocal("phone", e.target.value)}
-                              onBlur={updateField("phone")}
-                              className="h-8"
-                            />
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={p.phone || ""}
+                                onChange={(e) => setLocal("phone", e.target.value)}
+                                onBlur={updateField("phone")}
+                                className="h-8"
+                              />
+                              {p.phone && (
+                                <a
+                                  href={`tel:${String(p.phone).replace(/[^+\d]/g, "")}`}
+                                  className="shrink-0 rounded p-1 text-primary hover:bg-accent"
+                                  title={t("manager.tbl.callTitle")}
+                                  aria-label={t("manager.tbl.callTitle")}
+                                >
+                                  <Phone className="h-4 w-4" />
+                                </a>
+                              )}
+                            </div>
                           </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{p.email || ""}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {p.email ? (
+                              <a
+                                href={`mailto:${p.email}`}
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                              >
+                                <Mail className="h-3 w-3" />
+                                {p.email}
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2">
                             <Input
                               value={p.ccq_number || ""}
@@ -809,11 +835,24 @@ export default function ManagerDashboard() {
                             />
                           </td>
                           <td className="px-3 py-2 text-xs text-muted-foreground">{p.role || "employee"}</td>
+                          <td className="px-3 py-2 text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => downloadPayrollCsv(opt.id)}
+                              title={t("manager.downloadCsvTitle")}
+                              aria-label={t("manager.downloadCsv")}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
                     {employeeOptions.length === 0 && (
-                      <tr><td colSpan={5} className="px-3 py-4 text-center text-sm text-muted-foreground">—</td></tr>
+                      <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-muted-foreground">—</td></tr>
                     )}
                   </tbody>
                 </table>
