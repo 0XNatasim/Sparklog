@@ -83,6 +83,11 @@ export const dictionaries = {
     "form.errors.insertNoId": "Insert succeeded but no id returned.",
     "form.errors.extractFailed": "Failed to extract from image.",
     "form.errors.timedOut": "{label} timed out after {seconds}s. Please retry.",
+    "form.autofillTip.title": "How to take the screenshot",
+    "form.autofillTip.step1": "Open the work order in your app (e.g. Dynamics 365).",
+    "form.autofillTip.step2": "Go to the \"Bilan\" tab and scroll down until you can see the two green buttons (– and +) at the bottom of the screen, as shown below.",
+    "form.autofillTip.step3": "Take a screenshot, then come back here and select it.",
+    "form.autofillTip.gotIt": "Got it – choose screenshot",
 
     // history
     "history.title": "History",
@@ -274,6 +279,11 @@ export const dictionaries = {
     "form.errors.insertNoId": "Insertion réussie mais aucun identifiant retourné.",
     "form.errors.extractFailed": "Échec de l'extraction depuis l'image.",
     "form.errors.timedOut": "{label} a expiré après {seconds}s. Veuillez réessayer.",
+    "form.autofillTip.title": "Comment prendre la capture d'écran",
+    "form.autofillTip.step1": "Ouvrez l'ordre de travail dans votre application (ex. Dynamics 365).",
+    "form.autofillTip.step2": "Allez dans l'onglet « Bilan » et faites défiler jusqu'à voir les deux boutons verts (– et +) en bas de l'écran, comme sur l'image ci-dessous.",
+    "form.autofillTip.step3": "Prenez une capture d'écran, puis revenez ici et sélectionnez-la.",
+    "form.autofillTip.gotIt": "Compris – choisir la capture",
 
     "history.title": "Historique",
     "history.empty": "Aucun job pour le moment.",
