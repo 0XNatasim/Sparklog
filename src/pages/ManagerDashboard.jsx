@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
+import { withTimeout } from "@/lib/utils";
 
 dayjs.extend(isoWeek);
 
@@ -123,12 +124,15 @@ export default function ManagerDashboard() {
       if (status) q = q.eq("status", status);
       return applyDateScope(q);
     };
-    const [all, saved, submitted, approved] = await Promise.all([
-      employeeId === "all" ? base : scoped(null),
-      scoped("saved"),
-      scoped("submitted"),
-      scoped("approved"),
-    ]);
+    const [all, saved, submitted, approved] = await withTimeout(
+      Promise.all([
+        employeeId === "all" ? base : scoped(null),
+        scoped("saved"),
+        scoped("submitted"),
+        scoped("approved"),
+      ]),
+      12000
+    );
     setCounts({
       all: all.count || 0,
       saved: saved.count || 0,
@@ -141,12 +145,16 @@ export default function ManagerDashboard() {
     setErr(""); setInfo("");
     setLoading(true);
     try {
-      const { data: jobRows, error: jobErr } = await buildJobsQuery().range(0, PAGE_SIZE - 1);
+      const { data: jobRows, error: jobErr } = await withTimeout(
+        buildJobsQuery().range(0, PAGE_SIZE - 1),
+        12000
+      );
       if (jobErr) throw jobErr;
 
-      const { data: profileRows, error: profErr } = await supabase
-        .from("profiles")
-        .select("id, role, full_name, phone, email, ccq_number");
+      const { data: profileRows, error: profErr } = await withTimeout(
+        supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number"),
+        12000
+      );
       if (profErr) throw profErr;
 
       const m = new Map();
@@ -773,8 +781,11 @@ export default function ManagerDashboard() {
 
         {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {err}
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+            <span>{err}</span>
+            <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
+              {t("common.retry")}
+            </Button>
           </div>
         )}
         {info && (

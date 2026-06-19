@@ -10,8 +10,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
+import { Button } from "@/components/ui/button";
 
 dayjs.extend(isoWeek);
 dayjs.extend(customParseFormat);
@@ -75,12 +76,15 @@ export default function Week() {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("user_id", effectiveUserId)
-        .order("job_date", { ascending: false })
-        .order("updated_at", { ascending: false });
+      const { data, error } = await withTimeout(
+        supabase
+          .from("jobs")
+          .select("*")
+          .eq("user_id", effectiveUserId)
+          .order("job_date", { ascending: false })
+          .order("updated_at", { ascending: false }),
+        12000
+      );
       if (error) throw error;
       setJobs(data || []);
     } catch (e) {
@@ -171,8 +175,11 @@ export default function Week() {
       <div className="space-y-3">
         {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {err}
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+            <span>{err}</span>
+            <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
+              {t("common.retry")}
+            </Button>
           </div>
         )}
         {!loading && !err && weekly.length === 0 && (
