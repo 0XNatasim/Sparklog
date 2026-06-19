@@ -61,6 +61,7 @@ export default function ManagerDashboard() {
   const [employeeId, setEmployeeId] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [weekFilter, setWeekFilter] = useState("");
+  const [dayFilter, setDayFilter] = useState("");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
 
@@ -97,24 +98,30 @@ export default function ManagerDashboard() {
     // Approved columns, so ignore the status dropdown there — otherwise
     // the other two columns are always empty.
     if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
-    const range = weekFilterRange(weekFilter);
-    if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
+    if (dayFilter) {
+      q = q.eq("job_date", dayFilter);
+    } else {
+      const range = weekFilterRange(weekFilter);
+      if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
+    }
     return q;
   }
 
   async function loadCounts() {
     const range = weekFilterRange(weekFilter);
-    const base = (() => {
-      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
-      if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
+    const applyDateScope = (q) => {
+      if (dayFilter) return q.eq("job_date", dayFilter);
+      if (range) return q.gte("job_date", range.start).lte("job_date", range.end);
       return q;
-    })();
+    };
+    const base = applyDateScope(
+      supabase.from("jobs").select("id", { head: true, count: "exact" })
+    );
     const scoped = (status) => {
       let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
       if (employeeId !== "all") q = q.eq("user_id", employeeId);
       if (status) q = q.eq("status", status);
-      if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
-      return q;
+      return applyDateScope(q);
     };
     const [all, saved, submitted, approved] = await Promise.all([
       employeeId === "all" ? base : scoped(null),
@@ -176,7 +183,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, statusFilter, weekFilter]);
+  }, [employeeId, statusFilter, weekFilter, dayFilter]);
 
   const employeeOptions = useMemo(() => {
     const arr = [];
@@ -677,9 +684,35 @@ export default function ManagerDashboard() {
                 placeholder={t("manager.filters.searchPlaceholder")}
               />
 
+              <div className="flex items-center gap-1">
+                <Input
+                  type="date"
+                  value={dayFilter}
+                  onChange={(e) => setDayFilter(e.target.value)}
+                  title={t("manager.filters.dayTitle")}
+                  className="flex-1"
+                />
+                {!dayFilter && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDayFilter(dayjs().format("YYYY-MM-DD"))}
+                    title={t("manager.filters.today")}
+                  >
+                    {t("manager.filters.today")}
+                  </Button>
+                )}
+              </div>
+
               {weekFilter && (
                 <Button type="button" variant="secondary" onClick={() => setWeekFilter("")}>
                   {t("manager.filters.clearWeek")}
+                </Button>
+              )}
+              {dayFilter && (
+                <Button type="button" variant="secondary" onClick={() => setDayFilter("")}>
+                  {t("manager.filters.clearDay")}
                 </Button>
               )}
             </div>
