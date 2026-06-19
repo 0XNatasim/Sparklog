@@ -13,6 +13,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 dayjs.locale("en");
 
@@ -127,6 +134,7 @@ export default function EmployeeForm() {
   const [locked, setLocked] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
+  const [showAutofillTip, setShowAutofillTip] = useState(false);
 
   const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
@@ -516,7 +524,13 @@ export default function EmployeeForm() {
                     variant="outline"
                     className="ml-auto text-xs"
                     disabled={disableInputs || extracting}
-                    onClick={() => imageInputRef.current?.click()}
+                    onClick={() => {
+                      if (localStorage.getItem("autofill_tip_seen")) {
+                        imageInputRef.current?.click();
+                      } else {
+                        setShowAutofillTip(true);
+                      }
+                    }}
                   >
                     {extracting ? t("common.extracting") : t("form.buttons.autofill")}
                   </Button>
@@ -543,6 +557,41 @@ export default function EmployeeForm() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={showAutofillTip} onOpenChange={setShowAutofillTip}>
+        <DialogContent className="max-w-sm p-0 overflow-hidden">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle>{t("form.autofillTip.title")}</DialogTitle>
+          </DialogHeader>
+
+          <div className="px-5 space-y-2 text-sm text-muted-foreground">
+            <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
+            <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
+            <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
+          </div>
+
+          <div className="px-5 pb-2 pt-3">
+            <img
+              src="/autofill-screenshot-guide.jpg"
+              alt="Screenshot guide"
+              className="w-full rounded-md border object-cover"
+              style={{ maxHeight: "340px", objectPosition: "bottom" }}
+            />
+          </div>
+
+          <DialogFooter className="px-5 pb-5 pt-2">
+            <Button
+              className="w-full"
+              onClick={() => {
+                localStorage.setItem("autofill_tip_seen", "1");
+                setShowAutofillTip(false);
+                imageInputRef.current?.click();
+              }}
+            >
+              {t("form.autofillTip.gotIt")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
