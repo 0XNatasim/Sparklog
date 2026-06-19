@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
+import { withTimeout } from "@/lib/utils";
 
 dayjs.locale("en");
 
@@ -56,13 +57,15 @@ export default function History() {
     setInfo("");
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("job_date", { ascending: false })
-        .order("updated_at", { ascending: false });
-
+      const { data, error } = await withTimeout(
+        supabase
+          .from("jobs")
+          .select("*")
+          .eq("user_id", user?.id)
+          .order("job_date", { ascending: false })
+          .order("updated_at", { ascending: false }),
+        12000
+      );
       if (error) throw error;
       setJobs(data || []);
     } catch (e) {
@@ -193,8 +196,11 @@ export default function History() {
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
         )}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {err}
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+            <span>{err}</span>
+            <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
+              {t("common.retry")}
+            </Button>
           </div>
         )}
         {info && (
