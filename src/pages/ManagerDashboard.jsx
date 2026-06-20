@@ -626,7 +626,7 @@ export default function ManagerDashboard() {
               </Button>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <Select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
                 <option value="all">{t("manager.filters.allEmployees")}</option>
                 {employeeOptions.map((opt) => (
@@ -643,13 +643,12 @@ export default function ManagerDashboard() {
 
               <div className="flex items-center gap-1">
                 <Input
-                  type="week"
-                  value={weekFilter}
-                  onChange={(e) => setWeekFilter(e.target.value)}
-                  title={t("manager.filters.weekTitle")}
+                  value={searchLive}
+                  onChange={(e) => setSearchLive(e.target.value)}
+                  placeholder={t("manager.filters.searchPlaceholder")}
                   className="flex-1"
                 />
-                {/* Calendar icon: pick a date → auto-derive that date's ISO week */}
+                {/* Hidden date picker — calendar icon opens it, derives ISO week */}
                 <input
                   type="date"
                   value=""
@@ -664,7 +663,7 @@ export default function ManagerDashboard() {
                 />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={weekFilter ? "default" : "outline"}
                   size="icon"
                   className="h-9 w-9 shrink-0"
                   onClick={() => {
@@ -680,17 +679,20 @@ export default function ManagerDashboard() {
                 </Button>
               </div>
 
-              <Input
-                value={searchLive}
-                onChange={(e) => setSearchLive(e.target.value)}
-                placeholder={t("manager.filters.searchPlaceholder")}
-              />
-
-              {weekFilter && (
-                <Button type="button" variant="secondary" onClick={() => setWeekFilter("")}>
-                  {t("manager.filters.clearWeek")}
-                </Button>
-              )}
+              {weekFilter && (() => {
+                const range = weekFilterRange(weekFilter);
+                const label = range
+                  ? `${t("manager.weekShort")} ${dayjs(range.start).isoWeek()} · ${dayjs(range.start).format("DD MMM")} → ${dayjs(range.end).format("DD MMM YYYY")}`
+                  : weekFilter;
+                return (
+                  <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-3">
+                    <span className="text-sm text-muted-foreground">{label}</span>
+                    <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setWeekFilter("")}>
+                      {t("manager.filters.clearWeek")}
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
 
             {selectedEmployee && (
