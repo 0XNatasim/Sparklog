@@ -8,6 +8,7 @@ import EmployeeForm from "./pages/EmployeeForm";
 import History from "./pages/History";
 import Week from "./pages/Week";
 import ManagerDashboard from "./pages/ManagerDashboard";
+import Testing from "./pages/Testing";
 
 export default function App() {
   React.useEffect(() => {
@@ -65,6 +66,16 @@ export default function App() {
           element={
             <ProtectedRoute requireRole="manager">
               <ManagerDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Testing (manager only) */}
+        <Route
+          path="/testing"
+          element={
+            <ProtectedRoute requireRole="manager">
+              <Testing />
             </ProtectedRoute>
           }
         />
