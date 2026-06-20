@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 
@@ -81,16 +80,16 @@ function fmt(value) {
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
-  const [sectorId, setSectorId]     = useState("C");
-  const [ratesToDate, setRatesToDate] = useState(dayjs().format("YYYY-MM-DD"));
-  const [loading, setLoading]       = useState(false);
-  const [err, setErr]               = useState("");
-  const [results, setResults]       = useState(null);
-  // results: { sector, date, fetchedAt, source, rows: [{ skill, rates }] }
+  const [sectorId, setSectorId] = useState("C");
+  const [loading, setLoading]   = useState(false);
+  const [err, setErr]           = useState("");
+  const [results, setResults]   = useState(null);
+  // results: { sector, date, fetchedAt, rows: [{ skill, rates }] }
+
+  const today = dayjs().format("YYYY-MM-DD");
 
   async function handleSync() {
     setErr("");
-    setResults(null);
     setLoading(true);
 
     try {
@@ -99,7 +98,6 @@ export default function Testing() {
       const token = sessionData?.session?.access_token;
       if (!token) throw new Error("No session — please log in again.");
 
-      // Fetch all skill levels in parallel
       const responses = await Promise.all(
         SKILLS.map(async (skill) => {
           const { data, error } = await withTimeout(
@@ -107,9 +105,9 @@ export default function Testing() {
               body: {
                 occupationId: OCCUPATION.id,
                 sectorId,
-                skillId:    skill.id,
-                ratesToDate,
-                annexId:    "ALL",
+                skillId:  skill.id,
+                ratesToDate: today,
+                annexId:  "ALL",
               },
               headers: { Authorization: `Bearer ${token}` },
             }),
@@ -123,15 +121,14 @@ export default function Testing() {
 
       const rows = responses.map(({ skill, snapshot }) => ({
         skill,
-        raw:    snapshot?.raw_json ?? null,
-        rates:  parseRates(snapshot?.raw_json),
-        source: snapshot?.occupation_name ?? OCCUPATION.name,
+        raw:   snapshot?.raw_json ?? null,
+        rates: parseRates(snapshot?.raw_json),
       }));
 
       const sectorObj = SECTORS.find((s) => s.id === sectorId);
       setResults({
         sector:    sectorObj?.name ?? sectorId,
-        date:      ratesToDate,
+        date:      today,
         fetchedAt: new Date().toLocaleTimeString(),
         rows,
       });
@@ -142,6 +139,9 @@ export default function Testing() {
     }
   }
 
+  // Auto-load on mount and whenever sector changes
+  useEffect(() => { handleSync(); }, [sectorId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sector = SECTORS.find((s) => s.id === sectorId);
 
   return (
@@ -150,52 +150,42 @@ export default function Testing() {
 
         {/* ── Controls ── */}
         <Card>
-          <CardContent className="p-5 space-y-4">
-            <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              CCQ – Taux de salaire · {OCCUPATION.name}
-            </div>
-
-            <div className="flex flex-wrap items-end gap-3">
-              {/* Sector tabs */}
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Secteur</div>
-                <div className="flex gap-1">
-                  {SECTORS.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSectorId(s.id)}
-                      className={[
-                        "rounded-md px-3 py-1.5 text-xs font-semibold border transition-colors",
-                        sectorId === s.id
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background text-muted-foreground border-border hover:bg-accent",
-                      ].join(" ")}
-                    >
-                      {s.id === "C" ? "Commercial (ICI)" : "Résidentiel"}
-                    </button>
-                  ))}
-                </div>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  CCQ · {OCCUPATION.name} ·
+                </span>
+                {SECTORS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSectorId(s.id)}
+                    className={[
+                      "rounded-md px-3 py-1.5 text-xs font-semibold border transition-colors",
+                      sectorId === s.id
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:bg-accent",
+                    ].join(" ")}
+                  >
+                    {s.id === "C" ? "Commercial (ICI)" : "Résidentiel"}
+                  </button>
+                ))}
               </div>
 
-              {/* Date */}
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Date effective</div>
-                <Input
-                  type="date"
-                  value={ratesToDate}
-                  onChange={(e) => setRatesToDate(e.target.value)}
-                  className="w-44"
-                />
-              </div>
-
-              <Button onClick={handleSync} disabled={loading} className="self-end">
-                {loading ? "Syncing…" : "Sync taux CCQ"}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleSync}
+                disabled={loading}
+                className="text-xs text-muted-foreground"
+              >
+                {loading ? "…" : "↻"} {loading ? "Chargement" : "Rafraîchir"}
               </Button>
             </div>
 
             {err && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+              <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
                 <span>{err}</span>
                 <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={handleSync}>
                   {t("common.retry")}
@@ -287,10 +277,10 @@ export default function Testing() {
           </Card>
         )}
 
-        {!results && !loading && !err && (
+        {loading && !results && (
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground text-center">
-              Sélectionnez un secteur et une date, puis cliquez sur <b>Sync taux CCQ</b>.
+              Chargement des taux CCQ…
             </CardContent>
           </Card>
         )}
