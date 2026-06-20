@@ -152,9 +152,11 @@ export default function Login() {
                   <Input
                     id="phone"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                     placeholder={t("auth.phonePlaceholder")}
                     autoComplete="tel"
+                    inputMode="numeric"
+                    maxLength={15}
                   />
                 </div>
               </>
