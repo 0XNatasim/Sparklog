@@ -25,74 +25,51 @@ const SKILLS = [
 ];
 
 // ─── CCQ JSON parsing ─────────────────────────────────────────────────────────
-// The CCQ API response shape is not officially documented; we try several
-// known structures and fall back gracefully.
+// Actual CCQ API shape:
+//   AnnexesRates: { "Taux horaire": [{Name, Rates:{C3,C6}, Period},...], "Avantages sociaux": [...] }
+//   Rates use French decimal comma: "50,79" → 50.79
+//   Annexes: [{ cd_annexe: "C3", desc_annexe: "..." }]
 
 function parseRates(rawJson) {
   if (!rawJson) return null;
 
   const annexesRates = rawJson.AnnexesRates;
-  if (!annexesRates) return null;
+  if (!annexesRates || typeof annexesRates !== "object") return null;
 
-  // Prefer C3 (Règle générale – Travail de jour); fall back to first annex
-  let annexData = null;
-  let annexCode = null;
-  let annexDesc = null;
-
-  if (Array.isArray(annexesRates)) {
-    const c3 = annexesRates.find(
-      (a) => (a.Code ?? a.AnnexCode ?? a.annexCode) === "C3"
-    ) ?? annexesRates[0];
-    if (c3) {
-      annexCode = c3.Code ?? c3.AnnexCode ?? c3.annexCode ?? null;
-      annexDesc = c3.Description ?? c3.description ?? null;
-      annexData = c3.Rates ?? c3.rates ?? c3.HourlyRate ?? c3.hourlyRate ?? null;
-    }
-  } else if (typeof annexesRates === "object") {
-    const c3Data = annexesRates["C3"] ?? annexesRates[Object.keys(annexesRates)[0]];
-    annexCode = Object.keys(annexesRates)[0] === "C3" ? "C3" : Object.keys(annexesRates)[0];
-    if (c3Data) {
-      // C3 value could be an array of rate rows, or an object with named keys
-      if (Array.isArray(c3Data)) {
-        annexData = c3Data;
-      } else {
-        // object with keys Regular, HalfTime, Double etc.
-        annexData = Object.entries(c3Data).map(([k, v]) => ({
-          Name: k,
-          Rate: typeof v === "object" ? (v?.Rate ?? v?.rate) : v,
-        }));
-      }
-    }
-    // Try to get description from separate Annexes field
-    const annexesList = rawJson.Annexes;
-    if (Array.isArray(annexesList)) {
-      const meta = annexesList.find((a) => (a.Code ?? a.AnnexCode) === annexCode);
-      if (meta) annexDesc = meta.Description ?? meta.description ?? null;
-    }
-  }
-
-  if (!annexData) return { annexCode, annexDesc, regular: null, halfTime: null, double: null };
-
-  // Normalize each item into { name, rate }
-  const rows = annexData.map((item) => ({
-    name: String(item.Name ?? item.name ?? item.Category ?? item.category ?? "").toLowerCase(),
-    rate: parseFloat(String(item.Rate ?? item.rate ?? item.Value ?? item.value ?? 0)) || null,
-  }));
-
-  const find = (...keywords) => {
-    for (const kw of keywords) {
-      const row = rows.find((r) => r.name.includes(kw.toLowerCase()));
-      if (row?.rate != null) return row.rate;
-    }
-    return null;
+  // French decimal comma → JS float
+  const parseFr = (str) => {
+    if (str == null) return null;
+    const f = parseFloat(String(str).replace(",", "."));
+    return isNaN(f) ? null : f;
   };
+
+  // Prefer C3; fall back to first available annex code
+  const annexes = Array.isArray(rawJson.Annexes) ? rawJson.Annexes : [];
+  const c3Meta  = annexes.find((a) => a.cd_annexe === "C3") ?? annexes[0] ?? null;
+  const annexCode = c3Meta?.cd_annexe ?? "C3";
+  const annexDesc = c3Meta?.desc_annexe ?? null;
+
+  // Look up a rate from a named group + named row for annexCode
+  const get = (groupName, rowName) => {
+    const group = annexesRates[groupName];
+    if (!Array.isArray(group)) return null;
+    const row = group.find((r) => r.Name === rowName);
+    return row?.Rates ? parseFr(row.Rates[annexCode]) : null;
+  };
+
+  const regular  = get("Taux horaire", "Régulier");
+  const halfTime = get("Taux horaire", "Demi");
+  const double_  = get("Taux horaire", "Double");
+  const benefits = get("Avantages sociaux", "Total part du sal. et de l'empl.");
 
   return {
     annexCode,
     annexDesc,
-    regular:  find("régulier", "regular", "simple", "ordinaire"),
-    halfTime: find("temps et demi", "half", "demi", "1.5", "1½"),
-    double:   find("double", "temps double", "2x"),
+    regular,
+    halfTime,
+    double:   double_,
+    benefits,
+    regularWithBenefits: regular != null && benefits != null ? regular + benefits : null,
   };
 }
 
@@ -250,28 +227,36 @@ export default function Testing() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                      <th className="px-5 py-2.5 font-medium">Niveau</th>
-                      <th className="px-5 py-2.5 font-medium text-right">Régulier (1×)</th>
-                      <th className="px-5 py-2.5 font-medium text-right">Temps et demi (1.5×)</th>
-                      <th className="px-5 py-2.5 font-medium text-right">Temps double (2×)</th>
+                      <th className="px-4 py-2.5 font-medium">Niveau</th>
+                      <th className="px-4 py-2.5 font-medium text-right">Salaire (1×)</th>
+                      <th className="px-4 py-2.5 font-medium text-right">Avantages /h</th>
+                      <th className="px-4 py-2.5 font-medium text-right bg-primary/5">Avec avantages (1×)</th>
+                      <th className="px-4 py-2.5 font-medium text-right">T. et demi (1.5×)</th>
+                      <th className="px-4 py-2.5 font-medium text-right">T. double (2×)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {results.rows.map(({ skill, rates }) => (
                       <tr key={skill.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                        <td className="px-5 py-3 font-semibold">
+                        <td className="px-4 py-3 font-semibold">
                           {skill.label}
                           <span className="ml-2 text-xs font-normal text-muted-foreground">
                             {skill.pct}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-right font-mono">
+                        <td className="px-4 py-3 text-right font-mono">
                           {fmt(rates?.regular)}
                         </td>
-                        <td className="px-5 py-3 text-right font-mono">
+                        <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                          {fmt(rates?.benefits)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold bg-primary/5">
+                          {fmt(rates?.regularWithBenefits)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
                           {fmt(rates?.halfTime)}
                         </td>
-                        <td className="px-5 py-3 text-right font-mono">
+                        <td className="px-4 py-3 text-right font-mono">
                           {fmt(rates?.double)}
                         </td>
                       </tr>
