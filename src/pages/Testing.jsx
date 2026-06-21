@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
 import AppShell from "@/components/AppShell";
+import EmployeesPanel from "@/components/EmployeesPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 
@@ -77,14 +79,13 @@ function fmt(value) {
   return `$${Number(value).toFixed(2)}/h`;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-export default function Testing() {
+// ─── CCQ rates panel ──────────────────────────────────────────────────────────
+function CcqRatesPanel() {
   const t = useT();
   const [sectorId, setSectorId] = useState("C");
   const [loading, setLoading]   = useState(false);
   const [err, setErr]           = useState("");
   const [results, setResults]   = useState(null);
-  // results: { sector, date, fetchedAt, rows: [{ skill, rates }] }
 
   const today = dayjs().format("YYYY-MM-DD");
 
@@ -142,149 +143,172 @@ export default function Testing() {
   // Auto-load on mount and whenever sector changes
   useEffect(() => { handleSync(); }, [sectorId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sector = SECTORS.find((s) => s.id === sectorId);
-
   return (
-    <AppShell>
-      <div className="space-y-4">
-
-        {/* ── Controls ── */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  CCQ · {OCCUPATION.name} ·
-                </span>
-                {SECTORS.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSectorId(s.id)}
-                    className={[
-                      "rounded-md px-3 py-1.5 text-xs font-semibold border transition-colors",
-                      sectorId === s.id
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:bg-accent",
-                    ].join(" ")}
-                  >
-                    {s.id === "C" ? "Commercial (ICI)" : "Résidentiel"}
-                  </button>
-                ))}
-              </div>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleSync}
-                disabled={loading}
-                className="text-xs text-muted-foreground"
-              >
-                {loading ? "…" : "↻"} {loading ? "Chargement" : "Rafraîchir"}
-              </Button>
+    <div className="space-y-4">
+      {/* ── Controls ── */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                CCQ · {OCCUPATION.name} ·
+              </span>
+              {SECTORS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSectorId(s.id)}
+                  className={[
+                    "rounded-md px-3 py-1.5 text-xs font-semibold border transition-colors",
+                    sectorId === s.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:bg-accent",
+                  ].join(" ")}
+                >
+                  {s.id === "C" ? "Commercial (ICI)" : "Résidentiel"}
+                </button>
+              ))}
             </div>
 
-            {err && (
-              <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
-                <span>{err}</span>
-                <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={handleSync}>
-                  {t("common.retry")}
-                </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleSync}
+              disabled={loading}
+              className="text-xs text-muted-foreground"
+            >
+              {loading ? "…" : "↻"} {loading ? "Chargement" : "Rafraîchir"}
+            </Button>
+          </div>
+
+          {err && (
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+              <span>{err}</span>
+              <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={handleSync}>
+                {t("common.retry")}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Rate table ── */}
+      {results && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <div>
+                <div className="text-sm font-bold">{OCCUPATION.name}</div>
+                <div className="text-xs text-muted-foreground">{results.sector} · {results.date}</div>
               </div>
-            )}
+              <div className="text-xs text-muted-foreground text-right">
+                Synced {results.fetchedAt}
+                {results.rows[0]?.rates?.annexCode && (
+                  <><br />Annexe {results.rows[0].rates.annexCode}
+                  {results.rows[0].rates.annexDesc ? ` — ${results.rows[0].rates.annexDesc}` : ""}</>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                    <th className="px-4 py-2.5 font-medium">Niveau</th>
+                    <th className="px-4 py-2.5 font-medium text-right">Salaire (1×)</th>
+                    <th className="px-4 py-2.5 font-medium text-right">Avantages /h</th>
+                    <th className="px-4 py-2.5 font-medium text-right bg-primary/5">Avec avantages (1×)</th>
+                    <th className="px-4 py-2.5 font-medium text-right">T. et demi (1.5×)</th>
+                    <th className="px-4 py-2.5 font-medium text-right">T. double (2×)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.rows.map(({ skill, rates }) => (
+                    <tr key={skill.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 font-semibold">
+                        {skill.label}
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          {skill.pct}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(rates?.regular)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-muted-foreground">{fmt(rates?.benefits)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold bg-primary/5">{fmt(rates?.regularWithBenefits)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(rates?.halfTime)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{fmt(rates?.double)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Overtime rule note */}
+            <div className="border-t px-5 py-3 text-xs text-muted-foreground">
+              <b className="text-foreground">Note temps supplémentaire :</b> la 1<sup>re</sup> heure
+              supplémentaire est payée à <b className="text-foreground">+50 % (temps et demi, 1.5×)</b>,
+              les heures suivantes à <b className="text-foreground">+100 % (temps double, 2×)</b>.
+            </div>
+
+            {/* Raw JSON inspector (collapsed) */}
+            <details className="border-t">
+              <summary className="cursor-pointer px-5 py-2 text-xs text-muted-foreground select-none hover:text-foreground">
+                Réponse brute CCQ (débogage)
+              </summary>
+              <div className="px-5 pb-4 space-y-3">
+                {results.rows.map(({ skill, raw }) => (
+                  <div key={skill.id}>
+                    <div className="text-xs font-semibold text-muted-foreground mb-1">{skill.label}</div>
+                    <pre className="rounded bg-muted p-3 text-xs overflow-x-auto max-h-48 overflow-y-auto">
+                      {raw ? JSON.stringify(raw, null, 2) : "—"}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </details>
           </CardContent>
         </Card>
+      )}
 
-        {/* ── Rate table ── */}
-        {results && (
-          <Card>
-            <CardContent className="p-0">
-              <div className="flex items-center justify-between px-5 py-3 border-b">
-                <div>
-                  <div className="text-sm font-bold">{OCCUPATION.name}</div>
-                  <div className="text-xs text-muted-foreground">{results.sector} · {results.date}</div>
-                </div>
-                <div className="text-xs text-muted-foreground text-right">
-                  Synced {results.fetchedAt}
-                  {results.rows[0]?.rates?.annexCode && (
-                    <><br />Annexe {results.rows[0].rates.annexCode}
-                    {results.rows[0].rates.annexDesc ? ` — ${results.rows[0].rates.annexDesc}` : ""}</>
-                  )}
-                </div>
-              </div>
+      {loading && !results && (
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground text-center">
+            Chargement des taux CCQ…
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                      <th className="px-4 py-2.5 font-medium">Niveau</th>
-                      <th className="px-4 py-2.5 font-medium text-right">Salaire (1×)</th>
-                      <th className="px-4 py-2.5 font-medium text-right">Avantages /h</th>
-                      <th className="px-4 py-2.5 font-medium text-right bg-primary/5">Avec avantages (1×)</th>
-                      <th className="px-4 py-2.5 font-medium text-right">T. et demi (1.5×)</th>
-                      <th className="px-4 py-2.5 font-medium text-right">T. double (2×)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.rows.map(({ skill, rates }) => (
-                      <tr key={skill.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                        <td className="px-4 py-3 font-semibold">
-                          {skill.label}
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            {skill.pct}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono">
-                          {fmt(rates?.regular)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                          {fmt(rates?.benefits)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold bg-primary/5">
-                          {fmt(rates?.regularWithBenefits)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono">
-                          {fmt(rates?.halfTime)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono">
-                          {fmt(rates?.double)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+// ─── Placeholder panel for upcoming views ─────────────────────────────────────
+function ComingSoon({ label }) {
+  return (
+    <Card>
+      <CardContent className="p-8 text-sm text-muted-foreground text-center">
+        {label} — bientôt disponible.
+      </CardContent>
+    </Card>
+  );
+}
 
-              {/* Raw JSON inspector (collapsed) */}
-              <details className="border-t">
-                <summary className="cursor-pointer px-5 py-2 text-xs text-muted-foreground select-none hover:text-foreground">
-                  Réponse brute CCQ (débogage)
-                </summary>
-                <div className="px-5 pb-4 space-y-3">
-                  {results.rows.map(({ skill, raw }) => (
-                    <div key={skill.id}>
-                      <div className="text-xs font-semibold text-muted-foreground mb-1">
-                        {skill.label}
-                      </div>
-                      <pre className="rounded bg-muted p-3 text-xs overflow-x-auto max-h-48 overflow-y-auto">
-                        {raw ? JSON.stringify(raw, null, 2) : "—"}
-                      </pre>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            </CardContent>
-          </Card>
-        )}
+// ─── Page with sub-tabs ───────────────────────────────────────────────────────
+export default function Testing() {
+  const t = useT();
+  return (
+    <AppShell>
+      <Tabs defaultValue="employees" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="employees">{t("testing.tabs.employees")}</TabsTrigger>
+          <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
+          <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
+          <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
+        </TabsList>
 
-        {loading && !results && (
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground text-center">
-              Chargement des taux CCQ…
-            </CardContent>
-          </Card>
-        )}
-      </div>
+        <TabsContent value="employees"><EmployeesPanel /></TabsContent>
+        <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
+        <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
+        <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
+      </Tabs>
     </AppShell>
   );
 }
