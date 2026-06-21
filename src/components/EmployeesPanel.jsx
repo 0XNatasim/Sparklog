@@ -156,119 +156,120 @@ export default function EmployeesPanel() {
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
       )}
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-                  <th className="px-3 py-2">{t("manager.tbl.name")}</th>
-                  <th className="px-3 py-2">{t("manager.tbl.phone")}</th>
-                  <th className="px-3 py-2">{t("manager.tbl.email")}</th>
-                  <th className="px-3 py-2">CCQ#</th>
-                  <th className="px-3 py-2">{t("employees.level")}</th>
-                  <th className="px-3 py-2">{t("employees.sector")}</th>
-                  <th className="px-3 py-2">{t("employees.kmRate")}</th>
-                  <th className="px-3 py-2 text-right">CSV</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading && (
-                  <tr><td colSpan={8} className="px-3 py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</td></tr>
-                )}
-                {!loading && profiles.map((p) => (
-                  <tr key={p.id} className="border-b last:border-b-0">
-                    <td className="px-3 py-2">
-                      <Input
-                        value={p.full_name || ""}
-                        onChange={(e) => setLocal(p.id, "full_name", e.target.value)}
-                        onBlur={(e) => saveField(p.id, "full_name", e.target.value)}
-                        className="h-8 min-w-[9rem]"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <Input
-                          value={p.phone || ""}
-                          onChange={(e) => setLocal(p.id, "phone", e.target.value)}
-                          onBlur={(e) => saveField(p.id, "phone", e.target.value)}
-                          className="h-8 min-w-[7rem]"
-                        />
-                        {p.phone && (
-                          <a href={`tel:${String(p.phone).replace(/[^+\d]/g, "")}`} className="shrink-0 rounded p-1 text-primary hover:bg-accent" aria-label="call">
-                            <Phone className="h-4 w-4" />
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      {p.email ? (
-                        <a href={`mailto:${p.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                          <Mail className="h-3 w-3" />{p.email}
-                        </a>
-                      ) : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Input
-                        value={p.ccq_number || ""}
-                        onChange={(e) => setLocal(p.id, "ccq_number", e.target.value)}
-                        onBlur={(e) => saveField(p.id, "ccq_number", e.target.value)}
-                        className="h-8 w-24"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Select
-                        value={p.apprentice_level || ""}
-                        onChange={(e) => { setLocal(p.id, "apprentice_level", e.target.value); saveField(p.id, "apprentice_level", e.target.value); }}
-                        className="h-8 w-32"
-                      >
-                        <option value="">—</option>
-                        {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                      </Select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Select
-                        value={p.sector || ""}
-                        onChange={(e) => { setLocal(p.id, "sector", e.target.value); saveField(p.id, "sector", e.target.value); }}
-                        className="h-8 w-36"
-                      >
-                        <option value="">—</option>
-                        {SECTORS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                      </Select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground">$</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="9.99"
-                          inputMode="decimal"
-                          value={p.km_rate ?? ""}
-                          onChange={(e) => setLocal(p.id, "km_rate", e.target.value)}
-                          onBlur={(e) => saveField(p.id, "km_rate", e.target.value)}
-                          placeholder="0.65"
-                          className="h-8 w-20"
-                        />
-                        <span className="text-xs text-muted-foreground">/km</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadCsv(p)} aria-label="CSV">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {!loading && profiles.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-4 text-center text-sm text-muted-foreground">—</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {loading && (
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("common.loading")}</CardContent></Card>
+      )}
+
+      {!loading && profiles.length === 0 && (
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">—</CardContent></Card>
+      )}
+
+      {!loading && profiles.map((p) => (
+        <Card key={p.id}>
+          <CardContent className="p-4 space-y-3">
+            {/* Header: name + CSV */}
+            <div className="flex items-center gap-3">
+              <Input
+                value={p.full_name || ""}
+                onChange={(e) => setLocal(p.id, "full_name", e.target.value)}
+                onBlur={(e) => saveField(p.id, "full_name", e.target.value)}
+                placeholder={t("manager.tbl.name")}
+                className="h-9 flex-1 font-semibold"
+              />
+              <Button type="button" variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => downloadCsv(p)}>
+                <Download className="h-4 w-4" /> CSV
+              </Button>
+            </div>
+
+            {/* Contact */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label={t("manager.tbl.phone")}>
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={p.phone || ""}
+                    onChange={(e) => setLocal(p.id, "phone", e.target.value)}
+                    onBlur={(e) => saveField(p.id, "phone", e.target.value)}
+                    className="h-9"
+                  />
+                  {p.phone && (
+                    <a href={`tel:${String(p.phone).replace(/[^+\d]/g, "")}`} className="shrink-0 rounded p-2 text-primary hover:bg-accent" aria-label="call">
+                      <Phone className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              </Field>
+              <Field label={t("manager.tbl.email")}>
+                <div className="flex h-9 items-center text-sm">
+                  {p.email ? (
+                    <a href={`mailto:${p.email}`} className="inline-flex items-center gap-1.5 truncate text-primary hover:underline">
+                      <Mail className="h-4 w-4 shrink-0" /><span className="truncate">{p.email}</span>
+                    </a>
+                  ) : <span className="text-muted-foreground">—</span>}
+                </div>
+              </Field>
+            </div>
+
+            {/* Classification */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Field label="CCQ#">
+                <Input
+                  value={p.ccq_number || ""}
+                  onChange={(e) => setLocal(p.id, "ccq_number", e.target.value)}
+                  onBlur={(e) => saveField(p.id, "ccq_number", e.target.value)}
+                  className="h-9"
+                />
+              </Field>
+              <Field label={t("employees.level")}>
+                <Select
+                  value={p.apprentice_level || ""}
+                  onChange={(e) => { setLocal(p.id, "apprentice_level", e.target.value); saveField(p.id, "apprentice_level", e.target.value); }}
+                  className="h-9"
+                >
+                  <option value="">—</option>
+                  {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+                </Select>
+              </Field>
+              <Field label={t("employees.sector")}>
+                <Select
+                  value={p.sector || ""}
+                  onChange={(e) => { setLocal(p.id, "sector", e.target.value); saveField(p.id, "sector", e.target.value); }}
+                  className="h-9"
+                >
+                  <option value="">—</option>
+                  {SECTORS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </Select>
+              </Field>
+              <Field label={t("employees.kmRate")}>
+                <div className="flex h-9 items-center gap-1">
+                  <span className="text-sm text-muted-foreground">$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="9.99"
+                    inputMode="decimal"
+                    value={p.km_rate ?? ""}
+                    onChange={(e) => setLocal(p.id, "km_rate", e.target.value)}
+                    onBlur={(e) => saveField(p.id, "km_rate", e.target.value)}
+                    placeholder="0.65"
+                    className="h-9"
+                  />
+                  <span className="text-xs text-muted-foreground">/km</span>
+                </div>
+              </Field>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      {children}
+    </label>
   );
 }
