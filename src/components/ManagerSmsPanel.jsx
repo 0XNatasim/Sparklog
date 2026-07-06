@@ -76,7 +76,6 @@ export default function ManagerSmsPanel() {
       const { data, error } = await withTimeout(
         supabase.from("profiles")
           .select("id, full_name, phone, role")
-          .neq("role", "manager")
           .order("full_name", { ascending: true }),
         12000,
       );
