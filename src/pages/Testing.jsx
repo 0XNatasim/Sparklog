@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
 import AppShell from "@/components/AppShell";
 import EmployeesPanel from "@/components/EmployeesPanel";
+import ManagerSmsPanel from "@/components/ManagerSmsPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -299,12 +300,14 @@ export default function Testing() {
       <Tabs defaultValue="employees" className="space-y-4">
         <TabsList>
           <TabsTrigger value="employees">{t("testing.tabs.employees")}</TabsTrigger>
+          <TabsTrigger value="sms">{t("testing.tabs.sms")}</TabsTrigger>
           <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
           <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
           <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="employees"><EmployeesPanel /></TabsContent>
+        <TabsContent value="sms"><ManagerSmsPanel /></TabsContent>
         <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
         <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
         <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
