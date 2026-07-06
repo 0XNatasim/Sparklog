@@ -249,9 +249,9 @@ serve(async (req) => {
       : [];
 
     // Resolve recipients server-side from the DB (never trust client phone
-    // numbers). Recipients = every profile in the org (managers included, so
-    // the whole team is reachable — matches the Employees tab).
-    let query = admin.from("profiles").select("id, full_name, phone");
+    // numbers). Recipients = every profile in the org except the sender, so a
+    // manager never texts themselves (matches the Employees tab minus self).
+    let query = admin.from("profiles").select("id, full_name, phone").neq("id", senderId);
     if (!allEmployees) {
       if (recipientIds.length === 0) return json({ ok: false, error: "No recipients selected" }, 400);
       query = query.in("id", recipientIds);

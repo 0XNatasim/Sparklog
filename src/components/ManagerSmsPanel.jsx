@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MAX_LEN = 500;
 
@@ -50,6 +51,8 @@ function StatusBadge({ status }) {
 
 export default function ManagerSmsPanel() {
   const t = useT();
+  const { user } = useAuth();
+  const meId = user?.id ?? null;
 
   // ── Composer state ──
   const [body, setBody]           = useState("");
@@ -80,7 +83,8 @@ export default function ManagerSmsPanel() {
         12000,
       );
       if (error) throw error;
-      setEmployees(data ?? []);
+      // Exclude the sender — a manager shouldn't SMS themselves.
+      setEmployees((data ?? []).filter((p) => p.id !== meId));
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
     } finally {
@@ -107,7 +111,8 @@ export default function ManagerSmsPanel() {
     }
   }
 
-  useEffect(() => { loadEmployees(); loadHistory(); }, []);
+  useEffect(() => { loadEmployees(); }, [meId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadHistory(); }, []);
 
   // Employees carrying a phone number are the sendable set.
   const withPhone = useMemo(() => employees.filter((e) => e.phone), [employees]);
