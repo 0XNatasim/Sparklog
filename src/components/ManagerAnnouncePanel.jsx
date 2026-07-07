@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Search, Send, Users, Eye, Loader2 } from "lucide-react";
+import { Search, Send, Mail, Eye, Loader2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,24 +12,8 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
-const MAX_LEN = 500;
-
-// GSM-7 approximation matching the edge function: 160 for a single segment,
-// 153 per part once concatenated.
-function segmentsFor(text) {
-  const len = [...(text || "")].length;
-  if (len === 0) return 0;
-  if (len <= 160) return 1;
-  return Math.ceil(len / 153);
-}
-
-function fmtPhone(raw) {
-  if (!raw) return "—";
-  const d = String(raw).replace(/[^\d]/g, "");
-  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
-  if (d.length === 11 && d.startsWith("1")) return `(${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
-  return raw;
-}
+const MAX_LEN = 2000;
+const MAX_SUBJECT = 200;
 
 const STATUS_STYLES = {
   sent:      "bg-green-500/15 text-green-600 dark:text-green-400",
@@ -49,12 +33,13 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function ManagerSmsPanel() {
+export default function ManagerAnnouncePanel() {
   const t = useT();
   const { user } = useAuth();
   const meId = user?.id ?? null;
 
   // ── Composer state ──
+  const [subject, setSubject]     = useState("");
   const [body, setBody]           = useState("");
   const [mode, setMode]           = useState("all"); // "all" | "selected"
   const [search, setSearch]       = useState("");
@@ -78,12 +63,12 @@ export default function ManagerSmsPanel() {
     try {
       const { data, error } = await withTimeout(
         supabase.from("profiles")
-          .select("id, full_name, phone, role")
+          .select("id, full_name, email, role")
           .order("full_name", { ascending: true }),
         12000,
       );
       if (error) throw error;
-      // Exclude the sender — a manager shouldn't SMS themselves.
+      // Exclude the sender — a manager shouldn't email themselves.
       setEmployees((data ?? []).filter((p) => p.id !== meId));
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
@@ -97,7 +82,7 @@ export default function ManagerSmsPanel() {
     try {
       const { data, error } = await withTimeout(
         supabase.from("messages")
-          .select("id, sender_name, body, recipient_count, segment_count, provider, status, created_at, sent_at")
+          .select("id, sender_name, subject, body, recipient_count, provider, status, created_at, sent_at")
           .order("created_at", { ascending: false })
           .limit(50),
         12000,
@@ -114,20 +99,18 @@ export default function ManagerSmsPanel() {
   useEffect(() => { loadEmployees(); }, [meId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadHistory(); }, []);
 
-  // Employees carrying a phone number are the sendable set.
-  const withPhone = useMemo(() => employees.filter((e) => e.phone), [employees]);
+  // Employees carrying an email address are the sendable set.
+  const withEmail = useMemo(() => employees.filter((e) => e.email), [employees]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return employees;
     return employees.filter((e) =>
       (e.full_name || "").toLowerCase().includes(q) ||
-      String(e.phone || "").toLowerCase().includes(q));
+      String(e.email || "").toLowerCase().includes(q));
   }, [employees, search]);
 
-  const recipientCount = mode === "all" ? withPhone.length : selected.size;
-  const segments = segmentsFor(body);
-  const estimatedSms = recipientCount * segments;
+  const recipientCount = mode === "all" ? withEmail.length : selected.size;
   const overLimit = [...body].length > MAX_LEN;
   const canSend = body.trim().length > 0 && !overLimit && recipientCount > 0 && !sending;
 
@@ -141,7 +124,7 @@ export default function ManagerSmsPanel() {
   function selectAllVisible() {
     setSelected((prev) => {
       const next = new Set(prev);
-      filtered.forEach((e) => { if (e.phone) next.add(e.id); });
+      filtered.forEach((e) => { if (e.email) next.add(e.id); });
       return next;
     });
   }
@@ -155,12 +138,13 @@ export default function ManagerSmsPanel() {
       const token = sessionData?.session?.access_token;
       if (!token) throw new Error("No session — please log in again.");
 
+      const base = { subject: subject.trim() || undefined, body: body.trim() };
       const payload = mode === "all"
-        ? { body: body.trim(), allEmployees: true }
-        : { body: body.trim(), recipientIds: [...selected] };
+        ? { ...base, allEmployees: true }
+        : { ...base, recipientIds: [...selected] };
 
       const { data, error } = await withTimeout(
-        supabase.functions.invoke("send_sms", {
+        supabase.functions.invoke("send_announcement", {
           body: payload,
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -170,6 +154,7 @@ export default function ManagerSmsPanel() {
       if (!data?.ok) throw new Error(data?.error ?? "Send failed.");
 
       // Reset composer and refresh history.
+      setSubject("");
       setBody("");
       setSelected(new Set());
       setMode("all");
@@ -189,7 +174,7 @@ export default function ManagerSmsPanel() {
     try {
       const { data, error } = await withTimeout(
         supabase.from("message_recipients")
-          .select("id, name, phone, delivery_status, delivered_at, error")
+          .select("id, name, email, delivery_status, delivered_at, error")
           .eq("message_id", message.id)
           .order("name", { ascending: true }),
         12000,
@@ -219,15 +204,29 @@ export default function ManagerSmsPanel() {
       <Card>
         <CardContent className="space-y-5 p-5">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">{t("sms.title")}</h3>
+            <Mail className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">{t("announce.title")}</h3>
+          </div>
+
+          {/* Subject */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("announce.subject")}
+            </label>
+            <Input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={MAX_SUBJECT}
+              placeholder={t("announce.subjectPlaceholder")}
+              className="h-9"
+            />
           </div>
 
           {/* Message */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {t("sms.message")}
+                {t("announce.message")}
               </label>
               <span className={`text-xs tabular-nums ${overLimit ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
                 {[...body].length} / {MAX_LEN}
@@ -236,9 +235,9 @@ export default function ManagerSmsPanel() {
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              rows={4}
-              maxLength={MAX_LEN + 50}
-              placeholder={t("sms.placeholder")}
+              rows={6}
+              maxLength={MAX_LEN + 100}
+              placeholder={t("announce.placeholder")}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
             />
           </div>
@@ -246,17 +245,17 @@ export default function ManagerSmsPanel() {
           {/* Recipients */}
           <div className="space-y-2.5">
             <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {t("sms.recipients")}
+              {t("announce.recipients")}
             </label>
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="radio" name="sms-mode" checked={mode === "all"} onChange={() => setMode("all")} className="h-4 w-4 accent-[hsl(var(--primary))]" />
-                {t("sms.allEmployees")}
-                <span className="text-xs text-muted-foreground">({withPhone.length})</span>
+                <input type="radio" name="announce-mode" checked={mode === "all"} onChange={() => setMode("all")} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+                {t("announce.allEmployees")}
+                <span className="text-xs text-muted-foreground">({withEmail.length})</span>
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="radio" name="sms-mode" checked={mode === "selected"} onChange={() => setMode("selected")} className="h-4 w-4 accent-[hsl(var(--primary))]" />
-                {t("sms.selectedEmployees")}
+                <input type="radio" name="announce-mode" checked={mode === "selected"} onChange={() => setMode("selected")} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+                {t("announce.selectedEmployees")}
               </label>
             </div>
 
@@ -268,12 +267,12 @@ export default function ManagerSmsPanel() {
                     <Input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t("sms.search")}
+                      placeholder={t("announce.search")}
                       className="h-9 pl-8"
                     />
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={selectAllVisible}>{t("sms.selectAll")}</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={clearSelection}>{t("sms.clear")}</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={selectAllVisible}>{t("announce.selectAll")}</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={clearSelection}>{t("announce.clear")}</Button>
                 </div>
                 <div className="max-h-60 overflow-y-auto divide-y">
                   {loadingEmp && (
@@ -283,21 +282,21 @@ export default function ManagerSmsPanel() {
                     <div className="p-4 text-center text-sm text-muted-foreground">—</div>
                   )}
                   {!loadingEmp && filtered.map((e) => {
-                    const noPhone = !e.phone;
+                    const noEmail = !e.email;
                     return (
                       <label
                         key={e.id}
-                        className={`flex items-center gap-3 px-3 py-2.5 text-sm ${noPhone ? "opacity-50" : "cursor-pointer hover:bg-muted/40"}`}
+                        className={`flex items-center gap-3 px-3 py-2.5 text-sm ${noEmail ? "opacity-50" : "cursor-pointer hover:bg-muted/40"}`}
                       >
                         <input
                           type="checkbox"
-                          disabled={noPhone}
+                          disabled={noEmail}
                           checked={selected.has(e.id)}
                           onChange={() => toggle(e.id)}
                           className="h-4 w-4 accent-[hsl(var(--primary))]"
                         />
-                        <span className="flex-1 font-medium">{e.full_name || "—"}</span>
-                        <span className="text-muted-foreground">{noPhone ? t("sms.noPhone") : fmtPhone(e.phone)}</span>
+                        <span className="flex-1 font-medium truncate">{e.full_name || "—"}</span>
+                        <span className="text-muted-foreground truncate max-w-[14rem]">{noEmail ? t("announce.noEmail") : e.email}</span>
                       </label>
                     );
                   })}
@@ -309,21 +308,19 @@ export default function ManagerSmsPanel() {
           {/* Preview */}
           <div className="rounded-md bg-muted/50 px-4 py-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t("sms.previewRecipients")}</span>
-              <span className="font-semibold">{recipientCount} {t("sms.employees")}</span>
+              <span className="text-muted-foreground">{t("announce.previewRecipients")}</span>
+              <span className="font-semibold">{recipientCount} {t("announce.employees")}</span>
             </div>
             <div className="mt-1 flex items-center justify-between">
-              <span className="text-muted-foreground">{t("sms.previewCount")}</span>
-              <span className="font-semibold tabular-nums">
-                {estimatedSms}{segments > 1 ? ` (${segments}×)` : ""}
-              </span>
+              <span className="text-muted-foreground">{t("announce.previewCount")}</span>
+              <span className="font-semibold tabular-nums">{recipientCount}</span>
             </div>
           </div>
 
           {/* Send */}
           <div className="flex justify-end">
             <Button type="button" disabled={!canSend} onClick={() => setConfirmOpen(true)} className="gap-2">
-              <Send className="h-4 w-4" /> {t("sms.send")}
+              <Send className="h-4 w-4" /> {t("announce.send")}
             </Button>
           </div>
         </CardContent>
@@ -333,18 +330,18 @@ export default function ManagerSmsPanel() {
       <Card>
         <CardContent className="p-0">
           <div className="border-b px-5 py-3">
-            <h3 className="text-sm font-semibold">{t("sms.history")}</h3>
+            <h3 className="text-sm font-semibold">{t("announce.history")}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">{t("sms.tbl.datetime")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("sms.tbl.sentBy")}</th>
-                  <th className="px-4 py-2.5 font-medium text-right">{t("sms.tbl.count")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("sms.tbl.status")}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("sms.tbl.preview")}</th>
-                  <th className="px-4 py-2.5 font-medium text-right">{t("sms.tbl.details")}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("announce.tbl.datetime")}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("announce.tbl.sentBy")}</th>
+                  <th className="px-4 py-2.5 font-medium text-right">{t("announce.tbl.count")}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("announce.tbl.status")}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("announce.tbl.preview")}</th>
+                  <th className="px-4 py-2.5 font-medium text-right">{t("announce.tbl.details")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -352,7 +349,7 @@ export default function ManagerSmsPanel() {
                   <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</td></tr>
                 )}
                 {!loadingHist && history.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">{t("sms.empty")}</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">{t("announce.empty")}</td></tr>
                 )}
                 {!loadingHist && history.map((m) => (
                   <tr key={m.id} className="border-b last:border-b-0 hover:bg-muted/20 cursor-pointer" onClick={() => openDetails(m)}>
@@ -360,9 +357,9 @@ export default function ManagerSmsPanel() {
                     <td className="px-4 py-3 whitespace-nowrap">{m.sender_name || "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{m.recipient_count}</td>
                     <td className="px-4 py-3"><StatusBadge status={m.status} /></td>
-                    <td className="px-4 py-3 max-w-[16rem] truncate text-muted-foreground">{m.body}</td>
+                    <td className="px-4 py-3 max-w-[16rem] truncate text-muted-foreground">{m.subject || m.body}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={(ev) => { ev.stopPropagation(); openDetails(m); }} aria-label={t("sms.tbl.details")}>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={(ev) => { ev.stopPropagation(); openDetails(m); }} aria-label={t("announce.tbl.details")}>
                         <Eye className="h-4 w-4" />
                       </Button>
                     </td>
@@ -378,19 +375,20 @@ export default function ManagerSmsPanel() {
       <Dialog open={confirmOpen} onOpenChange={(o) => !sending && setConfirmOpen(o)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("sms.confirmTitle")}</DialogTitle>
+            <DialogTitle>{t("announce.confirmTitle")}</DialogTitle>
             <DialogDescription>
-              {t("sms.confirmBody", { count: recipientCount })}
+              {t("announce.confirmBody", { count: recipientCount })}
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm whitespace-pre-wrap max-h-40 overflow-y-auto">
-            {body}
+          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm max-h-48 overflow-y-auto">
+            {subject.trim() && <div className="font-semibold mb-1">{subject.trim()}</div>}
+            <div className="whitespace-pre-wrap">{body}</div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={sending}>{t("common.cancel")}</Button>
             <Button onClick={doSend} disabled={sending} className="gap-2">
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {t("sms.send")}
+              {t("announce.send")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -402,7 +400,7 @@ export default function ManagerSmsPanel() {
           {detail && (
             <>
               <DialogHeader>
-                <DialogTitle>{t("sms.detailTitle")}</DialogTitle>
+                <DialogTitle>{t("announce.detailTitle")}</DialogTitle>
                 <DialogDescription>
                   {dayjs(detail.message.created_at).format("YYYY-MM-DD HH:mm")} · {detail.message.sender_name || "—"} · {detail.message.provider || "mock"}
                 </DialogDescription>
@@ -410,14 +408,17 @@ export default function ManagerSmsPanel() {
 
               <div className="space-y-3">
                 <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t("sms.message")}</div>
-                  <div className="rounded-md bg-muted/50 px-3 py-2 text-sm whitespace-pre-wrap">{detail.message.body}</div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">{t("announce.message")}</div>
+                  <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+                    {detail.message.subject && <div className="font-semibold mb-1">{detail.message.subject}</div>}
+                    <div className="whitespace-pre-wrap">{detail.message.body}</div>
+                  </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("sms.recipientList")} ({detail.message.recipient_count})
+                      {t("announce.recipientList")} ({detail.message.recipient_count})
                     </div>
                     <StatusBadge status={detail.message.status} />
                   </div>
@@ -429,7 +430,7 @@ export default function ManagerSmsPanel() {
                       <div key={r.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                         <div className="min-w-0">
                           <div className="font-medium truncate">{r.name || "—"}</div>
-                          <div className="text-xs text-muted-foreground">{fmtPhone(r.phone)}</div>
+                          <div className="text-xs text-muted-foreground truncate">{r.email || "—"}</div>
                         </div>
                         <StatusBadge status={r.delivery_status} />
                       </div>

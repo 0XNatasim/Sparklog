@@ -1,20 +1,20 @@
-// supabase/functions/send_sms/index.ts
+// supabase/functions/send_announcement/index.ts
 //
-// Manager → employee SMS announcements.
+// Manager → employee announcements, delivered by email.
 //
-// Architected as a small notification service so the transport is swappable:
-//   SMSProvider          transport interface (send one message)
-//   MockProvider         default — logs, never hits the network (dev/testing)
-//   TwilioProvider       real Twilio REST send, used when creds are configured
+// Same swappable-notification-service shape as before, now email:
+//   EmailProvider        transport interface (send one email)
+//   MockEmailProvider    default — logs, never hits the network (dev/testing)
+//   ResendProvider       real send via Resend  (RESEND_API_KEY + RESEND_FROM)
+//   BrevoProvider        real send via Brevo    (BREVO_API_KEY + BREVO_FROM_*)
 //   NotificationService  orchestrates persistence + fan-out + delivery logging
 //
-// Adding Telnyx/MessageBird/etc. later = one new `implements SMSProvider`
-// class + a branch in pickProvider(). The UI and DB never change.
+// Whichever provider's env is configured wins; otherwise it runs in mock mode
+// (records everything, sends nothing) so the whole UI works before credentials
+// exist. Adding another ESP later = one new `implements EmailProvider` class.
 //
 // Request (POST, manager bearer token):
-//   { body: string, allEmployees?: boolean, recipientIds?: string[] }
-// Response:
-//   { ok, messageId, provider, recipientCount, delivered, failed, status }
+//   { subject?: string, body: string, allEmployees?: boolean, recipientIds?: string[] }
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -25,7 +25,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MAX_BODY_LEN = 500;
+const MAX_BODY_LEN = 2000;
+const MAX_SUBJECT_LEN = 200;
+const DEFAULT_SUBJECT = "Message from your manager";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -34,27 +36,13 @@ function json(data: unknown, status = 200) {
   });
 }
 
-// SMS segmentation: GSM-7 is 160 chars for a single segment, 153 per part
-// once concatenated. We approximate on the conservative GSM-7 path.
-function segmentCount(body: string): number {
-  const len = [...body].length;
-  if (len === 0) return 0;
-  if (len <= 160) return 1;
-  return Math.ceil(len / 153);
+function isEmail(v: string | null | undefined): v is string {
+  return typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
 
-// Normalize a stored phone into E.164-ish digits. Assumes North America when
-// no country code is present (10 digits → +1XXXXXXXXXX).
-function normalizePhone(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const trimmed = String(raw).trim();
-  const hasPlus = trimmed.startsWith("+");
-  const digits = trimmed.replace(/[^\d]/g, "");
-  if (!digits) return null;
-  if (hasPlus) return `+${digits}`;
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return `+${digits}`;
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
 // ── Provider abstraction ─────────────────────────────────────────────────────
@@ -64,76 +52,104 @@ interface SendResult {
   error?: string;
 }
 
-interface SMSProvider {
+interface EmailProvider {
   readonly name: string;
-  send(to: string, body: string): Promise<SendResult>;
+  send(to: string, subject: string, body: string): Promise<SendResult>;
 }
 
 // Default provider: no network, always "succeeds". Lets the whole pipeline
 // (DB rows, history, UI) work end-to-end before real credentials exist.
-class MockProvider implements SMSProvider {
+class MockEmailProvider implements EmailProvider {
   readonly name = "mock";
   // deno-lint-ignore require-await
-  async send(to: string, body: string): Promise<SendResult> {
-    console.log(`[mock-sms] → ${to}: ${body.slice(0, 60)}${body.length > 60 ? "…" : ""}`);
+  async send(to: string, subject: string): Promise<SendResult> {
+    console.log(`[mock-email] → ${to}: ${subject}`);
     return { status: "sent", providerSid: `mock_${crypto.randomUUID()}` };
   }
 }
 
-// Real Twilio transport. Activated only when all three env vars are present.
-class TwilioProvider implements SMSProvider {
-  readonly name = "twilio";
-  constructor(
-    private accountSid: string,
-    private authToken: string,
-    private from: string,
-  ) {}
+// Resend (https://resend.com) — needs a verified domain in production.
+class ResendProvider implements EmailProvider {
+  readonly name = "resend";
+  constructor(private apiKey: string, private from: string) {}
 
-  async send(to: string, body: string): Promise<SendResult> {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
-    const form = new URLSearchParams({ To: to, From: this.from, Body: body });
+  async send(to: string, subject: string, body: string): Promise<SendResult> {
     try {
-      const res = await fetch(url, {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
-        headers: {
-          Authorization: "Basic " + btoa(`${this.accountSid}:${this.authToken}`),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: form.toString(),
+        headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: this.from,
+          to: [to],
+          subject,
+          text: body,
+          html: `<div style="font-family:system-ui,sans-serif;white-space:pre-wrap">${escapeHtml(body)}</div>`,
+        }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        return { status: "failed", error: data?.message || `Twilio HTTP ${res.status}` };
-      }
-      return { status: "sent", providerSid: data?.sid };
+      if (!res.ok) return { status: "failed", error: data?.message || `Resend HTTP ${res.status}` };
+      return { status: "sent", providerSid: data?.id };
     } catch (e) {
       return { status: "failed", error: e instanceof Error ? e.message : String(e) };
     }
   }
 }
 
-function pickProvider(): SMSProvider {
-  const sid   = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
-  const token = Deno.env.get("TWILIO_AUTH_TOKEN")  ?? "";
-  const from  = Deno.env.get("TWILIO_FROM_NUMBER") ?? "";
-  if (sid && token && from) return new TwilioProvider(sid, token, from);
-  return new MockProvider();
+// Brevo / Sendinblue (https://brevo.com) — allows single verified sender email,
+// no custom domain required. Friendlier for a small team without a domain.
+class BrevoProvider implements EmailProvider {
+  readonly name = "brevo";
+  constructor(private apiKey: string, private fromEmail: string, private fromName: string) {}
+
+  async send(to: string, subject: string, body: string): Promise<SendResult> {
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": this.apiKey, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          sender: { email: this.fromEmail, name: this.fromName },
+          to: [{ email: to }],
+          subject,
+          textContent: body,
+          htmlContent: `<div style="font-family:system-ui,sans-serif;white-space:pre-wrap">${escapeHtml(body)}</div>`,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { status: "failed", error: data?.message || `Brevo HTTP ${res.status}` };
+      return { status: "sent", providerSid: data?.messageId };
+    } catch (e) {
+      return { status: "failed", error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+}
+
+function pickProvider(): EmailProvider {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  const resendFrom = Deno.env.get("RESEND_FROM") ?? "";
+  if (resendKey && resendFrom) return new ResendProvider(resendKey, resendFrom);
+
+  const brevoKey = Deno.env.get("BREVO_API_KEY") ?? "";
+  const brevoFrom = Deno.env.get("BREVO_FROM_EMAIL") ?? "";
+  const brevoName = Deno.env.get("BREVO_FROM_NAME") ?? "SparkLog";
+  if (brevoKey && brevoFrom) return new BrevoProvider(brevoKey, brevoFrom, brevoName);
+
+  return new MockEmailProvider();
 }
 
 // ── Notification service ─────────────────────────────────────────────────────
-interface Recipient { id: string; name: string | null; phone: string | null; }
+interface Recipient { id: string; name: string | null; email: string | null; }
 
 class NotificationService {
-  constructor(private admin: SupabaseClient, private provider: SMSProvider) {}
+  constructor(private admin: SupabaseClient, private provider: EmailProvider) {}
 
   async sendAnnouncement(opts: {
     senderId: string;
     senderName: string | null;
+    subject: string;
     body: string;
     recipients: Recipient[];
   }) {
-    const { senderId, senderName, body, recipients } = opts;
-    const segments = segmentCount(body);
+    const { senderId, senderName, subject, body, recipients } = opts;
 
     // 1. Persist the message (status: sending)
     const { data: msg, error: msgErr } = await this.admin
@@ -141,10 +157,11 @@ class NotificationService {
       .insert({
         sender_id:       senderId,
         sender_name:     senderName,
-        channel:         "sms",
+        channel:         "email",
+        subject,
         body,
         recipient_count: recipients.length,
-        segment_count:   segments,
+        segment_count:   1,
         provider:        this.provider.name,
         status:          "sending",
       })
@@ -153,23 +170,22 @@ class NotificationService {
     if (msgErr || !msg) throw new Error(msgErr?.message ?? "Failed to create message");
     const messageId = msg.id as string;
 
-    // 2. Persist recipient rows (status: queued). Rows with no valid phone are
-    //    recorded as "skipped" so history reflects reality.
+    // 2. Persist recipient rows. Rows with no valid email are "skipped".
     const recipientRows = recipients.map((r) => {
-      const phone = normalizePhone(r.phone);
+      const email = isEmail(r.email) ? r.email!.trim() : null;
       return {
         message_id:      messageId,
         employee_id:     r.id,
         name:            r.name,
-        phone,
-        delivery_status: phone ? "queued" : "skipped",
-        error:           phone ? null : "No phone number",
+        email,
+        delivery_status: email ? "queued" : "skipped",
+        error:           email ? null : "No email address",
       };
     });
     const { data: insertedRows, error: recErr } = await this.admin
       .from("message_recipients")
       .insert(recipientRows)
-      .select("id, phone, delivery_status");
+      .select("id, email, delivery_status");
     if (recErr) throw new Error(recErr.message);
 
     // 3. Fan out through the provider, updating each recipient's delivery state.
@@ -177,8 +193,8 @@ class NotificationService {
     let failed = 0;
     await Promise.all(
       (insertedRows ?? []).map(async (row) => {
-        if (row.delivery_status === "skipped" || !row.phone) { failed++; return; }
-        const result = await this.provider.send(row.phone, body);
+        if (row.delivery_status === "skipped" || !row.email) { failed++; return; }
+        const result = await this.provider.send(row.email, subject, body);
         if (result.status === "sent") delivered++; else failed++;
         await this.admin
           .from("message_recipients")
@@ -243,15 +259,18 @@ serve(async (req) => {
     if ([...body].length > MAX_BODY_LEN) {
       return json({ ok: false, error: `Message exceeds ${MAX_BODY_LEN} characters` }, 400);
     }
+    let subject: string = typeof payload?.subject === "string" ? payload.subject.trim() : "";
+    if (!subject) subject = DEFAULT_SUBJECT;
+    if ([...subject].length > MAX_SUBJECT_LEN) subject = [...subject].slice(0, MAX_SUBJECT_LEN).join("");
+
     const allEmployees = payload?.allEmployees === true;
     const recipientIds: string[] = Array.isArray(payload?.recipientIds)
       ? payload.recipientIds.filter((x: unknown) => typeof x === "string")
       : [];
 
-    // Resolve recipients server-side from the DB (never trust client phone
-    // numbers). Recipients = every profile in the org except the sender, so a
-    // manager never texts themselves (matches the Employees tab minus self).
-    let query = admin.from("profiles").select("id, full_name, phone").neq("id", senderId);
+    // Resolve recipients server-side from the DB. Recipients = every profile
+    // except the sender (a manager never emails themselves).
+    let query = admin.from("profiles").select("id, full_name, email").neq("id", senderId);
     if (!allEmployees) {
       if (recipientIds.length === 0) return json({ ok: false, error: "No recipients selected" }, 400);
       query = query.in("id", recipientIds);
@@ -260,7 +279,7 @@ serve(async (req) => {
     if (profErr) return json({ ok: false, error: profErr.message }, 500);
 
     const recipients: Recipient[] = (profiles ?? []).map((p) => ({
-      id: p.id, name: p.full_name ?? null, phone: p.phone ?? null,
+      id: p.id, name: p.full_name ?? null, email: p.email ?? null,
     }));
     if (recipients.length === 0) return json({ ok: false, error: "No matching employees" }, 400);
 
@@ -268,13 +287,14 @@ serve(async (req) => {
     const result = await service.sendAnnouncement({
       senderId,
       senderName: (senderProfile.full_name || "").trim() || callerUser.user.email || null,
+      subject,
       body,
       recipients,
     });
 
     return json({ ok: true, ...result });
   } catch (e) {
-    console.error("[send_sms] unexpected:", e);
+    console.error("[send_announcement] unexpected:", e);
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });
