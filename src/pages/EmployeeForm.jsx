@@ -52,8 +52,17 @@ function parseExtractedText(text) {
   const arrivee = labelTime(/Heure\s+d['’]?\s*arriv[eé]e/i);
   if (arrivee) out.arrivee = arrivee;
 
-  const km = text.match(/Distance\s+parcourue[^0-9]*?(\d+(?:[.,]\d+)?)/i);
-  if (km) out.km_aller = Math.round(parseFloat(km[1].replace(",", ".")));
+  // "Distance réelle parcourue (km)" is the authoritative value; only fall
+  // back to "Distance parcourue" when it isn't the miles field.
+  const kmReel = text.match(/Distance\s+r[éèe]+[l1]{1,2}e?\s+parcourue[^0-9]*?(\d+(?:[.,]\d+)?)/i);
+  if (kmReel) {
+    out.km_aller = Math.round(parseFloat(kmReel[1].replace(",", ".")));
+  } else {
+    const km = text.match(/Distance\s+parcourue([^0-9]*?)(\d+(?:[.,]\d+)?)/i);
+    if (km && !/mil(?:le|e)s?/i.test(km[1])) {
+      out.km_aller = Math.round(parseFloat(km[2].replace(",", ".")));
+    }
+  }
 
   return out;
 }

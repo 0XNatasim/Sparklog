@@ -71,7 +71,7 @@ Extract the following fields if present in the image:
 - depart: departure/start time in HH:mm 24h format (often labeled "Heure de début")
 - arrivee: arrival time in HH:mm 24h format (often labeled "Heure d'arrivée")
 - fin: end/finish time in HH:mm 24h format (often labeled "Heure de fin")
-- km_aller: one-way kilometers as a number (often labeled "Distance parcourue", convert "29,00" to 29)
+- km_aller: one-way kilometers as a number (convert "29,00" to 29). PRIORITY: take the value labeled "Distance réelle parcourue (km)" (usually the last value at the bottom of the screen). Only if that label is absent, use "Distance parcourue (km)". NEVER use a value labeled in miles such as "Distance parcourue (miles)".
 
 Return ONLY a valid JSON object with these exact keys. Use null for any field you cannot find. No explanation, no markdown.
 
