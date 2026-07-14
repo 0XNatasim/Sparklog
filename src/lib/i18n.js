@@ -126,6 +126,7 @@ export const dictionaries = {
     "form.autofillTip.step2": "Go to the \"Bilan\" tab and scroll down until you can see the \"Distance réelle parcourue (km)\" value at the very bottom of the screen, as shown below.",
     "form.autofillTip.step3": "Take a screenshot, then come back here and select it.",
     "form.autofillTip.gotIt": "Got it – choose screenshot",
+    "form.autofillTip.dontShowAgain": "Don't show this again",
 
     // history
     "history.title": "History",
@@ -360,6 +361,7 @@ export const dictionaries = {
     "form.autofillTip.step2": "Allez dans l'onglet « Bilan » et faites défiler jusqu'à voir la valeur « Distance réelle parcourue (km) » tout en bas de l'écran, comme sur l'image ci-dessous.",
     "form.autofillTip.step3": "Prenez une capture d'écran, puis revenez ici et sélectionnez-la.",
     "form.autofillTip.gotIt": "Compris – choisir la capture",
+    "form.autofillTip.dontShowAgain": "Ne plus afficher ce message",
 
     "history.title": "Historique",
     "history.empty": "Aucun job pour le moment.",

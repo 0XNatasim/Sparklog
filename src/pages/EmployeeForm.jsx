@@ -144,6 +144,7 @@ export default function EmployeeForm() {
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
+  const [dontShowTipAgain, setDontShowTipAgain] = useState(false);
 
   const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
@@ -587,11 +588,23 @@ export default function EmployeeForm() {
             />
           </div>
 
+          <label className="flex cursor-pointer select-none items-center gap-2 px-5 pt-1 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={dontShowTipAgain}
+              onChange={(e) => setDontShowTipAgain(e.target.checked)}
+            />
+            {t("form.autofillTip.dontShowAgain")}
+          </label>
+
           <DialogFooter className="px-5 pb-5 pt-2">
             <Button
               className="w-full"
               onClick={() => {
-                localStorage.setItem("autofill_tip_seen", "1");
+                if (dontShowTipAgain) {
+                  localStorage.setItem("autofill_tip_seen", "1");
+                }
                 setShowAutofillTip(false);
                 imageInputRef.current?.click();
               }}
