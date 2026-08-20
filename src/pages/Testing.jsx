@@ -7,6 +7,7 @@ import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ClipboardList, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 
@@ -24,6 +25,37 @@ const SKILLS = [
   { id: "3", label: "Apprenti 3", pct: "60%"  },
   { id: "2", label: "Apprenti 2", pct: "50%"  },
   { id: "1", label: "Apprenti 1", pct: "40%"  },
+];
+
+const FORMS = [
+  {
+    name: "Temps supp",
+    url: "https://forms.office.com/Pages/ResponsePage.aspx?id=8BAK9O5QgEiaN24d1Kwv83RO3QTV6M1JhNHDNpxKlTtUMkdSQUJGTDRQTFNYQUQxMUE1NjNSSVU1RC4u",
+  },
+  {
+    name: "Absence",
+    url: "https://forms.office.com/pages/responsepage.aspx?id=8BAK9O5QgEiaN24d1Kwv83RO3QTV6M1JhNHDNpxKlTtUNkdWNlM5UkIxM1NXNFNLOUJPUVpDVlNUUS4u&route=shorturl",
+  },
+  {
+    name: "Audit",
+    url: "https://forms.office.com/pages/responsepage.aspx?id=sqvQYoBd-ket04-x9iYHwJuHPRcS9NdEl4fNiq2Br8NUN0hDR1I5UzRXNllRTEdXOFJOUFdVUUQzVy4u&route=shorturl",
+  },
+  {
+    name: "Transfert de matériel entre électricien",
+    url: "https://forms.office.com/Pages/ResponsePage.aspx?id=sqvQYoBd-ket04-x9iYHwGXeCbSSf41AhgBlbAy17W1UNlBDQURBQlNUQzRHN08xVFFUSlA1OVZXTiQlQCN0PWcu",
+  },
+  {
+    name: "Inventaire entrepôt Britton",
+    url: "https://forms.office.com/pages/responsepage.aspx?id=sqvQYoBd-ket04-x9iYHwGXeCbSSf41AhgBlbAy17W1UMVZHMlg0MDBKSkI4Q0VSMUFCT0VYUzNPMCQlQCN0PWcu&route=shorturl",
+  },
+  {
+    name: "Prise de matériel",
+    url: "https://forms.office.com/Pages/ResponsePage.aspx?id=sqvQYoBd-ket04-x9iYHwJuHPRcS9NdEl4fNiq2Br8NUMUIwM0w0TlE3UkJKUTU1N1laWVhLN0JEMS4u",
+  },
+  {
+    name: "Inventaire sous-contractant",
+    url: "https://forms.office.com/Pages/ResponsePage.aspx?id=sqvQYoBd-ket04-x9iYHwGXeCbSSf41AhgBlbAy17W1UQTlSN0ZKMlRVTEw5OVFXOFUwRk5WNFNBMiQlQCN0PWcu",
+  },
 ];
 
 // ─── CCQ JSON parsing ─────────────────────────────────────────────────────────
@@ -292,18 +324,57 @@ function ComingSoon({ label }) {
   );
 }
 
+function FormsPanel() {
+  const t = useT();
+
+  return (
+    <Card>
+      <CardContent className="p-5 sm:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
+            <ClipboardList className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="font-semibold">{t("forms.title")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("forms.description")}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {FORMS.map((form) => (
+            <a
+              key={form.name}
+              href={form.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex min-h-16 items-center justify-between gap-4 rounded-lg border bg-background px-4 py-3 text-left transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <span className="font-medium leading-snug">{form.name}</span>
+              <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground group-hover:text-primary">
+                {t("forms.open")}
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </a>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Page with sub-tabs ───────────────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
   return (
     <AppShell>
       <Tabs defaultValue="employees" className="space-y-4">
-        <TabsList>
+        <TabsList className="h-auto max-w-full flex-wrap justify-start">
           <TabsTrigger value="employees">{t("testing.tabs.employees")}</TabsTrigger>
           <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
           <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
           <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
           <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
+          <TabsTrigger value="forms">{t("testing.tabs.forms")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="employees"><EmployeesPanel /></TabsContent>
@@ -311,6 +382,7 @@ export default function Testing() {
         <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
         <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
         <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
+        <TabsContent value="forms"><FormsPanel /></TabsContent>
       </Tabs>
     </AppShell>
   );
