@@ -20,6 +20,8 @@ export const dictionaries = {
     "common.false": "false",
     "common.on": "On",
     "common.off": "Off",
+    "common.show": "Show",
+    "common.hide": "Hide",
 
     // nav
     "nav.form": "Form",
@@ -287,6 +289,8 @@ export const dictionaries = {
     "common.false": "faux",
     "common.on": "Activé",
     "common.off": "Désactivé",
+    "common.show": "Afficher",
+    "common.hide": "Masquer",
 
     "nav.form": "Formulaire",
     "nav.history": "Historique",
