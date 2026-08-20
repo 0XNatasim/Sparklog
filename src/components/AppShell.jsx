@@ -71,6 +71,7 @@ export default function AppShell({ children }) {
           <NavItem to="/form">{t("nav.form")}</NavItem>
           <NavItem to="/history">{t("nav.history")}</NavItem>
           <NavItem to="/week">{t("nav.week")}</NavItem>
+          <NavItem to="/profile">{t("nav.profile")}</NavItem>
           {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
           {role === "manager" && <NavItem to="/testing">{t("nav.testing")}</NavItem>}
         </nav>

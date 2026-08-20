@@ -9,16 +9,24 @@ import History from "./pages/History";
 import Week from "./pages/Week";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import Testing from "./pages/Testing";
+import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
 
 export default function App() {
+  const isPasswordRecovery = window.location.pathname === "/reset-password";
+
   React.useEffect(() => {
     // If the user landed on a non-root path (e.g. /form from a stale bookmark),
     // collapse it to "/" so HashRouter takes over cleanly.
     const { pathname, hash, search } = window.location;
-    if (pathname !== "/" && !hash) {
+    if (pathname !== "/" && pathname !== "/reset-password" && !hash) {
       window.history.replaceState(null, "", `/${search}${hash}`);
     }
   }, []);
+
+  // Supabase appends its recovery credentials to the URL hash. Keep this
+  // pathname outside HashRouter so the credentials are not mistaken for a route.
+  if (isPasswordRecovery) return <ResetPassword />;
 
   return (
     <HashRouter>
@@ -56,6 +64,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Week />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

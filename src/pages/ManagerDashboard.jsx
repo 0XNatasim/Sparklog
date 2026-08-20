@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import FormsManager from "@/components/FormsManager";
 
 dayjs.extend(isoWeek);
 
@@ -599,6 +600,7 @@ export default function ManagerDashboard() {
   return (
     <AppShell>
       <div className="space-y-3">
+        <FormsManager />
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
