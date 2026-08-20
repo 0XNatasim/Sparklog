@@ -116,7 +116,7 @@ function ReservationStatusReference() {
           </ReferenceSection>
 
           <ReferenceSection title="En attente de thermostats">
-            <p className="font-semibold text-destructive">Ce statut ne doit jamais être utilisé.</p>
+            <p className="font-semibold text-destructive dark:text-red-400">Ce statut ne doit jamais être utilisé.</p>
           </ReferenceSection>
 
           <ReferenceSection title="Non admissible">
