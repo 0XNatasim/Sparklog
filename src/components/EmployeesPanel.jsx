@@ -36,7 +36,7 @@ export default function EmployeesPanel() {
       const { data, error } = await withTimeout(
         supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, ccq_number, apprentice_level, sector, km_rate")
+          .select("id, role, full_name, phone, email, ccq_number, apprentice_level, sector, km_rate, storage_compensation")
           .order("full_name", { ascending: true }),
         12000
       );
@@ -258,6 +258,26 @@ export default function EmployeesPanel() {
                 </div>
               </Field>
             </div>
+
+            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3">
+              <span>
+                <span className="block text-sm font-semibold">{t("employees.storage")}</span>
+                <span className="block text-xs text-muted-foreground">{t("employees.storageDescription")}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-3">
+                <span className="text-sm font-bold text-primary">$50</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(p.storage_compensation)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLocal(p.id, "storage_compensation", checked);
+                    saveField(p.id, "storage_compensation", checked);
+                  }}
+                  className="h-5 w-5 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+              </span>
+            </label>
           </CardContent>
         </Card>
       ))}
