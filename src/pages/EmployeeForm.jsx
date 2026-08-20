@@ -88,6 +88,16 @@ function isEditableStatus(s) {
   return s === "saved" || s === "updated";
 }
 
+const RETURN_TIME_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
+
+function formatReturnMinutes(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (!hours) return `${remainder} min`;
+  if (!remainder) return `${hours} h`;
+  return `${hours} h ${remainder}`;
+}
+
 function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -135,6 +145,9 @@ export default function EmployeeForm() {
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
+  const [returnStep, setReturnStep] = useState("closed");
+  const [returnMinutes, setReturnMinutes] = useState(null);
+  const [returnKm, setReturnKm] = useState("");
 
   const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
@@ -204,14 +217,16 @@ export default function EmployeeForm() {
   }, [editId, user?.id]);
 
   async function saveDraft() {
-    await saveJob("draft");
+    setReturnMinutes(null);
+    setReturnKm("");
+    setReturnStep("ask");
   }
 
   async function submitJob() {
     await saveJob("submit");
   }
 
-  async function saveJob(mode) {
+  async function saveJob(mode, returnValues = null) {
     if (!user?.id) {
       setErr(t("form.errors.notSignedIn"));
       return;
@@ -250,6 +265,10 @@ export default function EmployeeForm() {
         km_aller: kmAllerNum,
         status: nextStatus,
         locked: nextLocked,
+        ...(returnValues ? {
+          return_time_minutes: returnValues.minutes,
+          km_retour: returnValues.km,
+        } : {}),
       };
 
       if (editId) {
@@ -278,8 +297,9 @@ export default function EmployeeForm() {
         setLocked(nextLocked);
         setDirty(false);
 
-        navigate(`/form?edit=${data.id}`, { replace: true });
+        if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }
+      return true;
     } catch (e) {
       // Postgres unique_violation = "23505". Map it to a friendly message
       // since the raw "duplicate key value violates unique constraint…" is
@@ -291,8 +311,33 @@ export default function EmployeeForm() {
       } else {
         setErr(e?.message || t("form.errors.saveFailed"));
       }
+      return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveWithReturn(minutes, km) {
+    const saved = await saveJob("draft", { minutes, km });
+    if (!saved) {
+      setReturnStep("closed");
+      return;
+    }
+
+    setReturnStep("success");
+    if (editId) {
+      navigate("/form", { replace: true });
+    } else {
+      setJobDate(dayjs().format("YYYY-MM-DD"));
+      setOt("");
+      setDepart("");
+      setArrivee("");
+      setFin("");
+      setKmAller("");
+      setStatus("");
+      setLocked(false);
+      setDirty(false);
+      setInfo("");
     }
   }
 
@@ -590,6 +635,82 @@ export default function EmployeeForm() {
               {t("form.autofillTip.gotIt")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={returnStep !== "closed"} onOpenChange={(open) => {
+        if (!open && !saving) setReturnStep("closed");
+      }}>
+        <DialogContent className="max-w-md">
+          {returnStep === "ask" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("form.return.askTitle")}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">{t("form.return.askDescription")}</p>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" disabled={saving} onClick={() => saveWithReturn(0, 0)}>
+                  {t("common.no")}
+                </Button>
+                <Button type="button" disabled={saving} onClick={() => setReturnStep("time")}>
+                  {t("common.yes")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {returnStep === "time" && (
+            <>
+              <DialogHeader><DialogTitle>{t("form.return.timeTitle")}</DialogTitle></DialogHeader>
+              <div className="grid max-h-[55vh] grid-cols-4 gap-2 overflow-y-auto pr-1">
+                {RETURN_TIME_OPTIONS.map((minutes) => (
+                  <Button key={minutes} type="button" variant={returnMinutes === minutes ? "default" : "outline"} className="px-2" onClick={() => {
+                    setReturnMinutes(minutes);
+                    setReturnStep("km");
+                  }}>
+                    {formatReturnMinutes(minutes)}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {returnStep === "km" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("form.return.kmTitle")}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="return-km">{t("form.return.kmLabel")}</Label>
+                <Input
+                  id="return-km"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.1"
+                  autoFocus
+                  value={returnKm}
+                  onChange={(event) => setReturnKm(event.target.value)}
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">{t("form.return.selectedTime", { time: formatReturnMinutes(returnMinutes || 0) })}</p>
+              </div>
+              <DialogFooter>
+                <Button type="button" disabled={saving || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
+                  {saving ? t("common.saving") : t("form.buttons.save")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {returnStep === "success" && (
+            <>
+              <DialogHeader><DialogTitle>{t("form.return.savedTitle")}</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">{t("form.return.savedDescription")}</p>
+              <DialogFooter>
+                <Button type="button" onClick={() => setReturnStep("closed")}>{t("common.ok")}</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </AppShell>

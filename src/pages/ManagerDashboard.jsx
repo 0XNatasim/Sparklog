@@ -361,6 +361,8 @@ export default function ManagerDashboard() {
       "hours_decimal",
       "hours_hhmm",
       "km",
+      "return_time_minutes",
+      "return_km",
     ];
 
     function decimalHours(depart, fin) {
@@ -402,6 +404,8 @@ export default function ManagerDashboard() {
           dec.toFixed(2),
           fmtHHmm(dec),
           km,
+          Number(j.return_time_minutes ?? 0) || 0,
+          Number(j.km_retour ?? 0) || 0,
         ];
       });
 

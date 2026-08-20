@@ -76,7 +76,7 @@ export default function EmployeesPanel() {
       const { data: rows, error } = await withTimeout(
         supabase
           .from("jobs")
-          .select("job_date, ot, depart, arrivee, fin, km_aller, km_retour, status")
+          .select("job_date, ot, depart, arrivee, fin, km_aller, km_retour, return_time_minutes, status")
           .eq("user_id", p.id)
           .eq("status", "approved")
           .order("job_date", { ascending: true }),
@@ -88,7 +88,7 @@ export default function EmployeesPanel() {
         "employee_name", "employee_email", "employee_phone", "ccq_number",
         "apprentice_level", "sector", "km_rate",
         "week_iso", "job_date", "weekday", "ot", "depart", "arrivee", "fin",
-        "hours_decimal", "hours_hhmm", "km",
+        "hours_decimal", "hours_hhmm", "km", "return_time_minutes", "return_km",
       ];
 
       const decimalHours = (depart, fin) => {
@@ -118,6 +118,7 @@ export default function EmployeesPanel() {
           j.arrivee ? String(j.arrivee).slice(0, 5) : "",
           j.fin ? String(j.fin).slice(0, 5) : "",
           dec.toFixed(2), fmtHHmm(dec), km,
+          Number(j.return_time_minutes ?? 0) || 0, Number(j.km_retour ?? 0) || 0,
         ];
       });
 
