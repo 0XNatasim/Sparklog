@@ -63,7 +63,10 @@ export default function Profile() {
 
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />{t("profile.quickReference")}</CardTitle><CardDescription>{t("profile.quickReferenceDescription")}</CardDescription></CardHeader>
-              <CardContent><ReservationStatusReference /></CardContent>
+              <CardContent className="space-y-3">
+                <ReservationStatusReference />
+                <CalypsoV1Reference />
+              </CardContent>
             </Card>
           </>
         )}
@@ -130,6 +133,36 @@ function ReservationStatusReference() {
           </ReferenceSection>
 
           <p className="border-t pt-4 font-medium">Merci à tous de votre collaboration et de votre vigilance dans l&apos;utilisation des statuts.</p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CalypsoV1Reference() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <span>Calypso V1</span>
+          <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Calypso V1</DialogTitle>
+          <DialogDescription>Information importante concernant les appareils Calypso V1.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 text-sm leading-relaxed">
+          <p className="font-semibold text-destructive dark:text-red-400">
+            Svp ne plus installer de Calypso V1.
+          </p>
+          <p>
+            S&apos;il vous en reste en votre possession, veuillez les rapporter à votre entrepôt.
+          </p>
+          <p>
+            Nous sommes présentement en train de faire des tests sur les V1.
+          </p>
         </div>
       </DialogContent>
     </Dialog>
