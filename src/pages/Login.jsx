@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,6 +13,7 @@ import { useT } from "@/lib/use-t";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, role } = useAuth();
   const t = useT();
 
@@ -27,8 +28,12 @@ export default function Login() {
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState(
+    searchParams.get("passwordReset") === "success" ? t("auth.passwordResetSuccess") : ""
+  );
 
   const isSignup = mode === "signup";
+  const isForgotPassword = mode === "forgot";
 
   React.useEffect(() => {
     if (user) {
@@ -40,11 +45,13 @@ export default function Login() {
   const passwordsMatch = !isSignup || password === confirmPassword;
 
   const canSubmit = useMemo(() => {
-    if (!email.trim() || !password) return false;
+    if (!email.trim()) return false;
+    if (isForgotPassword) return true;
+    if (!password) return false;
     if (isSignup && fullName.trim().length < 2) return false;
     if (isSignup && password !== confirmPassword) return false;
     return true;
-  }, [email, password, confirmPassword, fullName, phone, isSignup]);
+  }, [email, password, confirmPassword, fullName, isSignup, isForgotPassword]);
 
   function normalizePhone(raw) {
     const s = String(raw || "").trim();
@@ -70,11 +77,18 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMsg("");
+    setSuccessMsg("");
     if (!canSubmit) return;
 
     setLoading(true);
     try {
-      if (isSignup) {
+      if (isForgotPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) throw error;
+        setSuccessMsg(t("auth.resetEmailSent"));
+      } else if (isSignup) {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -129,7 +143,7 @@ export default function Login() {
         <CardHeader>
           <CardTitle className="text-2xl">{t("auth.title")}</CardTitle>
           <CardDescription>
-            {isSignup ? t("auth.descSignup") : t("auth.descLogin")}
+            {isSignup ? t("auth.descSignup") : isForgotPassword ? t("auth.forgotDescription") : t("auth.descLogin")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -174,7 +188,7 @@ export default function Login() {
               />
             </div>
 
-            <div className="grid gap-1.5">
+            {!isForgotPassword && <div className="grid gap-1.5">
               <Label htmlFor="password">{t("auth.password")}</Label>
               <div className="relative">
                 <Input
@@ -195,7 +209,7 @@ export default function Login() {
                   {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </button>
               </div>
-            </div>
+            </div>}
 
             {isSignup && (
               <div className="grid gap-1.5">
@@ -231,9 +245,25 @@ export default function Login() {
               </div>
             )}
 
+            {successMsg && (
+              <div className="rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700 dark:text-green-400" role="status">
+                {successMsg}
+              </div>
+            )}
+
             <Button disabled={!canSubmit || loading} type="submit" className="mt-1">
-              {loading ? t("common.pleaseWait") : isSignup ? t("auth.signupButton") : t("auth.loginButton")}
+              {loading ? t("common.pleaseWait") : isForgotPassword ? t("auth.sendResetLink") : isSignup ? t("auth.signupButton") : t("auth.loginButton")}
             </Button>
+
+            {!isSignup && !isForgotPassword && (
+              <Button type="button" variant="link" className="-my-2" onClick={() => {
+                setErrorMsg("");
+                setSuccessMsg("");
+                setMode("forgot");
+              }}>
+                {t("auth.forgotPassword")}
+              </Button>
+            )}
 
             <Button
               type="button"
@@ -244,10 +274,11 @@ export default function Login() {
                 setConfirmPassword("");
                 setShowPassword(false);
                 setShowConfirm(false);
-                setMode(isSignup ? "login" : "signup");
+                setSuccessMsg("");
+                setMode(isSignup || isForgotPassword ? "login" : "signup");
               }}
             >
-              {isSignup ? t("auth.haveAccount") : t("auth.noAccount")}
+              {isSignup || isForgotPassword ? t("auth.backToLogin") : t("auth.noAccount")}
             </Button>
           </form>
         </CardContent>
