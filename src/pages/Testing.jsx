@@ -7,8 +7,10 @@ import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ClipboardList, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { COMPANY_FORMS } from "@/lib/forms";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -25,6 +27,64 @@ const SKILLS = [
   { id: "2", label: "Apprenti 2", pct: "50%"  },
   { id: "1", label: "Apprenti 1", pct: "40%"  },
 ];
+
+const EMPLOYER_COST_ROWS = [
+  { number: 1, label: "Taux de salaire", description: "Salaire horaire prévu à la convention collective.", values: ["50,79", "25,40", "30,47", "35,55", "43,17"] },
+  { number: 2, label: "Vacances", description: "Indemnité de vacances et de jours fériés ajoutée au salaire.", values: ["6,60", "3,30", "3,96", "4,62", "5,61"] },
+  { number: 3, label: "Salaire brut", description: "Taux de salaire plus l’indemnité de vacances.", values: ["57,39", "28,70", "34,43", "40,17", "48,78"], total: true },
+  { number: 4, label: "Assurance emploi", description: "Part employeur de la cotisation à l’assurance-emploi.", values: ["1,04", "0,52", "0,63", "0,73", "0,89"] },
+  { number: 5, label: "RQAP", description: "Part employeur du Régime québécois d’assurance parentale.", values: ["0,35", "0,17", "0,21", "0,24", "0,29"] },
+  { number: 6, label: "RRQ", description: "Part employeur du Régime de rentes du Québec.", values: ["3,71", "1,91", "2,27", "2,63", "3,17"] },
+  { number: 7, label: "F.S.S.", description: "Cotisation de l’employeur au Fonds des services de santé.", values: ["2,59", "1,37", "1,61", "1,86", "2,22"] },
+  { number: 8, label: "Avantages sociaux", description: "Contributions de l’employeur aux régimes d’avantages sociaux de l’industrie.", values: ["8,875", "7,955", "7,955", "7,955", "7,955"] },
+  { number: 9, label: "Taxe assurances", description: "Taxe applicable aux protections d’assurance.", values: ["0,330", "0,330", "0,330", "0,330", "0,330"] },
+  { number: 10, label: "Cotisation CCQ", description: "Prélèvement servant au financement des activités de la CCQ.", values: ["0,43", "0,22", "0,26", "0,30", "0,37"] },
+  { number: 11, label: "Cotisation AECQ + ACQ", description: "Cotisations aux associations patronales AECQ et ACQ.", values: ["0,06", "0,06", "0,06", "0,06", "0,06"] },
+  { number: 12, label: "Fonds divers", description: "Contributions aux différents fonds prévus dans l’industrie.", values: ["0,22", "0,22", "0,22", "0,22", "0,22"] },
+  { number: 13, label: "Équipement de sécurité", description: "Allocation estimée pour les équipements de protection et de sécurité.", values: ["0,80", "0,80", "0,80", "0,80", "0,80"] },
+  { number: 14, label: "Autres contributions", description: "Autres charges et contributions applicables à l’employeur.", values: ["1,52", "0,80", "0,95", "1,09", "1,30"] },
+  { number: 15, label: "Clauses monétaires normatives", description: "Coût des autres clauses monétaires prévues à la convention collective.", values: ["6,77", "3,39", "4,06", "4,74", "5,76"] },
+  { number: 16, label: "CNESST", description: "Cotisation estimée liée à la santé et à la sécurité du travail.", values: ["1,93", "1,02", "1,20", "1,38", "1,65"] },
+  { number: 17, label: "Total – Coût horaire de la main-d’œuvre", description: "Coût horaire total du salaire et des charges de main-d’œuvre.", values: ["86,02", "47,46", "54,98", "62,50", "73,79"], total: true },
+  { number: 18, label: "Camions", description: "Coût horaire estimé des véhicules affectés aux travaux.", values: ["14,55", "14,55", "14,55", "14,55", "14,55"] },
+  { number: 19, label: "Outils", description: "Coût horaire estimé des outils et de l’équipement courant.", values: ["1,68", "1,68", "1,68", "1,68", "1,68"] },
+  { number: 20, label: "Total avant frais d’administration et profit", description: "Main-d’œuvre, camion et outils, avant administration et marge bénéficiaire.", values: ["102,25", "63,69", "71,21", "78,73", "90,02"], total: true },
+];
+
+function EmployerCostTable() {
+  const t = useT();
+  return (
+    <div>
+      <div className="border-b bg-muted/20 px-5 py-4 text-sm">
+        <p className="font-semibold">{t("ccq.cost.title")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Montants en dollars par heure selon la grille ACQ fournie. Les frais d’administration et le profit ne sont pas inclus.
+          {" "}<a href="https://www.acq.org/documentation/grilles-taux-horaires-et-paie/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Source ACQ <ExternalLink className="inline h-3 w-3" /></a>
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] text-sm">
+          <thead>
+            <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+              <th className="px-4 py-2.5 font-medium">Élément</th>
+              <th className="min-w-64 px-4 py-2.5 font-medium">Description</th>
+              {['Compagnon', 'Apprenti P1', 'Apprenti P2', 'Apprenti P3', 'Apprenti P4'].map((label) => <th key={label} className="px-3 py-2.5 text-right font-medium">{label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {EMPLOYER_COST_ROWS.map((row) => (
+              <tr key={row.number} className={`border-b last:border-0 ${row.total ? "bg-primary/5 font-semibold" : "hover:bg-muted/20"}`}>
+                <td className="px-4 py-2.5"><span className="mr-2 text-xs text-muted-foreground">({row.number})</span>{row.label}</td>
+                <td className="px-4 py-2.5 text-xs font-normal text-muted-foreground">{row.description}</td>
+                {row.values.map((value, index) => <td key={index} className="px-3 py-2.5 text-right font-mono">{value} $</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // ─── CCQ JSON parsing ─────────────────────────────────────────────────────────
 // Actual CCQ API shape:
@@ -211,7 +271,16 @@ function CcqRatesPanel() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <Tabs defaultValue="salary" className="w-full">
+              <div className="border-b px-5 py-3">
+                <TabsList>
+                  <TabsTrigger value="salary">{t("ccq.tabs.salary")}</TabsTrigger>
+                  <TabsTrigger value="employer-cost">{t("ccq.tabs.employerCost")}</TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="salary" className="mt-0">
+                <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
@@ -241,17 +310,17 @@ function CcqRatesPanel() {
                   ))}
                 </tbody>
               </table>
-            </div>
+                </div>
 
-            {/* Overtime rule note */}
-            <div className="border-t px-5 py-3 text-xs text-muted-foreground">
+                {/* Overtime rule note */}
+                <div className="border-t px-5 py-3 text-xs text-muted-foreground">
               <b className="text-foreground">Note temps supplémentaire :</b> la 1<sup>re</sup> heure
               supplémentaire est payée à <b className="text-foreground">+50 % (temps et demi, 1.5×)</b>,
               les heures suivantes à <b className="text-foreground">+100 % (temps double, 2×)</b>.
-            </div>
+                </div>
 
-            {/* Raw JSON inspector (collapsed) */}
-            <details className="border-t">
+                {/* Raw JSON inspector (collapsed) */}
+                <details className="border-t">
               <summary className="cursor-pointer px-5 py-2 text-xs text-muted-foreground select-none hover:text-foreground">
                 Réponse brute CCQ (débogage)
               </summary>
@@ -265,7 +334,13 @@ function CcqRatesPanel() {
                   </div>
                 ))}
               </div>
-            </details>
+                </details>
+              </TabsContent>
+
+              <TabsContent value="employer-cost" className="mt-0">
+                <EmployerCostTable />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       )}
@@ -292,18 +367,57 @@ function ComingSoon({ label }) {
   );
 }
 
+function FormsPanel() {
+  const t = useT();
+
+  return (
+    <Card>
+      <CardContent className="p-5 sm:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
+            <ClipboardList className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="font-semibold">{t("forms.title")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("forms.description")}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {COMPANY_FORMS.map((form) => (
+            <a
+              key={form.name}
+              href={form.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex min-h-16 items-center justify-between gap-4 rounded-lg border bg-background px-4 py-3 text-left transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <span className="font-medium leading-snug">{form.name}</span>
+              <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground group-hover:text-primary">
+                {t("forms.open")}
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </a>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Page with sub-tabs ───────────────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
   return (
     <AppShell>
       <Tabs defaultValue="employees" className="space-y-4">
-        <TabsList>
+        <TabsList className="h-auto max-w-full flex-wrap justify-start">
           <TabsTrigger value="employees">{t("testing.tabs.employees")}</TabsTrigger>
           <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
           <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
           <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
           <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
+          <TabsTrigger value="forms">{t("testing.tabs.forms")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="employees"><EmployeesPanel /></TabsContent>
@@ -311,6 +425,7 @@ export default function Testing() {
         <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
         <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
         <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
+        <TabsContent value="forms"><FormsPanel /></TabsContent>
       </Tabs>
     </AppShell>
   );

@@ -111,7 +111,7 @@ serve(async (req) => {
     const { data: jobs, error: jobsErr } = await admin
       .from("jobs")
       .select(
-        "id,user_id,job_date,ot,depart,arrivee,fin,km_aller,status,exported_to_sheet"
+        "id,user_id,job_date,ot,depart,arrivee,fin,km_aller,return_time_minutes,km_retour,status,exported_to_sheet"
       )
       .in("id", job_ids);
     if (jobsErr) return json({ ok: false, error: jobsErr.message }, 500);
@@ -166,6 +166,8 @@ serve(async (req) => {
         fin,
         heures: formatHeures(depart, fin),
         km_aller: j.km_aller ?? "",
+        return_time_minutes: j.return_time_minutes ?? 0,
+        km_retour: j.km_retour ?? 0,
         employee_name: (prof?.full_name || "").trim(),
         employee_email: emails.get(j.user_id) || "",
         employee_phone: (prof?.phone || "").trim(),

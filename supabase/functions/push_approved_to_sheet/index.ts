@@ -131,7 +131,7 @@ serve(async (req) => {
     const { data: job, error: jobErr } = await admin
       .from("jobs")
       .select(
-        "id,user_id,job_date,ot,depart,arrivee,fin,km_aller,status,locked,exported_to_sheet,exported_at"
+        "id,user_id,job_date,ot,depart,arrivee,fin,km_aller,return_time_minutes,km_retour,status,locked,exported_to_sheet,exported_at"
       )
       .eq("id", job_id)
       .single();
@@ -183,6 +183,8 @@ serve(async (req) => {
         job.fin ? String(job.fin).slice(0, 5) : ""
       ),
       km_aller: job.km_aller ?? "",
+      return_time_minutes: job.return_time_minutes ?? 0,
+      km_retour: job.km_retour ?? 0,
       employee_name,
       employee_email,
       employee_phone,
