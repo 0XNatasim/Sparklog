@@ -97,10 +97,8 @@ export default function ManagerDashboard() {
       .order("job_date", { ascending: false })
       .order("updated_at", { ascending: false });
     if (employeeId !== "all") q = q.eq("user_id", employeeId);
-    // When an employee is selected the UI splits into Saved / Submitted /
-    // Approved columns, so ignore the status dropdown there — otherwise
-    // the other two columns are always empty.
-    if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
+    if (statusFilter === "saved") q = q.in("status", ["saved", "updated"]);
+    else if (statusFilter !== "all") q = q.eq("status", statusFilter);
     const range = weekFilterRange(weekFilter);
     if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
     return q;
@@ -118,7 +116,8 @@ export default function ManagerDashboard() {
     const scoped = (status) => {
       let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
       if (employeeId !== "all") q = q.eq("user_id", employeeId);
-      if (status) q = q.eq("status", status);
+      if (status === "saved") q = q.in("status", ["saved", "updated"]);
+      else if (status) q = q.eq("status", status);
       return applyDateScope(q);
     };
     const [all, saved, submitted, approved] = await withTimeout(
@@ -236,7 +235,7 @@ export default function ManagerDashboard() {
     const submitted = [];
     const approved = [];
     for (const j of filtered) {
-      if (j.status === "saved") saved.push(j);
+      if (j.status === "saved" || j.status === "updated") saved.push(j);
       else if (j.status === "submitted") submitted.push(j);
       else if (j.status === "approved") approved.push(j);
     }
@@ -246,6 +245,12 @@ export default function ManagerDashboard() {
     submitted.reverse();
     return { saved, submitted, approved };
   }, [filtered, employeeId]);
+
+  const visibleStatusColumns = split ? [
+    { key: "saved", label: t("manager.savedSection"), jobs: split.saved },
+    { key: "submitted", label: t("manager.submittedSection"), jobs: split.submitted },
+    { key: "approved", label: t("status.approved"), jobs: split.approved },
+  ].filter((column) => statusFilter === "all" || column.key === statusFilter) : [];
 
   const selectedEmployee = useMemo(() => {
     if (employeeId === "all") return null;
@@ -794,33 +799,22 @@ export default function ManagerDashboard() {
 
         {!loading && employeeId !== "all" && split && (
           <>
-            {/* Three small standalone header cards, above the columns */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                {t("manager.savedSection")}
-                <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.saved.length}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                {t("manager.submittedSection")}
-                <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.submitted.length}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                {t("status.approved")}
-                <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.approved.length}</span>
-              </div>
+            <div className={`grid grid-cols-1 gap-3 ${visibleStatusColumns.length === 3 ? "md:grid-cols-3" : ""}`}>
+              {visibleStatusColumns.map((column) => (
+                <div key={column.key} className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
+                  {column.label}
+                  <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{column.jobs.length}</span>
+                </div>
+              ))}
             </div>
 
-            {/* Three columns of job cards (no inner headers) */}
-            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-              <div className="flex flex-col gap-2 self-start">
-                {split.saved.map(renderJobCard)}
-              </div>
-              <div className="flex flex-col gap-2 self-start">
-                {split.submitted.map(renderJobCard)}
-              </div>
-              <div className="flex flex-col gap-2 self-start">
-                {split.approved.map(renderJobCard)}
-              </div>
+            <div className={`grid grid-cols-1 items-start gap-3 ${visibleStatusColumns.length === 3 ? "lg:grid-cols-3" : ""}`}>
+              {visibleStatusColumns.map((column) => (
+                <div key={column.key} className="flex flex-col gap-2 self-start">
+                  {column.jobs.map(renderJobCard)}
+                  {column.jobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noResults")}</CardContent></Card>}
+                </div>
+              ))}
             </div>
           </>
         )}
