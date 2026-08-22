@@ -160,6 +160,8 @@ export default function EmployeeForm() {
   const [pendingReturn, setPendingReturn] = useState(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
+  const [returnSaveError, setReturnSaveError] = useState("");
+  const [returnCheckBusy, setReturnCheckBusy] = useState(false);
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
@@ -340,8 +342,11 @@ export default function EmployeeForm() {
   }
 
   async function saveWithReturn(minutes, km) {
+    setReturnSaveError("");
+    setReturnCheckBusy(true);
     const returnValues = { minutes, km };
     const needsEvidence = await requiresOvertimeEvidence(minutes);
+    setReturnCheckBusy(false);
     if (needsEvidence) {
       setPendingReturn(returnValues);
       setReturnStep("evidence");
@@ -349,7 +354,7 @@ export default function EmployeeForm() {
     }
     const saved = await saveJob(pendingSaveMode, returnValues);
     if (!saved) {
-      setReturnStep("closed");
+      setReturnSaveError(t("form.return.saveError"));
       return;
     }
 
@@ -372,10 +377,14 @@ export default function EmployeeForm() {
 
   async function requiresOvertimeEvidence(candidateReturnMinutes) {
     try {
-      const [{ data: profile }, { data: dayJobs, error: jobsError }] = await Promise.all([
-        supabase.from("profiles").select("overtime_evidence_required, include_return_time_in_overtime").eq("id", user.id).single(),
-        supabase.from("jobs").select("id, depart, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
-      ]);
+      const [{ data: profile }, { data: dayJobs, error: jobsError }] = await withTimeout(
+        Promise.all([
+          supabase.from("profiles").select("overtime_evidence_required, include_return_time_in_overtime").eq("id", user.id).single(),
+          supabase.from("jobs").select("id, depart, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
+        ]),
+        12000,
+        "Overtime check"
+      );
       if (jobsError) throw jobsError;
       if (profile?.overtime_evidence_required === false) return false;
       if (editId && hasOvertimeEvidence) return false;
@@ -763,6 +772,11 @@ export default function EmployeeForm() {
         if (!open && !saving) setReturnStep("closed");
       }}>
         <DialogContent className="max-w-md">
+          {returnSaveError && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-400" role="alert">
+              {returnSaveError}
+            </div>
+          )}
           {returnStep === "ask" && (
             <>
               <DialogHeader>
@@ -770,10 +784,10 @@ export default function EmployeeForm() {
               </DialogHeader>
               <p className="text-sm text-muted-foreground">{t("form.return.askDescription")}</p>
               <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" disabled={saving} onClick={() => saveWithReturn(0, 0)}>
-                  {t("common.no")}
+                <Button type="button" variant="outline" disabled={saving || returnCheckBusy} onClick={() => saveWithReturn(0, 0)}>
+                  {returnCheckBusy ? t("common.pleaseWait") : t("common.no")}
                 </Button>
-                <Button type="button" disabled={saving} onClick={() => setReturnStep("time")}>
+                <Button type="button" disabled={saving || returnCheckBusy} onClick={() => setReturnStep("time")}>
                   {t("common.yes")}
                 </Button>
               </DialogFooter>
@@ -805,10 +819,8 @@ export default function EmployeeForm() {
                 <Label htmlFor="return-km">{t("form.return.kmLabel")}</Label>
                 <Input
                   id="return-km"
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  min="0"
-                  step="0.1"
                   autoFocus
                   value={returnKm}
                   onChange={(event) => setReturnKm(event.target.value)}
@@ -817,8 +829,8 @@ export default function EmployeeForm() {
                 <p className="text-xs text-muted-foreground">{t("form.return.selectedTime", { time: formatReturnMinutes(returnMinutes || 0) })}</p>
               </div>
               <DialogFooter>
-                <Button type="button" disabled={saving || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
-                  {saving ? t("common.saving") : t("form.buttons.save")}
+                <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
+                  {saving || returnCheckBusy ? t("common.saving") : t("form.buttons.save")}
                 </Button>
               </DialogFooter>
             </>
