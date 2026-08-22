@@ -154,6 +154,7 @@ export default function EmployeeForm() {
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
+  const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
@@ -704,6 +705,7 @@ export default function EmployeeForm() {
                       if (localStorage.getItem("autofill_tip_seen")) {
                         imageInputRef.current?.click();
                       } else {
+                        setAutofillTipPage(1);
                         setShowAutofillTip(true);
                       }
                     }}
@@ -733,39 +735,73 @@ export default function EmployeeForm() {
           </CardContent>
         </Card>
       </div>
-      <Dialog open={showAutofillTip} onOpenChange={setShowAutofillTip}>
+      <Dialog open={showAutofillTip} onOpenChange={(open) => {
+        setShowAutofillTip(open);
+        if (!open) setAutofillTipPage(1);
+      }}>
         <DialogContent className="max-w-sm p-0 overflow-hidden">
           <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle>{t("form.autofillTip.title")}</DialogTitle>
+            <DialogTitle>
+              {autofillTipPage === 1
+                ? t("form.autofillTip.title")
+                : t("form.autofillTip.exampleTitle")}
+            </DialogTitle>
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("form.autofillTip.page", { current: autofillTipPage, total: 2 })}
+            </p>
           </DialogHeader>
 
-          <div className="px-5 space-y-2 text-sm text-muted-foreground">
-            <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
-            <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
-            <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
-          </div>
-
-          <div className="px-5 pb-2 pt-3">
-            <img
-              src="/autofill-screenshot-guide.jpg"
-              alt="Screenshot guide"
-              className="w-full rounded-md border object-cover"
-              style={{ maxHeight: "340px", objectPosition: "bottom" }}
-            />
-          </div>
-
-          <DialogFooter className="px-5 pb-5 pt-2">
-            <Button
-              className="w-full"
-              onClick={() => {
-                localStorage.setItem("autofill_tip_seen", "1");
-                setShowAutofillTip(false);
-                imageInputRef.current?.click();
-              }}
-            >
-              {t("form.autofillTip.gotIt")}
-            </Button>
-          </DialogFooter>
+          {autofillTipPage === 1 ? (
+            <>
+              <div className="px-5 space-y-3 text-sm text-muted-foreground">
+                <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
+                <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
+                <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
+              </div>
+              <DialogFooter className="px-5 pb-5 pt-3">
+                <Button className="w-full" onClick={() => setAutofillTipPage(2)}>
+                  {t("form.autofillTip.next")}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="px-5 pb-2">
+                <p className="mb-3 text-sm text-muted-foreground">{t("form.autofillTip.exampleDescription")}</p>
+                <img
+                  src="/autofill-screenshot-guide.jpg"
+                  alt={t("form.autofillTip.exampleAlt")}
+                  className="w-full rounded-md border object-cover"
+                  style={{ maxHeight: "340px", objectPosition: "bottom" }}
+                />
+              </div>
+              <DialogFooter className="gap-2 px-5 pb-5 pt-2 sm:flex-col sm:space-x-0">
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setShowAutofillTip(false);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  {t("form.autofillTip.choose")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    localStorage.setItem("autofill_tip_seen", "1");
+                    setShowAutofillTip(false);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  {t("form.autofillTip.dontShowAgain")}
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => setAutofillTipPage(1)}>
+                  {t("common.back")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
       <Dialog open={returnStep !== "closed"} onOpenChange={(open) => {
