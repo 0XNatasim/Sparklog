@@ -188,6 +188,11 @@ export const dictionaries = {
     "form.evidence.choose": "Choose SMS screenshot",
     "form.evidence.processing": "Uploading and reading screenshot…",
     "form.evidence.failed": "The screenshot could not be saved. Please try again.",
+    "form.evidence.requiredContentTitle": "The screenshot must show:",
+    "form.evidence.requiredApproval": "The SMS message clearly approving the overtime request.",
+    "form.evidence.requiredDuration": "The employee’s reply confirming the overtime duration (for example, 30 min).",
+    "form.evidence.requiredCrop": "A close crop of the approval and duration, like the provided second example — not the entire conversation.",
+    "form.evidence.invalid": "This screenshot does not clearly contain an overtime approval and a duration. Crop the approval message and duration reply, then try again.",
 
     // history
     "history.title": "History",
@@ -484,6 +489,11 @@ export const dictionaries = {
     "form.evidence.choose": "Choisir la capture du SMS",
     "form.evidence.processing": "Téléversement et lecture de la capture…",
     "form.evidence.failed": "La capture n’a pas pu être enregistrée. Veuillez réessayer.",
+    "form.evidence.requiredContentTitle": "La capture doit montrer :",
+    "form.evidence.requiredApproval": "Le message SMS qui approuve clairement la demande de temps supplémentaire.",
+    "form.evidence.requiredDuration": "La réponse de l’employé confirmant la durée du temps supplémentaire (par exemple, 30 min).",
+    "form.evidence.requiredCrop": "Un cadrage serré de l’approbation et de la durée, comme le deuxième exemple fourni — pas toute la conversation.",
+    "form.evidence.invalid": "Cette capture ne contient pas clairement une approbation de temps supplémentaire et une durée. Cadrez le message d’approbation et la réponse avec la durée, puis réessayez.",
 
     "history.title": "Historique",
     "history.empty": "Aucun job pour le moment.",

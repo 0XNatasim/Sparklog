@@ -98,6 +98,14 @@ function formatReturnMinutes(minutes) {
   return `${hours} h ${remainder}`;
 }
 
+function validateOvertimeSmsText(text) {
+  const normalized = String(text || "").toLocaleLowerCase("fr-CA");
+  const mentionsOvertime = /temps\s+suppl[eé]mentaire|\bts\b/.test(normalized);
+  const confirmsApproval = /approuv[eé]e?|autoris[eé]e?|accord[eé]e?/.test(normalized);
+  const includesDuration = /\b\d+(?:[.,]\d+)?\s*(?:h(?:eure)?s?|min(?:ute)?s?)\b/.test(normalized);
+  return mentionsOvertime && confirmsApproval && includesDuration;
+}
+
 function withTimeout(promise, ms, label) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
@@ -151,6 +159,7 @@ export default function EmployeeForm() {
   const [returnKm, setReturnKm] = useState("");
   const [pendingReturn, setPendingReturn] = useState(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
+  const [evidenceValidationError, setEvidenceValidationError] = useState("");
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
@@ -393,6 +402,7 @@ export default function EmployeeForm() {
     if (!file || !pendingReturn) return;
     setEvidenceBusy(true);
     setErr("");
+    setEvidenceValidationError("");
 
     const jobId = editId || crypto.randomUUID();
     const evidenceId = crypto.randomUUID();
@@ -403,6 +413,10 @@ export default function EmployeeForm() {
     try {
       try {
         ocrText = await ocrSpaceExtract(file);
+        if (!validateOvertimeSmsText(ocrText)) {
+          setEvidenceValidationError(t("form.evidence.invalid"));
+          return;
+        }
       } catch (ocrError) {
         console.warn("Overtime evidence OCR needs review:", ocrError);
         ocrStatus = "needs_review";
@@ -819,6 +833,15 @@ export default function EmployeeForm() {
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">
                   {t("form.evidence.description")}
                 </div>
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <div className="font-semibold">{t("form.evidence.requiredContentTitle")}</div>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                    <li>{t("form.evidence.requiredApproval")}</li>
+                    <li>{t("form.evidence.requiredDuration")}</li>
+                    <li>{t("form.evidence.requiredCrop")}</li>
+                  </ul>
+                </div>
+                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">{evidenceValidationError}</div>}
                 <p className="text-muted-foreground">{t("form.evidence.ocrNotice")}</p>
                 <input
                   ref={overtimeInputRef}
