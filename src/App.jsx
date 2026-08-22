@@ -10,6 +10,7 @@ import Week from "./pages/Week";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import Testing from "./pages/Testing";
 import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
 
 export default function App() {
   const isPasswordRecovery = window.location.pathname === "/reset-password";
@@ -63,6 +64,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Week />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

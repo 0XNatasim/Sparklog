@@ -7,6 +7,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
+import NotificationsBell from "@/components/NotificationsBell";
 
 function NavItem({ to, children }) {
   return (
@@ -51,6 +52,7 @@ export default function AppShell({ children }) {
           </div>
 
           <div className="ml-auto flex items-center gap-0">
+            <NotificationsBell />
             <ThemeToggle className="h-8 w-8" />
             <LanguageToggle className="h-8 w-8" />
             <Button
@@ -71,6 +73,7 @@ export default function AppShell({ children }) {
           <NavItem to="/form">{t("nav.form")}</NavItem>
           <NavItem to="/history">{t("nav.history")}</NavItem>
           <NavItem to="/week">{t("nav.week")}</NavItem>
+          <NavItem to="/profile">{t("nav.profile")}</NavItem>
           {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
           {role === "manager" && <NavItem to="/testing">{t("nav.testing")}</NavItem>}
         </nav>

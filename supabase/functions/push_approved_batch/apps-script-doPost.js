@@ -31,7 +31,8 @@ function doPost(e) {
 
     // Build a 2D array of rows in the column order the sheet expects:
     // A=Date, B=Employee, C=Email, D=Phone, E=OT, F=Depart, G=Arrival,
-    // H=End, I=Heures, J=KM, K=Approved by, L=Approved at
+    // H=End, I=Heures, J=KM aller, K=Temps retour (min), L=KM retour,
+    // M=Approved by, N=Approved at
     function rowFrom(d) {
       return [
         d.job_date,
@@ -44,6 +45,8 @@ function doPost(e) {
         d.fin,
         d.heures,
         d.km_aller,
+        d.return_time_minutes,
+        d.km_retour,
         d.approved_by,
         d.approved_at,
       ];

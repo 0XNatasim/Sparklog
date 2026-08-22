@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, Phone } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import FormsManager from "@/components/FormsManager";
 
 dayjs.extend(isoWeek);
 
@@ -45,6 +46,9 @@ function weekKeyFromDate(dateStr) {
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
   const t = useT();
+  const [searchParams] = useSearchParams();
+  const focusedJobId = searchParams.get("job");
+  const [focusedEvidence, setFocusedEvidence] = useState(null);
 
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState(new Map());
@@ -185,6 +189,23 @@ export default function ManagerDashboard() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId, statusFilter, weekFilter]);
+
+  useEffect(() => {
+    if (!focusedJobId) return;
+    supabase.from("jobs").select("user_id").eq("id", focusedJobId).single().then(({ data }) => {
+      if (data?.user_id) setEmployeeId(data.user_id);
+    });
+    supabase.from("overtime_evidence").select("ocr_text, ocr_status, storage_path, daily_minutes, created_at").eq("job_id", focusedJobId).maybeSingle().then(async ({ data }) => {
+      if (!data) return;
+      const { data: signed } = await supabase.storage.from("overtime-evidence").createSignedUrl(data.storage_path, 600);
+      setFocusedEvidence({ ...data, imageUrl: signed?.signedUrl || "" });
+    });
+  }, [focusedJobId]);
+
+  useEffect(() => {
+    if (!focusedJobId || !jobs.some((job) => job.id === focusedJobId)) return;
+    requestAnimationFrame(() => document.getElementById(`job-${focusedJobId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [focusedJobId, jobs]);
 
   const employeeOptions = useMemo(() => {
     const arr = [];
@@ -360,6 +381,8 @@ export default function ManagerDashboard() {
       "hours_decimal",
       "hours_hhmm",
       "km",
+      "return_time_minutes",
+      "return_km",
     ];
 
     function decimalHours(depart, fin) {
@@ -401,6 +424,8 @@ export default function ManagerDashboard() {
           dec.toFixed(2),
           fmtHHmm(dec),
           km,
+          Number(j.return_time_minutes ?? 0) || 0,
+          Number(j.km_retour ?? 0) || 0,
         ];
       });
 
@@ -508,7 +533,7 @@ export default function ManagerDashboard() {
     const canApprove = j.status === "submitted";
 
     return (
-      <Card key={j.id}>
+      <Card key={j.id} id={`job-${j.id}`} className={focusedJobId === j.id ? "ring-2 ring-red-500" : ""}>
         <CardContent className="p-3">
           {/* Mobile: stacked. Desktop: single-row inline list. */}
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
@@ -589,6 +614,18 @@ export default function ManagerDashboard() {
           <div className="mt-1.5 text-xs text-muted-foreground">
             {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
           </div>
+          {focusedJobId === j.id && focusedEvidence && (
+            <div className="mt-3 grid gap-3 rounded-lg border border-red-500/30 bg-red-500/5 p-3 md:grid-cols-2">
+              <div>
+                <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
+                {focusedEvidence.imageUrl && <img src={focusedEvidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-80 w-full rounded-md border object-contain" />}
+              </div>
+              <div>
+                <div className="mb-2 text-sm font-semibold">OCR · {focusedEvidence.ocr_status}</div>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{focusedEvidence.ocr_text || t("notifications.ocrUnavailable")}</pre>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -599,6 +636,7 @@ export default function ManagerDashboard() {
   return (
     <AppShell>
       <div className="space-y-3">
+        <FormsManager />
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
