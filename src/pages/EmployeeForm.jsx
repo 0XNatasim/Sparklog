@@ -161,6 +161,7 @@ export default function EmployeeForm() {
   const [pendingReturn, setPendingReturn] = useState(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
+  const [showOvertimeExample, setShowOvertimeExample] = useState(false);
   const [returnSaveError, setReturnSaveError] = useState("");
   const [returnCheckBusy, setReturnCheckBusy] = useState(false);
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
@@ -805,7 +806,10 @@ export default function EmployeeForm() {
         </DialogContent>
       </Dialog>
       <Dialog open={returnStep !== "closed"} onOpenChange={(open) => {
-        if (!open && !saving) setReturnStep("closed");
+        if (!open && !saving) {
+          setReturnStep("closed");
+          setShowOvertimeExample(false);
+        }
       }}>
         <DialogContent className="max-w-md">
           {returnSaveError && (
@@ -888,6 +892,26 @@ export default function EmployeeForm() {
                     <li>{t("form.evidence.requiredDuration")}</li>
                     <li>{t("form.evidence.requiredCrop")}</li>
                   </ul>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    aria-expanded={showOvertimeExample}
+                    aria-controls="overtime-evidence-example"
+                    onClick={() => setShowOvertimeExample((visible) => !visible)}
+                  >
+                    {showOvertimeExample ? t("form.evidence.hideExample") : t("form.evidence.showExample")}
+                  </Button>
+                  {showOvertimeExample && (
+                    <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
+                      <img
+                        src="/overtime-evidence-example.svg"
+                        alt={t("form.evidence.exampleAlt")}
+                        className="max-h-96 w-full rounded object-contain"
+                      />
+                    </div>
+                  )}
                 </div>
                 {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">{evidenceValidationError}</div>}
                 <input
