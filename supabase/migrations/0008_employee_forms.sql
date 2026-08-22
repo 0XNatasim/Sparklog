@@ -17,11 +17,13 @@ on conflict (form_id) do nothing;
 
 alter table public.employee_forms enable row level security;
 
+drop policy if exists "employee_forms: authenticated read" on public.employee_forms;
 create policy "employee_forms: authenticated read"
   on public.employee_forms for select
   to authenticated
   using (true);
 
+drop policy if exists "employee_forms: manager update" on public.employee_forms;
 create policy "employee_forms: manager update"
   on public.employee_forms for update
   to authenticated

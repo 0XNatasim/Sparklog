@@ -63,24 +63,29 @@ alter table public.overtime_evidence enable row level security;
 alter table public.manager_notifications enable row level security;
 alter table public.manager_notification_reads enable row level security;
 
+drop policy if exists "overtime evidence: employee insert" on public.overtime_evidence;
 create policy "overtime evidence: employee insert"
   on public.overtime_evidence for insert to authenticated
   with check (
     user_id = auth.uid()
     and exists (select 1 from public.jobs where jobs.id = job_id and jobs.user_id = auth.uid())
   );
+drop policy if exists "overtime evidence: manager read" on public.overtime_evidence;
 create policy "overtime evidence: manager read"
   on public.overtime_evidence for select to authenticated
   using (public.get_my_role() = 'manager');
+drop policy if exists "notifications: employee insert" on public.manager_notifications;
 create policy "notifications: employee insert"
   on public.manager_notifications for insert to authenticated
   with check (
     employee_id = auth.uid()
     and exists (select 1 from public.jobs where jobs.id = job_id and jobs.user_id = auth.uid())
   );
+drop policy if exists "notifications: manager read" on public.manager_notifications;
 create policy "notifications: manager read"
   on public.manager_notifications for select to authenticated
   using (public.get_my_role() = 'manager');
+drop policy if exists "notification reads: manager manage own" on public.manager_notification_reads;
 create policy "notification reads: manager manage own"
   on public.manager_notification_reads for all to authenticated
   using (manager_id = auth.uid() and public.get_my_role() = 'manager')
@@ -90,11 +95,24 @@ insert into storage.buckets (id, name, public)
 values ('overtime-evidence', 'overtime-evidence', false)
 on conflict (id) do update set public = false;
 
+drop policy if exists "overtime storage: employee upload" on storage.objects;
 create policy "overtime storage: employee upload"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'overtime-evidence' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "overtime storage: manager read" on storage.objects;
 create policy "overtime storage: manager read"
   on storage.objects for select to authenticated
   using (bucket_id = 'overtime-evidence' and public.get_my_role() = 'manager');
 
-alter publication supabase_realtime add table public.manager_notifications;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'manager_notifications'
+  ) then
+    execute 'alter publication supabase_realtime add table public.manager_notifications';
+  end if;
+end $$;
