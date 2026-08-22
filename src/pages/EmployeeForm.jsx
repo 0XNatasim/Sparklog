@@ -890,7 +890,6 @@ export default function EmployeeForm() {
                   </ul>
                 </div>
                 {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">{evidenceValidationError}</div>}
-                <p className="text-muted-foreground">{t("form.evidence.ocrNotice")}</p>
                 <input
                   ref={overtimeInputRef}
                   type="file"
