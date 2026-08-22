@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, Phone } from "lucide-react";
+import { Calendar, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -46,9 +46,17 @@ function weekKeyFromDate(dateStr) {
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
   const t = useT();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
+  const activeSection = ["forms", "timesheet", "overtime", "download"].includes(searchParams.get("section"))
+    ? searchParams.get("section")
+    : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
+  const [overtimeJobs, setOvertimeJobs] = useState([]);
+  const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
+  const [overtimeLoading, setOvertimeLoading] = useState(false);
+  const [visibleEvidence, setVisibleEvidence] = useState(new Set());
+  const [evidenceImageLoading, setEvidenceImageLoading] = useState("");
 
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState(new Map());
@@ -203,9 +211,80 @@ export default function ManagerDashboard() {
   }, [focusedJobId]);
 
   useEffect(() => {
-    if (!focusedJobId || !jobs.some((job) => job.id === focusedJobId)) return;
+    if (activeSection !== "overtime") return;
+    let cancelled = false;
+    async function loadOvertime() {
+      setOvertimeLoading(true);
+      setErr("");
+      try {
+        const { data: evidenceRows, error: evidenceError } = await withTimeout(
+          supabase.from("overtime_evidence").select("job_id, ocr_text, ocr_status, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }),
+          12000
+        );
+        if (evidenceError) throw evidenceError;
+        const jobIds = (evidenceRows || []).map((row) => row.job_id);
+        const { data: jobRows, error: jobError } = jobIds.length
+          ? await withTimeout(supabase.from("jobs").select("*").in("id", jobIds), 12000)
+          : { data: [], error: null };
+        if (jobError) throw jobError;
+        const order = new Map(jobIds.map((id, index) => [id, index]));
+        const orderedJobs = (jobRows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
+        const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
+        if (missingProfileIds.length) {
+          const { data: profileRows, error: profileError } = await withTimeout(
+            supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
+            12000
+          );
+          if (profileError) throw profileError;
+          if (!cancelled) setProfiles((current) => {
+            const next = new Map(current);
+            (profileRows || []).forEach((profile) => next.set(profile.id, profile));
+            return next;
+          });
+        }
+        if (!cancelled) {
+          setOvertimeJobs(orderedJobs);
+          setOvertimeEvidence(new Map((evidenceRows || []).map((row) => [row.job_id, row])));
+          if (focusedJobId) setVisibleEvidence(new Set([focusedJobId]));
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e?.message || t("manager.overtime.failedLoad"));
+      } finally {
+        if (!cancelled) setOvertimeLoading(false);
+      }
+    }
+    loadOvertime();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, focusedJobId]);
+
+  async function toggleEvidence(jobId) {
+    if (visibleEvidence.has(jobId)) {
+      setVisibleEvidence((current) => {
+        const next = new Set(current);
+        next.delete(jobId);
+        return next;
+      });
+      return;
+    }
+    const evidence = overtimeEvidence.get(jobId);
+    if (evidence?.storage_path && !evidence.imageUrl) {
+      setEvidenceImageLoading(jobId);
+      const { data } = await supabase.storage.from("overtime-evidence").createSignedUrl(evidence.storage_path, 600);
+      setOvertimeEvidence((current) => {
+        const next = new Map(current);
+        next.set(jobId, { ...evidence, imageUrl: data?.signedUrl || "" });
+        return next;
+      });
+      setEvidenceImageLoading("");
+    }
+    setVisibleEvidence((current) => new Set(current).add(jobId));
+  }
+
+  useEffect(() => {
+    if (!focusedJobId || ![...jobs, ...overtimeJobs].some((job) => job.id === focusedJobId)) return;
     requestAnimationFrame(() => document.getElementById(`job-${focusedJobId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
-  }, [focusedJobId, jobs]);
+  }, [focusedJobId, jobs, overtimeJobs]);
 
   const employeeOptions = useMemo(() => {
     const arr = [];
@@ -631,12 +710,105 @@ export default function ManagerDashboard() {
     );
   }
 
+  function renderOvertimeCard(job) {
+    const evidence = overtimeEvidence.get(job.id);
+    const employee = profiles.get(job.user_id);
+    const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
+    const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
+    const km = (Number(job.km_aller ?? 0) || 0) + (Number(job.km_retour ?? 0) || 0);
+    const isVisible = visibleEvidence.has(job.id);
+
+    return (
+      <Card key={job.id} id={`job-${job.id}`} className={focusedJobId === job.id ? "ring-2 ring-red-500" : ""}>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-bold">{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{employeeName}</span>
+                {employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}
+                {employee?.email ? <> · <a className="text-primary hover:underline" href={`mailto:${employee.email}`}>{employee.email}</a></> : null}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
+              <Button type="button" size="sm" variant="outline" disabled={evidenceImageLoading === job.id} onClick={() => toggleEvidence(job.id)}>
+                {isVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}
+                {evidenceImageLoading === job.id ? t("common.loading") : isVisible ? t("manager.overtime.hideEvidence") : t("manager.overtime.showEvidence")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHours(totalHours)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.km")}: <b>{km}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
+            {job.return_time_minutes ? <span className="rounded-full border bg-muted px-2 py-1">{t("form.return.timeTitle")}: <b>{job.return_time_minutes} min</b></span> : null}
+            {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
+          </div>
+
+          <div>
+            <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
+            <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{evidence?.ocr_text || t("notifications.ocrUnavailable")}</pre>
+          </div>
+
+          {isVisible && (
+            <div className="rounded-lg border p-3">
+              <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
+              {evidence?.imageUrl
+                ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-md object-contain" />
+                : <p className="text-sm text-muted-foreground">{t("manager.overtime.imageUnavailable")}</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
   return (
     <AppShell>
       <div className="space-y-3">
-        <FormsManager />
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label={t("manager.sections.label")}>
+          {[
+            { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
+            { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
+            { id: "overtime", icon: TimerReset, label: t("manager.sections.overtime"), description: t("manager.sections.overtimeDescription") },
+            { id: "download", icon: Download, label: t("manager.sections.download"), description: t("manager.sections.downloadDescription") },
+          ].map(({ id, icon: Icon, label, description }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSearchParams({ section: id })}
+              aria-current={activeSection === id ? "page" : undefined}
+              className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === id ? "border-primary bg-primary/10 text-primary" : "bg-card hover:border-primary/50 hover:bg-accent"}`}
+            >
+              <div className="flex items-center gap-2 font-semibold"><Icon className="h-4 w-4" />{label}</div>
+              <div className={`mt-1 text-xs ${activeSection === id ? "text-primary/80" : "text-muted-foreground"}`}>{description}</div>
+            </button>
+          ))}
+        </div>
+
+        {activeSection === "forms" && <FormsManager collapsible={false} />}
+
+        {activeSection === "overtime" && (
+          <div className="space-y-3">
+            <Card><CardContent className="p-4"><h2 className="font-semibold">{t("manager.overtime.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.overtime.description")}</p></CardContent></Card>
+            {overtimeLoading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
+            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{err}</div>}
+            {!overtimeLoading && overtimeJobs.map(renderOvertimeCard)}
+            {!overtimeLoading && overtimeJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.overtime.empty")}</CardContent></Card>}
+          </div>
+        )}
+
+        {activeSection === "download" && (
+          <Card><CardContent className="p-8 text-center"><Download className="mx-auto h-8 w-8 text-muted-foreground" /><h2 className="mt-3 font-semibold">{t("manager.download.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.download.description")}</p></CardContent></Card>
+        )}
+
+        {activeSection === "timesheet" && <>
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -841,6 +1013,7 @@ export default function ManagerDashboard() {
             </Button>
           </div>
         )}
+        </>}
       </div>
     </AppShell>
   );
