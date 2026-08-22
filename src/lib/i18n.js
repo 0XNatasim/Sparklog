@@ -194,6 +194,9 @@ export const dictionaries = {
     "form.evidence.requiredDuration": "The employee’s reply confirming the overtime duration (for example, 30 min).",
     "form.evidence.requiredCrop": "A close crop of the approval and duration, like the provided example — not the entire conversation.",
     "form.evidence.invalid": "This screenshot does not clearly contain the dated overtime approval and a duration. Crop the approval message, date, and duration reply, then try again.",
+    "form.evidence.exampleTitle": "Visual example",
+    "form.evidence.exampleAlt": "Example of a tightly cropped SMS screenshot showing the dated overtime approval and the employee’s duration reply",
+    "form.evidence.hideExample": "Don’t show this example again",
 
     // history
     "history.title": "History",
@@ -496,6 +499,9 @@ export const dictionaries = {
     "form.evidence.requiredDuration": "La réponse de l’employé confirmant la durée du temps supplémentaire (par exemple, 30 min).",
     "form.evidence.requiredCrop": "Un cadrage serré de l’approbation et de la durée, comme l’exemple fourni — pas toute la conversation.",
     "form.evidence.invalid": "Cette capture ne contient pas clairement l’approbation datée du temps supplémentaire et une durée. Cadrez le message d’approbation, la date et la réponse avec la durée, puis réessayez.",
+    "form.evidence.exampleTitle": "Exemple visuel",
+    "form.evidence.exampleAlt": "Exemple de capture SMS cadrée montrant l’approbation datée du temps supplémentaire et la réponse de l’employé avec la durée",
+    "form.evidence.hideExample": "Ne plus afficher cet exemple",
 
     "history.title": "Historique",
     "history.empty": "Aucun job pour le moment.",

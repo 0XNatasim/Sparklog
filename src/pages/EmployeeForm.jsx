@@ -166,6 +166,9 @@ export default function EmployeeForm() {
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
+  const [showEvidenceExample, setShowEvidenceExample] = useState(
+    () => localStorage.getItem("overtime_evidence_example_hidden") !== "1"
+  );
 
   const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
@@ -854,6 +857,28 @@ export default function EmployeeForm() {
                     <li>{t("form.evidence.requiredCrop")}</li>
                   </ul>
                 </div>
+                {showEvidenceExample && (
+                  <div className="space-y-2 rounded-md border p-3">
+                    <div className="font-semibold">{t("form.evidence.exampleTitle")}</div>
+                    <img
+                      src="/overtime-sms-example.svg"
+                      alt={t("form.evidence.exampleAlt")}
+                      className="mx-auto max-h-[42vh] w-auto max-w-full rounded-md border"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs text-muted-foreground"
+                      onClick={() => {
+                        localStorage.setItem("overtime_evidence_example_hidden", "1");
+                        setShowEvidenceExample(false);
+                      }}
+                    >
+                      {t("form.evidence.hideExample")}
+                    </Button>
+                  </div>
+                )}
                 {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">{evidenceValidationError}</div>}
                 <p className="text-muted-foreground">{t("form.evidence.ocrNotice")}</p>
                 <input

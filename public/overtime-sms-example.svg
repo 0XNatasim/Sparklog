@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="367" height="432" viewBox="0 0 367 432" role="img" aria-labelledby="title desc">
+  <title id="title">Exemple de capture SMS pour le temps supplémentaire</title>
+  <desc id="desc">Message daté approuvant le temps supplémentaire et réponse de trente minutes.</desc>
+  <rect width="367" height="432" fill="#0d0d12"/>
+  <rect x="10" y="8" width="322" height="210" rx="22" fill="#202024"/>
+  <g fill="#f3f3f5" font-family="Arial, Helvetica, sans-serif" font-size="18">
+    <text x="25" y="34" text-decoration="underline">10-08-2026 demande de temps</text>
+    <text x="25" y="58">supplémentaire approuvé.</text>
+    <text x="25" y="105">Confirme moi la durée en temps</text>
+    <text x="25" y="130">supplémentaire a la fin de la journée</text>
+    <text x="25" y="155">Merci</text>
+    <text x="25" y="180">Mélanie Noël-Richard Contremaître</text>
+  </g>
+  <circle cx="318" cy="224" r="14" fill="#2b2b31"/>
+  <text x="309" y="231" font-family="Arial, sans-serif" font-size="15">👍</text>
+  <rect x="281" y="253" width="76" height="48" rx="24" fill="#46567e"/>
+  <text x="295" y="284" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="19">30min</text>
+  <text x="287" y="322" fill="#b9bac1" font-family="Arial, Helvetica, sans-serif" font-size="12">07:57  ✓✓  🔒</text>
+  <rect x="10" y="340" width="285" height="58" rx="29" fill="#222228"/>
+  <circle cx="39" cy="369" r="14" fill="none" stroke="#c5c7d0" stroke-width="2"/>
+  <path d="M39 361v16M31 369h16" stroke="#c5c7d0" stroke-width="2"/>
+  <text x="68" y="377" fill="#c5c7d0" font-family="Arial, Helvetica, sans-serif" font-size="18">RCS message</text>
+  <circle cx="326" cy="369" r="31" fill="#654b88"/>
+  <path d="M315 369v-8m6 15v-14m6 18v-22m6 18v-14m6 7v-8" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M82 411v13M176 418a8 8 0 1 0 16 0 8 8 0 1 0-16 0M287 411l-9 7 9 7" fill="none" stroke="#ddd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
