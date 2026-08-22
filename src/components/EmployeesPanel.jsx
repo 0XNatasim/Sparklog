@@ -36,7 +36,7 @@ export default function EmployeesPanel() {
       const { data, error } = await withTimeout(
         supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, ccq_number, apprentice_level, sector, km_rate, storage_compensation")
+          .select("id, role, full_name, phone, email, ccq_number, apprentice_level, sector, km_rate, storage_compensation, overtime_evidence_required, include_return_time_in_overtime, evidence_retention_days")
           .order("full_name", { ascending: true }),
         12000
       );
@@ -279,6 +279,50 @@ export default function EmployeesPanel() {
                 />
               </span>
             </label>
+
+            <div className="grid gap-3 rounded-lg border bg-muted/20 px-4 py-3 sm:grid-cols-2 sm:items-center">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={p.overtime_evidence_required !== false}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLocal(p.id, "overtime_evidence_required", checked);
+                    saveField(p.id, "overtime_evidence_required", checked);
+                  }}
+                  className="h-5 w-5 rounded border-input accent-primary"
+                />
+                <span>
+                  <span className="block text-sm font-semibold">{t("employees.overtimeEvidence")}</span>
+                  <span className="block text-xs text-muted-foreground">{t("employees.overtimeEvidenceDescription")}</span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={p.include_return_time_in_overtime !== false}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLocal(p.id, "include_return_time_in_overtime", checked);
+                    saveField(p.id, "include_return_time_in_overtime", checked);
+                  }}
+                  className="h-5 w-5 rounded border-input accent-primary"
+                />
+                <span className="text-sm font-medium">{t("employees.includeReturnTime")}</span>
+              </label>
+              <Field label={t("employees.retentionDays")}>
+                <Input
+                  type="number"
+                  min="1"
+                  max="365"
+                  inputMode="numeric"
+                  value={p.evidence_retention_days ?? 30}
+                  onChange={(e) => setLocal(p.id, "evidence_retention_days", e.target.value)}
+                  onBlur={(e) => saveField(p.id, "evidence_retention_days", Math.min(365, Math.max(1, Number(e.target.value) || 30)))}
+                  className="h-9"
+                />
+              </Field>
+            </div>
           </CardContent>
         </Card>
       ))}

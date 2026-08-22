@@ -144,10 +144,16 @@ export default function EmployeeForm() {
   const [locked, setLocked] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
+  const overtimeInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
+  const [pendingReturn, setPendingReturn] = useState(null);
+  const [evidenceBusy, setEvidenceBusy] = useState(false);
+  const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
+  const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
+  const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
   const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
@@ -178,6 +184,7 @@ export default function EmployeeForm() {
       setDepart(fmtTimeHHmm(data.depart) || "");
       setArrivee(fmtTimeHHmm(data.arrivee) || "");
       setFin(fmtTimeHHmm(data.fin) || "");
+      setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
 
       const aller = data.km_aller ?? "";
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
@@ -212,21 +219,26 @@ export default function EmployeeForm() {
       setErr("");
       setInfo("");
       setDirty(false);
+      setHasOvertimeEvidence(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
 
   async function saveDraft() {
+    setPendingSaveMode("draft");
     setReturnMinutes(null);
     setReturnKm("");
     setReturnStep("ask");
   }
 
   async function submitJob() {
-    await saveJob("submit");
+    setPendingSaveMode("submit");
+    setReturnMinutes(null);
+    setReturnKm("");
+    setReturnStep("ask");
   }
 
-  async function saveJob(mode, returnValues = null) {
+  async function saveJob(mode, returnValues = null, forcedId = null, captureEvidence = false) {
     if (!user?.id) {
       setErr(t("form.errors.notSignedIn"));
       return;
@@ -269,6 +281,7 @@ export default function EmployeeForm() {
           return_time_minutes: returnValues.minutes,
           km_retour: returnValues.km,
         } : {}),
+        ...(captureEvidence ? { overtime_evidence_captured: true } : {}),
       };
 
       if (editId) {
@@ -285,7 +298,7 @@ export default function EmployeeForm() {
         setDirty(false);
       } else {
         const { data, error } = await withTimeout(
-          supabase.from("jobs").insert(payload).select("id").single(),
+          supabase.from("jobs").insert(forcedId ? { ...payload, id: forcedId } : payload).select("id").single(),
           15000,
           "Save"
         );
@@ -299,7 +312,7 @@ export default function EmployeeForm() {
 
         if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }
-      return true;
+      return editId || forcedId || true;
     } catch (e) {
       // Postgres unique_violation = "23505". Map it to a friendly message
       // since the raw "duplicate key value violates unique constraint…" is
@@ -318,7 +331,14 @@ export default function EmployeeForm() {
   }
 
   async function saveWithReturn(minutes, km) {
-    const saved = await saveJob("draft", { minutes, km });
+    const returnValues = { minutes, km };
+    const needsEvidence = await requiresOvertimeEvidence(minutes);
+    if (needsEvidence) {
+      setPendingReturn(returnValues);
+      setReturnStep("evidence");
+      return;
+    }
+    const saved = await saveJob(pendingSaveMode, returnValues);
     if (!saved) {
       setReturnStep("closed");
       return;
@@ -338,6 +358,94 @@ export default function EmployeeForm() {
       setLocked(false);
       setDirty(false);
       setInfo("");
+    }
+  }
+
+  async function requiresOvertimeEvidence(candidateReturnMinutes) {
+    try {
+      const [{ data: profile }, { data: dayJobs, error: jobsError }] = await Promise.all([
+        supabase.from("profiles").select("overtime_evidence_required, include_return_time_in_overtime").eq("id", user.id).single(),
+        supabase.from("jobs").select("id, depart, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
+      ]);
+      if (jobsError) throw jobsError;
+      if (profile?.overtime_evidence_required === false) return false;
+      if (editId && hasOvertimeEvidence) return false;
+      const includeReturnTime = profile?.include_return_time_in_overtime !== false;
+      const existingMinutes = (dayJobs || [])
+        .filter((job) => job.id !== editId)
+        .reduce((total, job) => {
+          const start = makeDayjsFromJob(job_date, job.depart);
+          const end = makeDayjsFromJob(job_date, job.fin);
+          return total + Math.round((hoursBetween(start, end) || 0) * 60) + (includeReturnTime ? (Number(job.return_time_minutes) || 0) : 0);
+        }, 0);
+      const dailyMinutes = existingMinutes + Math.round(hoursDecimal * 60) + (includeReturnTime ? candidateReturnMinutes : 0);
+      setOvertimeDailyMinutes(dailyMinutes);
+      return dailyMinutes > 480;
+    } catch (error) {
+      setErr(error?.message || t("form.errors.failedLoad"));
+      return true;
+    }
+  }
+
+  async function handleOvertimeEvidence(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !pendingReturn) return;
+    setEvidenceBusy(true);
+    setErr("");
+
+    const jobId = editId || crypto.randomUUID();
+    const evidenceId = crypto.randomUUID();
+    const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
+    let ocrText = "";
+    let ocrStatus = "processed";
+
+    try {
+      try {
+        ocrText = await ocrSpaceExtract(file);
+      } catch (ocrError) {
+        console.warn("Overtime evidence OCR needs review:", ocrError);
+        ocrStatus = "needs_review";
+      }
+
+      const image = await compressImage(file);
+      const { error: uploadError } = await supabase.storage
+        .from("overtime-evidence")
+        .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+      if (uploadError) throw uploadError;
+
+      const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
+      if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("evidence_retention_days")
+        .eq("id", user.id)
+        .single();
+      const retentionDays = Math.min(365, Math.max(1, Number(profile?.evidence_retention_days) || 30));
+      const dailyMinutes = overtimeDailyMinutes;
+      const expiresAt = dayjs().add(retentionDays, "day").toISOString();
+      const { error: evidenceError } = await supabase
+        .from("overtime_evidence")
+        .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: ocrText || null, ocr_status: ocrStatus, daily_minutes: dailyMinutes, expires_at: expiresAt });
+      if (evidenceError) throw evidenceError;
+
+      const { error: notificationError } = await supabase.from("manager_notifications").insert({
+        employee_id: user.id,
+        job_id: jobId,
+        evidence_id: evidenceId,
+        daily_minutes: dailyMinutes,
+      });
+      if (notificationError) throw notificationError;
+      setPendingReturn(null);
+      setHasOvertimeEvidence(false);
+      setReturnStep("success");
+      navigate("/form", { replace: true });
+    } catch (error) {
+      setErr(error?.message || t("form.evidence.failed"));
+      setReturnStep("evidence");
+    } finally {
+      setEvidenceBusy(false);
     }
   }
 
@@ -697,6 +805,33 @@ export default function EmployeeForm() {
               <DialogFooter>
                 <Button type="button" disabled={saving || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
                   {saving ? t("common.saving") : t("form.buttons.save")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {returnStep === "evidence" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("form.evidence.title")}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">
+                  {t("form.evidence.description")}
+                </div>
+                <p className="text-muted-foreground">{t("form.evidence.ocrNotice")}</p>
+                <input
+                  ref={overtimeInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleOvertimeEvidence}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" disabled={evidenceBusy} onClick={() => overtimeInputRef.current?.click()}>
+                  {evidenceBusy ? t("form.evidence.processing") : t("form.evidence.choose")}
                 </Button>
               </DialogFooter>
             </>
