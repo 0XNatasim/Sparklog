@@ -103,7 +103,8 @@ function validateOvertimeSmsText(text) {
   const mentionsOvertime = /temps\s+suppl[eé]mentaire|\bts\b/.test(normalized);
   const confirmsApproval = /approuv[eé]e?|autoris[eé]e?|accord[eé]e?/.test(normalized);
   const includesDuration = /\b\d+(?:[.,]\d+)?\s*(?:h(?:eure)?s?|min(?:ute)?s?)\b/.test(normalized);
-  return mentionsOvertime && confirmsApproval && includesDuration;
+  const includesDate = /\b(?:\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\b/.test(normalized);
+  return mentionsOvertime && confirmsApproval && includesDuration && includesDate;
 }
 
 function withTimeout(promise, ms, label) {
