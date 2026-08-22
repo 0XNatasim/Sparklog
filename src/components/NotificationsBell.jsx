@@ -43,7 +43,7 @@ export default function NotificationsBell() {
   async function openNotification(notification) {
     await supabase.from("manager_notification_reads").upsert({ notification_id: notification.id, manager_id: user.id });
     setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read: true } : item));
-    navigate(`/manager?job=${notification.job_id}`);
+    navigate(`/manager?section=overtime&job=${notification.job_id}`);
   }
 
   return (
