@@ -2,14 +2,14 @@
 -- These values are copied into generated weekly records; raw jobs remain unchanged.
 alter table public.profiles
   add column if not exists nas_employee text,
-  add column if not exists trade_code text default '160',
+  add column if not exists trade_code text default '220',
   add column if not exists work_region text,
   add column if not exists wage_schedule text,
   add column if not exists hourly_rate numeric(8,2);
 
 update public.profiles
 set
-  trade_code = coalesce(trade_code, '160'),
+  trade_code = coalesce(trade_code, '220'),
   sector = case sector
     when 'C' then 'I'
     when 'I' then 'N'

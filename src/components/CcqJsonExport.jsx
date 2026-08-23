@@ -27,7 +27,7 @@ export default function CcqJsonExport() {
         const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }] = await withTimeout(
           Promise.all([
             supabase.from("jobs").select("id, user_id, job_date, depart, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }),
-            supabase.from("profiles").select("id, full_name, email, nas_employee, trade_code, work_region, wage_schedule, hourly_rate").order("full_name"),
+            supabase.from("profiles").select("id, full_name, email, nas_employee, work_region, wage_schedule, hourly_rate").order("full_name"),
           ]),
           12000
         );

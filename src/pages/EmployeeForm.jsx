@@ -153,6 +153,7 @@ export default function EmployeeForm() {
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
+  const parkingInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [returnStep, setReturnStep] = useState("closed");
@@ -166,6 +167,9 @@ export default function EmployeeForm() {
   const [returnCheckBusy, setReturnCheckBusy] = useState(false);
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
+  const [parkingRequested, setParkingRequested] = useState(false);
+  const [parkingFile, setParkingFile] = useState(null);
+  const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
   const [status, setStatus] = useState("");
@@ -198,6 +202,9 @@ export default function EmployeeForm() {
       setArrivee(fmtTimeHHmm(data.arrivee) || "");
       setFin(fmtTimeHHmm(data.fin) || "");
       setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
+      setParkingRequested(Boolean(data.parking_receipt_captured));
+      setHasParkingReceipt(Boolean(data.parking_receipt_captured));
+      setParkingFile(null);
 
       const aller = data.km_aller ?? "";
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
@@ -233,6 +240,9 @@ export default function EmployeeForm() {
       setInfo("");
       setDirty(false);
       setHasOvertimeEvidence(false);
+      setParkingRequested(false);
+      setHasParkingReceipt(false);
+      setParkingFile(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
@@ -257,6 +267,11 @@ export default function EmployeeForm() {
       return;
     }
     if (saving) return;
+    if (parkingRequested && !parkingFile && !hasParkingReceipt) {
+      setErr(t("form.parking.receiptRequired"));
+      parkingInputRef.current?.click();
+      return false;
+    }
 
     setErr("");
     setInfo("");
@@ -295,7 +310,10 @@ export default function EmployeeForm() {
           km_retour: returnValues.km,
         } : {}),
         ...(captureEvidence ? { overtime_evidence_captured: true } : {}),
+        parking_receipt_captured: hasParkingReceipt,
       };
+
+      let savedJobId = editId || forcedId;
 
       if (editId) {
         const { error } = await withTimeout(
@@ -317,6 +335,7 @@ export default function EmployeeForm() {
         );
         if (error) throw error;
         if (!data?.id) throw new Error(t("form.errors.insertNoId"));
+        savedJobId = data.id;
 
         setInfo(nextStatus === "submitted" ? t("form.toasts.savedAndSubmitted") : t("form.toasts.saved"));
         setStatus(nextStatus);
@@ -325,7 +344,14 @@ export default function EmployeeForm() {
 
         if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }
-      return editId || forcedId || true;
+      if (parkingRequested && parkingFile) {
+        await uploadParkingReceipt(savedJobId, parkingFile);
+        const { error: parkingFlagError } = await supabase.from("jobs").update({ parking_receipt_captured: true }).eq("id", savedJobId);
+        if (parkingFlagError) throw parkingFlagError;
+        setHasParkingReceipt(true);
+        setParkingFile(null);
+      }
+      return savedJobId;
     } catch (e) {
       // Postgres unique_violation = "23505". Map it to a friendly message
       // since the raw "duplicate key value violates unique constraint…" is
@@ -341,6 +367,36 @@ export default function EmployeeForm() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function uploadParkingReceipt(jobId, file) {
+    const receiptId = crypto.randomUUID();
+    const storagePath = `${user.id}/${job_date}/${receiptId}.jpg`;
+    const image = await compressImage(file);
+    const { error: uploadError } = await supabase.storage
+      .from("parking-receipts")
+      .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { error: receiptError } = await supabase.from("parking_receipts").upsert({
+      job_id: jobId,
+      user_id: user.id,
+      job_date,
+      storage_path: storagePath,
+    }, { onConflict: "job_id" });
+    if (receiptError) throw receiptError;
+  }
+
+  function handleParkingReceipt(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      if (!hasParkingReceipt) setParkingRequested(false);
+      return;
+    }
+    setParkingFile(file);
+    setParkingRequested(true);
+    setDirty(true);
   }
 
   async function saveWithReturn(minutes, km) {
@@ -374,6 +430,9 @@ export default function EmployeeForm() {
       setLocked(false);
       setDirty(false);
       setInfo("");
+      setParkingRequested(false);
+      setParkingFile(null);
+      setHasParkingReceipt(false);
     }
   }
 
@@ -666,6 +725,37 @@ export default function EmployeeForm() {
                 <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm font-bold">
                   {hoursLabel}
                 </div>
+              </div>
+
+              <div className="grid gap-1.5 sm:col-span-2 lg:col-span-3">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2.5">
+                  <span>
+                    <span className="block text-sm font-medium">{t("form.parking.title")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {parkingFile?.name || (hasParkingReceipt ? t("form.parking.receiptSaved") : t("form.parking.description"))}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={parkingRequested}
+                    disabled={disableInputs || hasParkingReceipt}
+                    onChange={(event) => {
+                      if (event.target.checked) parkingInputRef.current?.click();
+                      else {
+                        setParkingRequested(false);
+                        setParkingFile(null);
+                        setDirty(true);
+                      }
+                    }}
+                    className="h-5 w-5 rounded border-input accent-primary"
+                  />
+                </label>
+                <input ref={parkingInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleParkingReceipt} />
+                {parkingRequested && (
+                  <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
+                    {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                  </Button>
+                )}
               </div>
             </div>
 

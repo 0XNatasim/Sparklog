@@ -6,7 +6,6 @@ export function getMissingEmployeeFields(profile, t) {
     ["apprentice_level", t("employees.level")],
     ["km_rate", t("employees.kmRate")],
     ["nas_employee", t("employees.nasEmployee")],
-    ["trade_code", t("employees.tradeCode")],
     ["work_region", t("employees.workRegion")],
     ["union_association", t("employees.unionAssociation")],
     ["wage_schedule", t("employees.wageSchedule")],

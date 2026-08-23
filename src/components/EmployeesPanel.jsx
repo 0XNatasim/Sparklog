@@ -39,7 +39,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }, { data: overtimeSettings, error: settingsError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false }),
         supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single()]),
@@ -292,7 +292,7 @@ export default function EmployeesPanel() {
                   <Input value={p.nas_employee || ""} maxLength={9} inputMode="numeric" onChange={(e) => setLocal(p.id, "nas_employee", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "nas_employee", e.target.value)} className="h-9" />
                 </Field>
                 <Field label={t("employees.tradeCode")}>
-                  <Input value={p.trade_code || "160"} maxLength={3} inputMode="numeric" onChange={(e) => setLocal(p.id, "trade_code", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "trade_code", e.target.value || "160")} className="h-9" />
+                  <Input value="220" readOnly className="h-9 bg-muted" />
                 </Field>
                 <Field label={t("employees.workRegion")}>
                   <Select value={p.work_region || ""} onChange={(e) => { setLocal(p.id, "work_region", e.target.value); saveField(p.id, "work_region", e.target.value); }} className="h-9">

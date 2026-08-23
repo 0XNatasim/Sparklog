@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 
 const COMMERCIAL_SECTOR_CODE = "I";
+const ELECTRICIAN_TRADE_CODE = "220";
 
 export function weekEndingSaturday(date) {
   const value = dayjs(date);
@@ -30,12 +31,12 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     const profile = profilesById.get(job.user_id) || {};
     const dateSFL = weekEndingSaturday(job.job_date);
     const secteur = COMMERCIAL_SECTOR_CODE;
-    const key = [job.user_id, dateSFL, profile.trade_code, secteur, profile.work_region, profile.wage_schedule].join("|");
+    const key = [job.user_id, dateSFL, ELECTRICIAN_TRADE_CODE, secteur, profile.work_region, profile.wage_schedule].join("|");
     if (!groups.has(key)) {
       groups.set(key, {
         nas: profile.nas_employee || null,
         semaineFinissantLe: dateSFL,
-        codeMetier: profile.trade_code || "160",
+        codeMetier: ELECTRICIAN_TRADE_CODE,
         secteurActivite: secteur,
         region: profile.work_region || null,
         annexe: profile.wage_schedule || null,

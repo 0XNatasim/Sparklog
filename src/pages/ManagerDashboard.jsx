@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users } from "lucide-react";
+import { Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -50,7 +50,7 @@ export default function ManagerDashboard() {
   const t = useT();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const activeSection = ["employees", "forms", "timesheet", "overtime", "download"].includes(searchParams.get("section"))
+  const activeSection = ["employees", "forms", "timesheet", "overtime", "parking", "download"].includes(searchParams.get("section"))
     ? searchParams.get("section")
     : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
@@ -59,6 +59,11 @@ export default function ManagerDashboard() {
   const [overtimeLoading, setOvertimeLoading] = useState(false);
   const [visibleEvidence, setVisibleEvidence] = useState(new Set());
   const [evidenceImageLoading, setEvidenceImageLoading] = useState("");
+  const [parkingJobs, setParkingJobs] = useState([]);
+  const [parkingReceipts, setParkingReceipts] = useState(new Map());
+  const [parkingLoading, setParkingLoading] = useState(false);
+  const [visibleParkingReceipts, setVisibleParkingReceipts] = useState(new Set());
+  const [parkingImageLoading, setParkingImageLoading] = useState("");
 
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState(new Map());
@@ -238,6 +243,53 @@ export default function ManagerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, focusedJobId]);
 
+  useEffect(() => {
+    if (activeSection !== "parking") return;
+    let cancelled = false;
+    async function loadParking() {
+      setParkingLoading(true);
+      setErr("");
+      try {
+        const { data: receiptRows, error: receiptError } = await withTimeout(
+          supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, created_at").order("created_at", { ascending: false }),
+          12000
+        );
+        if (receiptError) throw receiptError;
+        const jobIds = (receiptRows || []).map((row) => row.job_id);
+        const { data: jobRows, error: jobError } = jobIds.length
+          ? await withTimeout(supabase.from("jobs").select("*").in("id", jobIds), 12000)
+          : { data: [], error: null };
+        if (jobError) throw jobError;
+        const order = new Map(jobIds.map((id, index) => [id, index]));
+        const orderedJobs = (jobRows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
+        const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
+        if (missingProfileIds.length) {
+          const { data: profileRows, error: profileError } = await withTimeout(
+            supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
+            12000
+          );
+          if (profileError) throw profileError;
+          if (!cancelled) setProfiles((current) => {
+            const next = new Map(current);
+            (profileRows || []).forEach((profile) => next.set(profile.id, profile));
+            return next;
+          });
+        }
+        if (!cancelled) {
+          setParkingJobs(orderedJobs);
+          setParkingReceipts(new Map((receiptRows || []).map((row) => [row.job_id, row])));
+        }
+      } catch (error) {
+        if (!cancelled) setErr(error?.message || t("manager.parking.failedLoad"));
+      } finally {
+        if (!cancelled) setParkingLoading(false);
+      }
+    }
+    loadParking();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
+
   async function toggleEvidence(jobId) {
     if (visibleEvidence.has(jobId)) {
       setVisibleEvidence((current) => {
@@ -259,6 +311,29 @@ export default function ManagerDashboard() {
       setEvidenceImageLoading("");
     }
     setVisibleEvidence((current) => new Set(current).add(jobId));
+  }
+
+  async function toggleParkingReceipt(jobId) {
+    if (visibleParkingReceipts.has(jobId)) {
+      setVisibleParkingReceipts((current) => {
+        const next = new Set(current);
+        next.delete(jobId);
+        return next;
+      });
+      return;
+    }
+    const receipt = parkingReceipts.get(jobId);
+    if (receipt?.storage_path && !receipt.imageUrl) {
+      setParkingImageLoading(jobId);
+      const { data } = await supabase.storage.from("parking-receipts").createSignedUrl(receipt.storage_path, 600);
+      setParkingReceipts((current) => {
+        const next = new Map(current);
+        next.set(jobId, { ...receipt, imageUrl: data?.signedUrl || "" });
+        return next;
+      });
+      setParkingImageLoading("");
+    }
+    setVisibleParkingReceipts((current) => new Set(current).add(jobId));
   }
 
   useEffect(() => {
@@ -644,17 +719,62 @@ export default function ManagerDashboard() {
     );
   }
 
+  function renderParkingCard(job) {
+    const receipt = parkingReceipts.get(job.id);
+    const employee = profiles.get(job.user_id);
+    const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
+    const isVisible = visibleParkingReceipts.has(job.id);
+
+    return (
+      <Card key={job.id} id={`parking-job-${job.id}`}>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-bold">{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{employeeName}</span>
+                {employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}
+                {employee?.email ? <> · <a className="text-primary hover:underline" href={`mailto:${employee.email}`}>{employee.email}</a></> : null}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
+              <Button type="button" size="sm" variant="outline" disabled={parkingImageLoading === job.id} onClick={() => toggleParkingReceipt(job.id)}>
+                {isVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}
+                {parkingImageLoading === job.id ? t("common.loading") : isVisible ? t("manager.parking.hideReceipt") : t("manager.parking.showReceipt")}
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("manager.parking.received")}: <b>{dayjs(receipt?.created_at).format("DD MMM HH:mm")}</b></span>
+          </div>
+          {isVisible && (
+            <div className="rounded-lg border p-3">
+              {receipt?.imageUrl
+                ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" />
+                : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
   return (
     <AppShell>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5" aria-label={t("manager.sections.label")}>
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-6" aria-label={t("manager.sections.label")}>
           {[
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
             { id: "overtime", icon: TimerReset, label: t("manager.sections.overtime"), description: t("manager.sections.overtimeDescription") },
+            { id: "parking", icon: Car, label: t("manager.sections.parking"), description: t("manager.sections.parkingDescription") },
             { id: "download", icon: Download, label: t("manager.sections.download"), description: t("manager.sections.downloadDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
             <button
@@ -681,6 +801,16 @@ export default function ManagerDashboard() {
             {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
             {!overtimeLoading && overtimeJobs.map(renderOvertimeCard)}
             {!overtimeLoading && overtimeJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.overtime.empty")}</CardContent></Card>}
+          </div>
+        )}
+
+        {activeSection === "parking" && (
+          <div className="space-y-3">
+            <Card><CardContent className="p-4"><h2 className="font-semibold">{t("manager.parking.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.parking.description")}</p></CardContent></Card>
+            {parkingLoading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
+            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
+            {!parkingLoading && parkingJobs.map(renderParkingCard)}
+            {!parkingLoading && parkingJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.parking.empty")}</CardContent></Card>}
           </div>
         )}
 
