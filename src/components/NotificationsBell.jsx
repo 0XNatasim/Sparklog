@@ -43,13 +43,13 @@ export default function NotificationsBell() {
   async function openNotification(notification) {
     await supabase.from("manager_notification_reads").upsert({ notification_id: notification.id, manager_id: user.id });
     setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read: true } : item));
-    navigate(`/manager?job=${notification.job_id}`);
+    navigate(`/manager?section=overtime&job=${notification.job_id}`);
   }
 
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-400" aria-label={t("notifications.title")}>
+        <Button variant="ghost" size="icon" className="relative h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-300" aria-label={t("notifications.title")}>
           <Bell className="h-5 w-5" />
           {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-red-600 px-1 text-[10px] font-bold leading-4 text-white">{unread > 99 ? "99+" : unread}</span>}
         </Button>

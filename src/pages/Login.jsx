@@ -234,13 +234,13 @@ export default function Login() {
                   </button>
                 </div>
                 {confirmPassword && !passwordsMatch && (
-                  <span className="text-xs text-destructive">{t("auth.passwordsDoNotMatch")}</span>
+                  <span className="text-xs text-destructive dark:text-red-300">{t("auth.passwordsDoNotMatch")}</span>
                 )}
               </div>
             )}
 
             {errorMsg && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
                 {errorMsg}
               </div>
             )}
