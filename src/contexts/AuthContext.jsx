@@ -56,6 +56,22 @@ export function AuthProvider({ children }) {
       if (!cancelled) setLoading(false);
     }, 10000);
 
+    function subscribeToProfile(userId) {
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
+      }
+      if (!userId) return;
+      profileChannelRef.current = supabase
+        .channel(`profile-access-${userId}`)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, (payload) => {
+          setRole(payload.new?.role || "Employee");
+          setFullName(payload.new?.full_name || null);
+          setIsPaused(Boolean(payload.new?.is_paused));
+        })
+        .subscribe();
+    }
+
     async function bootstrap() {
       if (isBootstrappedRef.current) return;
       isBootstrappedRef.current = true;

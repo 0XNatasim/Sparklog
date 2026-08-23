@@ -380,7 +380,7 @@ export default function EmployeesPanel() {
                     setLocal(p.id, "parking_receipts_enabled", checked);
                     saveField(p.id, "parking_receipts_enabled", checked);
                   }}
-                  className="h-5 w-5 rounded border-input accent-primary"
+                  className="h-5 w-5 rounded border-input accent-amber-600"
                 />
               </label>
             </div>
