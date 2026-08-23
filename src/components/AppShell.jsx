@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import NotificationsBell from "@/components/NotificationsBell";
+import RegionOnboarding from "@/components/RegionOnboarding";
 
 function NavItem({ to, children }) {
   return (
@@ -40,6 +41,7 @@ export default function AppShell({ children }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <RegionOnboarding />
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
