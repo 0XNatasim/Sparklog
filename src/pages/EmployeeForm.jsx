@@ -153,17 +153,23 @@ export default function EmployeeForm() {
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
+  const parkingInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
+  const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
   const [pendingReturn, setPendingReturn] = useState(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
+  const [showOvertimeExample, setShowOvertimeExample] = useState(false);
   const [returnSaveError, setReturnSaveError] = useState("");
   const [returnCheckBusy, setReturnCheckBusy] = useState(false);
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
+  const [parkingRequested, setParkingRequested] = useState(false);
+  const [parkingFile, setParkingFile] = useState(null);
+  const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
   const [status, setStatus] = useState("");
@@ -196,6 +202,9 @@ export default function EmployeeForm() {
       setArrivee(fmtTimeHHmm(data.arrivee) || "");
       setFin(fmtTimeHHmm(data.fin) || "");
       setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
+      setParkingRequested(Boolean(data.parking_receipt_captured));
+      setHasParkingReceipt(Boolean(data.parking_receipt_captured));
+      setParkingFile(null);
 
       const aller = data.km_aller ?? "";
       setKmAller(aller === null || aller === undefined ? "" : String(aller));
@@ -231,6 +240,9 @@ export default function EmployeeForm() {
       setInfo("");
       setDirty(false);
       setHasOvertimeEvidence(false);
+      setParkingRequested(false);
+      setHasParkingReceipt(false);
+      setParkingFile(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
@@ -255,6 +267,11 @@ export default function EmployeeForm() {
       return;
     }
     if (saving) return;
+    if (parkingRequested && !parkingFile && !hasParkingReceipt) {
+      setErr(t("form.parking.receiptRequired"));
+      parkingInputRef.current?.click();
+      return false;
+    }
 
     setErr("");
     setInfo("");
@@ -293,7 +310,10 @@ export default function EmployeeForm() {
           km_retour: returnValues.km,
         } : {}),
         ...(captureEvidence ? { overtime_evidence_captured: true } : {}),
+        parking_receipt_captured: hasParkingReceipt,
       };
+
+      let savedJobId = editId || forcedId;
 
       if (editId) {
         const { error } = await withTimeout(
@@ -315,6 +335,7 @@ export default function EmployeeForm() {
         );
         if (error) throw error;
         if (!data?.id) throw new Error(t("form.errors.insertNoId"));
+        savedJobId = data.id;
 
         setInfo(nextStatus === "submitted" ? t("form.toasts.savedAndSubmitted") : t("form.toasts.saved"));
         setStatus(nextStatus);
@@ -323,7 +344,14 @@ export default function EmployeeForm() {
 
         if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }
-      return editId || forcedId || true;
+      if (parkingRequested && parkingFile) {
+        await uploadParkingReceipt(savedJobId, parkingFile);
+        const { error: parkingFlagError } = await supabase.from("jobs").update({ parking_receipt_captured: true }).eq("id", savedJobId);
+        if (parkingFlagError) throw parkingFlagError;
+        setHasParkingReceipt(true);
+        setParkingFile(null);
+      }
+      return savedJobId;
     } catch (e) {
       // Postgres unique_violation = "23505". Map it to a friendly message
       // since the raw "duplicate key value violates unique constraint…" is
@@ -339,6 +367,36 @@ export default function EmployeeForm() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function uploadParkingReceipt(jobId, file) {
+    const receiptId = crypto.randomUUID();
+    const storagePath = `${user.id}/${job_date}/${receiptId}.jpg`;
+    const image = await compressImage(file);
+    const { error: uploadError } = await supabase.storage
+      .from("parking-receipts")
+      .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { error: receiptError } = await supabase.from("parking_receipts").upsert({
+      job_id: jobId,
+      user_id: user.id,
+      job_date,
+      storage_path: storagePath,
+    }, { onConflict: "job_id" });
+    if (receiptError) throw receiptError;
+  }
+
+  function handleParkingReceipt(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      if (!hasParkingReceipt) setParkingRequested(false);
+      return;
+    }
+    setParkingFile(file);
+    setParkingRequested(true);
+    setDirty(true);
   }
 
   async function saveWithReturn(minutes, km) {
@@ -372,6 +430,9 @@ export default function EmployeeForm() {
       setLocked(false);
       setDirty(false);
       setInfo("");
+      setParkingRequested(false);
+      setParkingFile(null);
+      setHasParkingReceipt(false);
     }
   }
 
@@ -379,14 +440,13 @@ export default function EmployeeForm() {
     try {
       const [{ data: profile }, { data: dayJobs, error: jobsError }] = await withTimeout(
         Promise.all([
-          supabase.from("profiles").select("overtime_evidence_required, include_return_time_in_overtime").eq("id", user.id).single(),
+          supabase.from("profiles").select("include_return_time_in_overtime").eq("id", user.id).single(),
           supabase.from("jobs").select("id, depart, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
         ]),
         12000,
         "Overtime check"
       );
       if (jobsError) throw jobsError;
-      if (profile?.overtime_evidence_required === false) return false;
       if (editId && hasOvertimeEvidence) return false;
       const includeReturnTime = profile?.include_return_time_in_overtime !== false;
       const existingMinutes = (dayJobs || [])
@@ -440,12 +500,12 @@ export default function EmployeeForm() {
       const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
       if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
 
-      const { data: profile } = await supabase
-        .from("profiles")
+      const { data: overtimeSettings } = await supabase
+        .from("overtime_settings")
         .select("evidence_retention_days")
-        .eq("id", user.id)
+        .eq("id", true)
         .single();
-      const retentionDays = Math.min(365, Math.max(1, Number(profile?.evidence_retention_days) || 30));
+      const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
       const expiresAt = dayjs().add(retentionDays, "day").toISOString();
       const { error: evidenceError } = await supabase
@@ -573,7 +633,7 @@ export default function EmployeeForm() {
     <AppShell>
       <div className="space-y-3">
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
             {err}
           </div>
         )}
@@ -666,6 +726,37 @@ export default function EmployeeForm() {
                   {hoursLabel}
                 </div>
               </div>
+
+              <div className="grid gap-1.5 sm:col-span-2 lg:col-span-3">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2.5">
+                  <span>
+                    <span className="block text-sm font-medium">{t("form.parking.title")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {parkingFile?.name || (hasParkingReceipt ? t("form.parking.receiptSaved") : t("form.parking.description"))}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={parkingRequested}
+                    disabled={disableInputs || hasParkingReceipt}
+                    onChange={(event) => {
+                      if (event.target.checked) parkingInputRef.current?.click();
+                      else {
+                        setParkingRequested(false);
+                        setParkingFile(null);
+                        setDirty(true);
+                      }
+                    }}
+                    className="h-5 w-5 rounded border-input accent-primary"
+                  />
+                </label>
+                <input ref={parkingInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleParkingReceipt} />
+                {parkingRequested && (
+                  <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
+                    {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-nowrap items-center gap-1.5 pt-2">
@@ -704,6 +795,7 @@ export default function EmployeeForm() {
                       if (localStorage.getItem("autofill_tip_seen")) {
                         imageInputRef.current?.click();
                       } else {
+                        setAutofillTipPage(1);
                         setShowAutofillTip(true);
                       }
                     }}
@@ -733,47 +825,84 @@ export default function EmployeeForm() {
           </CardContent>
         </Card>
       </div>
-      <Dialog open={showAutofillTip} onOpenChange={setShowAutofillTip}>
+      <Dialog open={showAutofillTip} onOpenChange={(open) => {
+        setShowAutofillTip(open);
+        if (!open) setAutofillTipPage(1);
+      }}>
         <DialogContent className="max-w-sm p-0 overflow-hidden">
           <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle>{t("form.autofillTip.title")}</DialogTitle>
+            <DialogTitle>
+              {autofillTipPage === 1
+                ? t("form.autofillTip.title")
+                : t("form.autofillTip.exampleTitle")}
+            </DialogTitle>
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("form.autofillTip.page", { current: autofillTipPage, total: 2 })}
+            </p>
           </DialogHeader>
 
-          <div className="px-5 space-y-2 text-sm text-muted-foreground">
-            <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
-            <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
-            <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
-          </div>
-
-          <div className="px-5 pb-2 pt-3">
-            <img
-              src="/autofill-screenshot-guide.jpg"
-              alt="Screenshot guide"
-              className="w-full rounded-md border object-cover"
-              style={{ maxHeight: "340px", objectPosition: "bottom" }}
-            />
-          </div>
-
-          <DialogFooter className="px-5 pb-5 pt-2">
-            <Button
-              className="w-full"
-              onClick={() => {
-                localStorage.setItem("autofill_tip_seen", "1");
-                setShowAutofillTip(false);
-                imageInputRef.current?.click();
-              }}
-            >
-              {t("form.autofillTip.gotIt")}
-            </Button>
-          </DialogFooter>
+          {autofillTipPage === 1 ? (
+            <>
+              <div className="px-5 space-y-3 text-sm text-muted-foreground">
+                <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
+                <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
+                <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
+              </div>
+              <DialogFooter className="px-5 pb-5 pt-3">
+                <Button className="w-full" onClick={() => setAutofillTipPage(2)}>
+                  {t("form.autofillTip.next")}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="px-5 pb-2">
+                <p className="mb-3 text-sm text-muted-foreground">{t("form.autofillTip.exampleDescription")}</p>
+                <img
+                  src="/autofill-screenshot-guide.jpg"
+                  alt={t("form.autofillTip.exampleAlt")}
+                  className="w-full rounded-md border object-cover"
+                  style={{ maxHeight: "340px", objectPosition: "bottom" }}
+                />
+              </div>
+              <DialogFooter className="gap-2 px-5 pb-5 pt-2 sm:flex-col sm:space-x-0">
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setShowAutofillTip(false);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  {t("form.autofillTip.choose")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    localStorage.setItem("autofill_tip_seen", "1");
+                    setShowAutofillTip(false);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  {t("form.autofillTip.dontShowAgain")}
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => setAutofillTipPage(1)}>
+                  {t("common.back")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
       <Dialog open={returnStep !== "closed"} onOpenChange={(open) => {
-        if (!open && !saving) setReturnStep("closed");
+        if (!open && !saving) {
+          setReturnStep("closed");
+          setShowOvertimeExample(false);
+        }
       }}>
         <DialogContent className="max-w-md">
           {returnSaveError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-400" role="alert">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">
               {returnSaveError}
             </div>
           )}
@@ -842,7 +971,7 @@ export default function EmployeeForm() {
                 <DialogTitle>{t("form.evidence.title")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">
                   {t("form.evidence.description")}
                 </div>
                 <div className="rounded-md border bg-muted/40 p-3">
@@ -852,9 +981,28 @@ export default function EmployeeForm() {
                     <li>{t("form.evidence.requiredDuration")}</li>
                     <li>{t("form.evidence.requiredCrop")}</li>
                   </ul>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    aria-expanded={showOvertimeExample}
+                    aria-controls="overtime-evidence-example"
+                    onClick={() => setShowOvertimeExample((visible) => !visible)}
+                  >
+                    {showOvertimeExample ? t("form.evidence.hideExample") : t("form.evidence.showExample")}
+                  </Button>
+                  {showOvertimeExample && (
+                    <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
+                      <img
+                        src="/overtime-evidence-example.jpg"
+                        alt={t("form.evidence.exampleAlt")}
+                        className="max-h-96 w-full rounded object-contain"
+                      />
+                    </div>
+                  )}
                 </div>
-                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">{evidenceValidationError}</div>}
-                <p className="text-muted-foreground">{t("form.evidence.ocrNotice")}</p>
+                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{evidenceValidationError}</div>}
                 <input
                   ref={overtimeInputRef}
                   type="file"
