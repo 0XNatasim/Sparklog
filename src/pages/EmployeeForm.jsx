@@ -441,12 +441,12 @@ export default function EmployeeForm() {
       const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
       if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
 
-      const { data: profile } = await supabase
-        .from("profiles")
+      const { data: overtimeSettings } = await supabase
+        .from("overtime_settings")
         .select("evidence_retention_days")
-        .eq("id", user.id)
+        .eq("id", true)
         .single();
-      const retentionDays = Math.min(365, Math.max(1, Number(profile?.evidence_retention_days) || 30));
+      const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
       const expiresAt = dayjs().add(retentionDays, "day").toISOString();
       const { error: evidenceError } = await supabase

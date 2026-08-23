@@ -34,21 +34,26 @@ export default function EmployeesPanel() {
   const [info, setInfo]         = useState("");
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [rates, setRates] = useState(new Map());
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [retentionSaving, setRetentionSaving] = useState(false);
 
   async function load() {
     setErr("");
     setLoading(true);
     try {
-      const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
+      const [{ data, error }, { data: snapshotRows, error: ratesError }, { data: overtimeSettings, error: settingsError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime, evidence_retention_days")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime")
           .order("full_name", { ascending: true }),
-        supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
+        supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false }),
+        supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single()]),
         12000
       );
       if (error) throw error;
       if (ratesError) throw ratesError;
+      if (settingsError) throw settingsError;
+      setRetentionDays(overtimeSettings?.evidence_retention_days || 30);
       const nextRates = new Map();
       (snapshotRows || []).forEach((snapshot) => {
         const key = `${snapshot.sector_id}:${snapshot.skill_id}`;
@@ -111,6 +116,17 @@ export default function EmployeesPanel() {
     }
   }
 
+  async function saveRetentionDays() {
+    const value = Math.min(365, Math.max(1, Number(retentionDays) || 30));
+    setRetentionDays(value);
+    setRetentionSaving(true);
+    setErr("");
+    const { error } = await supabase.from("overtime_settings").update({ evidence_retention_days: value, updated_at: new Date().toISOString() }).eq("id", true);
+    if (error) setErr(error.message);
+    else { setInfo(t("employees.retentionSaved")); setTimeout(() => setInfo(""), 1500); }
+    setRetentionSaving(false);
+  }
+
 
   return (
     <div className="space-y-3">
@@ -124,6 +140,22 @@ export default function EmployeesPanel() {
       )}
       {info && (
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
+      )}
+
+      {!loading && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
+            <div>
+              <div className="font-semibold">{t("employees.globalRetention")}</div>
+              <div className="text-xs text-muted-foreground">{t("employees.globalRetentionDescription")}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input type="number" min="1" max="365" value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} className="w-24" />
+              <span className="text-sm text-muted-foreground">{t("employees.days")}</span>
+              <Button type="button" size="sm" disabled={retentionSaving} onClick={saveRetentionDays}>{retentionSaving ? t("common.saving") : t("common.save")}</Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {loading && (
@@ -327,18 +359,6 @@ export default function EmployeesPanel() {
                 />
                 <span className="text-sm font-medium">{t("employees.includeReturnTime")}</span>
               </label>
-              <Field label={t("employees.retentionDays")}>
-                <Input
-                  type="number"
-                  min="1"
-                  max="365"
-                  inputMode="numeric"
-                  value={p.evidence_retention_days ?? 30}
-                  onChange={(e) => setLocal(p.id, "evidence_retention_days", e.target.value)}
-                  onBlur={(e) => saveField(p.id, "evidence_retention_days", Math.min(365, Math.max(1, Number(e.target.value) || 30)))}
-                  className="h-9"
-                />
-              </Field>
             </div>
           </CardContent>}
         </Card>
