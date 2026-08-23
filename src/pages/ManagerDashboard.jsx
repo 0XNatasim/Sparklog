@@ -16,6 +16,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
+import CcqJsonExport from "@/components/CcqJsonExport";
 
 dayjs.extend(isoWeek);
 
@@ -680,7 +681,7 @@ export default function ManagerDashboard() {
         )}
 
         {activeSection === "download" && (
-          <Card><CardContent className="p-8 text-center"><Download className="mx-auto h-8 w-8 text-muted-foreground" /><h2 className="mt-3 font-semibold">{t("manager.download.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.download.description")}</p></CardContent></Card>
+          <CcqJsonExport />
         )}
 
         {activeSection === "timesheet" && <>
