@@ -6,27 +6,29 @@ const AuthContext = createContext(null);
 async function fetchRoleForUser(userId) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("role, full_name")
+    .select("role, full_name, is_paused")
     .eq("id", userId)
     .maybeSingle();
 
   if (error) {
     console.warn("[Auth] fetchRole error:", error);
-    return { role: "Employee", full_name: null };
+    return { role: "Employee", full_name: null, is_paused: false };
   }
-  if (!data) return { role: "Employee", full_name: null };
+  if (!data) return { role: "Employee", full_name: null, is_paused: false };
 
-  return { role: data.role || "Employee", full_name: data.full_name || null };
+  return { role: data.role || "Employee", full_name: data.full_name || null, is_paused: Boolean(data.is_paused) };
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [fullName, setFullName] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
 
   const subscriptionRef = useRef(null);
+  const profileChannelRef = useRef(null);
   const isBootstrappedRef = useRef(false);
 
   useEffect(() => {
@@ -34,6 +36,22 @@ export function AuthProvider({ children }) {
     const fallbackTimer = setTimeout(() => {
       if (!cancelled) setLoading(false);
     }, 10000);
+
+    function subscribeToProfile(userId) {
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
+      }
+      if (!userId) return;
+      profileChannelRef.current = supabase
+        .channel(`profile-access-${userId}`)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, (payload) => {
+          setRole(payload.new?.role || "Employee");
+          setFullName(payload.new?.full_name || null);
+          setIsPaused(Boolean(payload.new?.is_paused));
+        })
+        .subscribe();
+    }
 
     async function bootstrap() {
       if (isBootstrappedRef.current) return;
@@ -74,10 +92,12 @@ export function AuthProvider({ children }) {
           if (!cancelled) {
             setRole(r.role);
             setFullName(r.full_name);
+            setIsPaused(r.is_paused);
           }
         } else {
           setRole(null);
           setFullName(null);
+          setIsPaused(false);
         }
       }
 
@@ -97,13 +117,19 @@ export function AuthProvider({ children }) {
           const r = await fetchRoleForUser(nextUser.id);
           setRole(r.role);
           setFullName(r.full_name);
+          setIsPaused(r.is_paused);
+          subscribeToProfile(nextUser.id);
         } else {
           setRole(null);
           setFullName(null);
+          setIsPaused(false);
+          subscribeToProfile(null);
         }
       });
 
       subscriptionRef.current = sub?.subscription ?? null;
+
+      subscribeToProfile(sessionUser?.id);
     }
 
     bootstrap();
@@ -115,6 +141,10 @@ export function AuthProvider({ children }) {
         subscriptionRef.current.unsubscribe?.();
         subscriptionRef.current = null;
       }
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
+      }
     };
   }, []);
 
@@ -123,13 +153,14 @@ export function AuthProvider({ children }) {
       user,
       role,
       fullName,
+      isPaused,
       loading,
       authError,
       async signOut() {
         await supabase.auth.signOut();
       }
     }),
-    [user, role, fullName, loading, authError]
+    [user, role, fullName, isPaused, loading, authError]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
