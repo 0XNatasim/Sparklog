@@ -6,10 +6,9 @@ import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ClipboardList, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
-import { COMPANY_FORMS } from "@/lib/forms";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -349,44 +348,6 @@ function ComingSoon({ label }) {
   );
 }
 
-function FormsPanel() {
-  const t = useT();
-
-  return (
-    <Card>
-      <CardContent className="p-5 sm:p-6">
-        <div className="mb-5 flex items-start gap-3">
-          <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
-            <ClipboardList className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div>
-            <h2 className="font-semibold">{t("forms.title")}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{t("forms.description")}</p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {COMPANY_FORMS.map((form) => (
-            <a
-              key={form.name}
-              href={form.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex min-h-16 items-center justify-between gap-4 rounded-lg border bg-background px-4 py-3 text-left transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <span className="font-medium leading-snug">{form.name}</span>
-              <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground group-hover:text-primary">
-                {t("forms.open")}
-                <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              </span>
-            </a>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 // ─── Page with sub-tabs ───────────────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
@@ -398,14 +359,12 @@ export default function Testing() {
           <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
           <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
           <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
-          <TabsTrigger value="forms">{t("testing.tabs.forms")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="announce"><ManagerAnnouncePanel /></TabsContent>
         <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
         <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
         <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
-        <TabsContent value="forms"><FormsPanel /></TabsContent>
       </Tabs>
     </AppShell>
   );
