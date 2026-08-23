@@ -42,7 +42,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, overtime_evidence_required, include_return_time_in_overtime, evidence_retention_days")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime, evidence_retention_days")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -314,22 +314,6 @@ export default function EmployeesPanel() {
             </label>
 
             <div className="grid gap-3 rounded-lg border bg-muted/20 px-4 py-3 sm:grid-cols-2 sm:items-center">
-              <label className="flex cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={p.overtime_evidence_required !== false}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLocal(p.id, "overtime_evidence_required", checked);
-                    saveField(p.id, "overtime_evidence_required", checked);
-                  }}
-                  className="h-5 w-5 rounded border-input accent-primary"
-                />
-                <span>
-                  <span className="block text-sm font-semibold">{t("employees.overtimeEvidence")}</span>
-                  <span className="block text-xs text-muted-foreground">{t("employees.overtimeEvidenceDescription")}</span>
-                </span>
-              </label>
               <label className="flex cursor-pointer items-center gap-3">
                 <input
                   type="checkbox"

@@ -381,14 +381,13 @@ export default function EmployeeForm() {
     try {
       const [{ data: profile }, { data: dayJobs, error: jobsError }] = await withTimeout(
         Promise.all([
-          supabase.from("profiles").select("overtime_evidence_required, include_return_time_in_overtime").eq("id", user.id).single(),
+          supabase.from("profiles").select("include_return_time_in_overtime").eq("id", user.id).single(),
           supabase.from("jobs").select("id, depart, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
         ]),
         12000,
         "Overtime check"
       );
       if (jobsError) throw jobsError;
-      if (profile?.overtime_evidence_required === false) return false;
       if (editId && hasOvertimeEvidence) return false;
       const includeReturnTime = profile?.include_return_time_in_overtime !== false;
       const existingMinutes = (dayJobs || [])

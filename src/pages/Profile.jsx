@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BookOpen, ExternalLink, Mail, Phone, UserRound } from "lucide-react";
+import { BookOpen, Building2, ExternalLink, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/AppShell";
@@ -7,6 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { COMPANY_FORMS } from "@/lib/forms";
 import { useT } from "@/lib/use-t";
+import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
+import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
+
+const SECTOR_LABELS = {
+  I: "Commercial (ICI)",
+  N: "Industriel",
+  H: "Résidentiel lourd",
+  R: "Résidentiel léger",
+};
 
 export default function Profile() {
   const t = useT();
@@ -19,7 +28,7 @@ export default function Profile() {
   useEffect(() => {
     if (!user?.id) return;
     Promise.all([
-      supabase.from("profiles").select("full_name, phone, email").eq("id", user.id).single(),
+      supabase.from("profiles").select("full_name, phone, email, work_region, union_association, sector").eq("id", user.id).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
     ]).then(([profileResult, formsResult]) => {
       const loadError = profileResult.error || formsResult.error;
@@ -46,10 +55,13 @@ export default function Profile() {
           <>
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><UserRound className="h-5 w-5 text-primary" />{t("profile.information")}</CardTitle></CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-3">
+              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label={t("auth.fullName")} value={profile?.full_name} icon={UserRound} />
                 <Info label={t("auth.phone")} value={profile?.phone} icon={Phone} href={profile?.phone ? `tel:${profile.phone}` : undefined} />
                 <Info label={t("auth.email")} value={profile?.email || user?.email} icon={Mail} href={`mailto:${profile?.email || user?.email}`} />
+                <Info label={t("profile.region")} value={QUEBEC_REGIONS.find((region) => region.code === profile?.work_region)?.name} icon={MapPin} />
+                <Info label={t("profile.unionAssociation")} value={UNION_ASSOCIATIONS.find((association) => association.code === profile?.union_association)?.employeeLabel} icon={Users} />
+                <Info label={t("profile.sector")} value={SECTOR_LABELS[profile?.sector]} icon={Building2} />
               </CardContent>
             </Card>
 
