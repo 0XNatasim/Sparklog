@@ -28,7 +28,6 @@ const SECTORS = [
 
 function missingEmployeeFields(profile, t) {
   const required = [
-    ["full_name", t("manager.tbl.name")],
     ["phone", t("manager.tbl.phone")],
     ["email", t("manager.tbl.email")],
     ["ccq_number", "CCQ#"],
@@ -241,37 +240,6 @@ export default function EmployeesPanel() {
                 <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
               </div>
             )}
-            {/* Header */}
-            <div className="flex items-center gap-3">
-              <Input
-                value={p.full_name || ""}
-                onChange={(e) => setLocal(p.id, "full_name", e.target.value)}
-                onBlur={(e) => saveField(p.id, "full_name", e.target.value)}
-                placeholder={t("manager.tbl.name")}
-                className="h-9 flex-1 font-semibold"
-              />
-            </div>
-
-            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-              <span className="flex items-start gap-3">
-                <PauseCircle className="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-300" />
-                <span>
-                  <span className="block text-sm font-semibold">{t("employees.pauseAccount")}</span>
-                  <span className="block text-xs text-muted-foreground">{t("employees.pauseDescription")}</span>
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={Boolean(p.is_paused)}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setLocal(p.id, "is_paused", checked);
-                  saveField(p.id, "is_paused", checked);
-                }}
-                className="h-5 w-5 rounded border-input accent-amber-600"
-              />
-            </label>
-
             {/* Contact */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label={t("manager.tbl.phone")}>
