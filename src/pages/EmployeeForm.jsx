@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
+import { withRetry, withTimeout } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -106,25 +107,6 @@ function validateOvertimeSmsText(text) {
   return mentionsOvertime && confirmsApproval && includesDuration;
 }
 
-function withTimeout(promise, ms, label) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s. Please retry.`)),
-      ms
-    );
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      }
-    );
-  });
-}
-
 export default function EmployeeForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -134,6 +116,7 @@ export default function EmployeeForm() {
   const editId = searchParams.get("edit");
 
   const [loadingEdit, setLoadingEdit] = useState(false);
+  const [editLoadFailed, setEditLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [err, setErr] = useState("");
@@ -190,9 +173,13 @@ export default function EmployeeForm() {
     setErr("");
     setInfo("");
     setLoadingEdit(true);
+    setEditLoadFailed(false);
 
     try {
-      const { data, error } = await supabase.from("jobs").select("*").eq("id", editId).single();
+      const { data, error } = await withRetry(
+        () => supabase.from("jobs").select("*").eq("id", editId).single(),
+        12000
+      );
       if (error) throw error;
       if (!data) throw new Error(t("form.errors.notFound"));
       if (data.user_id !== user.id) throw new Error(t("form.errors.notAuthorized"));
@@ -218,6 +205,7 @@ export default function EmployeeForm() {
       setDirty(false);
     } catch (e) {
       setErr(e?.message || t("form.errors.failedLoad"));
+      setEditLoadFailed(true);
     } finally {
       setLoadingEdit(false);
     }
@@ -239,6 +227,7 @@ export default function EmployeeForm() {
       setLocked(false);
       setErr("");
       setInfo("");
+      setEditLoadFailed(false);
       setDirty(false);
       setHasOvertimeEvidence(false);
       setParkingRequested(false);
@@ -650,8 +639,13 @@ export default function EmployeeForm() {
     <AppShell>
       <div className="space-y-3">
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
-            {err}
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
+            <span>{err}</span>
+            {editId && editLoadFailed && (
+              <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={loadingEdit} onClick={loadEdit}>
+                {t("common.retry")}
+              </Button>
+            )}
           </div>
         )}
         {info && (

@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/supabaseClient";
-import { useAuth } from "@/contexts/AuthContext";
+import { SESSION_RESUMED_EVENT, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useT } from "@/lib/use-t";
@@ -12,6 +12,7 @@ export default function NotificationsBell() {
   const navigate = useNavigate();
   const t = useT();
   const [notifications, setNotifications] = useState([]);
+  const channelRef = useRef(null);
 
   const load = useCallback(async () => {
     if (role !== "manager" || !user?.id) return;
@@ -28,14 +29,35 @@ export default function NotificationsBell() {
     setNotifications((rows || []).map((row) => ({ ...row, employeeName: names.get(row.employee_id) || "Employee", read: readIds.has(row.id) })));
   }, [role, user?.id]);
 
-  useEffect(() => {
-    load();
-    if (role !== "manager") return undefined;
-    const channel = supabase.channel("manager-overtime-notifications")
+  const subscribeToNotifications = useCallback(() => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    if (role !== "manager" || !user?.id) return;
+    channelRef.current = supabase.channel("manager-overtime-notifications")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "manager_notifications" }, load)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [load, role]);
+  }, [load, role, user?.id]);
+
+  useEffect(() => {
+    load();
+    subscribeToNotifications();
+
+    function handleSessionResumed() {
+      load();
+      subscribeToNotifications();
+    }
+
+    window.addEventListener(SESSION_RESUMED_EVENT, handleSessionResumed);
+    return () => {
+      window.removeEventListener(SESSION_RESUMED_EVENT, handleSessionResumed);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [load, subscribeToNotifications]);
 
   if (role !== "manager") return null;
   const unread = notifications.filter((notification) => !notification.read).length;
