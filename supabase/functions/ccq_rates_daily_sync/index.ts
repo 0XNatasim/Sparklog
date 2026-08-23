@@ -11,7 +11,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CCQ_BASE       = "https://www.ccq.org/api/wagerates/Rates";
 const OCCUPATION_ID  = "220";
-const SECTORS        = ["C", "R"];
+const SECTORS        = ["C"];
 const SKILLS         = ["6", "4", "3", "2", "1"];
 const TIMEOUT_MS     = 12_000;
 

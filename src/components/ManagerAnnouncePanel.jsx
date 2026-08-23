@@ -22,7 +22,7 @@ const STATUS_STYLES = {
   sending:   "bg-blue-500/15 text-blue-600 dark:text-blue-400",
   queued:    "bg-muted text-muted-foreground",
   skipped:   "bg-muted text-muted-foreground",
-  failed:    "bg-destructive/15 text-destructive",
+  failed:    "bg-destructive/15 text-destructive dark:text-red-300",
 };
 
 function StatusBadge({ status }) {
@@ -192,7 +192,7 @@ export default function ManagerAnnouncePanel() {
   return (
     <div className="space-y-4">
       {err && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
           <span>{err}</span>
           <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={() => { setErr(""); loadEmployees(); loadHistory(); }}>
             {t("common.retry")}
@@ -228,7 +228,7 @@ export default function ManagerAnnouncePanel() {
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t("announce.message")}
               </label>
-              <span className={`text-xs tabular-nums ${overLimit ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+              <span className={`text-xs tabular-nums ${overLimit ? "text-destructive dark:text-red-300 font-semibold" : "text-muted-foreground"}`}>
                 {[...body].length} / {MAX_LEN}
               </span>
             </div>
