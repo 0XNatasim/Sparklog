@@ -58,6 +58,7 @@ export default function ManagerDashboard() {
   const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
   const [overtimeLoading, setOvertimeLoading] = useState(false);
   const [visibleEvidence, setVisibleEvidence] = useState(new Set());
+  const [visibleOcr, setVisibleOcr] = useState(new Set());
   const [evidenceImageLoading, setEvidenceImageLoading] = useState("");
   const [parkingJobs, setParkingJobs] = useState([]);
   const [parkingReceipts, setParkingReceipts] = useState(new Map());
@@ -311,6 +312,15 @@ export default function ManagerDashboard() {
       setEvidenceImageLoading("");
     }
     setVisibleEvidence((current) => new Set(current).add(jobId));
+  }
+
+  function toggleOcr(jobId) {
+    setVisibleOcr((current) => {
+      const next = new Set(current);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
   }
 
   async function toggleParkingReceipt(jobId) {
@@ -669,6 +679,7 @@ export default function ManagerDashboard() {
     const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
     const km = (Number(job.km_aller ?? 0) || 0) + (Number(job.km_retour ?? 0) || 0);
     const isVisible = visibleEvidence.has(job.id);
+    const isOcrVisible = visibleOcr.has(job.id);
 
     return (
       <Card key={job.id} id={`job-${job.id}`} className={focusedJobId === job.id ? "ring-2 ring-red-500" : ""}>
@@ -684,6 +695,9 @@ export default function ManagerDashboard() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
+              <Button type="button" size="sm" variant="outline" aria-expanded={isOcrVisible} aria-controls={`overtime-ocr-${job.id}`} onClick={() => toggleOcr(job.id)}>
+                {isOcrVisible ? t("manager.overtime.hideOcr") : t("manager.overtime.showOcr")}
+              </Button>
               <Button type="button" size="sm" variant="outline" disabled={evidenceImageLoading === job.id} onClick={() => toggleEvidence(job.id)}>
                 {isVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}
                 {evidenceImageLoading === job.id ? t("common.loading") : isVisible ? t("manager.overtime.hideEvidence") : t("manager.overtime.showEvidence")}
@@ -701,10 +715,10 @@ export default function ManagerDashboard() {
             {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
           </div>
 
-          <div>
+          {isOcrVisible && <div id={`overtime-ocr-${job.id}`}>
             <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
             <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{evidence?.ocr_text || t("notifications.ocrUnavailable")}</pre>
-          </div>
+          </div>}
 
           {isVisible && (
             <div className="rounded-lg border p-3">
