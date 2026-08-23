@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { supabase } from "../supabaseClient";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -19,4 +20,27 @@ export function withTimeout(promise, ms) {
       )
     ),
   ]);
+}
+
+// Runs a fresh Supabase query, then performs one session refresh and one fresh
+// retry if the first request times out or fails. The factory is intentional:
+// Supabase query builders/promises must be recreated for the retry.
+export async function withRetry(makeQuery, ms) {
+  const run = async () => {
+    const result = await withTimeout(makeQuery(), ms);
+    if (result?.error) throw result.error;
+    return result;
+  };
+
+  try {
+    return await run();
+  } catch {
+    try {
+      await supabase.auth.refreshSession();
+    } catch {
+      // Still issue the single retry. Its error is the useful result to surface
+      // to the caller, and the network may have recovered in the meantime.
+    }
+    return run();
+  }
 }
