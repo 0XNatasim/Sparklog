@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, Phone } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ClipboardList, Clock3, Download, Image, ImageOff, TimerReset } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -16,6 +16,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
+import CcqJsonExport from "@/components/CcqJsonExport";
 
 dayjs.extend(isoWeek);
 
@@ -46,15 +47,22 @@ function weekKeyFromDate(dateStr) {
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
   const t = useT();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
+  const activeSection = ["forms", "timesheet", "overtime", "download"].includes(searchParams.get("section"))
+    ? searchParams.get("section")
+    : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
+  const [overtimeJobs, setOvertimeJobs] = useState([]);
+  const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
+  const [overtimeLoading, setOvertimeLoading] = useState(false);
+  const [visibleEvidence, setVisibleEvidence] = useState(new Set());
+  const [evidenceImageLoading, setEvidenceImageLoading] = useState("");
 
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const datePickerRef = useRef(null);
   const [hasMore, setHasMore] = useState(false);
   const [counts, setCounts] = useState({ all: 0, saved: 0, submitted: 0, approved: 0 });
   const [err, setErr] = useState("");
@@ -64,20 +72,8 @@ export default function ManagerDashboard() {
 
   const [employeeId, setEmployeeId] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [weekFilter, setWeekFilter] = useState("");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
-
-  function weekFilterRange(w) {
-    if (!w) return null;
-    const m = /^(\d{4})-W(\d{2})$/.exec(w);
-    if (!m) return null;
-    const d = dayjs().year(Number(m[1])).isoWeek(Number(m[2]));
-    return {
-      start: d.startOf("isoWeek").format("YYYY-MM-DD"),
-      end: d.endOf("isoWeek").format("YYYY-MM-DD"),
-    };
-  }
 
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
@@ -101,25 +97,16 @@ export default function ManagerDashboard() {
     // Approved columns, so ignore the status dropdown there — otherwise
     // the other two columns are always empty.
     if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
-    const range = weekFilterRange(weekFilter);
-    if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
     return q;
   }
 
   async function loadCounts() {
-    const range = weekFilterRange(weekFilter);
-    const applyDateScope = (q) => {
-      if (range) return q.gte("job_date", range.start).lte("job_date", range.end);
-      return q;
-    };
-    const base = applyDateScope(
-      supabase.from("jobs").select("id", { head: true, count: "exact" })
-    );
+    const base = supabase.from("jobs").select("id", { head: true, count: "exact" });
     const scoped = (status) => {
       let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
       if (employeeId !== "all") q = q.eq("user_id", employeeId);
       if (status) q = q.eq("status", status);
-      return applyDateScope(q);
+      return q;
     };
     const [all, saved, submitted, approved] = await withTimeout(
       Promise.all([
@@ -188,7 +175,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, statusFilter, weekFilter]);
+  }, [employeeId, statusFilter]);
 
   useEffect(() => {
     if (!focusedJobId) return;
@@ -203,9 +190,80 @@ export default function ManagerDashboard() {
   }, [focusedJobId]);
 
   useEffect(() => {
-    if (!focusedJobId || !jobs.some((job) => job.id === focusedJobId)) return;
+    if (activeSection !== "overtime") return;
+    let cancelled = false;
+    async function loadOvertime() {
+      setOvertimeLoading(true);
+      setErr("");
+      try {
+        const { data: evidenceRows, error: evidenceError } = await withTimeout(
+          supabase.from("overtime_evidence").select("job_id, ocr_text, ocr_status, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }),
+          12000
+        );
+        if (evidenceError) throw evidenceError;
+        const jobIds = (evidenceRows || []).map((row) => row.job_id);
+        const { data: jobRows, error: jobError } = jobIds.length
+          ? await withTimeout(supabase.from("jobs").select("*").in("id", jobIds), 12000)
+          : { data: [], error: null };
+        if (jobError) throw jobError;
+        const order = new Map(jobIds.map((id, index) => [id, index]));
+        const orderedJobs = (jobRows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
+        const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
+        if (missingProfileIds.length) {
+          const { data: profileRows, error: profileError } = await withTimeout(
+            supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
+            12000
+          );
+          if (profileError) throw profileError;
+          if (!cancelled) setProfiles((current) => {
+            const next = new Map(current);
+            (profileRows || []).forEach((profile) => next.set(profile.id, profile));
+            return next;
+          });
+        }
+        if (!cancelled) {
+          setOvertimeJobs(orderedJobs);
+          setOvertimeEvidence(new Map((evidenceRows || []).map((row) => [row.job_id, row])));
+          if (focusedJobId) setVisibleEvidence(new Set([focusedJobId]));
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e?.message || t("manager.overtime.failedLoad"));
+      } finally {
+        if (!cancelled) setOvertimeLoading(false);
+      }
+    }
+    loadOvertime();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, focusedJobId]);
+
+  async function toggleEvidence(jobId) {
+    if (visibleEvidence.has(jobId)) {
+      setVisibleEvidence((current) => {
+        const next = new Set(current);
+        next.delete(jobId);
+        return next;
+      });
+      return;
+    }
+    const evidence = overtimeEvidence.get(jobId);
+    if (evidence?.storage_path && !evidence.imageUrl) {
+      setEvidenceImageLoading(jobId);
+      const { data } = await supabase.storage.from("overtime-evidence").createSignedUrl(evidence.storage_path, 600);
+      setOvertimeEvidence((current) => {
+        const next = new Map(current);
+        next.set(jobId, { ...evidence, imageUrl: data?.signedUrl || "" });
+        return next;
+      });
+      setEvidenceImageLoading("");
+    }
+    setVisibleEvidence((current) => new Set(current).add(jobId));
+  }
+
+  useEffect(() => {
+    if (!focusedJobId || ![...jobs, ...overtimeJobs].some((job) => job.id === focusedJobId)) return;
     requestAnimationFrame(() => document.getElementById(`job-${focusedJobId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
-  }, [focusedJobId, jobs]);
+  }, [focusedJobId, jobs, overtimeJobs]);
 
   const employeeOptions = useMemo(() => {
     const arr = [];
@@ -348,109 +406,6 @@ export default function ManagerDashboard() {
     } finally {
       setActionLoadingId(null);
     }
-  }
-
-  // Payroll CSV: one row per approved job for the selected employee, scoped
-  // to the picked week if any. Hours in decimal so the payroll software can
-  // sum directly. Detailed format — easy to re-pivot or trim columns later
-  // once we know the exact Desjardins import template.
-  function downloadPayrollCsv(employeeIdArg) {
-    const targetId = employeeIdArg || selectedEmployee?.id;
-    if (!targetId) return;
-    const range = weekFilterRange(weekFilter);
-    const rows = jobs.filter((j) => {
-      if (j.user_id !== targetId) return false;
-      if (j.status !== "approved") return false;
-      if (range && (j.job_date < range.start || j.job_date > range.end)) return false;
-      return true;
-    });
-
-    const employee = profiles.get(targetId);
-    const header = [
-      "employee_name",
-      "employee_email",
-      "employee_phone",
-      "ccq_number",
-      "week_iso",
-      "job_date",
-      "weekday",
-      "ot",
-      "depart",
-      "arrivee",
-      "fin",
-      "hours_decimal",
-      "hours_hhmm",
-      "km",
-      "return_time_minutes",
-      "return_km",
-    ];
-
-    function decimalHours(depart, fin) {
-      if (!depart || !fin) return 0;
-      const [dh, dm] = String(depart).slice(0, 5).split(":").map(Number);
-      const [fh, fm] = String(fin).slice(0, 5).split(":").map(Number);
-      if ([dh, dm, fh, fm].some((n) => Number.isNaN(n))) return 0;
-      let mins = fh * 60 + fm - (dh * 60 + dm);
-      if (mins < 0) mins += 24 * 60;
-      return Math.round((mins / 60) * 100) / 100;
-    }
-
-    function fmtHHmm(decimal) {
-      if (!Number.isFinite(decimal) || decimal <= 0) return "0h00";
-      const total = Math.round(decimal * 60);
-      const h = Math.floor(total / 60);
-      const m = total % 60;
-      return `${h}h${String(m).padStart(2, "0")}`;
-    }
-
-    const csvRows = rows
-      .slice()
-      .sort((a, b) => (a.job_date < b.job_date ? -1 : a.job_date > b.job_date ? 1 : 0))
-      .map((j) => {
-        const dec = decimalHours(j.depart, j.fin);
-        const km = (Number(j.km_aller ?? 0) || 0) + (Number(j.km_retour ?? 0) || 0);
-        return [
-          employee?.full_name || "",
-          employee?.email || "",
-          employee?.phone || "",
-          employee?.ccq_number || "",
-          dayjs(j.job_date).format("YYYY-[W]WW"),
-          j.job_date,
-          dayjs(j.job_date).format("dddd"),
-          j.ot || "",
-          j.depart ? String(j.depart).slice(0, 5) : "",
-          j.arrivee ? String(j.arrivee).slice(0, 5) : "",
-          j.fin ? String(j.fin).slice(0, 5) : "",
-          dec.toFixed(2),
-          fmtHHmm(dec),
-          km,
-          Number(j.return_time_minutes ?? 0) || 0,
-          Number(j.km_retour ?? 0) || 0,
-        ];
-      });
-
-    function esc(v) {
-      const s = String(v ?? "");
-      return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    }
-
-    // BOM so Excel / Desjardins opens UTF-8 with accents correctly; ;-separated
-    // because that's what fr-CA spreadsheets default to.
-    const csv =
-      "﻿" +
-      [header.join(";"), ...csvRows.map((r) => r.map(esc).join(";"))].join("\r\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const weekTag = range ? weekFilter : "all";
-    const safeName = (employee?.full_name || "employee").replace(/[^\w-]+/g, "_");
-    a.href = url;
-    a.download = `sparklog_payroll_${safeName}_${weekTag}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   }
 
   async function invokeWithTimeout(name, options, ms = 30000) {
@@ -631,12 +586,105 @@ export default function ManagerDashboard() {
     );
   }
 
+  function renderOvertimeCard(job) {
+    const evidence = overtimeEvidence.get(job.id);
+    const employee = profiles.get(job.user_id);
+    const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
+    const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
+    const km = (Number(job.km_aller ?? 0) || 0) + (Number(job.km_retour ?? 0) || 0);
+    const isVisible = visibleEvidence.has(job.id);
+
+    return (
+      <Card key={job.id} id={`job-${job.id}`} className={focusedJobId === job.id ? "ring-2 ring-red-500" : ""}>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-bold">{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{employeeName}</span>
+                {employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}
+                {employee?.email ? <> · <a className="text-primary hover:underline" href={`mailto:${employee.email}`}>{employee.email}</a></> : null}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
+              <Button type="button" size="sm" variant="outline" disabled={evidenceImageLoading === job.id} onClick={() => toggleEvidence(job.id)}>
+                {isVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}
+                {evidenceImageLoading === job.id ? t("common.loading") : isVisible ? t("manager.overtime.hideEvidence") : t("manager.overtime.showEvidence")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHours(totalHours)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.km")}: <b>{km}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
+            {job.return_time_minutes ? <span className="rounded-full border bg-muted px-2 py-1">{t("form.return.timeTitle")}: <b>{job.return_time_minutes} min</b></span> : null}
+            {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
+          </div>
+
+          <div>
+            <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
+            <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{evidence?.ocr_text || t("notifications.ocrUnavailable")}</pre>
+          </div>
+
+          {isVisible && (
+            <div className="rounded-lg border p-3">
+              <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
+              {evidence?.imageUrl
+                ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-md object-contain" />
+                : <p className="text-sm text-muted-foreground">{t("manager.overtime.imageUnavailable")}</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
   return (
     <AppShell>
       <div className="space-y-3">
-        <FormsManager />
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label={t("manager.sections.label")}>
+          {[
+            { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
+            { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
+            { id: "overtime", icon: TimerReset, label: t("manager.sections.overtime"), description: t("manager.sections.overtimeDescription") },
+            { id: "download", icon: Download, label: t("manager.sections.download"), description: t("manager.sections.downloadDescription") },
+          ].map(({ id, icon: Icon, label, description }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSearchParams({ section: id })}
+              aria-current={activeSection === id ? "page" : undefined}
+              className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === id ? "border-primary bg-primary/10 text-primary" : "bg-card hover:border-primary/50 hover:bg-accent"}`}
+            >
+              <div className="flex items-center gap-2 font-semibold"><Icon className="h-4 w-4" />{label}</div>
+              <div className={`mt-1 text-xs ${activeSection === id ? "text-primary/80" : "text-muted-foreground"}`}>{description}</div>
+            </button>
+          ))}
+        </div>
+
+        {activeSection === "forms" && <FormsManager collapsible={false} />}
+
+        {activeSection === "overtime" && (
+          <div className="space-y-3">
+            <Card><CardContent className="p-4"><h2 className="font-semibold">{t("manager.overtime.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.overtime.description")}</p></CardContent></Card>
+            {overtimeLoading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
+            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
+            {!overtimeLoading && overtimeJobs.map(renderOvertimeCard)}
+            {!overtimeLoading && overtimeJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.overtime.empty")}</CardContent></Card>}
+          </div>
+        )}
+
+        {activeSection === "download" && (
+          <CcqJsonExport />
+        )}
+
+        {activeSection === "timesheet" && <>
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -669,58 +717,11 @@ export default function ManagerDashboard() {
                 <option value="approved">{t("status.approved")}</option>
               </Select>
 
-              <div className="flex items-center gap-1">
-                <Input
-                  value={searchLive}
-                  onChange={(e) => setSearchLive(e.target.value)}
-                  placeholder={t("manager.filters.searchPlaceholder")}
-                  className="flex-1"
-                />
-                {/* Hidden date picker — calendar icon opens it, derives ISO week */}
-                <input
-                  type="date"
-                  value=""
-                  className="sr-only"
-                  ref={(el) => (datePickerRef.current = el)}
-                  onChange={(e) => {
-                    const d = e.target.value;
-                    if (!d) return;
-                    setWeekFilter(dayjs(d).format("YYYY-[W]WW"));
-                    e.target.value = "";
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant={weekFilter ? "default" : "outline"}
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={() => {
-                    const el = datePickerRef.current;
-                    if (!el) return;
-                    if (typeof el.showPicker === "function") el.showPicker();
-                    else el.click();
-                  }}
-                  title={t("manager.filters.pickDate")}
-                  aria-label={t("manager.filters.pickDate")}
-                >
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {weekFilter && (() => {
-                const range = weekFilterRange(weekFilter);
-                const label = range
-                  ? `${t("manager.weekShort")} ${dayjs(range.start).isoWeek()} · ${dayjs(range.start).format("DD MMM")} → ${dayjs(range.end).format("DD MMM YYYY")}`
-                  : weekFilter;
-                return (
-                  <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-3">
-                    <span className="text-sm text-muted-foreground">{label}</span>
-                    <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setWeekFilter("")}>
-                      {t("manager.filters.clearWeek")}
-                    </Button>
-                  </div>
-                );
-              })()}
+              <Input
+                value={searchLive}
+                onChange={(e) => setSearchLive(e.target.value)}
+                placeholder={t("manager.filters.searchPlaceholder")}
+              />
             </div>
 
             {selectedEmployee && (
@@ -761,16 +762,6 @@ export default function ManagerDashboard() {
                   >
                     {bulkBusy ? t("common.working") : t("manager.approveWeek", { count: submittedForSelectedWeek.length })}
                   </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={downloadPayrollCsv}
-                    disabled={!selectedEmployee}
-                    title={t("manager.downloadCsvTitle")}
-                  >
-                    {t("manager.downloadCsv")}
-                  </Button>
                 </div>
               </div>
             )}
@@ -779,7 +770,7 @@ export default function ManagerDashboard() {
 
         {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
             <span>{err}</span>
             <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
               {t("common.retry")}
@@ -841,6 +832,7 @@ export default function ManagerDashboard() {
             </Button>
           </div>
         )}
+        </>}
       </div>
     </AppShell>
   );

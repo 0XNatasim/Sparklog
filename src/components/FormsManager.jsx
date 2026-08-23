@@ -5,12 +5,12 @@ import { COMPANY_FORMS } from "@/lib/forms";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useT } from "@/lib/use-t";
 
-export default function FormsManager() {
+export default function FormsManager({ collapsible = true }) {
   const t = useT();
   const [availability, setAvailability] = useState({});
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(!collapsible);
 
   useEffect(() => {
     supabase.from("employee_forms").select("form_id, enabled").then(({ data, error: loadError }) => {
@@ -35,6 +35,7 @@ export default function FormsManager() {
   return (
     <Card>
       <CardHeader className={isOpen ? "pb-3" : "pb-6"}>
+        {collapsible ? (
         <button
           type="button"
           onClick={() => setIsOpen((open) => !open)}
@@ -52,10 +53,19 @@ export default function FormsManager() {
             <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
           </span>
         </button>
+        ) : (
+          <div className="flex items-center gap-3">
+            <ClipboardList className="h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <CardTitle>{t("manager.forms.title")}</CardTitle>
+              <CardDescription className="mt-1">{t("manager.forms.description")}</CardDescription>
+            </div>
+          </div>
+        )}
       </CardHeader>
       {isOpen && (
         <CardContent id="manager-forms-list" className="grid gap-2 sm:grid-cols-2">
-          {error && <div className="col-span-full rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          {error && <div className="col-span-full rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
           {COMPANY_FORMS.map((form) => {
             const enabled = Boolean(availability[form.id]);
             return (

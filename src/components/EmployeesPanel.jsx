@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import dayjs from "dayjs";
-import { Phone, Mail, Download } from "lucide-react";
+import { Phone, Mail } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,8 +17,10 @@ const LEVELS = [
 ];
 
 const SECTORS = [
-  { value: "C", label: "Commercial (ICI)" },
-  { value: "R", label: "Résidentiel" },
+  { value: "I", label: "Commercial (ICI)" },
+  { value: "N", label: "Industriel" },
+  { value: "H", label: "Résidentiel lourd" },
+  { value: "R", label: "Résidentiel léger" },
 ];
 
 export default function EmployeesPanel() {
@@ -36,7 +37,7 @@ export default function EmployeesPanel() {
       const { data, error } = await withTimeout(
         supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, ccq_number, apprentice_level, sector, km_rate, storage_compensation, overtime_evidence_required, include_return_time_in_overtime, evidence_retention_days")
+          .select("id, role, full_name, phone, email, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, wage_schedule, hourly_rate, km_rate, storage_compensation, overtime_evidence_required, include_return_time_in_overtime, evidence_retention_days")
           .order("full_name", { ascending: true }),
         12000
       );
@@ -59,7 +60,7 @@ export default function EmployeesPanel() {
 
   async function saveField(id, field, rawValue) {
     let value = rawValue;
-    if (field === "km_rate") {
+    if (field === "km_rate" || field === "hourly_rate") {
       value = rawValue === "" || rawValue == null ? null : Number(rawValue);
       if (value != null && Number.isNaN(value)) return;
     } else if (typeof value === "string") {
@@ -70,83 +71,11 @@ export default function EmployeesPanel() {
     else { setInfo(`${field} ✓`); setTimeout(() => setInfo(""), 1500); }
   }
 
-  // Per-employee payroll CSV: fetch that employee's approved jobs on demand.
-  async function downloadCsv(p) {
-    try {
-      const { data: rows, error } = await withTimeout(
-        supabase
-          .from("jobs")
-          .select("job_date, ot, depart, arrivee, fin, km_aller, km_retour, return_time_minutes, status")
-          .eq("user_id", p.id)
-          .eq("status", "approved")
-          .order("job_date", { ascending: true }),
-        12000
-      );
-      if (error) throw error;
-
-      const header = [
-        "employee_name", "employee_email", "employee_phone", "ccq_number",
-        "apprentice_level", "sector", "km_rate",
-        "week_iso", "job_date", "weekday", "ot", "depart", "arrivee", "fin",
-        "hours_decimal", "hours_hhmm", "km", "return_time_minutes", "return_km",
-      ];
-
-      const decimalHours = (depart, fin) => {
-        if (!depart || !fin) return 0;
-        const [dh, dm] = String(depart).slice(0, 5).split(":").map(Number);
-        const [fh, fm] = String(fin).slice(0, 5).split(":").map(Number);
-        if ([dh, dm, fh, fm].some((n) => Number.isNaN(n))) return 0;
-        let mins = fh * 60 + fm - (dh * 60 + dm);
-        if (mins < 0) mins += 24 * 60;
-        return Math.round((mins / 60) * 100) / 100;
-      };
-      const fmtHHmm = (dec) => {
-        if (!Number.isFinite(dec) || dec <= 0) return "0h00";
-        const total = Math.round(dec * 60);
-        return `${Math.floor(total / 60)}h${String(total % 60).padStart(2, "0")}`;
-      };
-
-      const csvRows = (rows ?? []).map((j) => {
-        const dec = decimalHours(j.depart, j.fin);
-        const km = (Number(j.km_aller ?? 0) || 0) + (Number(j.km_retour ?? 0) || 0);
-        return [
-          p.full_name || "", p.email || "", p.phone || "", p.ccq_number || "",
-          p.apprentice_level || "", p.sector || "", p.km_rate ?? "",
-          dayjs(j.job_date).format("YYYY-[W]WW"), j.job_date,
-          dayjs(j.job_date).format("dddd"), j.ot || "",
-          j.depart ? String(j.depart).slice(0, 5) : "",
-          j.arrivee ? String(j.arrivee).slice(0, 5) : "",
-          j.fin ? String(j.fin).slice(0, 5) : "",
-          dec.toFixed(2), fmtHHmm(dec), km,
-          Number(j.return_time_minutes ?? 0) || 0, Number(j.km_retour ?? 0) || 0,
-        ];
-      });
-
-      const esc = (v) => {
-        const s = String(v ?? "");
-        return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-      };
-      const csv = "﻿" + [header.join(";"), ...csvRows.map((r) => r.map(esc).join(";"))].join("\r\n");
-
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const safeName = (p.full_name || "employee").replace(/[^\w-]+/g, "_");
-      a.href = url;
-      a.download = `sparklog_payroll_${safeName}_all.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setErr(e?.message ?? "CSV export failed.");
-    }
-  }
 
   return (
     <div className="space-y-3">
       {err && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
           <span>{err}</span>
           <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
             {t("common.retry")}
@@ -168,7 +97,7 @@ export default function EmployeesPanel() {
       {!loading && profiles.map((p) => (
         <Card key={p.id}>
           <CardContent className="p-4 space-y-3">
-            {/* Header: name + CSV */}
+            {/* Header */}
             <div className="flex items-center gap-3">
               <Input
                 value={p.full_name || ""}
@@ -177,9 +106,6 @@ export default function EmployeesPanel() {
                 placeholder={t("manager.tbl.name")}
                 className="h-9 flex-1 font-semibold"
               />
-              <Button type="button" variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => downloadCsv(p)}>
-                <Download className="h-4 w-4" /> CSV
-              </Button>
             </div>
 
             {/* Contact */}
@@ -258,6 +184,27 @@ export default function EmployeesPanel() {
                   <span className="text-xs text-muted-foreground">/km</span>
                 </div>
               </Field>
+            </div>
+
+            <div className="rounded-lg border p-3">
+              <div className="mb-3 text-sm font-semibold">{t("employees.ccqExport")}</div>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+                <Field label={t("employees.nasEmployee")}>
+                  <Input value={p.nas_employee || ""} maxLength={9} inputMode="numeric" onChange={(e) => setLocal(p.id, "nas_employee", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "nas_employee", e.target.value)} className="h-9" />
+                </Field>
+                <Field label={t("employees.tradeCode")}>
+                  <Input value={p.trade_code || "160"} maxLength={3} inputMode="numeric" onChange={(e) => setLocal(p.id, "trade_code", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "trade_code", e.target.value || "160")} className="h-9" />
+                </Field>
+                <Field label={t("employees.workRegion")}>
+                  <Input value={p.work_region || ""} maxLength={2} inputMode="numeric" onChange={(e) => setLocal(p.id, "work_region", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "work_region", e.target.value)} className="h-9" />
+                </Field>
+                <Field label={t("employees.wageSchedule")}>
+                  <Input value={p.wage_schedule || ""} onChange={(e) => setLocal(p.id, "wage_schedule", e.target.value)} onBlur={(e) => saveField(p.id, "wage_schedule", e.target.value)} className="h-9" />
+                </Field>
+                <Field label={t("employees.hourlyRate")}>
+                  <Input type="number" min="0" step="0.01" value={p.hourly_rate ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)} className="h-9" />
+                </Field>
+              </div>
             </div>
 
             <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3">

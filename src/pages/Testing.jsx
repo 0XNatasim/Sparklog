@@ -243,7 +243,7 @@ function CcqRatesPanel() {
           </div>
 
           {err && (
-            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
               <span>{err}</span>
               <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={handleSync}>
                 {t("common.retry")}
