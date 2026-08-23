@@ -41,7 +41,7 @@ export default function Profile() {
           <p className="text-sm text-muted-foreground">{t("profile.description")}</p>
         </div>
         {loading && <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("common.loading")}</CardContent></Card>}
-        {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+        {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
         {!loading && !error && (
           <>
             <Card>
@@ -119,7 +119,7 @@ function ReservationStatusReference() {
           </ReferenceSection>
 
           <ReferenceSection title="En attente de thermostats">
-            <p className="font-semibold text-destructive dark:text-red-400">Ce statut ne doit jamais être utilisé.</p>
+            <p className="font-semibold text-destructive dark:text-red-300">Ce statut ne doit jamais être utilisé.</p>
           </ReferenceSection>
 
           <ReferenceSection title="Non admissible">
@@ -154,7 +154,7 @@ function CalypsoV1Reference() {
           <DialogDescription>Information importante concernant les appareils Calypso V1.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 text-sm leading-relaxed">
-          <p className="font-semibold text-destructive dark:text-red-400">
+          <p className="font-semibold text-destructive dark:text-red-300">
             Svp ne plus installer de Calypso V1.
           </p>
           <p>

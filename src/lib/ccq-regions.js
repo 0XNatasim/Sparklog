@@ -1,0 +1,20 @@
+export const QUEBEC_REGIONS = [
+  { code: "01", name: "Bas-Saint-Laurent" },
+  { code: "02", name: "Saguenay–Lac-Saint-Jean" },
+  { code: "03", name: "Capitale-Nationale (Québec)" },
+  { code: "04", name: "Mauricie" },
+  { code: "05", name: "Estrie" },
+  { code: "06", name: "Montréal" },
+  { code: "07", name: "Outaouais" },
+  { code: "08", name: "Abitibi-Témiscamingue" },
+  { code: "09", name: "Côte-Nord" },
+  { code: "10", name: "Nord-du-Québec" },
+  { code: "11", name: "Gaspésie–Îles-de-la-Madeleine" },
+  { code: "12", name: "Chaudière-Appalaches" },
+  { code: "13", name: "Laval" },
+  { code: "14", name: "Lanaudière" },
+  { code: "15", name: "Laurentides" },
+  { code: "16", name: "Montérégie" },
+  { code: "17", name: "Centre-du-Québec" },
+];
+
