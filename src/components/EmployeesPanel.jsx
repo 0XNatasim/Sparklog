@@ -39,7 +39,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }, { data: overtimeSettings, error: settingsError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime, parking_receipts_enabled")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false }),
         supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single()]),
@@ -215,7 +215,7 @@ export default function EmployeesPanel() {
               </div>
             )}
             {/* Contact */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label={t("manager.tbl.phone")}>
                 <div className="flex items-center gap-1">
                   <Input
@@ -239,6 +239,21 @@ export default function EmployeesPanel() {
                     </a>
                   ) : <span className="text-muted-foreground">—</span>}
                 </div>
+              </Field>
+              <Field label={t("employees.pauseAccount")}>
+                <label className="flex h-9 cursor-pointer items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3">
+                  <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />{p.is_paused ? t("employees.paused") : t("employees.active")}</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(p.is_paused)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setLocal(p.id, "is_paused", checked);
+                      saveField(p.id, "is_paused", checked);
+                    }}
+                    className="h-5 w-5 rounded border-input accent-amber-600"
+                  />
+                </label>
               </Field>
             </div>
 
@@ -355,15 +370,15 @@ export default function EmployeesPanel() {
                   className="h-5 w-5 rounded border-input accent-primary"
                 />
               </label>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
-                <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />{t("employees.pauseAccount")}</span>
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
+                <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
                 <input
                   type="checkbox"
-                  checked={Boolean(p.is_paused)}
+                  checked={Boolean(p.parking_receipts_enabled)}
                   onChange={(e) => {
                     const checked = e.target.checked;
-                    setLocal(p.id, "is_paused", checked);
-                    saveField(p.id, "is_paused", checked);
+                    setLocal(p.id, "parking_receipts_enabled", checked);
+                    saveField(p.id, "parking_receipts_enabled", checked);
                   }}
                   className="h-5 w-5 rounded border-input accent-amber-600"
                 />

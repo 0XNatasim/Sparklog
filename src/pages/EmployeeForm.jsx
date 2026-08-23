@@ -170,6 +170,7 @@ export default function EmployeeForm() {
   const [parkingRequested, setParkingRequested] = useState(false);
   const [parkingFile, setParkingFile] = useState(null);
   const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
+  const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
   const [status, setStatus] = useState("");
@@ -246,6 +247,22 @@ export default function EmployeeForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from("profiles").select("parking_receipts_enabled").eq("id", user.id).single().then(({ data, error }) => {
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+      const enabled = Boolean(data?.parking_receipts_enabled);
+      setParkingReceiptsEnabled(enabled);
+      if (!enabled) {
+        setParkingRequested(false);
+        setParkingFile(null);
+      }
+    });
+  }, [user?.id]);
 
   async function saveDraft() {
     setPendingSaveMode("draft");
@@ -727,7 +744,7 @@ export default function EmployeeForm() {
                 </div>
               </div>
 
-              <div className="grid gap-1.5 sm:col-span-2 lg:col-span-3">
+              {parkingReceiptsEnabled && <div className="grid gap-1.5 sm:col-span-2 lg:col-span-3">
                 <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2.5">
                   <span>
                     <span className="block text-sm font-medium">{t("form.parking.title")}</span>
@@ -756,7 +773,7 @@ export default function EmployeeForm() {
                     {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
                   </Button>
                 )}
-              </div>
+              </div>}
             </div>
 
             <div className="flex flex-nowrap items-center gap-1.5 pt-2">
