@@ -340,11 +340,18 @@ export default function EmployeesPanel() {
                   </Select>
                 </Field>
                 <Field label={t("employees.wageSchedule")}>
-                  <Select value={p.wage_schedule || ""} onChange={(e) => saveAnnex(p, e.target.value)} className="h-9">
-                    <option value="">—</option>
-                    {(annexes.get(rateSectorForProfile(p.sector)) || []).map((annex) => <option key={annex.code} value={annex.code}>{annex.code}{annex.description ? ` — ${annex.description}` : ""}</option>)}
-                    {p.wage_schedule && !(annexes.get(rateSectorForProfile(p.sector)) || []).some((annex) => annex.code === p.wage_schedule) && <option value={p.wage_schedule}>{p.wage_schedule}</option>}
-                  </Select>
+                  {(annexes.get(rateSectorForProfile(p.sector)) || []).length > 0 ? (
+                    <Select value={p.wage_schedule || ""} onChange={(e) => saveAnnex(p, e.target.value)} className="h-9">
+                      <option value="">—</option>
+                      {(annexes.get(rateSectorForProfile(p.sector)) || []).map((annex) => <option key={annex.code} value={annex.code}>{annex.code}{annex.description ? ` — ${annex.description}` : ""}</option>)}
+                      {p.wage_schedule && !(annexes.get(rateSectorForProfile(p.sector)) || []).some((annex) => annex.code === p.wage_schedule) && <option value={p.wage_schedule}>{p.wage_schedule}</option>}
+                    </Select>
+                  ) : (
+                    <>
+                      <Input value={p.wage_schedule || ""} placeholder="C3" onChange={(e) => setLocal(p.id, "wage_schedule", e.target.value.toUpperCase())} onBlur={(e) => saveField(p.id, "wage_schedule", e.target.value.toUpperCase())} className="h-9" />
+                      <span className="text-[11px] text-amber-700 dark:text-amber-300">{t("employees.wageScheduleManual")}</span>
+                    </>
+                  )}
                   <span className="text-[11px] text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
                 </Field>
                 <Field label={t("employees.hourlyRate")}>
