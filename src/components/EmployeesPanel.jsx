@@ -17,10 +17,9 @@ const LEVELS = [
 ];
 
 const SECTORS = [
-  { value: "C", label: "Commercial (ICI)" },
-  { value: "I", label: "Industriel" },
-  { value: "G", label: "Génie civil et voirie" },
-  { value: "L", label: "Résidentiel lourd" },
+  { value: "I", label: "Commercial (ICI)" },
+  { value: "N", label: "Industriel" },
+  { value: "H", label: "Résidentiel lourd" },
   { value: "R", label: "Résidentiel léger" },
 ];
 
@@ -194,7 +193,7 @@ export default function EmployeesPanel() {
                   <Input value={p.nas_employee || ""} maxLength={9} inputMode="numeric" onChange={(e) => setLocal(p.id, "nas_employee", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "nas_employee", e.target.value)} className="h-9" />
                 </Field>
                 <Field label={t("employees.tradeCode")}>
-                  <Input value={p.trade_code || ""} maxLength={3} inputMode="numeric" onChange={(e) => setLocal(p.id, "trade_code", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "trade_code", e.target.value)} className="h-9" />
+                  <Input value={p.trade_code || "160"} maxLength={3} inputMode="numeric" onChange={(e) => setLocal(p.id, "trade_code", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "trade_code", e.target.value || "160")} className="h-9" />
                 </Field>
                 <Field label={t("employees.workRegion")}>
                   <Input value={p.work_region || ""} maxLength={2} inputMode="numeric" onChange={(e) => setLocal(p.id, "work_region", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "work_region", e.target.value)} className="h-9" />

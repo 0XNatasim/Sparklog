@@ -50,7 +50,7 @@ export default function CcqJsonExport() {
     return buildCcqWeeklyRecords(
       jobs.filter((job) => employeeId === "all" || job.user_id === employeeId),
       profileMap
-    ).filter((record) => !month || record.dateSFL.startsWith(month));
+    ).filter((record) => !month || record.semaineFinissantLe.startsWith(month));
   }, [employeeId, jobs, month, profiles]);
 
   const incomplete = records.filter((record) => missingCcqFields(record).length > 0);

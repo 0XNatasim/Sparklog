@@ -1,11 +1,12 @@
 import dayjs from "dayjs";
 
 const SECTOR_CODES = {
-  C: "COMMERCIAL",
-  I: "INDUSTRIAL",
-  G: "CIVIL_ROADS",
-  R: "LIGHT_RESIDENTIAL",
-  L: "HEAVY_RESIDENTIAL",
+  C: "I", // Legacy commercial value.
+  I: "I",
+  N: "N",
+  R: "R",
+  L: "H", // Legacy heavy-residential value.
+  H: "H",
 };
 
 export function weekEndingSaturday(date) {
@@ -39,14 +40,14 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     const key = [job.user_id, dateSFL, profile.trade_code, secteur, profile.work_region, profile.wage_schedule].join("|");
     if (!groups.has(key)) {
       groups.set(key, {
-        nasEmployee: profile.nas_employee || null,
-        dateSFL,
-        codeMetier: profile.trade_code || null,
-        secteur,
+        nas: profile.nas_employee || null,
+        semaineFinissantLe: dateSFL,
+        codeMetier: profile.trade_code || "160",
+        secteurActivite: secteur,
         region: profile.work_region || null,
         annexe: profile.wage_schedule || null,
         tauxHoraire: profile.hourly_rate == null ? null : Number(profile.hourly_rate),
-        heuresReg: 0,
+        heuresRegulieres: 0,
         heuresSup50: 0,
         heuresSup100: 0,
         _regularMinutes: 0,
@@ -75,7 +76,7 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
   }
 
   return [...groups.values()].map((record) => {
-    record.heuresReg = roundHours(record._regularMinutes);
+    record.heuresRegulieres = roundHours(record._regularMinutes);
     record.heuresSup50 = roundHours(record._sup50Minutes);
     record.heuresSup100 = roundHours(record._sup100Minutes);
     record.sourceEntryIds = record._entryIds;
@@ -88,6 +89,6 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
 }
 
 export function missingCcqFields(record) {
-  return ["nasEmployee", "dateSFL", "codeMetier", "secteur", "region", "annexe", "tauxHoraire"]
+  return ["nas", "semaineFinissantLe", "codeMetier", "secteurActivite", "region", "annexe", "tauxHoraire"]
     .filter((field) => record[field] == null || record[field] === "");
 }
