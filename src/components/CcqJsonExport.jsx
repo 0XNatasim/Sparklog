@@ -99,7 +99,7 @@ export default function CcqJsonExport() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-sm">
             <div>
               <b>{records.length}</b> {t("manager.download.weeklyRecords")}
-              {incomplete.length > 0 && <div className="text-destructive">{t("manager.download.incomplete", { count: incomplete.length })}</div>}
+              {incomplete.length > 0 && <div className="text-destructive dark:text-red-300">{t("manager.download.incomplete", { count: incomplete.length })}</div>}
             </div>
             <Button type="button" onClick={downloadJson} disabled={loading || records.length === 0 || incomplete.length > 0}>
               <Download className="mr-2 h-4 w-4" />{t("manager.download.json")}
@@ -109,7 +109,7 @@ export default function CcqJsonExport() {
         </CardContent>
       </Card>
       {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
-      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
       {!loading && records.length > 0 && (
         <Card><CardContent className="p-0"><pre className="max-h-[36rem] overflow-auto p-4 text-xs">{JSON.stringify(records, null, 2)}</pre></CardContent></Card>
       )}

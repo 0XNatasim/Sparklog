@@ -674,7 +674,7 @@ export default function ManagerDashboard() {
           <div className="space-y-3">
             <Card><CardContent className="p-4"><h2 className="font-semibold">{t("manager.overtime.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.overtime.description")}</p></CardContent></Card>
             {overtimeLoading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
-            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{err}</div>}
+            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
             {!overtimeLoading && overtimeJobs.map(renderOvertimeCard)}
             {!overtimeLoading && overtimeJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.overtime.empty")}</CardContent></Card>}
           </div>
@@ -770,7 +770,7 @@ export default function ManagerDashboard() {
 
         {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
             <span>{err}</span>
             <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
               {t("common.retry")}

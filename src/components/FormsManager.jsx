@@ -65,7 +65,7 @@ export default function FormsManager({ collapsible = true }) {
       </CardHeader>
       {isOpen && (
         <CardContent id="manager-forms-list" className="grid gap-2 sm:grid-cols-2">
-          {error && <div className="col-span-full rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          {error && <div className="col-span-full rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
           {COMPANY_FORMS.map((form) => {
             const enabled = Boolean(availability[form.id]);
             return (

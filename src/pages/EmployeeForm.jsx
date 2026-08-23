@@ -575,7 +575,7 @@ export default function EmployeeForm() {
     <AppShell>
       <div className="space-y-3">
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
             {err}
           </div>
         )}
@@ -813,7 +813,7 @@ export default function EmployeeForm() {
       }}>
         <DialogContent className="max-w-md">
           {returnSaveError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-400" role="alert">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">
               {returnSaveError}
             </div>
           )}
@@ -882,7 +882,7 @@ export default function EmployeeForm() {
                 <DialogTitle>{t("form.evidence.title")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">
                   {t("form.evidence.description")}
                 </div>
                 <div className="rounded-md border bg-muted/40 p-3">
@@ -913,7 +913,7 @@ export default function EmployeeForm() {
                     </div>
                   )}
                 </div>
-                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">{evidenceValidationError}</div>}
+                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{evidenceValidationError}</div>}
                 <input
                   ref={overtimeInputRef}
                   type="file"

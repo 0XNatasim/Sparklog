@@ -49,7 +49,7 @@ export default function NotificationsBell() {
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-400" aria-label={t("notifications.title")}>
+        <Button variant="ghost" size="icon" className="relative h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-300" aria-label={t("notifications.title")}>
           <Bell className="h-5 w-5" />
           {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-red-600 px-1 text-[10px] font-bold leading-4 text-white">{unread > 99 ? "99+" : unread}</span>}
         </Button>
