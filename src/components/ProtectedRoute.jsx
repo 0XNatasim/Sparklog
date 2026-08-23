@@ -1,9 +1,11 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useT } from "@/lib/use-t";
 
 export default function ProtectedRoute({ children, requireRole }) {
-  const { user, role, loading, authError } = useAuth();
+  const { user, role, isPaused, loading, authError, signOut } = useAuth();
+  const t = useT();
 
   if (loading) {
     return (
@@ -28,6 +30,18 @@ export default function ProtectedRoute({ children, requireRole }) {
   }
 
   if (!user) return <Navigate to="/login" replace />;
+
+  if (isPaused && role !== "manager") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background p-6 text-foreground">
+        <div className="max-w-md space-y-4 text-center">
+          <div className="text-xl font-bold">{t("auth.paused.title")}</div>
+          <p className="text-muted-foreground">{t("auth.paused.description")}</p>
+          <button type="button" onClick={signOut} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{t("nav.signOut")}</button>
+        </div>
+      </div>
+    );
+  }
 
   if (requireRole && role !== requireRole) return <Navigate to="/" replace />;
 

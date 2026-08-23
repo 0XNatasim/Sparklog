@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BookOpen, ExternalLink, Mail, Phone, UserRound } from "lucide-react";
+import { BookOpen, Building2, ExternalLink, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/AppShell";
@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { COMPANY_FORMS } from "@/lib/forms";
 import { useT } from "@/lib/use-t";
+import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
+import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
 export default function Profile() {
   const t = useT();
@@ -19,7 +21,7 @@ export default function Profile() {
   useEffect(() => {
     if (!user?.id) return;
     Promise.all([
-      supabase.from("profiles").select("full_name, phone, email").eq("id", user.id).single(),
+      supabase.from("profiles").select("full_name, phone, email, work_region, union_association").eq("id", user.id).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
     ]).then(([profileResult, formsResult]) => {
       const loadError = profileResult.error || formsResult.error;
@@ -41,15 +43,18 @@ export default function Profile() {
           <p className="text-sm text-muted-foreground">{t("profile.description")}</p>
         </div>
         {loading && <Card><CardContent className="p-6 text-sm text-muted-foreground">{t("common.loading")}</CardContent></Card>}
-        {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+        {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
         {!loading && !error && (
           <>
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><UserRound className="h-5 w-5 text-primary" />{t("profile.information")}</CardTitle></CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-3">
+              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label={t("auth.fullName")} value={profile?.full_name} icon={UserRound} />
                 <Info label={t("auth.phone")} value={profile?.phone} icon={Phone} href={profile?.phone ? `tel:${profile.phone}` : undefined} />
                 <Info label={t("auth.email")} value={profile?.email || user?.email} icon={Mail} href={`mailto:${profile?.email || user?.email}`} />
+                <Info label={t("profile.region")} value={QUEBEC_REGIONS.find((region) => region.code === profile?.work_region)?.name} icon={MapPin} />
+                <Info label={t("profile.unionAssociation")} value={UNION_ASSOCIATIONS.find((association) => association.code === profile?.union_association)?.employeeLabel} icon={Users} />
+                <Info label={t("profile.sector")} value={t("employees.commercialSector")} icon={Building2} />
               </CardContent>
             </Card>
 
@@ -119,7 +124,7 @@ function ReservationStatusReference() {
           </ReferenceSection>
 
           <ReferenceSection title="En attente de thermostats">
-            <p className="font-semibold text-destructive dark:text-red-400">Ce statut ne doit jamais être utilisé.</p>
+            <p className="font-semibold text-destructive dark:text-red-300">Ce statut ne doit jamais être utilisé.</p>
           </ReferenceSection>
 
           <ReferenceSection title="Non admissible">
@@ -154,7 +159,7 @@ function CalypsoV1Reference() {
           <DialogDescription>Information importante concernant les appareils Calypso V1.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 text-sm leading-relaxed">
-          <p className="font-semibold text-destructive dark:text-red-400">
+          <p className="font-semibold text-destructive dark:text-red-300">
             Svp ne plus installer de Calypso V1.
           </p>
           <p>
