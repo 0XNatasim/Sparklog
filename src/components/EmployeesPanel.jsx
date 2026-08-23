@@ -9,6 +9,7 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
+import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
 const LEVELS = [
@@ -18,41 +19,6 @@ const LEVELS = [
   { value: "apprenti_2", label: "Apprenti 2" },
   { value: "apprenti_1", label: "Apprenti 1" },
 ];
-
-function missingEmployeeFields(profile, t) {
-  const required = [
-    ["phone", t("manager.tbl.phone")],
-    ["email", t("manager.tbl.email")],
-    ["ccq_number", "CCQ#"],
-    ["apprentice_level", t("employees.level")],
-    ["km_rate", t("employees.kmRate")],
-    ["nas_employee", t("employees.nasEmployee")],
-    ["trade_code", t("employees.tradeCode")],
-    ["work_region", t("employees.workRegion")],
-    ["union_association", t("employees.unionAssociation")],
-    ["wage_schedule", t("employees.wageSchedule")],
-    ["hourly_rate", t("employees.hourlyRate")],
-  ];
-  return required.filter(([field]) => profile[field] == null || String(profile[field]).trim() === "").map(([, label]) => label);
-}
-
-function missingEmployeeFields(profile, t) {
-  const required = [
-    ["phone", t("manager.tbl.phone")],
-    ["email", t("manager.tbl.email")],
-    ["ccq_number", "CCQ#"],
-    ["apprentice_level", t("employees.level")],
-    ["sector", t("employees.sector")],
-    ["km_rate", t("employees.kmRate")],
-    ["nas_employee", t("employees.nasEmployee")],
-    ["trade_code", t("employees.tradeCode")],
-    ["work_region", t("employees.workRegion")],
-    ["union_association", t("employees.unionAssociation")],
-    ["wage_schedule", t("employees.wageSchedule")],
-    ["hourly_rate", t("employees.hourlyRate")],
-  ];
-  return required.filter(([field]) => profile[field] == null || String(profile[field]).trim() === "").map(([, label]) => label);
-}
 
 export default function EmployeesPanel() {
   const t = useT();
@@ -218,7 +184,7 @@ export default function EmployeesPanel() {
       )}
 
       {!loading && profiles.map((p) => {
-        const missingFields = missingEmployeeFields(p, t);
+        const missingFields = getMissingEmployeeFields(p, t);
         return (
         <Card key={p.id} className={p.is_paused ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-amber-500/40" : ""}>
           <button
