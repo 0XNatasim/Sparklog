@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
 import AppShell from "@/components/AppShell";
-import EmployeesPanel from "@/components/EmployeesPanel";
 import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -410,9 +409,8 @@ export default function Testing() {
   const t = useT();
   return (
     <AppShell>
-      <Tabs defaultValue="employees" className="space-y-4">
+      <Tabs defaultValue="announce" className="space-y-4">
         <TabsList className="h-auto max-w-full flex-wrap justify-start">
-          <TabsTrigger value="employees">{t("testing.tabs.employees")}</TabsTrigger>
           <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
           <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
           <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
@@ -420,7 +418,6 @@ export default function Testing() {
           <TabsTrigger value="forms">{t("testing.tabs.forms")}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="employees"><EmployeesPanel /></TabsContent>
         <TabsContent value="announce"><ManagerAnnouncePanel /></TabsContent>
         <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
         <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>

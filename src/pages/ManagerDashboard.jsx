@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Clock3, Download, Image, ImageOff, TimerReset } from "lucide-react";
+import { ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -17,6 +17,7 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
 import CcqJsonExport from "@/components/CcqJsonExport";
+import EmployeesPanel from "@/components/EmployeesPanel";
 
 dayjs.extend(isoWeek);
 
@@ -49,7 +50,7 @@ export default function ManagerDashboard() {
   const t = useT();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const activeSection = ["forms", "timesheet", "overtime", "download"].includes(searchParams.get("section"))
+  const activeSection = ["employees", "forms", "timesheet", "overtime", "download"].includes(searchParams.get("section"))
     ? searchParams.get("section")
     : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
@@ -648,8 +649,9 @@ export default function ManagerDashboard() {
   return (
     <AppShell>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label={t("manager.sections.label")}>
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5" aria-label={t("manager.sections.label")}>
           {[
+            { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
             { id: "overtime", icon: TimerReset, label: t("manager.sections.overtime"), description: t("manager.sections.overtimeDescription") },
@@ -667,6 +669,8 @@ export default function ManagerDashboard() {
             </button>
           ))}
         </div>
+
+        {activeSection === "employees" && <EmployeesPanel />}
 
         {activeSection === "forms" && <FormsManager collapsible={false} />}
 
