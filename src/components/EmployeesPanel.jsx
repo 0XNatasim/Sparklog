@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
-import { extractRegularHourlyRate, LEVEL_TO_SKILL, rateSectorForProfile } from "@/lib/ccq-rates";
+import { extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL, rateSectorForProfile } from "@/lib/ccq-rates";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
 const LEVELS = [
@@ -34,6 +34,7 @@ export default function EmployeesPanel() {
   const [info, setInfo]         = useState("");
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [rates, setRates] = useState(new Map());
+  const [annexes, setAnnexes] = useState(new Map());
   const [retentionDays, setRetentionDays] = useState(30);
   const [retentionSaving, setRetentionSaving] = useState(false);
 
@@ -55,18 +56,28 @@ export default function EmployeesPanel() {
       if (settingsError) throw settingsError;
       setRetentionDays(overtimeSettings?.evidence_retention_days || 30);
       const nextRates = new Map();
+      const nextAnnexes = new Map();
       (snapshotRows || []).forEach((snapshot) => {
-        const key = `${snapshot.sector_id}:${snapshot.skill_id}`;
-        if (!nextRates.has(key)) nextRates.set(key, extractRegularHourlyRate(snapshot.raw_json));
+        const availableAnnexes = extractRateAnnexes(snapshot.raw_json);
+        if (!nextAnnexes.has(snapshot.sector_id)) nextAnnexes.set(snapshot.sector_id, availableAnnexes);
+        availableAnnexes.forEach((annex) => {
+          const key = `${snapshot.sector_id}:${snapshot.skill_id}:${annex.code}`;
+          if (!nextRates.has(key)) nextRates.set(key, extractRegularHourlyRate(snapshot.raw_json, annex.code));
+        });
       });
       setRates(nextRates);
+      setAnnexes(nextAnnexes);
       const nextProfiles = data ?? [];
       setProfiles(nextProfiles);
       await Promise.all(nextProfiles.map(async (profile) => {
-        const rate = nextRates.get(`${rateSectorForProfile(profile.sector)}:${LEVEL_TO_SKILL[profile.apprentice_level]}`);
-        if (rate == null || Number(profile.hourly_rate) === rate) return;
-        await supabase.from("profiles").update({ hourly_rate: rate }).eq("id", profile.id);
+        const rateSector = rateSectorForProfile(profile.sector);
+        const availableAnnexes = nextAnnexes.get(rateSector) || [];
+        const annex = profile.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
+        const rate = nextRates.get(`${rateSector}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
+        if (rate == null || (Number(profile.hourly_rate) === rate && profile.wage_schedule === annex)) return;
+        await supabase.from("profiles").update({ hourly_rate: rate, wage_schedule: annex }).eq("id", profile.id);
         setLocal(profile.id, "hourly_rate", rate);
+        setLocal(profile.id, "wage_schedule", annex);
       }));
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
@@ -109,7 +120,21 @@ export default function EmployeesPanel() {
     setLocal(profile.id, field, value);
     await saveField(profile.id, field, value);
     const next = { ...profile, [field]: value };
-    const rate = rates.get(`${rateSectorForProfile(next.sector)}:${LEVEL_TO_SKILL[next.apprentice_level]}`);
+    const rateSector = rateSectorForProfile(next.sector);
+    const availableAnnexes = annexes.get(rateSector) || [];
+    const annex = next.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
+    const rate = rates.get(`${rateSector}:${LEVEL_TO_SKILL[next.apprentice_level]}:${annex}`);
+    if (rate != null) {
+      setLocal(profile.id, "hourly_rate", rate);
+      setLocal(profile.id, "wage_schedule", annex);
+      await Promise.all([saveField(profile.id, "hourly_rate", rate), saveField(profile.id, "wage_schedule", annex)]);
+    }
+  }
+
+  async function saveAnnex(profile, annex) {
+    setLocal(profile.id, "wage_schedule", annex);
+    await saveField(profile.id, "wage_schedule", annex);
+    const rate = rates.get(`${rateSectorForProfile(profile.sector)}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
     if (rate != null) {
       setLocal(profile.id, "hourly_rate", rate);
       await saveField(profile.id, "hourly_rate", rate);
@@ -315,7 +340,11 @@ export default function EmployeesPanel() {
                   </Select>
                 </Field>
                 <Field label={t("employees.wageSchedule")}>
-                  <Input value={p.wage_schedule || ""} onChange={(e) => setLocal(p.id, "wage_schedule", e.target.value)} onBlur={(e) => saveField(p.id, "wage_schedule", e.target.value)} className="h-9" />
+                  <Select value={p.wage_schedule || ""} onChange={(e) => saveAnnex(p, e.target.value)} className="h-9">
+                    <option value="">—</option>
+                    {(annexes.get(rateSectorForProfile(p.sector)) || []).map((annex) => <option key={annex.code} value={annex.code}>{annex.code}{annex.description ? ` — ${annex.description}` : ""}</option>)}
+                    {p.wage_schedule && !(annexes.get(rateSectorForProfile(p.sector)) || []).some((annex) => annex.code === p.wage_schedule) && <option value={p.wage_schedule}>{p.wage_schedule}</option>}
+                  </Select>
                   <span className="text-[11px] text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
                 </Field>
                 <Field label={t("employees.hourlyRate")}>
@@ -325,28 +354,9 @@ export default function EmployeesPanel() {
               </div>
             </div>
 
-            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border bg-muted/20 px-4 py-3">
-              <span>
-                <span className="block text-sm font-semibold">{t("employees.storage")}</span>
-                <span className="block text-xs text-muted-foreground">{t("employees.storageDescription")}</span>
-              </span>
-              <span className="flex shrink-0 items-center gap-3">
-                <span className="text-sm font-bold text-primary">$50</span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(p.storage_compensation)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLocal(p.id, "storage_compensation", checked);
-                    saveField(p.id, "storage_compensation", checked);
-                  }}
-                  className="h-5 w-5 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                />
-              </span>
-            </label>
-
-            <div className="grid gap-3 rounded-lg border bg-muted/20 px-4 py-3 sm:grid-cols-2 sm:items-center">
-              <label className="flex cursor-pointer items-center gap-3">
+            <div className="grid gap-2 border-t pt-3 md:grid-cols-3">
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
+                <span className="text-sm font-medium">{t("employees.includeReturnTime")}</span>
                 <input
                   type="checkbox"
                   checked={p.include_return_time_in_overtime !== false}
@@ -357,7 +367,32 @@ export default function EmployeesPanel() {
                   }}
                   className="h-5 w-5 rounded border-input accent-primary"
                 />
-                <span className="text-sm font-medium">{t("employees.includeReturnTime")}</span>
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
+                <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(p.storage_compensation)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLocal(p.id, "storage_compensation", checked);
+                    saveField(p.id, "storage_compensation", checked);
+                  }}
+                  className="h-5 w-5 rounded border-input accent-primary"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+                <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />{t("employees.pauseAccount")}</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(p.is_paused)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLocal(p.id, "is_paused", checked);
+                    saveField(p.id, "is_paused", checked);
+                  }}
+                  className="h-5 w-5 rounded border-input accent-amber-600"
+                />
               </label>
             </div>
           </CardContent>}
