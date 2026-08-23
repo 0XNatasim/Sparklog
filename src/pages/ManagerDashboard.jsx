@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ClipboardList, Clock3, Download, Image, ImageOff, TimerReset } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -16,6 +16,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
+import CcqJsonExport from "@/components/CcqJsonExport";
 
 dayjs.extend(isoWeek);
 
@@ -62,7 +63,6 @@ export default function ManagerDashboard() {
   const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const datePickerRef = useRef(null);
   const [hasMore, setHasMore] = useState(false);
   const [counts, setCounts] = useState({ all: 0, saved: 0, submitted: 0, approved: 0 });
   const [err, setErr] = useState("");
@@ -72,20 +72,8 @@ export default function ManagerDashboard() {
 
   const [employeeId, setEmployeeId] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [weekFilter, setWeekFilter] = useState("");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
-
-  function weekFilterRange(w) {
-    if (!w) return null;
-    const m = /^(\d{4})-W(\d{2})$/.exec(w);
-    if (!m) return null;
-    const d = dayjs().year(Number(m[1])).isoWeek(Number(m[2]));
-    return {
-      start: d.startOf("isoWeek").format("YYYY-MM-DD"),
-      end: d.endOf("isoWeek").format("YYYY-MM-DD"),
-    };
-  }
 
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
@@ -109,25 +97,16 @@ export default function ManagerDashboard() {
     // Approved columns, so ignore the status dropdown there — otherwise
     // the other two columns are always empty.
     if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
-    const range = weekFilterRange(weekFilter);
-    if (range) q = q.gte("job_date", range.start).lte("job_date", range.end);
     return q;
   }
 
   async function loadCounts() {
-    const range = weekFilterRange(weekFilter);
-    const applyDateScope = (q) => {
-      if (range) return q.gte("job_date", range.start).lte("job_date", range.end);
-      return q;
-    };
-    const base = applyDateScope(
-      supabase.from("jobs").select("id", { head: true, count: "exact" })
-    );
+    const base = supabase.from("jobs").select("id", { head: true, count: "exact" });
     const scoped = (status) => {
       let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
       if (employeeId !== "all") q = q.eq("user_id", employeeId);
       if (status) q = q.eq("status", status);
-      return applyDateScope(q);
+      return q;
     };
     const [all, saved, submitted, approved] = await withTimeout(
       Promise.all([
@@ -196,7 +175,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, statusFilter, weekFilter]);
+  }, [employeeId, statusFilter]);
 
   useEffect(() => {
     if (!focusedJobId) return;
@@ -427,109 +406,6 @@ export default function ManagerDashboard() {
     } finally {
       setActionLoadingId(null);
     }
-  }
-
-  // Payroll CSV: one row per approved job for the selected employee, scoped
-  // to the picked week if any. Hours in decimal so the payroll software can
-  // sum directly. Detailed format — easy to re-pivot or trim columns later
-  // once we know the exact Desjardins import template.
-  function downloadPayrollCsv(employeeIdArg) {
-    const targetId = employeeIdArg || selectedEmployee?.id;
-    if (!targetId) return;
-    const range = weekFilterRange(weekFilter);
-    const rows = jobs.filter((j) => {
-      if (j.user_id !== targetId) return false;
-      if (j.status !== "approved") return false;
-      if (range && (j.job_date < range.start || j.job_date > range.end)) return false;
-      return true;
-    });
-
-    const employee = profiles.get(targetId);
-    const header = [
-      "employee_name",
-      "employee_email",
-      "employee_phone",
-      "ccq_number",
-      "week_iso",
-      "job_date",
-      "weekday",
-      "ot",
-      "depart",
-      "arrivee",
-      "fin",
-      "hours_decimal",
-      "hours_hhmm",
-      "km",
-      "return_time_minutes",
-      "return_km",
-    ];
-
-    function decimalHours(depart, fin) {
-      if (!depart || !fin) return 0;
-      const [dh, dm] = String(depart).slice(0, 5).split(":").map(Number);
-      const [fh, fm] = String(fin).slice(0, 5).split(":").map(Number);
-      if ([dh, dm, fh, fm].some((n) => Number.isNaN(n))) return 0;
-      let mins = fh * 60 + fm - (dh * 60 + dm);
-      if (mins < 0) mins += 24 * 60;
-      return Math.round((mins / 60) * 100) / 100;
-    }
-
-    function fmtHHmm(decimal) {
-      if (!Number.isFinite(decimal) || decimal <= 0) return "0h00";
-      const total = Math.round(decimal * 60);
-      const h = Math.floor(total / 60);
-      const m = total % 60;
-      return `${h}h${String(m).padStart(2, "0")}`;
-    }
-
-    const csvRows = rows
-      .slice()
-      .sort((a, b) => (a.job_date < b.job_date ? -1 : a.job_date > b.job_date ? 1 : 0))
-      .map((j) => {
-        const dec = decimalHours(j.depart, j.fin);
-        const km = (Number(j.km_aller ?? 0) || 0) + (Number(j.km_retour ?? 0) || 0);
-        return [
-          employee?.full_name || "",
-          employee?.email || "",
-          employee?.phone || "",
-          employee?.ccq_number || "",
-          dayjs(j.job_date).format("YYYY-[W]WW"),
-          j.job_date,
-          dayjs(j.job_date).format("dddd"),
-          j.ot || "",
-          j.depart ? String(j.depart).slice(0, 5) : "",
-          j.arrivee ? String(j.arrivee).slice(0, 5) : "",
-          j.fin ? String(j.fin).slice(0, 5) : "",
-          dec.toFixed(2),
-          fmtHHmm(dec),
-          km,
-          Number(j.return_time_minutes ?? 0) || 0,
-          Number(j.km_retour ?? 0) || 0,
-        ];
-      });
-
-    function esc(v) {
-      const s = String(v ?? "");
-      return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    }
-
-    // BOM so Excel / Desjardins opens UTF-8 with accents correctly; ;-separated
-    // because that's what fr-CA spreadsheets default to.
-    const csv =
-      "﻿" +
-      [header.join(";"), ...csvRows.map((r) => r.map(esc).join(";"))].join("\r\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const weekTag = range ? weekFilter : "all";
-    const safeName = (employee?.full_name || "employee").replace(/[^\w-]+/g, "_");
-    a.href = url;
-    a.download = `sparklog_payroll_${safeName}_${weekTag}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   }
 
   async function invokeWithTimeout(name, options, ms = 30000) {
@@ -805,7 +681,7 @@ export default function ManagerDashboard() {
         )}
 
         {activeSection === "download" && (
-          <Card><CardContent className="p-8 text-center"><Download className="mx-auto h-8 w-8 text-muted-foreground" /><h2 className="mt-3 font-semibold">{t("manager.download.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.download.description")}</p></CardContent></Card>
+          <CcqJsonExport />
         )}
 
         {activeSection === "timesheet" && <>
@@ -841,58 +717,11 @@ export default function ManagerDashboard() {
                 <option value="approved">{t("status.approved")}</option>
               </Select>
 
-              <div className="flex items-center gap-1">
-                <Input
-                  value={searchLive}
-                  onChange={(e) => setSearchLive(e.target.value)}
-                  placeholder={t("manager.filters.searchPlaceholder")}
-                  className="flex-1"
-                />
-                {/* Hidden date picker — calendar icon opens it, derives ISO week */}
-                <input
-                  type="date"
-                  value=""
-                  className="sr-only"
-                  ref={(el) => (datePickerRef.current = el)}
-                  onChange={(e) => {
-                    const d = e.target.value;
-                    if (!d) return;
-                    setWeekFilter(dayjs(d).format("YYYY-[W]WW"));
-                    e.target.value = "";
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant={weekFilter ? "default" : "outline"}
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={() => {
-                    const el = datePickerRef.current;
-                    if (!el) return;
-                    if (typeof el.showPicker === "function") el.showPicker();
-                    else el.click();
-                  }}
-                  title={t("manager.filters.pickDate")}
-                  aria-label={t("manager.filters.pickDate")}
-                >
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {weekFilter && (() => {
-                const range = weekFilterRange(weekFilter);
-                const label = range
-                  ? `${t("manager.weekShort")} ${dayjs(range.start).isoWeek()} · ${dayjs(range.start).format("DD MMM")} → ${dayjs(range.end).format("DD MMM YYYY")}`
-                  : weekFilter;
-                return (
-                  <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-3">
-                    <span className="text-sm text-muted-foreground">{label}</span>
-                    <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setWeekFilter("")}>
-                      {t("manager.filters.clearWeek")}
-                    </Button>
-                  </div>
-                );
-              })()}
+              <Input
+                value={searchLive}
+                onChange={(e) => setSearchLive(e.target.value)}
+                placeholder={t("manager.filters.searchPlaceholder")}
+              />
             </div>
 
             {selectedEmployee && (
@@ -932,16 +761,6 @@ export default function ManagerDashboard() {
                     disabled={bulkBusy || submittedForSelectedWeek.length === 0 || weekOptions.length === 0}
                   >
                     {bulkBusy ? t("common.working") : t("manager.approveWeek", { count: submittedForSelectedWeek.length })}
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={downloadPayrollCsv}
-                    disabled={!selectedEmployee}
-                    title={t("manager.downloadCsvTitle")}
-                  >
-                    {t("manager.downloadCsv")}
                   </Button>
                 </div>
               </div>
