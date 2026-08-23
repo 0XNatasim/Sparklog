@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
-import { extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL, rateSectorForProfile } from "@/lib/ccq-rates";
+import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
 const LEVELS = [
@@ -19,12 +19,22 @@ const LEVELS = [
   { value: "apprenti_1", label: "Apprenti 1" },
 ];
 
-const SECTORS = [
-  { value: "I", label: "Commercial (ICI)" },
-  { value: "N", label: "Industriel" },
-  { value: "H", label: "Résidentiel lourd" },
-  { value: "R", label: "Résidentiel léger" },
-];
+function missingEmployeeFields(profile, t) {
+  const required = [
+    ["phone", t("manager.tbl.phone")],
+    ["email", t("manager.tbl.email")],
+    ["ccq_number", "CCQ#"],
+    ["apprentice_level", t("employees.level")],
+    ["km_rate", t("employees.kmRate")],
+    ["nas_employee", t("employees.nasEmployee")],
+    ["trade_code", t("employees.tradeCode")],
+    ["work_region", t("employees.workRegion")],
+    ["union_association", t("employees.unionAssociation")],
+    ["wage_schedule", t("employees.wageSchedule")],
+    ["hourly_rate", t("employees.hourlyRate")],
+  ];
+  return required.filter(([field]) => profile[field] == null || String(profile[field]).trim() === "").map(([, label]) => label);
+}
 
 function missingEmployeeFields(profile, t) {
   const required = [
@@ -63,7 +73,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }, { data: overtimeSettings, error: settingsError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false }),
         supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single()]),
@@ -88,10 +98,9 @@ export default function EmployeesPanel() {
       const nextProfiles = data ?? [];
       setProfiles(nextProfiles);
       await Promise.all(nextProfiles.map(async (profile) => {
-        const rateSector = rateSectorForProfile(profile.sector);
-        const availableAnnexes = nextAnnexes.get(rateSector) || [];
+        const availableAnnexes = nextAnnexes.get(COMMERCIAL_RATE_SECTOR) || [];
         const annex = profile.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
-        const rate = nextRates.get(`${rateSector}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
+        const rate = nextRates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
         if (rate == null || (Number(profile.hourly_rate) === rate && profile.wage_schedule === annex)) return;
         await supabase.from("profiles").update({ hourly_rate: rate, wage_schedule: annex }).eq("id", profile.id);
         setLocal(profile.id, "hourly_rate", rate);
@@ -138,10 +147,9 @@ export default function EmployeesPanel() {
     setLocal(profile.id, field, value);
     await saveField(profile.id, field, value);
     const next = { ...profile, [field]: value };
-    const rateSector = rateSectorForProfile(next.sector);
-    const availableAnnexes = annexes.get(rateSector) || [];
+    const availableAnnexes = annexes.get(COMMERCIAL_RATE_SECTOR) || [];
     const annex = next.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
-    const rate = rates.get(`${rateSector}:${LEVEL_TO_SKILL[next.apprentice_level]}:${annex}`);
+    const rate = rates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[next.apprentice_level]}:${annex}`);
     if (rate != null) {
       setLocal(profile.id, "hourly_rate", rate);
       setLocal(profile.id, "wage_schedule", annex);
@@ -152,7 +160,7 @@ export default function EmployeesPanel() {
   async function saveAnnex(profile, annex) {
     setLocal(profile.id, "wage_schedule", annex);
     await saveField(profile.id, "wage_schedule", annex);
-    const rate = rates.get(`${rateSectorForProfile(profile.sector)}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
+    const rate = rates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
     if (rate != null) {
       setLocal(profile.id, "hourly_rate", rate);
       await saveField(profile.id, "hourly_rate", rate);
@@ -289,14 +297,7 @@ export default function EmployeesPanel() {
                 </Select>
               </Field>
               <Field label={t("employees.sector")}>
-                <Select
-                  value={p.sector || ""}
-                  onChange={(e) => saveClassification(p, "sector", e.target.value)}
-                  className="h-9"
-                >
-                  <option value="">—</option>
-                  {SECTORS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </Select>
+                <Input value={t("employees.commercialSector")} readOnly className="h-9 bg-muted" />
               </Field>
               <Field label={t("employees.kmRate")}>
                 <div className="flex h-9 items-center gap-1">
@@ -340,11 +341,11 @@ export default function EmployeesPanel() {
                   </Select>
                 </Field>
                 <Field label={t("employees.wageSchedule")}>
-                  {(annexes.get(rateSectorForProfile(p.sector)) || []).length > 0 ? (
+                  {(annexes.get(COMMERCIAL_RATE_SECTOR) || []).length > 0 ? (
                     <Select value={p.wage_schedule || ""} onChange={(e) => saveAnnex(p, e.target.value)} className="h-9">
                       <option value="">—</option>
-                      {(annexes.get(rateSectorForProfile(p.sector)) || []).map((annex) => <option key={annex.code} value={annex.code}>{annex.code}{annex.description ? ` — ${annex.description}` : ""}</option>)}
-                      {p.wage_schedule && !(annexes.get(rateSectorForProfile(p.sector)) || []).some((annex) => annex.code === p.wage_schedule) && <option value={p.wage_schedule}>{p.wage_schedule}</option>}
+                      {(annexes.get(COMMERCIAL_RATE_SECTOR) || []).map((annex) => <option key={annex.code} value={annex.code}>{annex.code}{annex.description ? ` — ${annex.description}` : ""}</option>)}
+                      {p.wage_schedule && !(annexes.get(COMMERCIAL_RATE_SECTOR) || []).some((annex) => annex.code === p.wage_schedule) && <option value={p.wage_schedule}>{p.wage_schedule}</option>}
                     </Select>
                   ) : (
                     <>
@@ -356,7 +357,7 @@ export default function EmployeesPanel() {
                 </Field>
                 <Field label={t("employees.hourlyRate")}>
                   <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
-                  <span className="text-[11px] text-muted-foreground">{rateSectorForProfile(p.sector) ? t("employees.hourlyRateAutomatic") : t("employees.hourlyRateUnavailable")}</span>
+                  <span className="text-[11px] text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
                 </Field>
               </div>
             </div>

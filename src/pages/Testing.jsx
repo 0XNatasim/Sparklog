@@ -14,10 +14,7 @@ import { COMPANY_FORMS } from "@/lib/forms";
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
 
-const SECTORS = [
-  { id: "C", name: "Institutionnel et commercial (ICI)" },
-  { id: "R", name: "Résidentiel" },
-];
+const COMMERCIAL_SECTOR = { id: "C", name: "Institutionnel et commercial (ICI)" };
 
 const SKILLS = [
   { id: "6", label: "Compagnon",  pct: "100%" },
@@ -142,7 +139,6 @@ function fmt(value) {
 // ─── CCQ rates panel ──────────────────────────────────────────────────────────
 function CcqRatesPanel() {
   const t = useT();
-  const [sectorId, setSectorId] = useState("C");
   const [loading, setLoading]   = useState(false);
   const [err, setErr]           = useState("");
   const [results, setResults]   = useState(null);
@@ -165,7 +161,7 @@ function CcqRatesPanel() {
             supabase.functions.invoke("ccq_rates", {
               body: {
                 occupationId: OCCUPATION.id,
-                sectorId,
+                sectorId: COMMERCIAL_SECTOR.id,
                 skillId:  skill.id,
                 ratesToDate: today,
                 annexId:  "ALL",
@@ -186,9 +182,8 @@ function CcqRatesPanel() {
         rates: parseRates(snapshot?.raw_json),
       }));
 
-      const sectorObj = SECTORS.find((s) => s.id === sectorId);
       setResults({
-        sector:    sectorObj?.name ?? sectorId,
+        sector:    COMMERCIAL_SECTOR.name,
         date:      today,
         fetchedAt: new Date().toLocaleTimeString(),
         rows,
@@ -200,8 +195,8 @@ function CcqRatesPanel() {
     }
   }
 
-  // Auto-load on mount and whenever sector changes
-  useEffect(() => { handleSync(); }, [sectorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-load the only supported sector on mount.
+  useEffect(() => { handleSync(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
@@ -213,21 +208,9 @@ function CcqRatesPanel() {
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 CCQ · {OCCUPATION.name} ·
               </span>
-              {SECTORS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSectorId(s.id)}
-                  className={[
-                    "rounded-md px-3 py-1.5 text-xs font-semibold border transition-colors",
-                    sectorId === s.id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:bg-accent",
-                  ].join(" ")}
-                >
-                  {s.id === "C" ? "Commercial (ICI)" : "Résidentiel"}
-                </button>
-              ))}
+              <span className="rounded-md border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                Commercial (ICI)
+              </span>
             </div>
 
             <Button

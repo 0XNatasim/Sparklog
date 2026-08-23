@@ -6,11 +6,7 @@ export const LEVEL_TO_SKILL = {
   apprenti_1: "1",
 };
 
-export function rateSectorForProfile(sector) {
-  if (sector === "I") return "C";
-  if (sector === "R" || sector === "H") return "R";
-  return null;
-}
+export const COMMERCIAL_RATE_SECTOR = "C";
 
 export function extractRateAnnexes(rawJson) {
   const annexes = Array.isArray(rawJson?.Annexes) ? rawJson.Annexes : [];

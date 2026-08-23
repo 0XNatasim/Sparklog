@@ -1,13 +1,6 @@
 import dayjs from "dayjs";
 
-const SECTOR_CODES = {
-  C: "I", // Legacy commercial value.
-  I: "I",
-  N: "N",
-  R: "R",
-  L: "H", // Legacy heavy-residential value.
-  H: "H",
-};
+const COMMERCIAL_SECTOR_CODE = "I";
 
 export function weekEndingSaturday(date) {
   const value = dayjs(date);
@@ -36,7 +29,7 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
   for (const job of sortedJobs) {
     const profile = profilesById.get(job.user_id) || {};
     const dateSFL = weekEndingSaturday(job.job_date);
-    const secteur = SECTOR_CODES[profile.sector] || profile.sector || null;
+    const secteur = COMMERCIAL_SECTOR_CODE;
     const key = [job.user_id, dateSFL, profile.trade_code, secteur, profile.work_region, profile.wage_schedule].join("|");
     if (!groups.has(key)) {
       groups.set(key, {
