@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown, Mail, PauseCircle, Phone } from "lucide-react";
+import { ChevronDown, Mail, PauseCircle, Phone, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,25 @@ const SECTORS = [
   { value: "H", label: "Résidentiel lourd" },
   { value: "R", label: "Résidentiel léger" },
 ];
+
+function missingEmployeeFields(profile, t) {
+  const required = [
+    ["full_name", t("manager.tbl.name")],
+    ["phone", t("manager.tbl.phone")],
+    ["email", t("manager.tbl.email")],
+    ["ccq_number", "CCQ#"],
+    ["apprentice_level", t("employees.level")],
+    ["sector", t("employees.sector")],
+    ["km_rate", t("employees.kmRate")],
+    ["nas_employee", t("employees.nasEmployee")],
+    ["trade_code", t("employees.tradeCode")],
+    ["work_region", t("employees.workRegion")],
+    ["union_association", t("employees.unionAssociation")],
+    ["wage_schedule", t("employees.wageSchedule")],
+    ["hourly_rate", t("employees.hourlyRate")],
+  ];
+  return required.filter(([field]) => profile[field] == null || String(profile[field]).trim() === "").map(([, label]) => label);
+}
 
 export default function EmployeesPanel() {
   const t = useT();
@@ -191,8 +210,10 @@ export default function EmployeesPanel() {
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">—</CardContent></Card>
       )}
 
-      {!loading && profiles.map((p) => (
-        <Card key={p.id}>
+      {!loading && profiles.map((p) => {
+        const missingFields = missingEmployeeFields(p, t);
+        return (
+        <Card key={p.id} className={p.is_paused ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-amber-500/40" : ""}>
           <button
             type="button"
             onClick={() => toggleExpanded(p.id)}
@@ -203,12 +224,23 @@ export default function EmployeesPanel() {
               <div className="truncate font-semibold">{p.full_name || p.email || t("manager.employee")}</div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
             </div>
-            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.is_paused ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"}`}>
+            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.is_paused ? "bg-muted-foreground/15 text-muted-foreground" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"}`}>
               {p.is_paused ? t("employees.paused") : t("employees.active")}
             </span>
+            {missingFields.length > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                <TriangleAlert className="h-3.5 w-3.5" />{t("employees.missingCount", { count: missingFields.length })}
+              </span>
+            )}
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedIds.has(p.id) ? "rotate-180" : ""}`} />
           </button>
           {expandedIds.has(p.id) && <CardContent className="space-y-3 border-t p-4">
+            {missingFields.length > 0 && (
+              <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200" role="alert">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
+              </div>
+            )}
             {/* Header */}
             <div className="flex items-center gap-3">
               <Input
@@ -397,7 +429,7 @@ export default function EmployeesPanel() {
             </div>
           </CardContent>}
         </Card>
-      ))}
+      );})}
     </div>
   );
 }
