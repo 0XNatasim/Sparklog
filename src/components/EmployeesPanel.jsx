@@ -9,6 +9,7 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { extractRegularHourlyRate, LEVEL_TO_SKILL, rateSectorForProfile } from "@/lib/ccq-rates";
+import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
 const LEVELS = [
   { value: "compagnon",  label: "Compagnon" },
@@ -41,7 +42,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, wage_schedule, hourly_rate, km_rate, storage_compensation, overtime_evidence_required, include_return_time_in_overtime, evidence_retention_days")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, overtime_evidence_required, include_return_time_in_overtime, evidence_retention_days")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -262,7 +263,7 @@ export default function EmployeesPanel() {
 
             <div className="rounded-lg border p-3">
               <div className="mb-3 text-sm font-semibold">{t("employees.ccqExport")}</div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                 <Field label={t("employees.nasEmployee")}>
                   <Input value={p.nas_employee || ""} maxLength={9} inputMode="numeric" onChange={(e) => setLocal(p.id, "nas_employee", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "nas_employee", e.target.value)} className="h-9" />
                 </Field>
@@ -273,6 +274,12 @@ export default function EmployeesPanel() {
                   <Select value={p.work_region || ""} onChange={(e) => { setLocal(p.id, "work_region", e.target.value); saveField(p.id, "work_region", e.target.value); }} className="h-9">
                     <option value="">—</option>
                     {QUEBEC_REGIONS.map((region) => <option key={region.code} value={region.code}>{region.code} — {region.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label={t("employees.unionAssociation")}>
+                  <Select value={p.union_association || ""} onChange={(e) => { setLocal(p.id, "union_association", e.target.value); saveField(p.id, "union_association", e.target.value); }} className="h-9">
+                    <option value="">—</option>
+                    {UNION_ASSOCIATIONS.map((association) => <option key={association.code} value={association.code}>{association.name}</option>)}
                   </Select>
                 </Field>
                 <Field label={t("employees.wageSchedule")}>
