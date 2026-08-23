@@ -69,7 +69,7 @@ export default function RegionOnboarding() {
         ) : (
           <Select value={association} onChange={(event) => setAssociation(event.target.value)}>
             <option value="">{t("onboarding.union.choose")}</option>
-            {UNION_ASSOCIATIONS.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+            {UNION_ASSOCIATIONS.map((item) => <option key={item.code} value={item.code}>{item.employeeLabel}</option>)}
           </Select>
         )}
         {error && <p className="text-sm text-destructive dark:text-red-300">{error}</p>}
