@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
+import { extractRegularHourlyRate, LEVEL_TO_SKILL, rateSectorForProfile } from "@/lib/ccq-rates";
 
 const LEVELS = [
   { value: "compagnon",  label: "Compagnon" },
@@ -30,20 +32,36 @@ export default function EmployeesPanel() {
   const [err, setErr]           = useState("");
   const [info, setInfo]         = useState("");
   const [expandedIds, setExpandedIds] = useState(new Set());
+  const [rates, setRates] = useState(new Map());
 
   async function load() {
     setErr("");
     setLoading(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase
+      const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
+        Promise.all([supabase
           .from("profiles")
           .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, trade_code, apprentice_level, sector, work_region, wage_schedule, hourly_rate, km_rate, storage_compensation, overtime_evidence_required, include_return_time_in_overtime, evidence_retention_days")
           .order("full_name", { ascending: true }),
+        supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
       );
       if (error) throw error;
-      setProfiles(data ?? []);
+      if (ratesError) throw ratesError;
+      const nextRates = new Map();
+      (snapshotRows || []).forEach((snapshot) => {
+        const key = `${snapshot.sector_id}:${snapshot.skill_id}`;
+        if (!nextRates.has(key)) nextRates.set(key, extractRegularHourlyRate(snapshot.raw_json));
+      });
+      setRates(nextRates);
+      const nextProfiles = data ?? [];
+      setProfiles(nextProfiles);
+      await Promise.all(nextProfiles.map(async (profile) => {
+        const rate = nextRates.get(`${rateSectorForProfile(profile.sector)}:${LEVEL_TO_SKILL[profile.apprentice_level]}`);
+        if (rate == null || Number(profile.hourly_rate) === rate) return;
+        await supabase.from("profiles").update({ hourly_rate: rate }).eq("id", profile.id);
+        setLocal(profile.id, "hourly_rate", rate);
+      }));
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
     } finally {
@@ -79,6 +97,17 @@ export default function EmployeesPanel() {
     const { error } = await supabase.from("profiles").update({ [field]: value }).eq("id", id);
     if (error) setErr(error.message);
     else { setInfo(`${field} ✓`); setTimeout(() => setInfo(""), 1500); }
+  }
+
+  async function saveClassification(profile, field, value) {
+    setLocal(profile.id, field, value);
+    await saveField(profile.id, field, value);
+    const next = { ...profile, [field]: value };
+    const rate = rates.get(`${rateSectorForProfile(next.sector)}:${LEVEL_TO_SKILL[next.apprentice_level]}`);
+    if (rate != null) {
+      setLocal(profile.id, "hourly_rate", rate);
+      await saveField(profile.id, "hourly_rate", rate);
+    }
   }
 
 
@@ -194,7 +223,7 @@ export default function EmployeesPanel() {
               <Field label={t("employees.level")}>
                 <Select
                   value={p.apprentice_level || ""}
-                  onChange={(e) => { setLocal(p.id, "apprentice_level", e.target.value); saveField(p.id, "apprentice_level", e.target.value); }}
+                  onChange={(e) => saveClassification(p, "apprentice_level", e.target.value)}
                   className="h-9"
                 >
                   <option value="">—</option>
@@ -204,7 +233,7 @@ export default function EmployeesPanel() {
               <Field label={t("employees.sector")}>
                 <Select
                   value={p.sector || ""}
-                  onChange={(e) => { setLocal(p.id, "sector", e.target.value); saveField(p.id, "sector", e.target.value); }}
+                  onChange={(e) => saveClassification(p, "sector", e.target.value)}
                   className="h-9"
                 >
                   <option value="">—</option>
@@ -241,13 +270,18 @@ export default function EmployeesPanel() {
                   <Input value={p.trade_code || "160"} maxLength={3} inputMode="numeric" onChange={(e) => setLocal(p.id, "trade_code", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "trade_code", e.target.value || "160")} className="h-9" />
                 </Field>
                 <Field label={t("employees.workRegion")}>
-                  <Input value={p.work_region || ""} maxLength={2} inputMode="numeric" onChange={(e) => setLocal(p.id, "work_region", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "work_region", e.target.value)} className="h-9" />
+                  <Select value={p.work_region || ""} onChange={(e) => { setLocal(p.id, "work_region", e.target.value); saveField(p.id, "work_region", e.target.value); }} className="h-9">
+                    <option value="">—</option>
+                    {QUEBEC_REGIONS.map((region) => <option key={region.code} value={region.code}>{region.code} — {region.name}</option>)}
+                  </Select>
                 </Field>
                 <Field label={t("employees.wageSchedule")}>
                   <Input value={p.wage_schedule || ""} onChange={(e) => setLocal(p.id, "wage_schedule", e.target.value)} onBlur={(e) => saveField(p.id, "wage_schedule", e.target.value)} className="h-9" />
+                  <span className="text-[11px] text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
                 </Field>
                 <Field label={t("employees.hourlyRate")}>
-                  <Input type="number" min="0" step="0.01" value={p.hourly_rate ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)} className="h-9" />
+                  <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
+                  <span className="text-[11px] text-muted-foreground">{rateSectorForProfile(p.sector) ? t("employees.hourlyRateAutomatic") : t("employees.hourlyRateUnavailable")}</span>
                 </Field>
               </div>
             </div>
