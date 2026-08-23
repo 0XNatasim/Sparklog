@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
 import AppShell from "@/components/AppShell";
-import EmployeesPanel from "@/components/EmployeesPanel";
 import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,10 +14,7 @@ import { COMPANY_FORMS } from "@/lib/forms";
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
 
-const SECTORS = [
-  { id: "C", name: "Institutionnel et commercial (ICI)" },
-  { id: "R", name: "Résidentiel" },
-];
+const COMMERCIAL_SECTOR = { id: "C", name: "Institutionnel et commercial (ICI)" };
 
 const SKILLS = [
   { id: "6", label: "Compagnon",  pct: "100%" },
@@ -143,7 +139,6 @@ function fmt(value) {
 // ─── CCQ rates panel ──────────────────────────────────────────────────────────
 function CcqRatesPanel() {
   const t = useT();
-  const [sectorId, setSectorId] = useState("C");
   const [loading, setLoading]   = useState(false);
   const [err, setErr]           = useState("");
   const [results, setResults]   = useState(null);
@@ -166,7 +161,7 @@ function CcqRatesPanel() {
             supabase.functions.invoke("ccq_rates", {
               body: {
                 occupationId: OCCUPATION.id,
-                sectorId,
+                sectorId: COMMERCIAL_SECTOR.id,
                 skillId:  skill.id,
                 ratesToDate: today,
                 annexId:  "ALL",
@@ -187,9 +182,8 @@ function CcqRatesPanel() {
         rates: parseRates(snapshot?.raw_json),
       }));
 
-      const sectorObj = SECTORS.find((s) => s.id === sectorId);
       setResults({
-        sector:    sectorObj?.name ?? sectorId,
+        sector:    COMMERCIAL_SECTOR.name,
         date:      today,
         fetchedAt: new Date().toLocaleTimeString(),
         rows,
@@ -201,8 +195,8 @@ function CcqRatesPanel() {
     }
   }
 
-  // Auto-load on mount and whenever sector changes
-  useEffect(() => { handleSync(); }, [sectorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Auto-load the only supported sector on mount.
+  useEffect(() => { handleSync(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-4">
@@ -214,21 +208,9 @@ function CcqRatesPanel() {
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 CCQ · {OCCUPATION.name} ·
               </span>
-              {SECTORS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSectorId(s.id)}
-                  className={[
-                    "rounded-md px-3 py-1.5 text-xs font-semibold border transition-colors",
-                    sectorId === s.id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:bg-accent",
-                  ].join(" ")}
-                >
-                  {s.id === "C" ? "Commercial (ICI)" : "Résidentiel"}
-                </button>
-              ))}
+              <span className="rounded-md border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                Commercial (ICI)
+              </span>
             </div>
 
             <Button
@@ -243,7 +225,7 @@ function CcqRatesPanel() {
           </div>
 
           {err && (
-            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
               <span>{err}</span>
               <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={handleSync}>
                 {t("common.retry")}
@@ -410,9 +392,8 @@ export default function Testing() {
   const t = useT();
   return (
     <AppShell>
-      <Tabs defaultValue="employees" className="space-y-4">
+      <Tabs defaultValue="announce" className="space-y-4">
         <TabsList className="h-auto max-w-full flex-wrap justify-start">
-          <TabsTrigger value="employees">{t("testing.tabs.employees")}</TabsTrigger>
           <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
           <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
           <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
@@ -420,7 +401,6 @@ export default function Testing() {
           <TabsTrigger value="forms">{t("testing.tabs.forms")}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="employees"><EmployeesPanel /></TabsContent>
         <TabsContent value="announce"><ManagerAnnouncePanel /></TabsContent>
         <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
         <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
