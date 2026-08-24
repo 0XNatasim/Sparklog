@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
+import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 
 dayjs.locale("en");
@@ -36,9 +37,7 @@ function toHHmmLabelFromFormatHours(formatHoursResult) {
 }
 
 function kmTotal(job) {
-  const a = Number(job?.km_aller ?? 0) || 0;
-  const r = Number(job?.km_retour ?? 0) || 0;
-  return a + r;
+  return getKilometreBreakdown(job || {}).totalKm;
 }
 
 export default function History() {
@@ -196,7 +195,7 @@ export default function History() {
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
         )}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
             <span>{err}</span>
             <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
               {t("common.retry")}
@@ -247,8 +246,7 @@ export default function History() {
                   const totalLabelRaw = formatHours(totalHours);
                   const totalHHmm = toHHmmLabelFromFormatHours(totalLabelRaw);
 
-                  const a = Number(j.km_aller ?? 0) || 0;
-                  const r = Number(j.km_retour ?? 0) || 0;
+                  const { clientKm: a, returnKm: r } = getKilometreBreakdown(j);
                   const km = a + r;
 
                   const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";

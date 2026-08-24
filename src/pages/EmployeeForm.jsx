@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
+import { withRetry, withTimeout } from "@/lib/utils";
+import { isMealEligible } from "@/lib/payroll-calculations";
 import {
   Dialog,
   DialogContent,
@@ -106,25 +108,6 @@ function validateOvertimeSmsText(text) {
   return mentionsOvertime && confirmsApproval && includesDuration;
 }
 
-function withTimeout(promise, ms, label) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s. Please retry.`)),
-      ms
-    );
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      }
-    );
-  });
-}
-
 export default function EmployeeForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -134,6 +117,7 @@ export default function EmployeeForm() {
   const editId = searchParams.get("edit");
 
   const [loadingEdit, setLoadingEdit] = useState(false);
+  const [editLoadFailed, setEditLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [err, setErr] = useState("");
@@ -153,17 +137,29 @@ export default function EmployeeForm() {
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
+  const parkingInputRef = useRef(null);
+  const mealInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
+  const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
   const [pendingReturn, setPendingReturn] = useState(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
+  const [showOvertimeExample, setShowOvertimeExample] = useState(false);
   const [returnSaveError, setReturnSaveError] = useState("");
   const [returnCheckBusy, setReturnCheckBusy] = useState(false);
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
+  const [parkingRequested, setParkingRequested] = useState(false);
+  const [parkingFile, setParkingFile] = useState(null);
+  const [parkingAmount, setParkingAmount] = useState("");
+  const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
+  const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
+  const [pendingMealJobId, setPendingMealJobId] = useState(null);
+  const [mealBusy, setMealBusy] = useState(false);
+  const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
   const [status, setStatus] = useState("");
@@ -183,9 +179,13 @@ export default function EmployeeForm() {
     setErr("");
     setInfo("");
     setLoadingEdit(true);
+    setEditLoadFailed(false);
 
     try {
-      const { data, error } = await supabase.from("jobs").select("*").eq("id", editId).single();
+      const { data, error } = await withRetry(
+        () => supabase.from("jobs").select("*").eq("id", editId).single(),
+        12000
+      );
       if (error) throw error;
       if (!data) throw new Error(t("form.errors.notFound"));
       if (data.user_id !== user.id) throw new Error(t("form.errors.notAuthorized"));
@@ -196,9 +196,19 @@ export default function EmployeeForm() {
       setArrivee(fmtTimeHHmm(data.arrivee) || "");
       setFin(fmtTimeHHmm(data.fin) || "");
       setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
+      setParkingRequested(Boolean(data.parking_receipt_captured));
+      setHasParkingReceipt(Boolean(data.parking_receipt_captured));
+      setParkingFile(null);
 
       const aller = data.km_aller ?? "";
-      setKmAller(aller === null || aller === undefined ? "" : String(aller));
+      const totalKm = Number(data.km_total) || (Number(data.km_aller) || 0) + (Number(data.km_retour) || 0);
+      setKmAller(String(totalKm || ""));
+      if (data.parking_receipt_captured) {
+        const { data: parkingReceipt } = await supabase.from("parking_receipts").select("amount").eq("job_id", data.id).maybeSingle();
+        setParkingAmount(parkingReceipt?.amount == null ? "" : String(parkingReceipt.amount));
+      } else {
+        setParkingAmount("");
+      }
 
       const s = (data.status || "saved").trim();
       setStatus(s);
@@ -208,6 +218,7 @@ export default function EmployeeForm() {
       setDirty(false);
     } catch (e) {
       setErr(e?.message || t("form.errors.failedLoad"));
+      setEditLoadFailed(true);
     } finally {
       setLoadingEdit(false);
     }
@@ -229,11 +240,61 @@ export default function EmployeeForm() {
       setLocked(false);
       setErr("");
       setInfo("");
+      setEditLoadFailed(false);
       setDirty(false);
       setHasOvertimeEvidence(false);
+      setParkingRequested(false);
+      setHasParkingReceipt(false);
+      setParkingFile(null);
+      setParkingAmount("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from("profiles").select("parking_receipts_enabled").eq("id", user.id).single().then(({ data, error }) => {
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+      const enabled = Boolean(data?.parking_receipts_enabled);
+      setParkingReceiptsEnabled(enabled);
+      if (!enabled) {
+        setParkingRequested(false);
+        setParkingFile(null);
+      }
+    });
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !job_date) return;
+    let cancelled = false;
+    async function checkEntryWindow() {
+      const [{ data: settings }, { data: holiday }, { data: unlock }] = await Promise.all([
+        supabase.from("company_time_settings").select("daily_deadline, timezone").eq("id", true).single(),
+        supabase.from("company_holidays").select("holiday_date, label").eq("holiday_date", job_date).maybeSingle(),
+        supabase.from("job_entry_unlocks").select("unlocked_until").eq("user_id", user.id).eq("job_date", job_date).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const unlocked = Boolean(unlock && (!unlock.unlocked_until || dayjs(unlock.unlocked_until).isAfter(dayjs())));
+      if (unlocked) return setEntryBlockedReason("");
+      if (holiday) return setEntryBlockedReason(t("form.deadline.holiday", { name: holiday.label }));
+
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: settings?.timezone || "America/Toronto",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      });
+      const parts = Object.fromEntries(formatter.formatToParts(new Date()).map((part) => [part.type, part.value]));
+      const localDate = `${parts.year}-${parts.month}-${parts.day}`;
+      const localMinute = `${parts.hour}:${parts.minute}`;
+      const deadline = String(settings?.daily_deadline || "23:59").slice(0, 5);
+      const blocked = job_date < localDate || (job_date === localDate && localMinute > deadline);
+      setEntryBlockedReason(blocked ? t("form.deadline.passed", { time: deadline }) : "");
+    }
+    checkEntryWindow();
+    return () => { cancelled = true; };
+  }, [job_date, t, user?.id]);
 
   async function saveDraft() {
     setPendingSaveMode("draft");
@@ -255,13 +316,30 @@ export default function EmployeeForm() {
       return;
     }
     if (saving) return;
+    if (entryBlockedReason) {
+      setErr(entryBlockedReason);
+      return false;
+    }
+    const parkingAmountNumber = normalizeNumber(parkingAmount);
+    if (parkingRequested && (!parkingAmountNumber || parkingAmountNumber <= 0 || parkingAmountNumber > 20)) {
+      setErr(t("form.parking.amountRequired"));
+      return false;
+    }
+    if (parkingRequested && !parkingFile && !hasParkingReceipt) {
+      setErr(t("form.parking.receiptRequired"));
+      parkingInputRef.current?.click();
+      return false;
+    }
 
     setErr("");
     setInfo("");
     setSaving(true);
 
     try {
-      const kmAllerNum = normalizeNumber(km_aller) ?? 0;
+      const kmTotalNum = normalizeNumber(km_aller) ?? 0;
+      const kmReturnNum = Number(returnValues?.km) || 0;
+      if (kmReturnNum > kmTotalNum) throw new Error(t("form.return.kmExceedsTotal"));
+      const kmClientNum = Math.max(0, kmTotalNum - kmReturnNum);
 
       let nextStatus = "saved";
 
@@ -285,15 +363,19 @@ export default function EmployeeForm() {
         depart,
         arrivee,
         fin,
-        km_aller: kmAllerNum,
+        km_total: kmTotalNum,
+        km_aller: kmClientNum,
         status: nextStatus,
         locked: nextLocked,
         ...(returnValues ? {
           return_time_minutes: returnValues.minutes,
-          km_retour: returnValues.km,
+          km_retour: kmReturnNum,
         } : {}),
         ...(captureEvidence ? { overtime_evidence_captured: true } : {}),
+        parking_receipt_captured: hasParkingReceipt,
       };
+
+      let savedJobId = editId || forcedId;
 
       if (editId) {
         const { error } = await withTimeout(
@@ -315,6 +397,7 @@ export default function EmployeeForm() {
         );
         if (error) throw error;
         if (!data?.id) throw new Error(t("form.errors.insertNoId"));
+        savedJobId = data.id;
 
         setInfo(nextStatus === "submitted" ? t("form.toasts.savedAndSubmitted") : t("form.toasts.saved"));
         setStatus(nextStatus);
@@ -323,7 +406,14 @@ export default function EmployeeForm() {
 
         if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }
-      return editId || forcedId || true;
+      if (parkingRequested && parkingFile) {
+        await uploadParkingReceipt(savedJobId, parkingFile, parkingAmountNumber);
+        const { error: parkingFlagError } = await supabase.from("jobs").update({ parking_receipt_captured: true }).eq("id", savedJobId);
+        if (parkingFlagError) throw parkingFlagError;
+        setHasParkingReceipt(true);
+        setParkingFile(null);
+      }
+      return savedJobId;
     } catch (e) {
       // Postgres unique_violation = "23505". Map it to a friendly message
       // since the raw "duplicate key value violates unique constraint…" is
@@ -339,6 +429,37 @@ export default function EmployeeForm() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function uploadParkingReceipt(jobId, file, amount) {
+    const receiptId = crypto.randomUUID();
+    const storagePath = `${user.id}/${job_date}/${receiptId}.jpg`;
+    const image = await compressImage(file);
+    const { error: uploadError } = await supabase.storage
+      .from("parking-receipts")
+      .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { error: receiptError } = await supabase.from("parking_receipts").upsert({
+      job_id: jobId,
+      user_id: user.id,
+      job_date,
+      storage_path: storagePath,
+      amount,
+    }, { onConflict: "job_id" });
+    if (receiptError) throw receiptError;
+  }
+
+  function handleParkingReceipt(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      if (!hasParkingReceipt) setParkingRequested(false);
+      return;
+    }
+    setParkingFile(file);
+    setParkingRequested(true);
+    setDirty(true);
   }
 
   async function saveWithReturn(minutes, km) {
@@ -358,6 +479,11 @@ export default function EmployeeForm() {
       return;
     }
 
+    if (await shouldRequestMealClaim(saved)) {
+      setPendingMealJobId(saved);
+      setReturnStep("meal");
+      return;
+    }
     setReturnStep("success");
     if (editId) {
       navigate("/form", { replace: true });
@@ -372,36 +498,90 @@ export default function EmployeeForm() {
       setLocked(false);
       setDirty(false);
       setInfo("");
+      setParkingRequested(false);
+      setParkingFile(null);
+      setHasParkingReceipt(false);
     }
   }
 
   async function requiresOvertimeEvidence(candidateReturnMinutes) {
     try {
-      const [{ data: profile }, { data: dayJobs, error: jobsError }] = await withTimeout(
-        Promise.all([
-          supabase.from("profiles").select("overtime_evidence_required, include_return_time_in_overtime").eq("id", user.id).single(),
-          supabase.from("jobs").select("id, depart, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
-        ]),
+      const { data: dayJobs, error: jobsError } = await withTimeout(
+        supabase.from("jobs").select("id, depart, fin").eq("user_id", user.id).eq("job_date", job_date),
         12000,
         "Overtime check"
       );
       if (jobsError) throw jobsError;
-      if (profile?.overtime_evidence_required === false) return false;
       if (editId && hasOvertimeEvidence) return false;
-      const includeReturnTime = profile?.include_return_time_in_overtime !== false;
       const existingMinutes = (dayJobs || [])
         .filter((job) => job.id !== editId)
         .reduce((total, job) => {
           const start = makeDayjsFromJob(job_date, job.depart);
           const end = makeDayjsFromJob(job_date, job.fin);
-          return total + Math.round((hoursBetween(start, end) || 0) * 60) + (includeReturnTime ? (Number(job.return_time_minutes) || 0) : 0);
+          return total + Math.round((hoursBetween(start, end) || 0) * 60);
         }, 0);
-      const dailyMinutes = existingMinutes + Math.round(hoursDecimal * 60) + (includeReturnTime ? candidateReturnMinutes : 0);
+      // Return-to-storage time is deliberately excluded: it is always paid at
+      // the regular rate and never creates overtime or supper eligibility.
+      const dailyMinutes = existingMinutes + Math.round(hoursDecimal * 60);
       setOvertimeDailyMinutes(dailyMinutes);
       return dailyMinutes > 480;
     } catch (error) {
       setErr(error?.message || t("form.errors.failedLoad"));
       return true;
+    }
+  }
+
+  async function shouldRequestMealClaim(jobId) {
+    if (!isMealEligible({ jobDate: job_date, dailyWorkMinutes: overtimeDailyMinutes })) return false;
+    const { data, error } = await supabase
+      .from("meal_claims")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("job_date", job_date)
+      .maybeSingle();
+    if (error) throw error;
+    return !data && Boolean(jobId);
+  }
+
+  async function handleMealReceipt(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !pendingMealJobId) return;
+    setMealBusy(true);
+    setErr("");
+    try {
+      const claimId = crypto.randomUUID();
+      const storagePath = `${user.id}/${job_date}/${claimId}.jpg`;
+      const image = await compressImage(file);
+      const { error: uploadError } = await supabase.storage
+        .from("meal-receipts")
+        .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+      if (uploadError) throw uploadError;
+      const { error: claimError } = await supabase.from("meal_claims").insert({
+        id: claimId,
+        user_id: user.id,
+        job_id: pendingMealJobId,
+        job_date,
+        amount: 30,
+        storage_path: storagePath,
+        daily_work_minutes: overtimeDailyMinutes,
+      });
+      if (claimError) throw claimError;
+      const { error: notificationError } = await supabase.from("manager_notifications").insert({
+        type: "meal_claim",
+        employee_id: user.id,
+        job_id: pendingMealJobId,
+        meal_claim_id: claimId,
+        daily_minutes: overtimeDailyMinutes,
+      });
+      if (notificationError) throw notificationError;
+      setPendingMealJobId(null);
+      setReturnStep("success");
+      navigate("/form", { replace: true });
+    } catch (error) {
+      setErr(error?.message || t("form.meal.failed"));
+    } finally {
+      setMealBusy(false);
     }
   }
 
@@ -440,12 +620,12 @@ export default function EmployeeForm() {
       const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
       if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
 
-      const { data: profile } = await supabase
-        .from("profiles")
+      const { data: overtimeSettings } = await supabase
+        .from("overtime_settings")
         .select("evidence_retention_days")
-        .eq("id", user.id)
+        .eq("id", true)
         .single();
-      const retentionDays = Math.min(365, Math.max(1, Number(profile?.evidence_retention_days) || 30));
+      const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
       const expiresAt = dayjs().add(retentionDays, "day").toISOString();
       const { error: evidenceError } = await supabase
@@ -462,8 +642,13 @@ export default function EmployeeForm() {
       if (notificationError) throw notificationError;
       setPendingReturn(null);
       setHasOvertimeEvidence(false);
-      setReturnStep("success");
-      navigate("/form", { replace: true });
+      if (await shouldRequestMealClaim(savedJobId)) {
+        setPendingMealJobId(savedJobId);
+        setReturnStep("meal");
+      } else {
+        setReturnStep("success");
+        navigate("/form", { replace: true });
+      }
     } catch (error) {
       setErr(error?.message || t("form.evidence.failed"));
       setReturnStep("evidence");
@@ -566,20 +751,30 @@ export default function EmployeeForm() {
     }
   }
 
-  const disableInputs = locked || loadingEdit || saving;
+  const disableInputs = locked || loadingEdit || saving || Boolean(entryBlockedReason);
   const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
   return (
     <AppShell>
       <div className="space-y-3">
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {err}
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
+            <span>{err}</span>
+            {editId && editLoadFailed && (
+              <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={loadingEdit} onClick={loadEdit}>
+                {t("common.retry")}
+              </Button>
+            )}
           </div>
         )}
         {info && (
           <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {info}
+          </div>
+        )}
+        {entryBlockedReason && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
+            {entryBlockedReason}
           </div>
         )}
 
@@ -649,7 +844,7 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="km">{t("form.kmAller")}</Label>
+                <Label htmlFor="km">{t("form.kmTotal")}</Label>
                 <Input
                   id="km"
                   type="number"
@@ -666,6 +861,46 @@ export default function EmployeeForm() {
                   {hoursLabel}
                 </div>
               </div>
+
+              {parkingReceiptsEnabled && <div className="grid gap-1.5 sm:col-span-2 lg:col-span-3">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2.5">
+                  <span>
+                    <span className="block text-sm font-medium">{t("form.parking.title")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {parkingFile?.name || (hasParkingReceipt ? t("form.parking.receiptSaved") : t("form.parking.description"))}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={parkingRequested}
+                    disabled={disableInputs || hasParkingReceipt}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setParkingRequested(true);
+                        setDirty(true);
+                      }
+                      else {
+                        setParkingRequested(false);
+                        setParkingFile(null);
+                        setDirty(true);
+                      }
+                    }}
+                    className="h-5 w-5 rounded border-input accent-primary"
+                  />
+                </label>
+                <input ref={parkingInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleParkingReceipt} />
+                {parkingRequested && (
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
+                      <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
+                    </div>
+                    <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
+                      {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                    </Button>
+                  </div>
+                )}
+              </div>}
             </div>
 
             <div className="flex flex-nowrap items-center gap-1.5 pt-2">
@@ -704,6 +939,7 @@ export default function EmployeeForm() {
                       if (localStorage.getItem("autofill_tip_seen")) {
                         imageInputRef.current?.click();
                       } else {
+                        setAutofillTipPage(1);
                         setShowAutofillTip(true);
                       }
                     }}
@@ -733,47 +969,84 @@ export default function EmployeeForm() {
           </CardContent>
         </Card>
       </div>
-      <Dialog open={showAutofillTip} onOpenChange={setShowAutofillTip}>
+      <Dialog open={showAutofillTip} onOpenChange={(open) => {
+        setShowAutofillTip(open);
+        if (!open) setAutofillTipPage(1);
+      }}>
         <DialogContent className="max-w-sm p-0 overflow-hidden">
           <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle>{t("form.autofillTip.title")}</DialogTitle>
+            <DialogTitle>
+              {autofillTipPage === 1
+                ? t("form.autofillTip.title")
+                : t("form.autofillTip.exampleTitle")}
+            </DialogTitle>
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("form.autofillTip.page", { current: autofillTipPage, total: 2 })}
+            </p>
           </DialogHeader>
 
-          <div className="px-5 space-y-2 text-sm text-muted-foreground">
-            <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
-            <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
-            <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
-          </div>
-
-          <div className="px-5 pb-2 pt-3">
-            <img
-              src="/autofill-screenshot-guide.jpg"
-              alt="Screenshot guide"
-              className="w-full rounded-md border object-cover"
-              style={{ maxHeight: "340px", objectPosition: "bottom" }}
-            />
-          </div>
-
-          <DialogFooter className="px-5 pb-5 pt-2">
-            <Button
-              className="w-full"
-              onClick={() => {
-                localStorage.setItem("autofill_tip_seen", "1");
-                setShowAutofillTip(false);
-                imageInputRef.current?.click();
-              }}
-            >
-              {t("form.autofillTip.gotIt")}
-            </Button>
-          </DialogFooter>
+          {autofillTipPage === 1 ? (
+            <>
+              <div className="px-5 space-y-3 text-sm text-muted-foreground">
+                <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
+                <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
+                <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
+              </div>
+              <DialogFooter className="px-5 pb-5 pt-3">
+                <Button className="w-full" onClick={() => setAutofillTipPage(2)}>
+                  {t("form.autofillTip.next")}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="px-5 pb-2">
+                <p className="mb-3 text-sm text-muted-foreground">{t("form.autofillTip.exampleDescription")}</p>
+                <img
+                  src="/autofill-screenshot-guide.jpg"
+                  alt={t("form.autofillTip.exampleAlt")}
+                  className="w-full rounded-md border object-cover"
+                  style={{ maxHeight: "340px", objectPosition: "bottom" }}
+                />
+              </div>
+              <DialogFooter className="gap-2 px-5 pb-5 pt-2 sm:flex-col sm:space-x-0">
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setShowAutofillTip(false);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  {t("form.autofillTip.choose")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    localStorage.setItem("autofill_tip_seen", "1");
+                    setShowAutofillTip(false);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  {t("form.autofillTip.dontShowAgain")}
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => setAutofillTipPage(1)}>
+                  {t("common.back")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
       <Dialog open={returnStep !== "closed"} onOpenChange={(open) => {
-        if (!open && !saving) setReturnStep("closed");
+        if (!open && !saving) {
+          setReturnStep("closed");
+          setShowOvertimeExample(false);
+        }
       }}>
         <DialogContent className="max-w-md">
           {returnSaveError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-400" role="alert">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">
               {returnSaveError}
             </div>
           )}
@@ -827,10 +1100,33 @@ export default function EmployeeForm() {
                   placeholder="0"
                 />
                 <p className="text-xs text-muted-foreground">{t("form.return.selectedTime", { time: formatReturnMinutes(returnMinutes || 0) })}</p>
+                {normalizeNumber(returnKm) !== null && (
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {t("form.return.kmBreakdown", { client: Math.max(0, (normalizeNumber(km_aller) || 0) - normalizeNumber(returnKm)), returnKm: normalizeNumber(returnKm), total: normalizeNumber(km_aller) || 0 })}
+                  </p>
+                )}
               </div>
               <DialogFooter>
-                <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
+                <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0 || normalizeNumber(returnKm) > (normalizeNumber(km_aller) || 0)} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
                   {saving || returnCheckBusy ? t("common.saving") : t("form.buttons.save")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {returnStep === "meal" && (
+            <>
+              <DialogHeader><DialogTitle>{t("form.meal.title")}</DialogTitle></DialogHeader>
+              <div className="space-y-3 text-sm">
+                <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+                  {t("form.meal.description")}
+                </div>
+                <p className="text-muted-foreground">{t("form.meal.receiptRequired")}</p>
+                <input ref={mealInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleMealReceipt} />
+              </div>
+              <DialogFooter>
+                <Button type="button" disabled={mealBusy} onClick={() => mealInputRef.current?.click()}>
+                  {mealBusy ? t("common.saving") : t("form.meal.chooseReceipt")}
                 </Button>
               </DialogFooter>
             </>
@@ -842,7 +1138,7 @@ export default function EmployeeForm() {
                 <DialogTitle>{t("form.evidence.title")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">
                   {t("form.evidence.description")}
                 </div>
                 <div className="rounded-md border bg-muted/40 p-3">
@@ -852,9 +1148,28 @@ export default function EmployeeForm() {
                     <li>{t("form.evidence.requiredDuration")}</li>
                     <li>{t("form.evidence.requiredCrop")}</li>
                   </ul>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    aria-expanded={showOvertimeExample}
+                    aria-controls="overtime-evidence-example"
+                    onClick={() => setShowOvertimeExample((visible) => !visible)}
+                  >
+                    {showOvertimeExample ? t("form.evidence.hideExample") : t("form.evidence.showExample")}
+                  </Button>
+                  {showOvertimeExample && (
+                    <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
+                      <img
+                        src="/overtime-evidence-example.jpg"
+                        alt={t("form.evidence.exampleAlt")}
+                        className="max-h-96 w-full rounded object-contain"
+                      />
+                    </div>
+                  )}
                 </div>
-                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-400">{evidenceValidationError}</div>}
-                <p className="text-muted-foreground">{t("form.evidence.ocrNotice")}</p>
+                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{evidenceValidationError}</div>}
                 <input
                   ref={overtimeInputRef}
                   type="file"

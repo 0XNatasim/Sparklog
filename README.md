@@ -1,350 +1,279 @@
 # SparkLog
 
-SparkLog is a mobile-friendly app for field employees and managers to track work orders, hours, and kilometers.
+SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-- **Employees** log jobs from their phone, save them as drafts, and submit them for approval. They can also take a photo of a work order sheet to auto-fill the form.
-- **Managers** review submitted jobs, approve them, and export them to Google Sheets.
+## Current capabilities
 
----
+### Employees
 
-## What you need before starting
+- Create, save, edit, and submit daily job cards.
+- Record work-order number, date, departure, arrival, end time, mileage, and return-to-storage details.
+- Auto-fill a job card from a work-order photo.
+- Attach an overtime authorization screenshot when the daily total exceeds eight hours.
+- Attach a parking receipt when the manager enables Parking for that employee.
+- Review job history and weekly totals.
+- Complete first-login work-region and union-association onboarding.
+- View manager-enabled company forms from the Profile page.
 
-- A free [Supabase](https://supabase.com) account (the database and backend)
-- A free [Vercel](https://vercel.com) or [Render](https://render.com) account (hosts the website)
-- A [GitHub](https://github.com) account (to connect your code to your host)
-- A free [ocr.space](https://ocr.space/ocrapi) API key (powers the auto-fill from photo feature)
-- A Google account (for the Google Sheets export)
-- [Node.js](https://nodejs.org) installed on your computer (only needed if running locally)
-- _(Optional / legacy)_ An [Anthropic](https://console.anthropic.com) API key — only needed if you re-enable the original Claude-Vision OCR Edge Function. The app uses ocr.space by default and falls back to in-browser Tesseract; the Anthropic path is dead code unless you wire it back into `EmployeeForm.jsx`.
+### Managers
 
----
+The Manager workspace is divided into six sections:
 
-## Step 1 — Create a Supabase project
-
-1. Go to [supabase.com](https://supabase.com) and sign in
-2. Click **New project**
-3. Give it a name (e.g. `sparklog`), choose a region close to you, set a database password
-4. Wait for the project to finish setting up (~1 minute)
-
----
-
-## Step 2 — Create the database tables
-
-Go to **SQL Editor** in the left sidebar and run each block below one at a time.
-
-### Profiles table (stores employee/manager info)
-
-```sql
-create table public.profiles (
-  id        uuid primary key references auth.users(id) on delete cascade,
-  full_name text default '',
-  email     text default '',
-  phone     text default '',
-  role      text not null default 'employee' check (role in ('employee', 'manager'))
-);
-```
-
-### Jobs table (stores work orders)
-
-```sql
-create table public.jobs (
-  id                uuid primary key default gen_random_uuid(),
-  user_id           uuid not null references public.profiles(id) on delete cascade,
-  job_date          date not null,
-  ot                text,
-  depart            time,
-  arrivee           time,
-  fin               time,
-  km_aller          numeric default 0,
-  status            text not null default 'saved'
-                      check (status in ('saved', 'updated', 'submitted', 'approved')),
-  locked            boolean not null default false,
-  exported_to_sheet boolean not null default false,
-  exported_at       timestamptz,
-  exported_by       uuid references public.profiles(id),
-  updated_at        timestamptz default now()
-);
-```
-
-### Auto-update `updated_at` when a job is edited
-
-```sql
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  NEW.updated_at = now();
-  return NEW;
-end;
-$$;
-
-create trigger jobs_set_updated_at
-  before update on public.jobs
-  for each row execute function public.set_updated_at();
-```
-
----
-
-## Step 3 — Auto-create a profile when someone signs up
-
-This makes sure every new user automatically gets a profile row.
-
-```sql
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.profiles (id, role, full_name, phone, email)
-  values (
-    NEW.id,
-    'employee',
-    coalesce(NEW.raw_user_meta_data->>'full_name', ''),
-    coalesce(NEW.raw_user_meta_data->>'phone', ''),
-    coalesce(NEW.email, '')
-  )
-  on conflict (id) do nothing;
-  return NEW;
-end;
-$$;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
-```
-
----
-
-## Step 4 — Set up security rules (RLS)
-
-This controls who can see and edit what. Run all of this in the SQL Editor.
-
-```sql
--- Enable security on both tables
-alter table public.profiles enable row level security;
-alter table public.jobs     enable row level security;
-
--- Helper function to get the current user's role (avoids a known recursion bug)
-create or replace function public.get_my_role()
-returns text
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select role from public.profiles where id = auth.uid();
-$$;
-
--- PROFILES: everyone can read their own profile
-create policy "profiles: own read"
-  on public.profiles for select
-  using (auth.uid() = id);
-
--- PROFILES: managers can read all profiles
-create policy "profiles: manager read all"
-  on public.profiles for select
-  using (get_my_role() = 'manager');
-
--- PROFILES: everyone can update their own profile
-create policy "profiles: own update"
-  on public.profiles for update
-  using (auth.uid() = id);
-
--- JOBS: employees can read their own jobs
-create policy "jobs: own read"
-  on public.jobs for select
-  using (auth.uid() = user_id);
-
--- JOBS: managers can read all jobs
-create policy "jobs: manager read all"
-  on public.jobs for select
-  using (get_my_role() = 'manager');
-
--- JOBS: employees can create jobs for themselves
-create policy "jobs: own insert"
-  on public.jobs for insert
-  with check (auth.uid() = user_id);
-
--- JOBS: employees can edit their own unlocked jobs
-create policy "jobs: own update unlocked"
-  on public.jobs for update
-  using (auth.uid() = user_id and locked = false);
-
--- JOBS: employees can delete their own unlocked jobs
-create policy "jobs: own delete unlocked"
-  on public.jobs for delete
-  using (auth.uid() = user_id and locked = false);
-
--- JOBS: managers can update any job (approve / unlock).
--- Without this, manager approvals silently fail at the DB after the
--- Google Sheets export already ran, desyncing the row's status.
-create policy "jobs: manager update all"
-  on public.jobs for update
-  using (get_my_role() = 'manager')
-  with check (get_my_role() = 'manager');
-```
-
-### Indexes (keeps the dashboard fast as the table grows)
-
-```sql
-create index if not exists jobs_user_date_idx
-  on public.jobs (user_id, job_date desc);
-
-create index if not exists jobs_status_date_idx
-  on public.jobs (status, job_date desc);
-```
-
----
-
-## Step 5 — Deploy the Edge Functions
-
-Edge Functions are small backend scripts that run on Supabase's servers.
-
-### How to deploy a function via the browser
-
-1. In Supabase, go to **Edge Functions** in the left sidebar
-2. Click **New function**
-3. Name it exactly as shown below
-4. Paste the code from the matching file in this repo
-5. Click **Deploy**
-
-### Function 1 — `push_approved_to_sheet`
-
-Name: `push_approved_to_sheet`
-Code: copy from `supabase/functions/push_approved_to_sheet/index.ts`
-
-### Function 2 — `extract_job_from_image` _(optional / legacy)_
-
-Name: `extract_job_from_image`
-Code: copy from `supabase/functions/extract_job_from_image/index.ts`
-
-This Edge Function is the original Claude-Vision-based OCR path. It is **not used** by the current frontend, which calls [ocr.space](https://ocr.space/ocrapi) directly from the browser and falls back to in-browser Tesseract. You only need to deploy it if you intend to re-wire the frontend to use Claude Vision.
-
-### Disable JWT verification on the functions you deploy
-
-For each function, open its settings (gear icon) and turn **Verify JWT** **off**. The functions handle authentication themselves.
-
----
-
-## Step 6 — Add secrets to Supabase
-
-Secrets are private keys your functions need to work. Go to **Project Settings → Edge Functions → Add new secret** and add each one below.
-
-> **Where to find your Supabase keys:** Project Settings → API
-
-| Secret name | Where to get it |
+| Section | Purpose |
 |---|---|
-| `APPS_SCRIPT_URL` | From Step 8 below |
-| `APPS_SCRIPT_TOKEN` | A password you invent — must match what you set in Apps Script |
-| `ANTHROPIC_API_KEY` _(optional / legacy)_ | Only needed if you re-enable the `extract_job_from_image` Edge Function. OCR runs in the browser against ocr.space by default — skip unless you wire Claude Vision back in. |
+| **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, and pause accounts without deleting history. |
+| **Forms** | Open company forms and control which forms employees can see. |
+| **Time-sheet** | Review submitted jobs, unlock entries, and approve jobs before Google Sheets export. |
+| **Overtime** | Review overtime jobs, extracted SMS text, and the original authorization screenshot. |
+| **Parkings** | Review parking jobs and display their receipt pictures. |
+| **Download** | Preview and download CCQ-oriented weekly JSON records. |
 
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically — you do not need to add those.
+Other manager tools include announcements, CCQ rate synchronization, employee filtering, and bulk weekly approval.
 
----
+## CCQ assumptions
 
-## Step 7 — Deploy the frontend (Vercel or Render)
+The current deployment is intentionally limited to:
 
-Either host works — it's a static Vite build. Vercel is the current primary; Render still works via the included `render.yaml`.
+- **Occupation:** Electrician (`220`)
+- **Sector:** Institutional and Commercial (`I` in exports; `C` for the CCQ wage-rate endpoint)
+- **Week ending:** Saturday
 
-**Vercel**
-1. Push this repo to your GitHub account
-2. Go to [vercel.com](https://vercel.com) → **Add New → Project** → import the repo
-3. Framework preset: **Vite**. Build command `npm run build`, output dir `dist`
-4. Add the environment variables below under **Settings → Environment Variables**
-5. Click **Deploy**
+Approved daily jobs are preserved as source records. The Download section aggregates them by employee, Saturday week-ending date, trade, sector, region, and appendix, with separate regular, 50% overtime, and 100% overtime totals.
 
-**Render (alternative)**
-1. Push this repo to your GitHub account
-2. Go to [render.com](https://render.com) → **New → Static Site** → connect repo
-3. Render auto-detects from `render.yaml`. If not: build `npm run build`, publish `dist`
-4. Add the environment variables below under **Environment**
-5. Click **Deploy**
+> The JSON exporter is an integration-ready internal format, not a guarantee of direct CCQ acceptance. Validate overtime, statutory-holiday, appendix, and submission rules before production payroll use.
 
-Environment variables (same on either host):
+## OCR and image processing
 
-| Key | Value |
-|---|---|
-| `VITE_SUPABASE_URL` | Your Supabase project URL (Project Settings → API) |
-| `VITE_SUPABASE_ANON_KEY` | Your Supabase anon/public key (Project Settings → API) |
-| `VITE_OCR_SPACE_API_KEY` | (Optional) Free key from [ocr.space/ocrapi](https://ocr.space/ocrapi). If omitted, the app uses the public `helloworld` test key (heavily rate-limited) and falls back to in-browser Tesseract on failure. |
+SparkLog does **not** use an LLM, OpenRouter, Claude, GPT, or another generative-AI service for image extraction.
 
-After deploy, your host gives you a public URL. Re-deploy after changing env vars so Vite bakes the new values into the bundle.
+The active OCR flow is:
 
----
+1. The browser sends the selected image to [ocr.space](https://ocr.space/ocrapi).
+2. If that OCR request fails, the browser falls back to local `tesseract.js` processing.
+3. SparkLog parses the resulting text into job fields or validates overtime SMS content.
 
-## Step 8 — Set up Google Sheets export (optional)
+The former LLM/Vision Edge Function has been removed. No `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, or other LLM credential is needed.
 
-This lets managers export approved jobs directly to a Google Sheet.
+Parking receipt pictures are stored without OCR. Overtime screenshots retain OCR text for manager review and are removed according to the configured evidence-retention period.
 
-1. Go to [script.google.com](https://script.google.com) and create a **New project**
-2. Replace the default code with a `doPost(e)` function that:
-   - Validates the `APPS_SCRIPT_TOKEN` from the request body
-   - Appends a row to your Google Sheet with the job data
-3. Click **Deploy → New deployment → Web app**
-   - Execute as: **Me**
-   - Who has access: **Anyone**
-4. Copy the Web app URL → paste it as `APPS_SCRIPT_URL` in Supabase secrets (Step 6)
-5. Set the same token you chose in `APPS_SCRIPT_TOKEN` inside your script
+## Technology
 
-Until this is set up, the **Approve** button will show an error.
+- React 18 and Vite
+- Tailwind CSS and Radix-based UI components
+- Supabase Authentication, Postgres, Row Level Security, Storage, Realtime, and Edge Functions
+- Vercel as the primary static host; Render is also configured
+- `dayjs` for date/week calculations
+- ocr.space with an in-browser Tesseract fallback
 
----
+## Repository layout
 
-## Step 9 — Create the first manager account
+```text
+src/
+  components/       Shared UI and manager panels
+  contexts/         Authentication/profile state
+  lib/              CCQ export/rate helpers, i18n, and static lists
+  pages/            Employee, manager, history, profile, week, and testing pages
+supabase/
+  functions/        Server-side integrations and scheduled maintenance
+  migrations/       Incremental database, RLS, Storage, and cron changes
+public/              Static instructional images
+```
 
-1. Open your app URL and sign up with an email address
-2. Go to Supabase → **Table Editor → profiles**
-3. Find the row for that email
-4. Change the `role` column from `employee` to `manager`
-5. Save
+## Prerequisites
 
-That account now has full manager access. All future signups default to `employee`.
+- Node.js 18 or newer
+- npm
+- A Supabase project
+- A Vercel or Render project
+- An ocr.space API key for reliable OCR
+- A Google Apps Script endpoint if Google Sheets approval/export is enabled
+- Optional Resend or Brevo credentials for real announcement emails
 
----
+No LLM account or API key is required.
 
-## How to run locally (for developers)
+## Local development
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Create a file called `.env.local` in the project root:
+Create `.env.local`:
 
-```
+```dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_OCR_SPACE_API_KEY=your-ocr-space-key
 ```
 
-Then start the app:
+`VITE_OCR_SPACE_API_KEY` is technically optional because the code uses ocr.space's public `helloworld` key when absent, but that key is heavily rate-limited and should not be used for production.
+
+Start the application:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Build the production bundle:
 
----
+```bash
+npm run build
+```
 
-## How the app works
+The Vite development server normally runs at <http://localhost:5173>.
 
-### Employee flow
+## Supabase setup
 
-1. Sign up and log in
-2. Go to **Form** — fill in the date, work order number, times, and kilometers
-3. Or click **Auto-fill from photo** to upload an image of a work order sheet — the app reads it and fills the fields automatically
-4. Click **Save** to keep it as a draft, or **Submit** to send it to the manager
-5. View past jobs under **History**, weekly totals under **Week**
+SparkLog expects Supabase Auth plus the base `profiles` and `jobs` tables. Existing installations should apply every migration in `supabase/migrations` in filename order. The migrations add and configure:
 
-### Manager flow
+- Manager job-update policies and dashboard indexes
+- CCQ numbers, classifications, snapshots, profile metadata, and scheduled rate synchronization
+- Company-form visibility
+- Storage and return-trip fields
+- Overtime evidence, manager notifications, private Storage, and cleanup retention
+- Employee pause state and union association
+- Commercial-only sector and electrician-only occupation constraints
+- Parking receipts, private Storage, and employee-specific Parking permission
 
-1. Log in — you are redirected to the **Manager** dashboard
-2. See all submitted jobs from all employees
-3. Filter by employee, status, or search by name/OT number
-4. Click **Approve** on a job to export it to Google Sheets
-5. Use **Approve week** to approve all jobs for an employee in one click
+With the Supabase CLI linked to the target project:
 
----
+```bash
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push
+```
+
+For a fresh project, create the base schema and policies first or restore them from an existing SparkLog database before running these incremental migrations. At minimum:
+
+- `profiles.id` must reference `auth.users.id` and include `role`, `full_name`, `email`, and `phone`.
+- `jobs` must include the employee, date, job fields, status, locked/export state, and timestamps.
+- `public.get_my_role()` must return the authenticated profile role.
+- Employees must be allowed to manage their own unlocked jobs; managers must be allowed to read profiles/jobs and update jobs.
+
+After migrations, set the first manager manually:
+
+```sql
+update public.profiles
+set role = 'manager'
+where email = 'manager@example.com';
+```
+
+## Private evidence storage
+
+Migrations create two private buckets:
+
+- `overtime-evidence`
+- `parking-receipts`
+
+Employees can upload only under their own user-ID folder. Managers receive read access through RLS and the UI creates short-lived signed URLs only when an image is requested. Do not make either bucket public.
+
+## Edge Functions
+
+Deploy the functions used by your environment:
+
+```bash
+supabase functions deploy push_approved_to_sheet
+supabase functions deploy push_approved_batch
+supabase functions deploy send_announcement
+supabase functions deploy ccq_rates
+supabase functions deploy ccq_rates_daily_sync
+supabase functions deploy cleanup_overtime_evidence
+```
+
+| Function | Purpose |
+|---|---|
+| `push_approved_to_sheet` | Approves/exports one job through Google Apps Script. |
+| `push_approved_batch` | Approves/exports a group of jobs. |
+| `send_announcement` | Persists and emails manager announcements. |
+| `ccq_rates` | Authenticated proxy/cache for CCQ commercial electrician rates. |
+| `ccq_rates_daily_sync` | Service-role-only refresh of commercial rate snapshots. |
+| `cleanup_overtime_evidence` | Service-role-only deletion of expired overtime images and records. |
+
+The frontend sends authenticated bearer tokens to user-facing functions. Keep normal JWT verification/authentication behavior aligned with each function's own authorization checks; do not expose service-role credentials to the browser.
+
+## Supabase function secrets
+
+Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Configure only the integrations you use:
+
+| Secret | Required for |
+|---|---|
+| `APPS_SCRIPT_URL` | Google Sheets job export |
+| `APPS_SCRIPT_TOKEN` | Shared authentication secret for Apps Script |
+| `RESEND_API_KEY` + `RESEND_FROM` | Resend announcement email provider |
+| `BREVO_API_KEY` + `BREVO_FROM_EMAIL` | Brevo announcement email provider |
+| `BREVO_FROM_NAME` | Optional Brevo sender name |
+| `CCQ_RATES_CACHE_TTL_HOURS` | Optional CCQ cache override |
+| `CCQ_RATES_REQUEST_TIMEOUT_MS` | Optional CCQ request-timeout override |
+
+If neither email provider is configured, announcements use the built-in mock provider: records are created, but no real email is sent.
+
+## Google Sheets integration
+
+The approval functions expect a Google Apps Script web app that:
+
+1. Accepts the approved job payload.
+2. Verifies `APPS_SCRIPT_TOKEN`.
+3. Appends the job to the correct Google Sheet.
+4. Returns a successful JSON response.
+
+Store its deployed URL and shared token as Supabase secrets. Never put the Apps Script token in a `VITE_` variable because Vite variables are public in the browser bundle.
+
+## Deployment
+
+### Vercel
+
+1. Import the repository.
+2. Select the Vite framework preset.
+3. Use `npm run build` and output directory `dist`.
+4. Add the three frontend variables from `.env.local`.
+5. Deploy.
+
+`vercel.json` supplies SPA rewrites and cache headers.
+
+### Render
+
+Connect the repository as a static site. `render.yaml` uses `npm run build`, publishes `dist`, and rewrites application routes to `index.html`.
+
+## Operational workflows
+
+### Confirmed payroll and expense rules
+
+- Job kilometres from OCR/manual entry are the **total shown on the work order**. If an employee records a return to storage, the return kilometres are subtracted from that total to produce the client leg; they are never added a second time.
+- Return-to-storage time is always regular-rate paid time. It never creates overtime, including when the workday is already longer than eight hours.
+- A weekday supper claim becomes available at exactly 2 h 15 of overtime. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
+- Parking is enabled per employee, requires an amount and receipt, and is capped at $20 per employee/day.
+- Employee job entry uses `America/Toronto`. The full configured deadline minute is accepted (the default `23:59` blocks at midnight); company holidays are blocked and managers can unlock a specific employee/date.
+- Birth dates and CCQ card expiration dates are stored as full dates and maintained by managers.
+- The general travel-rate conversion rule from the original planning document is **deferred and is not implemented**.
+
+### Employee job lifecycle
+
+1. Employee creates or auto-fills a job.
+2. Optional employee-specific Parking control requests a receipt picture.
+3. Return travel and mileage are recorded.
+4. If the daily total exceeds eight hours, an overtime authorization screenshot is required.
+5. Employee saves a draft or submits a locked job.
+6. Manager reviews and approves it.
+
+### Manager onboarding checklist
+
+1. Apply all database migrations and deploy required Edge Functions.
+2. Create/promote a manager profile.
+3. Complete employee CCQ metadata in Manager → Employees.
+4. Enable Parking only for employees who need it.
+5. Configure the global overtime evidence-retention period.
+6. Synchronize commercial CCQ rates and select the correct appendix.
+7. Configure Google Sheets and an email provider if those integrations are required.
+
+## Security notes
+
+- Never expose the Supabase service-role key in frontend environment variables.
+- Treat all `VITE_*` variables as public.
+- Keep overtime and parking buckets private.
+- Preserve RLS policies and manager-only profile-setting triggers.
+- Pausing an account blocks employee access without deleting historical jobs or evidence.
+- Social insurance numbers and wage information are sensitive; restrict manager access and production logs accordingly.
 
 ## License
 
