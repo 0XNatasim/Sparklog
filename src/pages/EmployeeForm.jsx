@@ -613,33 +613,45 @@ export default function EmployeeForm() {
       }
 
       const image = await compressImage(file);
-      const { error: uploadError } = await supabase.storage
-        .from("overtime-evidence")
-        .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+      const { error: uploadError } = await withTimeout(
+        supabase.storage
+          .from("overtime-evidence")
+          .upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
+        20000
+      );
       if (uploadError) throw uploadError;
 
       const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
       if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
 
-      const { data: overtimeSettings } = await supabase
-        .from("overtime_settings")
-        .select("evidence_retention_days")
-        .eq("id", true)
-        .single();
+      const { data: overtimeSettings } = await withTimeout(
+        supabase
+          .from("overtime_settings")
+          .select("evidence_retention_days")
+          .eq("id", true)
+          .single(),
+        12000
+      );
       const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
       const expiresAt = dayjs().add(retentionDays, "day").toISOString();
-      const { error: evidenceError } = await supabase
-        .from("overtime_evidence")
-        .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: ocrText || null, ocr_status: ocrStatus, daily_minutes: dailyMinutes, expires_at: expiresAt });
+      const { error: evidenceError } = await withTimeout(
+        supabase
+          .from("overtime_evidence")
+          .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: ocrText || null, ocr_status: ocrStatus, daily_minutes: dailyMinutes, expires_at: expiresAt }),
+        12000
+      );
       if (evidenceError) throw evidenceError;
 
-      const { error: notificationError } = await supabase.from("manager_notifications").insert({
-        employee_id: user.id,
-        job_id: jobId,
-        evidence_id: evidenceId,
-        daily_minutes: dailyMinutes,
-      });
+      const { error: notificationError } = await withTimeout(
+        supabase.from("manager_notifications").insert({
+          employee_id: user.id,
+          job_id: jobId,
+          evidence_id: evidenceId,
+          daily_minutes: dailyMinutes,
+        }),
+        12000
+      );
       if (notificationError) throw notificationError;
       setPendingReturn(null);
       setHasOvertimeEvidence(false);
@@ -692,11 +704,19 @@ export default function EmployeeForm() {
     fd.append("scale", "true");
     fd.append("isTable", "true");
 
-    const res = await fetch("https://api.ocr.space/parse/image", {
-      method: "POST",
-      headers: { apikey: apiKey },
-      body: fd,
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+    let res;
+    try {
+      res = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        headers: { apikey: apiKey },
+        body: fd,
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
     if (!res.ok) throw new Error(`ocr.space HTTP ${res.status}`);
     const json = await res.json();
     if (json?.IsErroredOnProcessing) {
