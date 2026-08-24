@@ -243,7 +243,7 @@ Connect the repository as a static site. `render.yaml` uses `npm run build`, pub
 - Return-to-storage time is always regular-rate paid time. It never creates overtime, including when the workday is already longer than eight hours.
 - A weekday supper claim becomes available at exactly 2 h 15 of overtime. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
 - Parking is enabled per employee, requires an amount and receipt, and is capped at $20 per employee/day.
-- Employee job entry uses `America/Toronto`. The full configured deadline minute is accepted (the default `23:59` blocks at midnight); company holidays are blocked and managers can unlock a specific employee/date.
+- Employee job entry uses `America/Toronto`. The full configured deadline minute is accepted (the default `23:59` blocks at midnight); CCQ construction vacations and statutory holidays are installed automatically by dated migrations, and managers can unlock a specific employee/date.
 - Birth dates and CCQ card expiration dates are stored as full dates and maintained by managers.
 - The general travel-rate conversion rule from the original planning document is **deferred and is not implemented**.
 

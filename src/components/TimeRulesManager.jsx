@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarClock, LockOpen, Trash2 } from "lucide-react";
+import { CalendarClock, LockOpen } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,13 +7,20 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
 
+function montrealDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export default function TimeRulesManager() {
   const t = useT();
   const [deadline, setDeadline] = useState("23:59");
   const [holidays, setHolidays] = useState([]);
   const [profiles, setProfiles] = useState([]);
-  const [holidayDate, setHolidayDate] = useState("");
-  const [holidayLabel, setHolidayLabel] = useState("");
   const [unlockUser, setUnlockUser] = useState("");
   const [unlockDate, setUnlockDate] = useState("");
   const [message, setMessage] = useState("");
@@ -21,7 +28,7 @@ export default function TimeRulesManager() {
   async function load() {
     const [{ data: settings }, { data: holidayRows }, { data: employeeRows }] = await Promise.all([
       supabase.from("company_time_settings").select("daily_deadline").eq("id", true).single(),
-      supabase.from("company_holidays").select("holiday_date,label").order("holiday_date"),
+      supabase.from("company_holidays").select("holiday_date,label").gte("holiday_date", montrealDate()).order("holiday_date").limit(40),
       supabase.from("profiles").select("id,full_name,email").neq("role", "manager").order("full_name"),
     ]);
     setDeadline(String(settings?.daily_deadline || "23:59").slice(0, 5));
@@ -34,18 +41,6 @@ export default function TimeRulesManager() {
   async function saveDeadline() {
     const { error } = await supabase.from("company_time_settings").update({ daily_deadline: deadline, updated_at: new Date().toISOString() }).eq("id", true);
     setMessage(error?.message || t("timeRules.deadlineSaved"));
-  }
-
-  async function addHoliday() {
-    if (!holidayDate || !holidayLabel.trim()) return;
-    const { error } = await supabase.from("company_holidays").upsert({ holiday_date: holidayDate, label: holidayLabel.trim() });
-    setMessage(error?.message || t("timeRules.holidaySaved"));
-    if (!error) { setHolidayDate(""); setHolidayLabel(""); load(); }
-  }
-
-  async function removeHoliday(date) {
-    await supabase.from("company_holidays").delete().eq("holiday_date", date);
-    load();
   }
 
   async function unlockDay() {
@@ -67,11 +62,9 @@ export default function TimeRulesManager() {
             <p className="text-xs text-muted-foreground">{t("timeRules.deadlineHelp")}</p>
           </div>
           <div className="space-y-2 rounded-lg border p-3">
-            <label className="text-sm font-medium">{t("timeRules.holidays")}</label>
-            <Input type="date" value={holidayDate} onChange={(e) => setHolidayDate(e.target.value)} />
-            <Input value={holidayLabel} onChange={(e) => setHolidayLabel(e.target.value)} placeholder={t("timeRules.holidayName")} />
-            <Button type="button" size="sm" onClick={addHoliday}>{t("timeRules.addHoliday")}</Button>
-            <div className="space-y-1">{holidays.map((holiday) => <div key={holiday.holiday_date} className="flex items-center justify-between gap-2 text-xs"><span>{holiday.holiday_date} · {holiday.label}</span><Button type="button" size="icon" variant="ghost" onClick={() => removeHoliday(holiday.holiday_date)}><Trash2 className="h-3.5 w-3.5" /></Button></div>)}</div>
+            <label className="text-sm font-medium">{t("timeRules.ccqCalendar")}</label>
+            <p className="text-xs text-muted-foreground">{t("timeRules.ccqCalendarHelp")}</p>
+            <div className="max-h-52 space-y-1 overflow-y-auto pr-1">{holidays.map((holiday) => <div key={holiday.holiday_date} className="rounded border bg-muted/30 px-2 py-1.5 text-xs"><b>{holiday.holiday_date}</b> · {holiday.label}</div>)}</div>
           </div>
           <div className="space-y-2 rounded-lg border p-3">
             <label className="text-sm font-medium">{t("timeRules.unlock")}</label>
