@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
+import { CircleCheck } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -596,50 +597,64 @@ export default function EmployeeForm() {
     const jobId = editId || crypto.randomUUID();
     const evidenceId = crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
-    let ocrText = "";
-    let ocrStatus = "processed";
-
     try {
-      try {
-        ocrText = await ocrSpaceExtract(file);
-        if (!validateOvertimeSmsText(ocrText)) {
-          setEvidenceValidationError(t("form.evidence.invalid"));
-          return;
-        }
-      } catch (ocrError) {
-        console.warn("Overtime evidence OCR needs review:", ocrError);
-        ocrStatus = "needs_review";
-      }
-
       const image = await compressImage(file);
-      const { error: uploadError } = await supabase.storage
-        .from("overtime-evidence")
-        .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+      const { error: uploadError } = await withTimeout(
+        supabase.storage
+          .from("overtime-evidence")
+          .upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
+        20000
+      );
       if (uploadError) throw uploadError;
 
       const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
       if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
 
-      const { data: overtimeSettings } = await supabase
-        .from("overtime_settings")
-        .select("evidence_retention_days")
-        .eq("id", true)
-        .single();
+      const { data: overtimeSettings } = await withTimeout(
+        supabase
+          .from("overtime_settings")
+          .select("evidence_retention_days")
+          .eq("id", true)
+          .single(),
+        12000
+      );
       const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
       const expiresAt = dayjs().add(retentionDays, "day").toISOString();
-      const { error: evidenceError } = await supabase
-        .from("overtime_evidence")
-        .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: ocrText || null, ocr_status: ocrStatus, daily_minutes: dailyMinutes, expires_at: expiresAt });
+      const { error: evidenceError } = await withTimeout(
+        supabase
+          .from("overtime_evidence")
+          .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: null, ocr_status: "pending", daily_minutes: dailyMinutes, expires_at: expiresAt }),
+        12000
+      );
       if (evidenceError) throw evidenceError;
 
-      const { error: notificationError } = await supabase.from("manager_notifications").insert({
-        employee_id: user.id,
-        job_id: jobId,
-        evidence_id: evidenceId,
-        daily_minutes: dailyMinutes,
-      });
+      const { error: notificationError } = await withTimeout(
+        supabase.from("manager_notifications").insert({
+          employee_id: user.id,
+          job_id: jobId,
+          evidence_id: evidenceId,
+          daily_minutes: dailyMinutes,
+        }),
+        12000
+      );
       if (notificationError) throw notificationError;
+
+      // Processing is intentionally detached from the employee workflow. The
+      // Edge Function acknowledges immediately and continues OCR in the
+      // background, so a slow OCR provider cannot hold this dialog open.
+      try {
+        const { error: processingError } = await withTimeout(
+          supabase.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId } }),
+          5000
+        );
+        if (processingError) console.warn("Could not start overtime evidence processing:", processingError);
+      } catch (processingError) {
+        // The screenshot and pending evidence row are already durable. Do not
+        // block the employee when the optional processing trigger is offline.
+        console.warn("Could not start overtime evidence processing:", processingError);
+      }
+
       setPendingReturn(null);
       setHasOvertimeEvidence(false);
       if (await shouldRequestMealClaim(savedJobId)) {
@@ -691,11 +706,19 @@ export default function EmployeeForm() {
     fd.append("scale", "true");
     fd.append("isTable", "true");
 
-    const res = await fetch("https://api.ocr.space/parse/image", {
-      method: "POST",
-      headers: { apikey: apiKey },
-      body: fd,
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+    let res;
+    try {
+      res = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        headers: { apikey: apiKey },
+        body: fd,
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
     if (!res.ok) throw new Error(`ocr.space HTTP ${res.status}`);
     const json = await res.json();
     if (json?.IsErroredOnProcessing) {
@@ -888,16 +911,34 @@ export default function EmployeeForm() {
                     className="h-5 w-5 rounded border-input accent-primary"
                   />
                 </label>
-                <input ref={parkingInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleParkingReceipt} />
+                <input ref={parkingInputRef} type="file" accept="image/*" className="hidden" onChange={handleParkingReceipt} />
                 {parkingRequested && (
                   <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
                     <div className="grid gap-1.5">
                       <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
                       <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
                     </div>
-                    <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
-                      {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
+                        disabled={disableInputs}
+                        onClick={() => parkingInputRef.current?.click()}
+                      >
+                        {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                      </Button>
+                      {hasParkingReceipt && (
+                        <span
+                          className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400"
+                          title={t("form.parking.receiptSaved")}
+                        >
+                          <CircleCheck className="h-5 w-5" aria-hidden="true" />
+                          <span className="sr-only">{t("form.parking.receiptSaved")}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>}
@@ -1174,7 +1215,6 @@ export default function EmployeeForm() {
                   ref={overtimeInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   className="hidden"
                   onChange={handleOvertimeEvidence}
                 />
