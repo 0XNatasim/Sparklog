@@ -253,7 +253,7 @@ Connect the repository as a static site. `render.yaml` uses `npm run build`, pub
 2. Optional employee-specific Parking control requests a receipt picture.
 3. Return travel and mileage are recorded.
 4. If the daily total exceeds eight hours, an overtime authorization screenshot is required.
-5. Employee saves a draft or submits a locked job.
+5. Employee saves a draft or submits a locked job. Managers are notified when the proof is first uploaded and again if the employee later edits that job after it is unlocked.
 6. Manager reviews and approves it.
 
 ### Manager onboarding checklist
