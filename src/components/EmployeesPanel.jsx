@@ -354,11 +354,11 @@ export default function EmployeesPanel() {
                 <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
                 <input
                   type="checkbox"
-                  checked={Boolean(p.storage_compensation)}
+                  checked={p.include_return_time_in_overtime !== false}
                   onChange={(e) => {
                     const checked = e.target.checked;
-                    setLocal(p.id, "storage_compensation", checked);
-                    saveField(p.id, "storage_compensation", checked);
+                    setLocal(p.id, "include_return_time_in_overtime", checked);
+                    saveField(p.id, "include_return_time_in_overtime", checked);
                   }}
                   className="h-5 w-5 rounded border-input accent-primary"
                 />
@@ -373,7 +373,7 @@ export default function EmployeesPanel() {
                     setLocal(p.id, "parking_receipts_enabled", checked);
                     saveField(p.id, "parking_receipts_enabled", checked);
                   }}
-                  className="h-5 w-5 rounded border-input accent-primary"
+                  className="h-5 w-5 rounded border-input accent-amber-600"
                 />
               </label>
             </div>
