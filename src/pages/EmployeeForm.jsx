@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
+import { CircleCheck } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -895,16 +896,27 @@ export default function EmployeeForm() {
                       <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
                       <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
-                      disabled={disableInputs}
-                      onClick={() => parkingInputRef.current?.click()}
-                    >
-                      {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
+                        disabled={disableInputs}
+                        onClick={() => parkingInputRef.current?.click()}
+                      >
+                        {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                      </Button>
+                      {hasParkingReceipt && (
+                        <span
+                          className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400"
+                          title={t("form.parking.receiptSaved")}
+                        >
+                          <CircleCheck className="h-5 w-5" aria-hidden="true" />
+                          <span className="sr-only">{t("form.parking.receiptSaved")}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>}
