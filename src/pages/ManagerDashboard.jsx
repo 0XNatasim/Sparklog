@@ -509,15 +509,6 @@ export default function ManagerDashboard() {
     return split.submitted.filter((j) => weekKeyFromDate(j.job_date) === selectedWeekKey);
   }, [split, selectedEmployee, selectedWeekKey, weekOptions.length]);
 
-  function getEmployeeIdentity(userId) {
-    const p = profiles.get(userId);
-    return {
-      employee_full_name: p?.full_name || "",
-      employee_email: p?.email || "",
-      employee_phone: p?.phone || "",
-    };
-  }
-
   async function approve(jobId) {
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
@@ -530,21 +521,27 @@ export default function ManagerDashboard() {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error(t("manager.errors.noSession"));
 
-      const identity = getEmployeeIdentity(job.user_id);
-
-      const { data, error: fnErr } = await invokeWithTimeout("push_approved_to_sheet", {
-        body: { job_id: jobId, ...identity },
+      // Use the same maintained endpoint as weekly approvals. The legacy
+      // single-job function can be absent from older deployments, which makes
+      // the Functions client return only a generic non-2xx error.
+      const { data, error: fnErr } = await invokeWithTimeout("push_approved_batch", {
+        body: { job_ids: [jobId] },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (fnErr) throw fnErr;
-      if (data?.ok !== true && !data?.skipped) {
+      if (fnErr) throw new Error(await getFunctionErrorMessage(fnErr));
+      if (data?.ok !== true) {
         throw new Error(data?.error || t("manager.errors.exportFailed"));
       }
 
-      const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
-      if (error) throw error;
+      // The batch function normally updates the job atomically. A previously
+      // exported job is skipped, so finish its approval without exporting it a
+      // second time (the same idempotent behaviour as the former endpoint).
+      if (Number(data.skipped || 0) > 0) {
+        const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
+        if (error) throw error;
+      }
 
-      setInfo(data?.skipped ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
+      setInfo(Number(data.skipped || 0) > 0 ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
       await load();
     } catch (e) {
       setErr(e?.message || t("manager.errors.approveFailed"));
@@ -582,6 +579,15 @@ export default function ManagerDashboard() {
     ]);
   }
 
+  async function getFunctionErrorMessage(error) {
+    try {
+      const payload = await error?.context?.json();
+      return payload?.error || payload?.message || error?.message || t("manager.errors.exportFailed");
+    } catch {
+      return error?.message || t("manager.errors.exportFailed");
+    }
+  }
+
   async function approveWeekAll() {
     if (!selectedEmployee) return;
     const list = submittedForSelectedWeek;
@@ -615,7 +621,7 @@ export default function ManagerDashboard() {
         },
         60000
       );
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(await getFunctionErrorMessage(fnErr));
       if (data?.ok !== true) {
         throw new Error(data?.error || t("manager.errors.approveWeekFailed"));
       }
