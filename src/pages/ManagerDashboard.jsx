@@ -348,6 +348,26 @@ export default function ManagerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
+  async function ensureEvidenceImage(jobId) {
+    const evidence = overtimeEvidence.get(jobId);
+    if (evidence?.storage_path && !evidence.imageUrl) {
+      setEvidenceImageLoading(jobId);
+      try {
+        const { data, error } = await supabase.storage.from("overtime-evidence").createSignedUrl(evidence.storage_path, 600);
+        if (error) throw error;
+        setOvertimeEvidence((current) => {
+          const next = new Map(current);
+          next.set(jobId, { ...evidence, imageUrl: data?.signedUrl || "" });
+          return next;
+        });
+      } catch (error) {
+        setErr(error?.message || t("manager.overtime.imageUnavailable"));
+      } finally {
+        setEvidenceImageLoading("");
+      }
+    }
+  }
+
   async function toggleEvidence(jobId) {
     if (visibleEvidence.has(jobId)) {
       setVisibleEvidence((current) => {
@@ -357,17 +377,7 @@ export default function ManagerDashboard() {
       });
       return;
     }
-    const evidence = overtimeEvidence.get(jobId);
-    if (evidence?.storage_path && !evidence.imageUrl) {
-      setEvidenceImageLoading(jobId);
-      const { data } = await supabase.storage.from("overtime-evidence").createSignedUrl(evidence.storage_path, 600);
-      setOvertimeEvidence((current) => {
-        const next = new Map(current);
-        next.set(jobId, { ...evidence, imageUrl: data?.signedUrl || "" });
-        return next;
-      });
-      setEvidenceImageLoading("");
-    }
+    await ensureEvidenceImage(jobId);
     setVisibleEvidence((current) => new Set(current).add(jobId));
   }
 
@@ -381,7 +391,9 @@ export default function ManagerDashboard() {
     });
   }
 
-  function toggleOcr(jobId) {
+  async function toggleOcr(jobId) {
+    const opening = !visibleOcr.has(jobId);
+    if (opening) await ensureEvidenceImage(jobId);
     setVisibleOcr((current) => {
       const next = new Set(current);
       if (next.has(jobId)) next.delete(jobId);
@@ -782,7 +794,15 @@ export default function ManagerDashboard() {
 
           {isOcrVisible && <div id={`overtime-ocr-${job.id}`}>
             <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
-            <OcrConversation evidence={evidence} t={t} />
+            <div className="grid items-start gap-3 md:grid-cols-[minmax(180px,280px)_minmax(0,1fr)]">
+              <div className="rounded-xl border bg-muted/30 p-2">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
+                {evidence?.imageUrl
+                  ? <button type="button" className="block w-full" onClick={() => toggleEvidence(job.id)} aria-label={t("manager.overtime.showEvidence")}><img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-56 w-full rounded-lg object-contain" /></button>
+                  : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
+              </div>
+              <OcrConversation evidence={evidence} t={t} />
+            </div>
           </div>}
 
           {isVisible && (
