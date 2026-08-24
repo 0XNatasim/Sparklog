@@ -888,14 +888,21 @@ export default function EmployeeForm() {
                     className="h-5 w-5 rounded border-input accent-primary"
                   />
                 </label>
-                <input ref={parkingInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleParkingReceipt} />
+                <input ref={parkingInputRef} type="file" accept="image/*" className="hidden" onChange={handleParkingReceipt} />
                 {parkingRequested && (
                   <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
                     <div className="grid gap-1.5">
                       <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
                       <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
                     </div>
-                    <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
+                      disabled={disableInputs}
+                      onClick={() => parkingInputRef.current?.click()}
+                    >
                       {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
                     </Button>
                   </div>
@@ -1174,7 +1181,6 @@ export default function EmployeeForm() {
                   ref={overtimeInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   className="hidden"
                   onChange={handleOvertimeEvidence}
                 />
