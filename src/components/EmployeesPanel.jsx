@@ -39,7 +39,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }, { data: overtimeSettings, error: settingsError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, include_return_time_in_overtime, parking_receipts_enabled")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false }),
         supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single()]),
@@ -302,12 +302,18 @@ export default function EmployeesPanel() {
 
             <div className="rounded-lg border p-3">
               <div className="mb-3 text-sm font-semibold">{t("employees.ccqExport")}</div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <Field label={t("employees.nasEmployee")}>
                   <Input value={p.nas_employee || ""} maxLength={9} inputMode="numeric" onChange={(e) => setLocal(p.id, "nas_employee", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "nas_employee", e.target.value)} className="h-9" />
                 </Field>
                 <Field label={t("employees.tradeCode")}>
                   <Input value="220" readOnly className="h-9 bg-muted" />
+                </Field>
+                <Field label={t("employees.birthDate")}>
+                  <Input type="date" value={p.birth_date || ""} onChange={(e) => setLocal(p.id, "birth_date", e.target.value)} onBlur={(e) => saveField(p.id, "birth_date", e.target.value)} className="h-9" />
+                </Field>
+                <Field label={t("employees.ccqExpirationDate")}>
+                  <Input type="date" value={p.ccq_expiration_date || ""} onChange={(e) => setLocal(p.id, "ccq_expiration_date", e.target.value)} onBlur={(e) => saveField(p.id, "ccq_expiration_date", e.target.value)} className="h-9" />
                 </Field>
                 <Field label={t("employees.workRegion")}>
                   <Select value={p.work_region || ""} onChange={(e) => { setLocal(p.id, "work_region", e.target.value); saveField(p.id, "work_region", e.target.value); }} className="h-9">
@@ -343,9 +349,9 @@ export default function EmployeesPanel() {
               </div>
             </div>
 
-            <div className="grid gap-2 border-t pt-3 md:grid-cols-3">
+            <div className="grid gap-2 border-t pt-3 md:grid-cols-2">
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
-                <span className="text-sm font-medium">{t("employees.includeReturnTime")}</span>
+                <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
                 <input
                   type="checkbox"
                   checked={p.include_return_time_in_overtime !== false}
@@ -353,19 +359,6 @@ export default function EmployeesPanel() {
                     const checked = e.target.checked;
                     setLocal(p.id, "include_return_time_in_overtime", checked);
                     saveField(p.id, "include_return_time_in_overtime", checked);
-                  }}
-                  className="h-5 w-5 rounded border-input accent-primary"
-                />
-              </label>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
-                <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(p.storage_compensation)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLocal(p.id, "storage_compensation", checked);
-                    saveField(p.id, "storage_compensation", checked);
                   }}
                   className="h-5 w-5 rounded border-input accent-primary"
                 />

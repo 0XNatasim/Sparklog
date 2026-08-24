@@ -17,7 +17,7 @@ export default function NotificationsBell() {
   const load = useCallback(async () => {
     if (role !== "manager" || !user?.id) return;
     const [{ data: rows }, { data: reads }] = await Promise.all([
-      supabase.from("manager_notifications").select("id, employee_id, job_id, daily_minutes, created_at").order("created_at", { ascending: false }).limit(50),
+      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, daily_minutes, created_at").order("created_at", { ascending: false }).limit(50),
       supabase.from("manager_notification_reads").select("notification_id").eq("manager_id", user.id),
     ]);
     const employeeIds = [...new Set((rows || []).map((row) => row.employee_id))];
@@ -65,7 +65,7 @@ export default function NotificationsBell() {
   async function openNotification(notification) {
     await supabase.from("manager_notification_reads").upsert({ notification_id: notification.id, manager_id: user.id });
     setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read: true } : item));
-    navigate(`/manager?section=overtime&job=${notification.job_id}`);
+    navigate(notification.type === "meal_claim" ? "/manager?section=meals" : `/manager?section=overtime&job=${notification.job_id}`);
   }
 
   return (
@@ -82,7 +82,13 @@ export default function NotificationsBell() {
         {notifications.map((notification) => (
           <DropdownMenuItem key={notification.id} onSelect={() => openNotification(notification)} className={`block border-t px-3 py-3 ${notification.read ? "opacity-65" : "bg-red-500/10"}`}>
             <div className="font-semibold">{notification.employeeName}</div>
-            <div className="text-xs text-muted-foreground">{t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}</div>
+            <div className="text-xs text-muted-foreground">
+              {notification.type === "meal_claim"
+                ? t("notifications.meal")
+                : notification.type === "overtime_job_edited"
+                  ? t("notifications.overtimeEdited", { hours: (notification.daily_minutes / 60).toFixed(2) })
+                  : t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}
+            </div>
             <div className="mt-1 text-[11px] text-muted-foreground">{new Date(notification.created_at).toLocaleString()}</div>
           </DropdownMenuItem>
         ))}

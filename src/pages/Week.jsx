@@ -7,12 +7,12 @@ import "dayjs/locale/en";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { hoursBetween } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
+import { calculateDailyTotals } from "@/lib/payroll-calculations";
 
 dayjs.extend(isoWeek);
 dayjs.extend(customParseFormat);
@@ -27,18 +27,6 @@ function parseJobDate(job_date) {
   }
   const d = dayjs(job_date);
   return d.isValid() ? d : null;
-}
-
-function makeDayTime(job_date, timeStr) {
-  const d = parseJobDate(job_date);
-  if (!d || !timeStr) return null;
-  const t = String(timeStr).slice(0, 5);
-  const dt = dayjs(`${d.format("YYYY-MM-DD")}T${t}`);
-  return dt.isValid() ? dt : null;
-}
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
 }
 
 function formatHoursHM(hoursFloat) {
@@ -101,63 +89,48 @@ export default function Week() {
   }, [effectiveUserId]);
 
   const { weekly, dailyByKey } = useMemo(() => {
-    const dailyMap = new Map();
-
-    for (const j of jobs) {
-      const d = parseJobDate(j.job_date);
-      if (!d) continue;
-
-      const dayKey = d.format("YYYY-MM-DD");
-      if (!dailyMap.has(dayKey)) {
-        dailyMap.set(dayKey, { date: d, hours: 0, km: 0, otCount: 0, jobCount: 0 });
-      }
-      const day = dailyMap.get(dayKey);
-      day.jobCount += 1;
-
-      const d1 = makeDayTime(j.job_date, j.depart);
-      const d2 = makeDayTime(j.job_date, j.fin);
-      if (d1 && d2) day.hours += hoursBetween(d1, d2) || 0;
-
-      const kmAller = Number(j.km_aller ?? 0) || 0;
-      day.km += kmAller;
-      if (isNonEmptyOT(j.ot)) day.otCount += 1;
-    }
+    const calculatedDays = calculateDailyTotals(jobs);
+    const dailyMap = new Map([...calculatedDays].map(([dayKey, totals]) => [dayKey, {
+      ...totals,
+      date: parseJobDate(dayKey),
+      hours: totals.totalPaidMinutes / 60,
+      regularHours: (totals.regularWorkMinutes + totals.returnRegularMinutes) / 60,
+      ot15: totals.overtime50Minutes / 60,
+      ot20: totals.overtime100Minutes / 60,
+      km: totals.totalKm,
+      otCount: jobs.filter((job) => job.job_date === dayKey && isNonEmptyOT(job.ot)).length,
+    }]));
 
     const weeklyMap = new Map();
     for (const day of dailyMap.values()) {
       const weekStart = day.date.startOf("isoWeek");
       const weekKey = weekStart.format("YYYY-MM-DD");
-      const regular = clamp(day.hours, 0, 8);
-      const overtime = Math.max(day.hours - 8, 0);
-
       if (!weeklyMap.has(weekKey)) {
         weeklyMap.set(weekKey, {
           start: weekStart,
           end: weekStart.endOf("isoWeek"),
           regularHours: 0,
-          overtimeHours: 0,
+          ot15: 0,
+          ot20: 0,
           totalKm: 0,
           dayKeys: [],
         });
       }
       const w = weeklyMap.get(weekKey);
-      w.regularHours += regular;
-      w.overtimeHours += overtime;
+      w.regularHours += day.regularHours;
+      w.ot15 += day.ot15;
+      w.ot20 += day.ot20;
       w.totalKm += day.km;
       w.dayKeys.push(day.date.format("YYYY-MM-DD"));
     }
 
     const weeklyArr = Array.from(weeklyMap.values()).map((w) => {
-      const ot15 = Math.min(w.overtimeHours, 1);
-      const ot20 = Math.max(w.overtimeHours - 1, 0);
       const uniqueDayKeys = Array.from(new Set(w.dayKeys)).sort((a, b) =>
         dayjs(a).isAfter(dayjs(b)) ? -1 : 1
       );
       return {
         ...w,
-        ot15,
-        ot20,
-        totalHours: w.regularHours + w.overtimeHours,
+        totalHours: w.regularHours + w.ot15 + w.ot20,
         dayKeys: uniqueDayKeys,
       };
     });

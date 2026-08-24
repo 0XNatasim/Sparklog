@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
+import { isMealEligible } from "@/lib/payroll-calculations";
 import {
   Dialog,
   DialogContent,
@@ -137,6 +138,7 @@ export default function EmployeeForm() {
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
+  const mealInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [returnStep, setReturnStep] = useState("closed");
@@ -152,8 +154,12 @@ export default function EmployeeForm() {
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
   const [parkingRequested, setParkingRequested] = useState(false);
   const [parkingFile, setParkingFile] = useState(null);
+  const [parkingAmount, setParkingAmount] = useState("");
   const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
+  const [pendingMealJobId, setPendingMealJobId] = useState(null);
+  const [mealBusy, setMealBusy] = useState(false);
+  const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
   const [status, setStatus] = useState("");
@@ -195,7 +201,14 @@ export default function EmployeeForm() {
       setParkingFile(null);
 
       const aller = data.km_aller ?? "";
-      setKmAller(aller === null || aller === undefined ? "" : String(aller));
+      const totalKm = Number(data.km_total) || (Number(data.km_aller) || 0) + (Number(data.km_retour) || 0);
+      setKmAller(String(totalKm || ""));
+      if (data.parking_receipt_captured) {
+        const { data: parkingReceipt } = await supabase.from("parking_receipts").select("amount").eq("job_id", data.id).maybeSingle();
+        setParkingAmount(parkingReceipt?.amount == null ? "" : String(parkingReceipt.amount));
+      } else {
+        setParkingAmount("");
+      }
 
       const s = (data.status || "saved").trim();
       setStatus(s);
@@ -233,6 +246,7 @@ export default function EmployeeForm() {
       setParkingRequested(false);
       setHasParkingReceipt(false);
       setParkingFile(null);
+      setParkingAmount("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, user?.id]);
@@ -252,6 +266,35 @@ export default function EmployeeForm() {
       }
     });
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !job_date) return;
+    let cancelled = false;
+    async function checkEntryWindow() {
+      const [{ data: settings }, { data: holiday }, { data: unlock }] = await Promise.all([
+        supabase.from("company_time_settings").select("daily_deadline, timezone").eq("id", true).single(),
+        supabase.from("company_holidays").select("holiday_date, label").eq("holiday_date", job_date).maybeSingle(),
+        supabase.from("job_entry_unlocks").select("unlocked_until").eq("user_id", user.id).eq("job_date", job_date).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const unlocked = Boolean(unlock && (!unlock.unlocked_until || dayjs(unlock.unlocked_until).isAfter(dayjs())));
+      if (unlocked) return setEntryBlockedReason("");
+      if (holiday) return setEntryBlockedReason(t("form.deadline.holiday", { name: holiday.label }));
+
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: settings?.timezone || "America/Toronto",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      });
+      const parts = Object.fromEntries(formatter.formatToParts(new Date()).map((part) => [part.type, part.value]));
+      const localDate = `${parts.year}-${parts.month}-${parts.day}`;
+      const localMinute = `${parts.hour}:${parts.minute}`;
+      const deadline = String(settings?.daily_deadline || "23:59").slice(0, 5);
+      const blocked = job_date < localDate || (job_date === localDate && localMinute > deadline);
+      setEntryBlockedReason(blocked ? t("form.deadline.passed", { time: deadline }) : "");
+    }
+    checkEntryWindow();
+    return () => { cancelled = true; };
+  }, [job_date, t, user?.id]);
 
   async function saveDraft() {
     setPendingSaveMode("draft");
@@ -273,6 +316,15 @@ export default function EmployeeForm() {
       return;
     }
     if (saving) return;
+    if (entryBlockedReason) {
+      setErr(entryBlockedReason);
+      return false;
+    }
+    const parkingAmountNumber = normalizeNumber(parkingAmount);
+    if (parkingRequested && (!parkingAmountNumber || parkingAmountNumber <= 0 || parkingAmountNumber > 20)) {
+      setErr(t("form.parking.amountRequired"));
+      return false;
+    }
     if (parkingRequested && !parkingFile && !hasParkingReceipt) {
       setErr(t("form.parking.receiptRequired"));
       parkingInputRef.current?.click();
@@ -284,7 +336,10 @@ export default function EmployeeForm() {
     setSaving(true);
 
     try {
-      const kmAllerNum = normalizeNumber(km_aller) ?? 0;
+      const kmTotalNum = normalizeNumber(km_aller) ?? 0;
+      const kmReturnNum = Number(returnValues?.km) || 0;
+      if (kmReturnNum > kmTotalNum) throw new Error(t("form.return.kmExceedsTotal"));
+      const kmClientNum = Math.max(0, kmTotalNum - kmReturnNum);
 
       let nextStatus = "saved";
 
@@ -308,12 +363,13 @@ export default function EmployeeForm() {
         depart,
         arrivee,
         fin,
-        km_aller: kmAllerNum,
+        km_total: kmTotalNum,
+        km_aller: kmClientNum,
         status: nextStatus,
         locked: nextLocked,
         ...(returnValues ? {
           return_time_minutes: returnValues.minutes,
-          km_retour: returnValues.km,
+          km_retour: kmReturnNum,
         } : {}),
         ...(captureEvidence ? { overtime_evidence_captured: true } : {}),
         parking_receipt_captured: hasParkingReceipt,
@@ -351,7 +407,7 @@ export default function EmployeeForm() {
         if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }
       if (parkingRequested && parkingFile) {
-        await uploadParkingReceipt(savedJobId, parkingFile);
+        await uploadParkingReceipt(savedJobId, parkingFile, parkingAmountNumber);
         const { error: parkingFlagError } = await supabase.from("jobs").update({ parking_receipt_captured: true }).eq("id", savedJobId);
         if (parkingFlagError) throw parkingFlagError;
         setHasParkingReceipt(true);
@@ -375,7 +431,7 @@ export default function EmployeeForm() {
     }
   }
 
-  async function uploadParkingReceipt(jobId, file) {
+  async function uploadParkingReceipt(jobId, file, amount) {
     const receiptId = crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${receiptId}.jpg`;
     const image = await compressImage(file);
@@ -389,6 +445,7 @@ export default function EmployeeForm() {
       user_id: user.id,
       job_date,
       storage_path: storagePath,
+      amount,
     }, { onConflict: "job_id" });
     if (receiptError) throw receiptError;
   }
@@ -422,6 +479,11 @@ export default function EmployeeForm() {
       return;
     }
 
+    if (await shouldRequestMealClaim(saved)) {
+      setPendingMealJobId(saved);
+      setReturnStep("meal");
+      return;
+    }
     setReturnStep("success");
     if (editId) {
       navigate("/form", { replace: true });
@@ -444,30 +506,82 @@ export default function EmployeeForm() {
 
   async function requiresOvertimeEvidence(candidateReturnMinutes) {
     try {
-      const [{ data: profile }, { data: dayJobs, error: jobsError }] = await withTimeout(
-        Promise.all([
-          supabase.from("profiles").select("include_return_time_in_overtime").eq("id", user.id).single(),
-          supabase.from("jobs").select("id, depart, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
-        ]),
+      const { data: dayJobs, error: jobsError } = await withTimeout(
+        supabase.from("jobs").select("id, depart, fin").eq("user_id", user.id).eq("job_date", job_date),
         12000,
         "Overtime check"
       );
       if (jobsError) throw jobsError;
       if (editId && hasOvertimeEvidence) return false;
-      const includeReturnTime = profile?.include_return_time_in_overtime !== false;
       const existingMinutes = (dayJobs || [])
         .filter((job) => job.id !== editId)
         .reduce((total, job) => {
           const start = makeDayjsFromJob(job_date, job.depart);
           const end = makeDayjsFromJob(job_date, job.fin);
-          return total + Math.round((hoursBetween(start, end) || 0) * 60) + (includeReturnTime ? (Number(job.return_time_minutes) || 0) : 0);
+          return total + Math.round((hoursBetween(start, end) || 0) * 60);
         }, 0);
-      const dailyMinutes = existingMinutes + Math.round(hoursDecimal * 60) + (includeReturnTime ? candidateReturnMinutes : 0);
+      // Return-to-storage time is deliberately excluded: it is always paid at
+      // the regular rate and never creates overtime or supper eligibility.
+      const dailyMinutes = existingMinutes + Math.round(hoursDecimal * 60);
       setOvertimeDailyMinutes(dailyMinutes);
       return dailyMinutes > 480;
     } catch (error) {
       setErr(error?.message || t("form.errors.failedLoad"));
       return true;
+    }
+  }
+
+  async function shouldRequestMealClaim(jobId) {
+    if (!isMealEligible({ jobDate: job_date, dailyWorkMinutes: overtimeDailyMinutes })) return false;
+    const { data, error } = await supabase
+      .from("meal_claims")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("job_date", job_date)
+      .maybeSingle();
+    if (error) throw error;
+    return !data && Boolean(jobId);
+  }
+
+  async function handleMealReceipt(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !pendingMealJobId) return;
+    setMealBusy(true);
+    setErr("");
+    try {
+      const claimId = crypto.randomUUID();
+      const storagePath = `${user.id}/${job_date}/${claimId}.jpg`;
+      const image = await compressImage(file);
+      const { error: uploadError } = await supabase.storage
+        .from("meal-receipts")
+        .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+      if (uploadError) throw uploadError;
+      const { error: claimError } = await supabase.from("meal_claims").insert({
+        id: claimId,
+        user_id: user.id,
+        job_id: pendingMealJobId,
+        job_date,
+        amount: 30,
+        storage_path: storagePath,
+        daily_work_minutes: overtimeDailyMinutes,
+      });
+      if (claimError) throw claimError;
+      const { error: notificationError } = await supabase.from("manager_notifications").insert({
+        type: "meal_claim",
+        employee_id: user.id,
+        job_id: pendingMealJobId,
+        meal_claim_id: claimId,
+        daily_minutes: overtimeDailyMinutes,
+      });
+      if (notificationError) throw notificationError;
+      setPendingMealJobId(null);
+      setReturnStep("success");
+      navigate("/form", { replace: true });
+    } catch (error) {
+      setErr(error?.message || t("form.meal.failed"));
+    } finally {
+      setMealBusy(false);
     }
   }
 
@@ -528,8 +642,13 @@ export default function EmployeeForm() {
       if (notificationError) throw notificationError;
       setPendingReturn(null);
       setHasOvertimeEvidence(false);
-      setReturnStep("success");
-      navigate("/form", { replace: true });
+      if (await shouldRequestMealClaim(savedJobId)) {
+        setPendingMealJobId(savedJobId);
+        setReturnStep("meal");
+      } else {
+        setReturnStep("success");
+        navigate("/form", { replace: true });
+      }
     } catch (error) {
       setErr(error?.message || t("form.evidence.failed"));
       setReturnStep("evidence");
@@ -632,7 +751,7 @@ export default function EmployeeForm() {
     }
   }
 
-  const disableInputs = locked || loadingEdit || saving;
+  const disableInputs = locked || loadingEdit || saving || Boolean(entryBlockedReason);
   const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
   return (
@@ -651,6 +770,11 @@ export default function EmployeeForm() {
         {info && (
           <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {info}
+          </div>
+        )}
+        {entryBlockedReason && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
+            {entryBlockedReason}
           </div>
         )}
 
@@ -720,7 +844,7 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="km">{t("form.kmAller")}</Label>
+                <Label htmlFor="km">{t("form.kmTotal")}</Label>
                 <Input
                   id="km"
                   type="number"
@@ -751,7 +875,10 @@ export default function EmployeeForm() {
                     checked={parkingRequested}
                     disabled={disableInputs || hasParkingReceipt}
                     onChange={(event) => {
-                      if (event.target.checked) parkingInputRef.current?.click();
+                      if (event.target.checked) {
+                        setParkingRequested(true);
+                        setDirty(true);
+                      }
                       else {
                         setParkingRequested(false);
                         setParkingFile(null);
@@ -763,9 +890,15 @@ export default function EmployeeForm() {
                 </label>
                 <input ref={parkingInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleParkingReceipt} />
                 {parkingRequested && (
-                  <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
-                    {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
-                  </Button>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
+                      <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
+                    </div>
+                    <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
+                      {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                    </Button>
+                  </div>
                 )}
               </div>}
             </div>
@@ -967,10 +1100,33 @@ export default function EmployeeForm() {
                   placeholder="0"
                 />
                 <p className="text-xs text-muted-foreground">{t("form.return.selectedTime", { time: formatReturnMinutes(returnMinutes || 0) })}</p>
+                {normalizeNumber(returnKm) !== null && (
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {t("form.return.kmBreakdown", { client: Math.max(0, (normalizeNumber(km_aller) || 0) - normalizeNumber(returnKm)), returnKm: normalizeNumber(returnKm), total: normalizeNumber(km_aller) || 0 })}
+                  </p>
+                )}
               </div>
               <DialogFooter>
-                <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
+                <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0 || normalizeNumber(returnKm) > (normalizeNumber(km_aller) || 0)} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
                   {saving || returnCheckBusy ? t("common.saving") : t("form.buttons.save")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {returnStep === "meal" && (
+            <>
+              <DialogHeader><DialogTitle>{t("form.meal.title")}</DialogTitle></DialogHeader>
+              <div className="space-y-3 text-sm">
+                <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+                  {t("form.meal.description")}
+                </div>
+                <p className="text-muted-foreground">{t("form.meal.receiptRequired")}</p>
+                <input ref={mealInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleMealReceipt} />
+              </div>
+              <DialogFooter>
+                <Button type="button" disabled={mealBusy} onClick={() => mealInputRef.current?.click()}>
+                  {mealBusy ? t("common.saving") : t("form.meal.chooseReceipt")}
                 </Button>
               </DialogFooter>
             </>

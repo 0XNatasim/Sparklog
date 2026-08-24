@@ -3,6 +3,8 @@ export function getMissingEmployeeFields(profile, t) {
     ["phone", t("manager.tbl.phone")],
     ["email", t("manager.tbl.email")],
     ["ccq_number", "CCQ#"],
+    ["ccq_expiration_date", t("employees.ccqExpirationDate")],
+    ["birth_date", t("employees.birthDate")],
     ["apprentice_level", t("employees.level")],
     ["km_rate", t("employees.kmRate")],
     ["nas_employee", t("employees.nasEmployee")],

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users } from "lucide-react";
+import { Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -16,8 +16,11 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
-import CcqJsonExport from "@/components/CcqJsonExport";
+import ManagerDownloads from "@/components/ManagerDownloads";
 import EmployeesPanel from "@/components/EmployeesPanel";
+import TimeRulesManager from "@/components/TimeRulesManager";
+import MealClaimsManager from "@/components/MealClaimsManager";
+import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 
 dayjs.extend(isoWeek);
 
@@ -45,12 +48,66 @@ function weekKeyFromDate(dateStr) {
   return ws.format("YYYY-[W]WW");
 }
 
+function parseOcrConversation(rawText) {
+  const lines = String(rawText || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return { dateTime: "", approval: "", response: "" };
+
+  const dateIndex = lines.findIndex((line) =>
+    /(?:\b(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mer|jeu|ven|sam|dim)[a-zéû\.]*\b|\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|janv|févr|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-z\.]*\b)/i.test(line)
+  );
+  let durationIndex = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (/^\d+(?:[.,]\d+)?\s*(?:h(?:eures?)?|hrs?|min(?:utes?)?)(?:\s*\d+\s*min(?:utes?)?)?$/i.test(lines[index])) {
+      durationIndex = index;
+      break;
+    }
+  }
+  const dateTime = dateIndex >= 0 ? lines[dateIndex] : "";
+  const content = lines.filter((_, index) => index !== dateIndex);
+  const adjustedDurationIndex = durationIndex < 0 ? -1 : durationIndex - (dateIndex >= 0 && dateIndex < durationIndex ? 1 : 0);
+
+  if (adjustedDurationIndex < 0) {
+    return { dateTime, approval: content.join("\n"), response: "" };
+  }
+  return {
+    dateTime,
+    approval: content.slice(0, adjustedDurationIndex).join("\n"),
+    response: content.slice(adjustedDurationIndex).join("\n"),
+  };
+}
+
+function OcrConversation({ evidence, t, id }) {
+  if (!evidence?.ocr_text) {
+    return <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{t("notifications.ocrUnavailable")}</div>;
+  }
+  const conversation = parseOcrConversation(evidence.ocr_text);
+  const fallbackDate = evidence.created_at ? dayjs(evidence.created_at).format("DD MMM YYYY · HH:mm") : "";
+  return (
+    <div id={id} className="max-h-72 space-y-2 overflow-y-auto rounded-xl border bg-muted/30 p-3 text-sm">
+      <div className="text-left text-[11px] font-medium text-muted-foreground">{conversation.dateTime || fallbackDate}</div>
+      {conversation.approval && (
+        <div className="mr-auto max-w-[82%] rounded-2xl rounded-tl-sm border bg-background px-3 py-2 shadow-sm">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.approvalMessage")}</div>
+          <div className="whitespace-pre-wrap text-xs leading-relaxed">{conversation.approval}</div>
+        </div>
+      )}
+      {conversation.response && (
+        <div className="ml-auto max-w-[70%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-primary-foreground shadow-sm">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-75">{t("manager.overtime.employeeResponse")}</div>
+          <div className="whitespace-pre-wrap text-right text-xs font-medium leading-relaxed">{conversation.response}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
   const t = useT();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const activeSection = ["employees", "forms", "timesheet", "overtime", "parking", "download"].includes(searchParams.get("section"))
+  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "download"].includes(searchParams.get("section"))
     ? searchParams.get("section")
     : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
@@ -252,7 +309,7 @@ export default function ManagerDashboard() {
       setErr("");
       try {
         const { data: receiptRows, error: receiptError } = await withTimeout(
-          supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, created_at").order("created_at", { ascending: false }),
+          supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, amount, status, created_at").order("created_at", { ascending: false }),
           12000
         );
         if (receiptError) throw receiptError;
@@ -291,6 +348,26 @@ export default function ManagerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
+  async function ensureEvidenceImage(jobId) {
+    const evidence = overtimeEvidence.get(jobId);
+    if (evidence?.storage_path && !evidence.imageUrl) {
+      setEvidenceImageLoading(jobId);
+      try {
+        const { data, error } = await supabase.storage.from("overtime-evidence").createSignedUrl(evidence.storage_path, 600);
+        if (error) throw error;
+        setOvertimeEvidence((current) => {
+          const next = new Map(current);
+          next.set(jobId, { ...evidence, imageUrl: data?.signedUrl || "" });
+          return next;
+        });
+      } catch (error) {
+        setErr(error?.message || t("manager.overtime.imageUnavailable"));
+      } finally {
+        setEvidenceImageLoading("");
+      }
+    }
+  }
+
   async function toggleEvidence(jobId) {
     if (visibleEvidence.has(jobId)) {
       setVisibleEvidence((current) => {
@@ -300,21 +377,23 @@ export default function ManagerDashboard() {
       });
       return;
     }
-    const evidence = overtimeEvidence.get(jobId);
-    if (evidence?.storage_path && !evidence.imageUrl) {
-      setEvidenceImageLoading(jobId);
-      const { data } = await supabase.storage.from("overtime-evidence").createSignedUrl(evidence.storage_path, 600);
-      setOvertimeEvidence((current) => {
-        const next = new Map(current);
-        next.set(jobId, { ...evidence, imageUrl: data?.signedUrl || "" });
-        return next;
-      });
-      setEvidenceImageLoading("");
-    }
+    await ensureEvidenceImage(jobId);
     setVisibleEvidence((current) => new Set(current).add(jobId));
   }
 
-  function toggleOcr(jobId) {
+  async function reviewParking(jobId, status) {
+    const { error } = await supabase.from("parking_receipts").update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq("job_id", jobId);
+    if (error) return setErr(error.message);
+    setParkingReceipts((current) => {
+      const next = new Map(current);
+      next.set(jobId, { ...next.get(jobId), status });
+      return next;
+    });
+  }
+
+  async function toggleOcr(jobId) {
+    const opening = !visibleOcr.has(jobId);
+    if (opening) await ensureEvidenceImage(jobId);
     setVisibleOcr((current) => {
       const next = new Set(current);
       if (next.has(jobId)) next.delete(jobId);
@@ -566,9 +645,7 @@ export default function ManagerDashboard() {
     const totalHours = hoursBetween(d1, d2);
     const totalLabel = formatHours(totalHours);
 
-    const kmA = Number(j.km_aller ?? 0) || 0;
-    const kmR = Number(j.km_retour ?? 0) || 0;
-    const kmLabel = kmA + kmR;
+    const { totalKm: kmLabel } = getKilometreBreakdown(j);
 
     const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
     const canApprove = j.status === "submitted";
@@ -663,7 +740,7 @@ export default function ManagerDashboard() {
               </div>
               <div>
                 <div className="mb-2 text-sm font-semibold">OCR · {focusedEvidence.ocr_status}</div>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{focusedEvidence.ocr_text || t("notifications.ocrUnavailable")}</pre>
+                <OcrConversation evidence={focusedEvidence} t={t} id="focused-overtime-ocr" />
               </div>
             </div>
           )}
@@ -677,7 +754,7 @@ export default function ManagerDashboard() {
     const employee = profiles.get(job.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
     const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
-    const km = (Number(job.km_aller ?? 0) || 0) + (Number(job.km_retour ?? 0) || 0);
+    const { totalKm: km } = getKilometreBreakdown(job);
     const isVisible = visibleEvidence.has(job.id);
     const isOcrVisible = visibleOcr.has(job.id);
 
@@ -717,7 +794,15 @@ export default function ManagerDashboard() {
 
           {isOcrVisible && <div id={`overtime-ocr-${job.id}`}>
             <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
-            <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{evidence?.ocr_text || t("notifications.ocrUnavailable")}</pre>
+            <div className="grid items-start gap-3 md:grid-cols-[minmax(180px,280px)_minmax(0,1fr)]">
+              <div className="rounded-xl border bg-muted/30 p-2">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
+                {evidence?.imageUrl
+                  ? <button type="button" className="block w-full" onClick={() => toggleEvidence(job.id)} aria-label={t("manager.overtime.showEvidence")}><img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-56 w-full rounded-lg object-contain" /></button>
+                  : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
+              </div>
+              <OcrConversation evidence={evidence} t={t} />
+            </div>
           </div>}
 
           {isVisible && (
@@ -764,6 +849,8 @@ export default function ManagerDashboard() {
             <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
             <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
             <span className="rounded-full border bg-muted px-2 py-1">{t("manager.parking.received")}: <b>{dayjs(receipt?.created_at).format("DD MMM HH:mm")}</b></span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt?.amount || 0).toFixed(2)}</b> / $20</span>
+            <span className="rounded-full border bg-muted px-2 py-1">{t("manager.parking.reviewStatus")}: <b>{receipt?.status || "pending"}</b></span>
           </div>
           {isVisible && (
             <div className="rounded-lg border p-3">
@@ -772,6 +859,7 @@ export default function ManagerDashboard() {
                 : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}
             </div>
           )}
+          {receipt?.status === "pending" && <div className="flex gap-2"><Button type="button" size="sm" onClick={() => reviewParking(job.id, "approved")}>{t("manager.approve")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("meals.reject")}</Button></div>}
         </CardContent>
       </Card>
     );
@@ -782,12 +870,13 @@ export default function ManagerDashboard() {
   return (
     <AppShell>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-6" aria-label={t("manager.sections.label")}>
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-7" aria-label={t("manager.sections.label")}>
           {[
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
             { id: "overtime", icon: TimerReset, label: t("manager.sections.overtime"), description: t("manager.sections.overtimeDescription") },
+            { id: "meals", icon: Utensils, label: t("manager.sections.meals"), description: t("manager.sections.mealsDescription") },
             { id: "parking", icon: Car, label: t("manager.sections.parking"), description: t("manager.sections.parkingDescription") },
             { id: "download", icon: Download, label: t("manager.sections.download"), description: t("manager.sections.downloadDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
@@ -804,9 +893,11 @@ export default function ManagerDashboard() {
           ))}
         </div>
 
-        {activeSection === "employees" && <EmployeesPanel />}
+        {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
 
         {activeSection === "forms" && <FormsManager collapsible={false} />}
+
+        {activeSection === "meals" && <MealClaimsManager />}
 
         {activeSection === "overtime" && (
           <div className="space-y-3">
@@ -829,7 +920,7 @@ export default function ManagerDashboard() {
         )}
 
         {activeSection === "download" && (
-          <CcqJsonExport />
+          <ManagerDownloads />
         )}
 
         {activeSection === "timesheet" && <>

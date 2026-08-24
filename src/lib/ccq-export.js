@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { calculatePayrollEntries, roundHours } from "./payroll-calculations";
 
 const COMMERCIAL_SECTOR_CODE = "I";
 const ELECTRICIAN_TRADE_CODE = "220";
@@ -9,23 +10,10 @@ export function weekEndingSaturday(date) {
   return value.add((6 - value.day() + 7) % 7, "day").format("YYYY-MM-DD");
 }
 
-function minutesBetween(depart, fin) {
-  if (!depart || !fin) return 0;
-  const [startHour, startMinute] = String(depart).slice(0, 5).split(":").map(Number);
-  const [endHour, endMinute] = String(fin).slice(0, 5).split(":").map(Number);
-  if ([startHour, startMinute, endHour, endMinute].some(Number.isNaN)) return 0;
-  let minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
-  if (minutes < 0) minutes += 24 * 60;
-  return Math.max(0, minutes);
-}
-
-function roundHours(minutes) {
-  return Math.round((minutes / 60) * 100) / 100;
-}
-
 export function buildCcqWeeklyRecords(jobs, profilesById) {
   const groups = new Map();
   const sortedJobs = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}`.localeCompare(`${b.job_date}${b.depart || ""}`));
+  const payrollEntries = calculatePayrollEntries(sortedJobs);
 
   for (const job of sortedJobs) {
     const profile = profilesById.get(job.user_id) || {};
@@ -45,6 +33,7 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
         heuresSup50: 0,
         heuresSup100: 0,
         _regularMinutes: 0,
+        _regularWorkMinutes: 0,
         _sup50Minutes: 0,
         _sup100Minutes: 0,
         _entryIds: [],
@@ -52,18 +41,18 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     }
 
     const record = groups.get(key);
-    const workedMinutes = minutesBetween(job.depart, job.fin) + (Number(job.return_time_minutes) || 0);
-    const isSunday = dayjs(job.job_date).day() === 0;
-    let regular = isSunday ? 0 : Math.min(workedMinutes, 8 * 60);
-    let sup50 = isSunday ? 0 : Math.min(Math.max(0, workedMinutes - 8 * 60), 60);
-    let sup100 = isSunday ? workedMinutes : Math.max(0, workedMinutes - 9 * 60);
+    const entry = payrollEntries.get(job.id);
+    let regularWork = entry.regularWorkMinutes;
+    let sup50 = entry.overtime50Minutes;
+    let sup100 = entry.overtime100Minutes;
 
-    const weeklyRegularRoom = Math.max(0, 40 * 60 - record._regularMinutes);
-    if (regular > weeklyRegularRoom) {
-      sup50 += regular - weeklyRegularRoom;
-      regular = weeklyRegularRoom;
+    const weeklyRegularRoom = Math.max(0, 40 * 60 - record._regularWorkMinutes);
+    if (regularWork > weeklyRegularRoom) {
+      sup50 += regularWork - weeklyRegularRoom;
+      regularWork = weeklyRegularRoom;
     }
-    record._regularMinutes += regular;
+    record._regularWorkMinutes += regularWork;
+    record._regularMinutes += regularWork + entry.returnRegularMinutes;
     record._sup50Minutes += sup50;
     record._sup100Minutes += sup100;
     record._entryIds.push(job.id);
@@ -75,6 +64,7 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     record.heuresSup100 = roundHours(record._sup100Minutes);
     record.sourceEntryIds = record._entryIds;
     delete record._regularMinutes;
+    delete record._regularWorkMinutes;
     delete record._sup50Minutes;
     delete record._sup100Minutes;
     delete record._entryIds;
