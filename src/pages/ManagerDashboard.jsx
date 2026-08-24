@@ -48,6 +48,59 @@ function weekKeyFromDate(dateStr) {
   return ws.format("YYYY-[W]WW");
 }
 
+function parseOcrConversation(rawText) {
+  const lines = String(rawText || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return { dateTime: "", approval: "", response: "" };
+
+  const dateIndex = lines.findIndex((line) =>
+    /(?:\b(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mer|jeu|ven|sam|dim)[a-zéû\.]*\b|\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|janv|févr|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-z\.]*\b)/i.test(line)
+  );
+  let durationIndex = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (/^\d+(?:[.,]\d+)?\s*(?:h(?:eures?)?|hrs?|min(?:utes?)?)(?:\s*\d+\s*min(?:utes?)?)?$/i.test(lines[index])) {
+      durationIndex = index;
+      break;
+    }
+  }
+  const dateTime = dateIndex >= 0 ? lines[dateIndex] : "";
+  const content = lines.filter((_, index) => index !== dateIndex);
+  const adjustedDurationIndex = durationIndex < 0 ? -1 : durationIndex - (dateIndex >= 0 && dateIndex < durationIndex ? 1 : 0);
+
+  if (adjustedDurationIndex < 0) {
+    return { dateTime, approval: content.join("\n"), response: "" };
+  }
+  return {
+    dateTime,
+    approval: content.slice(0, adjustedDurationIndex).join("\n"),
+    response: content.slice(adjustedDurationIndex).join("\n"),
+  };
+}
+
+function OcrConversation({ evidence, t, id }) {
+  if (!evidence?.ocr_text) {
+    return <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{t("notifications.ocrUnavailable")}</div>;
+  }
+  const conversation = parseOcrConversation(evidence.ocr_text);
+  const fallbackDate = evidence.created_at ? dayjs(evidence.created_at).format("DD MMM YYYY · HH:mm") : "";
+  return (
+    <div id={id} className="max-h-72 space-y-2 overflow-y-auto rounded-xl border bg-muted/30 p-3 text-sm">
+      <div className="text-left text-[11px] font-medium text-muted-foreground">{conversation.dateTime || fallbackDate}</div>
+      {conversation.approval && (
+        <div className="mr-auto max-w-[82%] rounded-2xl rounded-tl-sm border bg-background px-3 py-2 shadow-sm">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.approvalMessage")}</div>
+          <div className="whitespace-pre-wrap text-xs leading-relaxed">{conversation.approval}</div>
+        </div>
+      )}
+      {conversation.response && (
+        <div className="ml-auto max-w-[70%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-primary-foreground shadow-sm">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-75">{t("manager.overtime.employeeResponse")}</div>
+          <div className="whitespace-pre-wrap text-right text-xs font-medium leading-relaxed">{conversation.response}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
   const t = useT();
@@ -675,7 +728,7 @@ export default function ManagerDashboard() {
               </div>
               <div>
                 <div className="mb-2 text-sm font-semibold">OCR · {focusedEvidence.ocr_status}</div>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{focusedEvidence.ocr_text || t("notifications.ocrUnavailable")}</pre>
+                <OcrConversation evidence={focusedEvidence} t={t} id="focused-overtime-ocr" />
               </div>
             </div>
           )}
@@ -729,7 +782,7 @@ export default function ManagerDashboard() {
 
           {isOcrVisible && <div id={`overtime-ocr-${job.id}`}>
             <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
-            <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{evidence?.ocr_text || t("notifications.ocrUnavailable")}</pre>
+            <OcrConversation evidence={evidence} t={t} />
           </div>}
 
           {isVisible && (
