@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
+import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
@@ -111,6 +112,8 @@ function validateOvertimeSmsText(text) {
 
 export default function EmployeeForm() {
   const { user } = useAuth();
+  const { isViewMode, viewedEmployee } = useViewMode();
+  const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const t = useT();
@@ -175,7 +178,7 @@ export default function EmployeeForm() {
   );
 
   async function loadEdit() {
-    if (!editId || !user?.id) return;
+    if (!editId || !effectiveUserId) return;
 
     setErr("");
     setInfo("");
@@ -189,7 +192,7 @@ export default function EmployeeForm() {
       );
       if (error) throw error;
       if (!data) throw new Error(t("form.errors.notFound"));
-      if (data.user_id !== user.id) throw new Error(t("form.errors.notAuthorized"));
+      if (data.user_id !== effectiveUserId) throw new Error(t("form.errors.notAuthorized"));
 
       setJobDate(data.job_date || dayjs().format("YYYY-MM-DD"));
       setOt(data.ot || "");
@@ -250,11 +253,11 @@ export default function EmployeeForm() {
       setParkingAmount("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId, user?.id]);
+  }, [editId, effectiveUserId]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    supabase.from("profiles").select("parking_receipts_enabled").eq("id", user.id).single().then(({ data, error }) => {
+    if (!effectiveUserId) return;
+    supabase.from("profiles").select("parking_receipts_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
         setErr(error.message);
         return;
@@ -266,16 +269,16 @@ export default function EmployeeForm() {
         setParkingFile(null);
       }
     });
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   useEffect(() => {
-    if (!user?.id || !job_date) return;
+    if (!effectiveUserId || !job_date) return;
     let cancelled = false;
     async function checkEntryWindow() {
       const [{ data: settings }, { data: holiday }, { data: unlock }] = await Promise.all([
         supabase.from("company_time_settings").select("daily_deadline, timezone").eq("id", true).single(),
         supabase.from("company_holidays").select("holiday_date, label").eq("holiday_date", job_date).maybeSingle(),
-        supabase.from("job_entry_unlocks").select("unlocked_until").eq("user_id", user.id).eq("job_date", job_date).maybeSingle(),
+        supabase.from("job_entry_unlocks").select("unlocked_until").eq("user_id", effectiveUserId).eq("job_date", job_date).maybeSingle(),
       ]);
       if (cancelled) return;
       const unlocked = Boolean(unlock && (!unlock.unlocked_until || dayjs(unlock.unlocked_until).isAfter(dayjs())));
@@ -295,7 +298,7 @@ export default function EmployeeForm() {
     }
     checkEntryWindow();
     return () => { cancelled = true; };
-  }, [job_date, t, user?.id]);
+  }, [job_date, t, effectiveUserId]);
 
   async function saveDraft() {
     setPendingSaveMode("draft");
@@ -312,6 +315,7 @@ export default function EmployeeForm() {
   }
 
   async function saveJob(mode, returnValues = null, forcedId = null, captureEvidence = false) {
+    if (isViewMode) return false;
     if (!user?.id) {
       setErr(t("form.errors.notSignedIn"));
       return;
@@ -786,7 +790,7 @@ export default function EmployeeForm() {
     }
   }
 
-  const disableInputs = locked || loadingEdit || saving || Boolean(entryBlockedReason);
+  const disableInputs = isViewMode || locked || loadingEdit || saving || Boolean(entryBlockedReason);
   const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
   return (

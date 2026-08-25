@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import NotificationsBell from "@/components/NotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
+import { useViewMode } from "@/contexts/ViewModeContext";
 
 function NavItem({ to, children }) {
   return (
@@ -33,6 +34,7 @@ export default function AppShell({ children }) {
   const { role, signOut } = useAuth();
   const navigate = useNavigate();
   const t = useT();
+  const { isViewMode, viewedEmployee, stopViewMode } = useViewMode();
 
   async function handleLogout() {
     await signOut();
@@ -41,7 +43,17 @@ export default function AppShell({ children }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <RegionOnboarding />
+      {!isViewMode && <RegionOnboarding />}
+      {isViewMode && (
+        <div className="sticky top-0 z-50 border-b border-amber-500 bg-amber-300 px-3 py-2 text-amber-950 shadow-sm">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+            <div className="text-sm font-bold">{t("viewMode.banner", { name: viewedEmployee.name })}</div>
+            <Button size="sm" variant="outline" className="h-8 border-amber-700 bg-amber-50 text-amber-950 hover:bg-white" onClick={() => { stopViewMode(); navigate("/manager?section=testing"); }}>
+              {t("viewMode.return")}
+            </Button>
+          </div>
+        </div>
+      )}
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:gap-3 sm:px-4 sm:py-3">
@@ -54,7 +66,7 @@ export default function AppShell({ children }) {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
-            <NotificationsBell />
+            {!isViewMode && <NotificationsBell />}
             <ThemeToggle className="h-8 w-8" />
             <LanguageToggle className="h-8 w-8" />
             <Button
@@ -76,7 +88,7 @@ export default function AppShell({ children }) {
           <NavItem to="/history">{t("nav.history")}</NavItem>
           <NavItem to="/week">{t("nav.week")}</NavItem>
           <NavItem to="/profile">{t("nav.profile")}</NavItem>
-          {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
+          {role === "manager" && !isViewMode && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
         </nav>
       </header>
 
