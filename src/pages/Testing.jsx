@@ -5,9 +5,11 @@ import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Eye } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import { useViewMode } from "@/contexts/ViewModeContext";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -350,8 +352,41 @@ function ComingSoon({ label }) {
 // ─── Page with sub-tabs ───────────────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
+  const navigate = useNavigate();
+  const { startViewMode } = useViewMode();
+  const [employees, setEmployees] = useState([]);
+  const [employeeError, setEmployeeError] = useState("");
+
+  useEffect(() => {
+    supabase.from("profiles").select("id, full_name, email, role").order("full_name").then(({ data, error }) => {
+      if (error) setEmployeeError(error.message);
+      else setEmployees((data || []).filter((profile) => String(profile.role).toLowerCase() !== "manager"));
+    });
+  }, []);
+
+  function viewAs(employeeId) {
+    const employee = employees.find((item) => item.id === employeeId);
+    if (!employee) return;
+    startViewMode(employee);
+    navigate("/history");
+  }
+
   return (
-    <Tabs defaultValue="announce" className="space-y-4">
+    <div className="space-y-4">
+      <Card className="border-amber-500/40 bg-amber-500/5">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <div className="rounded-full bg-amber-400/20 p-2 text-amber-700 dark:text-amber-300"><Eye className="h-5 w-5" /></div>
+            <div><h2 className="font-semibold">{t("viewMode.title")}</h2><p className="text-sm text-muted-foreground">{t("viewMode.description")}</p></div>
+          </div>
+          <select defaultValue="" onChange={(event) => viewAs(event.target.value)} className="h-10 min-w-56 rounded-md border bg-background px-3 text-sm" aria-label={t("viewMode.choose")}>
+            <option value="" disabled>{t("viewMode.choose")}</option>
+            {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.full_name || employee.email}</option>)}
+          </select>
+          {employeeError && <p className="text-sm text-destructive">{employeeError}</p>}
+        </CardContent>
+      </Card>
+      <Tabs defaultValue="announce" className="space-y-4">
       <TabsList className="h-auto max-w-full flex-wrap justify-start">
         <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
         <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
@@ -363,6 +398,7 @@ export default function Testing() {
       <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
       <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
       <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
   );
 }
