@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
+import { Beaker, Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -20,6 +20,7 @@ import ManagerDownloads from "@/components/ManagerDownloads";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
 import MealClaimsManager from "@/components/MealClaimsManager";
+import Testing from "@/pages/Testing";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 
 dayjs.extend(isoWeek);
@@ -107,7 +108,7 @@ export default function ManagerDashboard() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "download"].includes(searchParams.get("section"))
+  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "download", "testing"].includes(searchParams.get("section"))
     ? searchParams.get("section")
     : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
@@ -894,7 +895,7 @@ export default function ManagerDashboard() {
   return (
     <AppShell>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-7" aria-label={t("manager.sections.label")}>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8" aria-label={t("manager.sections.label")}>
           {[
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
@@ -903,6 +904,7 @@ export default function ManagerDashboard() {
             { id: "meals", icon: Utensils, label: t("manager.sections.meals"), description: t("manager.sections.mealsDescription") },
             { id: "parking", icon: Car, label: t("manager.sections.parking"), description: t("manager.sections.parkingDescription") },
             { id: "download", icon: Download, label: t("manager.sections.download"), description: t("manager.sections.downloadDescription") },
+            { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
             <button
               key={id}
@@ -920,6 +922,8 @@ export default function ManagerDashboard() {
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
 
         {activeSection === "forms" && <FormsManager collapsible={false} />}
+
+        {activeSection === "testing" && <Testing />}
 
         {activeSection === "meals" && <MealClaimsManager />}
 
