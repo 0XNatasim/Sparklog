@@ -799,15 +799,11 @@ export default function ManagerDashboard() {
           </div>
 
           {isOcrVisible && <div id={`overtime-ocr-${job.id}`}>
-            <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
-            <div className="grid items-start gap-3 md:grid-cols-[minmax(180px,280px)_minmax(0,1fr)]">
-              <div className="rounded-xl border bg-muted/30 p-2">
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
-                {evidence?.imageUrl
-                  ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-56 w-full rounded-lg object-contain" />
-                  : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
-              </div>
-              <OcrConversation evidence={evidence} t={t} />
+            <div className="rounded-xl border bg-muted/30 p-2">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
+              {evidence?.imageUrl
+                ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" />
+                : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
             </div>
           </div>}
 
