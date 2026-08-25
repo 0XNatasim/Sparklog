@@ -441,14 +441,22 @@ export default function EmployeeForm() {
       .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
     if (uploadError) throw uploadError;
 
-    const { error: receiptError } = await supabase.from("parking_receipts").upsert({
+    const { data: savedReceipt, error: receiptError } = await supabase.from("parking_receipts").upsert({
       job_id: jobId,
       user_id: user.id,
       job_date,
       storage_path: storagePath,
       amount,
-    }, { onConflict: "job_id" });
+    }, { onConflict: "job_id" }).select("id").single();
     if (receiptError) throw receiptError;
+    const { error: notificationError } = await supabase.from("manager_notifications").insert({
+      type: "parking_receipt",
+      employee_id: user.id,
+      job_id: jobId,
+      parking_receipt_id: savedReceipt.id,
+      daily_minutes: 0,
+    });
+    if (notificationError) throw notificationError;
   }
 
   function handleParkingReceipt(event) {
@@ -564,10 +572,14 @@ export default function EmployeeForm() {
         job_id: pendingMealJobId,
         job_date,
         amount: 30,
+        status: "approved",
+        payroll_treatment: "expense_reimbursement",
         storage_path: storagePath,
         daily_work_minutes: overtimeDailyMinutes,
       });
       if (claimError) throw claimError;
+      const { error: mealFlagError } = await supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", pendingMealJobId);
+      if (mealFlagError) throw mealFlagError;
       const { error: notificationError } = await supabase.from("manager_notifications").insert({
         type: "meal_claim",
         employee_id: user.id,

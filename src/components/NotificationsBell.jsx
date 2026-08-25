@@ -17,7 +17,7 @@ export default function NotificationsBell() {
   const load = useCallback(async () => {
     if (role !== "manager" || !user?.id) return;
     const [{ data: rows }, { data: reads }] = await Promise.all([
-      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, daily_minutes, created_at").order("created_at", { ascending: false }).limit(50),
+      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, parking_receipt_id, daily_minutes, created_at").order("created_at", { ascending: false }).limit(50),
       supabase.from("manager_notification_reads").select("notification_id").eq("manager_id", user.id),
     ]);
     const employeeIds = [...new Set((rows || []).map((row) => row.employee_id))];
@@ -65,7 +65,11 @@ export default function NotificationsBell() {
   async function openNotification(notification) {
     await supabase.from("manager_notification_reads").upsert({ notification_id: notification.id, manager_id: user.id });
     setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read: true } : item));
-    navigate(notification.type === "meal_claim" ? "/manager?section=meals" : `/manager?section=overtime&job=${notification.job_id}`);
+    navigate(notification.type === "meal_claim"
+      ? "/manager?section=meals"
+      : notification.type === "parking_receipt"
+        ? "/manager?section=parking"
+        : `/manager?section=overtime&job=${notification.job_id}`);
   }
 
   return (
@@ -85,6 +89,8 @@ export default function NotificationsBell() {
             <div className="text-xs text-muted-foreground">
               {notification.type === "meal_claim"
                 ? t("notifications.meal")
+                : notification.type === "parking_receipt"
+                  ? t("notifications.parking")
                 : notification.type === "overtime_job_edited"
                   ? t("notifications.overtimeEdited", { hours: (notification.daily_minutes / 60).toFixed(2) })
                   : t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}

@@ -669,6 +669,15 @@ export default function ManagerDashboard() {
                   <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
               )}
+              {j.meal_claim_captured && (
+                <span
+                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                  title={t("manager.timesheet.mealIndicator")}
+                  aria-label={t("manager.timesheet.mealIndicator")}
+                >
+                  <Utensils className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+              )}
             </div>
 
             {/* Employee · phone · email — one line, no labels.
