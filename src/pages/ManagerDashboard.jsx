@@ -115,7 +115,6 @@ export default function ManagerDashboard() {
   const [overtimeJobs, setOvertimeJobs] = useState([]);
   const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
   const [overtimeLoading, setOvertimeLoading] = useState(false);
-  const [visibleEvidence, setVisibleEvidence] = useState(new Set());
   const [visibleOcr, setVisibleOcr] = useState(new Set());
   const [evidenceImageLoading, setEvidenceImageLoading] = useState("");
   const [parkingJobs, setParkingJobs] = useState([]);
@@ -367,19 +366,6 @@ export default function ManagerDashboard() {
         setEvidenceImageLoading("");
       }
     }
-  }
-
-  async function toggleEvidence(jobId) {
-    if (visibleEvidence.has(jobId)) {
-      setVisibleEvidence((current) => {
-        const next = new Set(current);
-        next.delete(jobId);
-        return next;
-      });
-      return;
-    }
-    await ensureEvidenceImage(jobId);
-    setVisibleEvidence((current) => new Set(current).add(jobId));
   }
 
   async function reviewParking(jobId, status) {
@@ -780,7 +766,6 @@ export default function ManagerDashboard() {
     const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
     const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
     const { totalKm: km } = getKilometreBreakdown(job);
-    const isVisible = visibleEvidence.has(job.id);
     const isOcrVisible = visibleOcr.has(job.id);
 
     return (
@@ -799,10 +784,6 @@ export default function ManagerDashboard() {
               <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
               <Button type="button" size="sm" variant="outline" aria-expanded={isOcrVisible} aria-controls={`overtime-ocr-${job.id}`} onClick={() => toggleOcr(job.id)}>
                 {isOcrVisible ? t("manager.overtime.hideOcr") : t("manager.overtime.showOcr")}
-              </Button>
-              <Button type="button" size="sm" variant="outline" disabled={evidenceImageLoading === job.id} onClick={() => toggleEvidence(job.id)}>
-                {isVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}
-                {evidenceImageLoading === job.id ? t("common.loading") : isVisible ? t("manager.overtime.hideEvidence") : t("manager.overtime.showEvidence")}
               </Button>
             </div>
           </div>
@@ -823,21 +804,13 @@ export default function ManagerDashboard() {
               <div className="rounded-xl border bg-muted/30 p-2">
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
                 {evidence?.imageUrl
-                  ? <button type="button" className="block w-full" onClick={() => toggleEvidence(job.id)} aria-label={t("manager.overtime.showEvidence")}><img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-56 w-full rounded-lg object-contain" /></button>
+                  ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-56 w-full rounded-lg object-contain" />
                   : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
               </div>
               <OcrConversation evidence={evidence} t={t} />
             </div>
           </div>}
 
-          {isVisible && (
-            <div className="rounded-lg border p-3">
-              <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
-              {evidence?.imageUrl
-                ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-md object-contain" />
-                : <p className="text-sm text-muted-foreground">{t("manager.overtime.imageUnavailable")}</p>}
-            </div>
-          )}
         </CardContent>
       </Card>
     );

@@ -779,7 +779,7 @@ export default function EmployeeForm() {
 
   return (
     <AppShell>
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         {err && (
           <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
             <span>{err}</span>
@@ -802,7 +802,7 @@ export default function EmployeeForm() {
         )}
 
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-2 p-3 sm:space-y-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-muted-foreground">{t("form.status")}</div>
               <Badge variant={badgeVariant} className="uppercase tracking-wide">
@@ -810,64 +810,69 @@ export default function EmployeeForm() {
               </Badge>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="date">{t("form.date")}</Label>
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3">
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="date" className="text-xs sm:text-sm">{t("form.date")}</Label>
                 <Input
                   id="date"
                   type="date"
                   value={job_date}
                   onChange={(e) => { setJobDate(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="ot">{t("form.ot")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="ot" className="text-xs sm:text-sm"><span className="sm:hidden">{t("common.otLabel")}</span><span className="hidden sm:inline">{t("form.ot")}</span></Label>
                 <Input
                   id="ot"
                   value={ot}
                   onChange={(e) => { setOt(e.target.value); setDirty(true); }}
                   placeholder={t("form.otPlaceholder")}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="depart">{t("form.depart")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="depart" className="text-xs sm:text-sm">{t("form.depart")}</Label>
                 <Input
                   id="depart"
                   type="time"
                   value={depart}
                   onChange={(e) => { setDepart(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="arrivee">{t("form.arrival")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="arrivee" className="text-xs sm:text-sm">{t("form.arrival")}</Label>
                 <Input
                   id="arrivee"
                   type="time"
                   value={arrivee}
                   onChange={(e) => { setArrivee(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="fin">{t("form.end")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="fin" className="text-xs sm:text-sm">{t("form.end")}</Label>
                 <Input
                   id="fin"
                   type="time"
                   value={fin}
                   onChange={(e) => { setFin(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="km">{t("form.kmTotal")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="km" className="text-xs sm:text-sm"><span className="sm:hidden">{t("history.km")}</span><span className="hidden sm:inline">{t("form.kmTotal")}</span></Label>
                 <Input
                   id="km"
                   type="number"
@@ -875,12 +880,13 @@ export default function EmployeeForm() {
                   onChange={(e) => { setKmAller(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
                   placeholder="0"
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label>{t("form.totalHours")}</Label>
-                <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm font-bold">
+              <div className="col-span-2 grid gap-1 sm:col-span-1 sm:gap-1.5">
+                <Label className="text-xs sm:text-sm">{t("form.totalHours")}</Label>
+                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-bold sm:h-10">
                   {hoursLabel}
                 </div>
               </div>
