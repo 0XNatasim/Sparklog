@@ -46,11 +46,11 @@ Approved daily jobs are preserved as source records. The Download section aggreg
 
 SparkLog does **not** use an LLM, OpenRouter, Claude, GPT, or another generative-AI service for image extraction.
 
-The active OCR flow is:
+The active OCR flows are:
 
-1. The browser sends the selected image to [ocr.space](https://ocr.space/ocrapi).
-2. If that OCR request fails, the browser falls back to local `tesseract.js` processing.
-3. SparkLog parses the resulting text into job fields or validates overtime SMS content.
+1. Work-order autofill sends the selected image to [ocr.space](https://ocr.space/ocrapi) from the browser and falls back to local `tesseract.js` processing if necessary.
+2. Overtime evidence is uploaded and saved immediately with a `pending` status. The `process_overtime_evidence` Edge Function performs OCR asynchronously and changes the evidence to `processed`, `needs_review`, or `failed` without blocking the employee.
+3. SparkLog parses work-order text into job fields and retains overtime OCR text for manager review.
 
 The former LLM/Vision Edge Function has been removed. No `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, or other LLM credential is needed.
 
@@ -106,6 +106,8 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_OCR_SPACE_API_KEY=your-ocr-space-key
 ```
+
+The `process_overtime_evidence` Edge Function also expects an `OCR_SPACE_API_KEY` Supabase secret for background overtime processing.
 
 `VITE_OCR_SPACE_API_KEY` is technically optional because the code uses ocr.space's public `helloworld` key when absent, but that key is heavily rate-limited and should not be used for production.
 
