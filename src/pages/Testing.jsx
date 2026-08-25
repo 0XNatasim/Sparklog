@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
-import AppShell from "@/components/AppShell";
 import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -352,20 +351,18 @@ function ComingSoon({ label }) {
 export default function Testing() {
   const t = useT();
   return (
-    <AppShell>
-      <Tabs defaultValue="announce" className="space-y-4">
-        <TabsList className="h-auto max-w-full flex-wrap justify-start">
-          <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
-          <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
-          <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
-          <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
-        </TabsList>
+    <Tabs defaultValue="announce" className="space-y-4">
+      <TabsList className="h-auto max-w-full flex-wrap justify-start">
+        <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
+        <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
+        <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
+        <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
+      </TabsList>
 
-        <TabsContent value="announce"><ManagerAnnouncePanel /></TabsContent>
-        <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
-        <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
-        <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
-      </Tabs>
-    </AppShell>
+      <TabsContent value="announce"><ManagerAnnouncePanel /></TabsContent>
+      <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
+      <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
+      <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
+    </Tabs>
   );
 }

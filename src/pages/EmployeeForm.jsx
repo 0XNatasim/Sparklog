@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
+import { CircleCheck } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -440,14 +441,22 @@ export default function EmployeeForm() {
       .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
     if (uploadError) throw uploadError;
 
-    const { error: receiptError } = await supabase.from("parking_receipts").upsert({
+    const { data: savedReceipt, error: receiptError } = await supabase.from("parking_receipts").upsert({
       job_id: jobId,
       user_id: user.id,
       job_date,
       storage_path: storagePath,
       amount,
-    }, { onConflict: "job_id" });
+    }, { onConflict: "job_id" }).select("id").single();
     if (receiptError) throw receiptError;
+    const { error: notificationError } = await supabase.from("manager_notifications").insert({
+      type: "parking_receipt",
+      employee_id: user.id,
+      job_id: jobId,
+      parking_receipt_id: savedReceipt.id,
+      daily_minutes: 0,
+    });
+    if (notificationError) throw notificationError;
   }
 
   function handleParkingReceipt(event) {
@@ -563,10 +572,14 @@ export default function EmployeeForm() {
         job_id: pendingMealJobId,
         job_date,
         amount: 30,
+        status: "approved",
+        payroll_treatment: "expense_reimbursement",
         storage_path: storagePath,
         daily_work_minutes: overtimeDailyMinutes,
       });
       if (claimError) throw claimError;
+      const { error: mealFlagError } = await supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", pendingMealJobId);
+      if (mealFlagError) throw mealFlagError;
       const { error: notificationError } = await supabase.from("manager_notifications").insert({
         type: "meal_claim",
         employee_id: user.id,
@@ -596,50 +609,64 @@ export default function EmployeeForm() {
     const jobId = editId || crypto.randomUUID();
     const evidenceId = crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
-    let ocrText = "";
-    let ocrStatus = "processed";
-
     try {
-      try {
-        ocrText = await ocrSpaceExtract(file);
-        if (!validateOvertimeSmsText(ocrText)) {
-          setEvidenceValidationError(t("form.evidence.invalid"));
-          return;
-        }
-      } catch (ocrError) {
-        console.warn("Overtime evidence OCR needs review:", ocrError);
-        ocrStatus = "needs_review";
-      }
-
       const image = await compressImage(file);
-      const { error: uploadError } = await supabase.storage
-        .from("overtime-evidence")
-        .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+      const { error: uploadError } = await withTimeout(
+        supabase.storage
+          .from("overtime-evidence")
+          .upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
+        20000
+      );
       if (uploadError) throw uploadError;
 
       const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
       if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
 
-      const { data: overtimeSettings } = await supabase
-        .from("overtime_settings")
-        .select("evidence_retention_days")
-        .eq("id", true)
-        .single();
+      const { data: overtimeSettings } = await withTimeout(
+        supabase
+          .from("overtime_settings")
+          .select("evidence_retention_days")
+          .eq("id", true)
+          .single(),
+        12000
+      );
       const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
       const expiresAt = dayjs().add(retentionDays, "day").toISOString();
-      const { error: evidenceError } = await supabase
-        .from("overtime_evidence")
-        .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: ocrText || null, ocr_status: ocrStatus, daily_minutes: dailyMinutes, expires_at: expiresAt });
+      const { error: evidenceError } = await withTimeout(
+        supabase
+          .from("overtime_evidence")
+          .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: null, ocr_status: "pending", daily_minutes: dailyMinutes, expires_at: expiresAt }),
+        12000
+      );
       if (evidenceError) throw evidenceError;
 
-      const { error: notificationError } = await supabase.from("manager_notifications").insert({
-        employee_id: user.id,
-        job_id: jobId,
-        evidence_id: evidenceId,
-        daily_minutes: dailyMinutes,
-      });
+      const { error: notificationError } = await withTimeout(
+        supabase.from("manager_notifications").insert({
+          employee_id: user.id,
+          job_id: jobId,
+          evidence_id: evidenceId,
+          daily_minutes: dailyMinutes,
+        }),
+        12000
+      );
       if (notificationError) throw notificationError;
+
+      // Processing is intentionally detached from the employee workflow. The
+      // Edge Function acknowledges immediately and continues OCR in the
+      // background, so a slow OCR provider cannot hold this dialog open.
+      try {
+        const { error: processingError } = await withTimeout(
+          supabase.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId } }),
+          5000
+        );
+        if (processingError) console.warn("Could not start overtime evidence processing:", processingError);
+      } catch (processingError) {
+        // The screenshot and pending evidence row are already durable. Do not
+        // block the employee when the optional processing trigger is offline.
+        console.warn("Could not start overtime evidence processing:", processingError);
+      }
+
       setPendingReturn(null);
       setHasOvertimeEvidence(false);
       if (await shouldRequestMealClaim(savedJobId)) {
@@ -691,11 +718,19 @@ export default function EmployeeForm() {
     fd.append("scale", "true");
     fd.append("isTable", "true");
 
-    const res = await fetch("https://api.ocr.space/parse/image", {
-      method: "POST",
-      headers: { apikey: apiKey },
-      body: fd,
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+    let res;
+    try {
+      res = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        headers: { apikey: apiKey },
+        body: fd,
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
     if (!res.ok) throw new Error(`ocr.space HTTP ${res.status}`);
     const json = await res.json();
     if (json?.IsErroredOnProcessing) {
@@ -756,7 +791,7 @@ export default function EmployeeForm() {
 
   return (
     <AppShell>
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         {err && (
           <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
             <span>{err}</span>
@@ -779,7 +814,7 @@ export default function EmployeeForm() {
         )}
 
         <Card>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-2 p-3 sm:space-y-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-muted-foreground">{t("form.status")}</div>
               <Badge variant={badgeVariant} className="uppercase tracking-wide">
@@ -787,64 +822,69 @@ export default function EmployeeForm() {
               </Badge>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="date">{t("form.date")}</Label>
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3">
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="date" className="text-xs sm:text-sm">{t("form.date")}</Label>
                 <Input
                   id="date"
                   type="date"
                   value={job_date}
                   onChange={(e) => { setJobDate(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="ot">{t("form.ot")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="ot" className="text-xs sm:text-sm"><span className="sm:hidden">{t("common.otLabel")}</span><span className="hidden sm:inline">{t("form.ot")}</span></Label>
                 <Input
                   id="ot"
                   value={ot}
                   onChange={(e) => { setOt(e.target.value); setDirty(true); }}
                   placeholder={t("form.otPlaceholder")}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="depart">{t("form.depart")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="depart" className="text-xs sm:text-sm">{t("form.depart")}</Label>
                 <Input
                   id="depart"
                   type="time"
                   value={depart}
                   onChange={(e) => { setDepart(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="arrivee">{t("form.arrival")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="arrivee" className="text-xs sm:text-sm">{t("form.arrival")}</Label>
                 <Input
                   id="arrivee"
                   type="time"
                   value={arrivee}
                   onChange={(e) => { setArrivee(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="fin">{t("form.end")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="fin" className="text-xs sm:text-sm">{t("form.end")}</Label>
                 <Input
                   id="fin"
                   type="time"
                   value={fin}
                   onChange={(e) => { setFin(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="km">{t("form.kmTotal")}</Label>
+              <div className="grid gap-1 sm:gap-1.5">
+                <Label htmlFor="km" className="text-xs sm:text-sm"><span className="sm:hidden">{t("history.km")}</span><span className="hidden sm:inline">{t("form.kmTotal")}</span></Label>
                 <Input
                   id="km"
                   type="number"
@@ -852,12 +892,13 @@ export default function EmployeeForm() {
                   onChange={(e) => { setKmAller(e.target.value); setDirty(true); }}
                   disabled={disableInputs}
                   placeholder="0"
+                  className="h-9 sm:h-10"
                 />
               </div>
 
-              <div className="grid gap-1.5">
-                <Label>{t("form.totalHours")}</Label>
-                <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-sm font-bold">
+              <div className="col-span-2 grid gap-1 sm:col-span-1 sm:gap-1.5">
+                <Label className="text-xs sm:text-sm">{t("form.totalHours")}</Label>
+                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-bold sm:h-10">
                   {hoursLabel}
                 </div>
               </div>
@@ -888,16 +929,34 @@ export default function EmployeeForm() {
                     className="h-5 w-5 rounded border-input accent-primary"
                   />
                 </label>
-                <input ref={parkingInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleParkingReceipt} />
+                <input ref={parkingInputRef} type="file" accept="image/*" className="hidden" onChange={handleParkingReceipt} />
                 {parkingRequested && (
                   <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
                     <div className="grid gap-1.5">
                       <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
                       <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
                     </div>
-                    <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => parkingInputRef.current?.click()}>
-                      {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
+                        disabled={disableInputs}
+                        onClick={() => parkingInputRef.current?.click()}
+                      >
+                        {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                      </Button>
+                      {hasParkingReceipt && (
+                        <span
+                          className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400"
+                          title={t("form.parking.receiptSaved")}
+                        >
+                          <CircleCheck className="h-5 w-5" aria-hidden="true" />
+                          <span className="sr-only">{t("form.parking.receiptSaved")}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>}
@@ -1174,7 +1233,6 @@ export default function EmployeeForm() {
                   ref={overtimeInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   className="hidden"
                   onChange={handleOvertimeEvidence}
                 />

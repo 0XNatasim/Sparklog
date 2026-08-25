@@ -44,16 +44,16 @@ export default function AppShell({ children }) {
       <RegionOnboarding />
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
         {/* Top row: brand left, business name centered, controls right */}
-        <div className="relative mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link to="/form" className="text-lg font-extrabold tracking-tight">
+        <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:gap-3 sm:px-4 sm:py-3">
+          <Link to="/form" className="shrink-0 text-base font-extrabold tracking-tight sm:text-lg">
             SparkLog
           </Link>
 
-          <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-bold tracking-tight">
+          <div className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 text-base font-bold tracking-tight sm:block">
             Messier Connexion
           </div>
 
-          <div className="ml-auto flex items-center gap-0">
+          <div className="ml-auto flex shrink-0 items-center gap-0">
             <NotificationsBell />
             <ThemeToggle className="h-8 w-8" />
             <LanguageToggle className="h-8 w-8" />
@@ -71,17 +71,16 @@ export default function AppShell({ children }) {
         </div>
 
         {/* Second row: nav tabs */}
-        <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-1 px-4 pb-3">
+        <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:px-4 sm:pb-3">
           <NavItem to="/form">{t("nav.form")}</NavItem>
           <NavItem to="/history">{t("nav.history")}</NavItem>
           <NavItem to="/week">{t("nav.week")}</NavItem>
           <NavItem to="/profile">{t("nav.profile")}</NavItem>
           {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
-          {role === "manager" && <NavItem to="/testing">{t("nav.testing")}</NavItem>}
         </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-4">{children}</main>
+      <main className="mx-auto max-w-6xl px-2 py-2 sm:px-4 sm:py-4">{children}</main>
     </div>
   );
 }

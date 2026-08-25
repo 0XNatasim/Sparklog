@@ -23,13 +23,15 @@ export default function Profile() {
     Promise.all([
       supabase.from("profiles").select("full_name, phone, email, work_region, union_association").eq("id", user.id).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
-    ]).then(([profileResult, formsResult]) => {
-      const loadError = profileResult.error || formsResult.error;
+      supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
+    ]).then(([profileResult, formsResult, accessResult]) => {
+      const loadError = profileResult.error || formsResult.error || accessResult.error;
       if (loadError) setError(loadError.message);
       else {
         setProfile(profileResult.data);
         const enabledIds = new Set((formsResult.data || []).map((row) => row.form_id));
-        setForms(COMPANY_FORMS.filter((form) => enabledIds.has(form.id)));
+        const accessibleIds = new Set((accessResult.data || []).map((row) => row.form_id));
+        setForms(COMPANY_FORMS.filter((form) => enabledIds.has(form.id) && (!form.employeeSpecific || accessibleIds.has(form.id))));
       }
       setLoading(false);
     });

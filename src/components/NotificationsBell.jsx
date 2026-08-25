@@ -17,7 +17,7 @@ export default function NotificationsBell() {
   const load = useCallback(async () => {
     if (role !== "manager" || !user?.id) return;
     const [{ data: rows }, { data: reads }] = await Promise.all([
-      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, daily_minutes, created_at").order("created_at", { ascending: false }).limit(50),
+      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, parking_receipt_id, daily_minutes, created_at").order("created_at", { ascending: false }).limit(50),
       supabase.from("manager_notification_reads").select("notification_id").eq("manager_id", user.id),
     ]);
     const employeeIds = [...new Set((rows || []).map((row) => row.employee_id))];
@@ -65,7 +65,11 @@ export default function NotificationsBell() {
   async function openNotification(notification) {
     await supabase.from("manager_notification_reads").upsert({ notification_id: notification.id, manager_id: user.id });
     setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read: true } : item));
-    navigate(notification.type === "meal_claim" ? "/manager?section=meals" : `/manager?section=overtime&job=${notification.job_id}`);
+    navigate(notification.type === "meal_claim"
+      ? "/manager?section=meals"
+      : notification.type === "parking_receipt"
+        ? "/manager?section=parking"
+        : `/manager?section=overtime&job=${notification.job_id}`);
   }
 
   return (
@@ -76,7 +80,7 @@ export default function NotificationsBell() {
           {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-red-600 px-1 text-[10px] font-bold leading-4 text-white">{unread > 99 ? "99+" : unread}</span>}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-96 w-80 overflow-y-auto">
+      <DropdownMenuContent align="end" className="max-h-96 w-[calc(100vw-1rem)] overflow-y-auto sm:w-80">
         <div className="px-2 py-2 text-sm font-semibold">{t("notifications.title")}</div>
         {notifications.length === 0 && <div className="px-2 py-4 text-center text-xs text-muted-foreground">{t("notifications.empty")}</div>}
         {notifications.map((notification) => (
@@ -85,6 +89,8 @@ export default function NotificationsBell() {
             <div className="text-xs text-muted-foreground">
               {notification.type === "meal_claim"
                 ? t("notifications.meal")
+                : notification.type === "parking_receipt"
+                  ? t("notifications.parking")
                 : notification.type === "overtime_job_edited"
                   ? t("notifications.overtimeEdited", { hours: (notification.daily_minutes / 60).toFixed(2) })
                   : t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}
