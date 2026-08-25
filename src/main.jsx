@@ -5,13 +5,16 @@ import "./index.css";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { ThemeProvider } from "./components/theme-provider.jsx";
 import { LanguageProvider } from "./components/language-provider.jsx";
+import { ViewModeProvider } from "./contexts/ViewModeContext.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ThemeProvider defaultTheme="system">
       <LanguageProvider>
         <AuthProvider>
-          <App />
+          <ViewModeProvider>
+            <App />
+          </ViewModeProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
