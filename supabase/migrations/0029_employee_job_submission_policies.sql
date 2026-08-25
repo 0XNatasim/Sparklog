@@ -1,6 +1,13 @@
 -- Employees create jobs as either drafts or immediately submitted entries.  A
 -- submitted entry is locked by the client in the same INSERT, so an INSERT
 -- policy that only accepts unlocked rows rejects the "Save and submit" path.
+-- The drops make this migration safe when its SQL was already run manually in
+-- the Supabase SQL editor before `supabase db push` records the migration.
+drop policy if exists "jobs: employee insert own" on public.jobs;
+drop policy if exists "jobs: employee update own editable" on public.jobs;
+drop policy if exists "jobs: employee read own" on public.jobs;
+drop policy if exists "jobs: employee delete own editable" on public.jobs;
+
 create policy "jobs: employee insert own"
   on public.jobs
   for insert

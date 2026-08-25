@@ -156,8 +156,8 @@ For a fresh project, create the base schema and policies first or restore them f
 Migration `0029_employee_job_submission_policies.sql` installs the employee
 `jobs` policies explicitly. It allows an employee to create a draft, create a
 job already submitted, or transition an unlocked draft to the locked
-`submitted` state. Apply it if the API reports `new row violates row-level
-security policy for table "jobs"` when an employee saves or submits work.
+`submitted` state. The migration is safe to push if its SQL was previously run
+manually in the Supabase SQL editor.
 
 After migrations, set the first manager manually:
 
