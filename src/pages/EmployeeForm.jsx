@@ -47,16 +47,21 @@ function parseExtractedText(text) {
     return t ? `${String(t[1]).padStart(2, "0")}:${t[2]}` : null;
   };
 
-  const depart = labelTime(/Heure\s+de\s+d[eé]but/i);
+  // Labels are matched in both the French and the English variants of the
+  // source work-order app (it can be displayed in either language).
+  const depart = labelTime(/(?:Heure\s+de\s+d[eé]but|Start\s*Time)/i);
   if (depart) out.depart = depart;
 
-  const fin = labelTime(/Heure\s+de\s+fin/i);
+  const fin = labelTime(/(?:Heure\s+de\s+fin|End\s*Time)/i);
   if (fin) out.fin = fin;
 
-  const arrivee = labelTime(/Heure\s+d['’]?\s*arriv[eé]e/i);
+  const arrivee = labelTime(/(?:Heure\s+d['’]?\s*arriv[eé]e|(?:Actual\s+)?Arrival\s*Time)/i);
   if (arrivee) out.arrivee = arrivee;
 
-  const km = text.match(/Distance\s+parcourue[^0-9]*?(\d+(?:[.,]\d+)?)/i);
+  // Handles "Distance parcourue", "Distance réelle parcourue (km)" and the
+  // English "Distance travelled". The optional words between "Distance" and
+  // the keyword are skipped, then the first number after it is the value.
+  const km = text.match(/Distance[^\n\d]*?(?:parcourue|travell?ed)[^\d]*?(\d+(?:[.,]\d+)?)/i);
   if (km) out.km_aller = Math.round(parseFloat(km[1].replace(",", ".")));
 
   return out;
