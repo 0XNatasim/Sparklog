@@ -35,8 +35,6 @@ create table if not exists public.overtime_evidence (
   user_id uuid not null references public.profiles(id) on delete cascade,
   job_date date not null,
   storage_path text not null,
-  ocr_text text,
-  ocr_status text not null default 'needs_review' check (ocr_status in ('processed', 'needs_review', 'failed')),
   daily_minutes integer not null,
   created_at timestamptz not null default now(),
   expires_at timestamptz not null
