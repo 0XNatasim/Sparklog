@@ -71,6 +71,7 @@ export default function ManagerDashboard() {
   const [parkingImageLoading, setParkingImageLoading] = useState("");
 
   const [jobs, setJobs] = useState([]);
+  const [mealJobIds, setMealJobIds] = useState(new Set());
   const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -146,6 +147,12 @@ export default function ManagerDashboard() {
       );
       if (jobErr) throw jobErr;
 
+      const { data: mealRows, error: mealErr } = await withTimeout(
+        supabase.from("meal_claims").select("job_id"),
+        12000
+      );
+      if (mealErr) throw mealErr;
+
       const { data: profileRows, error: profErr } = await withTimeout(
         supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number"),
         12000
@@ -157,6 +164,7 @@ export default function ManagerDashboard() {
 
       setProfiles(m);
       setJobs(jobRows || []);
+      setMealJobIds(new Set((mealRows || []).map((claim) => claim.job_id)));
       setHasMore((jobRows || []).length === PAGE_SIZE);
       await loadCounts();
     } catch (e) {
@@ -616,7 +624,7 @@ export default function ManagerDashboard() {
                   <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
               )}
-              {j.meal_claim_captured && (
+              {(j.meal_claim_captured || mealJobIds.has(j.id)) && (
                 <span
                   className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                   title={t("manager.timesheet.mealIndicator")}

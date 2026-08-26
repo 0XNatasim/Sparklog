@@ -49,6 +49,7 @@ export default function History() {
   const t = useT();
 
   const [jobs, setJobs] = useState([]);
+  const [mealJobIds, setMealJobIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
@@ -59,17 +60,22 @@ export default function History() {
     setInfo("");
     setLoading(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from("jobs")
-          .select("*")
-          .eq("user_id", effectiveUserId)
-          .order("job_date", { ascending: false })
-          .order("updated_at", { ascending: false }),
+      const [jobsResult, mealsResult] = await withTimeout(
+        Promise.all([
+          supabase
+            .from("jobs")
+            .select("*")
+            .eq("user_id", user?.id)
+            .order("job_date", { ascending: false })
+            .order("updated_at", { ascending: false }),
+          supabase.from("meal_claims").select("job_id").eq("user_id", user?.id),
+        ]),
         12000
       );
-      if (error) throw error;
-      setJobs(data || []);
+      if (jobsResult.error) throw jobsResult.error;
+      if (mealsResult.error) throw mealsResult.error;
+      setJobs(jobsResult.data || []);
+      setMealJobIds(new Set((mealsResult.data || []).map((claim) => claim.job_id)));
     } catch (e) {
       setErr(e?.message || t("history.errors.failedLoad"));
     } finally {
@@ -268,7 +274,7 @@ export default function History() {
                             <span>{t("common.otLabel")}: {j.ot}</span>
                             {j.parking_receipt_captured && <ExpenseIcon icon={Car} label={t("history.parkingIndicator")} className="bg-sky-500/15 text-sky-700 dark:text-sky-300" />}
                             {j.overtime_evidence_captured && <ExpenseIcon icon={TimerReset} label={t("history.overtimeIndicator")} className="bg-amber-500/15 text-amber-700 dark:text-amber-300" />}
-                            {j.meal_claim_captured && <ExpenseIcon icon={Utensils} label={t("history.mealIndicator")} className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" />}
+                            {(j.meal_claim_captured || mealJobIds.has(j.id)) && <ExpenseIcon icon={Utensils} label={t("history.mealIndicator")} className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" />}
                           </div>
                           <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
                             {t(`status.${j.status}`)}
