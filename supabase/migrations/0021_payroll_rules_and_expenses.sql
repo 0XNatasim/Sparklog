@@ -8,7 +8,7 @@ alter table public.jobs
   add column if not exists km_total numeric not null default 0 check (km_total >= 0),
   add column if not exists meal_claim_captured boolean not null default false;
 
--- Existing km_aller values represented the OCR/manual total before the return
+-- Existing km_aller values represented the scanned/manual total before the return
 -- breakdown was introduced.
 update public.jobs
 set km_total = greatest(coalesce(km_total, 0), coalesce(km_aller, 0) + coalesce(km_retour, 0))

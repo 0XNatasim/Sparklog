@@ -8,9 +8,9 @@ import EmployeeForm from "./pages/EmployeeForm";
 import History from "./pages/History";
 import Week from "./pages/Week";
 import ManagerDashboard from "./pages/ManagerDashboard";
-import Testing from "./pages/Testing";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
+import { ViewModeProvider } from "@/contexts/ViewModeContext";
 
 export default function App() {
   const isPasswordRecovery = window.location.pathname === "/reset-password";
@@ -30,6 +30,7 @@ export default function App() {
 
   return (
     <HashRouter>
+      <ViewModeProvider>
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
@@ -87,12 +88,12 @@ export default function App() {
           }
         />
 
-        {/* Testing (manager only) */}
+        {/* Preserve old manager bookmarks after moving Testing into Manager. */}
         <Route
           path="/testing"
           element={
             <ProtectedRoute requireRole="manager">
-              <Testing />
+              <Navigate to="/manager?section=testing" replace />
             </ProtectedRoute>
           }
         />
@@ -100,6 +101,7 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ViewModeProvider>
     </HashRouter>
   );
 }

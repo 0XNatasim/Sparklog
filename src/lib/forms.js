@@ -5,5 +5,5 @@ export const COMPANY_FORMS = [
   { id: "equipment-transfer", name: "Transfert de matériel entre électricien", url: "https://forms.office.com/Pages/ResponsePage.aspx?id=sqvQYoBd-ket04-x9iYHwGXeCbSSf41AhgBlbAy17W1UNlBDQURBQlNUQzRHN08xVFFUSlA1OVZXTiQlQCN0PWcu" },
   { id: "britton-inventory", name: "Inventaire entrepôt Britton", url: "https://forms.office.com/pages/responsepage.aspx?id=sqvQYoBd-ket04-x9iYHwGXeCbSSf41AhgBlbAy17W1UMVZHMlg0MDBKSkI4Q0VSMUFCT0VYUzNPMCQlQCN0PWcu&route=shorturl" },
   { id: "equipment-pickup", name: "Prise de matériel", url: "https://forms.office.com/Pages/ResponsePage.aspx?id=sqvQYoBd-ket04-x9iYHwJuHPRcS9NdEl4fNiq2Br8NUMUIwM0w0TlE3UkJKUTU1N1laWVhLN0JEMS4u" },
-  { id: "subcontractor-inventory", name: "Inventaire sous-contractant", url: "https://forms.office.com/Pages/ResponsePage.aspx?id=sqvQYoBd-ket04-x9iYHwGXeCbSSf41AhgBlbAy17W1UQTlSN0ZKMlRVTEw5OVFXOFUwRk5WNFNBMiQlQCN0PWcu" },
+  { id: "subcontractor-inventory", name: "Inventaire sous-contractant", url: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=sqvQYoBd-ket04-x9iYHwGXeCbSSf41AhgBlbAy17W1UQTlSN0ZKMlRVTEw5OVFXOFUwRk5WNFNBMiQlQCN0PWcu", employeeSpecific: true },
 ];
