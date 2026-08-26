@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
+import { Beaker, Car, ClipboardList, Clock3, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -16,7 +16,6 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
-import ManagerDownloads from "@/components/ManagerDownloads";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
 import MealClaimsManager from "@/components/MealClaimsManager";
@@ -56,7 +55,7 @@ export default function ManagerDashboard() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "download", "testing"].includes(searchParams.get("section"))
+  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "testing"].includes(searchParams.get("section"))
     ? searchParams.get("section")
     : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
@@ -821,7 +820,6 @@ export default function ManagerDashboard() {
             { id: "overtime", icon: TimerReset, label: t("manager.sections.overtime"), description: t("manager.sections.overtimeDescription") },
             { id: "meals", icon: Utensils, label: t("manager.sections.meals"), description: t("manager.sections.mealsDescription") },
             { id: "parking", icon: Car, label: t("manager.sections.parking"), description: t("manager.sections.parkingDescription") },
-            { id: "download", icon: Download, label: t("manager.sections.download"), description: t("manager.sections.downloadDescription") },
             { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
             <button
@@ -863,10 +861,6 @@ export default function ManagerDashboard() {
             {!parkingLoading && parkingJobs.map(renderParkingCard)}
             {!parkingLoading && parkingJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.parking.empty")}</CardContent></Card>}
           </div>
-        )}
-
-        {activeSection === "download" && (
-          <ManagerDownloads />
         )}
 
         {activeSection === "timesheet" && <>
