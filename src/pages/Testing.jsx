@@ -4,11 +4,10 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ExternalLink, Eye } from "lucide-react";
+import { CalendarDays, CalendarRange, DollarSign, Download, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
-import { useViewMode } from "@/contexts/ViewModeContext";
+import ManagerDownloads from "@/components/ManagerDownloads";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -350,40 +349,40 @@ function ComingSoon({ label }) {
   );
 }
 
-// ─── Page with sub-tabs ───────────────────────────────────────────────────────
+// ─── Page with card sub-navigation ────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
-  const navigate = useNavigate();
-  const { startViewMode } = useViewMode();
-  const [employees, setEmployees] = useState([]);
-  const [employeeError, setEmployeeError] = useState("");
+  const [section, setSection] = useState("downloads");
 
-  useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email, role").order("full_name").then(({ data, error }) => {
-      if (error) setEmployeeError(error.message);
-      else setEmployees((data || []).filter((profile) => String(profile.role).toLowerCase() !== "manager"));
-    });
-  }, []);
-
-  function viewAs(employeeId) {
-    const employee = employees.find((item) => item.id === employeeId);
-    if (!employee) return;
-    startViewMode(employee);
-    navigate("/history");
-  }
+  const sections = [
+    { id: "downloads", icon: Download, label: t("testing.sections.downloads"), description: t("testing.sections.downloadsDescription") },
+    { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
+    { id: "week", icon: CalendarDays, label: t("testing.tabs.week"), description: t("testing.sections.weekDescription") },
+    { id: "month", icon: CalendarRange, label: t("testing.tabs.month"), description: t("testing.sections.monthDescription") },
+  ];
 
   return (
-    <Tabs defaultValue="ccq" className="space-y-4">
-      <TabsList className="h-auto max-w-full flex-wrap justify-start">
-        <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
-        <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
-        <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
-      </TabsList>
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4" aria-label={t("manager.sections.testing")}>
+        {sections.map(({ id, icon: Icon, label, description }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setSection(id)}
+            aria-current={section === id ? "page" : undefined}
+            className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${section === id ? "border-primary bg-primary/10 text-primary" : "bg-card hover:border-primary/50 hover:bg-accent"}`}
+          >
+            <div className="flex items-center gap-2 font-semibold"><Icon className="h-4 w-4" />{label}</div>
+            <div className={`mt-1 text-xs ${section === id ? "text-primary/80" : "text-muted-foreground"}`}>{description}</div>
+          </button>
+        ))}
+      </div>
 
-      <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
-      <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
-      <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
-    </Tabs>
+      {section === "downloads" && <ManagerDownloads />}
+      {section === "ccq" && <CcqRatesPanel />}
+      {section === "week" && <ComingSoon label={t("testing.tabs.week")} />}
+      {section === "month" && <ComingSoon label={t("testing.tabs.month")} />}
+    </div>
   );
 }
 
