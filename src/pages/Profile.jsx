@@ -9,19 +9,22 @@ import { COMPANY_FORMS } from "@/lib/forms";
 import { useT } from "@/lib/use-t";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
+import { useViewMode } from "@/contexts/ViewModeContext";
 
 export default function Profile() {
   const t = useT();
   const { user } = useAuth();
+  const { isViewMode, viewedEmployee } = useViewMode();
+  const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const [profile, setProfile] = useState(null);
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
     Promise.all([
-      supabase.from("profiles").select("full_name, phone, email, work_region, union_association").eq("id", user.id).single(),
+      supabase.from("profiles").select("full_name, phone, email, work_region, union_association").eq("id", effectiveUserId).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
       supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
     ]).then(([profileResult, formsResult, accessResult]) => {
@@ -35,7 +38,7 @@ export default function Profile() {
       }
       setLoading(false);
     });
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   return (
     <AppShell>
@@ -53,7 +56,7 @@ export default function Profile() {
               <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label={t("auth.fullName")} value={profile?.full_name} icon={UserRound} />
                 <Info label={t("auth.phone")} value={profile?.phone} icon={Phone} href={profile?.phone ? `tel:${profile.phone}` : undefined} />
-                <Info label={t("auth.email")} value={profile?.email || user?.email} icon={Mail} href={`mailto:${profile?.email || user?.email}`} />
+                <Info label={t("auth.email")} value={profile?.email || (!isViewMode ? user?.email : "")} icon={Mail} href={profile?.email ? `mailto:${profile.email}` : undefined} />
                 <Info label={t("profile.region")} value={QUEBEC_REGIONS.find((region) => region.code === profile?.work_region)?.name} icon={MapPin} />
                 <Info label={t("profile.unionAssociation")} value={UNION_ASSOCIATIONS.find((association) => association.code === profile?.union_association)?.employeeLabel} icon={Users} />
                 <Info label={t("profile.sector")} value={t("employees.commercialSector")} icon={Building2} />

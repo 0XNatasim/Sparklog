@@ -153,6 +153,12 @@ For a fresh project, create the base schema and policies first or restore them f
 - `public.get_my_role()` must return the authenticated profile role.
 - Employees must be allowed to manage their own unlocked jobs; managers must be allowed to read profiles/jobs and update jobs.
 
+Migration `0029_employee_job_submission_policies.sql` installs the employee
+`jobs` policies explicitly. It allows an employee to create a draft, create a
+job already submitted, or transition an unlocked draft to the locked
+`submitted` state. The migration is safe to push if its SQL was previously run
+manually in the Supabase SQL editor.
+
 After migrations, set the first manager manually:
 
 ```sql
