@@ -243,8 +243,24 @@ export default function ManagerDashboard() {
         }
         if (!cancelled) {
           setOvertimeJobs(orderedJobs);
-          setOvertimeEvidence(new Map((evidenceRows || []).map((row) => [row.job_id, row])));
-          if (focusedJobId) setVisibleEvidence(new Set([focusedJobId]));
+          const evidenceMap = new Map((evidenceRows || []).map((row) => [row.job_id, row]));
+          setOvertimeEvidence(evidenceMap);
+          // Coming from a manager notification (?job=…): auto-open that job's
+          // proof and load its screenshot so the panel is not empty.
+          const focused = focusedJobId ? evidenceMap.get(focusedJobId) : null;
+          if (focused) {
+            setVisibleProof(new Set([focusedJobId]));
+            if (focused.storage_path) {
+              const { data: signed } = await supabase.storage.from("overtime-evidence").createSignedUrl(focused.storage_path, 600);
+              if (!cancelled && signed?.signedUrl) {
+                setOvertimeEvidence((current) => {
+                  const next = new Map(current);
+                  next.set(focusedJobId, { ...focused, imageUrl: signed.signedUrl });
+                  return next;
+                });
+              }
+            }
+          }
         }
       } catch (e) {
         if (!cancelled) setErr(e?.message || t("manager.overtime.failedLoad"));
