@@ -372,21 +372,7 @@ export default function Testing() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="border-amber-500/40 bg-amber-500/5">
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            <div className="rounded-full bg-amber-400/20 p-2 text-amber-700 dark:text-amber-300"><Eye className="h-5 w-5" /></div>
-            <div><h2 className="font-semibold">{t("viewMode.title")}</h2><p className="text-sm text-muted-foreground">{t("viewMode.description")}</p></div>
-          </div>
-          <select defaultValue="" onChange={(event) => viewAs(event.target.value)} className="h-10 min-w-56 rounded-md border bg-background px-3 text-sm" aria-label={t("viewMode.choose")}>
-            <option value="" disabled>{t("viewMode.choose")}</option>
-            {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.full_name || employee.email}</option>)}
-          </select>
-          {employeeError && <p className="text-sm text-destructive">{employeeError}</p>}
-        </CardContent>
-      </Card>
-      <Tabs defaultValue="announce" className="space-y-4">
+    <Tabs defaultValue="announce" className="space-y-4">
       <TabsList className="h-auto max-w-full flex-wrap justify-start">
         <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
         <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
@@ -398,7 +384,6 @@ export default function Testing() {
       <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
       <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
       <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
-      </Tabs>
-    </div>
+    </Tabs>
   );
 }

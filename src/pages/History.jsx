@@ -14,7 +14,6 @@ import { useT } from "@/lib/use-t";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 import { Car, TimerReset, Utensils } from "lucide-react";
-import { useViewMode } from "@/contexts/ViewModeContext";
 
 dayjs.locale("en");
 

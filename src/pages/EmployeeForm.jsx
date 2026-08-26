@@ -142,7 +142,6 @@ export default function EmployeeForm() {
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
-  const mealInputRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [returnStep, setReturnStep] = useState("closed");
@@ -161,8 +160,6 @@ export default function EmployeeForm() {
   const [parkingAmount, setParkingAmount] = useState("");
   const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
-  const [pendingMealJobId, setPendingMealJobId] = useState(null);
-  const [mealBusy, setMealBusy] = useState(false);
   const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
@@ -413,8 +410,6 @@ export default function EmployeeForm() {
       }
       if (parkingRequested && parkingFile) {
         await uploadParkingReceipt(savedJobId, parkingFile, parkingAmountNumber);
-        const { error: parkingFlagError } = await supabase.from("jobs").update({ parking_receipt_captured: true }).eq("id", savedJobId);
-        if (parkingFlagError) throw parkingFlagError;
         setHasParkingReceipt(true);
         setParkingFile(null);
       }
@@ -493,8 +488,8 @@ export default function EmployeeForm() {
     }
 
     if (await shouldRequestMealClaim(saved)) {
-      setPendingMealJobId(saved);
-      setReturnStep("meal");
+      if (await createAutomaticMealClaim(saved)) setReturnStep("meal");
+      else setReturnStep("success");
       return;
     }
     setReturnStep("success");
@@ -556,29 +551,18 @@ export default function EmployeeForm() {
     return !data && Boolean(jobId);
   }
 
-  async function handleMealReceipt(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || !pendingMealJobId) return;
-    setMealBusy(true);
-    setErr("");
+  async function createAutomaticMealClaim(jobId) {
     try {
       const claimId = crypto.randomUUID();
-      const storagePath = `${user.id}/${job_date}/${claimId}.jpg`;
-      const image = await compressImage(file);
-      const { error: uploadError } = await supabase.storage
-        .from("meal-receipts")
-        .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
-      if (uploadError) throw uploadError;
       const { error: claimError } = await supabase.from("meal_claims").insert({
         id: claimId,
         user_id: user.id,
-        job_id: pendingMealJobId,
+        job_id: jobId,
         job_date,
         amount: 30,
         status: "approved",
         payroll_treatment: "expense_reimbursement",
-        storage_path: storagePath,
+        storage_path: null,
         daily_work_minutes: overtimeDailyMinutes,
       });
       if (claimError) throw claimError;
@@ -587,18 +571,15 @@ export default function EmployeeForm() {
       const { error: notificationError } = await supabase.from("manager_notifications").insert({
         type: "meal_claim",
         employee_id: user.id,
-        job_id: pendingMealJobId,
+        job_id: jobId,
         meal_claim_id: claimId,
         daily_minutes: overtimeDailyMinutes,
       });
       if (notificationError) throw notificationError;
-      setPendingMealJobId(null);
-      setReturnStep("success");
-      navigate("/form", { replace: true });
+      return true;
     } catch (error) {
       setErr(error?.message || t("form.meal.failed"));
-    } finally {
-      setMealBusy(false);
+      return false;
     }
   }
 
@@ -674,8 +655,8 @@ export default function EmployeeForm() {
       setPendingReturn(null);
       setHasOvertimeEvidence(false);
       if (await shouldRequestMealClaim(savedJobId)) {
-        setPendingMealJobId(savedJobId);
-        setReturnStep("meal");
+        if (await createAutomaticMealClaim(savedJobId)) setReturnStep("meal");
+        else setReturnStep("success");
       } else {
         setReturnStep("success");
         navigate("/form", { replace: true });
@@ -1180,17 +1161,11 @@ export default function EmployeeForm() {
           {returnStep === "meal" && (
             <>
               <DialogHeader><DialogTitle>{t("form.meal.title")}</DialogTitle></DialogHeader>
-              <div className="space-y-3 text-sm">
-                <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
-                  {t("form.meal.description")}
-                </div>
-                <p className="text-muted-foreground">{t("form.meal.receiptRequired")}</p>
-                <input ref={mealInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleMealReceipt} />
+              <div className="rounded-md border border-primary/30 bg-primary/10 p-3 text-sm">
+                {t("form.meal.description")}
               </div>
               <DialogFooter>
-                <Button type="button" disabled={mealBusy} onClick={() => mealInputRef.current?.click()}>
-                  {mealBusy ? t("common.saving") : t("form.meal.chooseReceipt")}
-                </Button>
+                <Button type="button" onClick={() => { setReturnStep("closed"); navigate("/form", { replace: true }); }}>{t("common.ok")}</Button>
               </DialogFooter>
             </>
           )}

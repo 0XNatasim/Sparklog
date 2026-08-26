@@ -66,7 +66,7 @@ export default function AppShell({ children }) {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
-            {!isViewMode && <NotificationsBell />}
+            <NotificationsBell />
             <ThemeToggle className="h-8 w-8" />
             <LanguageToggle className="h-8 w-8" />
             <Button
@@ -88,7 +88,7 @@ export default function AppShell({ children }) {
           <NavItem to="/history">{t("nav.history")}</NavItem>
           <NavItem to="/week">{t("nav.week")}</NavItem>
           <NavItem to="/profile">{t("nav.profile")}</NavItem>
-          {role === "manager" && !isViewMode && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
+          {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
         </nav>
       </header>
 

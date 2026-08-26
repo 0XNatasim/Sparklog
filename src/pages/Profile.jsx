@@ -26,7 +26,7 @@ export default function Profile() {
     Promise.all([
       supabase.from("profiles").select("full_name, phone, email, work_region, union_association").eq("id", effectiveUserId).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
-      supabase.from("employee_form_access").select("form_id").eq("employee_id", effectiveUserId),
+      supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
     ]).then(([profileResult, formsResult, accessResult]) => {
       const loadError = profileResult.error || formsResult.error || accessResult.error;
       if (loadError) setError(loadError.message);
