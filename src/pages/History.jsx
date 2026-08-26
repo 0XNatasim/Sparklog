@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/en";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useViewMode } from "@/contexts/ViewModeContext";
 import { hoursBetween, formatHours } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
+import JobCaptureIcons from "@/components/JobCaptureIcons";
 
 dayjs.locale("en");
 
@@ -42,10 +44,13 @@ function kmTotal(job) {
 
 export default function History() {
   const { user } = useAuth();
+  const { isViewMode, viewedEmployee } = useViewMode();
+  const effectiveUserId = isViewMode ? (viewedEmployee?.id || user?.id) : user?.id;
   const navigate = useNavigate();
   const t = useT();
 
   const [jobs, setJobs] = useState([]);
+  const [mealJobIds, setMealJobIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
@@ -56,17 +61,22 @@ export default function History() {
     setInfo("");
     setLoading(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from("jobs")
-          .select("*")
-          .eq("user_id", user?.id)
-          .order("job_date", { ascending: false })
-          .order("updated_at", { ascending: false }),
+      const [jobsResult, mealsResult] = await withTimeout(
+        Promise.all([
+          supabase
+            .from("jobs")
+            .select("*")
+            .eq("user_id", effectiveUserId)
+            .order("job_date", { ascending: false })
+            .order("updated_at", { ascending: false }),
+          supabase.from("meal_claims").select("job_id").eq("user_id", effectiveUserId),
+        ]),
         12000
       );
-      if (error) throw error;
-      setJobs(data || []);
+      if (jobsResult.error) throw jobsResult.error;
+      if (mealsResult.error) throw mealsResult.error;
+      setJobs(jobsResult.data || []);
+      setMealJobIds(new Set((mealsResult.data || []).map((claim) => claim.job_id)));
     } catch (e) {
       setErr(e?.message || t("history.errors.failedLoad"));
     } finally {
@@ -75,10 +85,10 @@ export default function History() {
   }
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   function sumHoursForJobs(list) {
     let total = 0;
@@ -261,7 +271,10 @@ export default function History() {
                       <CardContent className="space-y-3 p-4">
                         {/* Header row: OT + status */}
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-bold">{t("common.otLabel")}: {j.ot}</div>
+                          <div className="flex items-center gap-1.5 text-sm font-bold">
+                            <span>{t("common.otLabel")}: {j.ot}</span>
+                            <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+                          </div>
                           <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
                             {t(`status.${j.status}`)}
                           </Badge>
