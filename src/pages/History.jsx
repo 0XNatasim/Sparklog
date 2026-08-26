@@ -13,6 +13,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
+import { Car, TimerReset, Utensils } from "lucide-react";
 
 dayjs.locale("en");
 
@@ -46,6 +47,7 @@ export default function History() {
   const t = useT();
 
   const [jobs, setJobs] = useState([]);
+  const [mealJobIds, setMealJobIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
@@ -56,17 +58,22 @@ export default function History() {
     setInfo("");
     setLoading(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from("jobs")
-          .select("*")
-          .eq("user_id", user?.id)
-          .order("job_date", { ascending: false })
-          .order("updated_at", { ascending: false }),
+      const [jobsResult, mealsResult] = await withTimeout(
+        Promise.all([
+          supabase
+            .from("jobs")
+            .select("*")
+            .eq("user_id", user?.id)
+            .order("job_date", { ascending: false })
+            .order("updated_at", { ascending: false }),
+          supabase.from("meal_claims").select("job_id").eq("user_id", user?.id),
+        ]),
         12000
       );
-      if (error) throw error;
-      setJobs(data || []);
+      if (jobsResult.error) throw jobsResult.error;
+      if (mealsResult.error) throw mealsResult.error;
+      setJobs(jobsResult.data || []);
+      setMealJobIds(new Set((mealsResult.data || []).map((claim) => claim.job_id)));
     } catch (e) {
       setErr(e?.message || t("history.errors.failedLoad"));
     } finally {
@@ -261,7 +268,12 @@ export default function History() {
                       <CardContent className="space-y-3 p-4">
                         {/* Header row: OT + status */}
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-bold">{t("common.otLabel")}: {j.ot}</div>
+                          <div className="flex items-center gap-1.5 text-sm font-bold">
+                            <span>{t("common.otLabel")}: {j.ot}</span>
+                            {j.parking_receipt_captured && <ExpenseIcon icon={Car} label={t("history.parkingIndicator")} className="bg-sky-500/15 text-sky-700 dark:text-sky-300" />}
+                            {j.overtime_evidence_captured && <ExpenseIcon icon={TimerReset} label={t("history.overtimeIndicator")} className="bg-amber-500/15 text-amber-700 dark:text-amber-300" />}
+                            {(j.meal_claim_captured || mealJobIds.has(j.id)) && <ExpenseIcon icon={Utensils} label={t("history.mealIndicator")} className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" />}
+                          </div>
                           <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
                             {t(`status.${j.status}`)}
                           </Badge>
@@ -317,4 +329,8 @@ export default function History() {
       </div>
     </AppShell>
   );
+}
+
+function ExpenseIcon({ icon: Icon, label, className }) {
+  return <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${className}`} title={label} aria-label={label}><Icon className="h-3.5 w-3.5" aria-hidden="true" /></span>;
 }
