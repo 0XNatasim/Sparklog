@@ -49,59 +49,6 @@ function weekKeyFromDate(dateStr) {
   return ws.format("YYYY-[W]WW");
 }
 
-function parseOcrConversation(rawText) {
-  const lines = String(rawText || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (!lines.length) return { dateTime: "", approval: "", response: "" };
-
-  const dateIndex = lines.findIndex((line) =>
-    /(?:\b(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mer|jeu|ven|sam|dim)[a-zéû\.]*\b|\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|janv|févr|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-z\.]*\b)/i.test(line)
-  );
-  let durationIndex = -1;
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    if (/^\d+(?:[.,]\d+)?\s*(?:h(?:eures?)?|hrs?|min(?:utes?)?)(?:\s*\d+\s*min(?:utes?)?)?$/i.test(lines[index])) {
-      durationIndex = index;
-      break;
-    }
-  }
-  const dateTime = dateIndex >= 0 ? lines[dateIndex] : "";
-  const content = lines.filter((_, index) => index !== dateIndex);
-  const adjustedDurationIndex = durationIndex < 0 ? -1 : durationIndex - (dateIndex >= 0 && dateIndex < durationIndex ? 1 : 0);
-
-  if (adjustedDurationIndex < 0) {
-    return { dateTime, approval: content.join("\n"), response: "" };
-  }
-  return {
-    dateTime,
-    approval: content.slice(0, adjustedDurationIndex).join("\n"),
-    response: content.slice(adjustedDurationIndex).join("\n"),
-  };
-}
-
-function OcrConversation({ evidence, t, id }) {
-  if (!evidence?.ocr_text) {
-    return <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{t("notifications.ocrUnavailable")}</div>;
-  }
-  const conversation = parseOcrConversation(evidence.ocr_text);
-  const fallbackDate = evidence.created_at ? dayjs(evidence.created_at).format("DD MMM YYYY · HH:mm") : "";
-  return (
-    <div id={id} className="max-h-72 space-y-2 overflow-y-auto rounded-xl border bg-muted/30 p-3 text-sm">
-      <div className="text-left text-[11px] font-medium text-muted-foreground">{conversation.dateTime || fallbackDate}</div>
-      {conversation.approval && (
-        <div className="mr-auto max-w-[82%] rounded-2xl rounded-tl-sm border bg-background px-3 py-2 shadow-sm">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.approvalMessage")}</div>
-          <div className="whitespace-pre-wrap text-xs leading-relaxed">{conversation.approval}</div>
-        </div>
-      )}
-      {conversation.response && (
-        <div className="ml-auto max-w-[70%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-primary-foreground shadow-sm">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-75">{t("manager.overtime.employeeResponse")}</div>
-          <div className="whitespace-pre-wrap text-right text-xs font-medium leading-relaxed">{conversation.response}</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
   const t = useT();
@@ -115,7 +62,7 @@ export default function ManagerDashboard() {
   const [overtimeJobs, setOvertimeJobs] = useState([]);
   const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
   const [overtimeLoading, setOvertimeLoading] = useState(false);
-  const [visibleOcr, setVisibleOcr] = useState(new Set());
+  const [visibleProof, setVisibleProof] = useState(new Set());
   const [evidenceImageLoading, setEvidenceImageLoading] = useState("");
   const [parkingJobs, setParkingJobs] = useState([]);
   const [parkingReceipts, setParkingReceipts] = useState(new Map());
@@ -246,7 +193,7 @@ export default function ManagerDashboard() {
     supabase.from("jobs").select("user_id").eq("id", focusedJobId).single().then(({ data }) => {
       if (data?.user_id) setEmployeeId(data.user_id);
     });
-    supabase.from("overtime_evidence").select("ocr_text, ocr_status, storage_path, daily_minutes, created_at").eq("job_id", focusedJobId).maybeSingle().then(async ({ data }) => {
+    supabase.from("overtime_evidence").select("storage_path, daily_minutes, created_at").eq("job_id", focusedJobId).maybeSingle().then(async ({ data }) => {
       if (!data) return;
       const { data: signed } = await supabase.storage.from("overtime-evidence").createSignedUrl(data.storage_path, 600);
       setFocusedEvidence({ ...data, imageUrl: signed?.signedUrl || "" });
@@ -261,7 +208,7 @@ export default function ManagerDashboard() {
       setErr("");
       try {
         const { data: evidenceRows, error: evidenceError } = await withTimeout(
-          supabase.from("overtime_evidence").select("job_id, ocr_text, ocr_status, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }),
+          supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }),
           12000
         );
         if (evidenceError) throw evidenceError;
@@ -378,10 +325,10 @@ export default function ManagerDashboard() {
     });
   }
 
-  async function toggleOcr(jobId) {
-    const opening = !visibleOcr.has(jobId);
+  async function toggleProof(jobId) {
+    const opening = !visibleProof.has(jobId);
     if (opening) await ensureEvidenceImage(jobId);
-    setVisibleOcr((current) => {
+    setVisibleProof((current) => {
       const next = new Set(current);
       if (next.has(jobId)) next.delete(jobId);
       else next.add(jobId);
@@ -753,15 +700,9 @@ export default function ManagerDashboard() {
             {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
           </div>
           {focusedJobId === j.id && focusedEvidence && (
-            <div className="mt-3 grid gap-3 rounded-lg border border-red-500/30 bg-red-500/5 p-3 md:grid-cols-2">
-              <div>
-                <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
-                {focusedEvidence.imageUrl && <img src={focusedEvidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-80 w-full rounded-md border object-contain" />}
-              </div>
-              <div>
-                <div className="mb-2 text-sm font-semibold">OCR · {focusedEvidence.ocr_status}</div>
-                <OcrConversation evidence={focusedEvidence} t={t} id="focused-overtime-ocr" />
-              </div>
+            <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+              <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
+              {focusedEvidence.imageUrl && <img src={focusedEvidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-80 w-full rounded-md border object-contain" />}
             </div>
           )}
         </CardContent>
@@ -775,7 +716,7 @@ export default function ManagerDashboard() {
     const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
     const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
     const { totalKm: km } = getKilometreBreakdown(job);
-    const isOcrVisible = visibleOcr.has(job.id);
+    const isProofVisible = visibleProof.has(job.id);
 
     return (
       <Card key={job.id} id={`job-${job.id}`} className={focusedJobId === job.id ? "ring-2 ring-red-500" : ""}>
@@ -791,8 +732,8 @@ export default function ManagerDashboard() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
-              <Button type="button" size="sm" variant="outline" aria-expanded={isOcrVisible} aria-controls={`overtime-ocr-${job.id}`} onClick={() => toggleOcr(job.id)}>
-                {isOcrVisible ? t("manager.overtime.hideOcr") : t("manager.overtime.showOcr")}
+              <Button type="button" size="sm" variant="outline" aria-expanded={isProofVisible} aria-controls={`overtime-proof-${job.id}`} onClick={() => toggleProof(job.id)}>
+                {isProofVisible ? t("manager.overtime.hideProof") : t("manager.overtime.showProof")}
               </Button>
             </div>
           </div>
@@ -807,7 +748,7 @@ export default function ManagerDashboard() {
             {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
           </div>
 
-          {isOcrVisible && <div id={`overtime-ocr-${job.id}`}>
+          {isProofVisible && <div id={`overtime-proof-${job.id}`}>
             <div className="rounded-xl border bg-muted/30 p-2">
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
               {evidence?.imageUrl

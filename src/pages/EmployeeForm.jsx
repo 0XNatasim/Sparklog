@@ -621,7 +621,7 @@ export default function EmployeeForm() {
       const { error: evidenceError } = await withTimeout(
         supabase
           .from("overtime_evidence")
-          .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, ocr_text: null, ocr_status: "pending", daily_minutes: dailyMinutes, expires_at: expiresAt }),
+          .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, daily_minutes: dailyMinutes, expires_at: expiresAt }),
         12000
       );
       if (evidenceError) throw evidenceError;
@@ -636,21 +636,6 @@ export default function EmployeeForm() {
         12000
       );
       if (notificationError) throw notificationError;
-
-      // Processing is intentionally detached from the employee workflow. The
-      // Edge Function acknowledges immediately and continues OCR in the
-      // background, so a slow OCR provider cannot hold this dialog open.
-      try {
-        const { error: processingError } = await withTimeout(
-          supabase.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId } }),
-          5000
-        );
-        if (processingError) console.warn("Could not start overtime evidence processing:", processingError);
-      } catch (processingError) {
-        // The screenshot and pending evidence row are already durable. Do not
-        // block the employee when the optional processing trigger is offline.
-        console.warn("Could not start overtime evidence processing:", processingError);
-      }
 
       setPendingReturn(null);
       setHasOvertimeEvidence(false);

@@ -24,7 +24,7 @@ The Manager workspace is divided into six sections:
 | **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, and pause accounts without deleting history. |
 | **Forms** | Open company forms and control which forms employees can see. |
 | **Time-sheet** | Review submitted jobs, unlock entries, and approve jobs before Google Sheets export. |
-| **Overtime** | Review overtime jobs, extracted SMS text, and the original authorization screenshot. |
+| **Overtime** | Review overtime jobs and the original authorization screenshot. |
 | **Parkings** | Review parking jobs and display their receipt pictures. |
 | **Download** | Preview and download CCQ-oriented weekly JSON records. |
 
@@ -42,19 +42,15 @@ Approved daily jobs are preserved as source records. The Download section aggreg
 
 > The JSON exporter is an integration-ready internal format, not a guarantee of direct CCQ acceptance. Validate overtime, statutory-holiday, appendix, and submission rules before production payroll use.
 
-## OCR and image processing
+## Work-order image autofill
 
 SparkLog does **not** use an LLM, OpenRouter, Claude, GPT, or another generative-AI service for image extraction.
 
-The active OCR flows are:
-
-1. Work-order autofill sends the selected image to [ocr.space](https://ocr.space/ocrapi) from the browser and falls back to local `tesseract.js` processing if necessary.
-2. Overtime evidence is uploaded and saved immediately with a `pending` status. The `process_overtime_evidence` Edge Function performs OCR asynchronously and changes the evidence to `processed`, `needs_review`, or `failed` without blocking the employee.
-3. SparkLog parses work-order text into job fields and retains overtime OCR text for manager review.
+Work-order autofill sends the selected image to [ocr.space](https://ocr.space/ocrapi) from the browser and falls back to local `tesseract.js` processing if necessary. SparkLog parses the extracted work-order text into job fields.
 
 The former LLM/Vision Edge Function has been removed. No `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, or other LLM credential is needed.
 
-Parking receipt pictures are stored without OCR. Overtime screenshots retain OCR text for manager review and are removed according to the configured evidence-retention period.
+Parking receipt pictures and overtime proof screenshots are stored as images without text extraction. Overtime screenshots are removed according to the configured evidence-retention period.
 
 ## Technology
 
@@ -247,7 +243,7 @@ Connect the repository as a static site. `render.yaml` uses `npm run build`, pub
 
 ### Confirmed payroll and expense rules
 
-- Job kilometres from OCR/manual entry are the **total shown on the work order**. If an employee records a return to storage, the return kilometres are subtracted from that total to produce the client leg; they are never added a second time.
+- Job kilometres from image autofill or manual entry are the **total shown on the work order**. If an employee records a return to storage, the return kilometres are subtracted from that total to produce the client leg; they are never added a second time.
 - Return-to-storage time is always regular-rate paid time. It never creates overtime, including when the workday is already longer than eight hours.
 - A weekday supper claim becomes available at exactly 2 h 15 of overtime. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
 - Parking is enabled per employee, requires an amount and receipt, and is capped at $20 per employee/day.
