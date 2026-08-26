@@ -148,6 +148,7 @@ export default function EmployeeForm() {
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
   const [pendingReturn, setPendingReturn] = useState(null);
+  const [pendingEvidenceJobId, setPendingEvidenceJobId] = useState(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
   const [showOvertimeExample, setShowOvertimeExample] = useState(false);
@@ -586,59 +587,106 @@ export default function EmployeeForm() {
   async function handleOvertimeEvidence(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || !pendingReturn) return;
+    if (!file) {
+      setErr(t("form.evidence.fileMissing"));
+      return;
+    }
+    if (!pendingReturn) {
+      console.error("[overtime evidence] Missing return-to-shop values before file upload");
+      setErr(t("form.evidence.returnMissing"));
+      setReturnStep("evidence");
+      return;
+    }
     setEvidenceBusy(true);
     setErr("");
     setEvidenceValidationError("");
 
-    const jobId = editId || crypto.randomUUID();
+    const jobId = pendingEvidenceJobId || editId || crypto.randomUUID();
     const evidenceId = crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
     try {
-      const image = await compressImage(file);
-      const { error: uploadError } = await withTimeout(
-        supabase.storage
-          .from("overtime-evidence")
-          .upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
-        20000
-      );
-      if (uploadError) throw uploadError;
+      let image;
+      try {
+        image = await compressImage(file);
+        const { error: uploadError } = await withTimeout(
+          supabase.storage
+            .from("overtime-evidence")
+            .upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
+          20000
+        );
+        if (uploadError) throw uploadError;
+      } catch (error) {
+        console.error("[overtime evidence] Screenshot upload failed", error);
+        throw new Error(t("form.evidence.uploadFailed"));
+      }
 
-      const savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
-      if (!savedJobId) throw new Error(t("form.errors.saveFailed"));
+      let savedJobId = pendingEvidenceJobId;
+      if (!savedJobId) {
+        savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
+        if (!savedJobId) {
+          const { data: partiallySavedJob } = await supabase.from("jobs").select("id").eq("id", jobId).maybeSingle();
+          if (partiallySavedJob?.id) setPendingEvidenceJobId(partiallySavedJob.id);
+          console.error("[overtime evidence] Job save or parking receipt save failed", { jobId });
+          throw new Error(t("form.evidence.jobSaveFailed"));
+        }
+        setPendingEvidenceJobId(savedJobId);
+      } else if (parkingRequested && parkingFile) {
+        try {
+          await uploadParkingReceipt(savedJobId, parkingFile, normalizeNumber(parkingAmount));
+          setHasParkingReceipt(true);
+          setParkingFile(null);
+        } catch (error) {
+          console.error("[overtime evidence] Parking receipt retry failed", { savedJobId, error });
+          throw new Error(t("form.evidence.jobSaveFailed"));
+        }
+      }
 
-      const { data: overtimeSettings } = await withTimeout(
-        supabase
-          .from("overtime_settings")
-          .select("evidence_retention_days")
-          .eq("id", true)
-          .single(),
-        12000
-      );
+      let overtimeSettings;
+      try {
+        const { data, error: settingsError } = await withTimeout(
+          supabase
+            .from("overtime_settings")
+            .select("evidence_retention_days")
+            .eq("id", true)
+            .maybeSingle(),
+          12000
+        );
+        if (settingsError) throw settingsError;
+        overtimeSettings = data;
+      } catch (error) {
+        console.error("[overtime evidence] Retention settings load failed", error);
+        throw new Error(t("form.evidence.settingsFailed"));
+      }
       const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
       const expiresAt = dayjs().add(retentionDays, "day").toISOString();
-      const { error: evidenceError } = await withTimeout(
-        supabase
-          .from("overtime_evidence")
-          .insert({ id: evidenceId, job_id: jobId, user_id: user.id, job_date, storage_path: storagePath, daily_minutes: dailyMinutes, expires_at: expiresAt }),
-        12000
-      );
-      if (evidenceError) throw evidenceError;
+      try {
+        const { error: evidenceError } = await withTimeout(
+          supabase
+            .from("overtime_evidence")
+            .insert({ id: evidenceId, job_id: savedJobId, user_id: user.id, job_date, storage_path: storagePath, daily_minutes: dailyMinutes, expires_at: expiresAt }),
+          12000
+        );
+        if (evidenceError) throw evidenceError;
+      } catch (error) {
+        console.error("[overtime evidence] Evidence record insert failed", error);
+        throw new Error(t("form.evidence.recordFailed"));
+      }
 
       const { error: notificationError } = await withTimeout(
         supabase.from("manager_notifications").insert({
           employee_id: user.id,
-          job_id: jobId,
+          job_id: savedJobId,
           evidence_id: evidenceId,
           daily_minutes: dailyMinutes,
         }),
         12000
       );
-      if (notificationError) throw notificationError;
+      if (notificationError) console.error("[overtime evidence] Manager notification insert failed", notificationError);
 
       setPendingReturn(null);
-      setHasOvertimeEvidence(false);
+      setPendingEvidenceJobId(null);
+      setHasOvertimeEvidence(true);
       if (await shouldRequestMealClaim(savedJobId)) {
         if (await createAutomaticMealClaim(savedJobId)) setReturnStep("meal");
         else setReturnStep("success");

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Utensils } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +8,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { formatHours, hoursBetween } from "@/lib/time";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { useSearchParams } from "react-router-dom";
+import JobCaptureIcons from "@/components/JobCaptureIcons";
 
 export default function MealClaimsManager() {
   const t = useT();
@@ -49,7 +49,7 @@ export default function MealClaimsManager() {
           <div>
             <div className="flex items-center gap-2 font-bold">
               <span>{t("common.otLabel")}: {job?.ot || "—"} · {dayjs(claim.job_date).format("DD MMM YYYY")}</span>
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" title={t("manager.timesheet.mealIndicator")} aria-label={t("manager.timesheet.mealIndicator")}><Utensils className="h-3.5 w-3.5" aria-hidden="true" /></span>
+              <JobCaptureIcons job={{ ...job, meal_claim_captured: true }} />
             </div>
             <div className="mt-1 text-sm text-muted-foreground">{person?.full_name || person?.email}</div>
           </div>

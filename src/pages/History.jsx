@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/en";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useViewMode } from "@/contexts/ViewModeContext";
 import { hoursBetween, formatHours } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
-import { Car, TimerReset, Utensils } from "lucide-react";
+import JobCaptureIcons from "@/components/JobCaptureIcons";
 
 dayjs.locale("en");
 
@@ -44,7 +45,7 @@ function kmTotal(job) {
 export default function History() {
   const { user } = useAuth();
   const { isViewMode, viewedEmployee } = useViewMode();
-  const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
+  const effectiveUserId = isViewMode ? (viewedEmployee?.id || user?.id) : user?.id;
   const navigate = useNavigate();
   const t = useT();
 
@@ -65,10 +66,10 @@ export default function History() {
           supabase
             .from("jobs")
             .select("*")
-            .eq("user_id", user?.id)
+            .eq("user_id", effectiveUserId)
             .order("job_date", { ascending: false })
             .order("updated_at", { ascending: false }),
-          supabase.from("meal_claims").select("job_id").eq("user_id", user?.id),
+          supabase.from("meal_claims").select("job_id").eq("user_id", effectiveUserId),
         ]),
         12000
       );
@@ -272,9 +273,7 @@ export default function History() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 text-sm font-bold">
                             <span>{t("common.otLabel")}: {j.ot}</span>
-                            {j.parking_receipt_captured && <ExpenseIcon icon={Car} label={t("history.parkingIndicator")} className="bg-sky-500/15 text-sky-700 dark:text-sky-300" />}
-                            {j.overtime_evidence_captured && <ExpenseIcon icon={TimerReset} label={t("history.overtimeIndicator")} className="bg-amber-500/15 text-amber-700 dark:text-amber-300" />}
-                            {(j.meal_claim_captured || mealJobIds.has(j.id)) && <ExpenseIcon icon={Utensils} label={t("history.mealIndicator")} className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" />}
+                            <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
                           </div>
                           <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
                             {t(`status.${j.status}`)}

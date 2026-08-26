@@ -22,6 +22,7 @@ import TimeRulesManager from "@/components/TimeRulesManager";
 import MealClaimsManager from "@/components/MealClaimsManager";
 import Testing from "@/pages/Testing";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import JobCaptureIcons from "@/components/JobCaptureIcons";
 
 dayjs.extend(isoWeek);
 
@@ -606,33 +607,7 @@ export default function ManagerDashboard() {
             {/* OT + date */}
             <div className="flex items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
               <span>{t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}</span>
-              {j.parking_receipt_captured && (
-                <span
-                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300"
-                  title={t("manager.timesheet.parkingIndicator")}
-                  aria-label={t("manager.timesheet.parkingIndicator")}
-                >
-                  <Car className="h-3.5 w-3.5" aria-hidden="true" />
-                </span>
-              )}
-              {j.overtime_evidence_captured && (
-                <span
-                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                  title={t("manager.timesheet.overtimeIndicator")}
-                  aria-label={t("manager.timesheet.overtimeIndicator")}
-                >
-                  <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />
-                </span>
-              )}
-              {(j.meal_claim_captured || mealJobIds.has(j.id)) && (
-                <span
-                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                  title={t("manager.timesheet.mealIndicator")}
-                  aria-label={t("manager.timesheet.mealIndicator")}
-                >
-                  <Utensils className="h-3.5 w-3.5" aria-hidden="true" />
-                </span>
-              )}
+              <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
             </div>
 
             {/* Employee · phone · email — one line, no labels.
@@ -731,7 +706,7 @@ export default function ManagerDashboard() {
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-bold">{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</div>
+              <div className="flex items-center gap-2 font-bold"><span>{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</span><JobCaptureIcons job={{ ...job, overtime_evidence_captured: true }} /></div>
               <div className="mt-1 text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">{employeeName}</span>
                 {employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}
@@ -781,7 +756,7 @@ export default function ManagerDashboard() {
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-bold">{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</div>
+              <div className="flex items-center gap-2 font-bold"><span>{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</span><JobCaptureIcons job={{ ...job, parking_receipt_captured: true }} /></div>
               <div className="mt-1 text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">{employeeName}</span>
                 {employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}
