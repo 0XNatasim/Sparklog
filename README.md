@@ -103,6 +103,8 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_OCR_SPACE_API_KEY=your-ocr-space-key
 ```
 
+The `process_overtime_evidence` Edge Function also expects an `OCR_SPACE_API_KEY` Supabase secret for background overtime processing.
+
 `VITE_OCR_SPACE_API_KEY` is technically optional because the code uses ocr.space's public `helloworld` key when absent, but that key is heavily rate-limited and should not be used for production.
 
 Start the application:
@@ -146,6 +148,12 @@ For a fresh project, create the base schema and policies first or restore them f
 - `jobs` must include the employee, date, job fields, status, locked/export state, and timestamps.
 - `public.get_my_role()` must return the authenticated profile role.
 - Employees must be allowed to manage their own unlocked jobs; managers must be allowed to read profiles/jobs and update jobs.
+
+Migration `0029_employee_job_submission_policies.sql` installs the employee
+`jobs` policies explicitly. It allows an employee to create a draft, create a
+job already submitted, or transition an unlocked draft to the locked
+`submitted` state. The migration is safe to push if its SQL was previously run
+manually in the Supabase SQL editor.
 
 After migrations, set the first manager manually:
 

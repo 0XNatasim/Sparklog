@@ -4,9 +4,11 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Eye } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import { useViewMode } from "@/contexts/ViewModeContext";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -351,6 +353,25 @@ function ComingSoon({ label }) {
 // ─── Page with sub-tabs ───────────────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
+  const navigate = useNavigate();
+  const { startViewMode } = useViewMode();
+  const [employees, setEmployees] = useState([]);
+  const [employeeError, setEmployeeError] = useState("");
+
+  useEffect(() => {
+    supabase.from("profiles").select("id, full_name, email, role").order("full_name").then(({ data, error }) => {
+      if (error) setEmployeeError(error.message);
+      else setEmployees((data || []).filter((profile) => String(profile.role).toLowerCase() !== "manager"));
+    });
+  }, []);
+
+  function viewAs(employeeId) {
+    const employee = employees.find((item) => item.id === employeeId);
+    if (!employee) return;
+    startViewMode(employee);
+    navigate("/history");
+  }
+
   return (
     <Tabs defaultValue="ccq" className="space-y-4">
       <TabsList className="h-auto max-w-full flex-wrap justify-start">

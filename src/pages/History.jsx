@@ -331,3 +331,7 @@ export default function History() {
     </AppShell>
   );
 }
+
+function ExpenseIcon({ icon: Icon, label, className }) {
+  return <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${className}`} title={label} aria-label={label}><Icon className="h-3.5 w-3.5" aria-hidden="true" /></span>;
+}
