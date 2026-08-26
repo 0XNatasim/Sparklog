@@ -13,6 +13,7 @@ import { cn, withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
 import { calculateDailyTotals } from "@/lib/payroll-calculations";
+import { useViewMode } from "@/contexts/ViewModeContext";
 
 dayjs.extend(isoWeek);
 dayjs.extend(customParseFormat);
@@ -44,10 +45,11 @@ export default function Week() {
   const { user, role } = useAuth();
   const [searchParams] = useSearchParams();
   const t = useT();
+  const { isViewMode, viewedEmployee } = useViewMode();
 
   const employeeIdParam = searchParams.get("employee");
   const isManagerViewingEmployee = role === "manager" && Boolean(employeeIdParam);
-  const effectiveUserId = isManagerViewingEmployee ? employeeIdParam : user?.id;
+  const effectiveUserId = isViewMode ? viewedEmployee.id : (isManagerViewingEmployee ? employeeIdParam : user?.id);
 
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);

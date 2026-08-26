@@ -43,6 +43,8 @@ function kmTotal(job) {
 
 export default function History() {
   const { user } = useAuth();
+  const { isViewMode, viewedEmployee } = useViewMode();
+  const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const navigate = useNavigate();
   const t = useT();
 
@@ -82,10 +84,10 @@ export default function History() {
   }
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   function sumHoursForJobs(list) {
     let total = 0;
