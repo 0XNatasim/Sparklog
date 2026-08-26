@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
-import AppShell from "@/components/AppShell";
-import ManagerAnnouncePanel from "@/components/ManagerAnnouncePanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -154,8 +152,11 @@ function CcqRatesPanel() {
       const token = sessionData?.session?.access_token;
       if (!token) throw new Error("No session — please log in again.");
 
-      const responses = await Promise.all(
-        SKILLS.map(async (skill) => {
+      // Fetch levels sequentially. Sending five simultaneous Edge Function
+      // requests also sends five simultaneous requests to CCQ, which can make
+      // an otherwise valid level fail intermittently (commonly Apprenti 4).
+      const responses = [];
+      for (const skill of SKILLS) {
           const { data, error } = await withTimeout(
             supabase.functions.invoke("ccq_rates", {
               body: {
@@ -167,13 +168,12 @@ function CcqRatesPanel() {
               },
               headers: { Authorization: `Bearer ${token}` },
             }),
-            15000
+            25000
           );
-          if (error) throw new Error(`${skill.label}: ${error.message}`);
+          if (error) throw new Error(`${skill.label}: ${await getFunctionErrorMessage(error)}`);
           if (!data?.ok) throw new Error(`${skill.label}: ${data?.error ?? "Unknown error"}`);
-          return { skill, snapshot: data.snapshot };
-        })
-      );
+          responses.push({ skill, snapshot: data.snapshot });
+      }
 
       const rows = responses.map(({ skill, snapshot }) => ({
         skill,
@@ -352,20 +352,34 @@ function ComingSoon({ label }) {
 export default function Testing() {
   const t = useT();
   return (
-    <AppShell>
-      <Tabs defaultValue="announce" className="space-y-4">
-        <TabsList className="h-auto max-w-full flex-wrap justify-start">
-          <TabsTrigger value="announce">{t("testing.tabs.announce")}</TabsTrigger>
-          <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
-          <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
-          <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
-        </TabsList>
+    <Tabs defaultValue="ccq" className="space-y-4">
+      <TabsList className="h-auto max-w-full flex-wrap justify-start">
+        <TabsTrigger value="ccq">{t("testing.tabs.ccq")}</TabsTrigger>
+        <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
+        <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
+      </TabsList>
 
-        <TabsContent value="announce"><ManagerAnnouncePanel /></TabsContent>
-        <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
-        <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
-        <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
-      </Tabs>
-    </AppShell>
+      <TabsContent value="ccq"><CcqRatesPanel /></TabsContent>
+      <TabsContent value="week"><ComingSoon label={t("testing.tabs.week")} /></TabsContent>
+      <TabsContent value="month"><ComingSoon label={t("testing.tabs.month")} /></TabsContent>
+    </Tabs>
   );
+}
+
+async function getFunctionErrorMessage(error) {
+  const response = error?.context;
+  if (response instanceof Response) {
+    try {
+      const body = await response.clone().json();
+      return body?.error || body?.detail || error.message;
+    } catch {
+      try {
+        const body = await response.clone().text();
+        if (body) return body;
+      } catch {
+        // Fall through to the Functions client message.
+      }
+    }
+  }
+  return error?.message || "Edge Function request failed";
 }
