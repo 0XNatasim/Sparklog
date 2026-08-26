@@ -116,7 +116,8 @@ function validateOvertimeSmsText(text) {
 }
 
 export default function EmployeeForm() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isManager = String(role || "").toLowerCase() === "manager";
   const { isViewMode, viewedEmployee } = useViewMode();
   const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const navigate = useNavigate();
@@ -279,6 +280,9 @@ export default function EmployeeForm() {
     if (!effectiveUserId || !job_date) return;
     let cancelled = false;
     async function checkEntryWindow() {
+      // Managers are never blocked by the entry deadline or holidays; the
+      // database trigger already exempts them, so mirror that in the UI.
+      if (isManager) return setEntryBlockedReason("");
       const [{ data: settings }, { data: holiday }, { data: unlock }] = await Promise.all([
         supabase.from("company_time_settings").select("daily_deadline, timezone").eq("id", true).single(),
         supabase.from("company_holidays").select("holiday_date, label").eq("holiday_date", job_date).maybeSingle(),
@@ -302,7 +306,7 @@ export default function EmployeeForm() {
     }
     checkEntryWindow();
     return () => { cancelled = true; };
-  }, [job_date, t, effectiveUserId]);
+  }, [job_date, t, effectiveUserId, isManager]);
 
   async function saveDraft() {
     setPendingSaveMode("draft");
