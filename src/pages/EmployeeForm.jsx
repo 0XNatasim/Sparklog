@@ -547,9 +547,9 @@ export default function EmployeeForm() {
       .select("id")
       .eq("user_id", user.id)
       .eq("job_date", job_date)
-      .maybeSingle();
+      .limit(1);
     if (error) throw error;
-    return !data && Boolean(jobId);
+    return (data || []).length === 0 && Boolean(jobId);
   }
 
   async function createAutomaticMealClaim(jobId) {
@@ -687,9 +687,17 @@ export default function EmployeeForm() {
       setPendingReturn(null);
       setPendingEvidenceJobId(null);
       setHasOvertimeEvidence(true);
-      if (await shouldRequestMealClaim(savedJobId)) {
-        if (await createAutomaticMealClaim(savedJobId)) setReturnStep("meal");
-        else setReturnStep("success");
+      // The evidence is saved at this point. A failure while checking or
+      // creating the automatic meal claim must not throw the user back to the
+      // evidence step, so handle it separately and always move forward.
+      let showMeal = false;
+      try {
+        showMeal = (await shouldRequestMealClaim(savedJobId)) && (await createAutomaticMealClaim(savedJobId));
+      } catch (mealError) {
+        console.error("[overtime evidence] Meal claim step failed", mealError);
+      }
+      if (showMeal) {
+        setReturnStep("meal");
       } else {
         setReturnStep("success");
         navigate("/form", { replace: true });
@@ -1241,6 +1249,7 @@ export default function EmployeeForm() {
                   )}
                 </div>
                 {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{evidenceValidationError}</div>}
+                {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{err}</div>}
                 <input
                   ref={overtimeInputRef}
                   type="file"
