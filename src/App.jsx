@@ -8,7 +8,6 @@ import EmployeeForm from "./pages/EmployeeForm";
 import History from "./pages/History";
 import Week from "./pages/Week";
 import ManagerDashboard from "./pages/ManagerDashboard";
-import Testing from "./pages/Testing";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 
@@ -87,12 +86,12 @@ export default function App() {
           }
         />
 
-        {/* Testing (manager only) */}
+        {/* Preserve old manager bookmarks after moving Testing into Manager. */}
         <Route
           path="/testing"
           element={
             <ProtectedRoute requireRole="manager">
-              <Testing />
+              <Navigate to="/manager?section=testing" replace />
             </ProtectedRoute>
           }
         />

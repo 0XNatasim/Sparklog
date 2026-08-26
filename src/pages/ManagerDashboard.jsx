@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
+import { Beaker, Car, ClipboardList, Clock3, Download, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -20,6 +20,7 @@ import ManagerDownloads from "@/components/ManagerDownloads";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
 import MealClaimsManager from "@/components/MealClaimsManager";
+import Testing from "@/pages/Testing";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 
 dayjs.extend(isoWeek);
@@ -107,14 +108,13 @@ export default function ManagerDashboard() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "download"].includes(searchParams.get("section"))
+  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "download", "testing"].includes(searchParams.get("section"))
     ? searchParams.get("section")
     : "timesheet";
   const [focusedEvidence, setFocusedEvidence] = useState(null);
   const [overtimeJobs, setOvertimeJobs] = useState([]);
   const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
   const [overtimeLoading, setOvertimeLoading] = useState(false);
-  const [visibleEvidence, setVisibleEvidence] = useState(new Set());
   const [visibleOcr, setVisibleOcr] = useState(new Set());
   const [evidenceImageLoading, setEvidenceImageLoading] = useState("");
   const [parkingJobs, setParkingJobs] = useState([]);
@@ -368,19 +368,6 @@ export default function ManagerDashboard() {
     }
   }
 
-  async function toggleEvidence(jobId) {
-    if (visibleEvidence.has(jobId)) {
-      setVisibleEvidence((current) => {
-        const next = new Set(current);
-        next.delete(jobId);
-        return next;
-      });
-      return;
-    }
-    await ensureEvidenceImage(jobId);
-    setVisibleEvidence((current) => new Set(current).add(jobId));
-  }
-
   async function reviewParking(jobId, status) {
     const { error } = await supabase.from("parking_receipts").update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq("job_id", jobId);
     if (error) return setErr(error.message);
@@ -509,15 +496,6 @@ export default function ManagerDashboard() {
     return split.submitted.filter((j) => weekKeyFromDate(j.job_date) === selectedWeekKey);
   }, [split, selectedEmployee, selectedWeekKey, weekOptions.length]);
 
-  function getEmployeeIdentity(userId) {
-    const p = profiles.get(userId);
-    return {
-      employee_full_name: p?.full_name || "",
-      employee_email: p?.email || "",
-      employee_phone: p?.phone || "",
-    };
-  }
-
   async function approve(jobId) {
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
@@ -530,21 +508,27 @@ export default function ManagerDashboard() {
       const accessToken = sessionData?.session?.access_token;
       if (!accessToken) throw new Error(t("manager.errors.noSession"));
 
-      const identity = getEmployeeIdentity(job.user_id);
-
-      const { data, error: fnErr } = await invokeWithTimeout("push_approved_to_sheet", {
-        body: { job_id: jobId, ...identity },
+      // Use the same maintained endpoint as weekly approvals. The legacy
+      // single-job function can be absent from older deployments, which makes
+      // the Functions client return only a generic non-2xx error.
+      const { data, error: fnErr } = await invokeWithTimeout("push_approved_batch", {
+        body: { job_ids: [jobId] },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (fnErr) throw fnErr;
-      if (data?.ok !== true && !data?.skipped) {
+      if (fnErr) throw new Error(await getFunctionErrorMessage(fnErr));
+      if (data?.ok !== true) {
         throw new Error(data?.error || t("manager.errors.exportFailed"));
       }
 
-      const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
-      if (error) throw error;
+      // The batch function normally updates the job atomically. A previously
+      // exported job is skipped, so finish its approval without exporting it a
+      // second time (the same idempotent behaviour as the former endpoint).
+      if (Number(data.skipped || 0) > 0) {
+        const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
+        if (error) throw error;
+      }
 
-      setInfo(data?.skipped ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
+      setInfo(Number(data.skipped || 0) > 0 ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
       await load();
     } catch (e) {
       setErr(e?.message || t("manager.errors.approveFailed"));
@@ -582,6 +566,15 @@ export default function ManagerDashboard() {
     ]);
   }
 
+  async function getFunctionErrorMessage(error) {
+    try {
+      const payload = await error?.context?.json();
+      return payload?.error || payload?.message || error?.message || t("manager.errors.exportFailed");
+    } catch {
+      return error?.message || t("manager.errors.exportFailed");
+    }
+  }
+
   async function approveWeekAll() {
     if (!selectedEmployee) return;
     const list = submittedForSelectedWeek;
@@ -615,7 +608,7 @@ export default function ManagerDashboard() {
         },
         60000
       );
-      if (fnErr) throw fnErr;
+      if (fnErr) throw new Error(await getFunctionErrorMessage(fnErr));
       if (data?.ok !== true) {
         throw new Error(data?.error || t("manager.errors.approveWeekFailed"));
       }
@@ -656,8 +649,35 @@ export default function ManagerDashboard() {
           {/* Mobile: stacked. Desktop: single-row inline list. */}
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
             {/* OT + date */}
-            <div className="text-sm font-bold md:w-36 md:shrink-0">
-              {t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}
+            <div className="flex items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
+              <span>{t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}</span>
+              {j.parking_receipt_captured && (
+                <span
+                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300"
+                  title={t("manager.timesheet.parkingIndicator")}
+                  aria-label={t("manager.timesheet.parkingIndicator")}
+                >
+                  <Car className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+              )}
+              {j.overtime_evidence_captured && (
+                <span
+                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                  title={t("manager.timesheet.overtimeIndicator")}
+                  aria-label={t("manager.timesheet.overtimeIndicator")}
+                >
+                  <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+              )}
+              {j.meal_claim_captured && (
+                <span
+                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                  title={t("manager.timesheet.mealIndicator")}
+                  aria-label={t("manager.timesheet.mealIndicator")}
+                >
+                  <Utensils className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+              )}
             </div>
 
             {/* Employee · phone · email — one line, no labels.
@@ -755,7 +775,6 @@ export default function ManagerDashboard() {
     const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
     const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
     const { totalKm: km } = getKilometreBreakdown(job);
-    const isVisible = visibleEvidence.has(job.id);
     const isOcrVisible = visibleOcr.has(job.id);
 
     return (
@@ -775,10 +794,6 @@ export default function ManagerDashboard() {
               <Button type="button" size="sm" variant="outline" aria-expanded={isOcrVisible} aria-controls={`overtime-ocr-${job.id}`} onClick={() => toggleOcr(job.id)}>
                 {isOcrVisible ? t("manager.overtime.hideOcr") : t("manager.overtime.showOcr")}
               </Button>
-              <Button type="button" size="sm" variant="outline" disabled={evidenceImageLoading === job.id} onClick={() => toggleEvidence(job.id)}>
-                {isVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}
-                {evidenceImageLoading === job.id ? t("common.loading") : isVisible ? t("manager.overtime.hideEvidence") : t("manager.overtime.showEvidence")}
-              </Button>
             </div>
           </div>
 
@@ -793,26 +808,14 @@ export default function ManagerDashboard() {
           </div>
 
           {isOcrVisible && <div id={`overtime-ocr-${job.id}`}>
-            <div className="mb-1 text-sm font-semibold">OCR · {evidence?.ocr_status || "—"}</div>
-            <div className="grid items-start gap-3 md:grid-cols-[minmax(180px,280px)_minmax(0,1fr)]">
-              <div className="rounded-xl border bg-muted/30 p-2">
-                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
-                {evidence?.imageUrl
-                  ? <button type="button" className="block w-full" onClick={() => toggleEvidence(job.id)} aria-label={t("manager.overtime.showEvidence")}><img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-56 w-full rounded-lg object-contain" /></button>
-                  : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
-              </div>
-              <OcrConversation evidence={evidence} t={t} />
+            <div className="rounded-xl border bg-muted/30 p-2">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
+              {evidence?.imageUrl
+                ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" />
+                : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
             </div>
           </div>}
 
-          {isVisible && (
-            <div className="rounded-lg border p-3">
-              <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
-              {evidence?.imageUrl
-                ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-md object-contain" />
-                : <p className="text-sm text-muted-foreground">{t("manager.overtime.imageUnavailable")}</p>}
-            </div>
-          )}
         </CardContent>
       </Card>
     );
@@ -870,7 +873,7 @@ export default function ManagerDashboard() {
   return (
     <AppShell>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-7" aria-label={t("manager.sections.label")}>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8" aria-label={t("manager.sections.label")}>
           {[
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
@@ -879,6 +882,7 @@ export default function ManagerDashboard() {
             { id: "meals", icon: Utensils, label: t("manager.sections.meals"), description: t("manager.sections.mealsDescription") },
             { id: "parking", icon: Car, label: t("manager.sections.parking"), description: t("manager.sections.parkingDescription") },
             { id: "download", icon: Download, label: t("manager.sections.download"), description: t("manager.sections.downloadDescription") },
+            { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
             <button
               key={id}
@@ -896,6 +900,8 @@ export default function ManagerDashboard() {
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
 
         {activeSection === "forms" && <FormsManager collapsible={false} />}
+
+        {activeSection === "testing" && <Testing />}
 
         {activeSection === "meals" && <MealClaimsManager />}
 

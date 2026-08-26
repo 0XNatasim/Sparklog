@@ -49,6 +49,10 @@ serve(async (req) => {
     const anonKey      = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const serviceRole  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+    if (!supabaseUrl || !anonKey || !serviceRole) {
+      return json({ ok: false, error: "Server environment is missing Supabase credentials" }, 500);
+    }
+
     // --- Auth: identify caller ---
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.toLowerCase().startsWith("bearer ")
