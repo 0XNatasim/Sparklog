@@ -132,7 +132,7 @@ export default function FormsManager({ collapsible = true }) {
             return (
               <div key={form.id} className="rounded-lg border px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium">{form.name}</span>
+                  <span className="text-sm font-medium">{t(form.nameKey)}</span>
                   <div className="flex shrink-0 items-center gap-3">
                   <a
                     href={form.url}
@@ -147,7 +147,7 @@ export default function FormsManager({ collapsible = true }) {
                     type="button"
                     role="switch"
                     aria-checked={enabled}
-                    aria-label={`${form.name}: ${enabled ? t("common.on") : t("common.off")}`}
+                    aria-label={`${t(form.nameKey)}: ${enabled ? t("common.on") : t("common.off")}`}
                     disabled={busyId === form.id}
                     onClick={() => toggle(form.id)}
                     className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${enabled ? "bg-primary" : "bg-muted-foreground/30"}`}

@@ -66,7 +66,7 @@ export default function Profile() {
             <Card>
               <CardHeader><CardTitle>{t("profile.forms")}</CardTitle><CardDescription>{t("profile.formsDescription")}</CardDescription></CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2">
-                {forms.map((form) => <a key={form.id} href={form.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-lg border p-4 font-medium hover:border-primary/50 hover:bg-accent">{form.name}<ExternalLink className="h-4 w-4 text-muted-foreground" /></a>)}
+                {forms.map((form) => <a key={form.id} href={form.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-lg border p-4 font-medium hover:border-primary/50 hover:bg-accent">{t(form.nameKey)}<ExternalLink className="h-4 w-4 text-muted-foreground" /></a>)}
                 {forms.length === 0 && <p className="col-span-full text-sm text-muted-foreground">{t("profile.noForms")}</p>}
               </CardContent>
             </Card>
