@@ -570,7 +570,7 @@ export default function EmployeeForm() {
         daily_work_minutes: overtimeDailyMinutes,
       });
       if (claimError) throw claimError;
-      const { error: mealFlagError } = await supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", pendingMealJobId);
+      const { error: mealFlagError } = await supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", jobId);
       if (mealFlagError) throw mealFlagError;
       const { error: notificationError } = await supabase.from("manager_notifications").insert({
         type: "meal_claim",
