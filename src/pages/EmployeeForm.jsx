@@ -395,7 +395,7 @@ export default function EmployeeForm() {
         );
         if (error) throw error;
 
-        setInfo(nextStatus === "submitted" ? t("form.toasts.submitted") : t("form.toasts.updated"));
+        setInfo(nextStatus === "submitted" ? "form.toasts.submitted" : "form.toasts.updated");
         setStatus(nextStatus);
         setLocked(nextLocked);
         setDirty(false);
@@ -409,7 +409,7 @@ export default function EmployeeForm() {
         if (!data?.id) throw new Error(t("form.errors.insertNoId"));
         savedJobId = data.id;
 
-        setInfo(nextStatus === "submitted" ? t("form.toasts.savedAndSubmitted") : t("form.toasts.saved"));
+        setInfo(nextStatus === "submitted" ? "form.toasts.savedAndSubmitted" : "form.toasts.saved");
         setStatus(nextStatus);
         setLocked(nextLocked);
         setDirty(false);
@@ -788,7 +788,6 @@ export default function EmployeeForm() {
 
     try {
       let text = "";
-      let source = "ocr.space";
       try {
         text = await ocrSpaceExtract(file);
       } catch (apiErr) {
@@ -796,7 +795,6 @@ export default function EmployeeForm() {
         const { default: Tesseract } = await import("tesseract.js");
         const { data: ocr } = await Tesseract.recognize(file, "fra+eng");
         text = ocr?.text || "";
-        source = "tesseract";
       }
 
       const d = parseExtractedText(text);
@@ -812,7 +810,7 @@ export default function EmployeeForm() {
       // Auto-fill populated the form — mark dirty so Save appears
       setDirty(true);
 
-      setInfo(t("form.toasts.filledFromImage", { source }));
+      setInfo("form.toasts.filledFromImage");
     } catch (e) {
       setErr(e?.message || t("form.errors.extractFailed"));
     } finally {
@@ -838,7 +836,7 @@ export default function EmployeeForm() {
         )}
         {info && (
           <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            {info}
+            {t(info)}
           </div>
         )}
         {entryBlockedReason && (
