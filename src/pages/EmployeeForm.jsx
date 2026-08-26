@@ -142,6 +142,7 @@ export default function EmployeeForm() {
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
+  const lastSaveErrorRef = useRef("");
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [returnStep, setReturnStep] = useState("closed");
@@ -320,6 +321,7 @@ export default function EmployeeForm() {
     }
     if (saving) return;
     if (entryBlockedReason) {
+      lastSaveErrorRef.current = entryBlockedReason;
       setErr(entryBlockedReason);
       return false;
     }
@@ -422,10 +424,11 @@ export default function EmployeeForm() {
       const code = e?.code || e?.cause?.code;
       const msg = String(e?.message || "");
       if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
-        setErr(t("form.errors.duplicateOt", { ot: ot || "" }));
+        lastSaveErrorRef.current = t("form.errors.duplicateOt", { ot: ot || "" });
       } else {
-        setErr(e?.message || t("form.errors.saveFailed"));
+        lastSaveErrorRef.current = e?.message || t("form.errors.saveFailed");
       }
+      setErr(lastSaveErrorRef.current);
       return false;
     } finally {
       setSaving(false);
@@ -567,7 +570,7 @@ export default function EmployeeForm() {
         daily_work_minutes: overtimeDailyMinutes,
       });
       if (claimError) throw claimError;
-      const { error: mealFlagError } = await supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", pendingMealJobId);
+      const { error: mealFlagError } = await supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", jobId);
       if (mealFlagError) throw mealFlagError;
       const { error: notificationError } = await supabase.from("manager_notifications").insert({
         type: "meal_claim",
@@ -626,8 +629,8 @@ export default function EmployeeForm() {
         if (!savedJobId) {
           const { data: partiallySavedJob } = await supabase.from("jobs").select("id").eq("id", jobId).maybeSingle();
           if (partiallySavedJob?.id) setPendingEvidenceJobId(partiallySavedJob.id);
-          console.error("[overtime evidence] Job save or parking receipt save failed", { jobId });
-          throw new Error(t("form.evidence.jobSaveFailed"));
+          console.error("[overtime evidence] Job save or parking receipt save failed", { jobId, reason: lastSaveErrorRef.current });
+          throw new Error(lastSaveErrorRef.current || t("form.evidence.jobSaveFailed"));
         }
         setPendingEvidenceJobId(savedJobId);
       } else if (parkingRequested && parkingFile) {
@@ -637,7 +640,7 @@ export default function EmployeeForm() {
           setParkingFile(null);
         } catch (error) {
           console.error("[overtime evidence] Parking receipt retry failed", { savedJobId, error });
-          throw new Error(t("form.evidence.jobSaveFailed"));
+          throw new Error(error?.message || t("form.evidence.jobSaveFailed"));
         }
       }
 
