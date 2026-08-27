@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Car, ClipboardList, Clock3, Image, ImageOff, TimerReset, Users, Utensils } from "lucide-react";
+import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -18,7 +18,6 @@ import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
-import MealClaimsManager from "@/components/MealClaimsManager";
 import Testing from "@/pages/Testing";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
@@ -55,9 +54,12 @@ export default function ManagerDashboard() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const activeSection = ["employees", "forms", "timesheet", "overtime", "meals", "parking", "testing"].includes(searchParams.get("section"))
-    ? searchParams.get("section")
+  const requestedSection = searchParams.get("section");
+  const activeSection = ["employees", "forms", "timesheet", "notifications", "testing"].includes(requestedSection)
+    ? requestedSection
+    : ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications"
     : "timesheet";
+  const [notificationFilter, setNotificationFilter] = useState(["overtime", "meals", "parking"].includes(requestedSection) ? requestedSection : "all");
   const [focusedEvidence, setFocusedEvidence] = useState(null);
   const [overtimeJobs, setOvertimeJobs] = useState([]);
   const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
@@ -69,6 +71,8 @@ export default function ManagerDashboard() {
   const [parkingLoading, setParkingLoading] = useState(false);
   const [visibleParkingReceipts, setVisibleParkingReceipts] = useState(new Set());
   const [parkingImageLoading, setParkingImageLoading] = useState("");
+  const [notificationMealJobs, setNotificationMealJobs] = useState([]);
+  const [notificationMealsLoading, setNotificationMealsLoading] = useState(false);
 
   const [jobs, setJobs] = useState([]);
   const [mealJobIds, setMealJobIds] = useState(new Set());
@@ -209,7 +213,7 @@ export default function ManagerDashboard() {
   }, [focusedJobId]);
 
   useEffect(() => {
-    if (activeSection !== "overtime") return;
+    if (activeSection !== "notifications") return;
     let cancelled = false;
     async function loadOvertime() {
       setOvertimeLoading(true);
@@ -273,7 +277,7 @@ export default function ManagerDashboard() {
   }, [activeSection, focusedJobId]);
 
   useEffect(() => {
-    if (activeSection !== "parking") return;
+    if (activeSection !== "notifications") return;
     let cancelled = false;
     async function loadParking() {
       setParkingLoading(true);
@@ -317,6 +321,42 @@ export default function ManagerDashboard() {
     loadParking();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== "notifications") return;
+    let cancelled = false;
+    async function loadNotificationMeals() {
+      setNotificationMealsLoading(true);
+      const { data: claims, error: claimsError } = await withTimeout(
+        supabase.from("meal_claims").select("job_id, created_at").order("created_at", { ascending: false }), 12000
+      );
+      if (claimsError) {
+        setNotificationMealsLoading(false);
+        return setErr(claimsError.message);
+      }
+      const ids = [...new Set((claims || []).map((claim) => claim.job_id))];
+      const { data: rows, error } = ids.length
+        ? await withTimeout(supabase.from("jobs").select("*").in("id", ids), 12000)
+        : { data: [], error: null };
+      if (error) {
+        setNotificationMealsLoading(false);
+        return setErr(error.message);
+      }
+      const order = new Map(ids.map((id, index) => [id, index]));
+      const orderedRows = (rows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
+      const missingProfileIds = [...new Set(orderedRows.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
+      const { data: people } = missingProfileIds.length
+        ? await withTimeout(supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds), 12000)
+        : { data: [] };
+      if (!cancelled) {
+        setNotificationMealJobs(orderedRows);
+        setProfiles((current) => new Map([...current, ...(people || []).map((person) => [person.id, person])]));
+        setNotificationMealsLoading(false);
+      }
+    }
+    loadNotificationMeals();
+    return () => { cancelled = true; };
   }, [activeSection]);
 
   async function ensureEvidenceImage(jobId) {
@@ -708,104 +748,54 @@ export default function ManagerDashboard() {
     );
   }
 
-  function renderOvertimeCard(job) {
+  function renderNotificationCard(job) {
     const evidence = overtimeEvidence.get(job.id);
+    const receipt = parkingReceipts.get(job.id);
+    const hasMeal = mealJobIds.has(job.id) || notificationMealJobs.some((mealJob) => mealJob.id === job.id);
     const employee = profiles.get(job.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
     const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
     const { totalKm: km } = getKilometreBreakdown(job);
     const isProofVisible = visibleProof.has(job.id);
+    const isParkingVisible = visibleParkingReceipts.has(job.id);
 
-    return (
-      <Card key={job.id} id={`job-${job.id}`} className={focusedJobId === job.id ? "ring-2 ring-red-500" : ""}>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 font-bold"><span>{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</span><JobCaptureIcons job={{ ...job, overtime_evidence_captured: true }} /></div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{employeeName}</span>
-                {employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}
-                {employee?.email ? <> · <a className="text-primary hover:underline" href={`mailto:${employee.email}`}>{employee.email}</a></> : null}
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
-              <Button type="button" size="sm" variant="outline" aria-expanded={isProofVisible} aria-controls={`overtime-proof-${job.id}`} onClick={() => toggleProof(job.id)}>
-                {isProofVisible ? t("manager.overtime.hideProof") : t("manager.overtime.showProof")}
-              </Button>
-            </div>
+    return <Card key={job.id} id={`job-${job.id}`} className={focusedJobId === job.id ? "ring-2 ring-primary" : ""}>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 font-bold"><span>{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</span><JobCaptureIcons job={{ ...job, overtime_evidence_captured: Boolean(evidence), parking_receipt_captured: Boolean(receipt), meal_claim_captured: hasMeal }} /></div>
+            <div className="mt-1 text-sm text-muted-foreground"><span className="font-semibold text-foreground">{employeeName}</span>{employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}{employee?.email ? <> · <a className="text-primary hover:underline" href={`mailto:${employee.email}`}>{employee.email}</a></> : null}</div>
           </div>
-
-          <div className="flex flex-wrap gap-1.5 text-xs">
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHours(totalHours)}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.km")}: <b>{km}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
-            {job.return_time_minutes ? <span className="rounded-full border bg-muted px-2 py-1">{t("form.return.timeTitle")}: <b>{job.return_time_minutes} min</b></span> : null}
-            {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
+            {receipt && <Button type="button" size="sm" variant="outline" disabled={parkingImageLoading === job.id} onClick={() => toggleParkingReceipt(job.id)}>{isParkingVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}{parkingImageLoading === job.id ? t("common.loading") : isParkingVisible ? t("manager.notifications.hideParkingProof") : t("manager.notifications.showParkingProof")}</Button>}
+            {evidence && <Button type="button" size="sm" variant="outline" onClick={() => toggleProof(job.id)}>{isProofVisible ? t("manager.notifications.hideOvertimeProof") : t("manager.notifications.showOvertimeProof")}</Button>}
           </div>
-
-          {isProofVisible && <div id={`overtime-proof-${job.id}`}>
-            <div className="rounded-xl border bg-muted/30 p-2">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>
-              {evidence?.imageUrl
-                ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" />
-                : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}
-            </div>
-          </div>}
-
-        </CardContent>
-      </Card>
-    );
+        </div>
+        <div className="flex flex-wrap gap-1.5 text-xs">
+          <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHours(totalHours)}</b></span>
+          <span className="rounded-full border bg-muted px-2 py-1">{t("history.km")}: <b>{km}</b></span>
+          <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
+          <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
+          <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
+          {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
+          {receipt ? <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt.amount || 0).toFixed(2)}</b></span> : null}
+          {hasMeal ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">{t("manager.notifications.supper")}: <b>$30.00</b></span> : null}
+        </div>
+        {isParkingVisible && <div className="rounded-lg border p-3">{receipt?.imageUrl ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /> : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
+        {isProofVisible && <div className="rounded-xl border bg-muted/30 p-2"><div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>{evidence?.imageUrl ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" /> : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}</div>}
+        {receipt?.status === "pending" && <div className="flex gap-2"><Button type="button" size="sm" onClick={() => reviewParking(job.id, "approved")}>{t("manager.approve")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("meals.reject")}</Button></div>}
+      </CardContent>
+    </Card>;
   }
 
-  function renderParkingCard(job) {
-    const receipt = parkingReceipts.get(job.id);
-    const employee = profiles.get(job.user_id);
-    const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
-    const isVisible = visibleParkingReceipts.has(job.id);
-
-    return (
-      <Card key={job.id} id={`parking-job-${job.id}`}>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 font-bold"><span>{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</span><JobCaptureIcons job={{ ...job, parking_receipt_captured: true }} /></div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{employeeName}</span>
-                {employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}
-                {employee?.email ? <> · <a className="text-primary hover:underline" href={`mailto:${employee.email}`}>{employee.email}</a></> : null}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
-              <Button type="button" size="sm" variant="outline" disabled={parkingImageLoading === job.id} onClick={() => toggleParkingReceipt(job.id)}>
-                {isVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}
-                {parkingImageLoading === job.id ? t("common.loading") : isVisible ? t("manager.parking.hideReceipt") : t("manager.parking.showReceipt")}
-              </Button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5 text-xs">
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("manager.parking.received")}: <b>{dayjs(receipt?.created_at).format("DD MMM HH:mm")}</b></span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt?.amount || 0).toFixed(2)}</b> / $20</span>
-            <span className="rounded-full border bg-muted px-2 py-1">{t("manager.parking.reviewStatus")}: <b>{receipt?.status || "pending"}</b></span>
-          </div>
-          {isVisible && (
-            <div className="rounded-lg border p-3">
-              {receipt?.imageUrl
-                ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" />
-                : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}
-            </div>
-          )}
-          {receipt?.status === "pending" && <div className="flex gap-2"><Button type="button" size="sm" onClick={() => reviewParking(job.id, "approved")}>{t("manager.approve")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("meals.reject")}</Button></div>}
-        </CardContent>
-      </Card>
-    );
-  }
+  const notificationJobs = useMemo(() => {
+    const merged = new Map();
+    if (notificationFilter === "all" || notificationFilter === "overtime") overtimeJobs.forEach((job) => merged.set(job.id, job));
+    if (notificationFilter === "all" || notificationFilter === "meals") notificationMealJobs.forEach((job) => merged.set(job.id, job));
+    if (notificationFilter === "all" || notificationFilter === "parking") parkingJobs.forEach((job) => merged.set(job.id, job));
+    return [...merged.values()].sort((a, b) => dayjs(b.job_date).valueOf() - dayjs(a.job_date).valueOf());
+  }, [notificationFilter, notificationMealJobs, overtimeJobs, parkingJobs]);
 
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
@@ -817,9 +807,7 @@ export default function ManagerDashboard() {
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
-            { id: "overtime", icon: TimerReset, label: t("manager.sections.overtime"), description: t("manager.sections.overtimeDescription") },
-            { id: "meals", icon: Utensils, label: t("manager.sections.meals"), description: t("manager.sections.mealsDescription") },
-            { id: "parking", icon: Car, label: t("manager.sections.parking"), description: t("manager.sections.parkingDescription") },
+            { id: "notifications", icon: Bell, label: t("manager.sections.notifications"), description: t("manager.sections.notificationsDescription") },
             { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
             <button
@@ -841,25 +829,13 @@ export default function ManagerDashboard() {
 
         {activeSection === "testing" && <Testing />}
 
-        {activeSection === "meals" && <MealClaimsManager />}
-
-        {activeSection === "overtime" && (
+        {activeSection === "notifications" && (
           <div className="space-y-3">
-            <Card><CardContent className="p-4"><h2 className="font-semibold">{t("manager.overtime.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.overtime.description")}</p></CardContent></Card>
-            {overtimeLoading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
+            <Card><CardContent className="space-y-3 p-4"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select></CardContent></Card>
+            {(overtimeLoading || parkingLoading || notificationMealsLoading) && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
             {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
-            {!overtimeLoading && overtimeJobs.map(renderOvertimeCard)}
-            {!overtimeLoading && overtimeJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.overtime.empty")}</CardContent></Card>}
-          </div>
-        )}
-
-        {activeSection === "parking" && (
-          <div className="space-y-3">
-            <Card><CardContent className="p-4"><h2 className="font-semibold">{t("manager.parking.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.parking.description")}</p></CardContent></Card>
-            {parkingLoading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
-            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
-            {!parkingLoading && parkingJobs.map(renderParkingCard)}
-            {!parkingLoading && parkingJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.parking.empty")}</CardContent></Card>}
+            {!overtimeLoading && !parkingLoading && !notificationMealsLoading && notificationJobs.map(renderNotificationCard)}
+            {!overtimeLoading && !parkingLoading && !notificationMealsLoading && notificationJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.notifications.empty")}</CardContent></Card>}
           </div>
         )}
 
