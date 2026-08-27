@@ -32,7 +32,7 @@ export default function LiveCrew() {
     const today = montrealDate();
     const [{ data: people }, { data: jobs }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email").order("full_name"),
-      supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, created_at").eq("job_date", today),
+      supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, updated_at").eq("job_date", today),
     ]);
     const map = new Map();
     (jobs || []).forEach((job) => {
@@ -41,7 +41,7 @@ export default function LiveCrew() {
     });
     // Chronological order within the day (1st job, 2nd, …).
     map.forEach((list) => list.sort((a, b) =>
-      String(a.depart || "99").localeCompare(String(b.depart || "99")) || String(a.created_at).localeCompare(String(b.created_at))
+      String(a.depart || "99").localeCompare(String(b.depart || "99")) || String(a.updated_at).localeCompare(String(b.updated_at))
     ));
     setEmployees(people || []);
     setJobsByUser(map);
