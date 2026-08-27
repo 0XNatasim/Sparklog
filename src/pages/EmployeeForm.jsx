@@ -960,96 +960,90 @@ export default function EmployeeForm() {
                 />
               </div>
 
-              <div className="col-span-2 grid gap-1 sm:col-span-1 sm:gap-1.5">
+            </div>
+
+            <div className="flex flex-wrap items-end gap-2 sm:gap-4">
+              <div className="grid min-w-[8rem] flex-1 gap-1 sm:gap-1.5">
                 <Label className="text-xs sm:text-sm">{t("form.totalHours")}</Label>
                 <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-bold sm:h-10">
                   {hoursLabel}
                 </div>
               </div>
 
-              {parkingReceiptsEnabled && <div className="grid gap-1.5 sm:col-span-2 lg:col-span-3">
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border px-3 py-2.5">
-                  <span>
-                    <span className="block text-sm font-medium">{t("form.parking.title")}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {parkingFile?.name || (hasParkingReceipt ? t("form.parking.receiptSaved") : t("form.parking.description"))}
-                    </span>
-                  </span>
+              {parkingReceiptsEnabled && (
+                <label className="flex h-9 min-w-[9rem] flex-1 cursor-pointer items-center justify-between gap-2 rounded-md border px-3 sm:h-10">
+                  <span className="text-sm font-medium">{t("form.parking.title")}</span>
                   <input
                     type="checkbox"
                     checked={parkingRequested}
                     disabled={disableInputs || hasParkingReceipt}
                     onChange={(event) => {
-                      if (event.target.checked) {
-                        setParkingRequested(true);
-                        setDirty(true);
-                      }
-                      else {
-                        setParkingRequested(false);
-                        setParkingFile(null);
-                        setDirty(true);
-                      }
+                      if (event.target.checked) { setParkingRequested(true); setDirty(true); }
+                      else { setParkingRequested(false); setParkingFile(null); setDirty(true); }
                     }}
                     className="h-5 w-5 rounded border-input accent-primary"
                   />
                 </label>
-                <input ref={parkingInputRef} type="file" accept="image/*" className="hidden" onChange={handleParkingReceipt} />
-                {parkingRequested && (
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
-                    <div className="grid gap-1.5">
-                      <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
-                      <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
-                        disabled={disableInputs}
-                        onClick={() => parkingInputRef.current?.click()}
-                      >
-                        {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
-                      </Button>
-                      {hasParkingReceipt && (
-                        <span
-                          className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400"
-                          title={t("form.parking.receiptSaved")}
-                        >
-                          <CircleCheck className="h-5 w-5" aria-hidden="true" />
-                          <span className="sr-only">{t("form.parking.receiptSaved")}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>}
+              )}
             </div>
 
-            <div className="flex flex-nowrap items-center gap-1.5 pt-2">
-              {dirty && (
-                <Button type="button" size="sm" className="text-xs" disabled={disableInputs} onClick={saveDraft}>
-                  {saving ? t("common.saving") : t("form.buttons.save")}
-                </Button>
-              )}
+            {parkingReceiptsEnabled && parkingRequested && (
+              <div className="space-y-2 rounded-md border p-3">
+                <div className="text-xs text-muted-foreground">
+                  {parkingFile?.name || (hasParkingReceipt ? t("form.parking.receiptSaved") : t("form.parking.description"))}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
+                    <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
+                      disabled={disableInputs}
+                      onClick={() => parkingInputRef.current?.click()}
+                    >
+                      {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
+                    </Button>
+                    {hasParkingReceipt && (
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400" title={t("form.parking.receiptSaved")}>
+                        <CircleCheck className="h-5 w-5" aria-hidden="true" />
+                        <span className="sr-only">{t("form.parking.receiptSaved")}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <input ref={parkingInputRef} type="file" accept="image/*" className="hidden" onChange={handleParkingReceipt} />
+              </div>
+            )}
 
-              <Button type="button" size="sm" variant="secondary" className="text-xs" disabled={disableInputs} onClick={submitJob}>
+            <div className="space-y-2 pt-3">
+              <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs} onClick={submitJob}>
                 {saving ? t("common.submitting") : t("form.buttons.submit")}
               </Button>
 
-              {editId && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs"
-                  onClick={() => navigate("/form")}
-                  disabled={loadingEdit || saving}
-                >
-                  {t("form.buttons.newJob")}
-                </Button>
-              )}
-
+              <div className="flex items-center gap-2">
+                {dirty && (
+                  <Button type="button" size="sm" variant="outline" className="flex-1 text-xs" disabled={disableInputs} onClick={saveDraft}>
+                    {saving ? t("common.saving") : t("form.buttons.save")}
+                  </Button>
+                )}
+                {editId && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs"
+                    onClick={() => navigate("/form")}
+                    disabled={loadingEdit || saving}
+                  >
+                    {t("form.buttons.newJob")}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {locked && (
