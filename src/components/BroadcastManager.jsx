@@ -1,0 +1,187 @@
+import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import { Bell, Check, ChevronDown } from "lucide-react";
+import { supabase } from "../supabaseClient";
+import { useAuth } from "../contexts/AuthContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/use-t";
+
+export default function BroadcastManager() {
+  const t = useT();
+  const { user } = useAuth();
+
+  const [employees, setEmployees] = useState([]);
+  const [body, setBody] = useState("");
+  const [audience, setAudience] = useState("all");
+  const [selected, setSelected] = useState(new Set());
+  const [sending, setSending] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [recipientsByBroadcast, setRecipientsByBroadcast] = useState(new Map());
+  const [expanded, setExpanded] = useState("");
+
+  async function loadEmployees() {
+    const { data } = await supabase
+      .from("profiles").select("id, full_name, email").eq("role", "employee").order("full_name");
+    setEmployees(data || []);
+  }
+
+  async function loadLog() {
+    const [{ data: rows }, { data: recips }] = await Promise.all([
+      supabase.from("manager_broadcasts").select("id, body, audience, created_at").order("created_at", { ascending: false }),
+      supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at"),
+    ]);
+    setBroadcasts(rows || []);
+    const map = new Map();
+    (recips || []).forEach((r) => {
+      if (!map.has(r.broadcast_id)) map.set(r.broadcast_id, []);
+      map.get(r.broadcast_id).push(r);
+    });
+    setRecipientsByBroadcast(map);
+  }
+
+  useEffect(() => { loadEmployees(); loadLog(); }, []);
+
+  function toggleEmployee(id) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const employeeName = (id) => {
+    const e = employees.find((row) => row.id === id);
+    return e?.full_name || e?.email || id;
+  };
+
+  async function send() {
+    setMessage("");
+    if (!body.trim()) { setMessage(t("broadcast.needMessage")); return; }
+    const targetIds = audience === "all" ? employees.map((e) => e.id) : [...selected];
+    if (targetIds.length === 0) { setMessage(t("broadcast.needEmployees")); return; }
+
+    setSending(true);
+    try {
+      const { data: created, error: insertError } = await supabase
+        .from("manager_broadcasts")
+        .insert({ sender_id: user?.id, body: body.trim(), audience })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
+
+      const rows = targetIds.map((employee_id) => ({ broadcast_id: created.id, employee_id }));
+      const { error: recipError } = await supabase.from("broadcast_recipients").insert(rows);
+      if (recipError) throw recipError;
+
+      setBody("");
+      setSelected(new Set());
+      setAudience("all");
+      setMessage(t("broadcast.sent"));
+      await loadLog();
+    } catch (e) {
+      setMessage(e?.message || "Error");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="flex items-center gap-2 font-semibold"><Bell className="h-4 w-4" />{t("broadcast.title")}</div>
+          <p className="text-xs text-muted-foreground">{t("broadcast.description")}</p>
+          {message && <div className="rounded-md border bg-muted px-3 py-2 text-xs">{message}</div>}
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">{t("broadcast.message")}</label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={3}
+              placeholder={t("broadcast.messagePlaceholder")}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-sm font-medium">{t("broadcast.audience")}</span>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input type="radio" name="audience" checked={audience === "all"} onChange={() => setAudience("all")} className="accent-primary" />
+                {t("broadcast.audienceAll")}
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input type="radio" name="audience" checked={audience === "selected"} onChange={() => setAudience("selected")} className="accent-primary" />
+                {t("broadcast.audienceSelected")}
+              </label>
+            </div>
+            {audience === "selected" && (
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
+                {employees.map((employee) => (
+                  <label key={employee.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                    <input type="checkbox" checked={selected.has(employee.id)} onChange={() => toggleEmployee(employee.id)} className="h-4 w-4 accent-primary" />
+                    <span>{employee.full_name || employee.email}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Button type="button" disabled={sending} onClick={send}>{sending ? t("broadcast.sending") : t("broadcast.send")}</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <div className="text-sm font-semibold">{t("broadcast.log")}</div>
+          {broadcasts.length === 0 && <p className="text-xs text-muted-foreground">{t("broadcast.noLog")}</p>}
+          {broadcasts.map((b) => {
+            const recips = recipientsByBroadcast.get(b.id) || [];
+            const acked = recips.filter((r) => r.acknowledged_at).length;
+            const isOpen = expanded === b.id;
+            return (
+              <div key={b.id} className="rounded-lg border">
+                <button
+                  type="button"
+                  onClick={() => setExpanded(isOpen ? "" : b.id)}
+                  aria-expanded={isOpen}
+                  className="flex w-full items-start justify-between gap-3 rounded-lg p-3 text-left hover:bg-muted/50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{b.body}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
+                    </div>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
+                    {t("broadcast.viewedCount", { acked, total: recips.length })}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="border-t p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("broadcast.recipients")}</div>
+                    <div className="max-h-56 space-y-1 overflow-y-auto">
+                      {recips.map((r) => (
+                        <div key={r.employee_id} className="flex items-center justify-between gap-2 rounded border bg-muted/20 px-2 py-1.5 text-xs">
+                          <span>{employeeName(r.employee_id)}</span>
+                          {r.acknowledged_at
+                            ? <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" />{t("broadcast.viewed")} · {dayjs(r.acknowledged_at).format("DD MMM HH:mm")}</span>
+                            : <span className="text-muted-foreground">{t("broadcast.notViewed")}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
