@@ -1021,29 +1021,28 @@ export default function EmployeeForm() {
             )}
 
             <div className="space-y-2 pt-3">
-              <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs} onClick={submitJob}>
+              {dirty && (
+                <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs} onClick={saveDraft}>
+                  {saving ? t("common.saving") : t("form.buttons.save")}
+                </Button>
+              )}
+
+              <Button type="button" className="h-12 w-full text-base font-semibold bg-emerald-600 text-white hover:bg-emerald-700" disabled={disableInputs} onClick={submitJob}>
                 {saving ? t("common.submitting") : t("form.buttons.submit")}
               </Button>
 
-              <div className="flex items-center gap-2">
-                {dirty && (
-                  <Button type="button" size="sm" variant="outline" className="flex-1 text-xs" disabled={disableInputs} onClick={saveDraft}>
-                    {saving ? t("common.saving") : t("form.buttons.save")}
-                  </Button>
-                )}
-                {editId && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="text-xs"
-                    onClick={() => navigate("/form")}
-                    disabled={loadingEdit || saving}
-                  >
-                    {t("form.buttons.newJob")}
-                  </Button>
-                )}
-              </div>
+              {editId && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="w-full text-xs"
+                  onClick={() => navigate("/form")}
+                  disabled={loadingEdit || saving}
+                >
+                  {t("form.buttons.newJob")}
+                </Button>
+              )}
             </div>
 
             {locked && (
