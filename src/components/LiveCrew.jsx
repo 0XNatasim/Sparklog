@@ -31,7 +31,7 @@ export default function LiveCrew() {
     setLoading(true);
     const today = montrealDate();
     const [{ data: people }, { data: jobs }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email").eq("role", "employee").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, created_at").eq("job_date", today),
     ]);
     const map = new Map();
