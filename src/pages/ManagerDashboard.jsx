@@ -774,7 +774,10 @@ export default function ManagerDashboard() {
             <Badge variant={statusBadgeVariant(job.status)} className="uppercase tracking-wide">{t(`status.${job.status}`)}</Badge>
             <div className="flex flex-col gap-2">
               {evidence && <Button type="button" size="sm" variant="outline" onClick={() => toggleProof(job.id)}>{isProofVisible ? t("manager.notifications.hideOvertimeProof") : t("manager.notifications.showOvertimeProof")}</Button>}
-              {receipt && <Button type="button" size="sm" variant="outline" disabled={parkingImageLoading === job.id} onClick={() => toggleParkingReceipt(job.id)}>{isParkingVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}{parkingImageLoading === job.id ? t("common.loading") : isParkingVisible ? t("manager.notifications.hideParkingProof") : t("manager.notifications.showParkingProof")}</Button>}
+              {receipt && <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" disabled={parkingImageLoading === job.id} onClick={() => toggleParkingReceipt(job.id)}>{isParkingVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}{parkingImageLoading === job.id ? t("common.loading") : isParkingVisible ? t("manager.notifications.hideParkingProof") : t("manager.notifications.showParkingProof")}</Button>
+                {receipt.status === "pending" && <><Button type="button" size="sm" variant="secondary" onClick={() => reviewParking(job.id, "approved")}>{t("manager.notifications.approveParking")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("manager.notifications.rejectParking")}</Button></>}
+              </div>}
             </div>
           </div>
         </div>
@@ -787,13 +790,10 @@ export default function ManagerDashboard() {
           {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
           {receipt ? <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt.amount || 0).toFixed(2)}</b></span> : null}
           {hasMeal ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">{t("manager.notifications.supper")}: <b>$30.00</b></span> : null}
+          {job.status === "submitted" && <Button type="button" size="sm" className="ml-auto" disabled={actionLoadingId === job.id} onClick={() => approve(job.id)}>{actionLoadingId === job.id ? t("common.working") : t("manager.notifications.approveJob")}</Button>}
         </div>
         {isParkingVisible && <div className="rounded-lg border p-3">{receipt?.imageUrl ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /> : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
         {isProofVisible && <div className="rounded-xl border bg-muted/30 p-2"><div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>{evidence?.imageUrl ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" /> : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}</div>}
-        <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-3">
-          {receipt?.status === "pending" ? <div className="flex gap-2"><Button type="button" size="sm" variant="secondary" onClick={() => reviewParking(job.id, "approved")}>{t("manager.notifications.approveParking")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("manager.notifications.rejectParking")}</Button></div> : <div />}
-          {job.status === "submitted" && <Button type="button" size="sm" disabled={actionLoadingId === job.id} onClick={() => approve(job.id)}>{actionLoadingId === job.id ? t("common.working") : t("manager.notifications.approveJob")}</Button>}
-        </div>
       </CardContent>
     </Card>;
   }
