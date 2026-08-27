@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
-import { CircleCheck } from "lucide-react";
+import { Camera, CircleCheck } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -858,6 +858,34 @@ export default function EmployeeForm() {
               </Badge>
             </div>
 
+            {!locked && !editId && (
+              <>
+                <Button
+                  type="button"
+                  className="h-12 w-full text-base font-semibold"
+                  disabled={disableInputs || extracting}
+                  onClick={() => {
+                    if (localStorage.getItem("autofill_tip_seen")) {
+                      imageInputRef.current?.click();
+                    } else {
+                      setAutofillTipPage(1);
+                      setShowAutofillTip(true);
+                    }
+                  }}
+                >
+                  <Camera className="mr-2 h-5 w-5" />
+                  {extracting ? t("common.extracting") : t("form.buttons.autofill")}
+                </Button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleExtractFromImage}
+                />
+              </>
+            )}
+
             <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3">
               <div className="grid gap-1 sm:gap-1.5">
                 <Label htmlFor="date" className="text-xs sm:text-sm">{t("form.date")}</Label>
@@ -1022,34 +1050,6 @@ export default function EmployeeForm() {
                 </Button>
               )}
 
-              {!locked && !editId && (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="ml-auto text-xs"
-                    disabled={disableInputs || extracting}
-                    onClick={() => {
-                      if (localStorage.getItem("autofill_tip_seen")) {
-                        imageInputRef.current?.click();
-                      } else {
-                        setAutofillTipPage(1);
-                        setShowAutofillTip(true);
-                      }
-                    }}
-                  >
-                    {extracting ? t("common.extracting") : t("form.buttons.autofill")}
-                  </Button>
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleExtractFromImage}
-                  />
-                </>
-              )}
             </div>
 
             {locked && (
