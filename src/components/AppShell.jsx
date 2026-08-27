@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import NotificationsBell from "@/components/NotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
+import BroadcastPopup from "@/components/BroadcastPopup";
 import { useViewMode } from "@/contexts/ViewModeContext";
 
 function NavItem({ to, children }) {
@@ -44,6 +45,7 @@ export default function AppShell({ children }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {!isViewMode && <RegionOnboarding />}
+      {!isViewMode && <BroadcastPopup />}
       {isViewMode && (
         <div className="sticky top-0 z-50 border-b border-amber-500 bg-amber-300 px-3 py-2 text-amber-950 shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">

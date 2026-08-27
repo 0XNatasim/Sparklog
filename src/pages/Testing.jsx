@@ -4,10 +4,11 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CalendarDays, CalendarRange, DollarSign, Download, ExternalLink } from "lucide-react";
+import { Bell, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
+import BroadcastManager from "@/components/BroadcastManager";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -352,9 +353,10 @@ function ComingSoon({ label }) {
 // ─── Page with card sub-navigation ────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
-  const [section, setSection] = useState("downloads");
+  const [section, setSection] = useState("notifications");
 
   const sections = [
+    { id: "notifications", icon: Bell, label: t("testing.sections.broadcast"), description: t("testing.sections.broadcastDescription") },
     { id: "downloads", icon: Download, label: t("testing.sections.downloads"), description: t("testing.sections.downloadsDescription") },
     { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
     { id: "week", icon: CalendarDays, label: t("testing.tabs.week"), description: t("testing.sections.weekDescription") },
@@ -363,7 +365,7 @@ export default function Testing() {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4" aria-label={t("manager.sections.testing")}>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5" aria-label={t("manager.sections.testing")}>
         {sections.map(({ id, icon: Icon, label, description }) => (
           <button
             key={id}
@@ -378,6 +380,7 @@ export default function Testing() {
         ))}
       </div>
 
+      {section === "notifications" && <BroadcastManager />}
       {section === "downloads" && <ManagerDownloads />}
       {section === "ccq" && <CcqRatesPanel />}
       {section === "week" && <ComingSoon label={t("testing.tabs.week")} />}
