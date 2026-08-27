@@ -23,8 +23,9 @@ export default function BroadcastManager() {
   const [expanded, setExpanded] = useState("");
 
   async function loadEmployees() {
+    // Include managers too (a manager is a valid recipient / selectable target).
     const { data } = await supabase
-      .from("profiles").select("id, full_name, email").eq("role", "employee").order("full_name");
+      .from("profiles").select("id, full_name, email").order("full_name");
     setEmployees(data || []);
   }
 
