@@ -32,7 +32,7 @@ export default function TimeRulesManager() {
     const [{ data: settings }, { data: holidayRows }, { data: employeeRows }, { data: unlockRows }] = await Promise.all([
       supabase.from("company_time_settings").select("daily_deadline").eq("id", true).single(),
       supabase.from("company_holidays").select("holiday_date,label").gte("holiday_date", montrealDate()).order("holiday_date").limit(40),
-      supabase.from("profiles").select("id, full_name, email").eq("role", "employee").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
     ]);
     setDeadline(String(settings?.daily_deadline || "23:59").slice(0, 5));

@@ -19,7 +19,7 @@ export default function FormsManager({ collapsible = true }) {
   useEffect(() => {
     Promise.all([
       supabase.from("employee_forms").select("form_id, enabled"),
-      supabase.from("profiles").select("id, full_name, email").eq("role", "employee").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email").order("full_name"),
       supabase.from("employee_form_access").select("form_id, employee_id"),
     ]).then(([formsResult, employeesResult, accessResult]) => {
       const loadError = formsResult.error || employeesResult.error || accessResult.error;
