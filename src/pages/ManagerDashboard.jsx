@@ -511,7 +511,7 @@ export default function ManagerDashboard() {
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
     try {
-      const job = jobs.find((x) => x.id === jobId);
+      const job = [...jobs, ...overtimeJobs, ...parkingJobs, ...notificationMealJobs].find((x) => x.id === jobId);
       if (!job) throw new Error(t("manager.errors.jobNotFound"));
 
       const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
@@ -540,6 +540,10 @@ export default function ManagerDashboard() {
       }
 
       setInfo(Number(data.skipped || 0) > 0 ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
+      const markApproved = (rows) => rows.map((row) => row.id === jobId ? { ...row, status: "approved", locked: true } : row);
+      setOvertimeJobs(markApproved);
+      setParkingJobs(markApproved);
+      setNotificationMealJobs(markApproved);
       await load();
     } catch (e) {
       setErr(e?.message || t("manager.errors.approveFailed"));
@@ -784,7 +788,10 @@ export default function ManagerDashboard() {
         </div>
         {isParkingVisible && <div className="rounded-lg border p-3">{receipt?.imageUrl ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /> : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
         {isProofVisible && <div className="rounded-xl border bg-muted/30 p-2"><div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>{evidence?.imageUrl ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" /> : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}</div>}
-        {receipt?.status === "pending" && <div className="flex gap-2"><Button type="button" size="sm" onClick={() => reviewParking(job.id, "approved")}>{t("manager.approve")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("meals.reject")}</Button></div>}
+        <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-3">
+          {receipt?.status === "pending" ? <div className="space-y-1.5"><div className="text-xs font-semibold text-muted-foreground">{t("manager.notifications.parkingApproval")}</div><div className="flex gap-2"><Button type="button" size="sm" variant="secondary" onClick={() => reviewParking(job.id, "approved")}>{t("manager.notifications.approveParking")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("manager.notifications.rejectParking")}</Button></div></div> : <div />}
+          {job.status === "submitted" && <div className="space-y-1.5"><div className="text-xs font-semibold text-muted-foreground">{t("manager.notifications.jobApproval")}</div><Button type="button" size="sm" disabled={actionLoadingId === job.id} onClick={() => approve(job.id)}>{actionLoadingId === job.id ? t("common.working") : t("manager.notifications.approveJob")}</Button></div>}
+        </div>
       </CardContent>
     </Card>;
   }
