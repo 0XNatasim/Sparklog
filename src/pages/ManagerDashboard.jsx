@@ -451,6 +451,29 @@ export default function ManagerDashboard() {
     });
   }, [jobs, profiles, search]);
 
+  // "All employees" timesheet ordering. Approved jobs sink to the bottom as a
+  // whole block; within each block the list reads by day (newest first), then
+  // by employee, and finally from the earliest to the latest job of the day
+  // (by departure time) — so a given employee's same-day jobs always read
+  // top-to-bottom in chronological order.
+  const sortedAll = useMemo(() => {
+    const nameFor = (id) => {
+      const p = profiles.get(id);
+      return (p?.full_name?.trim() || p?.email?.trim() || String(id)).toLowerCase();
+    };
+    const approvedRank = (status) => (status === "approved" ? 1 : 0);
+    return [...filtered].sort((a, b) => {
+      const ra = approvedRank(a.status);
+      const rb = approvedRank(b.status);
+      if (ra !== rb) return ra - rb;
+      if (a.job_date !== b.job_date) return (a.job_date || "") < (b.job_date || "") ? 1 : -1;
+      const na = nameFor(a.user_id);
+      const nb = nameFor(b.user_id);
+      if (na !== nb) return na < nb ? -1 : 1;
+      return String(a.depart || "").localeCompare(String(b.depart || ""));
+    });
+  }, [filtered, profiles]);
+
   const split = useMemo(() => {
     if (employeeId === "all") return null;
     const saved = [];
@@ -461,10 +484,16 @@ export default function ManagerDashboard() {
       else if (j.status === "submitted") submitted.push(j);
       else if (j.status === "approved") approved.push(j);
     }
-    // Submitted is ordered ascending by date so the oldest job (next to
-    // approve) sits at the top of the column. Saved/approved keep the
-    // default descending order from the query.
-    submitted.reverse();
+    // Order each column by day (oldest day first) and, within a day, from the
+    // earliest to the latest job (by departure time). This keeps the same-day
+    // jobs reading top-to-bottom in chronological order.
+    const byDayThenDepart = (a, b) => {
+      if (a.job_date !== b.job_date) return (a.job_date || "") < (b.job_date || "") ? -1 : 1;
+      return String(a.depart || "").localeCompare(String(b.depart || ""));
+    };
+    saved.sort(byDayThenDepart);
+    submitted.sort(byDayThenDepart);
+    approved.sort(byDayThenDepart);
     return { saved, submitted, approved };
   }, [filtered, employeeId]);
 
@@ -982,8 +1011,8 @@ export default function ManagerDashboard() {
 
         {!loading && employeeId === "all" && (
           <div className="flex flex-col gap-2 self-start">
-            {filtered.map(renderJobCard)}
-            {filtered.length === 0 && (
+            {sortedAll.map(renderJobCard)}
+            {sortedAll.length === 0 && (
               <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noResults")}</CardContent></Card>
             )}
           </div>
