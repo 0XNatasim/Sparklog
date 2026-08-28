@@ -10,6 +10,7 @@ import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
 import LiveCrew from "@/components/LiveCrew";
 import CostingDashboard from "@/components/CostingDashboard";
+import ElectricianCostSheet from "@/components/ElectricianCostSheet";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -202,6 +203,9 @@ function CcqRatesPanel() {
 
   return (
     <div className="space-y-4">
+      {/* ── Editable electrician employer-cost sheet ── */}
+      <ElectricianCostSheet />
+
       {/* ── Controls ── */}
       <Card>
         <CardContent className="p-4">
@@ -322,7 +326,12 @@ function CcqRatesPanel() {
               </TabsContent>
 
               <TabsContent value="employer-cost" className="mt-0">
-                <EmployerCostTable />
+                <details className="border-t" open>
+                  <summary className="cursor-pointer px-5 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground select-none hover:text-foreground">
+                    idontknow — grille ACQ complète (référence)
+                  </summary>
+                  <EmployerCostTable />
+                </details>
               </TabsContent>
             </Tabs>
           </CardContent>
