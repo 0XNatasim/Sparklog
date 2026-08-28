@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Bell, Check, ChevronDown } from "lucide-react";
+import { Bell, Check, ChevronDown, Send, Trash2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +21,8 @@ export default function BroadcastManager() {
   const [broadcasts, setBroadcasts] = useState([]);
   const [recipientsByBroadcast, setRecipientsByBroadcast] = useState(new Map());
   const [expanded, setExpanded] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+  const [resendingId, setResendingId] = useState("");
 
   async function loadEmployees() {
     // Include managers too (a manager is a valid recipient / selectable target).
@@ -89,6 +91,54 @@ export default function BroadcastManager() {
     }
   }
 
+  async function remove(b) {
+    if (!window.confirm(t("broadcast.deleteConfirm"))) return;
+    setMessage("");
+    setDeletingId(b.id);
+    try {
+      // broadcast_recipients cascade-delete with the parent broadcast.
+      const { error } = await supabase.from("manager_broadcasts").delete().eq("id", b.id);
+      if (error) throw error;
+      if (expanded === b.id) setExpanded("");
+      setMessage(t("broadcast.deleted"));
+      await loadLog();
+    } catch (e) {
+      setMessage(e?.message || "Error");
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  async function resend(b) {
+    setMessage("");
+    setResendingId(b.id);
+    try {
+      // Re-send to exactly the same recipients as the original broadcast.
+      const recips = recipientsByBroadcast.get(b.id) || [];
+      let targetIds = recips.map((r) => r.employee_id);
+      if (targetIds.length === 0 && b.audience === "all") targetIds = employees.map((e) => e.id);
+      if (targetIds.length === 0) throw new Error(t("broadcast.needEmployees"));
+
+      const { data: created, error: insertError } = await supabase
+        .from("manager_broadcasts")
+        .insert({ sender_id: user?.id, body: b.body, audience: b.audience })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
+
+      const rows = targetIds.map((employee_id) => ({ broadcast_id: created.id, employee_id }));
+      const { error: recipError } = await supabase.from("broadcast_recipients").insert(rows);
+      if (recipError) throw recipError;
+
+      setMessage(t("broadcast.resent"));
+      await loadLog();
+    } catch (e) {
+      setMessage(e?.message || "Error");
+    } finally {
+      setResendingId("");
+    }
+  }
+
   return (
     <div className="space-y-3">
       <Card>
@@ -146,23 +196,51 @@ export default function BroadcastManager() {
             const isOpen = expanded === b.id;
             return (
               <div key={b.id} className="rounded-lg border">
-                <button
-                  type="button"
-                  onClick={() => setExpanded(isOpen ? "" : b.id)}
-                  aria-expanded={isOpen}
-                  className="flex w-full items-start justify-between gap-3 rounded-lg p-3 text-left hover:bg-muted/50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{b.body}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
+                <div className="flex items-stretch">
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(isOpen ? "" : b.id)}
+                    aria-expanded={isOpen}
+                    className="flex min-w-0 flex-1 items-start justify-between gap-3 rounded-l-lg p-3 text-left hover:bg-muted/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{b.body}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
+                      </div>
                     </div>
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
+                      {t("broadcast.viewedCount", { acked, total: recips.length })}
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    </span>
+                  </button>
+                  <div className="flex shrink-0 items-center gap-0.5 border-l px-1.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title={t("broadcast.resend")}
+                      aria-label={t("broadcast.resend")}
+                      disabled={resendingId === b.id || deletingId === b.id}
+                      onClick={() => resend(b)}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      title={t("broadcast.delete")}
+                      aria-label={t("broadcast.delete")}
+                      disabled={deletingId === b.id || resendingId === b.id}
+                      onClick={() => remove(b)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
-                    {t("broadcast.viewedCount", { acked, total: recips.length })}
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                  </span>
-                </button>
+                </div>
                 {isOpen && (
                   <div className="border-t p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("broadcast.recipients")}</div>
