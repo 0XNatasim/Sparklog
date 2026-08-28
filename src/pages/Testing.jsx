@@ -4,11 +4,10 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Bell, Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, Radio } from "lucide-react";
+import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, Radio } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
-import BroadcastManager from "@/components/BroadcastManager";
 import LiveCrew from "@/components/LiveCrew";
 import CostingDashboard from "@/components/CostingDashboard";
 
@@ -360,7 +359,6 @@ export default function Testing() {
   const sections = [
     { id: "live", icon: Radio, label: t("testing.sections.live"), description: t("testing.sections.liveDescription") },
     { id: "costing", icon: Calculator, label: t("testing.sections.costing"), description: t("testing.sections.costingDescription") },
-    { id: "notifications", icon: Bell, label: t("testing.sections.broadcast"), description: t("testing.sections.broadcastDescription") },
     { id: "downloads", icon: Download, label: t("testing.sections.downloads"), description: t("testing.sections.downloadsDescription") },
     { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
     { id: "week", icon: CalendarDays, label: t("testing.tabs.week"), description: t("testing.sections.weekDescription") },
@@ -369,7 +367,7 @@ export default function Testing() {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-7" aria-label={t("manager.sections.testing")}>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6" aria-label={t("manager.sections.testing")}>
         {sections.map(({ id, icon: Icon, label, description }) => (
           <button
             key={id}
@@ -386,7 +384,6 @@ export default function Testing() {
 
       {section === "live" && <LiveCrew />}
       {section === "costing" && <CostingDashboard />}
-      {section === "notifications" && <BroadcastManager />}
       {section === "downloads" && <ManagerDownloads />}
       {section === "ccq" && <CcqRatesPanel />}
       {section === "week" && <ComingSoon label={t("testing.tabs.week")} />}
