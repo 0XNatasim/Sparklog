@@ -38,7 +38,7 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, hourly_rate, km_rate"),
+        supabase.from("profiles").select("id, full_name, email, hourly_rate, km_rate, team_leader_premium"),
         supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, amount").gte("job_date", start).lte("job_date", end),
@@ -60,7 +60,11 @@ export default function CostingDashboard() {
       const result = [];
       userIds.forEach((userId) => {
         const profile = profileById.get(userId);
-        const rate = Number(profile?.hourly_rate) || 0;
+        const baseRate = Number(profile?.hourly_rate) || 0;
+        const premium = Number(profile?.team_leader_premium) || 0;
+        // Team leaders earn an extra $/hour on top of their base rate; the
+        // premium raises the hourly rate so it flows into regular and OT pay.
+        const rate = baseRate + premium;
         const kmRate = Number(profile?.km_rate) || 0;
 
         let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, totalKm = 0;
@@ -81,7 +85,8 @@ export default function CostingDashboard() {
         result.push({
           userId,
           name: profile?.full_name || profile?.email || String(userId).slice(0, 8),
-          hasRate: rate > 0,
+          hasRate: baseRate > 0,
+          premium,
           regHours: (regMin + returnMin) / 60,
           otHours: (ot50Min + ot100Min) / 60,
           labor, kmCost, mealsCost, parkingCost,
@@ -146,6 +151,7 @@ export default function CostingDashboard() {
                   <tr key={r.userId} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="px-3 py-2.5 font-medium">
                       {r.name}
+                      {r.premium > 0 && <span className="ml-2 text-[11px] font-normal text-primary">({t("costing.teamLeader")} +{money(r.premium)}/h)</span>}
                       {!r.hasRate && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noRate")})</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right font-mono">{r.regHours.toFixed(2)}</td>
