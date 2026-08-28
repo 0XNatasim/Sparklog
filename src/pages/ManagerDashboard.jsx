@@ -451,10 +451,11 @@ export default function ManagerDashboard() {
     });
   }, [jobs, profiles, search]);
 
-  // "All employees" timesheet ordering: group by day (newest day first),
-  // then by employee name, then push approved jobs below the non-approved
-  // ones, and finally order each group from the earliest to the latest job of
-  // the day (by departure time).
+  // "All employees" timesheet ordering. Approved jobs sink to the bottom as a
+  // whole block; within each block the list reads by day (newest first), then
+  // by employee, and finally from the earliest to the latest job of the day
+  // (by departure time) — so a given employee's same-day jobs always read
+  // top-to-bottom in chronological order.
   const sortedAll = useMemo(() => {
     const nameFor = (id) => {
       const p = profiles.get(id);
@@ -462,13 +463,13 @@ export default function ManagerDashboard() {
     };
     const approvedRank = (status) => (status === "approved" ? 1 : 0);
     return [...filtered].sort((a, b) => {
+      const ra = approvedRank(a.status);
+      const rb = approvedRank(b.status);
+      if (ra !== rb) return ra - rb;
       if (a.job_date !== b.job_date) return (a.job_date || "") < (b.job_date || "") ? 1 : -1;
       const na = nameFor(a.user_id);
       const nb = nameFor(b.user_id);
       if (na !== nb) return na < nb ? -1 : 1;
-      const ra = approvedRank(a.status);
-      const rb = approvedRank(b.status);
-      if (ra !== rb) return ra - rb;
       return String(a.depart || "").localeCompare(String(b.depart || ""));
     });
   }, [filtered, profiles]);
