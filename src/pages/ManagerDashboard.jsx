@@ -451,6 +451,28 @@ export default function ManagerDashboard() {
     });
   }, [jobs, profiles, search]);
 
+  // "All employees" timesheet ordering: group by day (newest day first),
+  // then by employee name, then push approved jobs below the non-approved
+  // ones, and finally order each group from the earliest to the latest job of
+  // the day (by departure time).
+  const sortedAll = useMemo(() => {
+    const nameFor = (id) => {
+      const p = profiles.get(id);
+      return (p?.full_name?.trim() || p?.email?.trim() || String(id)).toLowerCase();
+    };
+    const approvedRank = (status) => (status === "approved" ? 1 : 0);
+    return [...filtered].sort((a, b) => {
+      if (a.job_date !== b.job_date) return (a.job_date || "") < (b.job_date || "") ? 1 : -1;
+      const na = nameFor(a.user_id);
+      const nb = nameFor(b.user_id);
+      if (na !== nb) return na < nb ? -1 : 1;
+      const ra = approvedRank(a.status);
+      const rb = approvedRank(b.status);
+      if (ra !== rb) return ra - rb;
+      return String(a.depart || "").localeCompare(String(b.depart || ""));
+    });
+  }, [filtered, profiles]);
+
   const split = useMemo(() => {
     if (employeeId === "all") return null;
     const saved = [];
@@ -982,8 +1004,8 @@ export default function ManagerDashboard() {
 
         {!loading && employeeId === "all" && (
           <div className="flex flex-col gap-2 self-start">
-            {filtered.map(renderJobCard)}
-            {filtered.length === 0 && (
+            {sortedAll.map(renderJobCard)}
+            {sortedAll.length === 0 && (
               <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noResults")}</CardContent></Card>
             )}
           </div>
