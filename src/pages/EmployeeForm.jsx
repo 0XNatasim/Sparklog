@@ -1027,9 +1027,11 @@ export default function EmployeeForm() {
                 </Button>
               )}
 
-              <Button type="button" className="h-12 w-full text-base font-semibold bg-emerald-600 text-white hover:bg-emerald-700" disabled={disableInputs} onClick={submitJob}>
-                {saving ? t("common.submitting") : t("form.buttons.submit")}
-              </Button>
+              {(dirty || editId) && (
+                <Button type="button" className="h-12 w-full text-base font-semibold bg-emerald-600 text-white hover:bg-emerald-700" disabled={disableInputs} onClick={submitJob}>
+                  {saving ? t("common.submitting") : t("form.buttons.submit")}
+                </Button>
+              )}
 
               {editId && (
                 <Button
