@@ -825,6 +825,12 @@ export default function EmployeeForm() {
   const disableInputs = isViewMode || locked || loadingEdit || saving || Boolean(entryBlockedReason);
   const badgeVariant = statusBadgeVariant(editId ? (status || "saved") : "new");
 
+  // Save/Submit only appear once every field is filled — including parking
+  // (amount + receipt) when the parking box is checked.
+  const parkingComplete = !parkingRequested || (normalizeNumber(parkingAmount) > 0 && (Boolean(parkingFile) || hasParkingReceipt));
+  const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(arrivee) && Boolean(fin)
+    && String(km_aller).trim() !== "" && parkingComplete;
+
   return (
     <AppShell>
       <div className="space-y-2 sm:space-y-3">
@@ -1021,13 +1027,13 @@ export default function EmployeeForm() {
             )}
 
             <div className="space-y-2 pt-3">
-              {dirty && (
+              {dirty && formComplete && (
                 <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs} onClick={saveDraft}>
                   {saving ? t("common.saving") : t("form.buttons.save")}
                 </Button>
               )}
 
-              {(dirty || editId) && (
+              {(dirty || editId) && formComplete && (
                 <Button type="button" className="h-12 w-full text-base font-semibold bg-emerald-600 text-white hover:bg-emerald-700" disabled={disableInputs} onClick={submitJob}>
                   {saving ? t("common.submitting") : t("form.buttons.submit")}
                 </Button>
