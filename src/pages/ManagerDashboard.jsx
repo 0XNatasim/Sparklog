@@ -18,6 +18,7 @@ import { withTimeout } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
+import BroadcastManager from "@/components/BroadcastManager";
 import Testing from "@/pages/Testing";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
@@ -869,6 +870,7 @@ export default function ManagerDashboard() {
 
         {activeSection === "notifications" && (
           <div className="space-y-3">
+            <BroadcastManager />
             <Card><CardContent className="space-y-3 p-4"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select></CardContent></Card>
             {(overtimeLoading || parkingLoading || notificationMealsLoading) && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
             {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
