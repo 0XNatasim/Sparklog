@@ -483,10 +483,16 @@ export default function ManagerDashboard() {
       else if (j.status === "submitted") submitted.push(j);
       else if (j.status === "approved") approved.push(j);
     }
-    // Submitted is ordered ascending by date so the oldest job (next to
-    // approve) sits at the top of the column. Saved/approved keep the
-    // default descending order from the query.
-    submitted.reverse();
+    // Order each column by day (oldest day first) and, within a day, from the
+    // earliest to the latest job (by departure time). This keeps the same-day
+    // jobs reading top-to-bottom in chronological order.
+    const byDayThenDepart = (a, b) => {
+      if (a.job_date !== b.job_date) return (a.job_date || "") < (b.job_date || "") ? -1 : 1;
+      return String(a.depart || "").localeCompare(String(b.depart || ""));
+    };
+    saved.sort(byDayThenDepart);
+    submitted.sort(byDayThenDepart);
+    approved.sort(byDayThenDepart);
     return { saved, submitted, approved };
   }, [filtered, employeeId]);
 
