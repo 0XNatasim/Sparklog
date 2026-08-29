@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown, Mail, PauseCircle, Phone, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ChevronDown, Mail, PauseCircle, Phone, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
-import Fold from "@/components/ui/fold";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
 const LEVELS = [
@@ -30,26 +29,21 @@ export default function EmployeesPanel() {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [rates, setRates] = useState(new Map());
   const [annexes, setAnnexes] = useState(new Map());
-  const [retentionDays, setRetentionDays] = useState(30);
-  const [retentionSaving, setRetentionSaving] = useState(false);
 
   async function load() {
     setErr("");
     setLoading(true);
     try {
-      const [{ data, error }, { data: snapshotRows, error: ratesError }, { data: overtimeSettings, error: settingsError }] = await withTimeout(
+      const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
           .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled")
           .order("full_name", { ascending: true }),
-        supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false }),
-        supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single()]),
+        supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
       );
       if (error) throw error;
       if (ratesError) throw ratesError;
-      if (settingsError) throw settingsError;
-      setRetentionDays(overtimeSettings?.evidence_retention_days || 30);
       const nextRates = new Map();
       const nextAnnexes = new Map();
       (snapshotRows || []).forEach((snapshot) => {
@@ -134,18 +128,6 @@ export default function EmployeesPanel() {
     }
   }
 
-  async function saveRetentionDays() {
-    const value = Math.min(365, Math.max(1, Number(retentionDays) || 30));
-    setRetentionDays(value);
-    setRetentionSaving(true);
-    setErr("");
-    const { error } = await supabase.from("overtime_settings").update({ evidence_retention_days: value, updated_at: new Date().toISOString() }).eq("id", true);
-    if (error) setErr(error.message);
-    else { setInfo(t("employees.retentionSaved")); setTimeout(() => setInfo(""), 1500); }
-    setRetentionSaving(false);
-  }
-
-
   return (
     <div className="space-y-3">
       {err && (
@@ -158,19 +140,6 @@ export default function EmployeesPanel() {
       )}
       {info && (
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
-      )}
-
-      {!loading && (
-        <Fold icon={ShieldCheck} title={t("employees.globalRetention")}>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="text-xs text-muted-foreground">{t("employees.globalRetentionDescription")}</div>
-            <div className="flex items-center gap-2">
-              <Input type="number" min="1" max="365" value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} className="w-24" />
-              <span className="text-sm text-muted-foreground">{t("employees.days")}</span>
-              <Button type="button" size="sm" disabled={retentionSaving} onClick={saveRetentionDays}>{retentionSaving ? t("common.saving") : t("common.save")}</Button>
-            </div>
-          </div>
-        </Fold>
       )}
 
       {loading && (
