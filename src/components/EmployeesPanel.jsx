@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown, Mail, PauseCircle, Phone, TriangleAlert } from "lucide-react";
+import { ChevronDown, Mail, PauseCircle, Phone, ShieldCheck, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
+import Fold from "@/components/ui/fold";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
 const LEVELS = [
@@ -160,19 +161,16 @@ export default function EmployeesPanel() {
       )}
 
       {!loading && (
-        <Card>
-          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
-            <div>
-              <div className="font-semibold">{t("employees.globalRetention")}</div>
-              <div className="text-xs text-muted-foreground">{t("employees.globalRetentionDescription")}</div>
-            </div>
+        <Fold icon={ShieldCheck} title={t("employees.globalRetention")}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-xs text-muted-foreground">{t("employees.globalRetentionDescription")}</div>
             <div className="flex items-center gap-2">
               <Input type="number" min="1" max="365" value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} className="w-24" />
               <span className="text-sm text-muted-foreground">{t("employees.days")}</span>
               <Button type="button" size="sm" disabled={retentionSaving} onClick={saveRetentionDays}>{retentionSaving ? t("common.saving") : t("common.save")}</Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Fold>
       )}
 
       {loading && (
