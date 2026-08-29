@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarClock, Clock, CalendarDays, Unlock, Users } from "lucide-react";
+import { Clock, CalendarDays, Unlock, Users, ShieldCheck } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,17 +33,31 @@ export default function TimeRulesManager() {
   const [teamLeaderPremium, setTeamLeaderPremium] = useState("");
   const [teamLeaderBusy, setTeamLeaderBusy] = useState(false);
 
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [retentionSaving, setRetentionSaving] = useState(false);
+
   async function load() {
-    const [{ data: settings }, { data: holidayRows }, { data: employeeRows }, { data: unlockRows }] = await Promise.all([
+    const [{ data: settings }, { data: holidayRows }, { data: employeeRows }, { data: unlockRows }, { data: overtimeSettings }] = await Promise.all([
       supabase.from("company_time_settings").select("daily_deadline").eq("id", true).single(),
       supabase.from("company_holidays").select("holiday_date,label").gte("holiday_date", montrealDate()).order("holiday_date").limit(40),
       supabase.from("profiles").select("id, full_name, email, team_leader_premium").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
+      supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single(),
     ]);
     setDeadline(String(settings?.daily_deadline || "23:59").slice(0, 5));
     setHolidays(holidayRows || []);
     setEmployees(employeeRows || []);
     setUnlocks(unlockRows || []);
+    setRetentionDays(overtimeSettings?.evidence_retention_days || 30);
+  }
+
+  async function saveRetentionDays() {
+    const value = Math.min(365, Math.max(1, Number(retentionDays) || 30));
+    setRetentionDays(value);
+    setRetentionSaving(true);
+    const { error } = await supabase.from("overtime_settings").update({ evidence_retention_days: value, updated_at: new Date().toISOString() }).eq("id", true);
+    setMessage(error?.message || t("employees.retentionSaved"));
+    setRetentionSaving(false);
   }
 
   useEffect(() => { load(); }, []);
@@ -128,9 +142,18 @@ export default function TimeRulesManager() {
   return (
     <Card>
       <CardContent className="space-y-3 p-4">
-        <div className="flex items-center gap-2 font-semibold"><CalendarClock className="h-4 w-4" />{t("timeRules.title")}</div>
-        <p className="text-xs text-muted-foreground">{t("timeRules.description")}</p>
         {message && <div className="rounded-md border bg-muted px-3 py-2 text-xs">{message}</div>}
+
+        <Fold icon={ShieldCheck} title={t("employees.globalRetention")}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-xs text-muted-foreground">{t("employees.globalRetentionDescription")}</div>
+            <div className="flex items-center gap-2">
+              <Input type="number" min="1" max="365" value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} className="w-24" />
+              <span className="text-sm text-muted-foreground">{t("employees.days")}</span>
+              <Button type="button" size="sm" disabled={retentionSaving} onClick={saveRetentionDays}>{retentionSaving ? t("common.saving") : t("common.save")}</Button>
+            </div>
+          </div>
+        </Fold>
 
         <Fold icon={Clock} title={t("timeRules.deadline")}>
           <div className="space-y-2">
