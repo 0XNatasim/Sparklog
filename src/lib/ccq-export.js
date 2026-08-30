@@ -1,13 +1,22 @@
 import dayjs from "dayjs";
 import { calculatePayrollEntries, roundHours } from "./payroll-calculations";
 
-const COMMERCIAL_SECTOR_CODE = "I";
+const COMMERCIAL_SECTOR_CODE = "C";
 const ELECTRICIAN_TRADE_CODE = "220";
 
 export function weekEndingSaturday(date) {
   const value = dayjs(date);
   if (!value.isValid()) return "";
   return value.add((6 - value.day() + 7) % 7, "day").format("YYYY-MM-DD");
+}
+
+// CCQ appendix codes are written with a hyphen on the monthly report (e.g. "C-3").
+// Employee records store the compact rate-table code (e.g. "C3"); normalize on export.
+export function formatAppendixCode(code) {
+  if (code == null) return null;
+  const trimmed = String(code).trim();
+  if (trimmed === "") return null;
+  return trimmed.replace(/^([A-Za-z]+)-?(\d.*)$/, "$1-$2");
 }
 
 export function buildCcqWeeklyRecords(jobs, profilesById) {
@@ -23,15 +32,18 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     if (!groups.has(key)) {
       groups.set(key, {
         nas: profile.nas_employee || null,
+        nom: profile.full_name || null,
         semaineFinissantLe: dateSFL,
         codeMetier: ELECTRICIAN_TRADE_CODE,
         secteurActivite: secteur,
         region: profile.work_region || null,
-        annexe: profile.wage_schedule || null,
+        annexe: formatAppendixCode(profile.wage_schedule),
+        union: profile.union_association || null,
         tauxHoraire: profile.hourly_rate == null ? null : Number(profile.hourly_rate),
         heuresRegulieres: 0,
         heuresSup50: 0,
         heuresSup100: 0,
+        heuresTotal: 0,
         _regularMinutes: 0,
         _regularWorkMinutes: 0,
         _sup50Minutes: 0,
@@ -62,6 +74,7 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     record.heuresRegulieres = roundHours(record._regularMinutes);
     record.heuresSup50 = roundHours(record._sup50Minutes);
     record.heuresSup100 = roundHours(record._sup100Minutes);
+    record.heuresTotal = roundHours(record._regularMinutes + record._sup50Minutes + record._sup100Minutes);
     record.sourceEntryIds = record._entryIds;
     delete record._regularMinutes;
     delete record._regularWorkMinutes;
@@ -73,6 +86,6 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
 }
 
 export function missingCcqFields(record) {
-  return ["nas", "semaineFinissantLe", "codeMetier", "secteurActivite", "region", "annexe", "tauxHoraire"]
+  return ["nas", "nom", "semaineFinissantLe", "codeMetier", "secteurActivite", "region", "annexe", "tauxHoraire"]
     .filter((field) => record[field] == null || record[field] === "");
 }
