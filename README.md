@@ -282,3 +282,86 @@ Connect the repository as a static site. `render.yaml` uses `npm run build`, pub
 ## License
 
 Private / Internal Use — All rights reserved.
+
+---
+
+## CCQ monthly-report field-verification checklist
+
+Before the **first** monthly report is sent to the CCQ, every value that feeds
+the export must be confirmed — the app can warn when a field is *empty*, but it
+cannot know whether a filled-in value is *correct*. Work through this list with
+the person responsible for payroll/CCQ (the "approver" column).
+
+The CCQ monthly report is due **by the 15th of the month following** the work
+period, so this verification can happen after the crew starts recording hours —
+it does not block time-sheet go-live.
+
+> Legend: **✓** = confirmed correct · **✗** = needs fixing · note the correction.
+
+### 1. Per-employee data (repeat for each of the 10 employees)
+
+Confirmed in **Manager → Employees**. Source of truth is the employee's CCQ
+*certificat de compétence*.
+
+| Field | App field | Where it appears on the report | ✓ / ✗ | Correction / notes |
+|---|---|---|---|---|
+| Full name | `full_name` | Identification (D) — any error rejects the line | | |
+| Social insurance number (NAS) | `nas_employee` | Identification (D) | | |
+| Work region | `work_region` | Région de travail (K) — confirm against current CCQ region list | | |
+| Appendix / annexe | `wage_schedule` | Annexe/Salaire (J), exported as `C-3` | | |
+| Union association | `union_association` | Union/syndicat (L) — FTQ/International also need the **local** number | | |
+| Hourly rate | `hourly_rate` | Taux horaire — must match the confirmed annexe | | |
+| Apprenticeship level | `apprentice_level` | Période d'apprentissage (F) | | |
+
+### 2. Global assumptions (confirm once)
+
+| Assumption | Current value | Confirm |
+|---|---|---|
+| Occupation / trade | Électricien `220` | |
+| Sector | Institutionnel & commercial → `C` | |
+| Week ending | Saturday | |
+| Everyone reported as regular salaried worker (blank status) | yes | |
+| Statutory holidays in the period handled | **not yet** — verify June 24 / July 1 etc. manually | |
+
+### 3. Rates to verify against current CCQ / ACQ tables
+
+Wage and benefit rates are fetched from the CCQ rate snapshot; the flat
+contributions and the union-specific dues are **not yet computed by the app**
+(planned for the remittance stage) and must be verified against the current
+official tables before any dollar figure is trusted.
+
+| Rate | Source | Confirm current value |
+|---|---|---|
+| Regular / 150% / 200% hourly rates | CCQ rate sync (`ccq_rate_snapshots`) | |
+| Avantages sociaux ($/h) | CCQ rate sync | |
+| Congés & jours fériés (13 %) | CCQ convention | |
+| Prélèvement CCQ (1.5 %) | CCQ | |
+| Contribution sectorielle ($0.02/h) | CCQ | |
+| Fonds d'indemnisation ($0.02/h) | CCQ | |
+| Fonds de formation ($0.20/h) | CCQ | |
+| AECQ ($0.03/h + $225 annual, October) | AECQ | |
+| TPS / TVQ | Federal / Québec (TVQ is 9.975 %) | |
+| **Union dues — per union / local** | Table des taux de cotisation syndicale | |
+
+### 4. Union differences to resolve
+
+Dues and, in some cases, benefit handling differ by union (CSD, CSN, SQC,
+FTQ‑Construction, International/CPQMCI). List each union present in the crew and
+its confirmed dues rate (and local, for FTQ/International):
+
+| Union | Local (if applicable) | Dues rate | Confirmed by |
+|---|---|---|---|
+| | | | |
+
+### 5. Sign-off
+
+- [ ] All 10 employee records confirmed
+- [ ] Global assumptions confirmed
+- [ ] Current rates confirmed
+- [ ] Union differences resolved
+
+Approved by: _________________  Date: _________
+
+> This export is an integration-ready internal format, **not** a certified CCQ
+> submission file. Validate against the CCQ's current requirements before use in
+> production payroll.
