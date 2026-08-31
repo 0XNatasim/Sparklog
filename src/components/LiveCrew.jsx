@@ -31,9 +31,10 @@ export default function LiveCrew() {
     setLoading(true);
     const today = montrealDate();
     const [{ data: people }, { data: jobs }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, is_paused").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, updated_at").eq("job_date", today),
     ]);
+    const activePeople = (people || []).filter((person) => !person.is_paused);
     const map = new Map();
     (jobs || []).forEach((job) => {
       if (!map.has(job.user_id)) map.set(job.user_id, []);
@@ -43,7 +44,7 @@ export default function LiveCrew() {
     map.forEach((list) => list.sort((a, b) =>
       String(a.depart || "99").localeCompare(String(b.depart || "99")) || String(a.updated_at).localeCompare(String(b.updated_at))
     ));
-    setEmployees(people || []);
+    setEmployees(activePeople);
     setJobsByUser(map);
     setUpdatedAt(new Date());
     setLoading(false);
