@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Users } from "lucide-react";
+import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Radio, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -20,6 +20,7 @@ import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
 import BroadcastManager from "@/components/BroadcastManager";
 import Testing from "@/pages/Testing";
+import LiveCrew from "@/components/LiveCrew";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 
@@ -56,10 +57,10 @@ export default function ManagerDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
   const requestedSection = searchParams.get("section");
-  const activeSection = ["employees", "forms", "timesheet", "notifications", "testing"].includes(requestedSection)
+  const activeSection = ["live", "employees", "forms", "timesheet", "notifications", "testing"].includes(requestedSection)
     ? requestedSection
     : ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications"
-    : "timesheet";
+    : "live";
   const [notificationFilter, setNotificationFilter] = useState(["overtime", "meals", "parking"].includes(requestedSection) ? requestedSection : "all");
   const [focusedEvidence, setFocusedEvidence] = useState(null);
   const [overtimeJobs, setOvertimeJobs] = useState([]);
@@ -843,10 +844,11 @@ export default function ManagerDashboard() {
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8" aria-label={t("manager.sections.label")}>
           {[
-            { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
-            { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
+            { id: "live", icon: Radio, label: t("manager.sections.live"), description: t("manager.sections.liveDescription") },
             { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
             { id: "notifications", icon: Bell, label: t("manager.sections.notifications"), description: t("manager.sections.notificationsDescription") },
+            { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
+            { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
             <button
@@ -861,6 +863,8 @@ export default function ManagerDashboard() {
             </button>
           ))}
         </div>
+
+        {activeSection === "live" && <LiveCrew />}
 
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
 

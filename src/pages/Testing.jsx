@@ -4,11 +4,10 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, Radio } from "lucide-react";
+import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
-import LiveCrew from "@/components/LiveCrew";
 import CostingDashboard from "@/components/CostingDashboard";
 import ElectricianCostSheet from "@/components/ElectricianCostSheet";
 
@@ -363,10 +362,9 @@ function ComingSoon({ label }) {
 // ─── Page with card sub-navigation ────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
-  const [section, setSection] = useState("live");
+  const [section, setSection] = useState("costing");
 
   const sections = [
-    { id: "live", icon: Radio, label: t("testing.sections.live"), description: t("testing.sections.liveDescription") },
     { id: "costing", icon: Calculator, label: t("testing.sections.costing"), description: t("testing.sections.costingDescription") },
     { id: "downloads", icon: Download, label: t("testing.sections.downloads"), description: t("testing.sections.downloadsDescription") },
     { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
@@ -391,7 +389,6 @@ export default function Testing() {
         ))}
       </div>
 
-      {section === "live" && <LiveCrew />}
       {section === "costing" && <CostingDashboard />}
       {section === "downloads" && <ManagerDownloads />}
       {section === "ccq" && <CcqRatesPanel />}
