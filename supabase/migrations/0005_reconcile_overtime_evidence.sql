@@ -118,6 +118,12 @@ create trigger jobs_reconcile_overtime_evidence
   after insert or delete or update of job_date, depart, fin, status on public.jobs
   for each row execute function public.reconcile_overtime_evidence();
 
+-- These run only from triggers (as definer); they should not be callable via the
+-- REST/RPC surface by anon or signed-in users.
+revoke all on function public.overtime_day_minutes(uuid, date) from public, anon, authenticated;
+revoke all on function public.notify_overtime_job_edit() from public, anon, authenticated;
+revoke all on function public.reconcile_overtime_evidence() from public, anon, authenticated;
+
 -- -----------------------------------------------------------------------------
 -- One-time cleanup: clear evidence (and, via cascade, notifications) for any day
 -- that already carries overtime evidence but is no longer over 8h.
