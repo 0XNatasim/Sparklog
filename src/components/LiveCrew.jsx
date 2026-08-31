@@ -80,13 +80,17 @@ export default function LiveCrew() {
       </Card>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {employees.map((employee) => {
-          const jobs = jobsByUser.get(employee.id) || [];
-          const dayTotal = jobs.reduce((sum, job) => sum + (hoursBetween(
-            job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,
-            job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
-          ) || 0), 0);
-          return (
+        {employees
+          .map((employee) => {
+            const jobs = jobsByUser.get(employee.id) || [];
+            const dayTotal = jobs.reduce((sum, job) => sum + (hoursBetween(
+              job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,
+              job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
+            ) || 0), 0);
+            return { employee, jobs, dayTotal };
+          })
+          .sort((a, b) => b.dayTotal - a.dayTotal)
+          .map(({ employee, jobs, dayTotal }) => (
             <Card key={employee.id}>
               <CardContent className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
@@ -117,8 +121,7 @@ export default function LiveCrew() {
                 )}
               </CardContent>
             </Card>
-          );
-        })}
+          ))}
       </div>
     </div>
   );
