@@ -34,12 +34,35 @@ export default function BroadcastManager() {
     setEmployees(data || []);
   }
 
+  function setPickedImage(file) {
+    if (!file || !file.type?.startsWith("image/")) return;
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
   function pickImage(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    setPickedImage(file);
+  }
+
+  // Paste a screenshot straight into the message box (Ctrl+V / right-click paste).
+  function handlePaste(event) {
+    const items = event.clipboardData?.items || [];
+    for (const item of items) {
+      if (item.type?.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) { event.preventDefault(); setPickedImage(file); }
+        return;
+      }
+    }
+  }
+
+  // Drag an image file onto the message box.
+  function handleDrop(event) {
+    const file = [...(event.dataTransfer?.files || [])].find((f) => f.type?.startsWith("image/"));
+    if (file) { event.preventDefault(); setPickedImage(file); }
   }
 
   function clearImage() {
@@ -179,10 +202,14 @@ export default function BroadcastManager() {
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
+              onPaste={handlePaste}
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
               rows={3}
               placeholder={t("broadcast.messagePlaceholder")}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
+            <p className="text-xs text-muted-foreground">{t("broadcast.pasteHint")}</p>
           </div>
 
           <div className="space-y-2">
