@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { BookOpen, Building2, ChevronDown, ClipboardList, ExternalLink, IdCard, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
+import { BookOpen, Building2, ChevronDown, ClipboardList, ExternalLink, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/AppShell";
@@ -69,7 +69,6 @@ export default function Profile() {
               </div>
               {!isViewMode && ccqCardEnabled && (
                 <div className="mt-4 border-t pt-4">
-                  <div className="mb-2 flex items-center gap-2 font-semibold"><IdCard className="h-5 w-5 text-primary" />{t("ccqCard.title")}</div>
                   <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />
                 </div>
               )}
