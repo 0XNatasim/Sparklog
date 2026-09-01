@@ -33,6 +33,7 @@ export default function BroadcastPopup() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
+  const [dismissed, setDismissed] = useState(false);
   const current = queue[0];
 
   async function acknowledge() {
@@ -50,8 +51,8 @@ export default function BroadcastPopup() {
   if (!current) return null;
 
   return (
-    <Dialog open onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+    <Dialog open={!dismissed} onOpenChange={(o) => { if (!o) setDismissed(true); }}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("broadcast.popupTitle")}</DialogTitle>
         </DialogHeader>

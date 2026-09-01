@@ -71,8 +71,8 @@ export default function RegionOnboarding() {
   const descriptionKey = step === "region" ? "onboarding.region.description" : step === "association" ? "onboarding.union.description" : "onboarding.ccq.description";
 
   return (
-    <Dialog open={open}>
-      <DialogContent className="max-w-md" onEscapeKeyDown={(event) => event.preventDefault()} onPointerDownOutside={(event) => event.preventDefault()}>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{t(titleKey)}</DialogTitle>
           <DialogDescription>{t(descriptionKey)}</DialogDescription>
