@@ -501,9 +501,7 @@ export default function EmployeeForm() {
     }
 
     if (await shouldRequestMealClaim(saved)) {
-      if (await createAutomaticMealClaim(saved)) setReturnStep("meal");
-      else setReturnStep("success");
-      return;
+      await createMealClaim(saved);
     }
     setReturnStep("success");
     if (editId) {
@@ -564,7 +562,7 @@ export default function EmployeeForm() {
     return (data || []).length === 0 && Boolean(jobId);
   }
 
-  async function createAutomaticMealClaim(jobId) {
+  async function createMealClaim(jobId) {
     try {
       const claimId = crypto.randomUUID();
       const { error: claimError } = await supabase.from("meal_claims").insert({
@@ -573,8 +571,7 @@ export default function EmployeeForm() {
         job_id: jobId,
         job_date,
         amount: 30,
-        status: "approved",
-        payroll_treatment: "expense_reimbursement",
+        status: "pending",
         storage_path: null,
         daily_work_minutes: overtimeDailyMinutes,
       });
@@ -702,18 +699,13 @@ export default function EmployeeForm() {
       // The evidence is saved at this point. A failure while checking or
       // creating the automatic meal claim must not throw the user back to the
       // evidence step, so handle it separately and always move forward.
-      let showMeal = false;
       try {
-        showMeal = (await shouldRequestMealClaim(savedJobId)) && (await createAutomaticMealClaim(savedJobId));
+        if (await shouldRequestMealClaim(savedJobId)) await createMealClaim(savedJobId);
       } catch (mealError) {
         console.error("[overtime evidence] Meal claim step failed", mealError);
       }
-      if (showMeal) {
-        setReturnStep("meal");
-      } else {
-        setReturnStep("success");
-        navigate("/form", { replace: true });
-      }
+      setReturnStep("success");
+      navigate("/form", { replace: true });
     } catch (error) {
       setErr(error?.message || t("form.evidence.failed"));
       setReturnStep("evidence");
@@ -1206,18 +1198,6 @@ export default function EmployeeForm() {
                 <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0 || normalizeNumber(returnKm) > (normalizeNumber(km_aller) || 0)} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
                   {saving || returnCheckBusy ? t("common.saving") : t("form.buttons.save")}
                 </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "meal" && (
-            <>
-              <DialogHeader><DialogTitle>{t("form.meal.title")}</DialogTitle></DialogHeader>
-              <div className="rounded-md border border-primary/30 bg-primary/10 p-3 text-sm">
-                {t("form.meal.description")}
-              </div>
-              <DialogFooter>
-                <Button type="button" onClick={() => { setReturnStep("closed"); navigate("/form", { replace: true }); }}>{t("common.ok")}</Button>
               </DialogFooter>
             </>
           )}
