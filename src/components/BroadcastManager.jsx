@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Bell, Check, ChevronDown, Send, Trash2 } from "lucide-react";
+import { Bell, Check, ChevronDown, Image as ImageIcon, Paperclip, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
+import { compressImage } from "@/lib/ocr";
 
 export default function BroadcastManager() {
   const t = useT();
@@ -13,6 +14,8 @@ export default function BroadcastManager() {
 
   const [employees, setEmployees] = useState([]);
   const [body, setBody] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [audience, setAudience] = useState("all");
   const [selected, setSelected] = useState(new Set());
   const [sending, setSending] = useState(false);
@@ -31,9 +34,23 @@ export default function BroadcastManager() {
     setEmployees(data || []);
   }
 
+  function pickImage(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function clearImage() {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview("");
+  }
+
   async function loadLog() {
     const [{ data: rows }, { data: recips }] = await Promise.all([
-      supabase.from("manager_broadcasts").select("id, body, audience, created_at").order("created_at", { ascending: false }),
+      supabase.from("manager_broadcasts").select("id, body, audience, image_path, created_at").order("created_at", { ascending: false }),
       supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at"),
     ]);
     setBroadcasts(rows || []);
@@ -62,15 +79,24 @@ export default function BroadcastManager() {
 
   async function send() {
     setMessage("");
-    if (!body.trim()) { setMessage(t("broadcast.needMessage")); return; }
+    if (!body.trim() && !imageFile) { setMessage(t("broadcast.needMessage")); return; }
     const targetIds = audience === "all" ? employees.map((e) => e.id) : [...selected];
     if (targetIds.length === 0) { setMessage(t("broadcast.needEmployees")); return; }
 
     setSending(true);
     try {
+      let imagePath = null;
+      if (imageFile) {
+        const blob = await compressImage(imageFile);
+        const path = `${crypto.randomUUID()}.jpg`;
+        const { error: upErr } = await supabase.storage.from("broadcast-images").upload(path, blob, { contentType: "image/jpeg", upsert: false });
+        if (upErr) throw upErr;
+        imagePath = path;
+      }
+
       const { data: created, error: insertError } = await supabase
         .from("manager_broadcasts")
-        .insert({ sender_id: user?.id, body: body.trim(), audience })
+        .insert({ sender_id: user?.id, body: body.trim(), audience, image_path: imagePath })
         .select("id")
         .single();
       if (insertError) throw insertError;
@@ -80,6 +106,7 @@ export default function BroadcastManager() {
       if (recipError) throw recipError;
 
       setBody("");
+      clearImage();
       setSelected(new Set());
       setAudience("all");
       setMessage(t("broadcast.sent"));
@@ -121,7 +148,7 @@ export default function BroadcastManager() {
 
       const { data: created, error: insertError } = await supabase
         .from("manager_broadcasts")
-        .insert({ sender_id: user?.id, body: b.body, audience: b.audience })
+        .insert({ sender_id: user?.id, body: b.body, audience: b.audience, image_path: b.image_path || null })
         .select("id")
         .single();
       if (insertError) throw insertError;
@@ -182,6 +209,21 @@ export default function BroadcastManager() {
             )}
           </div>
 
+          <div className="space-y-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent">
+              <Paperclip className="h-4 w-4" />{t("broadcast.attachImage")}
+              <input type="file" accept="image/*" onChange={pickImage} className="hidden" />
+            </label>
+            {imagePreview && (
+              <div className="relative w-fit">
+                <img src={imagePreview} alt="" className="max-h-40 rounded-md border object-contain" />
+                <button type="button" onClick={clearImage} className="absolute -right-2 -top-2 rounded-full border bg-background p-0.5 shadow" aria-label={t("broadcast.removeImage")}>
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
           <Button type="button" disabled={sending} onClick={send}>{sending ? t("broadcast.sending") : t("broadcast.send")}</Button>
         </CardContent>
       </Card>
@@ -205,7 +247,8 @@ export default function BroadcastManager() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{b.body}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
+                      <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                        {b.image_path && <ImageIcon className="h-3.5 w-3.5" />}
                         {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
                       </div>
                     </div>

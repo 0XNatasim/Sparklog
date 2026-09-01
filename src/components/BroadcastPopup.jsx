@@ -21,7 +21,7 @@ export default function BroadcastPopup() {
     (async () => {
       const { data } = await supabase
         .from("broadcast_recipients")
-        .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at)")
+        .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path)")
         .eq("employee_id", user.id)
         .is("acknowledged_at", null);
       if (cancelled) return;
@@ -34,7 +34,18 @@ export default function BroadcastPopup() {
   }, [user?.id]);
 
   const [dismissed, setDismissed] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
   const current = queue[0];
+
+  useEffect(() => {
+    const path = current?.manager_broadcasts?.image_path;
+    if (!path) { setImageUrl(""); return; }
+    let cancelled = false;
+    supabase.storage.from("broadcast-images").createSignedUrl(path, 3600).then(({ data }) => {
+      if (!cancelled) setImageUrl(data?.signedUrl || "");
+    });
+    return () => { cancelled = true; };
+  }, [current?.broadcast_id]);
 
   async function acknowledge() {
     if (!current || !user?.id) return;
@@ -56,7 +67,8 @@ export default function BroadcastPopup() {
         <DialogHeader>
           <DialogTitle>{t("broadcast.popupTitle")}</DialogTitle>
         </DialogHeader>
-        <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>
+        {current.manager_broadcasts.body && <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>}
+        {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer"><img src={imageUrl} alt="" className="max-h-72 w-full rounded-md border object-contain" /></a>}
         <p className="text-xs text-muted-foreground">{dayjs(current.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</p>
         <DialogFooter>
           <Button type="button" disabled={busy} onClick={acknowledge}>{busy ? t("common.working") : t("broadcast.acknowledge")}</Button>
