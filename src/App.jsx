@@ -16,6 +16,9 @@ import { ViewModeProvider } from "@/contexts/ViewModeContext";
 // Landing route: managers start on the Manager dashboard, employees on the form.
 function RoleLanding() {
   const { role } = useAuth();
+  // Role loads just after `loading` clears; wait for it so a manager is not
+  // sent to /form before their role resolves.
+  if (!role) return null;
   return <Navigate to={role === "manager" ? "/manager" : "/form"} replace />;
 }
 

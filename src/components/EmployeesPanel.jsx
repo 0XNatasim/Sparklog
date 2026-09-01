@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown, Mail, PauseCircle, Phone, TriangleAlert } from "lucide-react";
+import { ChevronDown, Mail, PauseCircle, Phone, TriangleAlert, Trophy } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -172,7 +172,10 @@ export default function EmployeesPanel() {
             className="flex w-full items-center gap-3 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold">{p.full_name || p.email || t("manager.employee")}</div>
+              <div className="flex items-center gap-1.5 truncate font-semibold">
+                {p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
+                <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
+              </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
             </div>
             <span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.is_paused ? "bg-muted-foreground/15 text-muted-foreground" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"}`}>
