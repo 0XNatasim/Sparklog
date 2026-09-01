@@ -70,7 +70,7 @@ export default function Profile() {
             </CollapsibleCard>
 
             {!isViewMode && ccqCardEnabled && (
-              <CollapsibleCard icon={IdCard} title={t("ccqCard.title")} defaultOpen>
+              <CollapsibleCard icon={IdCard} title={t("ccqCard.title")}>
                 <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />
               </CollapsibleCard>
             )}
