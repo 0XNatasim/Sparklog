@@ -359,8 +359,6 @@ export default function EmployeesPanel() {
                 <div className="space-y-2">
                   {[
                     ["ccq_card_capture_enabled", "capture.ccqCard"],
-                    ["birth_date_capture_enabled", "capture.birthDate"],
-                    ["union_association_capture_enabled", "capture.union"],
                   ].map(([field, labelKey]) => (
                     <label key={field} className="flex items-center justify-between gap-3">
                       <span className="text-sm">{t(labelKey)}</span>

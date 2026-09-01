@@ -5,8 +5,6 @@ import { useT } from "@/lib/use-t";
 
 const TOGGLES = [
   { field: "ccq_card_enabled", labelKey: "capture.ccqCard", descKey: "capture.ccqCardDesc" },
-  { field: "birth_date_enabled", labelKey: "capture.birthDate", descKey: "capture.birthDateDesc" },
-  { field: "union_association_enabled", labelKey: "capture.union", descKey: "capture.unionDesc" },
 ];
 
 export default function CaptureSettingsManager() {
