@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { BookOpen, Building2, ExternalLink, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,7 @@ import { useT } from "@/lib/use-t";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { useViewMode } from "@/contexts/ViewModeContext";
+import CcqCardCapture from "@/components/CcqCardCapture";
 
 export default function Profile() {
   const t = useT();
@@ -17,28 +18,34 @@ export default function Profile() {
   const { isViewMode, viewedEmployee } = useViewMode();
   const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const [profile, setProfile] = useState(null);
+  const [captureSettings, setCaptureSettings] = useState(null);
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!effectiveUserId) return;
-    Promise.all([
-      supabase.from("profiles").select("full_name, phone, email, work_region, union_association").eq("id", effectiveUserId).single(),
+    const [profileResult, formsResult, accessResult, settingsResult] = await Promise.all([
+      supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, ccq_card_capture_enabled, birth_date_capture_enabled").eq("id", effectiveUserId).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
       supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
-    ]).then(([profileResult, formsResult, accessResult]) => {
-      const loadError = profileResult.error || formsResult.error || accessResult.error;
-      if (loadError) setError(loadError.message);
-      else {
-        setProfile(profileResult.data);
-        const enabledIds = new Set((formsResult.data || []).map((row) => row.form_id));
-        const accessibleIds = new Set((accessResult.data || []).map((row) => row.form_id));
-        setForms(COMPANY_FORMS.filter((form) => enabledIds.has(form.id) && (!form.employeeSpecific || accessibleIds.has(form.id))));
-      }
-      setLoading(false);
-    });
-  }, [effectiveUserId]);
+      supabase.from("company_capture_settings").select("ccq_card_enabled, birth_date_enabled").eq("id", true).maybeSingle(),
+    ]);
+    const loadError = profileResult.error || formsResult.error || accessResult.error || settingsResult.error;
+    if (loadError) setError(loadError.message);
+    else {
+      setProfile(profileResult.data);
+      setCaptureSettings(settingsResult.data || {});
+      const enabledIds = new Set((formsResult.data || []).map((row) => row.form_id));
+      const accessibleIds = new Set((accessResult.data || []).map((row) => row.form_id));
+      setForms(COMPANY_FORMS.filter((form) => enabledIds.has(form.id) && (!form.employeeSpecific || accessibleIds.has(form.id))));
+    }
+    setLoading(false);
+  }, [effectiveUserId, user?.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const ccqCardEnabled = profile?.ccq_card_capture_enabled ?? captureSettings?.ccq_card_enabled ?? false;
 
   return (
     <AppShell>
@@ -51,6 +58,9 @@ export default function Profile() {
         {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
         {!loading && !error && (
           <>
+            {!isViewMode && ccqCardEnabled && (
+              <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />
+            )}
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><UserRound className="h-5 w-5 text-primary" />{t("profile.information")}</CardTitle></CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -29,6 +29,17 @@ export default function EmployeesPanel() {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [rates, setRates] = useState(new Map());
   const [annexes, setAnnexes] = useState(new Map());
+  const [cardViews, setCardViews] = useState({});
+
+  async function toggleCard(profile) {
+    if (cardViews[profile.id]?.open) {
+      setCardViews((current) => ({ ...current, [profile.id]: { open: false } }));
+      return;
+    }
+    setCardViews((current) => ({ ...current, [profile.id]: { open: true, loading: true } }));
+    const { data, error } = await supabase.storage.from("ccq-cards").createSignedUrl(profile.ccq_card_path, 300);
+    setCardViews((current) => ({ ...current, [profile.id]: { open: true, loading: false, url: data?.signedUrl || null, error: error?.message || (!data ? "not found" : "") } }));
+  }
 
   async function load() {
     setErr("");
@@ -37,7 +48,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -369,6 +380,20 @@ export default function EmployeesPanel() {
                     </label>
                   ))}
                 </div>
+                {p.ccq_card_path && (
+                  <div className="mt-2 border-t pt-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => toggleCard(p)}>
+                      {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
+                    </Button>
+                    {cardViews[p.id]?.open && (
+                      <div className="mt-2">
+                        {cardViews[p.id]?.loading && <div className="text-xs text-muted-foreground">{t("common.loading")}</div>}
+                        {cardViews[p.id]?.url && <img src={cardViews[p.id].url} alt={t("ccqCard.title")} className="max-h-80 w-full rounded-md border object-contain" />}
+                        {cardViews[p.id]?.error && <div className="text-xs text-destructive dark:text-red-300">{cardViews[p.id].error}</div>}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>}
