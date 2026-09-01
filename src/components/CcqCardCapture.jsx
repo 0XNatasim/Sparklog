@@ -20,6 +20,12 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
     ccq_expiration_date: profile?.ccq_expiration_date || "",
     birth_date: profile?.birth_date || "",
   });
+  // Track the last-saved values so blur only saves an actual change.
+  const savedRef = useRef({
+    ccq_number: profile?.ccq_number || "",
+    ccq_expiration_date: profile?.ccq_expiration_date || "",
+    birth_date: profile?.birth_date || "",
+  });
 
   async function persist(values, file) {
     let cardPath = profile?.ccq_card_path || null;
@@ -61,6 +67,7 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
       };
       setForm(values);
       await persist(values, file);
+      savedRef.current = { ...values };
       setInfo(t("ccqCard.saved"));
     } catch (e) {
       setErr(e?.message || t("ccqCard.readFailed"));
@@ -71,10 +78,14 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
 
   async function saveField() {
     if (busy) return;
+    const s = savedRef.current;
+    // Only save when a field actually changed (avoid no-op saves on blur).
+    if (form.ccq_number === s.ccq_number && form.ccq_expiration_date === s.ccq_expiration_date && form.birth_date === s.birth_date) return;
     setErr("");
     setBusy(true);
     try {
       await persist(form, null);
+      savedRef.current = { ...form };
       setInfo(t("ccqCard.saved"));
     } catch (e) {
       setErr(e?.message || t("ccqCard.saveFailed"));
@@ -100,7 +111,7 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
         </label>
       </div>
 
-      <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden" />
+      <input ref={inputRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
       <Button type="button" variant="outline" disabled={busy} onClick={() => inputRef.current?.click()}>
         {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
         {t("ccqCard.upload")}
