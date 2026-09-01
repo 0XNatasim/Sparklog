@@ -30,17 +30,19 @@ export default function RegionOnboarding() {
   }
 
   useEffect(() => {
-    if (!user?.id || role === "manager") return;
+    if (!user?.id || !role) return;
     supabase.from("profiles").select("work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path").eq("id", user.id).single()
       .then(({ data, error: loadError }) => {
         if (loadError) return;
         setRegion(data?.work_region || "");
         setAssociation(data?.union_association || "");
         setProfile(data);
-        if (!data?.work_region) {
+        const isManager = role === "manager";
+        // Region and union are employee fields; managers only get the CCQ step.
+        if (!isManager && !data?.work_region) {
           setStep("region");
           setOpen(true);
-        } else if (!data?.union_association) {
+        } else if (!isManager && !data?.union_association) {
           setStep("association");
           setOpen(true);
         } else if (needsCcqCard(data)) {
