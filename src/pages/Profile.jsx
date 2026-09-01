@@ -67,13 +67,13 @@ export default function Profile() {
                 <Info label={t("profile.unionAssociation")} value={UNION_ASSOCIATIONS.find((association) => association.code === profile?.union_association)?.employeeLabel} icon={Users} />
                 <Info label={t("profile.sector")} value={t("employees.commercialSector")} icon={Building2} />
               </div>
+              {!isViewMode && ccqCardEnabled && (
+                <div className="mt-4 border-t pt-4">
+                  <div className="mb-2 flex items-center gap-2 font-semibold"><IdCard className="h-5 w-5 text-primary" />{t("ccqCard.title")}</div>
+                  <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />
+                </div>
+              )}
             </CollapsibleCard>
-
-            {!isViewMode && ccqCardEnabled && (
-              <CollapsibleCard icon={IdCard} title={t("ccqCard.title")}>
-                <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />
-              </CollapsibleCard>
-            )}
 
             <CollapsibleCard icon={ClipboardList} title={t("profile.forms")} description={t("profile.formsDescription")}>
               <div className="grid gap-3 sm:grid-cols-2">
