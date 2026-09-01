@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useT } from "@/lib/use-t";
 
+const TIME_FIELDS = new Set(["depart", "arrivee", "fin"]);
+
+function formatChangeValue(field, value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (TIME_FIELDS.has(field)) return String(value).slice(0, 5);
+  return String(value);
+}
+
 export default function NotificationsBell() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
@@ -17,7 +25,7 @@ export default function NotificationsBell() {
   const load = useCallback(async () => {
     if (role !== "manager" || !user?.id) return;
     const [{ data: rows }, { data: reads }] = await Promise.all([
-      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, parking_receipt_id, daily_minutes, created_at").order("created_at", { ascending: false }).limit(50),
+      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, parking_receipt_id, daily_minutes, changes, created_at").order("created_at", { ascending: false }).limit(50),
       supabase.from("manager_notification_reads").select("notification_id").eq("manager_id", user.id),
     ]);
     const employeeIds = [...new Set((rows || []).map((row) => row.employee_id))];
@@ -95,6 +103,19 @@ export default function NotificationsBell() {
                   ? t("notifications.overtimeEdited", { hours: (notification.daily_minutes / 60).toFixed(2) })
                   : t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}
             </div>
+            {notification.type === "overtime_job_edited" && notification.changes && Object.keys(notification.changes).length > 0 && (
+              <div className="mt-1.5 space-y-0.5 rounded-md border bg-muted/40 p-1.5 text-[11px]">
+                <div className="font-semibold text-muted-foreground">{t("notifications.changesTitle")}</div>
+                {Object.entries(notification.changes).map(([field, val]) => (
+                  <div key={field} className="flex flex-wrap items-center gap-x-1">
+                    <span className="font-medium">{t(`notifications.field.${field}`)}:</span>
+                    <span className="text-muted-foreground line-through">{formatChangeValue(field, val?.from)}</span>
+                    <span aria-hidden="true">→</span>
+                    <span className="font-semibold">{formatChangeValue(field, val?.to)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-1 text-[11px] text-muted-foreground">{new Date(notification.created_at).toLocaleString()}</div>
           </DropdownMenuItem>
         ))}
