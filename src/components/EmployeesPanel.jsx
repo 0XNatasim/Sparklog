@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ChevronDown, Crown, Mail, PauseCircle, Phone, TriangleAlert, Trophy } from "lucide-react";
 import { isBoss } from "@/lib/boss";
 import { supabase } from "../supabaseClient";
+import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,10 @@ const LEVELS = [
 
 export default function EmployeesPanel() {
   const t = useT();
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState([]);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading]   = useState(true);
   const [err, setErr]           = useState("");
   const [info, setInfo]         = useState("");
@@ -114,6 +118,29 @@ export default function EmployeesPanel() {
     const { error } = await supabase.from("profiles").update({ [field]: value }).eq("id", id);
     if (error) setErr(error.message);
     else { setInfo(`${field} ✓`); setTimeout(() => setInfo(""), 1500); }
+  }
+
+  async function handleDelete(profile) {
+    setDeleting(true);
+    setErr("");
+    try {
+      const { data, error } = await supabase.functions.invoke("delete_user", { body: { userId: profile.id } });
+      if (error) {
+        let message = error.message;
+        try { const ctx = await error.context?.json?.(); if (ctx?.error) message = ctx.error; } catch (_) { /* keep default */ }
+        throw new Error(message);
+      }
+      if (data && data.ok === false) throw new Error(data.error || "Delete failed");
+      setProfiles((prev) => prev.filter((x) => x.id !== profile.id));
+      setConfirmDelete(null);
+      setInfo(t("employees.deleted"));
+      setTimeout(() => setInfo(""), 2500);
+    } catch (e) {
+      setErr(e?.message || "Delete failed");
+      setConfirmDelete(null);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function saveClassification(profile, field, value) {
@@ -375,6 +402,23 @@ export default function EmployeesPanel() {
                 </div>
               )}
             </div>
+
+            {p.role !== "manager" && p.id !== user?.id && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-destructive dark:text-red-300">{t("employees.deleteUser")}</span>
+                  {confirmDelete === p.id ? (
+                    <div className="flex items-center gap-2">
+                      <Button type="button" size="sm" variant="outline" disabled={deleting} onClick={() => setConfirmDelete(null)}>{t("common.cancel")}</Button>
+                      <Button type="button" size="sm" variant="destructive" disabled={deleting} onClick={() => handleDelete(p)}>{deleting ? t("common.saving") : t("employees.deleteConfirm")}</Button>
+                    </div>
+                  ) : (
+                    <Button type="button" size="sm" variant="destructive" onClick={() => setConfirmDelete(p.id)}>{t("employees.deleteUser")}</Button>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{t("employees.deleteHint")}</p>
+              </div>
+            )}
           </CardContent>}
         </Card>
       );})}
