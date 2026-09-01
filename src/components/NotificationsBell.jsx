@@ -77,7 +77,9 @@ export default function NotificationsBell() {
       ? `/manager?section=meals&job=${notification.job_id}`
       : notification.type === "parking_receipt"
         ? "/manager?section=parking"
-        : `/manager?section=overtime&job=${notification.job_id}`);
+        : notification.type === "ccq_renewal"
+          ? "/manager?section=employees"
+          : `/manager?section=overtime&job=${notification.job_id}`);
   }
 
   return (
@@ -99,6 +101,8 @@ export default function NotificationsBell() {
                 ? t("notifications.meal")
                 : notification.type === "parking_receipt"
                   ? t("notifications.parking")
+                : notification.type === "ccq_renewal"
+                  ? t("notifications.ccqRenewal", { date: notification.changes?.ccq_expiration || "" })
                 : notification.type === "overtime_job_edited"
                   ? t("notifications.overtimeEdited", { hours: (notification.daily_minutes / 60).toFixed(2) })
                   : t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}
