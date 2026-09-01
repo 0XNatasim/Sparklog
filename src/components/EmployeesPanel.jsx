@@ -37,7 +37,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -343,6 +343,33 @@ export default function EmployeesPanel() {
                   className="h-5 w-5 rounded border-input accent-amber-600"
                 />
               </label>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("capture.perEmployeeTitle")}</div>
+                <div className="space-y-2">
+                  {[
+                    ["ccq_card_capture_enabled", "capture.ccqCard"],
+                    ["birth_date_capture_enabled", "capture.birthDate"],
+                    ["union_association_capture_enabled", "capture.union"],
+                  ].map(([field, labelKey]) => (
+                    <label key={field} className="flex items-center justify-between gap-3">
+                      <span className="text-sm">{t(labelKey)}</span>
+                      <Select
+                        value={p[field] === true ? "on" : p[field] === false ? "off" : "default"}
+                        onChange={(e) => {
+                          const v = e.target.value === "on" ? true : e.target.value === "off" ? false : null;
+                          setLocal(p.id, field, v);
+                          saveField(p.id, field, v);
+                        }}
+                        className="h-9 w-32"
+                      >
+                        <option value="default">{t("capture.override.default")}</option>
+                        <option value="on">{t("capture.override.on")}</option>
+                        <option value="off">{t("capture.override.off")}</option>
+                      </Select>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </CardContent>}
         </Card>

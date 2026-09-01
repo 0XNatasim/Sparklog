@@ -21,6 +21,7 @@ import TimeRulesManager from "@/components/TimeRulesManager";
 import BroadcastManager from "@/components/BroadcastManager";
 import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
+import CaptureSettingsManager from "@/components/CaptureSettingsManager";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 
@@ -868,7 +869,7 @@ export default function ManagerDashboard() {
 
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
 
-        {activeSection === "forms" && <FormsManager collapsible={false} />}
+        {activeSection === "forms" && <div className="space-y-3"><CaptureSettingsManager /><FormsManager collapsible={false} /></div>}
 
         {activeSection === "testing" && <Testing />}
 
