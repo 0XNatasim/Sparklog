@@ -11,6 +11,8 @@ import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import CcqCardCapture from "@/components/CcqCardCapture";
+import { isBoss } from "@/lib/boss";
+import { Radio } from "lucide-react";
 
 export default function Profile() {
   const t = useT();
@@ -25,7 +27,7 @@ export default function Profile() {
   const load = useCallback(async () => {
     if (!effectiveUserId) return;
     const [profileResult, formsResult, accessResult] = await Promise.all([
-      supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path").eq("id", effectiveUserId).single(),
+      supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, show_on_boards").eq("id", effectiveUserId).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
       supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
     ]);
@@ -41,6 +43,17 @@ export default function Profile() {
   }, [effectiveUserId, user?.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function toggleShowOnBoards(next) {
+    setProfile((current) => ({ ...current, show_on_boards: next }));
+    const { error: updateError } = await supabase.from("profiles").update({ show_on_boards: next }).eq("id", effectiveUserId);
+    if (updateError) {
+      setError(updateError.message);
+      setProfile((current) => ({ ...current, show_on_boards: !next }));
+    }
+  }
+
+  const showBoardsToggle = !isViewMode && isBoss(user?.id);
 
   return (
     <AppShell>
@@ -62,6 +75,15 @@ export default function Profile() {
                 <Info label={t("profile.unionAssociation")} value={UNION_ASSOCIATIONS.find((association) => association.code === profile?.union_association)?.employeeLabel} icon={Users} />
                 <Info label={t("profile.sector")} value={t("employees.commercialSector")} icon={Building2} />
               </div>
+              {showBoardsToggle && (
+                <div className="mt-4 border-t pt-4">
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border p-3">
+                    <span className="flex items-center gap-2 text-sm font-medium"><Radio className="h-4 w-4 text-primary" />{t("profile.showOnBoards")}</span>
+                    <input type="checkbox" className="h-4 w-4" checked={profile?.show_on_boards !== false} onChange={(event) => toggleShowOnBoards(event.target.checked)} />
+                  </label>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("profile.showOnBoardsHint")}</p>
+                </div>
+              )}
               {!isViewMode && (
                 <div className="mt-4 border-t pt-4">
                   <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />

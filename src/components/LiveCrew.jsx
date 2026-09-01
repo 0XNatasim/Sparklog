@@ -31,12 +31,11 @@ export default function LiveCrew() {
     setLoading(true);
     const today = montrealDate();
     const [{ data: people }, { data: jobs }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, is_paused").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, updated_at").eq("job_date", today),
     ]);
-    // Karine Messier (the boss) doesn't run job cards, so keep her off the crew board.
-    const HIDDEN_FROM_CREW = new Set(["38034202-cd04-4666-b7d0-3c24ae906afd"]);
-    const activePeople = (people || []).filter((person) => !person.is_paused && !HIDDEN_FROM_CREW.has(person.id));
+    // Paused users and anyone who opted out of the boards (e.g. the boss) are hidden.
+    const activePeople = (people || []).filter((person) => !person.is_paused && person.show_on_boards !== false);
     const map = new Map();
     (jobs || []).forEach((job) => {
       if (!map.has(job.user_id)) map.set(job.user_id, []);

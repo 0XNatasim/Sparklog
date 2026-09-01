@@ -160,7 +160,7 @@ export default function ManagerDashboard() {
       if (mealErr) throw mealErr;
 
       const { data: profileRows, error: profErr } = await withTimeout(
-        supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number"),
+        supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, is_paused, show_on_boards"),
         12000
       );
       if (profErr) throw profErr;
@@ -433,6 +433,8 @@ export default function ManagerDashboard() {
   const employeeOptions = useMemo(() => {
     const arr = [];
     profiles.forEach((p, id) => {
+      // Hide inactive employees and anyone opted out of the boards (e.g. the boss).
+      if (p?.is_paused || p?.show_on_boards === false) return;
       const label = p?.full_name?.trim() || p?.email?.trim() || `User ${String(id).slice(0, 8)}…`;
       arr.push({ id, label });
     });

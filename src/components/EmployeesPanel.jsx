@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown, Mail, PauseCircle, Phone, TriangleAlert, Trophy } from "lucide-react";
+import { ChevronDown, Crown, Mail, PauseCircle, Phone, TriangleAlert, Trophy } from "lucide-react";
+import { isBoss } from "@/lib/boss";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -173,7 +174,9 @@ export default function EmployeesPanel() {
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 truncate font-semibold">
-                {p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
+                {isBoss(p.id)
+                  ? <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.bossLabel")} />
+                  : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
