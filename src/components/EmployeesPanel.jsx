@@ -72,7 +72,8 @@ export default function EmployeesPanel() {
       });
       setRates(nextRates);
       setAnnexes(nextAnnexes);
-      const nextProfiles = data ?? [];
+      // Keep the DB's name order, but push inactive (paused) employees to the bottom.
+      const nextProfiles = [...(data ?? [])].sort((a, b) => (a.is_paused ? 1 : 0) - (b.is_paused ? 1 : 0));
       setProfiles(nextProfiles);
       await Promise.all(nextProfiles.map(async (profile) => {
         const availableAnnexes = nextAnnexes.get(COMMERCIAL_RATE_SECTOR) || [];
