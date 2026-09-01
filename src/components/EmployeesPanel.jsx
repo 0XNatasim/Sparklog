@@ -357,45 +357,20 @@ export default function EmployeesPanel() {
                   className="h-5 w-5 rounded border-input accent-amber-600"
                 />
               </label>
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("capture.perEmployeeTitle")}</div>
-                <div className="space-y-2">
-                  {[
-                    ["ccq_card_capture_enabled", "capture.ccqCard"],
-                  ].map(([field, labelKey]) => (
-                    <label key={field} className="flex items-center justify-between gap-3">
-                      <span className="text-sm">{t(labelKey)}</span>
-                      <Select
-                        value={p[field] === true ? "on" : p[field] === false ? "off" : "default"}
-                        onChange={(e) => {
-                          const v = e.target.value === "on" ? true : e.target.value === "off" ? false : null;
-                          setLocal(p.id, field, v);
-                          saveField(p.id, field, v);
-                        }}
-                        className="h-9 w-32"
-                      >
-                        <option value="default">{t("capture.override.default")}</option>
-                        <option value="on">{t("capture.override.on")}</option>
-                        <option value="off">{t("capture.override.off")}</option>
-                      </Select>
-                    </label>
-                  ))}
+              {p.ccq_card_path && (
+                <div className="rounded-lg border bg-muted/20 p-3">
+                  <Button type="button" size="sm" variant="outline" onClick={() => toggleCard(p)}>
+                    {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
+                  </Button>
+                  {cardViews[p.id]?.open && (
+                    <div className="mt-2">
+                      {cardViews[p.id]?.loading && <div className="text-xs text-muted-foreground">{t("common.loading")}</div>}
+                      {cardViews[p.id]?.url && <img src={cardViews[p.id].url} alt={t("ccqCard.title")} className="max-h-80 w-full rounded-md border object-contain" />}
+                      {cardViews[p.id]?.error && <div className="text-xs text-destructive dark:text-red-300">{cardViews[p.id].error}</div>}
+                    </div>
+                  )}
                 </div>
-                {p.ccq_card_path && (
-                  <div className="mt-2 border-t pt-2">
-                    <Button type="button" size="sm" variant="outline" onClick={() => toggleCard(p)}>
-                      {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
-                    </Button>
-                    {cardViews[p.id]?.open && (
-                      <div className="mt-2">
-                        {cardViews[p.id]?.loading && <div className="text-xs text-muted-foreground">{t("common.loading")}</div>}
-                        {cardViews[p.id]?.url && <img src={cardViews[p.id].url} alt={t("ccqCard.title")} className="max-h-80 w-full rounded-md border object-contain" />}
-                        {cardViews[p.id]?.error && <div className="text-xs text-destructive dark:text-red-300">{cardViews[p.id].error}</div>}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </CardContent>}
         </Card>
