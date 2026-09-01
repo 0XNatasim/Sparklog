@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
-import { IdCard, Upload, Loader2 } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
 import { supabase } from "@/supabaseClient";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
@@ -82,9 +81,7 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-center gap-2 font-semibold"><IdCard className="h-5 w-5 text-primary" />{t("ccqCard.title")}</div>
+    <div className="space-y-3">
         <p className="text-sm text-muted-foreground">{t("ccqCard.description")}</p>
         {profile?.ccq_card_path && !pendingFile && (
           <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">{t("ccqCard.onFile")}</div>
@@ -114,8 +111,7 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
         {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive dark:text-red-300">{err}</div>}
         {info && <div className="text-sm text-emerald-700 dark:text-emerald-300">{info}</div>}
 
-        <Button type="button" disabled={busy || !pendingFile && !profile?.ccq_card_path} onClick={save}>{t("ccqCard.save")}</Button>
-      </CardContent>
-    </Card>
+        <Button type="button" disabled={busy || (!pendingFile && !profile?.ccq_card_path)} onClick={save}>{t("ccqCard.save")}</Button>
+    </div>
   );
 }
