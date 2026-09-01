@@ -19,13 +19,13 @@ export default function FormsManager({ collapsible = true }) {
   useEffect(() => {
     Promise.all([
       supabase.from("employee_forms").select("form_id, enabled"),
-      supabase.from("profiles").select("id, full_name, email").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, is_paused").order("full_name"),
       supabase.from("employee_form_access").select("form_id, employee_id"),
     ]).then(([formsResult, employeesResult, accessResult]) => {
       const loadError = formsResult.error || employeesResult.error || accessResult.error;
       if (loadError) return setError(loadError.message);
       setAvailability(Object.fromEntries((formsResult.data || []).map((row) => [row.form_id, row.enabled])));
-      setEmployees(employeesResult.data || []);
+      setEmployees((employeesResult.data || []).filter((employee) => !employee.is_paused));
       const nextAccess = {};
       (accessResult.data || []).forEach((row) => {
         if (!nextAccess[row.form_id]) nextAccess[row.form_id] = [];
