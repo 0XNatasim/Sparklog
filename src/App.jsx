@@ -2,6 +2,7 @@
 import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { useAuth } from "./contexts/AuthContext";
 
 import Login from "./pages/Login";
 import EmployeeForm from "./pages/EmployeeForm";
@@ -11,6 +12,12 @@ import ManagerDashboard from "./pages/ManagerDashboard";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
+
+// Landing route: managers start on the Manager dashboard, employees on the form.
+function RoleLanding() {
+  const { role } = useAuth();
+  return <Navigate to={role === "manager" ? "/manager" : "/form"} replace />;
+}
 
 export default function App() {
   const isPasswordRecovery = window.location.pathname === "/reset-password";
@@ -35,10 +42,14 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<Login />} />
 
-        {/* Employee form (supports both "/" and "/form") */}
+        {/* Landing: managers → Manager dashboard, employees → form */}
         <Route
           path="/"
-          element={<Navigate to="/form" replace />}
+          element={
+            <ProtectedRoute>
+              <RoleLanding />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/form"

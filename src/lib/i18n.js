@@ -29,7 +29,7 @@ export const dictionaries = {
     "auth.paused.description": "Your work account is paused. Your existing time records are preserved. Contact your manager if this should be changed.",
 
     // nav
-    "nav.form": "Form",
+    "nav.form": "Job card",
     "nav.history": "History",
     "nav.week": "Week",
     "nav.manager": "Manager",
@@ -583,7 +583,7 @@ export const dictionaries = {
     "auth.paused.title": "Compte en pause",
     "auth.paused.description": "Votre compte de travail est en pause. Vos données de temps existantes sont conservées. Communiquez avec votre gestionnaire si la situation doit être modifiée.",
 
-    "nav.form": "Formulaire",
+    "nav.form": "Fiche de travail",
     "nav.history": "Historique",
     "nav.week": "Semaine",
     "nav.manager": "Gestion",
