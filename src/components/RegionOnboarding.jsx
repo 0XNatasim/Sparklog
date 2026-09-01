@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
@@ -18,32 +19,35 @@ export default function RegionOnboarding() {
   const [step, setStep] = useState("region");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [ccqEnabled, setCcqEnabled] = useState(false);
   const [profile, setProfile] = useState(null);
+
+  // A CCQ card is needed when there is none on file, or the current one expires
+  // within 30 days (so the employee re-uploads to renew the picture).
+  function needsCcqCard(data) {
+    if (!data?.ccq_card_path) return true;
+    if (!data?.ccq_expiration_date) return false;
+    return dayjs(data.ccq_expiration_date).diff(dayjs(), "day") <= 30;
+  }
 
   useEffect(() => {
     if (!user?.id || role === "manager") return;
-    Promise.all([
-      supabase.from("profiles").select("work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, ccq_card_capture_enabled").eq("id", user.id).single(),
-      supabase.from("company_capture_settings").select("ccq_card_enabled").eq("id", true).maybeSingle(),
-    ]).then(([{ data, error: loadError }, { data: settings }]) => {
-      if (loadError) return;
-      setRegion(data?.work_region || "");
-      setAssociation(data?.union_association || "");
-      setProfile(data);
-      const effCcq = data?.ccq_card_capture_enabled ?? settings?.ccq_card_enabled ?? false;
-      setCcqEnabled(effCcq);
-      if (!data?.work_region) {
-        setStep("region");
-        setOpen(true);
-      } else if (!data?.union_association) {
-        setStep("association");
-        setOpen(true);
-      } else if (effCcq && !data?.ccq_card_path) {
-        setStep("ccq");
-        setOpen(true);
-      }
-    });
+    supabase.from("profiles").select("work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path").eq("id", user.id).single()
+      .then(({ data, error: loadError }) => {
+        if (loadError) return;
+        setRegion(data?.work_region || "");
+        setAssociation(data?.union_association || "");
+        setProfile(data);
+        if (!data?.work_region) {
+          setStep("region");
+          setOpen(true);
+        } else if (!data?.union_association) {
+          setStep("association");
+          setOpen(true);
+        } else if (needsCcqCard(data)) {
+          setStep("ccq");
+          setOpen(true);
+        }
+      });
   }, [role, user?.id]);
 
   async function saveRegion() {
@@ -62,7 +66,7 @@ export default function RegionOnboarding() {
     setError("");
     const { error: updateError } = await supabase.from("profiles").update({ union_association: association }).eq("id", user.id);
     if (updateError) setError(updateError.message);
-    else if (ccqEnabled && !profile?.ccq_card_path) setStep("ccq");
+    else if (needsCcqCard(profile)) setStep("ccq");
     else setOpen(false);
     setSaving(false);
   }
@@ -98,7 +102,7 @@ export default function RegionOnboarding() {
             <Button type="button" onClick={() => setOpen(false)}>{t("common.done")}</Button>
           ) : (
             <Button type="button" disabled={(step === "region" ? !region : !association) || saving} onClick={step === "region" ? saveRegion : saveAssociation}>
-              {saving ? t("common.saving") : step === "region" ? t("common.next") : (ccqEnabled && !profile?.ccq_card_path ? t("common.next") : t("common.save"))}
+              {saving ? t("common.saving") : step === "region" ? t("common.next") : (needsCcqCard(profile) ? t("common.next") : t("common.save"))}
             </Button>
           )}
         </DialogFooter>

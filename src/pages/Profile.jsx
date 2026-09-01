@@ -18,24 +18,21 @@ export default function Profile() {
   const { isViewMode, viewedEmployee } = useViewMode();
   const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const [profile, setProfile] = useState(null);
-  const [captureSettings, setCaptureSettings] = useState(null);
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     if (!effectiveUserId) return;
-    const [profileResult, formsResult, accessResult, settingsResult] = await Promise.all([
-      supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, ccq_card_capture_enabled, birth_date_capture_enabled").eq("id", effectiveUserId).single(),
+    const [profileResult, formsResult, accessResult] = await Promise.all([
+      supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path").eq("id", effectiveUserId).single(),
       supabase.from("employee_forms").select("form_id").eq("enabled", true),
       supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
-      supabase.from("company_capture_settings").select("ccq_card_enabled, birth_date_enabled").eq("id", true).maybeSingle(),
     ]);
-    const loadError = profileResult.error || formsResult.error || accessResult.error || settingsResult.error;
+    const loadError = profileResult.error || formsResult.error || accessResult.error;
     if (loadError) setError(loadError.message);
     else {
       setProfile(profileResult.data);
-      setCaptureSettings(settingsResult.data || {});
       const enabledIds = new Set((formsResult.data || []).map((row) => row.form_id));
       const accessibleIds = new Set((accessResult.data || []).map((row) => row.form_id));
       setForms(COMPANY_FORMS.filter((form) => enabledIds.has(form.id) && (!form.employeeSpecific || accessibleIds.has(form.id))));
@@ -44,8 +41,6 @@ export default function Profile() {
   }, [effectiveUserId, user?.id]);
 
   useEffect(() => { load(); }, [load]);
-
-  const ccqCardEnabled = profile?.ccq_card_capture_enabled ?? captureSettings?.ccq_card_enabled ?? false;
 
   return (
     <AppShell>
@@ -67,7 +62,7 @@ export default function Profile() {
                 <Info label={t("profile.unionAssociation")} value={UNION_ASSOCIATIONS.find((association) => association.code === profile?.union_association)?.employeeLabel} icon={Users} />
                 <Info label={t("profile.sector")} value={t("employees.commercialSector")} icon={Building2} />
               </div>
-              {!isViewMode && ccqCardEnabled && (
+              {!isViewMode && (
                 <div className="mt-4 border-t pt-4">
                   <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />
                 </div>
