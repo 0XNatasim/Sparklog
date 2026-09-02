@@ -4,27 +4,30 @@
 //   - Single row (legacy, from push_approved_to_sheet):
 //       { token, job_id, job_date, employee_name, ..., approved_at, approved_by }
 //
-//   - Batch (new, from push_approved_batch):
+//   - Batch (from push_approved_batch):
 //       { token, rows: [ { job_id, job_date, employee_name, ... }, ... ] }
 //
-// IDEMPOTENCY: each row carries a job_id. We store it in a hidden column (O)
-// and skip any row whose job_id is already in the sheet. This makes posting the
-// same job twice a no-op — so a retry, a double-click, or two managers exporting
-// at once can never create duplicate rows. A ScriptLock serializes concurrent
-// posts so the "read existing ids → append new ones" step is race-free.
+// COLUMN LAYOUT written to "Feuille 1":
+//   A Date · B Employé · C Courriel · D Téléphone · E OT · F Départ ·
+//   G Arrivée · H Fin · I Heures · J KM · K Approuvé par · L Approuvé le ·
+//   M JobID  (dedup key — you can hide this column)
+//
+// IDEMPOTENCY: each row carries a job_id, stored in column M. Before appending
+// we read every job_id already in column M and skip any incoming row that's
+// already there. So posting the same job twice — a retry, a double-click, or
+// two managers exporting at once — never creates a duplicate row. A ScriptLock
+// serializes concurrent posts so the "read existing ids -> append new" step is
+// race-free.
 //
 // After saving, do Deploy -> Manage deployments -> Edit -> New version ->
 // Deploy. Otherwise the web app keeps serving the old code.
 
-// Column that stores job_id for dedup (O = 15). Columns A–N hold the visible
-// data; O is written alongside and can be hidden in the sheet if you like.
-var JOB_ID_COL = 15;
+var JOB_ID_COL = 13; // column M
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
-    // Wait up to 30s for any in-flight post to finish before we read/append.
-    lock.waitLock(30000);
+    lock.waitLock(30000); // wait up to 30s for an in-flight post to finish
   } catch (lockErr) {
     return jsonOut({ success: false, error: "Busy — another export is running, please retry" });
   }
@@ -44,7 +47,7 @@ function doPost(e) {
 
     var inputRows = Array.isArray(data.rows) ? data.rows : [data];
 
-    // Collect job_ids already present in the sheet (column O).
+    // job_ids already in the sheet (column M).
     var existing = {};
     var lastRow = sheet.getLastRow();
     if (lastRow >= 1) {
@@ -55,8 +58,8 @@ function doPost(e) {
       }
     }
 
-    // Keep only rows whose job_id we haven't written yet (dedup within the
-    // incoming batch too).
+    // Keep only rows whose job_id we haven't written yet (also dedup within
+    // the incoming batch).
     var toWrite = [];
     var skippedIds = [];
     for (var j = 0; j < inputRows.length; j++) {
@@ -85,26 +88,23 @@ function doPost(e) {
   }
 }
 
-// Build one visible row (columns A–N) in the order the sheet expects:
-// A=Date, B=Employee, C=Email, D=Phone, E=OT, F=Depart, G=Arrival,
-// H=End, I=Heures, J=KM aller, K=Temps retour (min), L=KM retour,
-// M=Approved by, N=Approved at. (Column O = job_id is appended by the caller.)
+// Build one visible row (columns A–L). Column M (job_id) is appended by the
+// caller. KM uses the outbound distance (km_aller); ask if you want the return
+// distance/time added as extra columns.
 function rowFrom(d) {
   return [
-    d.job_date,
-    d.employee_name,
-    d.employee_email,
-    d.employee_phone,
-    d.ot,
-    d.depart,
-    d.arrivee,
-    d.fin,
-    d.heures,
-    d.km_aller,
-    d.return_time_minutes,
-    d.km_retour,
-    d.approved_by,
-    d.approved_at,
+    d.job_date,      // A Date
+    d.employee_name, // B Employé
+    d.employee_email,// C Courriel
+    d.employee_phone,// D Téléphone
+    d.ot,            // E OT
+    d.depart,        // F Départ
+    d.arrivee,       // G Arrivée
+    d.fin,           // H Fin
+    d.heures,        // I Heures
+    d.km_aller,      // J KM
+    d.approved_by,   // K Approuvé par
+    d.approved_at,   // L Approuvé le
   ];
 }
 
