@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
-import { Camera, CircleCheck } from "lucide-react";
+import { Camera, CircleCheck, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -151,6 +151,7 @@ export default function EmployeeForm() {
   const lastSaveErrorRef = useRef("");
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
+  const [kmMissingAlert, setKmMissingAlert] = useState(false);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
@@ -818,6 +819,10 @@ export default function EmployeeForm() {
       if (d.fin) setFin(String(d.fin));
       if (d.km_aller !== null && d.km_aller !== undefined) {
         setKmAller(String(d.km_aller));
+      } else {
+        // No distance read from the screenshot — it's likely missing in Field
+        // Service too, so alert the employee to go check the work order.
+        setKmMissingAlert(true);
       }
       // Auto-fill populated the form — mark dirty so Save appears
       setDirty(true);
@@ -1289,6 +1294,20 @@ export default function EmployeeForm() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={kmMissingAlert} onOpenChange={setKmMissingAlert}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+              <TriangleAlert className="h-5 w-5" />{t("form.kmMissing.title")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t("form.kmMissing.body")}</p>
+          <DialogFooter>
+            <Button type="button" onClick={() => setKmMissingAlert(false)}>{t("common.ok")}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppShell>
