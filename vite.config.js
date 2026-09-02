@@ -13,13 +13,13 @@ export default defineConfig({
       // autoUpdate: a new deploy replaces the cached app on next load — no
       // stale-version lock-in for the crew already using it.
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+      includeAssets: ["favicon.png", "apple-touch-icon.png"],
       manifest: {
         name: "SparkLog",
         short_name: "SparkLog",
         description: "Feuilles de temps et suivi CCQ",
-        theme_color: "#0f172a",
-        background_color: "#0f172a",
+        theme_color: "#000000",
+        background_color: "#000000",
         display: "standalone",
         orientation: "portrait",
         start_url: "/",

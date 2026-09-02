@@ -140,6 +140,9 @@ export default function Login() {
         <LanguageToggle />
       </div>
       <Card className="w-full max-w-md">
+        <div className="flex justify-center pt-6">
+          <img src="/logo.jpg" alt="Messier Connexion" className="w-40 rounded-2xl" />
+        </div>
         <CardHeader>
           <CardTitle className="text-2xl">{t("auth.title")}</CardTitle>
           <CardDescription>

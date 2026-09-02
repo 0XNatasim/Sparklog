@@ -61,8 +61,9 @@ export default function AppShell({ children }) {
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:gap-3 sm:px-4 sm:py-3">
-          <Link to="/form" className="shrink-0 text-base font-extrabold tracking-tight sm:text-lg">
-            SparkLog
+          <Link to="/form" className="flex shrink-0 items-center gap-2">
+            <img src="/pwa-192.png" alt="Messier Connexion" className="h-9 w-9 rounded-lg" />
+            <span className="text-base font-extrabold tracking-tight sm:text-lg">SparkLog</span>
           </Link>
 
           <div className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 text-base font-bold tracking-tight sm:block">
