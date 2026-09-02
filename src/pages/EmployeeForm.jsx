@@ -526,7 +526,7 @@ export default function EmployeeForm() {
   async function requiresOvertimeEvidence(candidateReturnMinutes) {
     try {
       const { data: dayJobs, error: jobsError } = await withTimeout(
-        supabase.from("jobs").select("id, depart, fin").eq("user_id", user.id).eq("job_date", job_date),
+        supabase.from("jobs").select("id, depart, fin, overtime_evidence_captured").eq("user_id", user.id).eq("job_date", job_date),
         12000,
         "Overtime check"
       );
@@ -549,6 +549,9 @@ export default function EmployeeForm() {
       // creates overtime or supper eligibility.
       const fullDayMinutes = others.reduce((total, job) => total + workedMinutes(job), 0) + thisMinutes;
       setOvertimeDailyMinutes(fullDayMinutes);
+      // The overtime authorization is one screenshot per day. If another job
+      // today already has it, don't ask again for this one.
+      if (others.some((job) => job.overtime_evidence_captured)) return false;
       // Overtime evidence is only for a job that actually contains overtime
       // minutes — i.e. the running total up to and including THIS job (in
       // chronological order) passes 8h. A midday job never carries overtime
