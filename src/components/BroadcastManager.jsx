@@ -192,8 +192,12 @@ export default function BroadcastManager() {
   return (
     <div className="space-y-3">
       <Card>
-        <CardContent className="space-y-4 p-4">
-          <div className="flex items-center gap-2 font-semibold"><Bell className="h-4 w-4" />{t("broadcast.title")}</div>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-4 font-semibold select-none [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2"><Bell className="h-4 w-4" />{t("broadcast.title")}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-4 border-t p-4">
           <p className="text-xs text-muted-foreground">{t("broadcast.description")}</p>
           {message && <div className="rounded-md border bg-muted px-3 py-2 text-xs">{message}</div>}
 
@@ -252,12 +256,17 @@ export default function BroadcastManager() {
           </div>
 
           <Button type="button" disabled={sending} onClick={send}>{sending ? t("broadcast.sending") : t("broadcast.send")}</Button>
-        </CardContent>
+          </div>
+        </details>
       </Card>
 
       <Card>
-        <CardContent className="space-y-2 p-4">
-          <div className="text-sm font-semibold">{t("broadcast.log")}</div>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-4 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
+            <span>{t("broadcast.log")}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-2 border-t p-4">
           {broadcasts.length === 0 && <p className="text-xs text-muted-foreground">{t("broadcast.noLog")}</p>}
           {broadcasts.map((b) => {
             const recips = recipientsByBroadcast.get(b.id) || [];
@@ -329,7 +338,8 @@ export default function BroadcastManager() {
               </div>
             );
           })}
-        </CardContent>
+          </div>
+        </details>
       </Card>
     </div>
   );
