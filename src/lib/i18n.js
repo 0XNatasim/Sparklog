@@ -30,6 +30,7 @@ export const dictionaries = {
 
     // nav
     "nav.form": "Job card",
+    "offline.banner": "You're offline — your entry is saved on this device and will be here when you reconnect.",
     "nav.history": "History",
     "nav.week": "Week",
     "nav.manager": "Manager",
@@ -670,6 +671,7 @@ export const dictionaries = {
     "auth.paused.description": "Votre compte de travail est en pause. Vos données de temps existantes sont conservées. Communiquez avec votre gestionnaire si la situation doit être modifiée.",
 
     "nav.form": "Fiche de travail",
+    "offline.banner": "Hors ligne — votre saisie est enregistrée sur cet appareil et sera là au retour de la connexion.",
     "nav.history": "Historique",
     "nav.week": "Semaine",
     "nav.manager": "Gestion",

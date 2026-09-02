@@ -17,6 +17,7 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
+import { saveDraft, loadDraft, clearDraft } from "@/lib/form-draft";
 import {
   Dialog,
   DialogContent,
@@ -256,9 +257,29 @@ export default function EmployeeForm() {
       setHasParkingReceipt(false);
       setParkingFile(null);
       setParkingAmount("");
+      // Recover any unsaved entry left behind by a refresh, crash, or dropped
+      // connection (own form only — never in a manager's view-as mode).
+      if (!isViewMode) {
+        const draft = loadDraft(effectiveUserId);
+        if (draft) {
+          if (draft.job_date) setJobDate(draft.job_date);
+          setOt(draft.ot || "");
+          setDepart(draft.depart || "");
+          setArrivee(draft.arrivee || "");
+          setFin(draft.fin || "");
+          setKmAller(draft.km_aller || "");
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, effectiveUserId]);
+
+  // Continuously autosave the in-progress NEW entry to local storage so nothing
+  // is lost offline. Edits and manager view-as mode are never autosaved.
+  useEffect(() => {
+    if (editId || isViewMode || !effectiveUserId) return;
+    saveDraft(effectiveUserId, { job_date, ot, depart, arrivee, fin, km_aller });
+  }, [editId, isViewMode, effectiveUserId, job_date, ot, depart, arrivee, fin, km_aller]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
@@ -417,6 +438,8 @@ export default function EmployeeForm() {
         setStatus(nextStatus);
         setLocked(nextLocked);
         setDirty(false);
+        // The entry is persisted server-side now — drop the local recovery copy.
+        if (!isViewMode) clearDraft(effectiveUserId);
 
         if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }

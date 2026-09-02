@@ -10,6 +10,7 @@ import { useT } from "@/lib/use-t";
 import NotificationsBell from "@/components/NotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
+import OfflineBanner from "@/components/OfflineBanner";
 import { useViewMode } from "@/contexts/ViewModeContext";
 
 function NavItem({ to, children }) {
@@ -44,6 +45,7 @@ export default function AppShell({ children }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <OfflineBanner />
       {!isViewMode && <RegionOnboarding />}
       {!isViewMode && <BroadcastPopup />}
       {isViewMode && (
