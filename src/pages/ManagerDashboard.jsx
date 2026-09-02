@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Radio, Users } from "lucide-react";
+import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Radio, ShieldCheck, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -21,6 +21,7 @@ import TimeRulesManager from "@/components/TimeRulesManager";
 import BroadcastManager from "@/components/BroadcastManager";
 import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
+import AuditLog from "@/components/AuditLog";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 
@@ -57,7 +58,7 @@ export default function ManagerDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
   const requestedSection = searchParams.get("section");
-  const activeSection = ["live", "employees", "forms", "timesheet", "notifications", "testing"].includes(requestedSection)
+  const activeSection = ["live", "employees", "forms", "timesheet", "notifications", "testing", "audit"].includes(requestedSection)
     ? requestedSection
     : ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications"
     : "live";
@@ -851,6 +852,7 @@ export default function ManagerDashboard() {
             { id: "notifications", icon: Bell, label: t("manager.sections.notifications"), description: t("manager.sections.notificationsDescription") },
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
+            { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
             { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
           ].map(({ id, icon: Icon, label, description }) => (
             <button
@@ -871,6 +873,8 @@ export default function ManagerDashboard() {
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
 
         {activeSection === "forms" && <FormsManager collapsible={false} />}
+
+        {activeSection === "audit" && <AuditLog />}
 
         {activeSection === "testing" && <Testing />}
 

@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceRole);
     const { data: callerProfile } = await admin
-      .from("profiles").select("role").eq("id", callerId).maybeSingle();
+      .from("profiles").select("role, full_name").eq("id", callerId).maybeSingle();
     if (!callerProfile || callerProfile.role !== "manager") {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
@@ -93,6 +93,16 @@ serve(async (req) => {
     // Delete the auth user; profile and the user's own rows cascade automatically.
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr) return json({ ok: false, error: delErr.message }, 500);
+
+    // Record the deletion in the audit log (target snapshot survives the delete).
+    await admin.from("audit_log").insert({
+      actor_id: callerId,
+      actor_name: callerProfile.full_name ?? null,
+      action: "user_deleted",
+      target_user_id: target.id,
+      target_name: target.full_name,
+      details: { email: target.email },
+    });
 
     return json({ ok: true, deleted: { id: target.id, name: target.full_name, email: target.email } });
   } catch (e) {
