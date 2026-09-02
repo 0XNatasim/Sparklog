@@ -151,8 +151,22 @@ export default function History() {
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
     try {
+      // Collect the screenshot file paths before deleting the job — the DB rows
+      // cascade away on delete, but the storage files must be removed explicitly.
+      const [{ data: evidence }, { data: parking }] = await Promise.all([
+        supabase.from("overtime_evidence").select("storage_path").eq("job_id", jobId),
+        supabase.from("parking_receipts").select("storage_path").eq("job_id", jobId),
+      ]);
       const { error } = await supabase.from("jobs").delete().eq("id", jobId);
       if (error) throw error;
+      // Best-effort file cleanup (the job and its DB records are already gone;
+      // a storage hiccup must not report the delete as failed).
+      try {
+        const evPaths = (evidence || []).map((r) => r.storage_path).filter(Boolean);
+        const pkPaths = (parking || []).map((r) => r.storage_path).filter(Boolean);
+        if (evPaths.length) await supabase.storage.from("overtime-evidence").remove(evPaths);
+        if (pkPaths.length) await supabase.storage.from("parking-receipts").remove(pkPaths);
+      } catch { /* orphaned files are harmless */ }
       setInfo(t("history.toasts.deleted"));
       await load();
     } catch (e) {
