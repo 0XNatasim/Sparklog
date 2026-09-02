@@ -17,3 +17,15 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+// Fade out the launch splash (installed PWA only) once the app has painted.
+// Kept up briefly so it reads as a launch screen rather than a flicker.
+(function hideSplash() {
+  const splash = document.getElementById("app-splash");
+  if (!splash) return;
+  const remove = () => {
+    splash.style.opacity = "0";
+    setTimeout(() => splash.remove(), 450);
+  };
+  setTimeout(remove, 1000);
+})();
