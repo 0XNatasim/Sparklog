@@ -532,18 +532,31 @@ export default function EmployeeForm() {
       );
       if (jobsError) throw jobsError;
       if (editId && hasOvertimeEvidence) return false;
-      const existingMinutes = (dayJobs || [])
-        .filter((job) => job.id !== editId)
-        .reduce((total, job) => {
-          const start = makeDayjsFromJob(job_date, job.depart);
-          const end = makeDayjsFromJob(job_date, job.fin);
-          return total + Math.round((hoursBetween(start, end) || 0) * 60);
-        }, 0);
-      // Return-to-storage time is deliberately excluded: it is always paid at
-      // the regular rate and never creates overtime or supper eligibility.
-      const dailyMinutes = existingMinutes + Math.round(hoursDecimal * 60);
-      setOvertimeDailyMinutes(dailyMinutes);
-      return dailyMinutes > 480;
+      const startMinutes = (value) => {
+        const [h, m] = String(value || "").split(":").map(Number);
+        return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+      };
+      const thisMinutes = Math.round(hoursDecimal * 60);
+      const thisStart = startMinutes(depart);
+      const workedMinutes = (job) => {
+        const start = makeDayjsFromJob(job_date, job.depart);
+        const end = makeDayjsFromJob(job_date, job.fin);
+        return Math.round((hoursBetween(start, end) || 0) * 60);
+      };
+      const others = (dayJobs || []).filter((job) => job.id !== editId);
+      // Full day (all jobs) drives supper eligibility. Return-to-storage time is
+      // deliberately excluded: it is always paid at the regular rate and never
+      // creates overtime or supper eligibility.
+      const fullDayMinutes = others.reduce((total, job) => total + workedMinutes(job), 0) + thisMinutes;
+      setOvertimeDailyMinutes(fullDayMinutes);
+      // Overtime evidence is only for a job that actually contains overtime
+      // minutes — i.e. the running total up to and including THIS job (in
+      // chronological order) passes 8h. A midday job never carries overtime
+      // just because a later job pushed the day over 8h.
+      const earlierMinutes = others
+        .filter((job) => startMinutes(job.depart) < thisStart)
+        .reduce((total, job) => total + workedMinutes(job), 0);
+      return earlierMinutes + thisMinutes > 480;
     } catch (error) {
       setErr(error?.message || t("form.errors.failedLoad"));
       return true;
