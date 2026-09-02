@@ -205,13 +205,18 @@ serve(async (req) => {
       );
     }
 
-    // Apps Script dedupes by job_id and reports what it actually appended vs.
-    // skipped (already in the sheet). A non-JSON or older response just leaves
-    // these undefined; the DB marking below is unchanged either way.
+    // Apps Script must explicitly confirm the write with { success: true }.
+    // A non-JSON body (e.g. a Google login/permission HTML page returned with
+    // HTTP 200 when the deployment's access isn't "Anyone") or an explicit
+    // failure means nothing was written — do NOT mark the jobs exported.
     let sheetResult: { success?: boolean; written?: number; skipped?: number } = {};
-    try { sheetResult = JSON.parse(text); } catch { /* older Apps Script: plain text */ }
-    if (sheetResult && sheetResult.success === false) {
-      return json({ ok: false, error: "AppsScript rejected", detail: text }, 502);
+    try { sheetResult = JSON.parse(text); } catch { /* not JSON — treated as failure below */ }
+    if (sheetResult?.success !== true) {
+      return json({
+        ok: false,
+        error: "AppsScript did not confirm the write. Check that the web-app deployment's access is set to \"Anyone\" and that it runs the latest code.",
+        detail: String(text).slice(0, 500),
+      }, 502);
     }
 
     // Mark all eligible jobs as approved + exported in one UPDATE
