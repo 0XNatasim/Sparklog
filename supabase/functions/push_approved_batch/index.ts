@@ -205,6 +205,15 @@ serve(async (req) => {
       );
     }
 
+    // Apps Script dedupes by job_id and reports what it actually appended vs.
+    // skipped (already in the sheet). A non-JSON or older response just leaves
+    // these undefined; the DB marking below is unchanged either way.
+    let sheetResult: { success?: boolean; written?: number; skipped?: number } = {};
+    try { sheetResult = JSON.parse(text); } catch { /* older Apps Script: plain text */ }
+    if (sheetResult && sheetResult.success === false) {
+      return json({ ok: false, error: "AppsScript rejected", detail: text }, 502);
+    }
+
     // Mark all eligible jobs as approved + exported in one UPDATE
     const eligibleIds = eligible.map((j) => j.id);
     const { error: updErr } = await admin
@@ -224,6 +233,8 @@ serve(async (req) => {
       exported: eligibleIds.length,
       skipped: skipped.length,
       skipped_ids: skipped.map((j) => j.id),
+      sheet_written: sheetResult?.written,
+      sheet_skipped: sheetResult?.skipped,
       approved_by: approved_by_value,
       approved_at: approved_at_label,
     });
