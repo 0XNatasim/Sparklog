@@ -58,7 +58,7 @@ export default function AppShell({ children }) {
           </div>
         </div>
       )}
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
+      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30 dark:bg-[#151515]">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3">
           <Link to="/form" className="shrink-0 text-base font-extrabold tracking-tight sm:text-lg">
@@ -67,7 +67,7 @@ export default function AppShell({ children }) {
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
             <img src="/header-light.jpg" alt="Entreprise Électrique Messier Connexion Inc" className="h-16 w-auto rounded dark:hidden" />
-            <img src="/header.jpg" alt="Entreprise Électrique Messier Connexion Inc" className="hidden h-16 w-auto rounded dark:block" />
+            <img src="/header-dark.jpg" alt="Entreprise Électrique Messier Connexion Inc" className="hidden h-16 w-auto rounded dark:block" />
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
