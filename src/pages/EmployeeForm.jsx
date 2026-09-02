@@ -1102,7 +1102,14 @@ export default function EmployeeForm() {
           ) : (
             <>
               <div className="px-5 pb-2">
-                <p className="mb-3 text-sm text-muted-foreground">{t("form.autofillTip.exampleDescription")}</p>
+                <div className="mb-3 text-sm text-muted-foreground">
+                  <p>{t("form.autofillTip.exampleDescription")}</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                    <li>{t("form.autofillTip.exampleItem1")}</li>
+                    <li>{t("form.autofillTip.exampleItem2")}</li>
+                    <li>{t("form.autofillTip.exampleItem3")}</li>
+                  </ul>
+                </div>
                 <img
                   src="/Auto-fill.jpg"
                   alt={t("form.autofillTip.exampleAlt")}
