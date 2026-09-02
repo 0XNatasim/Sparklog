@@ -1104,7 +1104,7 @@ export default function EmployeeForm() {
               <div className="px-5 pb-2">
                 <p className="mb-3 text-sm text-muted-foreground">{t("form.autofillTip.exampleDescription")}</p>
                 <img
-                  src="/Auto-fill-example.jpg"
+                  src="/Auto-fill.jpg"
                   alt={t("form.autofillTip.exampleAlt")}
                   className="w-full rounded-md border object-cover"
                   style={{ maxHeight: "340px", objectPosition: "bottom" }}
