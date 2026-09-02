@@ -66,7 +66,8 @@ export default function AppShell({ children }) {
           </Link>
 
           <div className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 sm:block">
-            <img src="/header.jpg" alt="Entreprise Électrique Messier Connexion Inc" className="h-9 w-auto rounded" />
+            <img src="/header-light.jpg" alt="Entreprise Électrique Messier Connexion Inc" className="h-9 w-auto rounded dark:hidden" />
+            <img src="/header.jpg" alt="Entreprise Électrique Messier Connexion Inc" className="hidden h-9 w-auto rounded dark:block" />
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
