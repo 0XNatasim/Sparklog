@@ -4,12 +4,13 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink } from "lucide-react";
+import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
 import CostingDashboard from "@/components/CostingDashboard";
 import ElectricianCostSheet from "@/components/ElectricianCostSheet";
+import AuditLog from "@/components/AuditLog";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -370,6 +371,7 @@ export default function Testing() {
     { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
     { id: "week", icon: CalendarDays, label: t("testing.tabs.week"), description: t("testing.sections.weekDescription") },
     { id: "month", icon: CalendarRange, label: t("testing.tabs.month"), description: t("testing.sections.monthDescription") },
+    { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
   ];
 
   return (
@@ -394,6 +396,7 @@ export default function Testing() {
       {section === "ccq" && <CcqRatesPanel />}
       {section === "week" && <ComingSoon label={t("testing.tabs.week")} />}
       {section === "month" && <ComingSoon label={t("testing.tabs.month")} />}
+      {section === "audit" && <AuditLog />}
     </div>
   );
 }

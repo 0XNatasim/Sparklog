@@ -80,6 +80,20 @@ export default function AuditLog() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-sm font-semibold">{t("audit.legendTitle")}</div>
+          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+            <li>🗑️ {t("audit.legend.userDeleted")}</li>
+            <li>👤 {t("audit.legend.roleChange")}</li>
+            <li>⏸️ {t("audit.legend.pauseChange")}</li>
+            <li>🔓 {t("audit.legend.jobUnlock")}</li>
+            <li>✅ {t("audit.legend.jobApproved")}</li>
+            <li>🍽️ {t("audit.legend.mealParking")}</li>
+          </ul>
+        </CardContent>
+      </Card>
+
       {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
       {!loading && rows.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("audit.empty")}</CardContent></Card>}
 
