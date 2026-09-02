@@ -31,6 +31,11 @@ export const dictionaries = {
     // nav
     "nav.form": "Job card",
     "offline.banner": "You're offline — your entry is saved on this device and will be here when you reconnect.",
+    "install.title": "Install SparkLog",
+    "install.subtitle": "Add it to your home screen for quick, full-screen access.",
+    "install.button": "Install",
+    "install.iosBefore": "Tap",
+    "install.iosAfter": "then \"Add to Home Screen\".",
     "nav.history": "History",
     "nav.week": "Week",
     "nav.manager": "Manager",
@@ -675,6 +680,11 @@ export const dictionaries = {
 
     "nav.form": "Fiche de travail",
     "offline.banner": "Hors ligne — votre saisie est enregistrée sur cet appareil et sera là au retour de la connexion.",
+    "install.title": "Installer SparkLog",
+    "install.subtitle": "Ajoutez-la à votre écran d'accueil pour un accès rapide en plein écran.",
+    "install.button": "Installer",
+    "install.iosBefore": "Touchez",
+    "install.iosAfter": "puis « Sur l'écran d'accueil ».",
     "nav.history": "Historique",
     "nav.week": "Semaine",
     "nav.manager": "Gestion",

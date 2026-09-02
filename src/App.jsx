@@ -12,6 +12,7 @@ import ManagerDashboard from "./pages/ManagerDashboard";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
+import InstallPrompt from "@/components/InstallPrompt";
 
 // Landing route: managers start on the Manager dashboard, employees on the form.
 function RoleLanding() {
@@ -41,6 +42,7 @@ export default function App() {
   return (
     <HashRouter>
       <ViewModeProvider>
+      <InstallPrompt />
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
