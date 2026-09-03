@@ -314,8 +314,17 @@ export default function EmployeesPanel() {
             </div>
 
             {/* Time off (day off / week off) */}
-            <div className="rounded-lg border p-3">
-              <div className="mb-1 flex items-center gap-2 text-sm font-semibold"><CalendarDays className="h-4 w-4 text-primary" />{t("timeOff.title")}</div>
+            <details className="group rounded-lg border">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />{t("timeOff.title")}
+                  {(timeOff.get(p.id) || []).length > 0 && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground">{(timeOff.get(p.id) || []).length}</span>
+                  )}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t p-3">
               <p className="mb-2 text-xs text-muted-foreground">{t("timeOff.description")}</p>
               {(timeOff.get(p.id) || []).length > 0 && (
                 <div className="mb-2 space-y-1">
@@ -339,7 +348,8 @@ export default function EmployeesPanel() {
                 <Button type="button" size="sm" onClick={() => addTimeOff(p.id)}>{t("timeOff.add")}</Button>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">{t("timeOff.hint")}</p>
-            </div>
+              </div>
+            </details>
 
             {/* Classification */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
