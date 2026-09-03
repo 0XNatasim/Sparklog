@@ -141,10 +141,10 @@ export default function Login() {
         <ThemeToggle />
         <LanguageToggle />
       </div>
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md dark:bg-[#151515]">
         <div className="flex justify-center px-6 pt-6">
           <img src={headerLight} alt="Messier Connexion" className="w-64 max-w-full rounded dark:hidden" />
-          <img src={headerDark} alt="Messier Connexion" className="hidden w-64 max-w-full rounded dark:block" />
+          <img src={headerDark} alt="Messier Connexion" className="hidden w-64 max-w-full dark:block" />
         </div>
         <CardHeader>
           <CardTitle className="text-2xl">{t("auth.title")}</CardTitle>
