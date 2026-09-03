@@ -41,8 +41,11 @@ export default function AppShell({ children }) {
   const { isViewMode, viewedEmployee } = useViewMode();
 
   async function handleLogout() {
-    await signOut();
-    navigate("/login");
+    try {
+      await signOut();
+    } finally {
+      navigate("/login");
+    }
   }
 
   // In view mode, keep the ?employee param on every tab so the manager stays

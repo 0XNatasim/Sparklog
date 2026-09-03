@@ -246,7 +246,16 @@ export function AuthProvider({ children }) {
       loading,
       authError,
       async signOut() {
-        await supabase.auth.signOut();
+        // Clear the local session first (works offline / in the PWA); the
+        // network revoke is best-effort so a failed request can't leave the
+        // user stuck signed in.
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch (e) {
+          /* ignore — state is cleared below regardless */
+        }
+        setUser(null);
+        setRole(null);
       }
     }),
     [user, role, fullName, isPaused, loading, authError]
