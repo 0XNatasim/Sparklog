@@ -29,3 +29,27 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   };
   setTimeout(remove, 1000);
 })();
+
+// Auto-apply a new deploy — but never while the tab is in active use (that
+// would reload mid-entry and lose a timesheet). Check for updates on focus and
+// every few minutes; when a new version takes control, reload only once the
+// tab is in the background, so the user sees the fresh build on their return.
+(function autoUpdate() {
+  if (!("serviceWorker" in navigator)) return;
+  let reloading = false;
+  const reload = () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  };
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (document.visibilityState === "hidden") reload();
+    else document.addEventListener("visibilitychange", () => { if (document.hidden) reload(); }, { once: true });
+  });
+  navigator.serviceWorker.ready.then((registration) => {
+    const check = () => registration.update().catch(() => {});
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });
+    setInterval(check, 5 * 60 * 1000);
+  }).catch(() => {});
+})();
