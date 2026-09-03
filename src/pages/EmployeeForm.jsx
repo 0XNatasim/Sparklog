@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
 import { Camera, CircleCheck, TriangleAlert } from "lucide-react";
+import autofillExample from "../../public/Auto-fill.jpg";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -1119,7 +1120,7 @@ export default function EmployeeForm() {
                   </ul>
                 </div>
                 <img
-                  src="/Auto-fill.jpg"
+                  src={autofillExample}
                   alt={t("form.autofillTip.exampleAlt")}
                   className="w-full rounded-md border object-cover"
                   style={{ maxHeight: "340px", objectPosition: "bottom" }}

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import logoUrl from "../../public/logo.jpg";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -141,7 +142,7 @@ export default function Login() {
       </div>
       <Card className="w-full max-w-md">
         <div className="flex justify-center pt-6">
-          <img src="/logo.jpg" alt="Messier Connexion" className="w-40 rounded-2xl" />
+          <img src={logoUrl} alt="Messier Connexion" className="w-40 rounded-2xl" />
         </div>
         <CardHeader>
           <CardTitle className="text-2xl">{t("auth.title")}</CardTitle>
