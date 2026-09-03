@@ -28,10 +28,11 @@ export default function BroadcastManager() {
   const [resendingId, setResendingId] = useState("");
 
   async function loadEmployees() {
-    // Include managers too (a manager is a valid recipient / selectable target).
+    // Include managers too (a manager is a valid recipient / selectable target),
+    // but never inactive (paused) accounts.
     const { data } = await supabase
-      .from("profiles").select("id, full_name, email").order("full_name");
-    setEmployees(data || []);
+      .from("profiles").select("id, full_name, email, is_paused").order("full_name");
+    setEmployees((data || []).filter((employee) => !employee.is_paused));
   }
 
   function setPickedImage(file) {

@@ -40,13 +40,13 @@ export default function TimeRulesManager() {
     const [{ data: settings }, { data: holidayRows }, { data: employeeRows }, { data: unlockRows }, { data: overtimeSettings }] = await Promise.all([
       supabase.from("company_time_settings").select("daily_deadline").eq("id", true).single(),
       supabase.from("company_holidays").select("holiday_date,label").gte("holiday_date", montrealDate()).order("holiday_date").limit(40),
-      supabase.from("profiles").select("id, full_name, email, team_leader_premium").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, team_leader_premium, is_paused").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
       supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single(),
     ]);
     setDeadline(String(settings?.daily_deadline || "23:59").slice(0, 5));
     setHolidays(holidayRows || []);
-    setEmployees(employeeRows || []);
+    setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
     setUnlocks(unlockRows || []);
     setRetentionDays(overtimeSettings?.evidence_retention_days || 30);
   }
