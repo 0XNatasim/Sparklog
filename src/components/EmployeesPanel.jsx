@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, ChevronDown, Crown, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
 import { isBoss } from "@/lib/boss";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ const LEVELS = [
 export default function EmployeesPanel() {
   const t = useT();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState([]);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -264,6 +266,11 @@ export default function EmployeesPanel() {
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedIds.has(p.id) ? "rotate-180" : ""}`} />
           </button>
           {expandedIds.has(p.id) && <CardContent className="space-y-3 border-t p-4">
+            {p.id !== user?.id && (
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => navigate(`/form?employee=${p.id}&employeeName=${encodeURIComponent(p.full_name || p.email || "")}`)}>
+                <Eye className="mr-1.5 h-4 w-4" />{t("employees.viewAs")}
+              </Button>
+            )}
             {missingFields.length > 0 && (
               <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200" role="alert">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />

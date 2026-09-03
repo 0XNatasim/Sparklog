@@ -19,7 +19,7 @@ function NavItem({ to, children }) {
   return (
     <NavLink
       to={to}
-      end={to === "/form"}
+      end={to.startsWith("/form")}
       className={({ isActive }) =>
         cn(
           "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
@@ -38,12 +38,18 @@ export default function AppShell({ children }) {
   const { role, signOut } = useAuth();
   const navigate = useNavigate();
   const t = useT();
-  const { isViewMode, viewedEmployee, stopViewMode } = useViewMode();
+  const { isViewMode, viewedEmployee } = useViewMode();
 
   async function handleLogout() {
     await signOut();
     navigate("/login");
   }
+
+  // In view mode, keep the ?employee param on every tab so the manager stays
+  // in the employee's view while browsing Job card / History / Week / Profile.
+  const viewSuffix = isViewMode
+    ? `?employee=${viewedEmployee.id}&employeeName=${encodeURIComponent(viewedEmployee.name || "")}`
+    : "";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -54,7 +60,7 @@ export default function AppShell({ children }) {
         <div className="sticky top-0 z-50 border-b border-amber-500 bg-amber-300 px-3 py-2 text-amber-950 shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div className="text-sm font-bold">{t("viewMode.banner", { name: viewedEmployee.name })}</div>
-            <Button size="sm" variant="outline" className="h-8 border-amber-700 bg-amber-50 text-amber-950 hover:bg-white" onClick={() => { stopViewMode(); navigate("/manager?section=testing"); }}>
+            <Button size="sm" variant="outline" className="h-8 border-amber-700 bg-amber-50 text-amber-950 hover:bg-white" onClick={() => navigate("/manager?section=employees")}>
               {t("viewMode.return")}
             </Button>
           </div>
@@ -63,7 +69,7 @@ export default function AppShell({ children }) {
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30 dark:bg-[#151515]">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3">
-          <Link to="/form" className="shrink-0 text-base font-extrabold tracking-tight sm:text-lg">
+          <Link to={`/form${viewSuffix}`} className="shrink-0 text-base font-extrabold tracking-tight sm:text-lg">
             SparkLog
           </Link>
 
@@ -91,11 +97,11 @@ export default function AppShell({ children }) {
 
         {/* Second row: nav tabs */}
         <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:px-4 sm:pb-3">
-          <NavItem to="/form">{t("nav.form")}</NavItem>
-          <NavItem to="/history">{t("nav.history")}</NavItem>
-          <NavItem to="/week">{t("nav.week")}</NavItem>
-          <NavItem to="/profile">{t("nav.profile")}</NavItem>
-          {role === "manager" && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
+          <NavItem to={`/form${viewSuffix}`}>{t("nav.form")}</NavItem>
+          <NavItem to={`/history${viewSuffix}`}>{t("nav.history")}</NavItem>
+          <NavItem to={`/week${viewSuffix}`}>{t("nav.week")}</NavItem>
+          <NavItem to={`/profile${viewSuffix}`}>{t("nav.profile")}</NavItem>
+          {role === "manager" && !isViewMode && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
         </nav>
       </header>
 
