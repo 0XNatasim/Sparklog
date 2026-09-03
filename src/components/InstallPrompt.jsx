@@ -78,7 +78,7 @@ export default function InstallPrompt() {
   return (
     <div className="fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-xl border bg-card p-3 shadow-lg">
       <div className="flex items-center gap-3">
-        <img src="/pwa-192.png" alt="" className="h-10 w-10 shrink-0 rounded-lg" />
+        <img src="/pwa-192.png?v=2" alt="" className="h-10 w-10 shrink-0 rounded-lg" />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold">{t("install.title")}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">
