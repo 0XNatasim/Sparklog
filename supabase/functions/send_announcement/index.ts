@@ -269,8 +269,9 @@ serve(async (req) => {
       : [];
 
     // Resolve recipients server-side from the DB. Recipients = every profile
-    // except the sender (a manager never emails themselves).
-    let query = admin.from("profiles").select("id, full_name, email").neq("id", senderId);
+    // except the sender (a manager never emails themselves) and never inactive
+    // (paused) accounts.
+    let query = admin.from("profiles").select("id, full_name, email").neq("id", senderId).not("is_paused", "is", true);
     if (!allEmployees) {
       if (recipientIds.length === 0) return json({ ok: false, error: "No recipients selected" }, 400);
       query = query.in("id", recipientIds);

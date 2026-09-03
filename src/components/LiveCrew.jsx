@@ -30,12 +30,17 @@ export default function LiveCrew() {
   const load = useCallback(async () => {
     setLoading(true);
     const today = montrealDate();
-    const [{ data: people }, { data: jobs }] = await Promise.all([
+    const [{ data: people }, { data: jobs }, { data: timeOff }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, updated_at").eq("job_date", today),
+      supabase.from("employee_time_off").select("user_id").lte("start_date", today).gte("end_date", today),
     ]);
-    // Paused users and anyone who opted out of the boards (e.g. the boss) are hidden.
-    const activePeople = (people || []).filter((person) => !person.is_paused && person.show_on_boards !== false);
+    // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone
+    // scheduled off for the day.
+    const offToday = new Set((timeOff || []).map((row) => row.user_id));
+    const activePeople = (people || []).filter(
+      (person) => !person.is_paused && person.show_on_boards !== false && !offToday.has(person.id)
+    );
     const map = new Map();
     (jobs || []).forEach((job) => {
       if (!map.has(job.user_id)) map.set(job.user_id, []);
