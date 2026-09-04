@@ -92,10 +92,17 @@ Legend: ✅ allowed · ❌ denied · ⚠️ allowed but constrained (see notes) 
 1. **Paused containment confirmed live.** Every employee write path (tables + storage
    uploads) is gated by `is_active_employee()`; a paused account is blocked at the DB.
    Verified by direct multi-identity test before the migration was applied.
-2. **`emp read` gap on meal/overtime/parking storage + `overtime_evidence` rows.**
-   Employees cannot read back their own uploaded receipts/evidence (manager-read only).
-   This is *more* restrictive, not a hole — but if the employee UI tries to redisplay a
-   saved receipt it may fail. Verify against the app (behavioral, not security).
+2. **`emp read` gap on meal/overtime/parking storage — investigated 2026-09-04: NOT a
+   functional bug.** Traced every employee-side access: employees only *upload* to
+   these buckets and never fetch/display the images back (the app reads the permitted
+   table rows, e.g. parking amount, not the stored object). No display path fails, so
+   no policy change is warranted.
+   *Real but minor adjacent issue:* `History.jsx` calls `storage.remove()` on a job's
+   evidence/receipt files when an employee deletes a draft job, but employees have no
+   delete on storage.objects, so those removes fail silently → orphaned files.
+   Do **not** fix with a blanket employee-delete grant (it would also let an employee
+   delete overtime evidence after submission, weakening evidence integrity). Route it
+   through retention/reconciliation instead (M7.4 / cleanup function).
 3. **Managers are not gated by `is_active_employee()`** (their policies check
    `get_my_role()='manager'`). A *paused manager*, if that state ever exists, would
    retain manager write. Confirm managers are never paused, or add a guard.

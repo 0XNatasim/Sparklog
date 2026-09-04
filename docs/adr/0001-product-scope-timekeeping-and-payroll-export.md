@@ -1,8 +1,8 @@
 # ADR 0001 — Product scope: timekeeping and payroll export, not a payroll engine
 
-- **Status:** Proposed (awaiting human owner sign-off — see Ownership below)
+- **Status:** Accepted
 - **Date:** 2026-09-04
-- **Deciders:** TBD (product owner)
+- **Deciders:** simon1984bjeux@gmail.com (product owner)
 - **Work package:** M0.1 (see `GPT.md`)
 
 ## Context
@@ -58,12 +58,10 @@ completed and signed off by payroll and legal specialists.
 
 ## Ownership
 
-This ADR is a product decision and requires a named human owner before it is treated
-as **Accepted**. Claude Code drafted it from the stated product boundary but must not
-record approval on a human's behalf.
+This ADR is a product decision with a named accountable owner.
 
-- Product owner: **TBD**
-- Accepted on: **TBD**
+- Product owner: **simon1984bjeux@gmail.com**
+- Accepted on: **2026-09-04**
 
 ## References
 
