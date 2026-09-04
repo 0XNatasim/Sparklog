@@ -90,6 +90,7 @@ export default function ManagerDashboard() {
 
   const [employeeId, setEmployeeId] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dayFilter, setDayFilter] = useState("");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
 
@@ -115,15 +116,21 @@ export default function ManagerDashboard() {
     // Approved columns, so ignore the status dropdown there — otherwise
     // the other two columns are always empty.
     if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
+    if (dayFilter) q = q.eq("job_date", dayFilter);
     return q;
   }
 
   async function loadCounts() {
-    const base = supabase.from("jobs").select("id", { head: true, count: "exact" });
+    const base = (() => {
+      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
+      if (dayFilter) q = q.eq("job_date", dayFilter);
+      return q;
+    })();
     const scoped = (status) => {
       let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
       if (employeeId !== "all") q = q.eq("user_id", employeeId);
       if (status) q = q.eq("status", status);
+      if (dayFilter) q = q.eq("job_date", dayFilter);
       return q;
     };
     const [all, saved, submitted, approved] = await withTimeout(
@@ -200,7 +207,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, statusFilter]);
+  }, [employeeId, statusFilter, dayFilter]);
 
   useEffect(() => {
     if (!focusedJobId) return;
@@ -923,6 +930,25 @@ export default function ManagerDashboard() {
                 onChange={(e) => setSearchLive(e.target.value)}
                 placeholder={t("manager.filters.searchPlaceholder")}
               />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">{t("manager.filters.day")}</span>
+              <Input
+                type="date"
+                value={dayFilter}
+                onChange={(e) => setDayFilter(e.target.value)}
+                className="h-9 w-auto"
+                aria-label={t("manager.filters.day")}
+              />
+              <Button type="button" size="sm" variant="outline" onClick={() => setDayFilter(dayjs().format("YYYY-MM-DD"))}>
+                {t("manager.filters.today")}
+              </Button>
+              {dayFilter && (
+                <Button type="button" size="sm" variant="ghost" onClick={() => setDayFilter("")}>
+                  {t("manager.filters.clearDay")}
+                </Button>
+              )}
             </div>
 
             {selectedEmployee && (
