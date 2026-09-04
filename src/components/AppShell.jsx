@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -83,6 +83,16 @@ export default function AppShell({ children }) {
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
             <NotificationsBell />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => window.location.reload()}
+              title={t("nav.refresh")}
+              aria-label={t("nav.refresh")}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <ThemeToggle className="h-8 w-8" />
             <LanguageToggle className="h-8 w-8" />
             <Button
