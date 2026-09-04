@@ -52,6 +52,50 @@ describe("overtime 50%/100% split", () => {
   });
 });
 
+describe("weekly overtime split (M1 golden fixtures — 1.5x allowance is per WEEK)", () => {
+  // Week of Mon 2026-06-01 .. Fri 2026-06-05 (no weekend work).
+  const week = (days) => {
+    const jobs = days.map(([date, fin], i) => ({ id: `j${i}`, job_date: date, depart: "08:00", fin, return_time_minutes: 0 }));
+    const entries = [...calculatePayrollEntries(jobs).values()];
+    const sum = (k) => entries.reduce((t, e) => t + e[k], 0);
+    return { reg: sum("regularWorkMinutes"), ot50: sum("overtime50Minutes"), ot100: sum("overtime100Minutes") };
+  };
+
+  it("9h each day Mon–Fri (45h) → 40h reg, 1h @1.5x, 4h @2x", () => {
+    const r = week([["2026-06-01", "17:00"], ["2026-06-02", "17:00"], ["2026-06-03", "17:00"], ["2026-06-04", "17:00"], ["2026-06-05", "17:00"]]);
+    expect(r.reg).toBe(2400);   // 40h
+    expect(r.ot50).toBe(60);    // 1h — only the first OT hour of the WEEK
+    expect(r.ot100).toBe(240);  // 4h
+  });
+
+  it("12h Mon then 6h Tue–Fri (36h) → 32h reg, 1h @1.5x, 3h @2x", () => {
+    const r = week([["2026-06-01", "20:00"], ["2026-06-02", "14:00"], ["2026-06-03", "14:00"], ["2026-06-04", "14:00"], ["2026-06-05", "14:00"]]);
+    expect(r.reg).toBe(1920);   // 32h
+    expect(r.ot50).toBe(60);    // 1h
+    expect(r.ot100).toBe(180);  // 3h
+  });
+
+  it("the 1.5x allowance resets each week", () => {
+    // 9h on Mon of two different weeks → each week gets its own first-hour @1.5x.
+    const r = week([["2026-06-01", "17:00"], ["2026-06-08", "17:00"]]);
+    expect(r.ot50).toBe(120);   // 60 + 60
+    expect(r.ot100).toBe(0);
+  });
+
+  it("conserves every minute (reg + ot50 + ot100 = worked)", () => {
+    const jobs = [
+      { id: "a", job_date: "2026-06-01", depart: "08:00", fin: "20:00", return_time_minutes: 0 },
+      { id: "b", job_date: "2026-06-02", depart: "08:00", fin: "17:00", return_time_minutes: 0 },
+    ];
+    let worked = 0, split = 0;
+    for (const e of calculatePayrollEntries(jobs).values()) {
+      worked += e.overtimeWorkMinutes + e.regularWorkMinutes;
+      split += e.regularWorkMinutes + e.overtime50Minutes + e.overtime100Minutes;
+    }
+    expect(split).toBe(worked);
+  });
+});
+
 describe("return-to-storage time", () => {
   it("never creates overtime and is paid at the regular rate", () => {
     const e = entry("16:00", { return_time_minutes: 60 });

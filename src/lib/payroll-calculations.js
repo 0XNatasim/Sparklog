@@ -21,18 +21,33 @@ export function getKilometreBreakdown(job) {
   };
 }
 
+// Payroll week runs to the Saturday that ends it (matches the CCQ weekly grouping in
+// ccq-export). Used to scope the 1.5x overtime allowance to the week, not the day.
+function payrollWeekKey(jobDate) {
+  const d = dayjs(jobDate);
+  if (!d.isValid()) return String(jobDate || "");
+  return d.add((6 - d.day() + 7) % 7, "day").format("YYYY-MM-DD");
+}
+
 export function calculatePayrollEntries(jobs) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
-  const dayState = new Map();
+  // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
+  // per WEEK at 1.5x, everything beyond that is 2x. Jobs are processed chronologically
+  // so the earliest overtime of the week consumes the 1.5x allowance first.
+  const dayWorkMinutes = new Map();      // job_date -> minutes worked so far that day
+  const weekOvertimeMinutes = new Map(); // week key -> overtime minutes so far that week
   const entries = new Map();
 
   for (const job of sorted) {
-    const state = dayState.get(job.job_date) || { workMinutes: 0, overtimeMinutes: 0 };
+    const wk = payrollWeekKey(job.job_date);
+    const priorDayWork = dayWorkMinutes.get(job.job_date) || 0;
+    const priorWeekOvertime = weekOvertimeMinutes.get(wk) || 0;
+
     const workMinutes = minutesBetween(job.depart, job.fin);
-    const regularRoom = Math.max(0, 480 - state.workMinutes);
+    const regularRoom = Math.max(0, 480 - priorDayWork);
     const regularWorkMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - regularWorkMinutes;
-    const overtime50Room = Math.max(0, 60 - state.overtimeMinutes);
+    const overtime50Room = Math.max(0, 60 - priorWeekOvertime);
     const overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
     const returnRegularMinutes = Math.max(0, Number(job.return_time_minutes) || 0);
@@ -49,9 +64,8 @@ export function calculatePayrollEntries(jobs) {
       totalPaidMinutes: workMinutes + returnRegularMinutes,
       ...kilometres,
     });
-    state.workMinutes += workMinutes;
-    state.overtimeMinutes += overtimeWorkMinutes;
-    dayState.set(job.job_date, state);
+    dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes);
+    weekOvertimeMinutes.set(wk, priorWeekOvertime + overtimeWorkMinutes);
   }
   return entries;
 }
