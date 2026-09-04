@@ -103,9 +103,8 @@ These are now captured as data in `public.payroll_rules` and documented in
 citation pending). Status against code:
 
 - 480 min/day regular cap — matches the rule. ✅
-- **OT 1.5×/2× split — MISMATCH.** Code applies the 1.5× hour *per day*
-  (`payroll-calculations.js`); the confirmed rule applies it *per week*. The app
-  currently mis-pays overtime for multi-day-OT weeks. Fix tracked in `docs/rules/`. ⚠️
+- OT 1.5×/2× split — **fixed 2026-09-04**: code now applies the 1.5× hour *per week*
+  (`payroll-calculations.js`), matching the rule, with golden-fixture tests. ✅
 - 615 min weekday supper eligibility — matches the rule. ✅
 - Trade `220`, sector `C` (`ccq-export.js`, `ccq-rates.js`) — matches. ✅
 - Team-leader premium added into hourly rate, all hours (`CostingDashboard.jsx`,

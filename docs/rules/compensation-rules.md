@@ -21,12 +21,10 @@
 | 9h each day Mon–Fri (45h) | 40h | 1h | 4h |
 | 12h Mon, then 24h Tue–Fri (36h) | 32h | 1h | 3h |
 
-> ⚠️ **Known code discrepancy (to fix in M4 / a targeted fix).**
-> `src/lib/payroll-calculations.js` currently applies the 1.5× hour **per day** (first
-> 60 min of *each day's* overtime), not per week. That over-counts 1.5× hours and
-> under-counts 2× hours for anyone with overtime on more than one day in a week — i.e.
-> the app currently **mis-pays overtime**. The fix must move the 1.5× allowance to a
-> weekly accumulator and be proven against the golden cases above before shipping.
+> ✅ **Fixed 2026-09-04.** `src/lib/payroll-calculations.js` now applies the 1.5× hour
+> per **week** (accumulator scoped to the week ending Saturday), matching this rule. The
+> golden cases above are pinned as tests in `payroll-calculations.test.js`. Previously
+> the 1.5× hour reset each day, which under-paid overtime on multi-day-OT weeks.
 
 ## SUPPER — meal eligibility
 - Eligible when a person works **≥ 615 min (10h15) in a weekday**.
