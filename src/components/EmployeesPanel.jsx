@@ -504,7 +504,7 @@ export default function EmployeesPanel() {
               </div>
             </details>
 
-            {p.role !== "manager" && p.id !== user?.id && (
+            {p.is_paused && p.role !== "manager" && p.id !== user?.id && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-destructive dark:text-red-300">{t("employees.deleteUser")}</span>
