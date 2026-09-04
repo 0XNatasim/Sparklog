@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { hoursBetween, formatHours } from "../lib/time";
+import { formatHours } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import TimeRulesManager from "@/components/TimeRulesManager";
 import BroadcastManager from "@/components/BroadcastManager";
 import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
-import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 
 dayjs.extend(isoWeek);
@@ -37,12 +37,6 @@ function debounce(fn, delay) {
 function fmtTimeHHmm(t) {
   if (!t) return "—";
   return String(t).slice(0, 5);
-}
-
-function makeDayjsFromJob(job_date, timeStr) {
-  if (!job_date || !timeStr) return null;
-  const d = dayjs(`${job_date}T${timeStr}`);
-  return d.isValid() ? d : null;
 }
 
 function weekKeyFromDate(dateStr) {
@@ -688,9 +682,9 @@ export default function ManagerDashboard() {
     const employee = profiles.get(j.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
 
-    const d1 = makeDayjsFromJob(j.job_date, j.depart);
-    const d2 = makeDayjsFromJob(j.job_date, j.fin);
-    const totalHours = hoursBetween(d1, d2);
+    // Worked hours from the authoritative interval calc, which wraps past
+    // midnight (overnight jobs) exactly as the payroll classification does.
+    const totalHours = minutesBetween(j.depart, j.fin) / 60;
     const totalLabel = formatHours(totalHours);
 
     const { totalKm: kmLabel } = getKilometreBreakdown(j);
@@ -798,7 +792,7 @@ export default function ManagerDashboard() {
     const hasMeal = mealJobIds.has(job.id) || notificationMealJobs.some((mealJob) => mealJob.id === job.id);
     const employee = profiles.get(job.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
-    const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
+    const totalHours = minutesBetween(job.depart, job.fin) / 60;
     const { totalKm: km } = getKilometreBreakdown(job);
     const isProofVisible = visibleProof.has(job.id);
     const isParkingVisible = visibleParkingReceipts.has(job.id);
