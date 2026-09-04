@@ -96,15 +96,20 @@ authoritative engine.
 4. **Inline minute→hour math.** `Week.jsx` (`/60` inline) and `EmployeeForm.jsx`
    (`overtimeDailyMinutes` computed locally). *Plan:* consume the shared calculator.
 
-## F. Rule constants that currently live in code (need a cited source under `docs/rules/`)
+## F. Rule constants that currently live in code
 
-- 480 min/day regular cap; 60 min OT@1.5 then 2× (`payroll-calculations.js`)
-- 615 min weekday supper eligibility (`payroll-calculations.js`)
-- Trade code `220`, sector `C`, appendix formatting (`ccq-export.js`, `ccq-rates.js`)
-- Team-leader premium added into hourly rate (`CostingDashboard.jsx`, migration 0003)
+These are now captured as data in `public.payroll_rules` and documented in
+`docs/rules/compensation-rules.md` (approved under interim authority 2026-09-04, CCQ
+citation pending). Status against code:
 
-None of these carry a primary-source citation yet. They are documented here as
-*existing behavior*, not as validated rules — that validation is Milestone 1.
+- 480 min/day regular cap — matches the rule. ✅
+- **OT 1.5×/2× split — MISMATCH.** Code applies the 1.5× hour *per day*
+  (`payroll-calculations.js`); the confirmed rule applies it *per week*. The app
+  currently mis-pays overtime for multi-day-OT weeks. Fix tracked in `docs/rules/`. ⚠️
+- 615 min weekday supper eligibility — matches the rule. ✅
+- Trade `220`, sector `C` (`ccq-export.js`, `ccq-rates.js`) — matches. ✅
+- Team-leader premium added into hourly rate, all hours (`CostingDashboard.jsx`,
+  migration 0003) — matches. ✅
 
 ## Exit status for M0.4
 

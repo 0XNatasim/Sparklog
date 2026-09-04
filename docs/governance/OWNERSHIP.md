@@ -12,17 +12,20 @@ without its owner's approval (see "What each gate blocks").
 | Responsibility | Owner | Blocks |
 |---|---|---|
 | Product boundary and product decisions | simon1984bjeux@gmail.com | All releases |
-| CCQ / legal interpretation | Karine Messier | Rule-engine behavior |
-| Payroll validation | Karine Messier | Approved payroll basis / export |
+| CCQ / legal interpretation | simon1984bjeux@gmail.com (interim) | Rule-engine behavior |
+| Payroll validation | simon1984bjeux@gmail.com (interim) | Approved payroll basis / export |
 | Security and privacy | simon1984bjeux@gmail.com | Sensitive-data and auth changes |
 | Database migrations | simon1984bjeux@gmail.com | Production DB changes |
 | Production deployment approval | simon1984bjeux@gmail.com | Production releases |
 | Incident response | simon1984bjeux@gmail.com | Production operation |
 
 > **Note on the CCQ/legal and payroll roles.** `GPT.md` calls for a *qualified*
-> CCQ/payroll specialist to sign off on legal and compensation rules. Karine Messier
-> is recorded here as the current authority for those decisions. Until a qualified
-> specialist has validated a given rule with a cited source, no calculated value may
+> CCQ/payroll specialist to sign off on legal and compensation rules. On the product
+> owner's decision (2026-09-04), **simon1984bjeux@gmail.com acts as interim authority**
+> for CCQ/legal interpretation and payroll validation, providing and approving rules
+> until a qualified specialist (e.g. Karine Messier) is engaged to review them. Rules
+> approved under interim authority are recorded with their source where available and
+> remain subject to later specialist review. Until such review, no calculated value may
 > be presented as finalized payroll — it stays labeled as an estimate / preview / not
 > finalized / requires payroll review (per ADR 0001). Assigning an owner does not by
 > itself constitute legal validation.
