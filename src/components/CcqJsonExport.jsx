@@ -88,6 +88,7 @@ export default function CcqJsonExport() {
           <div>
             <h2 className="font-semibold">{t("manager.download.title")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{t("manager.download.description")}</p>
+            <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{t("manager.download.previewNotice")}</p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>

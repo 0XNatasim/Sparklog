@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 import { useT } from "@/lib/use-t";
 
-// A slim sticky bar shown while the device is offline, so the crew knows the
-// network is down and that whatever they're typing is being kept locally.
+// SparkLog caches the application shell, not unsent form data, so this banner
+// must not promise durable local storage.
 export default function OfflineBanner() {
   const t = useT();
   const [offline, setOffline] = useState(typeof navigator !== "undefined" && navigator.onLine === false);
