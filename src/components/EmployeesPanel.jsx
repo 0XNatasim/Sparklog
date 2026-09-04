@@ -358,8 +358,18 @@ export default function EmployeesPanel() {
               </div>
             </details>
 
-            {/* Classification */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Employee payroll and CCQ details stay out of the way until a manager needs to edit them. */}
+            <details className="group rounded-lg border">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{t("employees.ccqExport")}</span>
+                  <span className="hidden text-xs font-normal text-muted-foreground sm:inline">CCQ# {p.ccq_number || "—"}</span>
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-4 border-t p-3">
+                {/* Classification */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="CCQ#">
                 <Input
                   value={p.ccq_number || ""}
@@ -399,11 +409,10 @@ export default function EmployeesPanel() {
                   <span className="text-xs text-muted-foreground">/km</span>
                 </div>
               </Field>
-            </div>
+                </div>
 
-            <div className="rounded-lg border p-3">
-              <div className="mb-3 text-sm font-semibold">{t("employees.ccqExport")}</div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="rounded-lg bg-muted/20 p-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label={t("employees.nasEmployee")}>
                   <Input value={p.nas_employee || ""} maxLength={9} inputMode="numeric" onChange={(e) => setLocal(p.id, "nas_employee", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "nas_employee", e.target.value)} className="h-9" />
                 </Field>
@@ -448,18 +457,18 @@ export default function EmployeesPanel() {
                   <span className="text-[11px] text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
                 </Field>
               </div>
-            </div>
+                </div>
 
-            <div className="grid gap-2 border-t pt-3 md:grid-cols-2">
+                <div className="grid gap-2 border-t pt-3 md:grid-cols-2">
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
                 <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
                 <input
                   type="checkbox"
-                  checked={p.include_return_time_in_overtime !== false}
+                  checked={Boolean(p.storage_compensation)}
                   onChange={(e) => {
                     const checked = e.target.checked;
-                    setLocal(p.id, "include_return_time_in_overtime", checked);
-                    saveField(p.id, "include_return_time_in_overtime", checked);
+                    setLocal(p.id, "storage_compensation", checked);
+                    saveField(p.id, "storage_compensation", checked);
                   }}
                   className="h-5 w-5 rounded border-input accent-primary"
                 />
@@ -491,7 +500,9 @@ export default function EmployeesPanel() {
                   )}
                 </div>
               )}
-            </div>
+                </div>
+              </div>
+            </details>
 
             {p.role !== "manager" && p.id !== user?.id && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
