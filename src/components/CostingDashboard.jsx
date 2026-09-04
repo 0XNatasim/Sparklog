@@ -116,8 +116,9 @@ export default function CostingDashboard() {
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="font-semibold">{t("costing.title")} · {dayjs(range.start).format("DD MMM")} – {dayjs(range.end).format("DD MMM YYYY")}</div>
+              <div className="font-semibold">{t("costing.estimateLabel")} · {dayjs(range.start).format("DD MMM")} – {dayjs(range.end).format("DD MMM YYYY")}</div>
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.description")}</p>
+              <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{t("costing.reviewNotice")}</p>
             </div>
             <div className="flex overflow-hidden rounded-md border">
               {["week", "month"].map((p) => (
