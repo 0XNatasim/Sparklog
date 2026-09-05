@@ -51,9 +51,14 @@
   and collective agreements; values confirmed by interim authority 2026-09-05.
 - Calculation: `calculateCongesIndemnity(weeklyWageDollars)` in
   `src/lib/payroll-calculations.js`, tested. e.g. $1000 → **$130** (60 / 55 / 15).
-- **Assumption to confirm:** base = wages earned in the week **including overtime
-  premium dollars** (per the CCQ wording "salary earned during each week of work").
-- Not yet surfaced in the UI (costing / CCQ export) — that wiring is the next step.
+- **Base — confirmed 2026-09-05:** the 13% is on **gross wages earned, which include
+  overtime** (salaire brut incl. temps supplémentaire). So overtime premium dollars are
+  in the base (Option 1). Sources: CCQ via construmd.com "Paie CCQ" (2026-06-30) and
+  mobilepunch.com "How to calculate CCQ vacation pay in 2026". The one fully airtight
+  check remains a real remittance on an overtime week.
+- **It is employer-paid, on top of wages — NOT deducted from the worker.** In SparkLog
+  it is shown as an employer cost (costing dashboard), never as a payroll deduction.
+- Surfaced in the UI: "Leave 13%" column in the costing dashboard.
 
 ## TRADE_SECTOR — classification default
 - All employees, for now: **trade 220, sector C (commercial)**.
