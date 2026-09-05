@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { hoursBetween, formatHours } from "../lib/time";
+import { formatHours } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,14 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
-import { withTimeout } from "@/lib/utils";
+import { withRetry } from "@/lib/utils";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
 import BroadcastManager from "@/components/BroadcastManager";
 import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
-import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 
 dayjs.extend(isoWeek);
@@ -37,12 +37,6 @@ function debounce(fn, delay) {
 function fmtTimeHHmm(t) {
   if (!t) return "—";
   return String(t).slice(0, 5);
-}
-
-function makeDayjsFromJob(job_date, timeStr) {
-  if (!job_date || !timeStr) return null;
-  const d = dayjs(`${job_date}T${timeStr}`);
-  return d.isValid() ? d : null;
 }
 
 function weekKeyFromDate(dateStr) {
@@ -121,11 +115,7 @@ export default function ManagerDashboard() {
   }
 
   async function loadCounts() {
-    const base = (() => {
-      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
-      if (dayFilter) q = q.eq("job_date", dayFilter);
-      return q;
-    })();
+    // Rebuilt inside the factory so each retry attempt gets fresh query builders.
     const scoped = (status) => {
       let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
       if (employeeId !== "all") q = q.eq("user_id", employeeId);
@@ -133,9 +123,14 @@ export default function ManagerDashboard() {
       if (dayFilter) q = q.eq("job_date", dayFilter);
       return q;
     };
-    const [all, saved, submitted, approved] = await withTimeout(
-      Promise.all([
-        employeeId === "all" ? base : scoped(null),
+    const base = () => {
+      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
+      if (dayFilter) q = q.eq("job_date", dayFilter);
+      return q;
+    };
+    const [all, saved, submitted, approved] = await withRetry(
+      () => Promise.all([
+        employeeId === "all" ? base() : scoped(null),
         scoped("saved"),
         scoped("submitted"),
         scoped("approved"),
@@ -154,28 +149,17 @@ export default function ManagerDashboard() {
     setErr(""); setInfo("");
     setLoading(true);
     try {
-      const { data: jobRows, error: jobErr } = await withTimeout(
-        buildJobsQuery().range(0, PAGE_SIZE - 1),
+      const { data: jobRows } = await withRetry(
+        () => buildJobsQuery().range(0, PAGE_SIZE - 1),
         12000
       );
-      if (jobErr) throw jobErr;
 
-      const { data: mealRows, error: mealErr } = await withTimeout(
-        supabase.from("meal_claims").select("job_id"),
-        12000
-      );
-      if (mealErr) throw mealErr;
+      // Only the meal indicators for the jobs actually on screen — no full-table scan.
+      const jobIds = (jobRows || []).map((j) => j.id);
+      const { data: mealRows } = jobIds.length
+        ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", jobIds), 12000)
+        : { data: [] };
 
-      const { data: profileRows, error: profErr } = await withTimeout(
-        supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, is_paused, show_on_boards"),
-        12000
-      );
-      if (profErr) throw profErr;
-
-      const m = new Map();
-      (profileRows || []).forEach((p) => m.set(p.id, p));
-
-      setProfiles(m);
       setJobs(jobRows || []);
       setMealJobIds(new Set((mealRows || []).map((claim) => claim.job_id)));
       setHasMore((jobRows || []).length === PAGE_SIZE);
@@ -209,6 +193,28 @@ export default function ManagerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId, statusFilter, dayFilter]);
 
+  // The roster changes rarely, so load it once rather than on every filter change
+  // (that kept re-pulling the whole profiles table into the per-selection burst).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await withRetry(
+          () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, is_paused, show_on_boards"),
+          12000
+        );
+        if (!cancelled) setProfiles((current) => {
+          const next = new Map(current);
+          (data || []).forEach((p) => next.set(p.id, p));
+          return next;
+        });
+      } catch {
+        // Names fall back to the id fragment; non-fatal, and load() surfaces real errors.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     if (!focusedJobId) return;
     supabase.from("jobs").select("user_id").eq("id", focusedJobId).single().then(({ data }) => {
@@ -228,22 +234,22 @@ export default function ManagerDashboard() {
       setOvertimeLoading(true);
       setErr("");
       try {
-        const { data: evidenceRows, error: evidenceError } = await withTimeout(
-          supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }),
+        const { data: evidenceRows, error: evidenceError } = await withRetry(
+          () => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }),
           12000
         );
         if (evidenceError) throw evidenceError;
         const jobIds = (evidenceRows || []).map((row) => row.job_id);
         const { data: jobRows, error: jobError } = jobIds.length
-          ? await withTimeout(supabase.from("jobs").select("*").in("id", jobIds), 12000)
+          ? await withRetry(() => supabase.from("jobs").select("*").in("id", jobIds), 12000)
           : { data: [], error: null };
         if (jobError) throw jobError;
         const order = new Map(jobIds.map((id, index) => [id, index]));
         const orderedJobs = (jobRows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
         const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
         if (missingProfileIds.length) {
-          const { data: profileRows, error: profileError } = await withTimeout(
-            supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
+          const { data: profileRows, error: profileError } = await withRetry(
+            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
             12000
           );
           if (profileError) throw profileError;
@@ -292,22 +298,22 @@ export default function ManagerDashboard() {
       setParkingLoading(true);
       setErr("");
       try {
-        const { data: receiptRows, error: receiptError } = await withTimeout(
-          supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, amount, status, created_at").order("created_at", { ascending: false }),
+        const { data: receiptRows, error: receiptError } = await withRetry(
+          () => supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, amount, status, created_at").order("created_at", { ascending: false }),
           12000
         );
         if (receiptError) throw receiptError;
         const jobIds = (receiptRows || []).map((row) => row.job_id);
         const { data: jobRows, error: jobError } = jobIds.length
-          ? await withTimeout(supabase.from("jobs").select("*").in("id", jobIds), 12000)
+          ? await withRetry(() => supabase.from("jobs").select("*").in("id", jobIds), 12000)
           : { data: [], error: null };
         if (jobError) throw jobError;
         const order = new Map(jobIds.map((id, index) => [id, index]));
         const orderedJobs = (jobRows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
         const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
         if (missingProfileIds.length) {
-          const { data: profileRows, error: profileError } = await withTimeout(
-            supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
+          const { data: profileRows, error: profileError } = await withRetry(
+            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
             12000
           );
           if (profileError) throw profileError;
@@ -337,31 +343,28 @@ export default function ManagerDashboard() {
     let cancelled = false;
     async function loadNotificationMeals() {
       setNotificationMealsLoading(true);
-      const { data: claims, error: claimsError } = await withTimeout(
-        supabase.from("meal_claims").select("job_id, created_at").order("created_at", { ascending: false }), 12000
-      );
-      if (claimsError) {
-        setNotificationMealsLoading(false);
-        return setErr(claimsError.message);
-      }
-      const ids = [...new Set((claims || []).map((claim) => claim.job_id))];
-      const { data: rows, error } = ids.length
-        ? await withTimeout(supabase.from("jobs").select("*").in("id", ids), 12000)
-        : { data: [], error: null };
-      if (error) {
-        setNotificationMealsLoading(false);
-        return setErr(error.message);
-      }
-      const order = new Map(ids.map((id, index) => [id, index]));
-      const orderedRows = (rows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
-      const missingProfileIds = [...new Set(orderedRows.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
-      const { data: people } = missingProfileIds.length
-        ? await withTimeout(supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds), 12000)
-        : { data: [] };
-      if (!cancelled) {
-        setNotificationMealJobs(orderedRows);
-        setProfiles((current) => new Map([...current, ...(people || []).map((person) => [person.id, person])]));
-        setNotificationMealsLoading(false);
+      try {
+        const { data: claims } = await withRetry(
+          () => supabase.from("meal_claims").select("job_id, created_at").order("created_at", { ascending: false }), 12000
+        );
+        const ids = [...new Set((claims || []).map((claim) => claim.job_id))];
+        const { data: rows } = ids.length
+          ? await withRetry(() => supabase.from("jobs").select("*").in("id", ids), 12000)
+          : { data: [] };
+        const order = new Map(ids.map((id, index) => [id, index]));
+        const orderedRows = (rows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
+        const missingProfileIds = [...new Set(orderedRows.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
+        const { data: people } = missingProfileIds.length
+          ? await withRetry(() => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds), 12000)
+          : { data: [] };
+        if (!cancelled) {
+          setNotificationMealJobs(orderedRows);
+          setProfiles((current) => new Map([...current, ...(people || []).map((person) => [person.id, person])]));
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e?.message || t("manager.errors.failedLoad"));
+      } finally {
+        if (!cancelled) setNotificationMealsLoading(false);
       }
     }
     loadNotificationMeals();
@@ -688,9 +691,9 @@ export default function ManagerDashboard() {
     const employee = profiles.get(j.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
 
-    const d1 = makeDayjsFromJob(j.job_date, j.depart);
-    const d2 = makeDayjsFromJob(j.job_date, j.fin);
-    const totalHours = hoursBetween(d1, d2);
+    // Worked hours from the authoritative interval calc, which wraps past
+    // midnight (overnight jobs) exactly as the payroll classification does.
+    const totalHours = minutesBetween(j.depart, j.fin) / 60;
     const totalLabel = formatHours(totalHours);
 
     const { totalKm: kmLabel } = getKilometreBreakdown(j);
@@ -798,7 +801,7 @@ export default function ManagerDashboard() {
     const hasMeal = mealJobIds.has(job.id) || notificationMealJobs.some((mealJob) => mealJob.id === job.id);
     const employee = profiles.get(job.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(job.user_id).slice(0, 8)}…`;
-    const totalHours = hoursBetween(makeDayjsFromJob(job.job_date, job.depart), makeDayjsFromJob(job.job_date, job.fin));
+    const totalHours = minutesBetween(job.depart, job.fin) / 60;
     const { totalKm: km } = getKilometreBreakdown(job);
     const isProofVisible = visibleProof.has(job.id);
     const isParkingVisible = visibleParkingReceipts.has(job.id);

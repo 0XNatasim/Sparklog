@@ -4,7 +4,7 @@ import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayrollEntries } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, calculateCongesIndemnity } from "@/lib/payroll-calculations";
 import { useT } from "@/lib/use-t";
 
 dayjs.extend(isoWeek);
@@ -78,6 +78,9 @@ export default function CostingDashboard() {
         });
 
         const labor = rate * ((regMin + returnMin) / 60 + (ot50Min / 60) * 1.5 + (ot100Min / 60) * 2);
+        // CCQ indemnité de congés: 13% of wages earned (labor already includes the OT
+        // premium dollars, which is the base the rule specifies).
+        const conges = calculateCongesIndemnity(labor).total;
         const kmCost = totalKm * kmRate;
         const mealsCost = mealByUser.get(userId) || 0;
         const parkingCost = parkingByUser.get(userId) || 0;
@@ -89,8 +92,8 @@ export default function CostingDashboard() {
           premium,
           regHours: (regMin + returnMin) / 60,
           otHours: (ot50Min + ot100Min) / 60,
-          labor, kmCost, mealsCost, parkingCost,
-          total: labor + kmCost + mealsCost + parkingCost,
+          labor, conges, kmCost, mealsCost, parkingCost,
+          total: labor + conges + kmCost + mealsCost + parkingCost,
         });
       });
       result.sort((a, b) => b.total - a.total);
@@ -104,11 +107,12 @@ export default function CostingDashboard() {
     regHours: acc.regHours + r.regHours,
     otHours: acc.otHours + r.otHours,
     labor: acc.labor + r.labor,
+    conges: acc.conges + r.conges,
     kmCost: acc.kmCost + r.kmCost,
     mealsCost: acc.mealsCost + r.mealsCost,
     parkingCost: acc.parkingCost + r.parkingCost,
     total: acc.total + r.total,
-  }), { regHours: 0, otHours: 0, labor: 0, kmCost: 0, mealsCost: 0, parkingCost: 0, total: 0 });
+  }), { regHours: 0, otHours: 0, labor: 0, conges: 0, kmCost: 0, mealsCost: 0, parkingCost: 0, total: 0 });
 
   return (
     <div className="space-y-3">
@@ -134,13 +138,14 @@ export default function CostingDashboard() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <th className="px-3 py-2.5 font-medium">{t("costing.col.employee")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">{t("costing.col.regHours")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">{t("costing.col.otHours")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">{t("costing.col.labor")}</th>
+                  <th className="px-3 py-2.5 text-right font-medium">{t("costing.col.conges")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">{t("costing.col.km")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">{t("costing.col.meals")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">{t("costing.col.parking")}</th>
@@ -158,6 +163,7 @@ export default function CostingDashboard() {
                     <td className="px-3 py-2.5 text-right font-mono">{r.regHours.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{r.otHours.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(r.labor)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{money(r.conges)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(r.kmCost)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(r.mealsCost)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(r.parkingCost)}</td>
@@ -165,7 +171,7 @@ export default function CostingDashboard() {
                   </tr>
                 ))}
                 {!loading && rows.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-6 text-center text-sm text-muted-foreground">{t("costing.empty")}</td></tr>
+                  <tr><td colSpan={9} className="px-3 py-6 text-center text-sm text-muted-foreground">{t("costing.empty")}</td></tr>
                 )}
               </tbody>
               {rows.length > 0 && (
@@ -175,6 +181,7 @@ export default function CostingDashboard() {
                     <td className="px-3 py-2.5 text-right font-mono">{totals.regHours.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{totals.otHours.toFixed(2)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(totals.labor)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{money(totals.conges)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(totals.kmCost)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(totals.mealsCost)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(totals.parkingCost)}</td>

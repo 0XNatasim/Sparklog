@@ -17,18 +17,18 @@ SparkLog is a bilingual, mobile-first time-tracking application for Québec elec
 
 ### Managers
 
-The Manager workspace is divided into six sections:
+The Manager workspace has six sections:
 
 | Section | Purpose |
 |---|---|
-| **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, and pause accounts without deleting history. |
+| **Live crew** | See who is working today. |
+| **Time-sheet** | Review submitted jobs, filter by employee / status / day, unlock entries, and approve jobs individually or a full week before Google Sheets export. |
+| **Notifications** | Review overtime authorizations, supper claims, and parking receipts in one place. |
+| **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, set day/week time off, manage company holidays, and pause accounts (or delete already-inactive ones) without losing history. |
 | **Forms** | Open company forms and control which forms employees can see. |
-| **Time-sheet** | Review submitted jobs, unlock entries, and approve jobs before Google Sheets export. |
-| **Overtime** | Review overtime jobs and the original authorization screenshot. |
-| **Parkings** | Review parking jobs and display their receipt pictures. |
-| **Download** | Preview and download CCQ-oriented weekly JSON records. |
+| **Testing** | Tools and previews: the costing dashboard (including the CCQ leave indemnity), the CCQ JSON export/download, and the sensitive-actions audit log. |
 
-Other manager tools include announcements, CCQ rate synchronization, employee filtering, and bulk weekly approval.
+Managers can also broadcast announcements, synchronize CCQ rates, view the app as any employee, and force a manual refresh from the header (useful in installed PWA/App mode).
 
 ## CCQ assumptions
 
@@ -149,11 +149,11 @@ For a fresh project, create the base schema and policies first or restore them f
 - `public.get_my_role()` must return the authenticated profile role.
 - Employees must be allowed to manage their own unlocked jobs; managers must be allowed to read profiles/jobs and update jobs.
 
-Migration `0029_employee_job_submission_policies.sql` installs the employee
-`jobs` policies explicitly. It allows an employee to create a draft, create a
-job already submitted, or transition an unlocked draft to the locked
-`submitted` state. The migration is safe to push if its SQL was previously run
-manually in the Supabase SQL editor.
+Employee `jobs` policies (create a draft, create an already-submitted job, or move an
+unlocked draft to the locked `submitted` state) are installed by the migrations, and
+migration `0018_paused_employee_write_containment.sql` additionally blocks **all**
+employee writes while an account is paused and replaces the profile-field blacklist with
+an explicit employee-editable whitelist. Migrations are written to be safe to re-run.
 
 After migrations, set the first manager manually:
 
@@ -192,7 +192,9 @@ supabase functions deploy cleanup_overtime_evidence
 | `send_announcement` | Persists and emails manager announcements. |
 | `ccq_rates` | Authenticated proxy/cache for CCQ commercial electrician rates. |
 | `ccq_rates_daily_sync` | Service-role-only refresh of commercial rate snapshots. |
+| `process_overtime_evidence` | Background OCR of overtime authorization screenshots (ocr.space). |
 | `cleanup_overtime_evidence` | Service-role-only deletion of expired overtime images and records. |
+| `delete_user` | Manager-only hard delete of an inactive account, with guards and an audit-log entry. |
 
 The frontend sends authenticated bearer tokens to user-facing functions. Keep normal JWT verification/authentication behavior aligned with each function's own authorization checks; do not expose service-role credentials to the browser.
 
@@ -243,6 +245,18 @@ Connect the repository as a static site. `render.yaml` uses `npm run build`, pub
 
 ### Confirmed payroll and expense rules
 
+Rules are recorded as data in the `public.payroll_rules` table and documented in
+`docs/rules/compensation-rules.md` (with their CCQ sources). Highlights:
+
+- **Overtime.** Regular hours are capped at 8 h/day; time worked past 8 h in a day is
+  overtime. The **first hour of overtime in the week** is paid at 1.5×; all further
+  overtime that week is at 2×. The 1.5× allowance is **weekly, not per day**.
+- **Holidays & weekends.** Employees never work weekends. Statutory holidays and the CCQ
+  construction vacation weeks are non-working (job entry is blocked via
+  `company_holidays`). The CCQ **leave indemnity — 13 % of weekly gross wages** (6 %
+  vacation + 5.5 % statutory holidays + 1.5 % sick) — is paid by the employer *on top of*
+  wages and shown as an employer cost in the costing dashboard; it is **not** deducted
+  from the worker.
 - Job kilometres from image autofill or manual entry are the **total shown on the work order**. If an employee records a return to storage, the return kilometres are subtracted from that total to produce the client leg; they are never added a second time.
 - Return-to-storage time is always regular-rate paid time. It never creates overtime, including when the workday is already longer than eight hours.
 - A weekday supper claim becomes available at exactly 2 h 15 of overtime. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
@@ -269,6 +283,37 @@ Connect the repository as a static site. `render.yaml` uses `npm run build`, pub
 5. Configure the global overtime evidence-retention period.
 6. Synchronize commercial CCQ rates and select the correct appendix.
 7. Configure Google Sheets and an email provider if those integrations are required.
+
+## Reliability (free-tier keep-warm)
+
+SparkLog must be usable by managers at any hour. On the Supabase free tier two layers
+keep it responsive despite cold starts:
+
+- **Client auto-retry** — `withRetry` (`src/lib/utils.js`) retries a stalled read a few
+  times with backoff before surfacing an error, so a cold start self-heals.
+- **24/7 keep-warm** — `.github/workflows/keep-warm.yml` pings the `public.ping()` RPC
+  every ~10 minutes so Postgres never goes cold. Requires repo secrets `SUPABASE_URL`
+  and `SUPABASE_ANON_KEY`, and runs only from the default branch.
+
+This is best-effort, not an SLA. When uptime becomes critical, move to **Supabase Pro**
+(no pausing, steadier compute, daily backups). See `docs/ops/supabase-reliability.md`.
+
+## Governance & documentation
+
+Payroll-adjacent work follows a scope-and-rule discipline (see `GPT.md` and the `docs/`
+tree):
+
+- `docs/adr/` — product-scope decision: SparkLog is a **timekeeping + payroll-export**
+  tool, not a payroll engine. Every calculated value stays labeled as an estimate /
+  preview until a qualified specialist validates it.
+- `docs/rules/` — approved compensation rules with their CCQ sources (system of record:
+  the `payroll_rules` table).
+- `docs/governance/OWNERSHIP.md` — named owners and approval gates.
+- `docs/security/authorization-matrix.md` — the enforced RLS matrix, plus the runnable
+  adversarial suite at `tests/rls/authorization_matrix.sql`.
+- `docs/inventory/` — every calculation and export surface.
+- `.github/pull_request_template.md` — a required payroll-rule gate: no new pay rule
+  merges without a cited source and specialist approval.
 
 ## Security notes
 
@@ -321,7 +366,7 @@ Confirmed in **Manager → Employees**. Source of truth is the employee's CCQ
 | Sector | Institutionnel & commercial → `C` | |
 | Week ending | Saturday | |
 | Everyone reported as regular salaried worker (blank status) | yes | |
-| Statutory holidays in the period handled | **not yet** — verify June 24 / July 1 etc. manually | |
+| Statutory holidays / construction vacations | **handled** — non-working (entry blocked via `company_holidays`); 13 % leave indemnity computed | |
 
 ### 3. Rates to verify against current CCQ / ACQ tables
 
@@ -334,7 +379,7 @@ official tables before any dollar figure is trusted.
 |---|---|---|
 | Regular / 150% / 200% hourly rates | CCQ rate sync (`ccq_rate_snapshots`) | |
 | Avantages sociaux ($/h) | CCQ rate sync | |
-| Congés & jours fériés (13 %) | CCQ convention | |
+| Congés & jours fériés (13 % = 6 % vac + 5.5 % fériés + 1.5 % maladie) | CCQ chèque-vacances — **confirmed** | |
 | Prélèvement CCQ (1.5 %) | CCQ | |
 | Contribution sectorielle ($0.02/h) | CCQ | |
 | Fonds d'indemnisation ($0.02/h) | CCQ | |

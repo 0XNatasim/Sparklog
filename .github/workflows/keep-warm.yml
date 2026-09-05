@@ -1,0 +1,50 @@
+name: Keep Supabase warm
+
+# Pings a lightweight DB function every ~10 minutes, 24/7, so the free-tier Supabase
+# project never goes cold and the manager dashboard stays responsive at any hour.
+# Together with the client-side auto-retry (src/lib/utils.js withRetry) this keeps the
+# app operational around the clock on the free tier — best-effort; a hard uptime
+# guarantee needs Supabase Pro.
+#
+# Requires two repo secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL       e.g. https://sqpsjmyycxxwfstmpgom.supabase.co
+#   SUPABASE_ANON_KEY  the project's public anon key (same one the frontend uses)
+#
+# NOTE: GitHub only runs scheduled workflows from the DEFAULT branch, so this starts
+# firing once it is merged to main. Cron timing is best-effort (can drift 5-15 min).
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Missing SUPABASE_URL or SUPABASE_ANON_KEY secret."; exit 1
+          fi
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+              -X POST "$SUPABASE_URL/rest/v1/rpc/ping" \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+            echo "attempt $attempt: HTTP $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 20
+          done
+          echo "keep-warm ping failed after 3 attempts (project may be paused/down)."
+          exit 1
