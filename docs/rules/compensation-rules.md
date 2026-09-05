@@ -30,6 +30,24 @@
 - Eligible when a person works **≥ 615 min (10h15) in a weekday**.
 - Weekdays only; no weekend work.
 
+## HOLIDAY — statutory holidays & construction vacation
+- Employees **never work** statutory holidays or the construction vacation weeks
+  (treated like weekends). The app already **blocks job entry** on `company_holidays`
+  dates, and that calendar is populated from the CCQ calendar through 2029.
+- Source: CCQ dates congés/vacances + FAQ fériés (see links in `payroll_rules`).
+
+## HOLIDAY_INDEMNITY — holiday + vacation pay ⏳ requires_review
+- Decision: **SparkLog should compute** the holiday/vacation indemnity (not left to
+  external payroll).
+- **Blocked on a value.** The indemnity percentage(s) and the base they apply to come
+  from the CCQ *Chèque de vacances* page
+  (`https://www.ccq.org/en/avantages-sociaux/salaire-taux/cheque-vacances`) and the
+  collective agreements. `ccq.org` is blocked by the sandbox network policy, so the
+  figure could not be fetched here. Recorded as **draft** until the interim authority
+  supplies the percentage/base (and any per-annexe/level differences — cf. the
+  `Vacances` row in `Testing.jsx`: 6,60 / 3,30 / 3,96 / 4,62 / 5,61).
+- Until then, no indemnity is computed and nothing claims one (`requires_review`).
+
 ## TRADE_SECTOR — classification default
 - All employees, for now: **trade 220, sector C (commercial)**.
 
