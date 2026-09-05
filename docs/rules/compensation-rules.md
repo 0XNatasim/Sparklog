@@ -36,17 +36,24 @@
   dates, and that calendar is populated from the CCQ calendar through 2029.
 - Source: CCQ dates congés/vacances + FAQ fériés (see links in `payroll_rules`).
 
-## HOLIDAY_INDEMNITY — holiday + vacation pay ⏳ requires_review
-- Decision: **SparkLog should compute** the holiday/vacation indemnity (not left to
-  external payroll).
-- **Blocked on a value.** The indemnity percentage(s) and the base they apply to come
-  from the CCQ *Chèque de vacances* page
-  (`https://www.ccq.org/en/avantages-sociaux/salaire-taux/cheque-vacances`) and the
-  collective agreements. `ccq.org` is blocked by the sandbox network policy, so the
-  figure could not be fetched here. Recorded as **draft** until the interim authority
-  supplies the percentage/base (and any per-annexe/level differences — cf. the
-  `Vacances` row in `Testing.jsx`: 6,60 / 3,30 / 3,96 / 4,62 / 5,61).
-- Until then, no indemnity is computed and nothing claims one (`requires_review`).
+## HOLIDAY_INDEMNITY — indemnité de congés ✅ approved
+- **13% of the gross salary earned each week**, split:
+  - **6.0%** annual vacations
+  - **5.5%** paid statutory holidays
+  - **1.5%** sick leave
+- Same 13% rate for **every level**; the dollar amount differs only because wages
+  differ. (The `Testing.jsx` "Vacances" row 6,60 / 3,30 / 3,96 / 4,62 / 5,61 is just 13%
+  pre-expressed as $/h per level.)
+- Remittance: employer remits monthly to the CCQ; the CCQ pays workers twice a year
+  (end of June, end of November). SparkLog computes/shows the estimate; it does not
+  remit.
+- Source: CCQ *Chèque de vacances* — https://www.ccq.org/en/avantages-sociaux/salaire-taux/cheque-vacances
+  and collective agreements; values confirmed by interim authority 2026-09-05.
+- Calculation: `calculateCongesIndemnity(weeklyWageDollars)` in
+  `src/lib/payroll-calculations.js`, tested. e.g. $1000 → **$130** (60 / 55 / 15).
+- **Assumption to confirm:** base = wages earned in the week **including overtime
+  premium dollars** (per the CCQ wording "salary earned during each week of work").
+- Not yet surfaced in the UI (costing / CCQ export) — that wiring is the next step.
 
 ## TRADE_SECTOR — classification default
 - All employees, for now: **trade 220, sector C (commercial)**.

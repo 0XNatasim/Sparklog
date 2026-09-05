@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { minutesBetween, calculatePayrollEntries, isMealEligible, roundHours } from "./payroll-calculations";
+import { minutesBetween, calculatePayrollEntries, isMealEligible, roundHours, calculateCongesIndemnity } from "./payroll-calculations";
 
 // Single-job helper: returns the payroll entry for one job worked from 08:00.
 function entry(fin, extra = {}) {
@@ -109,6 +109,26 @@ describe("isMealEligible (supper: >8h + 2h15 = 615 min, weekday only)", () => {
   it("614 min → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 614 })).toBe(false));
   it("615 min on a weekday → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 615 })).toBe(true));
   it("never eligible on a Saturday", () => expect(isMealEligible({ jobDate: "2026-06-06", dailyWorkMinutes: 700 })).toBe(false));
+});
+
+describe("calculateCongesIndemnity (CCQ 13% = 6% vacation + 5.5% holidays + 1.5% sick)", () => {
+  it("$1000 weekly wages → $130 total, split 60/55/15", () => {
+    const r = calculateCongesIndemnity(1000);
+    expect(r.vacation).toBeCloseTo(60, 6);
+    expect(r.statutoryHolidays).toBeCloseTo(55, 6);
+    expect(r.sick).toBeCloseTo(15, 6);
+    expect(r.total).toBeCloseTo(130, 6);
+  });
+  it("components always sum to the total (13%)", () => {
+    const r = calculateCongesIndemnity(1234.56);
+    expect(r.vacation + r.statutoryHolidays + r.sick).toBeCloseTo(r.total, 9);
+    expect(r.total).toBeCloseTo(1234.56 * 0.13, 9);
+  });
+  it("0 or invalid wages → 0", () => {
+    expect(calculateCongesIndemnity(0).total).toBe(0);
+    expect(calculateCongesIndemnity(-5).total).toBe(0);
+    expect(calculateCongesIndemnity(undefined).total).toBe(0);
+  });
 });
 
 describe("roundHours", () => {

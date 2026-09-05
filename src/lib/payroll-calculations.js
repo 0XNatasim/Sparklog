@@ -105,3 +105,17 @@ export function isMealEligible({ jobDate, dailyWorkMinutes }) {
 export function roundHours(minutes) {
   return Math.round((minutes / 60) * 100) / 100;
 }
+
+// Indemnité de congés (CCQ): 13% of weekly wages earned — 6% annual vacation,
+// 5.5% paid statutory holidays, 1.5% sick leave. The rate is the same for every level;
+// the dollar amount differs only because wages differ. Base is the gross salary earned
+// in the week. Source: CCQ chèque-vacances page; see docs/rules/compensation-rules.md.
+export const CONGES_INDEMNITY_RATES = { vacation: 0.06, statutoryHolidays: 0.055, sick: 0.015 };
+
+export function calculateCongesIndemnity(weeklyWageDollars) {
+  const wages = Math.max(0, Number(weeklyWageDollars) || 0);
+  const vacation = wages * CONGES_INDEMNITY_RATES.vacation;
+  const statutoryHolidays = wages * CONGES_INDEMNITY_RATES.statutoryHolidays;
+  const sick = wages * CONGES_INDEMNITY_RATES.sick;
+  return { vacation, statutoryHolidays, sick, total: vacation + statutoryHolidays + sick };
+}
