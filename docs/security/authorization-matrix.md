@@ -117,10 +117,17 @@ Legend: ✅ allowed · ❌ denied · ⚠️ allowed but constrained (see notes) 
    `ccq_rate_snapshots`, `employee_forms`, `job_entry_unlocks`, messaging tables). All
    have RLS **on**; a full CRUD row for each is a follow-up to complete M2.1.
 
-## Exit status for M2.1
+## Exit status for M2.1 / M2.4
 
 - [x] CRUD matrix for the sensitive write-target tables and all storage buckets, per
   role, taken from the live database.
-- [ ] Extend the matrix to the remaining config/reference and messaging tables.
-- [ ] Turn this matrix into the automated adversarial test suite (**M2.4**) so it is
-  enforced, not just documented.
+- [x] **Runnable adversarial suite (M2.4, Option A):** `tests/rls/authorization_matrix.sql`
+  impersonates anon / active employee / paused employee / manager and asserts the matrix
+  in a rolled-back transaction. Verified green against the live DB 2026-09-05 (9/9 pass),
+  including the paused-account containment invariants (cannot insert a job, cannot update
+  own profile).
+- [ ] Extend the matrix + suite to the remaining config/reference and messaging tables.
+- [ ] **Option B (future):** promote the suite into CI against a disposable Supabase
+  (`supabase start` / `db reset` in a GitHub Action) with minted JWTs and a clean +
+  upgrade migration path, so the matrix is enforced on every PR. Header of the SQL file
+  tracks this.
