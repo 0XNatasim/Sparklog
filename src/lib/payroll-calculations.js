@@ -1,4 +1,10 @@
-import dayjs from "dayjs";
+// Authoritative payroll classification engine.
+//
+// This module is intentionally DEPENDENCY-FREE (no dayjs) so the exact same code runs
+// in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
+// one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
+// alter a classified value; approval snapshots record the version they were computed with.
+export const ENGINE_VERSION = "1.0.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -21,12 +27,27 @@ export function getKilometreBreakdown(job) {
   };
 }
 
+// Parse a YYYY-MM-DD work date at UTC midnight. Using UTC keeps the day-of-week stable
+// regardless of the runtime's timezone (browser vs Deno).
+function parseWorkDate(jobDate) {
+  if (!jobDate) return null;
+  const d = new Date(`${String(jobDate).slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Day of week for a work date: 0 = Sunday … 6 = Saturday.
+function dayOfWeek(jobDate) {
+  const d = parseWorkDate(jobDate);
+  return d ? d.getUTCDay() : null;
+}
+
 // Payroll week runs to the Saturday that ends it (matches the CCQ weekly grouping in
 // ccq-export). Used to scope the 1.5x overtime allowance to the week, not the day.
-function payrollWeekKey(jobDate) {
-  const d = dayjs(jobDate);
-  if (!d.isValid()) return String(jobDate || "");
-  return d.add((6 - d.day() + 7) % 7, "day").format("YYYY-MM-DD");
+export function payrollWeekKey(jobDate) {
+  const d = parseWorkDate(jobDate);
+  if (!d) return String(jobDate || "");
+  d.setUTCDate(d.getUTCDate() + ((6 - d.getUTCDay() + 7) % 7));
+  return d.toISOString().slice(0, 10);
 }
 
 export function calculatePayrollEntries(jobs) {
@@ -98,8 +119,8 @@ export function calculateDailyTotals(jobs) {
 }
 
 export function isMealEligible({ jobDate, dailyWorkMinutes }) {
-  const weekday = dayjs(jobDate).day();
-  return weekday !== 0 && weekday !== 6 && Math.max(0, dailyWorkMinutes - 480) >= 135;
+  const weekday = dayOfWeek(jobDate);
+  return weekday !== null && weekday !== 0 && weekday !== 6 && Math.max(0, dailyWorkMinutes - 480) >= 135;
 }
 
 export function roundHours(minutes) {
@@ -118,4 +139,57 @@ export function calculateCongesIndemnity(weeklyWageDollars) {
   const statutoryHolidays = wages * CONGES_INDEMNITY_RATES.statutoryHolidays;
   const sick = wages * CONGES_INDEMNITY_RATES.sick;
   return { vacation, statutoryHolidays, sick, total: vacation + statutoryHolidays + sick };
+}
+
+// Authoritative entry point. Given a set of jobs (normally one employee), returns a
+// versioned, self-describing classification: a per-job trace, per-week totals, and
+// warnings for inputs that need review. Every worked minute is accounted for exactly
+// once (regular + ot50 + ot100). This is the contract the Edge Function returns and the
+// approval snapshot records.
+export function computeWeek(jobs) {
+  const list = Array.isArray(jobs) ? jobs.filter(Boolean) : [];
+  const entriesMap = calculatePayrollEntries(list);
+  const perJob = [];
+  const warnings = [];
+  const weeks = new Map();
+
+  for (const job of list) {
+    const e = entriesMap.get(job.id);
+    if (!e) continue;
+    if (!job.depart || !job.fin) {
+      warnings.push({ code: "missing_time", jobId: job.id, jobDate: job.job_date });
+    } else if (minutesBetween(job.depart, job.fin) === 0) {
+      warnings.push({ code: "zero_duration", jobId: job.id, jobDate: job.job_date });
+    }
+    const weekEnding = payrollWeekKey(job.job_date);
+    perJob.push({
+      jobId: job.id,
+      jobDate: job.job_date,
+      weekEnding,
+      workMinutes: e.regularWorkMinutes + e.overtimeWorkMinutes,
+      regularWorkMinutes: e.regularWorkMinutes,
+      overtime50Minutes: e.overtime50Minutes,
+      overtime100Minutes: e.overtime100Minutes,
+      returnRegularMinutes: e.returnRegularMinutes,
+    });
+    const w = weeks.get(weekEnding) || {
+      weekEnding, regularMinutes: 0, overtime50Minutes: 0, overtime100Minutes: 0,
+      returnRegularMinutes: 0, workedMinutes: 0,
+    };
+    w.regularMinutes += e.regularWorkMinutes;
+    w.overtime50Minutes += e.overtime50Minutes;
+    w.overtime100Minutes += e.overtime100Minutes;
+    w.returnRegularMinutes += e.returnRegularMinutes;
+    w.workedMinutes += e.regularWorkMinutes + e.overtimeWorkMinutes;
+    weeks.set(weekEnding, w);
+  }
+
+  return {
+    engineVersion: ENGINE_VERSION,
+    generatedAt: new Date().toISOString(),
+    jobCount: perJob.length,
+    perJob,
+    weeks: [...weeks.values()].sort((a, b) => a.weekEnding.localeCompare(b.weekEnding)),
+    warnings,
+  };
 }

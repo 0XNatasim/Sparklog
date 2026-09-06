@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { minutesBetween, calculatePayrollEntries, isMealEligible, roundHours, calculateCongesIndemnity } from "./payroll-calculations";
+import { minutesBetween, calculatePayrollEntries, isMealEligible, roundHours, calculateCongesIndemnity, computeWeek, ENGINE_VERSION } from "./payroll-calculations";
 
 // Single-job helper: returns the payroll entry for one job worked from 08:00.
 function entry(fin, extra = {}) {
@@ -128,6 +128,31 @@ describe("calculateCongesIndemnity (CCQ 13% = 6% vacation + 5.5% holidays + 1.5%
     expect(calculateCongesIndemnity(0).total).toBe(0);
     expect(calculateCongesIndemnity(-5).total).toBe(0);
     expect(calculateCongesIndemnity(undefined).total).toBe(0);
+  });
+});
+
+describe("computeWeek (authoritative contract)", () => {
+  it("returns a versioned, self-describing result", () => {
+    const r = computeWeek([{ id: "j1", job_date: "2026-06-01", depart: "08:00", fin: "17:00", return_time_minutes: 0 }]);
+    expect(r.engineVersion).toBe(ENGINE_VERSION);
+    expect(typeof r.generatedAt).toBe("string");
+    expect(r.perJob).toHaveLength(1);
+    expect(r.perJob[0].weekEnding).toBe("2026-06-06"); // Saturday of that week
+  });
+
+  it("aggregates per week with the weekly OT split (9h x5 = 40 reg / 1h @1.5 / 4h @2)", () => {
+    const jobs = ["2026-06-01","2026-06-02","2026-06-03","2026-06-04","2026-06-05"]
+      .map((d, i) => ({ id: `j${i}`, job_date: d, depart: "08:00", fin: "17:00", return_time_minutes: 0 }));
+    const r = computeWeek(jobs);
+    expect(r.weeks).toHaveLength(1);
+    expect(r.weeks[0].regularMinutes).toBe(2400);
+    expect(r.weeks[0].overtime50Minutes).toBe(60);
+    expect(r.weeks[0].overtime100Minutes).toBe(240);
+  });
+
+  it("flags jobs missing a time as a warning", () => {
+    const r = computeWeek([{ id: "j1", job_date: "2026-06-01", depart: "08:00", fin: "", return_time_minutes: 0 }]);
+    expect(r.warnings.some((w) => w.code === "missing_time")).toBe(true);
   });
 });
 
