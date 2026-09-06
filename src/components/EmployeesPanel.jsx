@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, Wrench, X } from "lucide-react";
 import dayjs from "dayjs";
-import { isBoss } from "@/lib/boss";
+import { isBoss, isDev } from "@/lib/boss";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -250,7 +250,9 @@ export default function EmployeesPanel() {
               <div className="flex items-center gap-1.5 truncate font-semibold">
                 {isBoss(p.id)
                   ? <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.bossLabel")} />
-                  : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
+                  : isDev(p.id)
+                    ? <Wrench className="h-4 w-4 shrink-0 text-sky-500" aria-label={t("manager.devLabel")} />
+                    : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
