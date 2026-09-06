@@ -1,9 +1,9 @@
-// Authoritative payroll classification engine.
+// Authoritative payroll classification engine — the SINGLE source of the pay math.
 //
-// This module is intentionally DEPENDENCY-FREE (no dayjs) so the exact same code runs
-// in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
-// one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
-// alter a classified value; approval snapshots record the version they were computed with.
+// Pure and dependency-free so the identical code runs in the browser (preview), in this
+// Supabase Edge Function (authority), and under vitest. `src/lib/payroll-calculations.js`
+// mirrors this file and a parity test (payroll-engine-parity.test.js) fails CI if they
+// ever diverge. Bump ENGINE_VERSION on any change that can alter a classified value.
 export const ENGINE_VERSION = "1.0.0";
 
 export function minutesBetween(depart, fin) {
@@ -27,22 +27,17 @@ export function getKilometreBreakdown(job) {
   };
 }
 
-// Parse a YYYY-MM-DD work date at UTC midnight. Using UTC keeps the day-of-week stable
-// regardless of the runtime's timezone (browser vs Deno).
 function parseWorkDate(jobDate) {
   if (!jobDate) return null;
   const d = new Date(`${String(jobDate).slice(0, 10)}T00:00:00Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-// Day of week for a work date: 0 = Sunday … 6 = Saturday.
 function dayOfWeek(jobDate) {
   const d = parseWorkDate(jobDate);
   return d ? d.getUTCDay() : null;
 }
 
-// Payroll week runs to the Saturday that ends it (matches the CCQ weekly grouping in
-// ccq-export). Used to scope the 1.5x overtime allowance to the week, not the day.
 export function payrollWeekKey(jobDate) {
   const d = parseWorkDate(jobDate);
   if (!d) return String(jobDate || "");
@@ -52,11 +47,8 @@ export function payrollWeekKey(jobDate) {
 
 export function calculatePayrollEntries(jobs) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
-  // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
-  // per WEEK at 1.5x, everything beyond that is 2x. Jobs are processed chronologically
-  // so the earliest overtime of the week consumes the 1.5x allowance first.
-  const dayWorkMinutes = new Map();      // job_date -> minutes worked so far that day
-  const weekOvertimeMinutes = new Map(); // week key -> overtime minutes so far that week
+  const dayWorkMinutes = new Map();
+  const weekOvertimeMinutes = new Map();
   const entries = new Map();
 
   for (const job of sorted) {
@@ -91,33 +83,6 @@ export function calculatePayrollEntries(jobs) {
   return entries;
 }
 
-export function calculateDailyTotals(jobs) {
-  const entries = calculatePayrollEntries(jobs);
-  const days = new Map();
-  for (const entry of entries.values()) {
-    const date = entry.job.job_date;
-    const day = days.get(date) || {
-      jobDate: date,
-      regularWorkMinutes: 0,
-      overtime50Minutes: 0,
-      overtime100Minutes: 0,
-      overtimeWorkMinutes: 0,
-      returnRegularMinutes: 0,
-      totalPaidMinutes: 0,
-      clientKm: 0,
-      returnKm: 0,
-      totalKm: 0,
-      jobCount: 0,
-    };
-    for (const key of ["regularWorkMinutes", "overtime50Minutes", "overtime100Minutes", "overtimeWorkMinutes", "returnRegularMinutes", "totalPaidMinutes", "clientKm", "returnKm", "totalKm"]) {
-      day[key] += entry[key];
-    }
-    day.jobCount += 1;
-    days.set(date, day);
-  }
-  return days;
-}
-
 export function isMealEligible({ jobDate, dailyWorkMinutes }) {
   const weekday = dayOfWeek(jobDate);
   return weekday !== null && weekday !== 0 && weekday !== 6 && Math.max(0, dailyWorkMinutes - 480) >= 135;
@@ -127,10 +92,6 @@ export function roundHours(minutes) {
   return Math.round((minutes / 60) * 100) / 100;
 }
 
-// Indemnité de congés (CCQ): 13% of weekly wages earned — 6% annual vacation,
-// 5.5% paid statutory holidays, 1.5% sick leave. The rate is the same for every level;
-// the dollar amount differs only because wages differ. Base is the gross salary earned
-// in the week. Source: CCQ chèque-vacances page; see docs/rules/compensation-rules.md.
 export const CONGES_INDEMNITY_RATES = { vacation: 0.06, statutoryHolidays: 0.055, sick: 0.015 };
 
 export function calculateCongesIndemnity(weeklyWageDollars) {
@@ -141,11 +102,6 @@ export function calculateCongesIndemnity(weeklyWageDollars) {
   return { vacation, statutoryHolidays, sick, total: vacation + statutoryHolidays + sick };
 }
 
-// Authoritative entry point. Given a set of jobs (normally one employee), returns a
-// versioned, self-describing classification: a per-job trace, per-week totals, and
-// warnings for inputs that need review. Every worked minute is accounted for exactly
-// once (regular + ot50 + ot100). This is the contract the Edge Function returns and the
-// approval snapshot records.
 export function computeWeek(jobs) {
   const list = Array.isArray(jobs) ? jobs.filter(Boolean) : [];
   const entriesMap = calculatePayrollEntries(list);

@@ -192,6 +192,7 @@ supabase functions deploy cleanup_overtime_evidence
 | `send_announcement` | Persists and emails manager announcements. |
 | `ccq_rates` | Authenticated proxy/cache for CCQ commercial electrician rates. |
 | `ccq_rates_daily_sync` | Service-role-only refresh of commercial rate snapshots. |
+| `classify_week` | Authoritative payroll classification (M4): reads an employee's jobs server-side and returns the versioned `computeWeek()` result (per-job trace, per-week regular/OT50/OT100, engine version, warnings). Manager-only. Shares one engine with the client via `supabase/functions/_shared/payroll_engine.js` (parity-tested). |
 | `process_overtime_evidence` | Background OCR of overtime authorization screenshots (ocr.space). |
 | `cleanup_overtime_evidence` | Service-role-only deletion of expired overtime images and records. |
 | `delete_user` | Manager-only hard delete of an inactive account, with guards and an audit-log entry. |
