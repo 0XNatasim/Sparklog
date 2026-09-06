@@ -455,15 +455,10 @@ export default function ManagerDashboard() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return jobs;
-    return jobs.filter((j) => {
-      const employee = profiles.get(j.user_id);
-      const haystack = [
-        j.ot || "", j.job_date || "", j.status || "",
-        employee?.full_name || "", employee?.phone || "", employee?.email || "",
-      ].join(" ").toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [jobs, profiles, search]);
+    // Text search is OT (work-order number) only — employee, status and date each have
+    // their own dedicated filter above.
+    return jobs.filter((j) => String(j.ot || "").toLowerCase().includes(q));
+  }, [jobs, search]);
 
   // "All employees" timesheet ordering. Approved jobs sink to the bottom as a
   // whole block; within each block the list reads by day (newest first), then
@@ -913,7 +908,8 @@ export default function ManagerDashboard() {
               </span>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {/* One line: employee · status · date · OT search. */}
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <Select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
                 <option value="all">{t("manager.filters.allEmployees")}</option>
                 {employeeOptions.map((opt) => (
@@ -928,30 +924,30 @@ export default function ManagerDashboard() {
                 <option value="approved">{t("status.approved")}</option>
               </Select>
 
+              <div className="flex items-center gap-1">
+                <Input
+                  type="date"
+                  value={dayFilter}
+                  onChange={(e) => setDayFilter(e.target.value)}
+                  className="h-9 min-w-0 flex-1"
+                  aria-label={t("manager.filters.day")}
+                  title={t("manager.filters.day")}
+                />
+                <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setDayFilter(dayjs().format("YYYY-MM-DD"))}>
+                  {t("manager.filters.today")}
+                </Button>
+                {dayFilter && (
+                  <Button type="button" size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => setDayFilter("")} aria-label={t("manager.filters.clearDay")} title={t("manager.filters.clearDay")}>
+                    ×
+                  </Button>
+                )}
+              </div>
+
               <Input
                 value={searchLive}
                 onChange={(e) => setSearchLive(e.target.value)}
                 placeholder={t("manager.filters.searchPlaceholder")}
               />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">{t("manager.filters.day")}</span>
-              <Input
-                type="date"
-                value={dayFilter}
-                onChange={(e) => setDayFilter(e.target.value)}
-                className="h-9 w-auto"
-                aria-label={t("manager.filters.day")}
-              />
-              <Button type="button" size="sm" variant="outline" onClick={() => setDayFilter(dayjs().format("YYYY-MM-DD"))}>
-                {t("manager.filters.today")}
-              </Button>
-              {dayFilter && (
-                <Button type="button" size="sm" variant="ghost" onClick={() => setDayFilter("")}>
-                  {t("manager.filters.clearDay")}
-                </Button>
-              )}
             </div>
 
             {selectedEmployee && (
