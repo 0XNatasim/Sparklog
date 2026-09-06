@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, Wrench, X } from "lucide-react";
 import dayjs from "dayjs";
-import { isBoss, isDev } from "@/lib/boss";
+import { isBoss, isDev, isPrivileged } from "@/lib/boss";
+import NasField from "./NasField";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -29,6 +30,8 @@ export default function EmployeesPanel() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState([]);
+  const privileged = isPrivileged(user?.id);
+  const [nasSet, setNasSet] = useState(new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [timeOff, setTimeOff] = useState(new Map());
@@ -59,7 +62,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, nas_employee, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -81,6 +84,12 @@ export default function EmployeesPanel() {
       // Keep the DB's name order, but push inactive (paused) employees to the bottom.
       const nextProfiles = [...(data ?? [])].sort((a, b) => (a.is_paused ? 1 : 0) - (b.is_paused ? 1 : 0));
       setProfiles(nextProfiles);
+      // NAS lives in the restricted vault; only privileged users can see who has one.
+      // Fetch presence only (not the value) — the value is revealed on demand + audited.
+      if (privileged) {
+        const { data: nasRows } = await supabase.from("employee_sensitive").select("user_id").not("nas", "is", null);
+        setNasSet(new Set((nasRows || []).map((r) => r.user_id)));
+      }
       await Promise.all(nextProfiles.map(async (profile) => {
         const availableAnnexes = nextAnnexes.get(COMMERCIAL_RATE_SECTOR) || [];
         const annex = profile.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
@@ -416,7 +425,7 @@ export default function EmployeesPanel() {
                 <div className="rounded-lg bg-muted/20 p-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label={t("employees.nasEmployee")}>
-                  <Input value={p.nas_employee || ""} maxLength={9} inputMode="numeric" onChange={(e) => setLocal(p.id, "nas_employee", e.target.value.replace(/\D/g, ""))} onBlur={(e) => saveField(p.id, "nas_employee", e.target.value)} className="h-9" />
+                  <NasField employeeId={p.id} initialHasNas={nasSet.has(p.id)} privileged={privileged} />
                 </Field>
                 <Field label={t("employees.tradeCode")}>
                   <Input value="220" readOnly className="h-9 bg-muted" />
