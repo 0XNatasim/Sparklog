@@ -24,17 +24,21 @@ export default function CcqJsonExport() {
       setLoading(true);
       setError("");
       try {
-        const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }] = await withTimeout(
+        const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }, { data: nasRows }] = await withTimeout(
           Promise.all([
             supabase.from("jobs").select("id, user_id, job_date, depart, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }),
-            supabase.from("profiles").select("id, full_name, email, nas_employee, work_region, wage_schedule, union_association, hourly_rate").order("full_name"),
+            supabase.from("profiles").select("id, full_name, email, work_region, wage_schedule, union_association, hourly_rate").order("full_name"),
+            // NAS comes from the restricted vault; RLS returns rows only to privileged
+            // users (owner/dev), so a non-privileged export simply has no NAS.
+            supabase.from("employee_sensitive").select("user_id, nas"),
           ]),
           12000
         );
         if (jobError) throw jobError;
         if (profileError) throw profileError;
+        const nasByUser = new Map((nasRows || []).map((r) => [r.user_id, r.nas]));
         setJobs(jobRows || []);
-        setProfiles(profileRows || []);
+        setProfiles((profileRows || []).map((p) => ({ ...p, nas_employee: nasByUser.get(p.id) || null })));
       } catch (loadError) {
         setError(loadError?.message || t("manager.download.failedLoad"));
       } finally {

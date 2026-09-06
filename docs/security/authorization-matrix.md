@@ -87,6 +87,20 @@ Legend: ✅ allowed · ❌ denied · ⚠️ allowed but constrained (see notes) 
 - Managers have **read-only** on meal/overtime/parking storage (no delete via RLS —
   deletion is service-role only).
 
+## Sensitive data — NAS/SIN vault (M8, done 2026-09-05)
+
+NAS/SIN is no longer on `profiles`. It lives in `public.employee_sensitive`:
+
+| Op | anon | emp | manager (non-privileged) | owner + dev (privileged) | service |
+|---|---|---|---|---|---|
+| SELECT / INSERT / UPDATE | ❌ | ❌ | ❌ | ✅ (`is_privileged()`) | ✅ bypasses RLS |
+
+- "Privileged" = owner (`BOSS_ID`) + dev (`DEV_ID`), via `public.is_privileged()`.
+- The UI never eager-loads the value: presence only. Reveal goes through the
+  `reveal_nas(target)` SECURITY DEFINER RPC, which re-checks `is_privileged()` and writes
+  an `audit_log` row (`action = 'nas_reveal'`). The UI adds a password re-prompt on top.
+- CCQ export reads NAS from the vault (only privileged users run it).
+
 ## Notes, observations, and follow-ups
 
 1. **Paused containment confirmed live.** Every employee write path (tables + storage

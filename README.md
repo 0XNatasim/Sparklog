@@ -322,7 +322,7 @@ tree):
 - Keep overtime and parking buckets private.
 - Preserve RLS policies and manager-only profile-setting triggers.
 - Pausing an account blocks employee access without deleting historical jobs or evidence.
-- Social insurance numbers and wage information are sensitive; restrict manager access and production logs accordingly.
+- **NAS/SIN is vaulted.** It lives in `employee_sensitive` (RLS: readable/writable only by the owner + dev, and the service role), not on `profiles`. Other managers only see a mask; the owner/dev reveal a value behind a password re-prompt, and every reveal is logged to `audit_log` via the `reveal_nas()` RPC. Wage information is sensitive; restrict access and production logs accordingly.
 
 ## License
 
