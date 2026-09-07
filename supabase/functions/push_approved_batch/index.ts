@@ -107,7 +107,7 @@ serve(async (req) => {
     const approved_by_value =
       (approverProfile.full_name || "").trim() || approverEmail || approverId;
 
-    // Fetch all jobs in one query — only those still submitted + not exported
+    // Read the requested jobs.
     const { data: jobs, error: jobsErr } = await admin
       .from("jobs")
       .select(
@@ -119,7 +119,7 @@ serve(async (req) => {
     const eligible = (jobs || []).filter(
       (j) => j.status === "submitted" && !j.exported_to_sheet
     );
-    const skipped = (jobs || []).filter(
+    const alreadySkipped = (jobs || []).filter(
       (j) => j.status !== "submitted" || j.exported_to_sheet
     );
 
@@ -127,20 +127,59 @@ serve(async (req) => {
       return json({
         ok: true,
         exported: 0,
-        skipped: skipped.length,
-        skipped_ids: skipped.map((j) => j.id),
+        skipped: alreadySkipped.length,
+        skipped_ids: alreadySkipped.map((j) => j.id),
       });
     }
 
-    // Fetch employee profiles for all unique user_ids in one query
-    const userIds = [...new Set(eligible.map((j) => j.user_id))];
+    const approvedAt = new Date();
+    const approved_at_label = formatMontrealShort(approvedAt);
+
+    // ✅ Idempotent claim. Atomically mark the still-eligible jobs approved+exported
+    // BEFORE calling Apps Script, and only export the rows this call actually claimed.
+    // A concurrent or double-clicked call matches 0 rows here (they are no longer
+    // status='submitted' AND exported_to_sheet=false), so it writes nothing to the
+    // sheet — no duplicate rows. If the Apps Script write then fails, the claim is
+    // reverted so the jobs can be retried.
+    const eligibleIds = eligible.map((j) => j.id);
+    const { data: claimedRows, error: claimErr } = await admin
+      .from("jobs")
+      .update({
+        status: "approved",
+        locked: true,
+        exported_to_sheet: true,
+        exported_at: approvedAt.toISOString(),
+        exported_by: approverId,
+      })
+      .in("id", eligibleIds)
+      .eq("status", "submitted")
+      .eq("exported_to_sheet", false)
+      .select("id");
+    if (claimErr) return json({ ok: false, error: claimErr.message }, 500);
+
+    const claimedIds = (claimedRows || []).map((r) => r.id);
+    if (claimedIds.length === 0) {
+      // Another concurrent call already claimed these — do not export again.
+      return json({ ok: true, exported: 0, skipped: (jobs || []).length, note: "already_claimed" });
+    }
+    const claimedSet = new Set(claimedIds);
+    const claimedJobs = eligible.filter((j) => claimedSet.has(j.id));
+
+    const revertClaim = async () => {
+      await admin
+        .from("jobs")
+        .update({ status: "submitted", exported_to_sheet: false, exported_at: null, exported_by: null })
+        .in("id", claimedIds);
+    };
+
+    // Profiles + auth emails for the claimed jobs only.
+    const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
       .select("id, full_name, phone")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
-    // Fetch auth emails (one call each, but bounded by unique users not jobs)
     const emails = new Map<string, string>();
     await Promise.all(
       userIds.map(async (uid) => {
@@ -149,10 +188,7 @@ serve(async (req) => {
       })
     );
 
-    const approvedAt = new Date();
-    const approved_at_label = formatMontrealShort(approvedAt);
-
-    const rows = eligible.map((j) => {
+    const rows = claimedJobs.map((j) => {
       const prof = profileMap.get(j.user_id);
       const depart = j.depart ? String(j.depart).slice(0, 5) : "";
       const arrivee = j.arrivee ? String(j.arrivee).slice(0, 5) : "";
@@ -176,7 +212,7 @@ serve(async (req) => {
       };
     });
 
-    // One POST to Apps Script with all rows
+    // One POST to Apps Script with the claimed rows.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     let resp: Response;
@@ -190,6 +226,7 @@ serve(async (req) => {
       });
       text = await resp.text();
     } catch (e) {
+      await revertClaim();
       return json(
         { ok: false, error: "AppsScript fetch failed", detail: String(e) },
         502
@@ -199,6 +236,7 @@ serve(async (req) => {
     }
 
     if (!resp.ok) {
+      await revertClaim();
       return json(
         { ok: false, error: "AppsScript failed", status: resp.status, detail: text },
         502
@@ -208,10 +246,11 @@ serve(async (req) => {
     // Apps Script must explicitly confirm the write with { success: true }.
     // A non-JSON body (e.g. a Google login/permission HTML page returned with
     // HTTP 200 when the deployment's access isn't "Anyone") or an explicit
-    // failure means nothing was written — do NOT mark the jobs exported.
+    // failure means nothing was written — revert the claim so nothing is stuck.
     let sheetResult: { success?: boolean; written?: number; skipped?: number } = {};
     try { sheetResult = JSON.parse(text); } catch { /* not JSON — treated as failure below */ }
     if (sheetResult?.success !== true) {
+      await revertClaim();
       return json({
         ok: false,
         error: "AppsScript did not confirm the write. Check that the web-app deployment's access is set to \"Anyone\" and that it runs the latest code.",
@@ -219,25 +258,11 @@ serve(async (req) => {
       }, 502);
     }
 
-    // Mark all eligible jobs as approved + exported in one UPDATE
-    const eligibleIds = eligible.map((j) => j.id);
-    const { error: updErr } = await admin
-      .from("jobs")
-      .update({
-        status: "approved",
-        locked: true,
-        exported_to_sheet: true,
-        exported_at: approvedAt.toISOString(),
-        exported_by: approverId,
-      })
-      .in("id", eligibleIds);
-    if (updErr) return json({ ok: false, error: updErr.message }, 500);
-
     return json({
       ok: true,
-      exported: eligibleIds.length,
-      skipped: skipped.length,
-      skipped_ids: skipped.map((j) => j.id),
+      exported: claimedIds.length,
+      skipped: (jobs || []).length - claimedIds.length,
+      skipped_ids: alreadySkipped.map((j) => j.id),
       sheet_written: sheetResult?.written,
       sheet_skipped: sheetResult?.skipped,
       approved_by: approved_by_value,
