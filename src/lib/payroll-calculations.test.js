@@ -97,11 +97,13 @@ describe("weekly overtime split (M1 golden fixtures — 1.5x allowance is per WE
 });
 
 describe("return-to-storage time", () => {
-  it("never creates overtime and is paid at the regular rate", () => {
+  it("is NOT paid separately (already inside Départ→Fin) — return_time_minutes never adds to pay", () => {
     const e = entry("16:00", { return_time_minutes: 60 });
     expect(e.overtimeWorkMinutes).toBe(0);
-    expect(e.returnRegularMinutes).toBe(60);
-    expect(e.regularPaidMinutes).toBe(540);
+    // Return minutes are not paid again: the drive back is already logged within the job span.
+    expect(e.returnRegularMinutes).toBe(0);
+    expect(e.regularPaidMinutes).toBe(480);
+    expect(e.totalPaidMinutes).toBe(480);
   });
 });
 

@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "1.0.0";
+export const ENGINE_VERSION = "1.1.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -71,7 +71,12 @@ export function calculatePayrollEntries(jobs) {
     const overtime50Room = Math.max(0, 60 - priorWeekOvertime);
     const overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
-    const returnRegularMinutes = Math.max(0, Number(job.return_time_minutes) || 0);
+    // Return travel time is NOT paid separately: the crew already logs the drive back
+    // inside the job's Départ→Fin span (the work order covers it), so Départ→Fin is the
+    // single source of paid time. Adding return_time_minutes on top would double-count.
+    // The return_time_minutes / km_retour columns are kept on the row for mileage and
+    // reference, but only km_retour feeds pay (as kilometres), never the minutes.
+    const returnRegularMinutes = 0;
     const kilometres = getKilometreBreakdown(job);
 
     entries.set(job.id, {
