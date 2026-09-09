@@ -526,20 +526,23 @@ export default function EmployeeForm() {
   }
 
   async function requiresOvertimeEvidence(candidateReturnMinutes) {
+    // These are known locally without any network call, so they stay valid even
+    // if the day-jobs lookup below fails.
+    const startMinutes = (value) => {
+      const [h, m] = String(value || "").split(":").map(Number);
+      return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+    };
+    const thisMinutes = Math.round(hoursDecimal * 60);
+    const thisStart = startMinutes(depart);
     try {
-      const { data: dayJobs, error: jobsError } = await withTimeout(
-        supabase.from("jobs").select("id, depart, fin, overtime_evidence_captured").eq("user_id", user.id).eq("job_date", job_date),
-        12000,
-        "Overtime check"
+      // Retry (with a session refresh + backoff) so a Supabase free-tier cold
+      // start doesn't fail the check on the first slow attempt.
+      const { data: dayJobs } = await withRetry(
+        () => supabase.from("jobs").select("id, depart, fin, overtime_evidence_captured").eq("user_id", user.id).eq("job_date", job_date),
+        8000,
+        { retries: 2 }
       );
-      if (jobsError) throw jobsError;
       if (editId && hasOvertimeEvidence) return false;
-      const startMinutes = (value) => {
-        const [h, m] = String(value || "").split(":").map(Number);
-        return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-      };
-      const thisMinutes = Math.round(hoursDecimal * 60);
-      const thisStart = startMinutes(depart);
       const workedMinutes = (job) => {
         const start = makeDayjsFromJob(job_date, job.depart);
         const end = makeDayjsFromJob(job_date, job.fin);
@@ -563,8 +566,15 @@ export default function EmployeeForm() {
         .reduce((total, job) => total + workedMinutes(job), 0);
       return earlierMinutes + thisMinutes > 480;
     } catch (error) {
-      setErr(error?.message || t("form.errors.failedLoad"));
-      return true;
+      // The day-jobs lookup failed (e.g. a cold-start timeout even after retries).
+      // Fall back to a LOCAL-only decision using just this job's own duration, so a
+      // slow network can never demand an overtime screenshot for a job that on its
+      // own is under 8h — such as a first, 3h job of the day. Only this job alone
+      // exceeding 8h forces evidence here; the manager still reviews at approval and
+      // the authoritative engine recomputes the day.
+      console.error("[overtime evidence] day-jobs check failed; using local fallback", error);
+      setOvertimeDailyMinutes(thisMinutes);
+      return thisMinutes > 480;
     }
   }
 
@@ -1122,8 +1132,8 @@ export default function EmployeeForm() {
                 <img
                   src={autofillExample}
                   alt={t("form.autofillTip.exampleAlt")}
-                  className="w-full rounded-md border object-cover"
-                  style={{ maxHeight: "340px", objectPosition: "bottom" }}
+                  className="mx-auto w-full rounded-md border object-contain"
+                  style={{ maxHeight: "60vh" }}
                 />
               </div>
               <DialogFooter className="gap-2 px-5 pb-5 pt-2 sm:flex-col sm:space-x-0">
