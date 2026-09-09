@@ -1,539 +1,432 @@
-# Sparklog Payroll & CCQ Integrity Program
+# Sparklog Source-Level Employee and Manager Audit
 
-> Execution plan for Claude Code. Read this entire document before changing code.
+**Audit date:** 2026-09-09
 
-## 1. Mission and product boundary
+**Scope:** Raw execution paths in `src`, Supabase Edge Functions, SQL migrations, and tests.
 
-Sparklog is to become a **timekeeping and payroll-export system first**, not a complete
-Québec construction payroll engine. It records authoritative work facts, classifies
-hours for review, produces reproducible approval snapshots, and exports those results
-to an established payroll system. Final deductions, remittances, and statutory payroll
-remain outside Sparklog until a separately approved full-payroll program is completed.
+**Status:** Findings and recommended remediations only; this document does not claim that the defects are fixed.
 
-Do not rewrite the application. Preserve the React/Vite/Supabase field workflow and
-deliver the work below incrementally. Until qualified payroll and legal reviewers sign
-off, every calculated value must be described as one of:
+## Executive summary
 
-- **Estimated labor cost**
-- **Internal CCQ preview**
-- **Not finalized payroll**
-- **Requires payroll review**
+Sparklog has useful server-side protections: employees are restricted to their own jobs, privileged job fields are trigger-protected, paused employees are blocked from the main write paths, and approval Edge Functions independently verify the caller's manager role. Those controls prevent straightforward employee self-approval and peer-record access.
 
-Do not invent or infer legal rules. When a rule lacks approved documentation, return a
-visible `requires_review` result instead of silently guessing.
+The highest-priority production defects are nevertheless concrete and workflow-affecting:
 
-## 2. Instructions for Claude Code
+1. Overnight shifts have two incompatible duration implementations. Employee-facing views calculate `22:00 -> 06:00` as zero, while manager/payroll paths calculate eight hours.
+2. The single-job approval client force-approves any job reported as skipped, even when the server skipped it because its state changed and it was not exported.
+3. Cost reports combine draft, submitted, approved, pending, rejected, and current-rate data into one total.
+4. Job creation and submission lack a durable idempotency key, and direct API clients can insert an incomplete job directly as submitted.
+5. Opening the employee-management panel can overwrite compensation fields for many employees.
+6. Attachment, claim, notification, approval, and export workflows are multi-step and can leave partial or ambiguous states.
 
-For every work session:
+The repository does not implement clock-in, clock-out, or break buttons. The closest applicable race analysis is therefore the manual Save/Submit workflow.
 
-1. Read this file, `README.md`, every applicable `AGENTS.md`, and the relevant existing
-   migrations, functions, tests, and callers.
-2. Inspect `git status` and recent history. Never overwrite unrelated work.
-3. Select **one unchecked work package** whose prerequisites are complete. Do not mix
-   schema foundations, calculation changes, and UI redesign in a single pull request.
-4. Write a short implementation plan and identify security, migration, rollback, data
-   backfill, privacy, and legal-review consequences before editing.
-5. Add tests before or with implementation. Database authorization must be tested with
-   direct Supabase requests, not merely by hiding controls in React.
-6. Use additive, forward-only migrations. Never edit a migration already deployed.
-7. Keep raw work facts immutable after approval; derived results belong in snapshots.
-8. Update documentation and this checklist. Record decisions in ADRs under
-   `docs/adr/`; record approved rules under `docs/rules/`.
-9. Run the smallest relevant tests while developing, then the complete required gate.
-10. Review the diff for secrets, PII, permissive RLS, destructive SQL, duplicate rule
-    implementations, and accessibility regressions.
-11. Commit a coherent change and open a pull request with migration order, deployment
-    steps, rollback/forward-fix instructions, test evidence, screenshots for visible
-    changes, and unresolved risks.
+---
 
-Never place service-role keys, payroll-provider secrets, NAS/SIN data, production
-records, or real evidence images in the repository, logs, fixtures, screenshots, or PRs.
-Never bypass RLS from a browser. Never put authoritative payroll logic in React.
+## 1. Critical and high-priority correctness defects
 
-## 3. Mandatory human ownership and approval gates
+### 1.1 P0 — Overnight duration differs between employee and payroll paths
 
-Create `docs/governance/OWNERSHIP.md` and replace each placeholder with a named person
-before the corresponding production release:
+`src/lib/time.js` calculates a Day.js difference and returns zero for any non-positive result:
 
-| Responsibility | Required owner | Blocks |
-|---|---|---|
-| Product boundary and product decisions | `TBD` | All releases |
-| CCQ/legal interpretation | `TBD` qualified specialist | Rule-engine behavior |
-| Payroll validation | `TBD` payroll specialist | Approved payroll basis/export |
-| Security and privacy | `TBD` | Sensitive-data and auth changes |
-| Database migrations | `TBD` | Production DB changes |
-| Production deployment approval | `TBD` | Production releases |
-| Incident response | `TBD` | Production operation |
-
-No compensation or classification rule may ship without a primary-source citation,
-effective dates, approved examples, reviewer, automated fixtures, and immutable rule
-version. Claude Code may build the schema and mark fixtures pending, but must not claim
-legal validation or fill approval fields on behalf of a human.
-
-## 4. Repository architecture target
-
-Gradually move toward this organization without a big-bang rewrite:
-
-```text
-src/
-  domain/time/          # raw intervals, normalization, overlap validation
-  domain/payroll/       # preview types and API clients, no authoritative approval
-  domain/ccq/           # CCQ presentation/export adapters
-  domain/expenses/      # meal/parking models and views
-  domain/employees/     # employee-facing domain UI
-  services/             # Supabase and sync adapters
-  components/           # small presentation components
-supabase/
-  functions/            # authenticated orchestration and authoritative calculation
-  migrations/           # forward-only schema/RLS changes
-tests/
-  rls/                  # direct multi-identity authorization tests
-  integration/          # Edge Function/database workflows
-  e2e/                  # critical browser flows
-docs/
-  adr/ rules/ runbooks/ privacy/ threat-model/
+```js
+const diffMinutes = e.diff(s, "minute");
+if (diffMinutes <= 0) return 0;
 ```
 
-Use integer minutes and integer currency minor units for persisted calculations. Define
-rounding rules explicitly; do not use floating-point money. All server timestamps use
-UTC, while work dates and legal day/week boundaries use the approved Québec timezone
-policy. Store stable identifiers and hashes, not locale-formatted values.
+`src/lib/payroll-calculations.js` instead interprets a negative difference as crossing midnight:
 
-## 5. Program backlog and delivery order
-
-Checkboxes are evidence-based: mark an item complete only when its acceptance tests,
-documentation, review, and deployment prerequisites are satisfied.
-
-### Milestone 0 — Freeze and governance
-
-- [ ] **M0.1 — Declare product scope.** Add an ADR selecting timekeeping/payroll export,
-  describe excluded deductions/remittances, and expose the boundary in operator docs.
-- [ ] **M0.2 — Freeze payroll-rule expansion.** Add a PR template checklist that rejects
-  new premiums, deductions, schedules, or classifications without the rule gate.
-- [ ] **M0.3 — Assign owners.** Add the ownership document above, CODEOWNERS where
-  appropriate, escalation paths, and approval requirements.
-- [ ] **M0.4 — Inventory current calculations and exports.** Map every calculator,
-  dashboard, preview, Edge Function, Apps Script, cron, and external caller. Identify
-  duplicate transformations and give each a retirement or migration plan.
-- [x] **M0.5 — Label known previews as estimates.** Existing UI copy provides an initial
-  warning. Audit every remaining report, notification, file name, API response, and
-  export before considering the labeling work complete.
-
-**Exit:** scope is approved, named owners exist, no unreviewed rule can enter unnoticed,
-and all current calculation surfaces are catalogued.
-
-### Milestone 1 — Legally validated specification
-
-- [ ] **M1.1 — Rules schema/document format.** Define fields: `rule_code`, `title`,
-  `sector`, `trade`, `appendix`, `schedule_type`, `effective_from`, `effective_to`,
-  `source_document`, `source_section`, `approved_by`, `approved_at`, `examples`,
-  `exceptions`, and `version`. Enforce non-overlapping versions where applicable.
-- [ ] **M1.2 — Specialist rules matrix.** Obtain written decisions for the first 50%
-  overtime allowance, daily/weekly interaction, Saturday, Sunday, holidays, construction
-  vacations, 8-hour/10-hour/compressed/service schedules, overnight shifts, mid-week
-  schedule changes, travel/return-to-storage, meals, team-leader premiums, apprentice
-  levels, appendices, and Sparklog's actual employee arrangements.
-- [ ] **M1.3 — Golden fixtures.** Add traceable fixtures for exactly 8h, 8h+1m, 9h on
-  one/two days, crossing 40h, post-threshold work, authorized/unauthorized Saturday,
-  Sunday, holiday, overnight, multiple and overlapping jobs, 4x10, service schedules,
-  mid-week schedule/rate/classification changes, storage return, rejected/cancelled and
-  corrected approved jobs, and minute/period rounding boundaries.
-- [ ] **M1.4 — Validation workflow.** Add fixture status (`draft`, `specialist_approved`,
-  `superseded`), reviewer identity, approval timestamp, source link/hash, and CI behavior
-  that distinguishes mechanical tests from legally approved fixtures.
-
-**Exit:** specialists approve the applicable matrix, fixtures identify their sources and
-versions, and unresolved scenarios fail safely as `requires_review`.
-
-### Milestone 2 — P0 authorization containment
-
-The existing `0018_paused_employee_write_containment.sql` is a starting point, not proof
-of completion. Audit all tables, buckets, RPCs, Edge Functions, and legacy policies.
-
-- [ ] **M2.1 — Authorization inventory.** Generate a table-by-table and bucket-by-bucket
-  CRUD matrix for anonymous, active employee A/B, paused employee, manager, and service
-  role. Include views, functions, realtime, and indirect writes from triggers.
-- [ ] **M2.2 — Active-account invariant.** Apply the database predicate to job, meal,
-  parking, overtime, notification, CCQ-card, evidence, and future sync writes. Include
-  insert/update/delete and storage upload/update/move/delete semantics as appropriate.
-- [ ] **M2.3 — Profile allowlist.** Confirm product-approved employee-owned fields.
-  Replace trigger-only assumptions with least-privilege columns/RPCs where practical;
-  manager/server fields use dedicated, authorized operations. Ensure employees cannot
-  modify ownership, role, pause, rates, schedules, classifications, NAS, audit fields,
-  approval/export state, or timestamps.
-- [ ] **M2.4 — Adversarial integration suite.** Start disposable Supabase locally in CI,
-  mint/use separate identities, and exercise every CRUD operation plus forged ownership,
-  approval fields, evidence paths, review state, audit records, and stale-token paused
-  access. Verify service-role behavior only in trusted server tests.
-- [ ] **M2.5 — Acceptance test.** A paused employee with an otherwise valid token cannot
-  create, update, submit, delete, upload, invoke an employee mutation RPC, or mutate via
-  offline sync except an explicitly documented support action.
-
-**Exit:** the authorization matrix passes against a clean migrated database and an
-upgrade-path database; the security owner reviews the policies.
-
-### Milestone 3 — Raw facts, schedules, compensation, and rules
-
-- [ ] **M3.1 — Raw work-fact model.** Preserve employee, date, start/end, breaks, travel,
-  return, kilometres, work type/location, evidence, notes, corrections, source device,
-  and timestamps. Model correction history instead of overwriting approved facts.
-- [ ] **M3.2 — Effective-dated schedules.** Add schedule definitions and employee
-  assignments for `standard_8h`, `authorized_10h`, `compressed_4x10`,
-  `service_schedule`, and approved special arrangements. Prevent overlapping assignments
-  and preserve history.
-- [ ] **M3.3 — Effective-dated compensation.** Add employee histories for sector, trade,
-  apprentice/compagnon class, appendix, base rate, team-leader premium, kilometre rate,
-  storage compensation, other taxable/non-taxable amounts, CCQ rate snapshot, reason,
-  and approving manager. Prevent gaps/overlaps according to approved policy.
-- [ ] **M3.4 — Rule and CCQ snapshots.** Persist immutable effective-dated source
-  snapshots with content hashes and approval metadata. Never resolve historical values
-  from the current profile.
-- [ ] **M3.5 — Backfill and reconciliation.** Write dry-run reports, deterministic
-  backfill tooling, counts/checksums, exception output, resumability, and forward-fix
-  procedures. Do not fabricate missing history; flag it for review.
-
-**Exit:** changing today's profile/schedule/rate cannot change historical approved data;
-all ambiguous backfill records appear in an exception report.
-
-### Milestone 4 — One week-aware authoritative engine
-
-- [ ] **M4.1 — Versioned input/output contract.** A calculation request identifies an
-  employee/week and contains normalized authoritative facts, applicable schedule/rate/
-  rule snapshot IDs, timezone, and input hash. Output includes regular, OT50, OT100 and
-  other premium minutes, applied rates/premiums, schedule, rule version, trace, warnings,
-  errors, calculated time, and engine version.
-- [ ] **M4.2 — Normalization and validation.** Sort intervals; validate impossible times,
-  overnight boundaries, duplicates, overlaps, multiple jobs, missing schedules/rates,
-  and unsupported arrangements. Never double-count minutes.
-- [ ] **M4.3 — Weekly classifier.** Resolve date-specific schedules and holidays, process
-  daily/weekly accumulators in the specialist-approved ordering, consume allowances, and
-  emit a machine-readable explanation for each classified interval.
-- [ ] **M4.4 — Server authority.** Implement calculation in a Supabase Edge Function or
-  trusted server module. Client calculations are explicitly previews. Authorization,
-  database reads, calculation, and snapshot persistence occur server-side.
-- [ ] **M4.5 — Consumer migration.** Employee preview, manager review, costing, CCQ JSON,
-  Sheets export, period summaries, and audit comparison consume the same versioned result.
-  Delete duplicate transformations only after caller and rollback audits.
-- [ ] **M4.6 — Test depth.** Run golden fixtures, property/invariant tests (minute
-  conservation, order independence after normalization, no negative classifications),
-  timezone/DST cases, malformed inputs, and deterministic snapshot/hash tests.
-
-**Exit:** there is one authoritative classification, its output explains every minute,
-and unsupported/legal ambiguities block approval rather than defaulting.
-
-### Milestone 5 — Approval, state, costing, and export integrity
-
-- [ ] **M5.1 — Explicit state machines.** Define and enforce transitions such as
-  `draft -> locally_saved -> syncing -> saved -> submitted -> approved -> exported`,
-  with `rejected`, `returned_for_correction`, `superseded`, `voided`, `export_failed`,
-  and `adjustment_required`. Enforce server-side using a transition API/RPC and audit it.
-- [ ] **M5.2 — Immutable approval snapshot.** Store input IDs/hash, classified minutes,
-  rates and premiums, schedule/rule/CCQ snapshots, calculator version, manager identity,
-  approval time, export state, correlation ID, and external deduplication key.
-- [ ] **M5.3 — Idempotent approval.** Lock appropriate records/periods and use unique
-  constraints so retries return the prior result. Test concurrent calls and partial
-  failures. Never infer the manager from a service-role database session; pass and verify
-  the authenticated actor.
-- [ ] **M5.4 — Controlled recalculation.** Preserve original and proposed snapshots,
-  generate a difference report, require reason/reviewer/approval, and create an explicit
-  adjustment rather than silently mutating approved periods.
-- [ ] **M5.5 — Costing modes.** Separate draft estimate, submitted/unapproved, approved
-  payroll basis, pending/approved/rejected expenses, exported, and export-failed states.
-  Totals must disclose their included statuses and snapshot source.
-- [ ] **M5.6 — Idempotent exports.** Create durable export attempts and outcomes with
-  external keys, payload hash, retries, acknowledgements, and reconciliation status.
-  Verify no legacy/scheduled/external caller before retiring old paths.
-
-**Exit:** repeated/concurrent approval or export calls cannot duplicate records; every
-approved dollar is reproducible and every adjustment preserves its predecessor.
-
-### Milestone 6 — Durable offline field operation
-
-- [ ] **M6.1 — IndexedDB store.** Persist schema-versioned draft payload, attachment
-  blobs, local ID, employee ID, created/updated time, sync state, retries, last error,
-  server ID, payload hash, and durable idempotency key. Add upgrade/migration tests.
-- [ ] **M6.2 — Observable queue.** Display editing, saved on device, waiting, syncing,
-  synced, needs attention, and conflict states. Provide a queue/detail screen and retry/
-  correction actions. Keep local data until complete server acknowledgement.
-- [ ] **M6.3 — Authentication and account changes.** Define behavior for expired tokens,
-  logout, employee switching on a shared device, remote pause while offline, revoked
-  access, and local-data retention/deletion. Never sync a draft under another identity.
-- [ ] **M6.4 — Conflict and duplication policy.** Use the pre-generated submission key,
-  hashes, server uniqueness, and explicit conflict outcomes for two-device submissions.
-- [ ] **M6.5 — Hostile mobile tests.** Automate browser closure mid-upload, signal loss
-  after relational creation, double taps, app update with drafts, expired auth, paused
-  employee, two devices, storage success/database failure, and connection flapping.
-- [ ] **M6.6 — Honest copy.** Only claim durable on-device saving after persistence,
-  recovery, quota/error behavior, and the hostile-condition suite pass.
-
-**Exit:** a draft and attachments survive restart/update; retries are observable and do
-not duplicate work; identity and paused-user rules remain enforced by the server.
-
-### Milestone 7 — Atomic submission and reconciliation
-
-- [ ] **M7.1 — Submission API.** Authenticate and authorize one idempotent request that
-  creates/validates the job, meal, parking, overtime evidence metadata, manager
-  notification, and audit event. Make relational writes transactional.
-- [ ] **M7.2 — Evidence state machine.** Document staged/uploaded/verified/attached/
-  quarantined/deleted states; validate MIME via file content, size, ownership, path, and
-  expected association. Use signed operations and retention rules.
-- [ ] **M7.3 — Failure recovery.** Specify compensation for upload failure and relational
-  failure. Return retry-safe typed errors and preserve the local draft.
-- [ ] **M7.4 — Reconciliation jobs.** Detect orphaned objects, missing evidence, claims
-  without jobs, missing notifications, approved jobs without snapshots, and exported
-  records without external confirmation. Produce metrics and an operator exception queue.
-
-**Exit:** each submission is complete or recoverable, every retry is idempotent, and
-scheduled reconciliation identifies all defined partial states.
-
-### Milestone 8 — Privacy and sensitive data
-
-- [ ] **M8.1 — Data inventory/DPIA.** For each sensitive field document purpose,
-  necessity, source, read/write roles, retention, deletion/anonymization, export targets,
-  processors, residency, and incident impact.
-- [ ] **M8.2 — Isolate NAS/SIN.** Migrate it from general profiles to a restricted vault/
-  table. Default to masking, require explicit reveal permission and reason, audit every
-  reveal, prohibit bulk browser retrieval, encrypt appropriately, and define retention.
-- [ ] **M8.3 — Other sensitive records.** Apply equivalent least-privilege review to CCQ
-  cards, dates of birth, compensation, union association, addresses, work-order images,
-  evidence, and employment history. Remove sensitive fields from broad `select *` paths.
-- [ ] **M8.4 — OCR proxy.** Move OCR behind authenticated infrastructure; validate file
-  type/size, remove metadata, crop/redact where feasible, keep provider configuration on
-  the server, audit processing, enforce retention, and offer manual entry. Complete a
-  provider privacy/residency assessment before production use.
-- [ ] **M8.5 — Privacy workflows.** Implement tested access, correction, retention,
-  deletion/anonymization, legal-hold, lost-device, and breach-response procedures.
-
-**Exit:** sensitive reads are narrow and audited, client bundles/queries cannot bulk-read
-NAS, and retention/deletion behavior has owner approval and tests.
-
-### Milestone 9 — Structured auditability
-
-- [ ] **M9.1 — Append-only audit schema.** Store actor ID/role, validated subject,
-  target type/ID, operation, before/after JSON, reason, request/correlation ID, approved
-  client/device metadata, server time, rule/rate/snapshot IDs, and outcome. Restrict
-  mutation and sensitive contents.
-- [ ] **M9.2 — Coverage.** Audit compensation, schedule, classification, appendix/region,
-  kilometre rate, premiums, manager edits, approval/reversal, recalculation, exports,
-  sensitive reads, evidence deletion, and rule/CCQ snapshots.
-- [ ] **M9.3 — Actor integrity.** Edge Functions validate the JWT actor and pass it to
-  service-role operations; triggers must not falsely attribute the service role as the
-  human. Add impersonation and missing-actor tests.
-- [ ] **M9.4 — Audit access and retention.** Define who can search/export audit events,
-  redact sensitive payload fields, monitor access, and test retention/integrity checks.
-
-**Exit:** every material change and sensitive reveal has trustworthy actor, reason,
-before/after or immutable reference, correlation ID, and server timestamp.
-
-### Milestone 10 — Platform and frontend hardening
-
-- [ ] **M10.1 — Security headers.** Add CSP in report-only mode, collect violations,
-  eliminate unsafe dependencies/inline behavior, then enforce. Add `frame-ancestors`,
-  `X-Content-Type-Options`, Referrer Policy, Permissions Policy, and deployment-appropriate
-  HSTS consistently across Vercel/Render. Test production headers and SPA behavior.
-- [ ] **M10.2 — Dependency/secret controls.** Add lockfile audit, dependency update
-  policy, secret scanning, SAST where useful, and artifact/SBOM generation.
-- [ ] **M10.3 — Domain decomposition.** Move one tested seam at a time into the target
-  folders. React owns presentation/input only; server/domain modules own authorization,
-  calculation, and workflow invariants.
-- [ ] **M10.4 — Employee-profile research.** Interview record maintainers, identify
-  frequent/rare tasks, prototype 2–3 layouts, test desktop/mobile/accessibility, record
-  the decision, and only then implement. Avoid another unvalidated cosmetic rearrangement.
-- [ ] **M10.5 — Accessibility/mobile.** Add keyboard, focus, screen-reader, contrast,
-  reduced-motion, touch-target, zoom, responsive, and bilingual layout checks to critical
-  flows. Capture screenshots for intentional visual changes.
-
-**Exit:** enforced headers work in deployed environments, critical flows meet the agreed
-accessibility bar, and authoritative concerns are absent from presentation components.
-
-### Milestone 11 — CI, observability, recovery, and staged release
-
-- [ ] **M11.1 — Required CI.** Gate on formatting/lint, type checking (introduce
-  incrementally if needed), unit/legal fixtures, clean and upgrade migrations, RLS,
-  integration, critical E2E, production build, dependency/secret scanning, and bundle
-  budget. Pin runtime/tool versions and upload useful failure artifacts without PII.
-- [ ] **M11.2 — Correlated observability.** Propagate a correlation ID through client,
-  Edge Function, database, audit, and export. Monitor submission/sync/storage/approval/
-  export/OCR failures, retries, duplicate prevention, calculation errors, rule versions,
-  auth/RLS denials, reconciliation exceptions, and client-version adoption.
-- [ ] **M11.3 — Alerting/SLOs.** Define owners, severity, actionable thresholds, runbook
-  links, privacy-safe logs, sampling, retention, and alert tests.
-- [ ] **M11.4 — Recovery runbooks.** Document and exercise database restore, storage
-  recovery, deployment rollback/forward-fix, snapshot restoration, export reconciliation,
-  lost device, credential rotation, privacy incident, and data-subject requests. Record
-  recovery-point and recovery-time evidence.
-- [ ] **M11.5 — Staged releases.** Require local checks, CI, isolated staging database,
-  internal manager validation, 1–2 pilot employees, payroll comparison, controlled
-  rollout, feature flags/kill switches, and post-release reconciliation.
-
-**Exit:** restore and incident drills have evidence, alerts reach owners, and no payroll
-rule is released directly to all employees.
-
-### Milestone 12 — Full payroll engine (conditional, separate program)
-
-Do not begin until the product owner explicitly selects full payroll, legal/payroll
-specialists approve the scope, and Milestones 0–11 are operating reliably.
-
-- [ ] **M12.1 — YTD ledger.** Model annual employee balances for pensionable/insurable/
-  QPIP earnings, RRQ/QPP and additional tiers, EI, QPIP/RQAP, federal/Québec tax,
-  employer contributions, annual maxima consumed, and verified opening balances.
-- [ ] **M12.2 — Statutory parameters.** Store tax year, effective dates, exemptions,
-  rates, ceilings, employer multipliers, formula/version, primary source, and approval.
-  Never hard-code one year's table as timeless behavior.
-- [ ] **M12.3 — Payroll controls.** Add pay-period locking, adjustments, reversals,
-  remittance reconciliation, segregation of duties, audit, rounding, and year-end flows.
-- [ ] **M12.4 — Parallel validation.** Compare several complete periods with established
-  payroll software, including annual ceilings, imported opening balances, rate/class
-  changes, overtime, holidays, expenses, and corrections. Define tolerances and require
-  payroll-specialist sign-off before reliance.
-
-**Exit:** this milestone has its own threat model, legal specification, operational
-controls, and signed parallel-run evidence. Until then Sparklog is not payroll software.
-
-## 6. Cross-cutting implementation requirements
-
-### Database and migrations
-
-- Test both a clean database and an upgrade from the latest production-like schema.
-- Enable RLS explicitly and avoid permissive-policy surprises: policies for the same
-  command combine using OR unless deliberately restrictive.
-- Set safe `search_path` on security-definer functions, schema-qualify objects, minimize
-  grants, validate arguments, and test anonymous/authenticated/service roles.
-- Prefer constraints and unique indexes for invariants and idempotency; application-only
-  checks are insufficient under concurrency.
-- Every backfill supports dry run, reports exceptions, is resumable/idempotent, and has
-  reconciliation queries. Production rollback normally means a forward fix; do not drop
-  captured data to reverse a release.
-
-### Edge Functions and APIs
-
-- Validate JWT, role, active state, ownership, input schema, size, state transition, and
-  idempotency before using service-role access.
-- Return typed, stable error codes safe for user display and retry decisions.
-- Add request/correlation IDs; do not log tokens, full OCR text, sensitive profiles, or
-  evidence URLs. Timeouts and retries must not create duplicate side effects.
-
-### Calculation correctness
-
-- Preserve raw facts and immutable approved results separately.
-- Hash a canonical, documented input representation. Include every value capable of
-  changing output; exclude volatile presentation fields.
-- Persist IDs and versions for schedule, compensation, rule, holiday, CCQ rate, and
-  engine. A trace must account for all input minutes exactly once or reject the input.
-- Legal sources and approvals are data, not comments. Tests without specialist approval
-  prove code consistency, not legal correctness.
-
-### UI and bilingual behavior
-
-- Add English and French copy together. Do not embed authoritative classification rules
-  in translations or components.
-- Always distinguish local, syncing, submitted, approved, rejected, and exported status.
-- Do not expose PII in notifications, URLs, analytics, logs, error trackers, or screenshots.
-- Visible changes require responsive and accessibility review plus before/after evidence.
-
-## 7. Standard pull-request template for each work package
-
-Every PR body must include:
-
-```markdown
-## Scope
-- Work package ID and the single outcome delivered
-- Explicit non-goals
-
-## Risk review
-- Authorization/privacy/legal/calculation risks
-- Migration, backfill, compatibility, and concurrency risks
-
-## Implementation
-- Schema/API/UI changes
-- Invariants and idempotency strategy
-
-## Verification
-- Exact commands and results
-- Identities/scenarios tested
-- Screenshots for visible changes
-
-## Deployment
-- Prerequisites and secret/config changes
-- Migration/function/frontend order
-- Feature flag or kill switch
-- Reconciliation queries and success metrics
-
-## Recovery
-- Roll-forward/rollback procedure
-- Data preservation notes
-
-## Human approvals
-- Product:
-- CCQ/legal (when applicable):
-- Payroll (when applicable):
-- Security/privacy (when applicable):
-- Database/deployment:
-
-## Follow-ups and unresolved risks
-- Links to tracked work; never hide incomplete safety work
+```js
+let minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+if (minutes < 0) minutes += 24 * 60;
 ```
 
-## 8. Required verification gate
+#### Reproduction
 
-Extend scripts/tooling as milestones are implemented. The final target gate is:
+1. Enter `depart = 22:00` and `fin = 06:00`.
+2. Observe zero hours in the employee form, History, and Live Crew.
+3. Observe eight hours in manager timecard cards and payroll/export calculations.
 
-```bash
-npm ci
-npm test
-npm run lint
-npm run typecheck
-npm run build
-supabase start
-supabase db reset
-npm run test:migrations
-npm run test:rls
-npm run test:integration
-npm run test:e2e
-npm run scan:secrets
-npm audit --audit-level=high
+#### Impact
+
+- Employee and manager surfaces disagree about the same job.
+- Overtime-evidence calculations use the zero-duration implementation and may not request mandatory evidence.
+- The daily-minute accumulator used for automatic meal eligibility may remain zero.
+- An accidentally reversed OCR time can alternatively become an implausibly long overnight shift in the payroll path.
+
+#### Required remediation
+
+Create one normalized interval function used by every consumer. It must:
+
+- validate strict time inputs;
+- distinguish an explicitly confirmed overnight shift from an accidental reversal;
+- reject zero duration;
+- enforce an approved maximum duration;
+- return integer minutes, warnings, and a normalized end-day offset;
+- be revalidated server-side at submission and approval.
+
+Delegating `hoursBetween()` to `minutesBetween()` restores consistency but is insufficient without explicit overnight validation.
+
+---
+
+### 1.2 P0 — Skipped single-job approval can become approved without export
+
+The batch Edge Function uses one `skipped` count for jobs that are either no longer submitted or already exported. The single-job client then treats any positive skipped count as permission to directly write:
+
+```js
+{ status: "approved", locked: true }
 ```
 
-If a script does not exist yet, create it in the relevant CI work package rather than
-reporting it as passed. Environment limitations may justify a warning locally, but they
-do not waive the CI gate for production. Record exact versions and results.
+That fallback does not export the job or set export metadata.
 
-## 9. Definition of done for the full program
+#### Reproduction
 
-Sparklog is top tier only when all of the following are demonstrated, not merely claimed:
+1. Manager A loads a submitted job.
+2. Manager B unlocks or changes the job, leaving Manager A with stale UI.
+3. Manager A clicks Approve.
+4. The Edge Function correctly skips the no-longer-submitted job.
+5. Manager A's client sees `skipped > 0` and force-approves it locally.
 
-- A paused employee is blocked server-side, including stale tokens and queued drafts.
-- Retries and concurrency cannot duplicate jobs, evidence, notifications, approvals, or
-  exports.
-- Offline drafts and attachments survive browser closure and app upgrades.
-- Every approved dollar and classified minute can be reproduced and explained.
-- New profile values never rewrite historical payroll results.
-- Every calculation identifies approved rule, schedule, compensation, CCQ, and engine
-  versions; ambiguity stops approval.
-- Sensitive-data access is least-privilege, masked where appropriate, and audited.
-- Exports are idempotent, acknowledged, monitored, and reconcilable.
-- Approved legal fixtures cover all applicable real arrangements and boundary cases.
-- Database/storage recovery and incident procedures have been exercised.
-- Managers see exactly what is estimated, pending, approved, rejected, exported, or
-  failed; employees see exactly what is local, syncing, synced, or needs attention.
-- Payroll specialists sign off on parallel comparisons before any result is treated as
-  finalized payroll.
+Employees cannot normally edit a submitted job directly because it is locked by RLS. The reachable race is a stale manager view, a concurrent manager action, or another trusted process changing state.
 
-## 10. First tasks to execute next
+#### Impact
 
-Claude Code should begin with these small, ordered PRs:
+- The database says approved while the payroll sheet has no corresponding export.
+- The manager may approve facts different from those originally reviewed.
+- The UI reports a successful skipped approval rather than a conflict.
 
-1. **Governance PR:** M0.1–M0.4 documentation, ownership placeholders, PR template, and
-   complete calculation/export inventory. Do not alter payroll behavior.
-2. **Security test harness PR:** M2.1 and disposable Supabase RLS infrastructure; encode
-   the current expected access matrix before further policy changes.
-3. **Containment follow-up PR:** Fix every failing paused-account and profile-ownership
-   case uncovered by direct tests; include clean/upgrade migration verification.
-4. **Rule-specification PR:** M1.1 schema/docs and draft golden-fixture format, without
-   inventing expected legal outcomes.
-5. **Historical-data foundation PRs:** M3 schedules, compensation, snapshots, dry-run
-   backfill, and exception reports in separately reviewable increments.
-6. Continue milestone-by-milestone only after each exit criterion and human gate is met.
+#### Required remediation
 
-This ordering deliberately puts evidence, authorization, and validated rule ownership
-before a new calculator, offline queue, visual redesign, or full-payroll feature.
+- Remove the client-side force-approval fallback.
+- Return a typed per-job result such as `exported`, `already_exported`, `state_changed`, `already_claimed`, or `not_found`.
+- Reload and require re-review for every state-changing outcome.
+- Keep approval transitions inside an authorized server RPC/Edge workflow.
+
+---
+
+### 1.3 P0 — Submitted jobs can contain invalid or incomplete time facts
+
+The `jobs` table permits null `depart`, `arrivee`, and `fin` fields and has no chronology, duration, or overlap constraint. Current RLS also permits an active employee to insert a row directly as `status = 'submitted'` and `locked = true`.
+
+#### Reproduction
+
+Using an employee token, insert an owned job containing null times or equal start/end times, with submitted/locked state. The UI's `formComplete` check is bypassed, and approval eligibility checks only submission/export state.
+
+#### Impact
+
+- Forged clients bypass all browser validation.
+- Zero-hour or missing-time rows can be exported.
+- Overlapping jobs are summed and can inflate work and overtime.
+- Unsupported intervals become warnings rather than approval blockers.
+
+#### Required remediation
+
+- Allow direct employee inserts only as saved, unlocked drafts.
+- Submit through a server-side transition RPC.
+- Lock the employee/day while checking overlaps.
+- Reject missing, zero, excessive, malformed, or ambiguous intervals.
+- Reject approval whenever authoritative classification returns blocking warnings.
+
+---
+
+### 1.4 P0 — Costing combines incompatible states and mutable current rates
+
+`CostingDashboard` applies date filters but no status filters to jobs, meals, or parking. It sums every returned amount and calculates all historical labor from the employee's current profile rate and premium.
+
+#### Reproduction
+
+1. Create one draft job and one approved job in the same period.
+2. Create an approved expense and a rejected expense.
+3. Open Costing; all records contribute.
+4. Change the employee's current rate and reopen the period; historical totals change.
+
+#### Impact
+
+- Draft work and rejected expenses inflate totals.
+- Submitted estimates are indistinguishable from approved basis.
+- Historical costs are not reproducible.
+- Manager reports cannot reconcile to approval or export.
+
+#### Required remediation
+
+Report separate buckets for draft estimates, submitted work, approved snapshots, pending/approved/rejected expenses, exported work, and failed/unknown exports. Historical approved totals must come from immutable snapshots with effective-dated compensation, not current profiles.
+
+---
+
+### 1.5 P1 — Duplicate jobs are possible after timeout, retry, or rapid submission
+
+The jobs table has no submission idempotency key. `withTimeout()` races the client promise but does not cancel the underlying database request. An insert can commit after the browser reports a timeout; retrying creates a second job. React's `saving` state improves UI behavior but is not a synchronous or durable concurrency control.
+
+The existing friendly `23505` duplicate-OT message is not backed by a job uniqueness constraint.
+
+#### Required remediation
+
+Do not assume `(user_id, job_date, ot)` is unique without confirming the business rule; an employee may legitimately have multiple intervals for one work order. Instead:
+
+```sql
+alter table public.jobs add column submission_key uuid;
+create unique index jobs_user_submission_key_uniq
+  on public.jobs (user_id, submission_key)
+  where submission_key is not null;
+```
+
+Generate and persist the key before the first request, reuse it for every retry, and return the prior result when the key already exists. A synchronous ref guard may suppress double taps, but database idempotency is still mandatory.
+
+---
+
+### 1.6 P1 — Submission and attachment workflows are non-atomic
+
+Job save, parking upload, receipt metadata, evidence upload, evidence metadata, meal claims, capture flags, and manager notifications are separate operations. Storage uploads can precede relational records, and notification failure is sometimes explicitly non-fatal.
+
+#### Failure states
+
+- orphaned evidence or receipt objects;
+- job capture flag set without matching metadata;
+- metadata inserted without notification;
+- meal claim inserted without job flag;
+- submitted job missing requested expense/evidence;
+- ambiguous retry behavior after browser closure.
+
+#### Required remediation
+
+Use a staged attachment state machine and one idempotent server submission API. Make relational writes transactional, preserve local drafts until acknowledgement, and add scheduled reconciliation for orphaned objects and incomplete submissions.
+
+---
+
+### 1.7 P1 — Loading EmployeesPanel mutates employee compensation
+
+`EmployeesPanel.load()` compares each profile against fetched CCQ rates and issues a profile update for every mismatch. Merely opening the panel can therefore overwrite `hourly_rate` and `wage_schedule` for many employees.
+
+#### Impact
+
+- N writes for N mismatched employees;
+- write contention and realtime churn;
+- current profile compensation silently replaces manager intent;
+- historical costing changes because Costing reads current rates;
+- loading a view has material side effects.
+
+#### Required remediation
+
+Never mutate compensation during a read/render path. Present a dry-run comparison, require an explicit authorized batch action, preserve effective dates and history, and perform the accepted changes in one audited server operation.
+
+---
+
+### 1.8 P1 — Login profile synchronization sends an invalid role value
+
+`Login.ensureProfile()` upserts `role: "Employee"`, while the schema permits only lowercase `employee` or `manager`. Current profile-write containment also excludes role from employee-owned fields. The operation can fail and silently drop the accompanying phone/email/name synchronization because the UI only logs a console warning.
+
+#### Required remediation
+
+Never send role from the browser. Let the auth trigger initialize the lowercase role and expose profile-sync failures to the user through a retryable, typed error.
+
+---
+
+## 2. Approval, concurrency, and audit integrity
+
+### 2.1 Atomic claim mitigates duplicate sheet rows but does not complete the workflow
+
+The approval Edge Function conditionally updates only submitted, unexported rows. The companion Apps Script locks execution and deduplicates by job ID. These are valuable protections against concurrent duplicate exports.
+
+They do not provide complete end-to-end consistency because:
+
+- the initial read and claim are separate operations;
+- the claim has no reviewed row version or input hash;
+- there is no immutable approval snapshot;
+- broad manager updates can still mutate workflow-controlled fields;
+- the external export is outside the database transaction;
+- a timeout can occur after the external system commits;
+- claim rollback does not compare the current row version;
+- skipped outcomes are ambiguous;
+- no durable export-attempt record supports reconciliation.
+
+#### Required remediation
+
+Create an approval RPC that locks rows, compares the reviewed input hash, computes authoritative results, persists immutable snapshots, records the actor, and creates durable export attempts. External timeouts must become `unknown/reconcile`, not assumed failures.
+
+### 2.2 Approval audit actor can be null
+
+The Edge Function updates jobs through a service-role client. The job-approval audit trigger records `auth.uid()`, which is null under the service role, even though the function already knows the authenticated manager's `approverId`.
+
+#### Required remediation
+
+Write the audit row inside the approval transaction using an explicitly verified actor. Include request ID, snapshot ID, input hash, before/after state, and outcome. Never trust an unverified actor ID supplied by a client.
+
+### 2.3 Manager updates lack a server-enforced state machine
+
+Manager RLS broadly permits updates to all jobs. UI controls hide some transitions, but a forged manager request can change ownership, approved facts, locked state, status, or export metadata without a correction workflow.
+
+#### Required remediation
+
+Revoke direct mutation of workflow-controlled fields and expose narrow operations such as:
+
+- `return_job_for_correction`;
+- `approve_jobs`;
+- `void_approval`;
+- `create_adjustment`;
+- `review_meal_claim`;
+- `review_parking_claim`.
+
+Concurrent review updates must include an expected state/version so that the first valid transition wins and later requests receive an explicit conflict.
+
+---
+
+## 3. RBAC, privacy, and resilience
+
+### 3.1 Controls verified as positive
+
+- Employees can read their own jobs, while managers receive all-job access.
+- Employees cannot set approval/export fields because database triggers protect them.
+- Paused employees are blocked from the primary job, claim, notification, and storage write paths.
+- Approval and announcement Edge Functions authenticate the bearer token and re-check manager role server-side.
+- Employee NAS is no longer present in the broad profiles table after migration `0026`.
+
+These controls should still be validated with direct multi-identity integration tests against the final migrated schema and real storage policies.
+
+### 3.2 NAS vault access remains too broad for privileged identities
+
+NAS is isolated in `employee_sensitive`, which is an improvement. However, privilege is granted to two hardcoded user UUIDs rather than a revocable permission model. Those users can select the vault directly and bulk-read values without going through the audited `reveal_nas` RPC; `CcqJsonExport` does exactly that.
+
+This is not leakage to every manager or employee. It is a concentrated bulk-exfiltration risk for the two trusted accounts.
+
+#### Required remediation
+
+- Replace hardcoded identities with revocable, active-role-aware permissions.
+- Revoke direct browser SELECT on NAS values.
+- Generate sensitive exports server-side under a distinct `nas_export` permission.
+- Require a purpose/reason and audit each reveal/export.
+- Mask values by default and rate-limit sensitive operations.
+
+### 3.3 OCR sends screenshots to a third party without adequate controls
+
+Overtime screenshots are sent to `ocr.space`. The server path does not validate content magic bytes, impose an explicit code-level size limit, remove metadata, crop/redact unrelated content, or document provider retention/residency. Full extracted text may be retained.
+
+#### Required remediation
+
+Validate and re-encode files server-side, enforce strict size/dimension limits, strip metadata, minimize the image region and stored OCR text, add privacy audit events, and complete a provider privacy/retention review.
+
+### 3.4 No error boundary protects critical views
+
+Authentication guards are not render error boundaries. An unexpected exception in EmployeeForm, History, Week, or ManagerDashboard can blank the application and discard memory-only drafts.
+
+#### Required remediation
+
+Add application- and workflow-level error boundaries with privacy-safe correlation IDs and recovery actions. Durable local drafts must survive the error and reload.
+
+### 3.5 Wildcard CORS is low-value hardening, not a primary vulnerability
+
+Approval functions permit `Access-Control-Allow-Origin: *`, but they require and validate bearer tokens. Restricting origins may reduce casual browser invocation but does not protect a stolen token or non-browser caller. Prioritize CSP/XSS prevention, short-lived sessions, reauthentication for sensitive operations, rate monitoring, and audit correlation.
+
+---
+
+## 4. Performance and latency risks
+
+### 4.1 Unbounded manager review queries
+
+Manager notification paths fetch all overtime evidence, parking receipts, and meal claims, then issue related `.in(ids)` queries for jobs and profiles. The standalone meal manager also loads its entire table. This grows with company history and can hit payload, URL, row-cap, memory, and render limits.
+
+Use narrow joined views/RPCs, pending/recent predicates, cursor pagination, and covering/partial indexes on review status and creation time.
+
+### 4.2 Offset pagination over mutable ordering
+
+The main manager list sorts by `job_date` and `updated_at`, then loads more by numeric offset. If a row changes between page requests, it can move across the offset boundary and be skipped or duplicated.
+
+Use deterministic keyset pagination ordered by `(job_date desc, updated_at desc, id desc)`.
+
+### 4.3 Four count queries per filter change
+
+Each manager load issues separate exact counts for all, saved, submitted, and approved jobs. Replace them with one conditional-aggregate RPC or return summary metadata with the page.
+
+### 4.4 Unbounded employee History and Week data
+
+History and Week fetch an employee's complete job history and recalculate all periods in the browser. Default to recent weeks, load older periods by cursor, and consume immutable server snapshots for approved history.
+
+### 4.5 Live Crew reloads the roster every 30 seconds
+
+The Live Crew poll fetches all profiles, today's jobs, and current time off every 30 seconds. Cache the roster, subscribe to relevant realtime changes, pause polling while hidden, prevent overlapping requests, and retain low-frequency polling only as reconciliation.
+
+### 4.6 Client-side costing joins full datasets
+
+Costing downloads profiles, jobs, meals, and parking rows and joins/calculates them in the browser. Move status policy, effective compensation lookup, and approved snapshot aggregation to one authorized server endpoint.
+
+### 4.7 Batch approval performs an Auth Admin request per employee
+
+The Edge Function calls `admin.auth.admin.getUserById()` once for each distinct employee in a batch. This is an N+1 external/auth pattern. Use a trusted server-side source that can retrieve the required emails in one operation, or avoid exporting unnecessary contact data.
+
+### 4.8 Main application is not route-split
+
+All pages are eagerly imported, so employees download manager-only dashboard and testing code. Lazy-load routes and split large vendor surfaces such as OCR, MUI/date pickers, Supabase, and manager reporting.
+
+### 4.9 Large unmemoized lists are secondary to query control
+
+Manager card renderers live inside the parent and all visible cards rerender with parent state. Extracting stable `React.memo` cards can help after pagination and state decomposition. Query bounding, virtualization, and route splitting have higher expected impact than merely wrapping callbacks in `useCallback`.
+
+---
+
+## 5. Edge-case matrix
+
+| Persona | Scenario | Current behavior | Expected behavior | Recommended patch |
+|---|---|---|---|---|
+| Employee | `22:00 -> 06:00` overnight | Employee paths show 0; payroll paths show 8h | One validated result everywhere | Shared interval normalizer with explicit overnight intent |
+| Employee | Equal start/end | Zero minutes may be submitted/exported | Reject zero duration | Server submission and approval validation |
+| Employee | Reversed OCR times | Employee path may show 0; payroll path may infer a long overnight | Require confirmation or correction | Bounds and overnight confirmation |
+| Employee | Overlapping jobs | Every interval is summed | Reject or require review | Transactional overlap validation |
+| Employee | Direct crafted insert | Can start submitted/locked and bypass UI checks | Draft-only insert; validated transition | Submission RPC and narrower RLS |
+| Employee | Slow insert, client timeout, retry | First insert may commit; retry creates another | One logical submission | Durable idempotency key |
+| Employee | Rapid repeated submit | React state is not a database concurrency control | Subsequent attempt returns original result | Synchronous UX guard plus server uniqueness |
+| Employee | Offline edit and reload | Memory-only draft is lost | Draft and attachments restored | IndexedDB queue bound to identity |
+| Employee | Upload succeeds, row insert fails | Orphaned storage object | Recoverable staged upload | Evidence state machine and reconciliation |
+| Employee | Midnight in UTC but prior day in Montréal | Device-local default date can disagree with company date | Company timezone determines work date | Shared timezone-aware date service |
+| Employee | DST ambiguity | Date/time facts contain no offset/fold semantics | Ambiguity rejected or explicit | Normalized instants plus approved timezone policy |
+| Employee | Returning profile sync | Uppercase role can reject the entire upsert | Role untouched; profile fields saved | Remove role from client payload |
+| Employee | Paused stale token | Primary current write policies check active database state | All writes remain blocked | Complete direct RLS/storage/RPC test matrix |
+| Manager | Stale single-job approval | Skipped job can be force-approved without export | State-change conflict and re-review | Remove client fallback; typed result |
+| Manager | Two simultaneous approval claims | Conditional claim and sheet dedup reduce duplicate rows | One immutable approval, explicit loser result | Snapshot/hash/attempt workflow |
+| Manager | Edit during export | No reviewed-version hash or immutable snapshot | Export exact reviewed version | Row lock, expected hash, snapshot |
+| Manager | External commit then timeout | Claim may be reverted into ambiguous state | Mark unknown and reconcile | Durable export attempts and receipts |
+| Manager | Two meal/parking reviews | Last writer can win | First valid transition wins; conflict returned | Expected-status review RPC |
+| Manager | Change current rate | Historical Costing changes | Approved history remains stable | Effective-dated compensation snapshots |
+| Manager | Rejected expense | Included in Costing | Excluded from payable totals | Status-scoped aggregation |
+| Manager | Open EmployeesPanel | May update rates for many employees | Read path has no writes | Explicit reviewed batch action |
+| Manager | Months of notifications | Full-table reads and large `.in()` queries | Cursor-paginated review queue | Joined server endpoint and indexes |
+| Manager | Load next page during edits | Offset page can skip/duplicate rows | Stable cursor result | Keyset pagination |
+| Manager | Sensitive export | Two hardcoded identities can bulk-read NAS | Revocable permission and audited server export | Remove direct vault SELECT |
+| Both | HTTP 401/403/500 | Mostly generic errors; no durable retry queue | Typed retry and reauthentication policy | Shared API adapter and observable queue |
+| Both | Render exception | No route error boundary | Safe recovery without draft loss | Error boundaries plus durable drafts |
+| Both | Clock-in/out/break race | Feature does not exist | If added, server owns transitions/timestamps | Unique active-clock constraint and RPCs |
+
+---
+
+## 6. Correctly prioritized remediation plan
+
+1. Remove the skipped-job force-approval fallback.
+2. Unify and validate interval duration, especially overnight shifts.
+3. Block malformed, zero, excessive, and overlapping jobs at submission and approval.
+4. Add durable per-submission idempotency.
+5. Separate Costing by status and stop using current rates for historical approved work.
+6. Remove compensation writes from EmployeesPanel loading.
+7. Make job/evidence/expense/notification submission atomic or explicitly recoverable.
+8. Persist immutable approval snapshots and durable export attempts.
+9. Repair actor attribution for service-role approval audits.
+10. Replace broad manager updates with server-enforced state transitions.
+11. Remove client-supplied role from profile synchronization.
+12. Add cursor pagination and query bounds to manager and employee history surfaces.
+13. Implement an identity-bound IndexedDB offline queue with attachment support.
+14. Replace hardcoded NAS identities and direct bulk browser access.
+15. Add error boundaries, route splitting, dependency gates, and hostile-condition integration tests.
+
+## 7. Verification gaps
+
+Existing unit tests validate calculation and export helpers, but they do not establish the safety of the end-to-end employee/manager workflows described above. Required coverage includes:
+
+- direct multi-identity RLS and storage tests against the final migration state;
+- overnight, DST, zero, excessive, malformed, duplicate, and overlapping intervals;
+- browser closure and network loss at every submission step;
+- timeout-after-commit idempotency;
+- two-manager stale review, approval, and expense-review races;
+- external export success with lost response;
+- immutable snapshot reproducibility after rate/profile changes;
+- manager payload and render tests with 100+ employees and long history;
+- expired tokens, remote pause, shared-device user changes, and queued drafts;
+- error-boundary recovery without losing local data.
+
+Until these fixes and tests exist, Sparklog should be treated as a time-entry and estimate tool whose approvals and calculated values require payroll review, not as finalized payroll authority.
