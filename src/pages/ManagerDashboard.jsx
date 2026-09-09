@@ -23,6 +23,7 @@ import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import { wasSingleJobExported } from "@/lib/approval";
 
 dayjs.extend(isoWeek);
 
@@ -569,20 +570,13 @@ export default function ManagerDashboard() {
         throw new Error(data?.error || t("manager.errors.exportFailed"));
       }
 
-      // The batch function normally updates the job atomically. A previously
-      // exported job is skipped, so finish its approval without exporting it a
-      // second time (the same idempotent behaviour as the former endpoint).
-      if (Number(data.skipped || 0) > 0) {
-        const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
-        if (error) throw error;
-      }
-
-      setInfo(Number(data.skipped || 0) > 0 ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
-      const markApproved = (rows) => rows.map((row) => row.id === jobId ? { ...row, status: "approved", locked: true } : row);
-      setOvertimeJobs(markApproved);
-      setParkingJobs(markApproved);
-      setNotificationMealJobs(markApproved);
+      // A skipped row is ambiguous: it may already be exported, may have been
+      // changed since this screen loaded, or may have been claimed by another
+      // manager. Never manufacture an approval in the browser. Trust only an
+      // explicit exported=1 response and reload the authoritative row.
+      const exported = wasSingleJobExported(data);
       await load();
+      setInfo(exported ? t("manager.toasts.approvedAndExported") : t("manager.toasts.approvalNotApplied"));
     } catch (e) {
       setErr(e?.message || t("manager.errors.approveFailed"));
     } finally {
