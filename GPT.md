@@ -4,7 +4,7 @@
 
 **Scope:** Raw execution paths in `src`, Supabase Edge Functions, SQL migrations, and tests.
 
-**Status:** Findings and recommended remediations only; this document does not claim that the defects are fixed.
+**Status:** Living audit. Resolved findings are marked with their implementation and verification evidence; all other entries remain recommendations.
 
 ## Executive summary
 
@@ -12,12 +12,11 @@ Sparklog has useful server-side protections: employees are restricted to their o
 
 The highest-priority production defects are nevertheless concrete and workflow-affecting:
 
-1. Overnight shifts have two incompatible duration implementations. Employee-facing views calculate `22:00 -> 06:00` as zero, while manager/payroll paths calculate eight hours.
-2. The single-job approval client force-approves any job reported as skipped, even when the server skipped it because its state changed and it was not exported.
-3. Cost reports combine draft, submitted, approved, pending, rejected, and current-rate data into one total.
-4. Job creation and submission lack a durable idempotency key, and direct API clients can insert an incomplete job directly as submitted.
-5. Opening the employee-management panel can overwrite compensation fields for many employees.
-6. Attachment, claim, notification, approval, and export workflows are multi-step and can leave partial or ambiguous states.
+1. The single-job approval client force-approves any job reported as skipped, even when the server skipped it because its state changed and it was not exported.
+2. Cost reports combine draft, submitted, approved, pending, rejected, and current-rate data into one total.
+3. Job creation and submission lack a durable idempotency key, and direct API clients can insert an incomplete job directly as submitted.
+4. Opening the employee-management panel can overwrite compensation fields for many employees.
+5. Attachment, claim, notification, approval, and export workflows are multi-step and can leave partial or ambiguous states.
 
 The repository does not implement clock-in, clock-out, or break buttons. The closest applicable race analysis is therefore the manual Save/Submit workflow.
 
@@ -25,16 +24,16 @@ The repository does not implement clock-in, clock-out, or break buttons. The clo
 
 ## 1. Critical and high-priority correctness defects
 
-### 1.1 P0 — Overnight duration differs between employee and payroll paths
+### 1.1 Resolved — Overnight duration differed between employee and payroll paths
 
-`src/lib/time.js` calculates a Day.js difference and returns zero for any non-positive result:
+Previously, `src/lib/time.js` calculated a Day.js difference and returned zero for any non-positive result:
 
 ```js
 const diffMinutes = e.diff(s, "minute");
 if (diffMinutes <= 0) return 0;
 ```
 
-`src/lib/payroll-calculations.js` instead interprets a negative difference as crossing midnight:
+`src/lib/payroll-calculations.js` interprets a negative difference as crossing midnight:
 
 ```js
 let minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
@@ -54,18 +53,13 @@ if (minutes < 0) minutes += 24 * 60;
 - The daily-minute accumulator used for automatic meal eligibility may remain zero.
 - An accidentally reversed OCR time can alternatively become an implausibly long overnight shift in the payroll path.
 
-#### Required remediation
+#### Resolution
 
-Create one normalized interval function used by every consumer. It must:
+`hoursBetween()` now validates its Day.js inputs and delegates duration calculation to the payroll engine's `minutesBetween()` function. Employee Form, History, Live Crew, and Meal Claims therefore use the same overnight convention as manager timecards and payroll classification.
 
-- validate strict time inputs;
-- distinguish an explicitly confirmed overnight shift from an accidental reversal;
-- reject zero duration;
-- enforce an approved maximum duration;
-- return integer minutes, warnings, and a normalized end-day offset;
-- be revalidated server-side at submission and approval.
+Unit tests cover same-day, overnight, equal-time, missing, and invalid inputs. The overnight regression specifically asserts that `22:00 -> 06:00` produces eight hours.
 
-Delegating `hoursBetween()` to `minutesBetween()` restores consistency but is insufficient without explicit overnight validation.
+Explicit overnight confirmation, maximum-duration enforcement, and server-side rejection of ambiguous intervals remain tracked under section 1.3; this resolution removes the client/payroll disagreement without claiming those broader validation controls are complete.
 
 ---
 
@@ -366,7 +360,7 @@ Manager card renderers live inside the parent and all visible cards rerender wit
 
 | Persona | Scenario | Current behavior | Expected behavior | Recommended patch |
 |---|---|---|---|---|
-| Employee | `22:00 -> 06:00` overnight | Employee paths show 0; payroll paths show 8h | One validated result everywhere | Shared interval normalizer with explicit overnight intent |
+| Employee | `22:00 -> 06:00` overnight | Resolved: employee and payroll paths now both return 8h | One consistent result everywhere | Completed by delegating `hoursBetween()` to `minutesBetween()`; explicit overnight confirmation remains follow-up validation |
 | Employee | Equal start/end | Zero minutes may be submitted/exported | Reject zero duration | Server submission and approval validation |
 | Employee | Reversed OCR times | Employee path may show 0; payroll path may infer a long overnight | Require confirmation or correction | Bounds and overnight confirmation |
 | Employee | Overlapping jobs | Every interval is summed | Reject or require review | Transactional overlap validation |
@@ -399,20 +393,19 @@ Manager card renderers live inside the parent and all visible cards rerender wit
 ## 6. Correctly prioritized remediation plan
 
 1. Remove the skipped-job force-approval fallback.
-2. Unify and validate interval duration, especially overnight shifts.
-3. Block malformed, zero, excessive, and overlapping jobs at submission and approval.
-4. Add durable per-submission idempotency.
-5. Separate Costing by status and stop using current rates for historical approved work.
-6. Remove compensation writes from EmployeesPanel loading.
-7. Make job/evidence/expense/notification submission atomic or explicitly recoverable.
-8. Persist immutable approval snapshots and durable export attempts.
-9. Repair actor attribution for service-role approval audits.
-10. Replace broad manager updates with server-enforced state transitions.
-11. Remove client-supplied role from profile synchronization.
-12. Add cursor pagination and query bounds to manager and employee history surfaces.
-13. Implement an identity-bound IndexedDB offline queue with attachment support.
-14. Replace hardcoded NAS identities and direct bulk browser access.
-15. Add error boundaries, route splitting, dependency gates, and hostile-condition integration tests.
+2. Add explicit overnight confirmation and block malformed, zero, excessive, and overlapping jobs at submission and approval.
+3. Add durable per-submission idempotency.
+4. Separate Costing by status and stop using current rates for historical approved work.
+5. Remove compensation writes from EmployeesPanel loading.
+6. Make job/evidence/expense/notification submission atomic or explicitly recoverable.
+7. Persist immutable approval snapshots and durable export attempts.
+8. Repair actor attribution for service-role approval audits.
+9. Replace broad manager updates with server-enforced state transitions.
+10. Remove client-supplied role from profile synchronization.
+11. Add cursor pagination and query bounds to manager and employee history surfaces.
+12. Implement an identity-bound IndexedDB offline queue with attachment support.
+13. Replace hardcoded NAS identities and direct bulk browser access.
+14. Add error boundaries, route splitting, dependency gates, and hostile-condition integration tests.
 
 ## 7. Verification gaps
 
