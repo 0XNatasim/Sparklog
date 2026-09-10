@@ -10,6 +10,7 @@ import { useAuth } from "../contexts/AuthContext";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, withTimeout } from "@/lib/utils";
+import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
 import { calculateDailyTotals } from "@/lib/payroll-calculations";
@@ -48,7 +49,7 @@ export default function Week() {
   const { isViewMode, viewedEmployee } = useViewMode();
 
   const employeeIdParam = searchParams.get("employee");
-  const isManagerViewingEmployee = role === "manager" && Boolean(employeeIdParam);
+  const isManagerViewingEmployee = isManagerRole(role) && Boolean(employeeIdParam);
   const effectiveUserId = isViewMode ? viewedEmployee.id : (isManagerViewingEmployee ? employeeIdParam : user?.id);
 
   const [jobs, setJobs] = useState([]);

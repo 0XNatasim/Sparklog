@@ -66,14 +66,14 @@ serve(async (req) => {
     const { data: { user }, error: authErr } = await caller.auth.getUser();
     if (authErr || !user) return json({ ok: false, error: "Invalid session" }, 401);
 
-    // --- Auth: require manager role ---
+    // --- Auth: require manager-tier role (manager or admin) ---
     const admin = createClient(supabaseUrl, serviceRole);
     const { data: profile } = await admin
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    if (profile?.role !== "manager") {
+    if (!profile || !["manager", "admin", "owner"].includes(profile.role)) {
       return json({ ok: false, error: "Forbidden: manager only" }, 403);
     }
 

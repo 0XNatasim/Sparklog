@@ -5,6 +5,7 @@ import { supabase } from "@/supabaseClient";
 import { SESSION_RESUMED_EVENT, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 
 const TIME_FIELDS = new Set(["depart", "arrivee", "fin"]);
@@ -23,7 +24,7 @@ export default function NotificationsBell() {
   const channelRef = useRef(null);
 
   const load = useCallback(async () => {
-    if (role !== "manager" || !user?.id) return;
+    if (!isManagerRole(role) || !user?.id) return;
     const [{ data: rows }, { data: reads }] = await Promise.all([
       supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, parking_receipt_id, daily_minutes, changes, created_at").order("created_at", { ascending: false }).limit(50),
       supabase.from("manager_notification_reads").select("notification_id").eq("manager_id", user.id),
@@ -42,7 +43,7 @@ export default function NotificationsBell() {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    if (role !== "manager" || !user?.id) return;
+    if (!isManagerRole(role) || !user?.id) return;
     channelRef.current = supabase.channel("manager-overtime-notifications")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "manager_notifications" }, load)
       .subscribe();
@@ -67,7 +68,7 @@ export default function NotificationsBell() {
     };
   }, [load, subscribeToNotifications]);
 
-  if (role !== "manager") return null;
+  if (!isManagerRole(role)) return null;
   const unread = notifications.filter((notification) => !notification.read).length;
 
   async function openNotification(notification) {

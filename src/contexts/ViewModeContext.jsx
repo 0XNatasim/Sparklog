@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { isManagerRole } from "@/lib/roles";
 
 const ViewModeContext = createContext({ isViewMode: false, viewedEmployee: null });
 
@@ -10,7 +11,7 @@ export function ViewModeProvider({ children }) {
   const employeeId = searchParams.get("employee");
   const employeeName = searchParams.get("employeeName") || "";
   const value = useMemo(() => ({
-    isViewMode: role === "manager" && Boolean(employeeId),
+    isViewMode: isManagerRole(role) && Boolean(employeeId),
     viewedEmployee: employeeId ? { id: employeeId, name: employeeName } : null,
   }), [employeeId, employeeName, role]);
 

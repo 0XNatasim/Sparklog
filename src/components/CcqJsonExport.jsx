@@ -27,7 +27,7 @@ export default function CcqJsonExport() {
         const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }, { data: nasRows }] = await withTimeout(
           Promise.all([
             supabase.from("jobs").select("id, user_id, job_date, depart, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }),
-            supabase.from("profiles").select("id, full_name, email, work_region, wage_schedule, union_association, hourly_rate").order("full_name"),
+            supabase.from("profiles").select("id, full_name, email, role, work_region, wage_schedule, union_association, hourly_rate").order("full_name"),
             // NAS comes from the restricted vault; RLS returns rows only to privileged
             // users (owner/dev), so a non-privileged export simply has no NAS.
             supabase.from("employee_sensitive").select("user_id, nas"),
@@ -49,13 +49,17 @@ export default function CcqJsonExport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The CCQ report covers CCQ tradespeople only. Administration ('admin') staff are
+  // paid flat-hourly off the CCQ grid, so they are excluded from this export entirely.
+  const ccqProfiles = useMemo(() => profiles.filter((profile) => profile.role !== "admin"), [profiles]);
+
   const records = useMemo(() => {
-    const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+    const profileMap = new Map(ccqProfiles.map((profile) => [profile.id, profile]));
     return buildCcqWeeklyRecords(
-      jobs.filter((job) => employeeId === "all" || job.user_id === employeeId),
+      jobs.filter((job) => (employeeId === "all" || job.user_id === employeeId) && profileMap.has(job.user_id)),
       profileMap
     ).filter((record) => !month || record.semaineFinissantLe.startsWith(month));
-  }, [employeeId, jobs, month, profiles]);
+  }, [employeeId, jobs, month, ccqProfiles]);
 
   const incomplete = records.filter((record) => missingCcqFields(record).length > 0);
 
@@ -97,7 +101,7 @@ export default function CcqJsonExport() {
           <div className="grid gap-2 sm:grid-cols-2">
             <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
               <option value="all">{t("manager.filters.allEmployees")}</option>
-              {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name || profile.email}</option>)}
+              {ccqProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name || profile.email}</option>)}
             </Select>
             <Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} aria-label={t("manager.download.reportingMonth")} />
           </div>

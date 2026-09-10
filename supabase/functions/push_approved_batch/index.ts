@@ -101,7 +101,7 @@ serve(async (req) => {
       .select("role, full_name")
       .eq("id", approverId)
       .maybeSingle();
-    if (!approverProfile || approverProfile.role !== "manager") {
+    if (!approverProfile || !["manager", "admin", "owner"].includes(approverProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
     const approved_by_value =
@@ -176,7 +176,7 @@ serve(async (req) => {
     const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone")
+      .select("id, full_name, phone, role")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -207,6 +207,10 @@ serve(async (req) => {
         employee_name: (prof?.full_name || "").trim(),
         employee_email: emails.get(j.user_id) || "",
         employee_phone: (prof?.phone || "").trim(),
+        // Pay basis for the Apps Script sheet: 'admin' (administration/office) staff are
+        // paid a flat hourly rate, NOT on the CCQ wage grid, so the sheet must apply flat
+        // pay (no CCQ premiums/overtime rules) for these rows. Everyone else is 'ccq'.
+        employee_pay_basis: prof?.role === "admin" ? "flat_hourly" : "ccq",
         approved_at: approved_at_label,
         approved_by: approved_by_value,
       };

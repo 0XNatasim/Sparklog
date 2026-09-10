@@ -18,7 +18,7 @@ begin;
 
 do $suite$
 declare
-  empA uuid; empB uuid; paused uuid; mgr uuid;
+  empA uuid; empB uuid; paused uuid; mgr uuid; adm uuid; ownr uuid;
   res text := '';
   fails int := 0;
   skips int := 0;
@@ -28,6 +28,8 @@ begin
   select id into empB   from public.profiles where role='employee' and is_paused=false and id <> empA order by id limit 1;
   select id into paused from public.profiles where role='employee' and is_paused=true  order by id limit 1;
   select id into mgr    from public.profiles where role='manager'  order by id limit 1;
+  select id into adm    from public.profiles where role='admin'    order by id limit 1;
+  select id into ownr   from public.profiles where role='owner'    order by id limit 1;
 
   ---------------------------------------------------------------- A1: anon reads nothing
   begin
@@ -124,6 +126,57 @@ begin
     reset role;
     res := res || format(E'\nPASS A9  manager reads jobs (%s visible)', n);
   exception when others then reset role; res := res || format(E'\nFAIL A9  manager read errored %s', sqlerrm); fails := fails+1; end; end if;
+
+  ---------------------------------------- A10: admin is manager-tier — can read all jobs
+  if adm is null then res := res || E'\nSKIP A10 no admin (set a profile to role=admin to cover)'; skips := skips+1;
+  else begin
+    perform set_config('request.jwt.claims', json_build_object('sub',adm,'role','authenticated')::text, true);
+    set local role authenticated;
+    select count(*) into n from public.jobs;
+    reset role;
+    res := res || format(E'\nPASS A10 admin reads all jobs like a manager (%s visible)', n);
+  exception when others then reset role; res := res || format(E'\nFAIL A10 admin read errored %s', sqlerrm); fails := fails+1; end; end if;
+
+  ------------------------------ A11: admin is NOT privileged — cannot read the NAS vault ***
+  if adm is null then res := res || E'\nSKIP A11 no admin'; skips := skips+1;
+  else begin
+    perform set_config('request.jwt.claims', json_build_object('sub',adm,'role','authenticated')::text, true);
+    set local role authenticated;
+    select count(*) into n from public.employee_sensitive;
+    reset role;
+    if n = 0 then res := res || E'\nPASS A11 admin cannot read employee_sensitive (0 rows)';
+    else res := res || format(E'\nFAIL A11 admin saw %s NAS vault rows (!!)', n); fails := fails+1; end if;
+  exception when others then reset role; res := res || format(E'\nPASS A11 admin blocked from NAS vault (%s)', sqlstate); end; end if;
+
+  ---------------------------- A12: admin cannot reveal NAS via the audited RPC (privileged only)
+  if adm is null then res := res || E'\nSKIP A12 no admin'; skips := skips+1;
+  else begin
+    perform set_config('request.jwt.claims', json_build_object('sub',adm,'role','authenticated')::text, true);
+    set local role authenticated;
+    perform public.reveal_nas(adm);
+    reset role;
+    res := res || E'\nFAIL A12 admin revealed NAS via reveal_nas() (!!)'; fails := fails+1;
+  exception when others then reset role; res := res || format(E'\nPASS A12 admin cannot reveal_nas (%s)', sqlstate); end; end if;
+
+  ---------------------------------------- A13: owner is manager-tier — can read all jobs
+  if ownr is null then res := res || E'\nSKIP A13 no owner (set a profile to role=owner to cover)'; skips := skips+1;
+  else begin
+    perform set_config('request.jwt.claims', json_build_object('sub',ownr,'role','authenticated')::text, true);
+    set local role authenticated;
+    select count(*) into n from public.jobs;
+    reset role;
+    res := res || format(E'\nPASS A13 owner reads all jobs like a manager (%s visible)', n);
+  exception when others then reset role; res := res || format(E'\nFAIL A13 owner read errored %s', sqlerrm); fails := fails+1; end; end if;
+
+  ---------------------------- A14: owner IS privileged — can read the NAS vault (owner only)
+  if ownr is null then res := res || E'\nSKIP A14 no owner'; skips := skips+1;
+  else begin
+    perform set_config('request.jwt.claims', json_build_object('sub',ownr,'role','authenticated')::text, true);
+    set local role authenticated;
+    select count(*) into n from public.employee_sensitive;
+    reset role;
+    res := res || format(E'\nPASS A14 owner can read employee_sensitive (%s rows)', n);
+  exception when others then reset role; res := res || format(E'\nFAIL A14 owner blocked from NAS vault (%s)', sqlstate); fails := fails+1; end; end if;
 
   raise notice '=== RLS authorization suite ===%', res;
   raise notice '=== % failure(s), % skip(s) ===', fails, skips;
