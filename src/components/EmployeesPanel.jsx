@@ -291,6 +291,30 @@ export default function EmployeesPanel() {
                 <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
               </div>
             )}
+            {/* Role — only the owner (boss) and developer may assign roles. */}
+            {privileged && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field label={t("employees.roleLabel")}>
+                  {isBoss(p.id) || isDev(p.id) ? (
+                    <div className="flex h-9 items-center text-sm text-muted-foreground">
+                      {isBoss(p.id) ? t("manager.bossLabel") : t("manager.devLabel")}
+                    </div>
+                  ) : (
+                    <Select
+                      value={p.role || "employee"}
+                      disabled={p.id === user?.id}
+                      onChange={(e) => { const v = e.target.value; setLocal(p.id, "role", v); saveField(p.id, "role", v); }}
+                      className="h-9"
+                    >
+                      <option value="employee">{t("manager.employee")}</option>
+                      <option value="manager">{t("manager.roleLabel")}</option>
+                      <option value="admin">{t("manager.adminLabel")}</option>
+                    </Select>
+                  )}
+                </Field>
+              </div>
+            )}
+
             {/* Contact */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label={t("manager.tbl.phone")}>
