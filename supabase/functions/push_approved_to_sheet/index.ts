@@ -120,7 +120,7 @@ serve(async (req) => {
     if (approverProfErr) {
       return json({ ok: false, error: approverProfErr.message }, 500);
     }
-    if (!approverProfile || !["manager", "admin"].includes(approverProfile.role)) {
+    if (!approverProfile || !["manager", "admin", "owner"].includes(approverProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
 

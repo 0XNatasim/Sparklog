@@ -61,7 +61,7 @@ serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceRole);
     const { data: callerProfile } = await admin
       .from("profiles").select("role, full_name").eq("id", callerId).maybeSingle();
-    if (!callerProfile || !["manager", "admin"].includes(callerProfile.role)) {
+    if (!callerProfile || !["manager", "admin", "owner"].includes(callerProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
 
@@ -75,7 +75,7 @@ serve(async (req) => {
     const { data: target } = await admin
       .from("profiles").select("id, role, full_name, email").eq("id", userId).maybeSingle();
     if (!target) return json({ ok: false, error: "User not found" }, 404);
-    if (["manager", "admin"].includes(target.role)) {
+    if (["manager", "admin", "owner"].includes(target.role)) {
       return json({ ok: false, error: "Manager-tier accounts cannot be deleted here. Change the role first if this is intended." }, 400);
     }
 

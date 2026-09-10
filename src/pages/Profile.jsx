@@ -11,12 +11,12 @@ import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import CcqCardCapture from "@/components/CcqCardCapture";
-import { isBoss } from "@/lib/boss";
+import { isOwnerRole } from "@/lib/roles";
 import { Radio } from "lucide-react";
 
 export default function Profile() {
   const t = useT();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { isViewMode, viewedEmployee } = useViewMode();
   const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const [profile, setProfile] = useState(null);
@@ -53,7 +53,7 @@ export default function Profile() {
     }
   }
 
-  const showBoardsToggle = !isViewMode && isBoss(user?.id);
+  const showBoardsToggle = !isViewMode && isOwnerRole(role);
 
   return (
     <AppShell>

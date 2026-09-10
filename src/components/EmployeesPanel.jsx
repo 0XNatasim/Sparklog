@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, Wrench, X } from "lucide-react";
+import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
-import { isBoss, isDev, isPrivileged } from "@/lib/boss";
-import { isManagerRole } from "@/lib/roles";
+import { isManagerRole, isPrivileged } from "@/lib/roles";
 import NasField from "./NasField";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -28,10 +27,10 @@ const LEVELS = [
 
 export default function EmployeesPanel() {
   const t = useT();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState([]);
-  const privileged = isPrivileged(user?.id);
+  const privileged = isPrivileged(role);
   const [nasSet, setNasSet] = useState(new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -258,13 +257,11 @@ export default function EmployeesPanel() {
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 truncate font-semibold">
-                {isBoss(p.id)
+                {p.role === "owner"
                   ? <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.bossLabel")} />
-                  : isDev(p.id)
-                    ? <Wrench className="h-4 w-4 shrink-0 text-sky-500" aria-label={t("manager.devLabel")} />
-                    : p.role === "admin"
-                      ? <Briefcase className="h-4 w-4 shrink-0 text-violet-500" aria-label={t("manager.adminLabel")} />
-                      : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
+                  : p.role === "admin"
+                    ? <Briefcase className="h-4 w-4 shrink-0 text-violet-500" aria-label={t("manager.adminLabel")} />
+                    : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
@@ -291,26 +288,22 @@ export default function EmployeesPanel() {
                 <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
               </div>
             )}
-            {/* Role — only the owner (boss) and developer may assign roles. */}
+            {/* Role — only the owner may assign roles (see is_privileged / 0031, 0032).
+                The owner's own row is locked to avoid demoting the last owner by accident. */}
             {privileged && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Field label={t("employees.roleLabel")}>
-                  {isBoss(p.id) || isDev(p.id) ? (
-                    <div className="flex h-9 items-center text-sm text-muted-foreground">
-                      {isBoss(p.id) ? t("manager.bossLabel") : t("manager.devLabel")}
-                    </div>
-                  ) : (
-                    <Select
-                      value={p.role || "employee"}
-                      disabled={p.id === user?.id}
-                      onChange={(e) => { const v = e.target.value; setLocal(p.id, "role", v); saveField(p.id, "role", v); }}
-                      className="h-9"
-                    >
-                      <option value="employee">{t("manager.employee")}</option>
-                      <option value="manager">{t("manager.roleLabel")}</option>
-                      <option value="admin">{t("manager.adminLabel")}</option>
-                    </Select>
-                  )}
+                  <Select
+                    value={p.role || "employee"}
+                    disabled={p.id === user?.id}
+                    onChange={(e) => { const v = e.target.value; setLocal(p.id, "role", v); saveField(p.id, "role", v); }}
+                    className="h-9"
+                  >
+                    <option value="employee">{t("manager.employee")}</option>
+                    <option value="manager">{t("manager.roleLabel")}</option>
+                    <option value="admin">{t("manager.adminLabel")}</option>
+                    <option value="owner">{t("manager.bossLabel")}</option>
+                  </Select>
                 </Field>
               </div>
             )}

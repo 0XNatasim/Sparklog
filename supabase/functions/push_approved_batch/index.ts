@@ -101,7 +101,7 @@ serve(async (req) => {
       .select("role, full_name")
       .eq("id", approverId)
       .maybeSingle();
-    if (!approverProfile || !["manager", "admin"].includes(approverProfile.role)) {
+    if (!approverProfile || !["manager", "admin", "owner"].includes(approverProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
     const approved_by_value =

@@ -1,13 +1,28 @@
-// Role helpers. Roles are stored lowercase: 'employee', 'manager', 'admin'.
+// Role helpers. Roles are stored lowercase: 'employee', 'manager', 'admin', 'owner'.
 //
-// `admin` (the administration / office role) is a manager-tier account: it reaches
-// every manager screen, so the UI treats it like a manager everywhere EXCEPT
-// sensitive-data (NAS/SIN) surfaces, which stay gated by isPrivileged() on explicit
-// user ids (see src/lib/boss.js). The admin is never privileged, so those surfaces are
-// hidden for them automatically and RLS blocks the underlying reads.
+// Tiers:
+//   employee — the crew
+//   manager  — full dashboard
+//   admin    — administration/office: manager-tier access, non-CCQ pay, but NEVER NAS/SIN
+//   owner    — the company owner: manager-tier AND privileged (NAS/SIN reveal, role
+//              assignment, the crown). Replaces the old hardcoded boss/dev ids so a fork
+//              only has to mark one account `owner` in the DB — no source edit.
+//
+// Privilege is role-based (owner), matching is_privileged() in the database. These take a
+// role string, not a user id, so nothing here is tied to a specific deployment.
 
-// True when the role has manager-level access (manager or admin). Use this anywhere a
+// True for the company owner — the privileged tier (sensitive data, role assignment).
+export function isOwnerRole(role) {
+  return role === "owner";
+}
+
+// True when the role has manager-level access (manager, admin or owner). Use anywhere a
 // screen or action was previously gated on `role === "manager"`.
 export function isManagerRole(role) {
-  return role === "manager" || role === "admin";
+  return role === "manager" || role === "admin" || role === "owner";
+}
+
+// True when the role may see sensitive data (NAS/SIN) and assign roles. Owner only.
+export function isPrivileged(role) {
+  return isOwnerRole(role);
 }

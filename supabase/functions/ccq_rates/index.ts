@@ -73,7 +73,7 @@ serve(async (req) => {
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    if (!profile || !["manager", "admin"].includes(profile.role)) {
+    if (!profile || !["manager", "admin", "owner"].includes(profile.role)) {
       return json({ ok: false, error: "Forbidden: manager only" }, 403);
     }
 
