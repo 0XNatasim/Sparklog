@@ -110,7 +110,7 @@ serve(async (req) => {
     // admin client for DB reads/writes
     const admin = createClient(supabaseUrl, serviceRole);
 
-    // ✅ Enforce manager role (only manager can export)
+    // ✅ Enforce manager-tier role (manager or admin can export)
     const { data: approverProfile, error: approverProfErr } = await admin
       .from("profiles")
       .select("role, full_name")
@@ -120,7 +120,7 @@ serve(async (req) => {
     if (approverProfErr) {
       return json({ ok: false, error: approverProfErr.message }, 500);
     }
-    if (!approverProfile || approverProfile.role !== "manager") {
+    if (!approverProfile || !["manager", "admin"].includes(approverProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
 
@@ -156,7 +156,7 @@ serve(async (req) => {
     const [{ data: prof }, userAuthRes] = await Promise.all([
       admin
         .from("profiles")
-        .select("full_name, phone")
+        .select("full_name, phone, role")
         .eq("id", job.user_id)
         .maybeSingle(),
       admin.auth.admin.getUserById(job.user_id),
@@ -188,6 +188,9 @@ serve(async (req) => {
       employee_name,
       employee_email,
       employee_phone,
+      // Pay basis for the Apps Script sheet: 'admin' (administration/office) staff are
+      // paid a flat hourly rate, NOT on the CCQ wage grid. Everyone else is 'ccq'.
+      employee_pay_basis: prof?.role === "admin" ? "flat_hourly" : "ccq",
       approved_at: approved_at_label,
       approved_by: approved_by_value,
     };

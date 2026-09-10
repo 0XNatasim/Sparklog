@@ -248,7 +248,7 @@ serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceRole);
     const { data: senderProfile } = await admin
       .from("profiles").select("role, full_name").eq("id", senderId).maybeSingle();
-    if (!senderProfile || senderProfile.role !== "manager") {
+    if (!senderProfile || !["manager", "admin"].includes(senderProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
 

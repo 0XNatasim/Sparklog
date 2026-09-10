@@ -5,6 +5,7 @@ import headerDark from "../../public/header-dark.jpg";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { isManagerRole } from "@/lib/roles";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ export default function Login() {
 
   React.useEffect(() => {
     if (user) {
-      if (role === "manager") navigate("/manager", { replace: true });
+      if (isManagerRole(role)) navigate("/manager", { replace: true });
       else navigate("/", { replace: true });
     }
   }, [user, role, navigate]);

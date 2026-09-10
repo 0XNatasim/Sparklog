@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, Wrench, X } from "lucide-react";
+import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, Wrench, X } from "lucide-react";
 import dayjs from "dayjs";
 import { isBoss, isDev, isPrivileged } from "@/lib/boss";
+import { isManagerRole } from "@/lib/roles";
 import NasField from "./NasField";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -261,7 +262,9 @@ export default function EmployeesPanel() {
                   ? <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.bossLabel")} />
                   : isDev(p.id)
                     ? <Wrench className="h-4 w-4 shrink-0 text-sky-500" aria-label={t("manager.devLabel")} />
-                    : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
+                    : p.role === "admin"
+                      ? <Briefcase className="h-4 w-4 shrink-0 text-violet-500" aria-label={t("manager.adminLabel")} />
+                      : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
@@ -515,7 +518,7 @@ export default function EmployeesPanel() {
               </div>
             </details>
 
-            {p.is_paused && p.role !== "manager" && p.id !== user?.id && (
+            {p.is_paused && !isManagerRole(p.role) && p.id !== user?.id && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-destructive dark:text-red-300">{t("employees.deleteUser")}</span>

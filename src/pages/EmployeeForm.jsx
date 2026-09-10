@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
+import { isManagerRole } from "@/lib/roles";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
@@ -118,7 +119,7 @@ function validateOvertimeSmsText(text) {
 
 export default function EmployeeForm() {
   const { user, role } = useAuth();
-  const isManager = String(role || "").toLowerCase() === "manager";
+  const isManager = isManagerRole(String(role || "").toLowerCase());
   const { isViewMode, viewedEmployee } = useViewMode();
   const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const navigate = useNavigate();

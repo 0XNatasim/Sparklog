@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 
 export default function ProtectedRoute({ children, requireRole }) {
@@ -31,7 +32,7 @@ export default function ProtectedRoute({ children, requireRole }) {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  if (isPaused && role !== "manager") {
+  if (isPaused && !isManagerRole(role)) {
     return (
       <div className="grid min-h-screen place-items-center bg-background p-6 text-foreground">
         <div className="max-w-md space-y-4 text-center">
@@ -43,7 +44,9 @@ export default function ProtectedRoute({ children, requireRole }) {
     );
   }
 
-  if (requireRole && role !== requireRole) return <Navigate to="/" replace />;
+  // A "manager" requirement is satisfied by any manager-tier role (manager or admin).
+  const meetsRole = requireRole === "manager" ? isManagerRole(role) : role === requireRole;
+  if (requireRole && !meetsRole) return <Navigate to="/" replace />;
 
   return children;
 }

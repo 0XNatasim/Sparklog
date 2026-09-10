@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { useT } from "@/lib/use-t";
+import { isManagerRole } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
@@ -37,7 +38,7 @@ export default function RegionOnboarding() {
         setRegion(data?.work_region || "");
         setAssociation(data?.union_association || "");
         setProfile(data);
-        const isManager = role === "manager";
+        const isManager = isManagerRole(role);
         // Region and union are employee fields; managers only get the CCQ step.
         if (!isManager && !data?.work_region) {
           setStep("region");

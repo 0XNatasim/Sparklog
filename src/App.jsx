@@ -12,15 +12,16 @@ import ManagerDashboard from "./pages/ManagerDashboard";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
+import { isManagerRole } from "@/lib/roles";
 import InstallPrompt from "@/components/InstallPrompt";
 
-// Landing route: managers start on the Manager dashboard, employees on the form.
+// Landing route: managers (and admins) start on the Manager dashboard, employees on the form.
 function RoleLanding() {
   const { role } = useAuth();
   // Role loads just after `loading` clears; wait for it so a manager is not
   // sent to /form before their role resolves.
   if (!role) return null;
-  return <Navigate to={role === "manager" ? "/manager" : "/form"} replace />;
+  return <Navigate to={isManagerRole(role) ? "/manager" : "/form"} replace />;
 }
 
 export default function App() {

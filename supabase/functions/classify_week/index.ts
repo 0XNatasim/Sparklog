@@ -53,7 +53,7 @@ serve(async (req) => {
     const { data: prof, error: profErr } = await admin
       .from("profiles").select("role").eq("id", callerRes.user.id).maybeSingle();
     if (profErr) return json({ ok: false, error: profErr.message }, 500);
-    if (!prof || prof.role !== "manager") return json({ ok: false, error: "Forbidden: manager role required" }, 403);
+    if (!prof || !["manager", "admin"].includes(prof.role)) return json({ ok: false, error: "Forbidden: manager role required" }, 403);
 
     let q = admin
       .from("jobs")
