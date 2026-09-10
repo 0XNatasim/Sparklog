@@ -176,7 +176,7 @@ serve(async (req) => {
     const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone, role")
+      .select("id, full_name, phone, role, hourly_rate")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -211,6 +211,9 @@ serve(async (req) => {
         // paid a flat hourly rate, NOT on the CCQ wage grid, so the sheet must apply flat
         // pay (no CCQ premiums/overtime rules) for these rows. Everyone else is 'ccq'.
         employee_pay_basis: prof?.role === "admin" ? "flat_hourly" : "ccq",
+        // Flat hourly rate for administration ('admin') staff — the sheet multiplies paid
+        // hours by this for their pay. Empty for CCQ employees (the sheet uses the CCQ grid).
+        employee_hourly_rate: prof?.role === "admin" ? (prof?.hourly_rate ?? "") : "",
         approved_at: approved_at_label,
         approved_by: approved_by_value,
       };
