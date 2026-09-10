@@ -156,7 +156,7 @@ serve(async (req) => {
     const [{ data: prof }, userAuthRes] = await Promise.all([
       admin
         .from("profiles")
-        .select("full_name, phone, role")
+        .select("full_name, phone, role, hourly_rate")
         .eq("id", job.user_id)
         .maybeSingle(),
       admin.auth.admin.getUserById(job.user_id),
@@ -191,6 +191,9 @@ serve(async (req) => {
       // Pay basis for the Apps Script sheet: 'admin' (administration/office) staff are
       // paid a flat hourly rate, NOT on the CCQ wage grid. Everyone else is 'ccq'.
       employee_pay_basis: prof?.role === "admin" ? "flat_hourly" : "ccq",
+      // Flat hourly rate for administration ('admin') staff — the sheet multiplies paid
+      // hours by this for their pay. Empty for CCQ employees (the sheet uses the CCQ grid).
+      employee_hourly_rate: prof?.role === "admin" ? (prof?.hourly_rate ?? "") : "",
       approved_at: approved_at_label,
       approved_by: approved_by_value,
     };
