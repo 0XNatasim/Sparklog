@@ -45,9 +45,26 @@ Notes from the calendar:
 ## Monthly report period (Période de rapport mensuel)
 
 Each month carries a highlighted **monthly reporting period** (employer monthly
-report to the CCQ). The exact highlighted days per month are shown as shaded
-cells in the PDF grid and are not reproduced here — read them from
-[`ccq-industry-calendar-2026.pdf`](./ccq-industry-calendar-2026.pdf).
+report to the CCQ). **Rule: the period always ends on the last Saturday of the
+month.** This matches the app's payroll week, which also ends on Saturday
+(`payrollWeekKey` in `src/lib/payroll-calculations.js`).
+
+End date (last Saturday) for each month of 2026:
+
+| Month | Period ends |
+|---|---|
+| January (janvier) | Sat 31 Jan 2026 |
+| February (février) | Sat 28 Feb 2026 |
+| March (mars) | Sat 28 Mar 2026 |
+| April (avril) | Sat 25 Apr 2026 |
+| May (mai) | Sat 30 May 2026 |
+| June (juin) | Sat 27 Jun 2026 |
+| July (juillet) | Sat 25 Jul 2026 |
+| August (août) | Sat 29 Aug 2026 |
+| September (septembre) | Sat 26 Sep 2026 |
+| October (octobre) | Sat 31 Oct 2026 |
+| November (novembre) | Sat 28 Nov 2026 |
+| December (décembre) | Sat 26 Dec 2026 |
 
 ---
 
