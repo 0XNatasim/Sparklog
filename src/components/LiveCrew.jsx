@@ -113,7 +113,7 @@ export default function LiveCrew() {
                       <div key={job.id} className={cn("flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-sm", jobCodeTintClass(job.ot))}>
                         <span className="flex items-center gap-2 truncate">
                           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">{index + 1}</span>
-                          <span className="truncate">OT {job.ot || "—"}</span>
+                          <span className="truncate">{job.ot || "—"}</span>
                         </span>
                         <span className="shrink-0 font-mono font-semibold">{fmtHM(hoursBetween(
                           job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,

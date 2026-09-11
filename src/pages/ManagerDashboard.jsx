@@ -724,7 +724,7 @@ export default function ManagerDashboard() {
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
             {/* OT + date */}
             <div className="flex items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
-              <span>{t("common.otLabel")}: {j.ot} • {dayjs(j.job_date).format("DD MMM")}</span>
+              <span>{j.ot} • {dayjs(j.job_date).format("DD MMM")}</span>
               <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
             </div>
 
@@ -826,7 +826,7 @@ export default function ManagerDashboard() {
       <CardContent className="space-y-3 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 font-bold"><span>{t("common.otLabel")}: {job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</span><JobCaptureIcons job={{ ...job, overtime_evidence_captured: Boolean(evidence), parking_receipt_captured: Boolean(receipt), meal_claim_captured: hasMeal }} /></div>
+            <div className="flex items-center gap-2 font-bold"><span>{job.ot} · {dayjs(job.job_date).format("DD MMM YYYY")}</span><JobCaptureIcons job={{ ...job, overtime_evidence_captured: Boolean(evidence), parking_receipt_captured: Boolean(receipt), meal_claim_captured: hasMeal }} /></div>
             <div className="mt-1 text-sm text-muted-foreground"><span className="font-semibold text-foreground">{employeeName}</span>{employee?.phone ? <> · <a className="text-primary hover:underline" href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}>{employee.phone}</a></> : null}{employee?.email ? <> · <a className="text-primary hover:underline" href={`mailto:${employee.email}`}>{employee.email}</a></> : null}</div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

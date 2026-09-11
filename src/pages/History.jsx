@@ -286,7 +286,7 @@ export default function History() {
                         {/* Header row: OT + status */}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 text-sm font-bold">
-                            <span>{t("common.otLabel")}: {j.ot}</span>
+                            <span>{j.ot}</span>
                             <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
                           </div>
                           <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
