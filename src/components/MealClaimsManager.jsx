@@ -72,7 +72,7 @@ export default function MealClaimsManager() {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2 font-bold">
-              <span>{t("common.otLabel")}: {job?.ot || "—"} · {dayjs(claim.job_date).format("DD MMM YYYY")}</span>
+              <span>{job?.ot || "—"} · {dayjs(claim.job_date).format("DD MMM YYYY")}</span>
               <JobCaptureIcons job={{ ...job, meal_claim_captured: true }} />
             </div>
             <div className="mt-1 text-sm text-muted-foreground">{person?.full_name || person?.email}</div>
