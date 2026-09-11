@@ -16,6 +16,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
+import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
@@ -973,11 +974,16 @@ export default function ManagerDashboard() {
                     {weekOptions.length === 0 ? (
                       <option value="latest">{t("manager.noSubmittedWeeks")}</option>
                     ) : (
-                      weekOptions.map((w) => (
-                        <option key={w.key} value={w.key}>
-                          {t("manager.weekShort")} {w.start.isoWeek()} • {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")} ({w.count})
-                        </option>
-                      ))
+                      weekOptions.map((w) => {
+                        // The CCQ week ends Saturday (isoWeek start is Monday, +5 = Saturday);
+                        // show which monthly report period (ends last Saturday) it rolls up to.
+                        const rp = monthlyReportPeriod(w.start.add(5, "day").format("YYYY-MM-DD"));
+                        return (
+                          <option key={w.key} value={w.key}>
+                            {t("manager.weekShort")} {w.start.isoWeek()} • {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")} ({w.count}){rp ? ` • ${t("manager.reportPeriodShort")} ${dayjs(rp.end).format("DD MMM")}` : ""}
+                          </option>
+                        );
+                      })
                     )}
                   </Select>
 
