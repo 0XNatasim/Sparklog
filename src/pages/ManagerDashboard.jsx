@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Radio, Users } from "lucide-react";
+import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Radio, TriangleAlert, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -703,9 +703,30 @@ export default function ManagerDashboard() {
     }
   }
 
+  // Days (per employee) that total more than 8h of worked time but have NO overtime
+  // authorization screenshot on any of that day's jobs. Backstop for jobs entered out
+  // of order, where the employee-side prompt can miss the crossing. Return time is not
+  // counted (it never creates overtime), matching the payroll engine.
+  const overtimeDaysMissingEvidence = useMemo(() => {
+    const totals = new Map(); // `${user_id}|${job_date}` -> { minutes, hasEvidence }
+    for (const j of jobs) {
+      const key = `${j.user_id}|${j.job_date}`;
+      const acc = totals.get(key) || { minutes: 0, hasEvidence: false };
+      acc.minutes += minutesBetween(j.depart, j.fin);
+      if (j.overtime_evidence_captured) acc.hasEvidence = true;
+      totals.set(key, acc);
+    }
+    const flagged = new Set();
+    for (const [key, v] of totals) {
+      if (v.minutes > 480 && !v.hasEvidence) flagged.add(key);
+    }
+    return flagged;
+  }, [jobs]);
+
   function renderJobCard(j) {
     const employee = profiles.get(j.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
+    const dayOvertimeNoEvidence = overtimeDaysMissingEvidence.has(`${j.user_id}|${j.job_date}`);
 
     // Worked hours from the authoritative interval calc, which wraps past
     // midnight (overnight jobs) exactly as the payroll classification does.
@@ -723,9 +744,17 @@ export default function ManagerDashboard() {
           {/* Mobile: stacked. Desktop: single-row inline list. */}
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
             {/* OT + date */}
-            <div className="flex items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
               <span>{j.ot} • {dayjs(j.job_date).format("DD MMM")}</span>
               <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+              {dayOvertimeNoEvidence && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
+                  title={t("manager.overtimeNoEvidenceHint")}
+                >
+                  <TriangleAlert className="h-3 w-3" />{t("manager.overtimeNoEvidence")}
+                </span>
+              )}
             </div>
 
             {/* Employee · phone · email — one line, no labels.

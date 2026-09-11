@@ -527,14 +527,9 @@ export default function EmployeeForm() {
   }
 
   async function requiresOvertimeEvidence(candidateReturnMinutes) {
-    // These are known locally without any network call, so they stay valid even
-    // if the day-jobs lookup below fails.
-    const startMinutes = (value) => {
-      const [h, m] = String(value || "").split(":").map(Number);
-      return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-    };
+    // Known locally without any network call, so it stays valid even if the
+    // day-jobs lookup below fails.
     const thisMinutes = Math.round(hoursDecimal * 60);
-    const thisStart = startMinutes(depart);
     try {
       // Retry (with a session refresh + backoff) so a Supabase free-tier cold
       // start doesn't fail the check on the first slow attempt.
@@ -558,14 +553,14 @@ export default function EmployeeForm() {
       // The overtime authorization is one screenshot per day. If another job
       // today already has it, don't ask again for this one.
       if (others.some((job) => job.overtime_evidence_captured)) return false;
-      // Overtime evidence is only for a job that actually contains overtime
-      // minutes — i.e. the running total up to and including THIS job (in
-      // chronological order) passes 8h. A midday job never carries overtime
-      // just because a later job pushed the day over 8h.
-      const earlierMinutes = others
-        .filter((job) => startMinutes(job.depart) < thisStart)
-        .reduce((total, job) => total + workedMinutes(job), 0);
-      return earlierMinutes + thisMinutes > 480;
+      // Require the screenshot whenever the WHOLE day (all of the employee's jobs
+      // that day, this one included) passes 8h — not just this job's chronological
+      // running total. A day split across several short jobs still needs one
+      // authorization: whichever job is being saved when the running day total
+      // crosses 8h asks for it (the once-per-day guard above prevents a second
+      // prompt, and the manager also sees an "8h+, no evidence" flag at approval
+      // as a backstop for jobs that were entered out of order).
+      return fullDayMinutes > 480;
     } catch (error) {
       // The day-jobs lookup failed (e.g. a cold-start timeout even after retries).
       // Fall back to a LOCAL-only decision using just this job's own duration, so a
