@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { formatHours } from "../lib/time";
+import { formatHM } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -731,7 +731,7 @@ export default function ManagerDashboard() {
     // Worked hours from the authoritative interval calc, which wraps past
     // midnight (overnight jobs) exactly as the payroll classification does.
     const totalHours = minutesBetween(j.depart, j.fin) / 60;
-    const totalLabel = formatHours(totalHours);
+    const totalLabel = formatHM(totalHours);
 
     const { totalKm: kmLabel } = getKilometreBreakdown(j);
 
@@ -870,12 +870,12 @@ export default function ManagerDashboard() {
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5 text-xs">
-          <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHours(totalHours)}</b></span>
+          <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHM(totalHours)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.km")}: <b>{km}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
-          {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHours(evidence.daily_minutes / 60)}</b></span> : null}
+          {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHM(evidence.daily_minutes / 60)}</b></span> : null}
           {receipt ? <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt.amount || 0).toFixed(2)}</b></span> : null}
           {hasMeal ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">{t("manager.notifications.supper")}: <b>$30.00</b></span> : null}
           {job.status === "submitted" && <Button type="button" size="sm" className="ml-auto" disabled={actionLoadingId === job.id} onClick={() => approve(job.id)}>{actionLoadingId === job.id ? t("common.working") : t("manager.notifications.approveJob")}</Button>}
