@@ -14,7 +14,8 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
-import { withRetry } from "@/lib/utils";
+import { cn, withRetry } from "@/lib/utils";
+import { jobCodeTintClass } from "@/lib/job-code";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
 import TimeRulesManager from "@/components/TimeRulesManager";
@@ -697,7 +698,7 @@ export default function ManagerDashboard() {
     const canApprove = j.status === "submitted";
 
     return (
-      <Card key={j.id} id={`job-${j.id}`} className={focusedJobId === j.id ? "ring-2 ring-red-500" : ""}>
+      <Card key={j.id} id={`job-${j.id}`} className={cn(jobCodeTintClass(j.ot), focusedJobId === j.id && "ring-2 ring-red-500")}>
         <CardContent className="p-3">
           {/* Mobile: stacked. Desktop: single-row inline list. */}
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
