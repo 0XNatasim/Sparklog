@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { hoursBetween } from "@/lib/time";
+import { hoursBetween, formatHM } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
 import { useT } from "@/lib/use-t";
@@ -17,10 +17,7 @@ function montrealDate() {
   }).format(new Date());
 }
 
-function fmtHM(decimalHours) {
-  const minutes = Math.max(0, Math.round((decimalHours || 0) * 60));
-  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;
-}
+const fmtHM = formatHM;
 
 export default function LiveCrew() {
   const t = useT();

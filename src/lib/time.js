@@ -29,3 +29,10 @@ export function formatHours(hours) {
   if (!hours || hours <= 0) return "0.00";
   return hours.toFixed(2);
 }
+
+// Duration in wall-clock style, e.g. 3.55h -> "3h33". Clearer than decimal hours
+// for a worked-time total (matches the Live Crew view).
+export function formatHM(hours) {
+  const minutes = Math.max(0, Math.round((hours || 0) * 60));
+  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;
+}
