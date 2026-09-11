@@ -41,9 +41,17 @@ function fmtTimeHHmm(t) {
   return String(t).slice(0, 5);
 }
 
+// CCQ week: Sunday → Saturday, keyed by the Saturday that ends it (matches the CCQ
+// calendar and the payroll engine's Saturday week-ending). `start` is the Sunday,
+// `end` the Saturday, `key` the Saturday as YYYY-MM-DD.
+function ccqWeek(dateStr) {
+  const d = dayjs(dateStr);
+  const end = d.add((6 - d.day() + 7) % 7, "day"); // advance to this week's Saturday
+  const start = end.subtract(6, "day");            // Sunday
+  return { key: end.format("YYYY-MM-DD"), start, end };
+}
 function weekKeyFromDate(dateStr) {
-  const ws = dayjs(dateStr).startOf("isoWeek");
-  return ws.format("YYYY-[W]WW");
+  return ccqWeek(dateStr).key;
 }
 
 export default function ManagerDashboard() {
@@ -521,15 +529,25 @@ export default function ManagerDashboard() {
     if (!split) return [];
     const m = new Map();
     for (const j of split.submitted) {
-      const ws = dayjs(j.job_date).startOf("isoWeek");
-      const key = ws.format("YYYY-[W]WW");
-      if (!m.has(key)) {
-        m.set(key, { key, start: ws, end: ws.endOf("isoWeek"), count: 0 });
-      }
-      m.get(key).count += 1;
+      const wk = ccqWeek(j.job_date);
+      if (!m.has(wk.key)) m.set(wk.key, { ...wk, count: 0 });
+      m.get(wk.key).count += 1;
     }
-    return Array.from(m.values()).sort((a, b) => (b.start.isAfter(a.start) ? 1 : -1));
+    return Array.from(m.values()).sort((a, b) => (b.end.isAfter(a.end) ? 1 : -1));
   }, [split]);
+
+  // Group the CCQ weeks under their monthly report period (each ends on the last
+  // Saturday of a month), newest period first — laid out like the CCQ calendar.
+  const weekGroups = useMemo(() => {
+    const groups = new Map();
+    for (const w of weekOptions) {
+      const rp = monthlyReportPeriod(w.key);
+      const pk = rp ? rp.end : w.key;
+      if (!groups.has(pk)) groups.set(pk, { periodEnd: pk, weeks: [] });
+      groups.get(pk).weeks.push(w);
+    }
+    return Array.from(groups.values()).sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1));
+  }, [weekOptions]);
 
   useEffect(() => {
     if (!selectedEmployee || weekOptions.length === 0) {
@@ -635,10 +653,11 @@ export default function ManagerDashboard() {
     const list = submittedForSelectedWeek;
     if (!list || list.length === 0) return;
 
+    const wk = ccqWeek(list[0].job_date);
     const label =
       selectedWeekKey === "latest"
         ? t("manager.confirm.selectedPeriod")
-        : `${t("manager.weekShort")} ${dayjs(list[0].job_date).isoWeek()} (${dayjs(list[0].job_date).startOf("isoWeek").format("DD MMM")} → ${dayjs(list[0].job_date).startOf("isoWeek").endOf("isoWeek").format("DD MMM YYYY")})`;
+        : `${t("manager.weekShort")} ${wk.start.format("DD MMM")} → ${wk.end.format("DD MMM YYYY")}`;
 
     const ok = window.confirm(t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length }));
     if (!ok) return;
@@ -974,16 +993,17 @@ export default function ManagerDashboard() {
                     {weekOptions.length === 0 ? (
                       <option value="latest">{t("manager.noSubmittedWeeks")}</option>
                     ) : (
-                      weekOptions.map((w) => {
-                        // The CCQ week ends Saturday (isoWeek start is Monday, +5 = Saturday);
-                        // show which monthly report period (ends last Saturday) it rolls up to.
-                        const rp = monthlyReportPeriod(w.start.add(5, "day").format("YYYY-MM-DD"));
-                        return (
-                          <option key={w.key} value={w.key}>
-                            {t("manager.weekShort")} {w.start.isoWeek()} • {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")} ({w.count}){rp ? ` • ${t("manager.reportPeriodShort")} ${dayjs(rp.end).format("DD MMM")}` : ""}
-                          </option>
-                        );
-                      })
+                      // Weeks (Sun → Sat) grouped under their monthly CCQ report period,
+                      // like the CCQ calendar.
+                      weekGroups.map((g) => (
+                        <optgroup key={g.periodEnd} label={`${t("manager.reportPeriodShort")} ${dayjs(g.periodEnd).format("DD MMM YYYY")}`}>
+                          {g.weeks.map((w) => (
+                            <option key={w.key} value={w.key}>
+                              {t("manager.weekShort")} {w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")} ({w.count})
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))
                     )}
                   </Select>
 
