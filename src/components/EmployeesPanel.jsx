@@ -25,6 +25,11 @@ const LEVELS = [
   { value: "apprenti_1", label: "Apprenti 1" },
 ];
 
+// Ordering of the employees list: owner first, then administration, then managers,
+// then employees. Within each group the list stays alphabetical (paused sink last).
+const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3 };
+const roleRank = (role) => (role in ROLE_ORDER ? ROLE_ORDER[role] : 4);
+
 export default function EmployeesPanel() {
   const t = useT();
   const { user, role } = useAuth();
@@ -81,8 +86,15 @@ export default function EmployeesPanel() {
       });
       setRates(nextRates);
       setAnnexes(nextAnnexes);
-      // Keep the DB's name order, but push inactive (paused) employees to the bottom.
-      const nextProfiles = [...(data ?? [])].sort((a, b) => (a.is_paused ? 1 : 0) - (b.is_paused ? 1 : 0));
+      // Group by role (owner → admin → manager → employee), keep alphabetical order
+      // within each group, and push inactive (paused) accounts to the bottom of their group.
+      const nextProfiles = [...(data ?? [])].sort((a, b) => {
+        const byRole = roleRank(a.role) - roleRank(b.role);
+        if (byRole !== 0) return byRole;
+        const byPaused = (a.is_paused ? 1 : 0) - (b.is_paused ? 1 : 0);
+        if (byPaused !== 0) return byPaused;
+        return (a.full_name || a.email || "").localeCompare(b.full_name || b.email || "", undefined, { sensitivity: "base" });
+      });
       setProfiles(nextProfiles);
       // NAS lives in the restricted vault; only privileged users can see who has one.
       // Fetch presence only (not the value) — the value is revealed on demand + audited.
