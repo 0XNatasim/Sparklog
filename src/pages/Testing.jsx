@@ -9,6 +9,7 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
 import CostingDashboard from "@/components/CostingDashboard";
+import WeeklySummary from "@/components/WeeklySummary";
 import ElectricianCostSheet from "@/components/ElectricianCostSheet";
 import AuditLog from "@/components/AuditLog";
 
@@ -394,7 +395,7 @@ export default function Testing() {
       {section === "costing" && <CostingDashboard />}
       {section === "downloads" && <ManagerDownloads />}
       {section === "ccq" && <CcqRatesPanel />}
-      {section === "week" && <ComingSoon label={t("testing.tabs.week")} />}
+      {section === "week" && <WeeklySummary />}
       {section === "month" && <ComingSoon label={t("testing.tabs.month")} />}
       {section === "audit" && <AuditLog />}
     </div>
