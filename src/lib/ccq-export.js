@@ -48,7 +48,6 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
         _regularWorkMinutes: 0,
         _sup50Minutes: 0,
         _sup100Minutes: 0,
-        _entryIds: [],
       });
     }
 
@@ -67,7 +66,6 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     record._regularMinutes += regularWork + entry.returnRegularMinutes;
     record._sup50Minutes += sup50;
     record._sup100Minutes += sup100;
-    record._entryIds.push(job.id);
   }
 
   return [...groups.values()].map((record) => {
@@ -75,12 +73,10 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     record.heuresSup50 = roundHours(record._sup50Minutes);
     record.heuresSup100 = roundHours(record._sup100Minutes);
     record.heuresTotal = roundHours(record._regularMinutes + record._sup50Minutes + record._sup100Minutes);
-    record.sourceEntryIds = record._entryIds;
     delete record._regularMinutes;
     delete record._regularWorkMinutes;
     delete record._sup50Minutes;
     delete record._sup100Minutes;
-    delete record._entryIds;
     return record;
   });
 }
