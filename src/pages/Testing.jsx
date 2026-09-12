@@ -9,7 +9,7 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
 import CostingDashboard from "@/components/CostingDashboard";
-import WeeklySummary from "@/components/WeeklySummary";
+import PeriodSummary from "@/components/PeriodSummary";
 import ElectricianCostSheet from "@/components/ElectricianCostSheet";
 import AuditLog from "@/components/AuditLog";
 
@@ -350,17 +350,6 @@ function CcqRatesPanel() {
   );
 }
 
-// ─── Placeholder panel for upcoming views ─────────────────────────────────────
-function ComingSoon({ label }) {
-  return (
-    <Card>
-      <CardContent className="p-8 text-sm text-muted-foreground text-center">
-        {label} — bientôt disponible.
-      </CardContent>
-    </Card>
-  );
-}
-
 // ─── Page with card sub-navigation ────────────────────────────────────────────
 export default function Testing() {
   const t = useT();
@@ -395,8 +384,8 @@ export default function Testing() {
       {section === "costing" && <CostingDashboard />}
       {section === "downloads" && <ManagerDownloads />}
       {section === "ccq" && <CcqRatesPanel />}
-      {section === "week" && <WeeklySummary />}
-      {section === "month" && <ComingSoon label={t("testing.tabs.month")} />}
+      {section === "week" && <PeriodSummary mode="week" />}
+      {section === "month" && <PeriodSummary mode="month" />}
       {section === "audit" && <AuditLog />}
     </div>
   );
