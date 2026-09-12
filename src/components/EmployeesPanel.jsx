@@ -314,7 +314,9 @@ export default function EmployeesPanel() {
                     className="h-9"
                   >
                     <option value="employee">{t("manager.employee")}</option>
-                    <option value="manager">{t("manager.roleLabel")}</option>
+                    {/* `manager` is hidden from the picker (owner + admin + employee cover this
+                        deployment); still shown if a profile already has it, so it isn't lost. */}
+                    {p.role === "manager" && <option value="manager">{t("manager.roleLabel")}</option>}
                     <option value="admin">{t("manager.adminLabel")}</option>
                     <option value="owner">{t("manager.bossLabel")}</option>
                   </Select>
