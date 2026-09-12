@@ -5,6 +5,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { calculatePayrollEntries, calculateCongesIndemnity } from "@/lib/payroll-calculations";
 import { jobCodeKind } from "@/lib/job-code";
+import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import { formatHM } from "@/lib/time";
 import { useT } from "@/lib/use-t";
 
@@ -28,22 +29,33 @@ function ccqWeek(dateStr) {
   return { key: end.format("YYYY-MM-DD"), end, start: end.subtract(6, "day") };
 }
 
+// The period a job date belongs to: a CCQ week, or a monthly report period
+// (ends the last Saturday of the month). Returns dayjs start/end + a string key.
+function periodFor(mode, dateStr) {
+  if (mode === "month") {
+    const p = monthlyReportPeriod(dateStr);
+    return { key: p.key, start: dayjs(p.start), end: dayjs(p.end) };
+  }
+  return ccqWeek(dateStr);
+}
+
 function montrealToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
-const WEEKS_BACK = 8;
-
-export default function WeeklySummary() {
+// Summary cards for the Testing "Week" and "Month" tabs. `mode` = "week" | "month".
+export default function PeriodSummary({ mode = "week" }) {
   const t = useT();
-  const [weeks, setWeeks] = useState([]);
+  const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const range = useMemo(() => {
     const end = montrealToday();
-    const start = dayjs(end).subtract(WEEKS_BACK, "week").startOf("isoWeek").format("YYYY-MM-DD");
+    const start = mode === "month"
+      ? dayjs(end).subtract(6, "month").startOf("month").format("YYYY-MM-DD")
+      : dayjs(end).subtract(8, "week").startOf("isoWeek").format("YYYY-MM-DD");
     return { start, end };
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,26 +74,18 @@ export default function WeeklySummary() {
       const contributions = contribRows || [];
       const profileById = new Map((people || []).map((p) => [p.id, p]));
 
-      // Bucket everything by CCQ week key.
       const buckets = new Map();
-      const bucket = (key, meta) => {
-        if (!buckets.has(key)) buckets.set(key, { ...meta, jobs: [], meals: 0, parking: 0 });
-        return buckets.get(key);
+      const bucket = (dateStr) => {
+        const p = periodFor(mode, dateStr);
+        if (!buckets.has(p.key)) buckets.set(p.key, { ...p, jobs: [], meals: 0, parking: 0 });
+        return buckets.get(p.key);
       };
-      (jobs || []).forEach((j) => {
-        const w = ccqWeek(j.job_date);
-        bucket(w.key, w).jobs.push(j);
-      });
+      (jobs || []).forEach((j) => bucket(j.job_date).jobs.push(j));
       (meals || []).forEach((m) => {
-        const w = ccqWeek(m.job_date);
         const prof = profileById.get(m.user_id);
-        // Meals are the CCQ supper allowance — not an admin advantage.
-        if (prof?.role !== "admin") bucket(w.key, w).meals += Number(m.amount) || 0;
+        if (prof?.role !== "admin") bucket(m.job_date).meals += Number(m.amount) || 0; // meals = CCQ supper, not for admin
       });
-      (parking || []).forEach((p) => {
-        const w = ccqWeek(p.job_date);
-        bucket(w.key, w).parking += Number(p.amount) || 0;
-      });
+      (parking || []).forEach((p) => { bucket(p.job_date).parking += Number(p.amount) || 0; });
 
       const result = [];
       for (const b of buckets.values()) {
@@ -100,8 +104,7 @@ export default function WeeklySummary() {
           const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
           let empLabor = 0, empPaidMin = 0;
-          const entries = calculatePayrollEntries(ujobs);
-          entries.forEach((e) => {
+          calculatePayrollEntries(ujobs).forEach((e) => {
             workedMin += e.regularWorkMinutes + e.overtimeWorkMinutes;
             empPaidMin += e.regularWorkMinutes + e.returnRegularMinutes + e.overtime50Minutes + e.overtime100Minutes;
             if (e.overtimeWorkMinutes > 0) otJobs += 1;
@@ -120,9 +123,10 @@ export default function WeeklySummary() {
         }
 
         const expenses = kmCost + b.meals + b.parking;
+        const title = mode === "month" ? b.end.format("MMMM YYYY") : `${t("manager.weekShort")} ${b.end.isoWeek()}`;
         result.push({
           key: b.key,
-          weekNo: b.end.isoWeek(),
+          title,
           start: b.start,
           end: b.end,
           activeEmployees: byUser.size,
@@ -138,24 +142,24 @@ export default function WeeklySummary() {
         });
       }
       result.sort((a, b) => (a.key < b.key ? 1 : -1));
-      setWeeks(result);
+      setPeriods(result);
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [range]);
+  }, [range, mode, t]);
 
-  if (!loading && weeks.length === 0) {
-    return <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">{t("testing.week.empty")}</CardContent></Card>;
+  if (!loading && periods.length === 0) {
+    return <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">{t(mode === "month" ? "testing.month.empty" : "testing.week.empty")}</CardContent></Card>;
   }
 
   return (
     <div className="space-y-3">
       <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{t("costing.reviewNotice")}</p>
-      {weeks.map((w) => (
+      {periods.map((w) => (
         <Card key={w.key}>
           <CardContent className="p-4">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-              <div className="font-semibold">{t("manager.weekShort")} {w.weekNo}</div>
+              <div className="font-semibold">{w.title}</div>
               <div className="text-sm text-muted-foreground">{w.start.format("DD MMM")} → {w.end.format("DD MMM YYYY")}</div>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -8,9 +8,9 @@ export default function ManagerDownloads() {
   const t = useT();
   const [section, setSection] = useState("ccq");
   const cards = [
-    { id: "bank", icon: Banknote, title: t("downloads.bank"), description: t("downloads.bankDescription") },
-    { id: "das", icon: Building2, title: t("downloads.das"), description: t("downloads.dasDescription") },
     { id: "ccq", icon: FileJson, title: t("downloads.ccq"), description: t("downloads.ccqDescription") },
+    { id: "das", icon: Building2, title: t("downloads.das"), description: t("downloads.dasDescription") },
+    { id: "bank", icon: Banknote, title: t("downloads.bank"), description: t("downloads.bankDescription") },
   ];
   return (
     <div className="space-y-3">
