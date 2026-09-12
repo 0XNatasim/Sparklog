@@ -112,7 +112,9 @@ export default function CostingDashboard() {
           ? contributions.map((c) => ({ code: c.code, label: c.label, amount: (Number(c[rateKey]) || 0) * paidHours })).filter((l) => l.amount !== 0)
           : [];
         const contribTotal = contribLines.reduce((s, l) => s + l.amount, 0);
-        const mealsCost = mealByUser.get(userId) || 0;
+        // Meals are the CCQ supper allowance — a CCQ advantage, so not for admin staff.
+        // km and parking are actual expense reimbursements and still apply.
+        const mealsCost = isNonCcq ? 0 : (mealByUser.get(userId) || 0);
         const parkingCost = parkingByUser.get(userId) || 0;
 
         result.push({
