@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown, Coins } from "lucide-react";
+import { ChevronDown, Coins, ExternalLink } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,17 @@ export default function EmployerContributionsManager() {
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
           </summary>
           <div className="border-t p-4">
-            <p className="mb-3 text-xs text-muted-foreground">{t("costing.contrib.description")}</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              {t("costing.contrib.description")}{" "}
+              <a
+                href="https://www.acq.org/wp-content/uploads/2026/04/grilles-taux-ici.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-0.5 text-primary hover:underline"
+              >
+                {t("costing.contrib.sourceLink")}<ExternalLink className="h-3 w-3" />
+              </a>
+            </p>
             {err && <div className="mb-2 text-xs text-destructive dark:text-red-300">{err}</div>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-sm">
