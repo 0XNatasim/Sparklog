@@ -2,6 +2,19 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
+## Roles
+
+Roles are stored lowercase in `profiles.role`:
+
+| Role | Access |
+|---|---|
+| `employee` | Records and submits their own jobs; sees only their own data. |
+| `manager` | Full manager workspace: review, approve, export, employee settings, costing. |
+| `admin` | Administration/office staff. Manager-tier access to every screen **except** NAS/SIN, but **non-CCQ**: paid a flat hourly rate, and excluded from CCQ advantages (no leave indemnity, employer contributions, or meal allowance in costing). |
+| `owner` | The company owner — manager-tier **and** privileged (NAS/SIN reveal, role assignment, crown). Replaces the former hard-coded owner/dev accounts, so a fork just marks one account `owner`. |
+
+`get_my_role()` collapses `admin` and `owner` to `manager` for authorization; the raw role drives labels, pay basis, and privilege. Only an **owner** can assign roles (enforced by a DB trigger and an owner-only picker in Manager → Employees).
+
 ## Current capabilities
 
 ### Employees
@@ -22,11 +35,11 @@ The Manager workspace has six sections:
 | Section | Purpose |
 |---|---|
 | **Live crew** | See who is working today. |
-| **Time-sheet** | Review submitted jobs, filter by employee / status / day, unlock entries, and approve jobs individually or a full week before Google Sheets export. |
+| **Time-sheet** | Review submitted jobs, filter by employee / status / day, unlock entries, and approve jobs individually or a full week before Google Sheets export. Weeks run Sunday→Saturday (matching the payroll engine) and are grouped under their CCQ monthly report period (which ends on the last Saturday of the month). Job cards are tinted by code prefix (AD… = administration, JOB… = project) and flagged when a day exceeds 8 h with no overtime screenshot. |
 | **Notifications** | Review overtime authorizations, supper claims, and parking receipts in one place. |
-| **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, set day/week time off, manage company holidays, and pause accounts (or delete already-inactive ones) without losing history. |
+| **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, set day/week time off, manage company holidays, and pause accounts (or delete already-inactive ones) without losing history. The list is grouped by role (owner → admin → manager → employee, alphabetical within each). Owners can assign roles here; `admin` staff show a flat-hourly pay field instead of CCQ metadata. |
 | **Forms** | Open company forms and control which forms employees can see. |
-| **Testing** | Tools and previews: the costing dashboard (including the CCQ leave indemnity), the CCQ JSON export/download, and the sensitive-actions audit log. |
+| **Testing** | Tools and previews: the costing dashboard (full employer cost — see below), the CCQ JSON export/download, the CCQ rate / ACQ employer-cost tables, and the sensitive-actions audit log. |
 
 Managers can also broadcast announcements, synchronize CCQ rates, view the app as any employee, and force a manual refresh from the header (useful in installed PWA/App mode).
 
@@ -155,13 +168,17 @@ migration `0018_paused_employee_write_containment.sql` additionally blocks **all
 employee writes while an account is paused and replaces the profile-field blacklist with
 an explicit employee-editable whitelist. Migrations are written to be safe to re-run.
 
-After migrations, set the first manager manually:
+After migrations, set the first **owner** manually (the owner is the privileged tier and
+the only role that can assign other roles, so bootstrap it directly in SQL):
 
 ```sql
 update public.profiles
-set role = 'manager'
-where email = 'manager@example.com';
+set role = 'owner'
+where email = 'owner@example.com';
 ```
+
+Use `role = 'manager'` for additional supervisors, `role = 'admin'` for non-CCQ
+administration staff. Once an owner exists, roles can be assigned from Manager → Employees.
 
 ## Private evidence storage
 
@@ -258,6 +275,15 @@ Rules are recorded as data in the `public.payroll_rules` table and documented in
   vacation + 5.5 % statutory holidays + 1.5 % sick) — is paid by the employer *on top of*
   wages and shown as an employer cost in the costing dashboard; it is **not** deducted
   from the worker.
+- **Costing = real employer cost (estimate).** The costing dashboard reports actual wages
+  (using the rate **frozen on each job at submission**, so a later rate change never
+  rewrites past costs) + the 13 % indemnity + **employer contributions** + km/meals/parking,
+  with a foldable per-row breakdown. Employer contributions are per-hour amounts **by CCQ
+  level** (EI, RQAP, RRQ, F.S.S., avantages sociaux, taxe assurances, CCQ, AECQ+ACQ, fonds
+  divers, équipement, autres, CNESST), seeded from the ACQ grid and editable by a manager
+  in the settings panel above the table (`employer_contributions`). It stays a labeled
+  estimate (statutory annual maximums are not modelled). `admin` (non-CCQ) staff are costed
+  at wages + km/parking only — no indemnity, contributions, or meal allowance.
 - Job kilometres from image autofill or manual entry are the **total shown on the work order**. If an employee records a return to storage, the return kilometres are subtracted from that total to produce the client leg; they are never added a second time.
 - Return-to-storage time is always regular-rate paid time. It never creates overtime, including when the workday is already longer than eight hours.
 - A weekday supper claim becomes available at exactly 2 h 15 of overtime. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
@@ -323,7 +349,7 @@ tree):
 - Keep overtime and parking buckets private.
 - Preserve RLS policies and manager-only profile-setting triggers.
 - Pausing an account blocks employee access without deleting historical jobs or evidence.
-- **NAS/SIN is vaulted.** It lives in `employee_sensitive` (RLS: readable/writable only by the owner + dev, and the service role), not on `profiles`. Other managers only see a mask; the owner/dev reveal a value behind a password re-prompt, and every reveal is logged to `audit_log` via the `reveal_nas()` RPC. Wage information is sensitive; restrict access and production logs accordingly.
+- **NAS/SIN is vaulted.** It lives in `employee_sensitive` (RLS: readable/writable only by the **`owner` role** and the service role), not on `profiles`. `is_privileged()` is role-based (`role = 'owner'`) — no hard-coded user ids. Other managers and `admin` staff only see a mask; owners reveal a value and every reveal is logged to `audit_log` via the `reveal_nas()` RPC. Wage information is sensitive; restrict access and production logs accordingly.
 
 ## License
 
