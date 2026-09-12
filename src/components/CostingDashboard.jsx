@@ -57,7 +57,7 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, hourly_rate, km_rate, team_leader_premium, apprentice_level"),
+        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, km_rate, team_leader_premium, apprentice_level"),
         supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, amount").gte("job_date", start).lte("job_date", end),
@@ -84,7 +84,10 @@ export default function CostingDashboard() {
         const baseRate = Number(profile?.hourly_rate) || 0;
         const premium = Number(profile?.team_leader_premium) || 0;
         const level = profile?.apprentice_level || null;
-        const rateKey = level ? LEVEL_RATE_KEY[level] : null;
+        // Administration staff are non-CCQ: no CCQ level → no employer contributions,
+        // and no 13% CCQ congés indemnity (that is a CCQ advantage they don't get).
+        const isNonCcq = profile?.role === "admin";
+        const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
         let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, totalKm = 0, labor = 0, kmCost = 0;
         const entries = calculatePayrollEntries(jobsByUser.get(userId) || []);
@@ -102,7 +105,7 @@ export default function CostingDashboard() {
           kmCost += e.totalKm * jobKmRate;
         });
 
-        const conges = calculateCongesIndemnity(labor).total;
+        const conges = isNonCcq ? 0 : calculateCongesIndemnity(labor).total;
         const paidHours = (regMin + returnMin + ot50Min + ot100Min) / 60;
         // Employer contributions: per-hour rate for this employee's level × paid hours.
         const contribLines = rateKey
@@ -116,6 +119,7 @@ export default function CostingDashboard() {
           userId,
           name: profile?.full_name || profile?.email || String(userId).slice(0, 8),
           hasRate: baseRate > 0,
+          isNonCcq,
           hasLevel: Boolean(rateKey),
           premium,
           regHours: (regMin + returnMin) / 60,
@@ -196,7 +200,8 @@ export default function CostingDashboard() {
                           {r.name}
                           {r.premium > 0 && <span className="ml-2 text-[11px] font-normal text-primary">({t("costing.teamLeader")} +{money(r.premium)}/h)</span>}
                           {!r.hasRate && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noRate")})</span>}
-                          {!r.hasLevel && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noLevel")})</span>}
+                          {r.isNonCcq && <span className="ml-2 text-[11px] font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
+                          {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noLevel")})</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono">{r.regHours.toFixed(2)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{r.otHours.toFixed(2)}</td>
