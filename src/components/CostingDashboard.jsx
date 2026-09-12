@@ -39,7 +39,7 @@ export default function CostingDashboard() {
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, hourly_rate, km_rate, team_leader_premium"),
-        supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", start).lte("job_date", end),
+        supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, amount").gte("job_date", start).lte("job_date", end),
       ]);
@@ -62,12 +62,8 @@ export default function CostingDashboard() {
         const profile = profileById.get(userId);
         const baseRate = Number(profile?.hourly_rate) || 0;
         const premium = Number(profile?.team_leader_premium) || 0;
-        // Team leaders earn an extra $/hour on top of their base rate; the
-        // premium raises the hourly rate so it flows into regular and OT pay.
-        const rate = baseRate + premium;
-        const kmRate = Number(profile?.km_rate) || 0;
 
-        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, totalKm = 0;
+        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, totalKm = 0, labor = 0, kmCost = 0;
         const entries = calculatePayrollEntries(jobsByUser.get(userId) || []);
         entries.forEach((e) => {
           regMin += e.regularWorkMinutes;
@@ -75,13 +71,20 @@ export default function CostingDashboard() {
           ot100Min += e.overtime100Minutes;
           returnMin += e.returnRegularMinutes;
           totalKm += e.totalKm;
+          // Rate frozen on the job at submission (migration 0034). Fall back to the
+          // current profile rate for legacy jobs that have no snapshot. Team-leader
+          // premium raises the hourly rate so it flows into regular and OT pay.
+          const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
+          const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;
+          const jobRate = jobBase + jobPremium;
+          const jobKmRate = Number(e.job?.km_rate_snapshot ?? profile?.km_rate) || 0;
+          labor += jobRate * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
+          kmCost += e.totalKm * jobKmRate;
         });
 
-        const labor = rate * ((regMin + returnMin) / 60 + (ot50Min / 60) * 1.5 + (ot100Min / 60) * 2);
         // CCQ indemnité de congés: 13% of wages earned (labor already includes the OT
         // premium dollars, which is the base the rule specifies).
         const conges = calculateCongesIndemnity(labor).total;
-        const kmCost = totalKm * kmRate;
         const mealsCost = mealByUser.get(userId) || 0;
         const parkingCost = parkingByUser.get(userId) || 0;
 
