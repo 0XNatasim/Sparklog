@@ -321,9 +321,9 @@ function StorageTemperatureReference() {
 
 function ContactsReference() {
   const britton = [
-    { name: "Olivier Dagenais", role: "Superviseur", email: "odagenais@britton.ca" },
-    { name: "Mélanie Noël-Richard", role: null, email: "mrichard@britton.ca" },
-    { name: "Marc-Antoine Charette", role: "Superviseur", email: "mcharette@britton.ca" },
+    { name: "Olivier Dagenais", role: "Superviseur", email: "odagenais@britton.ca", phone: "438-828-7070" },
+    { name: "Mélanie Noël-Richard", role: null, email: "mrichard@britton.ca", phone: "514-799-0097" },
+    { name: "Marc-Antoine Charette", role: "Superviseur", email: "mcharette@britton.ca", phone: "514-912-7847" },
   ];
   return (
     <Dialog>
@@ -348,7 +348,12 @@ function ContactsReference() {
               {britton.map((c) => (
                 <div key={c.email} className="rounded-md border p-3">
                   <div className="font-medium">{c.name}{c.role ? <span className="ml-2 text-xs font-normal text-muted-foreground">{c.role}</span> : null}</div>
-                  <a href={`mailto:${c.email}`} className="mt-1 inline-flex items-center gap-1.5 text-primary hover:underline">
+                  {c.phone && (
+                    <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
+                      <Phone className="h-3.5 w-3.5" />{c.phone}
+                    </a>
+                  )}
+                  <a href={`mailto:${c.email}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
                     <Mail className="h-3.5 w-3.5" />{c.email}
                   </a>
                 </div>
