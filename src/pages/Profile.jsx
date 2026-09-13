@@ -102,6 +102,9 @@ export default function Profile() {
               <div className="space-y-3">
                 <ReservationStatusReference />
                 <CalypsoV1Reference />
+                <ThermostatSpacingReference />
+                <StorageTemperatureReference />
+                <ContactsReference />
               </div>
             </CollapsibleCard>
           </>
@@ -216,6 +219,127 @@ function CalypsoV1Reference() {
           <p>
             Nous sommes présentement en train de faire des tests sur les V1.
           </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReferenceButton({ label }) {
+  return (
+    <button type="button" className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+      <span>{label}</span>
+      <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
+
+function ThermostatSpacingReference() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild><ReferenceButton label="Distance entre thermostats" /></DialogTrigger>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Distance entre thermostats</DialogTitle>
+          <DialogDescription>Distance minimale à respecter entre 2 thermostats.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5 text-sm leading-relaxed">
+          <p>Au moment de faire votre installation, nos manufacturiers recommandent une distance minimale à respecter entre 2 thermostats.</p>
+
+          <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+            <p className="font-semibold">Distance minimale entre 2 thermostats</p>
+            <p className="mt-1">6 pouces (15,24 cm) de dégagement de chaque côté (à gauche et à droite).</p>
+          </div>
+
+          <ReferenceSection title="Superposition (un au-dessus de l'autre)">
+            <p>Il est impossible de garantir le fonctionnement de thermostats positionnés un au-dessus de l&apos;autre, puisque la chaleur dégagée par celui du dessous viendra biaiser la température de celui du haut.</p>
+          </ReferenceSection>
+
+          <ReferenceSection title="Si les règles ne peuvent pas être respectées">
+            <p>Il est de votre responsabilité d&apos;expliquer la situation au client et d&apos;éviter ce genre d&apos;installation pour tous les thermostats en cause, et de laisser ces installations telles quelles.</p>
+            <p>Le client a toujours la possibilité de faire corriger la situation par un électricien certifié et de faire une commande supplémentaire dans le futur.</p>
+          </ReferenceSection>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StorageTemperatureReference() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild><ReferenceButton label="Température d'entreposage" /></DialogTrigger>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Température d&apos;entreposage</DialogTitle>
+          <DialogDescription>Choc thermique et condensation en période de grand froid.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5 text-sm leading-relaxed">
+          <p>La grande différence de température entre les appareils qui arrivent de l&apos;extérieur en périodes de grands froids et la température ambiante chez le client peut créer un problème à l&apos;installation des thermostats et des contrôleurs de chauffe-eau.</p>
+          <p>Le choc thermique entre les températures très froides à l&apos;extérieur et autour de +20 °C à l&apos;intérieur risque de causer de la condensation sous la forme d&apos;une couche d&apos;humidité au niveau des composantes électroniques. Celle-ci génère un pont entre les points de soudure, ce qui peut entraîner des courts-circuits qui endommagent les appareils lorsqu&apos;on rétablit le courant.</p>
+
+          <ReferenceSection title="Observations">
+            <p>Les cas observés ont démontré des tâches noires et des étincelles apparentes. Les équipements ont dû être remplacés.</p>
+          </ReferenceSection>
+
+          <ReferenceSection title="Comportements souhaités">
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Ne pas laisser les appareils à l&apos;extérieur, même dans le coffre d&apos;une voiture, durant la période hivernale.</li>
+              <li>Laisser les appareils atteindre le plus près possible de la température de la pièce avant de les installer.</li>
+            </ul>
+          </ReferenceSection>
+
+          <ReferenceSection title="Rappels">
+            <p className="font-semibold">Température d&apos;entreposage minimum</p>
+            <ul className="list-disc space-y-1 pl-5"><li>−40 °C à 50 °C pour tous les appareils.</li></ul>
+            <p className="mt-2 font-semibold">Température d&apos;utilisation</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>−20 °C à 50 °C pour les thermostats.</li>
+              <li>0 °C à 40 °C pour les contrôleurs de chauffe-eau.</li>
+            </ul>
+          </ReferenceSection>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ContactsReference() {
+  const britton = [
+    { name: "Olivier Dagenais", role: "Superviseur", email: "odagenais@britton.ca" },
+    { name: "Mélanie Noël-Richard", role: null, email: "mrichard@britton.ca" },
+    { name: "Marc-Antoine Charette", role: "Superviseur", email: "mcharette@britton.ca" },
+  ];
+  return (
+    <Dialog>
+      <DialogTrigger asChild><ReferenceButton label="Contacts" /></DialogTrigger>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Contacts</DialogTitle>
+          <DialogDescription>Superviseurs CIE (Britton) et répartition HILO.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5 text-sm leading-relaxed">
+          <ReferenceSection title="CIE — Britton">
+            <div className="space-y-2">
+              {britton.map((c) => (
+                <div key={c.email} className="rounded-md border p-3">
+                  <div className="font-medium">{c.name}{c.role ? <span className="ml-2 text-xs font-normal text-muted-foreground">{c.role}</span> : null}</div>
+                  <a href={`mailto:${c.email}`} className="mt-1 inline-flex items-center gap-1.5 text-primary hover:underline">
+                    <Mail className="h-3.5 w-3.5" />{c.email}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </ReferenceSection>
+
+          <ReferenceSection title="HILO — Répartition">
+            <div className="rounded-md border p-3">
+              <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
+                <Phone className="h-3.5 w-3.5" />438-289-4456
+              </a>
+              <p className="mt-1 text-xs text-muted-foreground">Choix caché : composez le 7.</p>
+            </div>
+          </ReferenceSection>
         </div>
       </DialogContent>
     </Dialog>
