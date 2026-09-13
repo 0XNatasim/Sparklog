@@ -91,6 +91,10 @@ export default function Profile() {
               )}
             </CollapsibleCard>
 
+            <CollapsibleCard icon={Phone} title={t("profile.contacts")} description={t("profile.contactsDescription")}>
+              <ContactsReference />
+            </CollapsibleCard>
+
             <CollapsibleCard icon={ClipboardList} title={t("profile.forms")} description={t("profile.formsDescription")}>
               <div className="grid gap-3 sm:grid-cols-2">
                 {forms.map((form) => <a key={form.id} href={form.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-lg border p-4 font-medium hover:border-primary/50 hover:bg-accent">{t(form.nameKey)}<ExternalLink className="h-4 w-4 text-muted-foreground" /></a>)}
@@ -104,7 +108,15 @@ export default function Profile() {
                 <CalypsoV1Reference />
                 <ThermostatSpacingReference />
                 <StorageTemperatureReference />
-                <ContactsReference />
+                <a
+                  href="https://support.sinopetech.com/wp-content/uploads/2026/04/660-0735-0022-E_TH1300ZB-ENG-Avec-GT130_web.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <span>Thermostat plancher chauffant — TH1300ZB (manuel)</span>
+                  <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </a>
               </div>
             </CollapsibleCard>
           </>
@@ -322,6 +334,15 @@ function ContactsReference() {
           <DialogDescription>Superviseurs CIE (Britton) et répartition HILO.</DialogDescription>
         </DialogHeader>
         <div className="space-y-5 text-sm leading-relaxed">
+          <ReferenceSection title="HILO — Répartition">
+            <div className="rounded-md border p-3">
+              <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
+                <Phone className="h-3.5 w-3.5" />438-289-4456
+              </a>
+              <p className="mt-1 text-xs text-muted-foreground">Choix caché : composez le 7.</p>
+            </div>
+          </ReferenceSection>
+
           <ReferenceSection title="CIE — Britton">
             <div className="space-y-2">
               {britton.map((c) => (
@@ -332,15 +353,6 @@ function ContactsReference() {
                   </a>
                 </div>
               ))}
-            </div>
-          </ReferenceSection>
-
-          <ReferenceSection title="HILO — Répartition">
-            <div className="rounded-md border p-3">
-              <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
-                <Phone className="h-3.5 w-3.5" />438-289-4456
-              </a>
-              <p className="mt-1 text-xs text-muted-foreground">Choix caché : composez le 7.</p>
             </div>
           </ReferenceSection>
         </div>
