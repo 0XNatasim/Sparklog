@@ -1,8 +1,12 @@
-import React, { useState } from "react";
-import { AlertTriangle, Calculator, ChevronDown } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { AlertTriangle, Calculator, ChevronDown, Save } from "lucide-react";
+import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayroll, RULE_VERSION } from "@/payroll";
+
+const TAX_YEAR = 2026;
+const EMPTY_YTD = { grossIncome: 0, rrqEmployee: 0, rrq2Employee: 0, eiEmployee: 0, rqapEmployee: 0, federalTax: 0, quebecTax: 0, pensionableIncomeRRQ: 0, insurableIncomeEI: 0, insurableIncomeRQAP: 0, labourStandardsIncome: 0 };
 
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
@@ -53,10 +57,75 @@ export default function PayrollEngineTester() {
   const [frequency, setFrequency] = useState("weekly");
   const [pay, setPay] = useState({ regularHours: 40, hourlyRate: 45.36, overtimeHours: 5, otMultiplier: 1.5, bonus: 0, vacation: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
-  const [ytd, setYtd] = useState({ grossIncome: 0, rrqEmployee: 0, rrq2Employee: 0, eiEmployee: 0, rqapEmployee: 0, federalTax: 0, quebecTax: 0, pensionableIncomeRRQ: 0, insurableIncomeEI: 0, insurableIncomeRQAP: 0, labourStandardsIncome: 0 });
+  const [ytd, setYtd] = useState({ ...EMPTY_YTD });
+  const [asOfDate, setAsOfDate] = useState("");
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
   const [result, setResult] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
+
+  const [employees, setEmployees] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [saveState, setSaveState] = useState({ status: "idle", message: "" }); // idle|loading|saving|saved|error
+
+  // Load the roster once. Errors are non-fatal — the bench still works manually.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, role, hourly_rate, apprentice_level")
+        .order("full_name", { ascending: true });
+      if (!cancelled) setEmployees(data || []);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // On employee change: prefill the hourly rate and load any saved YTD balances.
+  async function handleSelectEmployee(id) {
+    setSelectedId(id);
+    setSaveState({ status: "idle", message: "" });
+    if (!id) return;
+    const profile = employees.find((e) => e.id === id);
+    if (profile?.hourly_rate != null) setPay((s) => ({ ...s, hourlyRate: profile.hourly_rate }));
+
+    setSaveState({ status: "loading", message: "" });
+    const { data, error } = await supabase
+      .from("payroll_ytd")
+      .select("*")
+      .eq("user_id", id)
+      .eq("tax_year", TAX_YEAR)
+      .maybeSingle();
+    if (error) { setSaveState({ status: "error", message: error.message }); setYtd({ ...EMPTY_YTD }); setAsOfDate(""); return; }
+    if (data) {
+      setYtd({
+        grossIncome: data.gross_income, rrqEmployee: data.rrq_employee, rrq2Employee: data.rrq2_employee,
+        eiEmployee: data.ei_employee, rqapEmployee: data.rqap_employee, federalTax: data.federal_tax,
+        quebecTax: data.quebec_tax, pensionableIncomeRRQ: data.pensionable_income_rrq,
+        insurableIncomeEI: data.insurable_income_ei, insurableIncomeRQAP: data.insurable_income_rqap,
+        labourStandardsIncome: data.labour_standards_income,
+      });
+      setAsOfDate(data.as_of_date || "");
+      setSaveState({ status: "saved", message: "Loaded saved balances." });
+    } else {
+      setYtd({ ...EMPTY_YTD }); setAsOfDate("");
+      setSaveState({ status: "idle", message: "No saved balances yet for this employee." });
+    }
+  }
+
+  async function handleSaveYtd() {
+    if (!selectedId) return;
+    setSaveState({ status: "saving", message: "" });
+    const num = (v) => Number(v) || 0;
+    const { error } = await supabase.from("payroll_ytd").upsert({
+      user_id: selectedId, tax_year: TAX_YEAR, as_of_date: asOfDate || null,
+      gross_income: num(ytd.grossIncome), rrq_employee: num(ytd.rrqEmployee), rrq2_employee: num(ytd.rrq2Employee),
+      ei_employee: num(ytd.eiEmployee), rqap_employee: num(ytd.rqapEmployee), federal_tax: num(ytd.federalTax),
+      quebec_tax: num(ytd.quebecTax), pensionable_income_rrq: num(ytd.pensionableIncomeRRQ),
+      insurable_income_ei: num(ytd.insurableIncomeEI), insurable_income_rqap: num(ytd.insurableIncomeRQAP),
+      labour_standards_income: num(ytd.labourStandardsIncome),
+    }, { onConflict: "user_id,tax_year" });
+    setSaveState(error ? { status: "error", message: error.message } : { status: "saved", message: "Balances saved." });
+  }
 
   const setP = (k) => (v) => setPay((s) => ({ ...s, [k]: v }));
   const setE = (k) => (v) => setEmp((s) => ({ ...s, [k]: v }));
@@ -166,17 +235,50 @@ export default function PayrollEngineTester() {
         <Field label="Taxable benefits" value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
       </Section>
 
-      <Section title="Year-to-date (before this period)">
-        <Field label="Gross YTD" value={ytd.grossIncome} onChange={setY("grossIncome")} />
-        <Field label="RRQ YTD" value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} />
-        <Field label="RRQ2 YTD" value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} />
-        <Field label="EI YTD" value={ytd.eiEmployee} onChange={setY("eiEmployee")} />
-        <Field label="RQAP YTD" value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} />
-        <Field label="Federal tax YTD" value={ytd.federalTax} onChange={setY("federalTax")} />
-        <Field label="Québec tax YTD" value={ytd.quebecTax} onChange={setY("quebecTax")} />
-        <Field label="Pensionable YTD (RRQ)" value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} />
-        <Field label="Insurable YTD (EI)" value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} />
-      </Section>
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Year-to-date opening balances ({TAX_YEAR}) — already paid this year
+            </div>
+            {selectedId && (
+              <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs">
+                <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? "Saving…" : "Save for this employee"}
+              </Button>
+            )}
+          </div>
+
+          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <label className="block text-xs">
+              <span className="text-muted-foreground">Employee</span>
+              <select value={selectedId} onChange={(e) => handleSelectEmployee(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <option value="">— Manual (no employee) —</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.role && e.role !== "employee" ? ` · ${e.role}` : ""}</option>)}
+              </select>
+            </label>
+            <Field label="Balances as of (last pay date)" value={asOfDate} onChange={setAsOfDate} type="date" step={undefined} />
+          </div>
+
+          {saveState.message && (
+            <div className={`mb-3 text-xs ${saveState.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+              {saveState.status === "error" ? `Save/load unavailable: ${saveState.message}` : saveState.message}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Field label="Gross YTD" value={ytd.grossIncome} onChange={setY("grossIncome")} />
+            <Field label="RRQ YTD" value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} />
+            <Field label="RRQ2 YTD" value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} />
+            <Field label="EI YTD" value={ytd.eiEmployee} onChange={setY("eiEmployee")} />
+            <Field label="RQAP YTD" value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} />
+            <Field label="Federal tax YTD" value={ytd.federalTax} onChange={setY("federalTax")} />
+            <Field label="Québec tax YTD" value={ytd.quebecTax} onChange={setY("quebecTax")} />
+            <Field label="Pensionable YTD (RRQ)" value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} />
+            <Field label="Insurable YTD (EI)" value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} />
+            <Field label="Insurable YTD (RQAP)" value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-4">
