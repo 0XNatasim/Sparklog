@@ -117,6 +117,15 @@ export default function Profile() {
                   <span>Thermostat plancher chauffant — TH1300ZB (manuel)</span>
                   <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </a>
+                <a
+                  href="https://support.sinopetech.com/wp-content/uploads/2026/01/660-0339-0000-29012026-Guide-dinstallation-RM3510WF-FR.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <span>Calypso V2 — RM3510WF (guide d&apos;installation)</span>
+                  <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </a>
               </div>
             </CollapsibleCard>
           </>
