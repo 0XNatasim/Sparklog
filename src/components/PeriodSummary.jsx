@@ -137,6 +137,9 @@ export default function PeriodSummary({ mode = "week" }) {
           labor,
           conges,
           contribTotal,
+          km: kmCost,
+          supper: b.meals,
+          parking: b.parking,
           expenses,
           total: labor + conges + contribTotal + expenses,
         });
@@ -170,7 +173,9 @@ export default function PeriodSummary({ mode = "week" }) {
               <Stat label={t("testing.week.adJobs")} value={w.adJobs} accent="sky" />
               <Stat label={t("testing.week.labor")} value={money(w.labor)} />
               <Stat label={t("testing.week.contributions")} value={money(w.contribTotal)} />
-              <Stat label={t("testing.week.expenses")} value={money(w.expenses)} />
+              <Stat label={t("testing.week.km")} value={money(w.km)} />
+              <Stat label={t("testing.week.supper")} value={money(w.supper)} />
+              <Stat label={t("testing.week.parking")} value={money(w.parking)} />
             </div>
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t pt-3 text-sm">
               <span className="text-muted-foreground">{t("testing.week.indemnity")}: <span className="font-mono">{money(w.conges)}</span></span>
