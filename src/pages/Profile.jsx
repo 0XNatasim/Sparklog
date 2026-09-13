@@ -225,14 +225,17 @@ function CalypsoV1Reference() {
   );
 }
 
-function ReferenceButton({ label }) {
+// Radix DialogTrigger `asChild` clones its child and injects onClick + a ref.
+// forwardRef + {...props} are required, otherwise the trigger never wires up and
+// the popup won't open on click.
+const ReferenceButton = React.forwardRef(function ReferenceButton({ label, ...props }, ref) {
   return (
-    <button type="button" className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+    <button ref={ref} type="button" {...props} className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
       <span>{label}</span>
       <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
     </button>
   );
-}
+});
 
 function ThermostatSpacingReference() {
   return (
