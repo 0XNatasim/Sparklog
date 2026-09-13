@@ -57,7 +57,7 @@ function Row({ label, value, strong }) {
 export default function PayrollEngineTester() {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, hourlyRate: 45.36, overtimeHours: 5, otMultiplier: 1.5, bonus: 0, vacation: 0, taxableBenefit: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, hourlyRate: 45.36, ot150Hours: 0, ot200Hours: 0, bonus: 0, vacation: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD });
   const [asOfDate, setAsOfDate] = useState("");
@@ -136,8 +136,9 @@ export default function PayrollEngineTester() {
 
   function handleCalculate() {
     const earnings = [];
-    const regular = Number(pay.regularHours) * Number(pay.hourlyRate);
-    const overtime = Number(pay.overtimeHours) * Number(pay.hourlyRate) * Number(pay.otMultiplier);
+    const rate = Number(pay.hourlyRate);
+    const regular = Number(pay.regularHours) * rate;
+    const overtime = Number(pay.ot150Hours) * rate * 1.5 + Number(pay.ot200Hours) * rate * 2;
     if (regular) earnings.push({ type: "regular", amount: regular });
     if (overtime) earnings.push({ type: "overtime", amount: overtime });
     if (Number(pay.bonus)) earnings.push({ type: "bonus", amount: Number(pay.bonus) });
@@ -227,8 +228,8 @@ export default function PayrollEngineTester() {
       <Section title={t("payroll.paySection")}>
         <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
         <Field label={t("payroll.hourlyRate")} value={pay.hourlyRate} onChange={setP("hourlyRate")} />
-        <Field label={t("payroll.overtimeHours")} value={pay.overtimeHours} onChange={setP("overtimeHours")} step="0.25" />
-        <Field label={t("payroll.otMultiplier")} value={pay.otMultiplier} onChange={setP("otMultiplier")} step="0.5" />
+        <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" />
+        <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" />
         <Field label={t("payroll.bonus")} value={pay.bonus} onChange={setP("bonus")} />
         <Field label={t("payroll.vacation")} value={pay.vacation} onChange={setP("vacation")} />
         <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
