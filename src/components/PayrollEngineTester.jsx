@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayroll, RULE_VERSION } from "@/payroll";
+import { useT } from "@/lib/use-t";
 
 const TAX_YEAR = 2026;
 const EMPTY_YTD = { grossIncome: 0, rrqEmployee: 0, rrq2Employee: 0, eiEmployee: 0, rqapEmployee: 0, federalTax: 0, quebecTax: 0, pensionableIncomeRRQ: 0, insurableIncomeEI: 0, insurableIncomeRQAP: 0, labourStandardsIncome: 0 };
@@ -54,6 +55,7 @@ function Row({ label, value, strong }) {
 // calls calculatePayroll(input), and renders the result (spec steps 21-23 + the
 // golden rule). Everything shown is a test-bench estimate, never finalized pay.
 export default function PayrollEngineTester() {
+  const t = useT();
   const [frequency, setFrequency] = useState("weekly");
   const [pay, setPay] = useState({ regularHours: 40, hourlyRate: 45.36, overtimeHours: 5, otMultiplier: 1.5, bonus: 0, vacation: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
@@ -105,10 +107,10 @@ export default function PayrollEngineTester() {
         labourStandardsIncome: data.labour_standards_income,
       });
       setAsOfDate(data.as_of_date || "");
-      setSaveState({ status: "saved", message: "Loaded saved balances." });
+      setSaveState({ status: "saved", message: t("payroll.loaded") });
     } else {
       setYtd({ ...EMPTY_YTD }); setAsOfDate("");
-      setSaveState({ status: "idle", message: "No saved balances yet for this employee." });
+      setSaveState({ status: "idle", message: t("payroll.noSaved") });
     }
   }
 
@@ -124,7 +126,7 @@ export default function PayrollEngineTester() {
       insurable_income_ei: num(ytd.insurableIncomeEI), insurable_income_rqap: num(ytd.insurableIncomeRQAP),
       labour_standards_income: num(ytd.labourStandardsIncome),
     }, { onConflict: "user_id,tax_year" });
-    setSaveState(error ? { status: "error", message: error.message } : { status: "saved", message: "Balances saved." });
+    setSaveState(error ? { status: "error", message: error.message } : { status: "saved", message: t("payroll.saved") });
   }
 
   const setP = (k) => (v) => setPay((s) => ({ ...s, [k]: v }));
@@ -191,10 +193,7 @@ export default function PayrollEngineTester() {
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <b>Test bench — not finalized payroll.</b> This is a deterministic DAS engine driven by an{" "}
-            <b>unvalidated placeholder</b> 2026 rule set ({RULE_VERSION.quebec} / {RULE_VERSION.federal}).
-            No constant has been checked against TP-1015.F / T4127. Validate against WebRAS &amp; PDOC and obtain
-            specialist sign-off before any real use. Every result is <i>Requires payroll review</i>.
+            <b>{t("payroll.banner.title")}</b> {t("payroll.banner.body", { quebec: RULE_VERSION.quebec, federal: RULE_VERSION.federal })}
           </div>
         </div>
       </div>
@@ -202,121 +201,121 @@ export default function PayrollEngineTester() {
       {/* ── Inputs ── */}
       <Card>
         <CardContent className="p-4">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Employee</div>
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employee")}</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <label className="block text-xs">
-              <span className="text-muted-foreground">Province</span>
+              <span className="text-muted-foreground">{t("payroll.province")}</span>
               <input value="Québec" disabled className="mt-1 w-full rounded-md border bg-muted/40 px-2 py-1.5 text-sm" />
             </label>
             <label className="block text-xs">
-              <span className="text-muted-foreground">Pay frequency</span>
+              <span className="text-muted-foreground">{t("payroll.frequency")}</span>
               <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-                <option value="weekly">Weekly (52)</option>
-                <option value="biweekly">Bi-weekly (26)</option>
-                <option value="semimonthly">Semi-monthly (24)</option>
-                <option value="monthly">Monthly (12)</option>
+                <option value="weekly">{t("payroll.freq.weekly")}</option>
+                <option value="biweekly">{t("payroll.freq.biweekly")}</option>
+                <option value="semimonthly">{t("payroll.freq.semimonthly")}</option>
+                <option value="monthly">{t("payroll.freq.monthly")}</option>
               </select>
             </label>
-            <Field label="TD1 federal claim ($, blank = basic)" value={emp.td1ClaimAmount} onChange={setE("td1ClaimAmount")} step="1" />
-            <Field label="QC personal credits ($, blank = basic)" value={emp.personalTaxCredits} onChange={setE("personalTaxCredits")} step="1" />
-            <Field label="Extra federal tax / period" value={emp.additionalFederal} onChange={setE("additionalFederal")} />
-            <Field label="Extra Québec tax / period" value={emp.additionalQuebec} onChange={setE("additionalQuebec")} />
+            <Field label={t("payroll.td1")} value={emp.td1ClaimAmount} onChange={setE("td1ClaimAmount")} step="1" />
+            <Field label={t("payroll.qcCredits")} value={emp.personalTaxCredits} onChange={setE("personalTaxCredits")} step="1" />
+            <Field label={t("payroll.extraFederal")} value={emp.additionalFederal} onChange={setE("additionalFederal")} />
+            <Field label={t("payroll.extraQuebec")} value={emp.additionalQuebec} onChange={setE("additionalQuebec")} />
           </div>
         </CardContent>
       </Card>
 
-      <Section title="Pay (this period)">
-        <Field label="Regular hours" value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
-        <Field label="Hourly rate" value={pay.hourlyRate} onChange={setP("hourlyRate")} />
-        <Field label="Overtime hours" value={pay.overtimeHours} onChange={setP("overtimeHours")} step="0.25" />
-        <Field label="OT multiplier" value={pay.otMultiplier} onChange={setP("otMultiplier")} step="0.5" />
-        <Field label="Bonus" value={pay.bonus} onChange={setP("bonus")} />
-        <Field label="Vacation" value={pay.vacation} onChange={setP("vacation")} />
-        <Field label="Taxable benefits" value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
+      <Section title={t("payroll.paySection")}>
+        <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
+        <Field label={t("payroll.hourlyRate")} value={pay.hourlyRate} onChange={setP("hourlyRate")} />
+        <Field label={t("payroll.overtimeHours")} value={pay.overtimeHours} onChange={setP("overtimeHours")} step="0.25" />
+        <Field label={t("payroll.otMultiplier")} value={pay.otMultiplier} onChange={setP("otMultiplier")} step="0.5" />
+        <Field label={t("payroll.bonus")} value={pay.bonus} onChange={setP("bonus")} />
+        <Field label={t("payroll.vacation")} value={pay.vacation} onChange={setP("vacation")} />
+        <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
       </Section>
 
       <Card>
         <CardContent className="p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Year-to-date opening balances ({TAX_YEAR}) — already paid this year
+              {t("payroll.ytdTitle", { year: TAX_YEAR })}
             </div>
             {selectedId && (
               <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs">
-                <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? "Saving…" : "Save for this employee"}
+                <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
               </Button>
             )}
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <label className="block text-xs">
-              <span className="text-muted-foreground">Employee</span>
+              <span className="text-muted-foreground">{t("payroll.employee")}</span>
               <select value={selectedId} onChange={(e) => handleSelectEmployee(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-                <option value="">— Manual (no employee) —</option>
+                <option value="">{t("payroll.manual")}</option>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.role && e.role !== "employee" ? ` · ${e.role}` : ""}</option>)}
               </select>
             </label>
-            <Field label="Balances as of (last pay date)" value={asOfDate} onChange={setAsOfDate} type="date" step={undefined} />
+            <Field label={t("payroll.asOf")} value={asOfDate} onChange={setAsOfDate} type="date" step={undefined} />
           </div>
 
           {saveState.message && (
             <div className={`mb-3 text-xs ${saveState.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
-              {saveState.status === "error" ? `Save/load unavailable: ${saveState.message}` : saveState.message}
+              {saveState.status === "error" ? t("payroll.saveUnavailable", { message: saveState.message }) : saveState.message}
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label="Gross YTD" value={ytd.grossIncome} onChange={setY("grossIncome")} />
-            <Field label="RRQ YTD" value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} />
-            <Field label="RRQ2 YTD" value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} />
-            <Field label="EI YTD" value={ytd.eiEmployee} onChange={setY("eiEmployee")} />
-            <Field label="RQAP YTD" value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} />
-            <Field label="Federal tax YTD" value={ytd.federalTax} onChange={setY("federalTax")} />
-            <Field label="Québec tax YTD" value={ytd.quebecTax} onChange={setY("quebecTax")} />
-            <Field label="Pensionable YTD (RRQ)" value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} />
-            <Field label="Insurable YTD (EI)" value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} />
-            <Field label="Insurable YTD (RQAP)" value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} />
+            <Field label={t("payroll.grossYtd")} value={ytd.grossIncome} onChange={setY("grossIncome")} />
+            <Field label={t("payroll.rrqYtd")} value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} />
+            <Field label={t("payroll.rrq2Ytd")} value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} />
+            <Field label={t("payroll.eiYtd")} value={ytd.eiEmployee} onChange={setY("eiEmployee")} />
+            <Field label={t("payroll.rqapYtd")} value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} />
+            <Field label={t("payroll.federalTaxYtd")} value={ytd.federalTax} onChange={setY("federalTax")} />
+            <Field label={t("payroll.quebecTaxYtd")} value={ytd.quebecTax} onChange={setY("quebecTax")} />
+            <Field label={t("payroll.pensionableYtd")} value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} />
+            <Field label={t("payroll.insurableEiYtd")} value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} />
+            <Field label={t("payroll.insurableRqapYtd")} value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} />
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="p-4">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Employer</div>
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employer")}</div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label="Annual payroll estimate" value={employer.annualPayrollEstimate} onChange={setEr("annualPayrollEstimate")} step="1000" />
+            <Field label={t("payroll.annualPayroll")} value={employer.annualPayrollEstimate} onChange={setEr("annualPayrollEstimate")} step="1000" />
             <label className="block text-xs">
-              <span className="text-muted-foreground">FSS category</span>
+              <span className="text-muted-foreground">{t("payroll.fssCategory")}</span>
               <select value={employer.fssCategory} onChange={(e) => setEr("fssCategory")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-                <option value="general">General</option>
-                <option value="primary_manufacturing">Primary / manufacturing</option>
-                <option value="public">Public sector</option>
+                <option value="general">{t("payroll.fss.general")}</option>
+                <option value="primary_manufacturing">{t("payroll.fss.primary")}</option>
+                <option value="public">{t("payroll.fss.public")}</option>
               </select>
             </label>
-            <Field label="CNESST rate (%)" value={employer.cnesstRate} onChange={setEr("cnesstRate")} />
+            <Field label={t("payroll.cnesstRate")} value={employer.cnesstRate} onChange={setEr("cnesstRate")} />
             <label className="col-span-2 flex items-center gap-2 self-end text-xs sm:col-span-3">
               <input type="checkbox" checked={employer.workforceSkillsFundApplicable} onChange={(e) => setEr("workforceSkillsFundApplicable")(e.target.checked)} />
-              <span className="text-muted-foreground">FDRCMO (workforce skills fund) applicable</span>
+              <span className="text-muted-foreground">{t("payroll.fdrcmo")}</span>
             </label>
           </div>
         </CardContent>
       </Card>
 
       <Button onClick={handleCalculate} className="w-full sm:w-auto">
-        <Calculator className="mr-2 h-4 w-4" /> Calculate payroll
+        <Calculator className="mr-2 h-4 w-4" /> {t("payroll.calculate")}
       </Button>
 
-      {result && <Results result={result} open={openExplain} setOpen={setOpenExplain} />}
+      {result && <Results result={result} open={openExplain} setOpen={setOpenExplain} t={t} />}
     </div>
   );
 }
 
-function Results({ result, open, setOpen }) {
+function Results({ result, open, setOpen, t }) {
   if (!result.gross) {
     return (
       <Card>
         <CardContent className="p-4 text-sm">
-          <div className="font-semibold text-amber-700 dark:text-amber-300">Requires payroll review</div>
+          <div className="font-semibold text-amber-700 dark:text-amber-300">{t("payroll.requiresReview")}</div>
           <ul className="mt-2 list-disc pl-5 text-muted-foreground">{result.reviewReasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
         </CardContent>
       </Card>
@@ -333,37 +332,37 @@ function Results({ result, open, setOpen }) {
 
       <div className="grid gap-3 lg:grid-cols-3">
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Employee</div>
-          <Row label="Gross (total)" value={money(gross.total)} />
-          <Row label="Federal tax" value={money(employee.federalTax)} />
-          <Row label="Québec tax" value={money(employee.quebecTax)} />
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employee")}</div>
+          <Row label={t("payroll.grossTotal")} value={money(gross.total)} />
+          <Row label={t("payroll.federalTax")} value={money(employee.federalTax)} />
+          <Row label={t("payroll.quebecTax")} value={money(employee.quebecTax)} />
           <Row label="RRQ" value={money(employee.rrq.total)} />
-          <Row label="EI" value={money(employee.ei)} />
+          <Row label={t("payroll.ei")} value={money(employee.ei)} />
           <Row label="RQAP" value={money(employee.rqap)} />
-          <Row label="Total deductions" value={money(employee.totalDeductions)} />
-          <Row label="Net pay" value={money(employee.netPay)} strong />
+          <Row label={t("payroll.totalDeductions")} value={money(employee.totalDeductions)} />
+          <Row label={t("payroll.netPay")} value={money(employee.netPay)} strong />
         </CardContent></Card>
 
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Employer</div>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employer")}</div>
           <Row label="RRQ" value={money(employer.rrq)} />
-          <Row label="EI" value={money(employer.ei)} />
+          <Row label={t("payroll.ei")} value={money(employer.ei)} />
           <Row label="RQAP" value={money(employer.rqap)} />
           <Row label="FSS" value={money(employer.fss)} />
-          <Row label="Labour standards" value={money(employer.labourStandards)} />
+          <Row label={t("payroll.labourStandards")} value={money(employer.labourStandards)} />
           <Row label="FDRCMO" value={money(employer.workforceFund)} />
           <Row label="CNESST" value={money(employer.cnesst)} />
-          <Row label="Total contributions" value={money(employer.totalContributions)} />
-          <Row label="Total payroll cost" value={money(employer.totalPayrollCost)} strong />
+          <Row label={t("payroll.totalContributions")} value={money(employer.totalContributions)} />
+          <Row label={t("payroll.totalPayrollCost")} value={money(employer.totalPayrollCost)} strong />
         </CardContent></Card>
 
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">DAS (remittances)</div>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.dasTitle")}</div>
           <Row label="Revenu Québec" value={money(das.quebec)} />
-          <Row label="ARC (federal)" value={money(das.arc)} />
-          <Row label="Total DAS" value={money(das.total)} strong />
+          <Row label={t("payroll.arcFederal")} value={money(das.arc)} />
+          <Row label={t("payroll.totalDas")} value={money(das.total)} strong />
           <div className="pt-2 text-[11px] text-muted-foreground">
-            QC = Québec tax + RRQ + RQAP + FSS. ARC = federal tax + EI.
+            {t("payroll.dasFooter")}
           </div>
         </CardContent></Card>
       </div>
@@ -372,7 +371,7 @@ function Results({ result, open, setOpen }) {
       <Card>
         <CardContent className="p-0">
           <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold">
-            <span>Calculation details</span>
+            <span>{t("payroll.calcDetails")}</span>
             <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
           {open && (
@@ -384,7 +383,7 @@ function Results({ result, open, setOpen }) {
       </Card>
 
       <p className="text-[11px] text-muted-foreground">
-        Rule set {result.meta.rulesVersion.quebec} / {result.meta.rulesVersion.federal} · status: {result.meta.rulesVersion.status}
+        {t("payroll.ruleSetLine", { quebec: result.meta.rulesVersion.quebec, federal: result.meta.rulesVersion.federal, status: result.meta.rulesVersion.status })}
       </p>
     </div>
   );
