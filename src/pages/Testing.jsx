@@ -4,13 +4,14 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, ShieldCheck } from "lucide-react";
+import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import ManagerDownloads from "@/components/ManagerDownloads";
 import CostingDashboard from "@/components/CostingDashboard";
 import PeriodSummary from "@/components/PeriodSummary";
 import ElectricianCostSheet from "@/components/ElectricianCostSheet";
+import PayrollEngineTester from "@/components/PayrollEngineTester";
 import AuditLog from "@/components/AuditLog";
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
@@ -361,6 +362,7 @@ export default function Testing() {
     { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
     { id: "week", icon: CalendarDays, label: t("testing.tabs.week"), description: t("testing.sections.weekDescription") },
     { id: "month", icon: CalendarRange, label: t("testing.tabs.month"), description: t("testing.sections.monthDescription") },
+    { id: "payroll", icon: Wallet, label: t("testing.tabs.payroll"), description: t("testing.sections.payrollDescription") },
     { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
   ];
 
@@ -386,6 +388,7 @@ export default function Testing() {
       {section === "ccq" && <CcqRatesPanel />}
       {section === "week" && <PeriodSummary mode="week" />}
       {section === "month" && <PeriodSummary mode="month" />}
+      {section === "payroll" && <PayrollEngineTester />}
       {section === "audit" && <AuditLog />}
     </div>
   );
