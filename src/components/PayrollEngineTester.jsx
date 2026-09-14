@@ -7,7 +7,33 @@ import { calculatePayroll, RULE_VERSION } from "@/payroll";
 import { useT } from "@/lib/use-t";
 
 const TAX_YEAR = 2026;
-const EMPTY_YTD = { grossIncome: 0, rrqEmployee: 0, rrq2Employee: 0, eiEmployee: 0, rqapEmployee: 0, federalTax: 0, quebecTax: 0, pensionableIncomeRRQ: 0, insurableIncomeEI: 0, insurableIncomeRQAP: 0, labourStandardsIncome: 0 };
+
+// CCQ cumulative (Sommaire) figures — record-only opening balances from the stub.
+// [stateKey, dbColumn, label]. They do NOT feed the DAS calc; they're stored so the
+// app holds a complete YTD picture per employee.
+const CCQ_CUMUL = [
+  ["vacancesCcq", "vacances_ccq", "Vacances CCQ (13%)"],
+  ["regularEarnings", "regular_earnings", "Salaire régulier"],
+  ["doubleTime", "double_time", "Temps double"],
+  ["vacationPay", "vacation_pay", "Vacances"],
+  ["ccqLevy", "ccq_levy", "Prélèvement CCQ"],
+  ["ccqBenefitsDeduction", "ccq_benefits_deduction", "Av. sociaux CCQ (déd.)"],
+  ["ccqBenefitsAdvantage", "ccq_benefits_advantage", "Av. sociaux CCQ (avantage)"],
+  ["ccqTaxableBenefit", "ccq_taxable_benefit", "Avantage imposable add. CCQ"],
+  ["medicInsurance", "medic_insurance", "Assurance MÉDIC"],
+  ["unionDues", "union_dues", "Cotisation syndicale"],
+  ["unionEducationFund", "union_education_fund", "Caisse d'éducation syndicale"],
+  ["insuranceSalesTax", "insurance_sales_tax", "Taxe de vente assurance"],
+  ["safetyEquipment", "safety_equipment", "Équipement de sécurité"],
+  ["kmIndemnity", "km_indemnity", "Indemnité KM"],
+  ["otherIncome", "other_income", "Autre revenu"],
+  ["hoursYtd", "hours_ytd", "Heures"],
+];
+
+const EMPTY_YTD = {
+  grossIncome: 0, rrqEmployee: 0, rrq2Employee: 0, eiEmployee: 0, rqapEmployee: 0, federalTax: 0, quebecTax: 0, pensionableIncomeRRQ: 0, insurableIncomeEI: 0, insurableIncomeRQAP: 0, labourStandardsIncome: 0,
+  ...Object.fromEntries(CCQ_CUMUL.map(([k]) => [k, 0])),
+};
 
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
@@ -110,6 +136,7 @@ export default function PayrollEngineTester() {
         quebecTax: data.quebec_tax, pensionableIncomeRRQ: data.pensionable_income_rrq,
         insurableIncomeEI: data.insurable_income_ei, insurableIncomeRQAP: data.insurable_income_rqap,
         labourStandardsIncome: data.labour_standards_income,
+        ...Object.fromEntries(CCQ_CUMUL.map(([k, col]) => [k, data[col] ?? 0])),
       });
       setAsOfDate(data.as_of_date || "");
       setSaveState({ status: "saved", message: t("payroll.loaded") });
@@ -130,6 +157,7 @@ export default function PayrollEngineTester() {
       quebec_tax: num(ytd.quebecTax), pensionable_income_rrq: num(ytd.pensionableIncomeRRQ),
       insurable_income_ei: num(ytd.insurableIncomeEI), insurable_income_rqap: num(ytd.insurableIncomeRQAP),
       labour_standards_income: num(ytd.labourStandardsIncome),
+      ...Object.fromEntries(CCQ_CUMUL.map(([k, col]) => [col, num(ytd[k])])),
     }, { onConflict: "user_id,tax_year" });
     setSaveState(error ? { status: "error", message: error.message } : { status: "saved", message: t("payroll.saved") });
   }
@@ -282,6 +310,21 @@ export default function PayrollEngineTester() {
             <Field label={t("payroll.insurableEiYtd")} value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} />
             <Field label={t("payroll.insurableRqapYtd")} value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} />
           </div>
+
+          <details className="mt-3 group rounded-lg border">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
+              <span>{t("payroll.ccqCumulTitle")}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="border-t p-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {CCQ_CUMUL.map(([k, , label]) => (
+                  <Field key={k} label={label} value={ytd[k]} onChange={setY(k)} />
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
+            </div>
+          </details>
         </CardContent>
       </Card>
 
