@@ -20,6 +20,12 @@ function montrealToday() {
 
 const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 
+// CCQ week key (ending Saturday) — used to prorate weekly reimbursements.
+const ccqWeekKey = (dateStr) => {
+  const d = dayjs(dateStr);
+  return d.add((6 - d.day() + 7) % 7, "day").format("YYYY-MM-DD");
+};
+
 // CCQ level → the matching per-hour rate column on employer_contributions.
 const LEVEL_RATE_KEY = {
   compagnon: "rate_compagnon",
@@ -58,7 +64,7 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, km_rate, team_leader_premium, apprentice_level"),
+        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement"),
         supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, amount").gte("job_date", start).lte("job_date", end),
@@ -119,6 +125,10 @@ export default function CostingDashboard() {
         // km and parking are actual expense reimbursements and still apply.
         const mealsCost = isNonCcq ? 0 : (mealByUser.get(userId) || 0);
         const parkingCost = parkingByUser.get(userId) || 0;
+        // Phone/data reimbursement is a fixed weekly amount — prorate by the number
+        // of distinct CCQ weeks the employee actually worked in the range.
+        const weeksWorked = new Set((jobsByUser.get(userId) || []).map((j) => ccqWeekKey(j.job_date))).size;
+        const phoneData = weeksWorked * (Number(profile?.phone_data_reimbursement) || 0);
 
         result.push({
           userId,
@@ -129,8 +139,8 @@ export default function CostingDashboard() {
           premium,
           regHours: (regMin + returnMin) / 60,
           otHours: (ot50Min + ot100Min) / 60,
-          labor, conges, contribTotal, contribLines, kmCost, mealsCost, parkingCost,
-          total: labor + conges + contribTotal + kmCost + mealsCost + parkingCost,
+          labor, conges, contribTotal, contribLines, kmCost, mealsCost, parkingCost, phoneData,
+          total: labor + conges + contribTotal + kmCost + mealsCost + parkingCost + phoneData,
         });
       });
       result.sort((a, b) => b.total - a.total);
@@ -146,7 +156,7 @@ export default function CostingDashboard() {
     labor: acc.labor + r.labor,
     conges: acc.conges + r.conges,
     contribTotal: acc.contribTotal + r.contribTotal,
-    expenses: acc.expenses + r.kmCost + r.mealsCost + r.parkingCost,
+    expenses: acc.expenses + r.kmCost + r.mealsCost + r.parkingCost + r.phoneData,
     total: acc.total + r.total,
   }), { regHours: 0, otHours: 0, labor: 0, conges: 0, contribTotal: 0, expenses: 0, total: 0 });
 
@@ -195,7 +205,7 @@ export default function CostingDashboard() {
               <tbody>
                 {rows.map((r) => {
                   const isOpen = expanded.has(r.userId);
-                  const expenses = r.kmCost + r.mealsCost + r.parkingCost;
+                  const expenses = r.kmCost + r.mealsCost + r.parkingCost + r.phoneData;
                   return (
                     <React.Fragment key={r.userId}>
                       <tr className="border-b last:border-0 hover:bg-muted/20">
@@ -228,6 +238,7 @@ export default function CostingDashboard() {
                               <Detail label={t("costing.col.km")} value={money(r.kmCost)} />
                               <Detail label={t("costing.col.meals")} value={money(r.mealsCost)} />
                               <Detail label={t("costing.col.parking")} value={money(r.parkingCost)} />
+                              <Detail label={t("costing.col.phoneData")} value={money(r.phoneData)} />
                             </div>
                           </td>
                         </tr>
