@@ -138,11 +138,26 @@ export function roundHours(minutes) {
 // in the week. Source: CCQ chèque-vacances page; see docs/rules/compensation-rules.md.
 export const CONGES_INDEMNITY_RATES = { vacation: 0.06, statutoryHolidays: 0.055, sick: 0.015 };
 
-export function calculateCongesIndemnity(weeklyWageDollars) {
+// Map a conges_indemnity_rate DB row to the rates shape, falling back to the code
+// constant for any missing field. Lets the estimate views read the DB value while
+// staying safe if the row is absent. (The authoritative export path does not use
+// this — it keeps the versioned constant.)
+export function congesRatesFromRow(row) {
+  if (!row) return CONGES_INDEMNITY_RATES;
+  const num = (v, d) => (v == null || Number.isNaN(Number(v)) ? d : Number(v));
+  return {
+    vacation: num(row.vacation, CONGES_INDEMNITY_RATES.vacation),
+    statutoryHolidays: num(row.statutory_holidays, CONGES_INDEMNITY_RATES.statutoryHolidays),
+    sick: num(row.sick, CONGES_INDEMNITY_RATES.sick),
+  };
+}
+
+export function calculateCongesIndemnity(weeklyWageDollars, rates = CONGES_INDEMNITY_RATES) {
   const wages = Math.max(0, Number(weeklyWageDollars) || 0);
-  const vacation = wages * CONGES_INDEMNITY_RATES.vacation;
-  const statutoryHolidays = wages * CONGES_INDEMNITY_RATES.statutoryHolidays;
-  const sick = wages * CONGES_INDEMNITY_RATES.sick;
+  const r = rates || CONGES_INDEMNITY_RATES;
+  const vacation = wages * (r.vacation ?? 0);
+  const statutoryHolidays = wages * (r.statutoryHolidays ?? 0);
+  const sick = wages * (r.sick ?? 0);
   return { vacation, statutoryHolidays, sick, total: vacation + statutoryHolidays + sick };
 }
 

@@ -5,9 +5,10 @@ import { ChevronRight } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayrollEntries, calculateCongesIndemnity } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow } from "@/lib/payroll-calculations";
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
+import CongesIndemnityManager from "@/components/CongesIndemnityManager";
 
 dayjs.extend(isoWeek);
 
@@ -56,16 +57,18 @@ export default function CostingDashboard() {
     (async () => {
       setLoading(true);
       const { start, end } = range;
-      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }] = await Promise.all([
+      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, role, hourly_rate, km_rate, team_leader_premium, apprentice_level"),
         supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }),
+        supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle(),
       ]);
       if (cancelled) return;
 
       const contributions = contribRows || [];
+      const congesRates = congesRatesFromRow(congesRow);
       const profileById = new Map((people || []).map((p) => [p.id, p]));
       const jobsByUser = new Map();
       (jobs || []).forEach((job) => {
@@ -105,7 +108,7 @@ export default function CostingDashboard() {
           kmCost += e.totalKm * jobKmRate;
         });
 
-        const conges = isNonCcq ? 0 : calculateCongesIndemnity(labor).total;
+        const conges = isNonCcq ? 0 : calculateCongesIndemnity(labor, congesRates).total;
         const paidHours = (regMin + returnMin + ot50Min + ot100Min) / 60;
         // Employer contributions: per-hour rate for this employee's level × paid hours.
         const contribLines = rateKey
@@ -171,6 +174,7 @@ export default function CostingDashboard() {
       </Card>
 
       <EmployerContributionsManager />
+      <CongesIndemnityManager />
 
       <Card>
         <CardContent className="p-0">
