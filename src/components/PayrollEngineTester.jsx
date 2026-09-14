@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { AlertTriangle, Calculator, ChevronDown, Save } from "lucide-react";
+import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayroll, RULE_VERSION } from "@/payroll";
+import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 
 const TAX_YEAR = 2026;
@@ -90,6 +91,7 @@ export default function PayrollEngineTester() {
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
   const [result, setResult] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
+  const [showStub, setShowStub] = useState(false);
 
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -101,7 +103,7 @@ export default function PayrollEngineTester() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, team_leader_premium, apprentice_level")
+        .select("id, full_name, role, hourly_rate, team_leader_premium, apprentice_level, employee_number, ccq_number")
         .order("full_name", { ascending: true });
       if (!cancelled) setEmployees(data || []);
     })();
@@ -350,11 +352,28 @@ export default function PayrollEngineTester() {
         </CardContent>
       </Card>
 
-      <Button onClick={handleCalculate} className="w-full sm:w-auto">
-        <Calculator className="mr-2 h-4 w-4" /> {t("payroll.calculate")}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={handleCalculate} className="w-full sm:w-auto">
+          <Calculator className="mr-2 h-4 w-4" /> {t("payroll.calculate")}
+        </Button>
+        {result && result.gross && (
+          <Button variant="outline" onClick={() => setShowStub(true)} className="w-full sm:w-auto">
+            <Printer className="mr-2 h-4 w-4" /> {t("payroll.printStub")}
+          </Button>
+        )}
+      </div>
 
       {result && <Results result={result} open={openExplain} setOpen={setOpenExplain} t={t} />}
+
+      <PayStubPrint
+        open={showStub}
+        onOpenChange={setShowStub}
+        result={result}
+        ytd={ytd}
+        pay={pay}
+        employee={employees.find((e) => e.id === selectedId) || null}
+        frequency={frequency}
+      />
     </div>
   );
 }
