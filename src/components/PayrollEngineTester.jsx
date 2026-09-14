@@ -1,13 +1,25 @@
 import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
 import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayroll, RULE_VERSION } from "@/payroll";
+import { calculatePayrollEntries } from "@/lib/payroll-calculations";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 
+dayjs.extend(isoWeek);
+
 const TAX_YEAR = 2026;
+
+// CCQ week (Sunday → Saturday) keyed by the ending Saturday.
+function ccqWeek(dateStr) {
+  const d = dayjs(dateStr);
+  const end = d.add((6 - d.day() + 7) % 7, "day");
+  return { key: end.format("YYYY-MM-DD"), start: end.subtract(6, "day"), end };
+}
 
 // CCQ cumulative (Sommaire) figures — record-only opening balances from the stub.
 // [stateKey, dbColumn, label]. They do NOT feed the DAS calc; they're stored so the
@@ -84,17 +96,20 @@ function Row({ label, value, strong }) {
 export default function PayrollEngineTester() {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, hourlyRate: 45.36, ot150Hours: 0, ot200Hours: 0, bonus: 0, vacation: 0, taxableBenefit: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, hourlyRate: 45.36, ot150Hours: 0, ot200Hours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD });
   const [asOfDate, setAsOfDate] = useState("");
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
   const [result, setResult] = useState(null);
+  const [reimb, setReimb] = useState({ km: 0, phone: 0, total: 0 });
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
 
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
+  const [weekOptions, setWeekOptions] = useState([]); // [{key, label, start, end, weekNo, regularHours, ot150Hours, ot200Hours, km}]
+  const [selectedWeek, setSelectedWeek] = useState(""); // "" = manual
   const [saveState, setSaveState] = useState({ status: "idle", message: "" }); // idle|loading|saving|saved|error
 
   // Load the roster once. Errors are non-fatal — the bench still works manually.
@@ -103,7 +118,7 @@ export default function PayrollEngineTester() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, team_leader_premium, apprentice_level, employee_number, ccq_number")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, employee_number, ccq_number, phone_data_reimbursement")
         .order("full_name", { ascending: true });
       if (!cancelled) setEmployees(data || []);
     })();
@@ -114,14 +129,40 @@ export default function PayrollEngineTester() {
   async function handleSelectEmployee(id) {
     setSelectedId(id);
     setSaveState({ status: "idle", message: "" });
+    setWeekOptions([]); setSelectedWeek("");
     if (!id) return;
     const profile = employees.find((e) => e.id === id);
     if (profile?.hourly_rate != null) {
       // Effective wage = base rate + team-leader premium. The premium is paid on
       // every hour (regular + OT), so it belongs in the hourly rate, not Bonus.
       const effectiveRate = Number(profile.hourly_rate) + Number(profile.team_leader_premium || 0);
-      setPay((s) => ({ ...s, hourlyRate: effectiveRate }));
+      setPay((s) => ({ ...s, hourlyRate: effectiveRate, kmRate: Number(profile.km_rate) || 0 }));
     }
+
+    // Build a week picker from the employee's recent jobs (last ~16 weeks).
+    const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
+    const { data: jobRows } = await supabase
+      .from("jobs")
+      .select("id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes")
+      .eq("user_id", id).gte("job_date", since).order("job_date", { ascending: false });
+    const byWeek = new Map();
+    (jobRows || []).forEach((j) => {
+      const w = ccqWeek(j.job_date);
+      if (!byWeek.has(w.key)) byWeek.set(w.key, { ...w, jobs: [] });
+      byWeek.get(w.key).jobs.push(j);
+    });
+    const opts = [...byWeek.values()].map((w) => {
+      let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, km = 0;
+      calculatePayrollEntries(w.jobs).forEach((e) => {
+        regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
+        retMin += e.returnRegularMinutes; km += e.totalKm;
+      });
+      return {
+        key: w.key, start: w.start, end: w.end, weekNo: w.end.isoWeek(),
+        regularHours: (regMin + retMin) / 60, ot150Hours: ot50 / 60, ot200Hours: ot100 / 60, km,
+      };
+    }).sort((a, b) => (a.key < b.key ? 1 : -1));
+    setWeekOptions(opts);
 
     setSaveState({ status: "loading", message: "" });
     const { data, error } = await supabase
@@ -164,6 +205,17 @@ export default function PayrollEngineTester() {
     setSaveState(error ? { status: "error", message: error.message } : { status: "saved", message: t("payroll.saved") });
   }
 
+  // Selecting a week fills the hours + km from that week's actual jobs; "" = manual.
+  function handleSelectWeek(key) {
+    setSelectedWeek(key);
+    if (!key) return;
+    const w = weekOptions.find((o) => o.key === key);
+    if (!w) return;
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    setFrequency("weekly");
+    setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), km: r2(w.km) }));
+  }
+
   const setP = (k) => (v) => setPay((s) => ({ ...s, [k]: v }));
   const setE = (k) => (v) => setEmp((s) => ({ ...s, [k]: v }));
   const setY = (k) => (v) => setYtd((s) => ({ ...s, [k]: v }));
@@ -176,9 +228,13 @@ export default function PayrollEngineTester() {
     const overtime = Number(pay.ot150Hours) * rate * 1.5 + Number(pay.ot200Hours) * rate * 2;
     if (regular) earnings.push({ type: "regular", amount: regular });
     if (overtime) earnings.push({ type: "overtime", amount: overtime });
-    if (Number(pay.bonus)) earnings.push({ type: "bonus", amount: Number(pay.bonus) });
-    if (Number(pay.vacation)) earnings.push({ type: "vacation", amount: Number(pay.vacation) });
     if (Number(pay.taxableBenefit)) earnings.push({ type: "taxableBenefit", amount: Number(pay.taxableBenefit) });
+
+    // Non-taxable reimbursements (outside the DAS calc): KM + weekly phone/data.
+    const profile = employees.find((e) => e.id === selectedId);
+    const kmReimb = Number(pay.km) * Number(pay.kmRate);
+    const phoneReimb = Number(profile?.phone_data_reimbursement) || 0;
+    setReimb({ km: kmReimb, phone: phoneReimb, total: kmReimb + phoneReimb });
 
     setResult(calculatePayroll({
       taxYear: 2026,
@@ -260,15 +316,34 @@ export default function PayrollEngineTester() {
         </CardContent>
       </Card>
 
-      <Section title={t("payroll.paySection")}>
-        <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
-        <Field label={t("payroll.hourlyRate")} value={pay.hourlyRate} onChange={setP("hourlyRate")} />
-        <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" />
-        <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" />
-        <Field label={t("payroll.bonus")} value={pay.bonus} onChange={setP("bonus")} />
-        <Field label={t("payroll.vacation")} value={pay.vacation} onChange={setP("vacation")} />
-        <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
-      </Section>
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.paySection")}</div>
+          {selectedId && (
+            <label className="mb-3 block text-xs">
+              <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
+              <select value={selectedWeek} onChange={(e) => handleSelectWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <option value="">{t("payroll.weekManual")}</option>
+                {weekOptions.map((w) => (
+                  <option key={w.key} value={w.key}>
+                    {t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM")} · {(w.regularHours + w.ot150Hours + w.ot200Hours).toFixed(2)}h · {w.km.toFixed(0)}km
+                  </option>
+                ))}
+                {weekOptions.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
+              </select>
+            </label>
+          )}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
+            <Field label={t("payroll.hourlyRate")} value={pay.hourlyRate} onChange={setP("hourlyRate")} />
+            <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" />
+            <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" />
+            <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" />
+            <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" />
+            <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-4">
@@ -363,7 +438,7 @@ export default function PayrollEngineTester() {
         )}
       </div>
 
-      {result && <Results result={result} open={openExplain} setOpen={setOpenExplain} t={t} />}
+      {result && <Results result={result} reimb={reimb} open={openExplain} setOpen={setOpenExplain} t={t} />}
 
       <PayStubPrint
         open={showStub}
@@ -371,14 +446,16 @@ export default function PayrollEngineTester() {
         result={result}
         ytd={ytd}
         pay={pay}
+        reimb={reimb}
         employee={employees.find((e) => e.id === selectedId) || null}
         frequency={frequency}
+        week={weekOptions.find((w) => w.key === selectedWeek) || null}
       />
     </div>
   );
 }
 
-function Results({ result, open, setOpen, t }) {
+function Results({ result, reimb, open, setOpen, t }) {
   if (!result.gross) {
     return (
       <Card>
@@ -409,6 +486,13 @@ function Results({ result, open, setOpen, t }) {
           <Row label="RQAP" value={money(employee.rqap)} />
           <Row label={t("payroll.totalDeductions")} value={money(employee.totalDeductions)} />
           <Row label={t("payroll.netPay")} value={money(employee.netPay)} strong />
+          {reimb && reimb.total > 0 && (
+            <>
+              <Row label={t("payroll.reimbKm")} value={money(reimb.km)} />
+              <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} />
+              <Row label={t("payroll.netPlusReimb")} value={money(employee.netPay + reimb.total)} strong />
+            </>
+          )}
         </CardContent></Card>
 
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
