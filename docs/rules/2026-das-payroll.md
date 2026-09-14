@@ -2,6 +2,14 @@
 
 > **Status: DRAFT — NOT VALIDATED. Do not use for finalized pay.**
 >
+> **Validation progress (2026):** RRQ, EI (QC) and RQAP verified against CRA
+> **T4127 123e édition** (Tableaux 8.4 / 8.8 and the EI table). Federal income tax
+> verified against **T4127 Tableau 8.1/8.2** — brackets + K, MPBF max 16 452 $,
+> CCE 1 501 $, Québec abatement 16.5 %. **Still a placeholder:** the Québec income
+> tax (TP-1015.F brackets, montant de base, déduction pour travailleur). The rule
+> set stays `draft` (every result `requires_review`) until the Québec side is filled
+> and a few pays are validated against WebRAS/PDOC with specialist sign-off.
+>
 > This document registers the constants and sources for the payroll (source
 > deductions / DAS) engine under `src/payroll/`. Per
 > [ADR 0001](../adr/0001-product-scope-timekeeping-and-payroll-export.md) and the

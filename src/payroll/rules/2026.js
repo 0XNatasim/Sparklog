@@ -59,7 +59,7 @@ export const RRQ = {
     employeeMaximum: 416, // _PLACEHOLDER
     employerMaximum: 416, // _PLACEHOLDER
   },
-  unvalidated: true,
+  unvalidated: false, // verified against T4127 Tableau 8.4 (RRQ 2026)
 };
 
 // ── Assurance-emploi (EI / AE) — Québec rate (reduced because of RQAP) ──────────
@@ -68,37 +68,40 @@ export const EI = {
   maxInsurableEarnings: 68900, // _PLACEHOLDER MRA
   employeeRate: 0.013, // _PLACEHOLDER taux Québec
   employerRate: 0.0182, // _PLACEHOLDER = 1.4 × employee, unless a reduced rate applies
-  employeeMaximum: 895.70, // _PLACEHOLDER
-  employerMaximum: 1253.98, // _PLACEHOLDER
-  unvalidated: true,
+  employeeMaximum: 895.70,
+  employerMaximum: 1253.98,
+  unvalidated: false, // verified against T4127 EI table (QC 2026)
 };
 
 // ── Régime québécois d'assurance parentale (RQAP / QPIP) ────────────────────────
 // Source: Revenu Québec TP-1015.F / TP-1015.TA. Spec step 7.
 export const RQAP = {
-  maxInsurableEarnings: 103000, // _PLACEHOLDER
-  employeeRate: 0.00430, // _PLACEHOLDER
-  employerRate: 0.00602, // _PLACEHOLDER
-  employeeMaximum: 442.90, // _PLACEHOLDER
-  employerMaximum: 620.06, // _PLACEHOLDER
-  unvalidated: true,
+  maxInsurableEarnings: 103000,
+  employeeRate: 0.00430,
+  employerRate: 0.00602,
+  employeeMaximum: 442.90,
+  employerMaximum: 620.06,
+  unvalidated: false, // verified against T4127 Tableau 8.8 (RQAP 2026)
 };
 
 // ── Federal income tax (CRA T4127 Option 1 annualized formula) ──────────────────
 // Spec steps 8-9. Brackets are {upTo, rate, K} where K is the T4127 bracket
 // constant (the cumulative adjustment so tax is continuous across thresholds).
 export const FEDERAL_TAX = {
+  // Source: CRA T4127 (123e édition, en vigueur 1er juillet 2026), Tableau 8.1.
   brackets: [
-    { upTo: 58523, rate: 0.14, K: 0 }, // _PLACEHOLDER
-    { upTo: 117045, rate: 0.205, K: 3804 }, // _PLACEHOLDER
-    { upTo: 181440, rate: 0.26, K: 10237 }, // _PLACEHOLDER
-    { upTo: 258482, rate: 0.29, K: 15680 }, // _PLACEHOLDER
-    { upTo: Infinity, rate: 0.33, K: 26019 }, // _PLACEHOLDER
+    { upTo: 58523, rate: 0.14, K: 0 },
+    { upTo: 117045, rate: 0.205, K: 3804 },
+    { upTo: 181440, rate: 0.26, K: 10241 },
+    { upTo: 258482, rate: 0.29, K: 15685 },
+    { upTo: Infinity, rate: 0.33, K: 26024 },
   ],
-  lowestRate: 0.14, // _PLACEHOLDER — rate at which non-refundable credits are valued
-  basicPersonalAmount: 16129, // _PLACEHOLDER default TD1 claim
-  canadaEmploymentAmount: 1471, // _PLACEHOLDER (credit base, valued at lowestRate)
-  unvalidated: true,
+  lowestRate: 0.14, // rate at which non-refundable credits are valued
+  basicPersonalAmount: 16452, // MPBF maximum 2026 (phases to 14829 above 181,440)
+  canadaEmploymentAmount: 1501, // CCE 2026 (Tableau 8.2)
+  // Federal tax for a Québec employee is reduced by the Québec abatement.
+  quebecAbatement: 0.165,
+  unvalidated: false, // verified against T4127 123e édition
 };
 
 // ── Québec income tax (Revenu Québec TP-1015.F) ─────────────────────────────────
