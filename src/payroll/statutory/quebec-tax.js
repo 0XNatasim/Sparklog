@@ -29,14 +29,11 @@ export function calculateQuebecTax({
   const b = bracketFor(r.brackets, Y);
   const claim = personalTaxCredits != null ? personalTaxCredits : r.basicPersonalAmount;
 
-  const annualRrq = Math.min(P * toDollars(credits?.rrqBaseCents || 0), rules.rrq.tier1.employeeMaximum);
-  const annualEi = Math.min(P * toDollars(credits?.eiCents || 0), rules.ei.employeeMaximum);
-  const annualRqap = Math.min(P * toDollars(credits?.rqapCents || 0), rules.rqap.employeeMaximum);
+  // Québec values personal tax credits (TP-1015.3) at the lowest rate. Unlike the
+  // federal formula, Québec has no separate QPP/EI/QPIP contribution credit.
+  const personalCredit = r.lowestRate * claim;
 
-  const personalCredit = r.lowestRate * claim; // TP-1015.3 personal amounts
-  const contributionCredit = r.lowestRate * (annualRrq + annualEi + annualRqap);
-
-  const annualTax = Math.max(0, b.rate * Y - b.K - personalCredit - contributionCredit);
+  const annualTax = Math.max(0, b.rate * Y - b.K - personalCredit);
   const periodTax = annualTax / P + additionalTax;
   const taxCents = Math.max(0, roundCents(periodTax));
 
@@ -49,7 +46,7 @@ export function calculateQuebecTax({
       bracketRate: b.rate,
       bracketConstantK: b.K,
       personalTaxCredits: claim,
-      creditContributions: money(roundCents(annualRrq + annualEi + annualRqap)),
+      personalCredit: money(roundCents(personalCredit)),
       annualTax: money(roundCents(annualTax)),
       periodsPerYear: P,
       tax: money(taxCents),
