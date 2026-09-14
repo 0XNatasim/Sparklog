@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,24 @@ const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2
 // cumulatives. It is a DRAFT: the DAS figures come from the unvalidated placeholder
 // rule set, and the CCQ Période cells that the app doesn't compute are left blank.
 // Never a substitute for the official pay stub.
-export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, employee, frequency }) {
+export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, employee, frequency, week }) {
   const [hdr, setHdr] = useState({
-    periodStart: "", periodEnd: "", payDate: "", week: "", ref: "",
+    periodStart: week?.start ? week.start.format("YYYY-MM-DD") : "",
+    periodEnd: week?.end ? week.end.format("YYYY-MM-DD") : "",
+    payDate: "", week: week?.weekNo ? String(week.weekNo) : "", ref: "",
   });
   const setH = (k) => (e) => setHdr((s) => ({ ...s, [k]: e.target.value }));
+
+  // When opened, sync the period/week header from the currently selected week.
+  useEffect(() => {
+    if (!open || !week) return;
+    setHdr((s) => ({
+      ...s,
+      periodStart: week.start ? week.start.format("YYYY-MM-DD") : s.periodStart,
+      periodEnd: week.end ? week.end.format("YYYY-MM-DD") : s.periodEnd,
+      week: week.weekNo ? String(week.weekNo) : s.week,
+    }));
+  }, [open, week]);
 
   if (!result || !result.gross) return null;
   const g = result.gross, emp = result.employee;
@@ -29,15 +42,13 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, emp
     { label: "Salaire régulier", unit: pay.regularHours, taux: rate, montant: regAmt },
     { label: "Temps et demi", unit: pay.ot150Hours, taux: rate * 1.5, montant: ot150Amt },
     { label: "Temps double", unit: pay.ot200Hours, taux: rate * 2, montant: ot200Amt },
-    n(pay.bonus) ? { label: "Prime", unit: "", taux: "", montant: n(pay.bonus) } : null,
-    n(pay.vacation) ? { label: "Vacances", unit: "", taux: "", montant: n(pay.vacation) } : null,
     n(pay.taxableBenefit) ? { label: "Avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
   ].filter(Boolean);
 
   // Non-taxable reimbursements — paid on top of net, outside the DAS calc.
-  const phoneData = n(employee?.phone_data_reimbursement);
   const reimbursements = [
-    phoneData ? { label: "Remboursement données cellulaire", montant: phoneData } : null,
+    n(reimb?.km) ? { label: "Indemnité KM", montant: n(reimb.km) } : null,
+    n(reimb?.phone) ? { label: "Remboursement données cellulaire", montant: n(reimb.phone) } : null,
   ].filter(Boolean);
   const reimbTotal = reimbursements.reduce((s, r) => s + r.montant, 0);
 
