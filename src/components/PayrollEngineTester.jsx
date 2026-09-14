@@ -75,7 +75,7 @@ export default function PayrollEngineTester() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, apprentice_level")
+        .select("id, full_name, role, hourly_rate, team_leader_premium, apprentice_level")
         .order("full_name", { ascending: true });
       if (!cancelled) setEmployees(data || []);
     })();
@@ -88,7 +88,12 @@ export default function PayrollEngineTester() {
     setSaveState({ status: "idle", message: "" });
     if (!id) return;
     const profile = employees.find((e) => e.id === id);
-    if (profile?.hourly_rate != null) setPay((s) => ({ ...s, hourlyRate: profile.hourly_rate }));
+    if (profile?.hourly_rate != null) {
+      // Effective wage = base rate + team-leader premium. The premium is paid on
+      // every hour (regular + OT), so it belongs in the hourly rate, not Bonus.
+      const effectiveRate = Number(profile.hourly_rate) + Number(profile.team_leader_premium || 0);
+      setPay((s) => ({ ...s, hourlyRate: effectiveRate }));
+    }
 
     setSaveState({ status: "loading", message: "" });
     const { data, error } = await supabase
