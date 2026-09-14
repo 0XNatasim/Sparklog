@@ -67,7 +67,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -271,6 +271,7 @@ export default function EmployeesPanel() {
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 truncate font-semibold">
+                {p.employee_number && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">#{p.employee_number}</span>}
                 {p.role === "owner"
                   ? <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.bossLabel")} />
                   : p.role === "admin"
@@ -323,6 +324,19 @@ export default function EmployeesPanel() {
                 </Field>
               </div>
             )}
+
+            {/* Identity */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Field label={t("employees.employeeNumber")}>
+                <Input
+                  value={p.employee_number || ""}
+                  onChange={(e) => setLocal(p.id, "employee_number", e.target.value)}
+                  onBlur={(e) => saveField(p.id, "employee_number", e.target.value)}
+                  placeholder="09"
+                  className="h-9"
+                />
+              </Field>
+            </div>
 
             {/* Contact */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
