@@ -34,6 +34,13 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, emp
     n(pay.taxableBenefit) ? { label: "Avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
   ].filter(Boolean);
 
+  // Non-taxable reimbursements — paid on top of net, outside the DAS calc.
+  const phoneData = n(employee?.phone_data_reimbursement);
+  const reimbursements = [
+    phoneData ? { label: "Remboursement données cellulaire", montant: phoneData } : null,
+  ].filter(Boolean);
+  const reimbTotal = reimbursements.reduce((s, r) => s + r.montant, 0);
+
   // Sommaire: statutory lines carry a Période (from the calc) + Cumulatif (YTD + période).
   const stat = [
     { label: "Gains", per: g.total, cum: n(ytd.grossIncome) + g.total },
@@ -131,6 +138,26 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, emp
                   ))}
                 </tbody>
               </table>
+
+              {reimbursements.length > 0 && (
+                <div className="mt-2">
+                  <div className="mb-1 font-semibold italic">Remboursements <span className="font-normal">(non imposables)</span></div>
+                  <table className="w-full">
+                    <tbody>
+                      {reimbursements.map((r, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="py-0.5">{r.label}</td>
+                          <td className="text-right font-mono">{money(r.montant)}</td>
+                        </tr>
+                      ))}
+                      <tr className="font-semibold">
+                        <td className="py-0.5">Paie nette + remboursements</td>
+                        <td className="text-right font-mono">{money(emp.netPay + reimbTotal)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Sommaire */}
