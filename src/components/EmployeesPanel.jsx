@@ -67,7 +67,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -180,6 +180,9 @@ export default function EmployeesPanel() {
     if (field === "km_rate" || field === "hourly_rate") {
       value = rawValue === "" || rawValue == null ? null : Number(rawValue);
       if (value != null && Number.isNaN(value)) return;
+    } else if (field === "phone_data_reimbursement") {
+      value = rawValue === "" || rawValue == null ? 0 : Number(rawValue);
+      if (Number.isNaN(value)) return;
     } else if (typeof value === "string") {
       value = value.trim() || null;
     }
@@ -501,6 +504,24 @@ export default function EmployeesPanel() {
                   />
                   <span className="text-xs text-muted-foreground">/km</span>
                 </div>
+              </Field>
+              <Field label={t("employees.phoneData")}>
+                <div className="flex h-9 items-center gap-1">
+                  <span className="text-sm text-muted-foreground">$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    inputMode="decimal"
+                    value={p.phone_data_reimbursement ?? ""}
+                    onChange={(e) => setLocal(p.id, "phone_data_reimbursement", e.target.value)}
+                    onBlur={(e) => saveField(p.id, "phone_data_reimbursement", e.target.value)}
+                    placeholder="0.00"
+                    className="h-9"
+                  />
+                  <span className="text-xs text-muted-foreground">/{t("employees.perWeek")}</span>
+                </div>
+                <span className="text-[11px] text-muted-foreground">{t("employees.phoneDataHint")}</span>
               </Field>
                 </div>
 
