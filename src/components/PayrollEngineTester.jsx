@@ -96,7 +96,7 @@ function Row({ label, value, strong }) {
 export default function PayrollEngineTester() {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, hourlyRate: 45.36, ot150Hours: 0, ot200Hours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD });
   const [asOfDate, setAsOfDate] = useState("");
@@ -133,10 +133,14 @@ export default function PayrollEngineTester() {
     if (!id) return;
     const profile = employees.find((e) => e.id === id);
     if (profile?.hourly_rate != null) {
-      // Effective wage = base rate + team-leader premium. The premium is paid on
-      // every hour (regular + OT), so it belongs in the hourly rate, not Bonus.
-      const effectiveRate = Number(profile.hourly_rate) + Number(profile.team_leader_premium || 0);
-      setPay((s) => ({ ...s, hourlyRate: effectiveRate, kmRate: Number(profile.km_rate) || 0 }));
+      // Base wage + team-leader premium kept separate: regular is paid at base +
+      // premium, but overtime is computed on the BASE rate only (per the CCQ stub).
+      setPay((s) => ({
+        ...s,
+        baseRate: Number(profile.hourly_rate) || 0,
+        premium: Number(profile.team_leader_premium) || 0,
+        kmRate: Number(profile.km_rate) || 0,
+      }));
     }
 
     // Build a week picker from the employee's recent jobs (last ~16 weeks).
@@ -223,9 +227,11 @@ export default function PayrollEngineTester() {
 
   function handleCalculate() {
     const earnings = [];
-    const rate = Number(pay.hourlyRate);
-    const regular = Number(pay.regularHours) * rate;
-    const overtime = Number(pay.ot150Hours) * rate * 1.5 + Number(pay.ot200Hours) * rate * 2;
+    const base = Number(pay.baseRate);
+    const prem = Number(pay.premium);
+    // Regular is paid at base + premium; overtime is on the base rate only (CCQ).
+    const regular = Number(pay.regularHours) * (base + prem);
+    const overtime = Number(pay.ot150Hours) * base * 1.5 + Number(pay.ot200Hours) * base * 2;
     if (regular) earnings.push({ type: "regular", amount: regular });
     if (overtime) earnings.push({ type: "overtime", amount: overtime });
     if (Number(pay.taxableBenefit)) earnings.push({ type: "taxableBenefit", amount: Number(pay.taxableBenefit) });
@@ -335,7 +341,8 @@ export default function PayrollEngineTester() {
           )}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
-            <Field label={t("payroll.hourlyRate")} value={pay.hourlyRate} onChange={setP("hourlyRate")} />
+            <Field label={t("payroll.baseRate")} value={pay.baseRate} onChange={setP("baseRate")} />
+            <Field label={t("payroll.premium")} value={pay.premium} onChange={setP("premium")} />
             <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" />
             <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" />
             <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" />

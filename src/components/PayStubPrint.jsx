@@ -31,17 +31,18 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
   if (!result || !result.gross) return null;
   const g = result.gross, emp = result.employee;
-  const rate = n(pay.hourlyRate);
-  const regAmt = n(pay.regularHours) * rate;
-  const ot150Amt = n(pay.ot150Hours) * rate * 1.5;
-  const ot200Amt = n(pay.ot200Hours) * rate * 2;
-  const hours = n(pay.regularHours) + n(pay.ot150Hours) + n(pay.ot200Hours);
+  const base = n(pay.baseRate);
+  const prem = n(pay.premium);
+  const regHrs = n(pay.regularHours);
+  const hours = regHrs + n(pay.ot150Hours) + n(pay.ot200Hours);
 
-  // Transactions (gains detail): unit / rate / amount.
+  // Transactions (gains detail): unit / rate / amount. Regular is split into the
+  // base-rate line + the premium line ("Régulier à taux horaire"); OT is on base.
   const gains = [
-    { label: "Salaire régulier", unit: pay.regularHours, taux: rate, montant: regAmt },
-    { label: "Temps et demi", unit: pay.ot150Hours, taux: rate * 1.5, montant: ot150Amt },
-    { label: "Temps double", unit: pay.ot200Hours, taux: rate * 2, montant: ot200Amt },
+    { label: "Salaire régulier fixe", unit: pay.regularHours, taux: base, montant: regHrs * base },
+    { label: "Temps et demi", unit: pay.ot150Hours, taux: base * 1.5, montant: n(pay.ot150Hours) * base * 1.5 },
+    { label: "Temps double", unit: pay.ot200Hours, taux: base * 2, montant: n(pay.ot200Hours) * base * 2 },
+    prem ? { label: "Régulier à taux horaire", unit: pay.regularHours, taux: prem, montant: regHrs * prem } : null,
     n(pay.taxableBenefit) ? { label: "Avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
   ].filter(Boolean);
 
