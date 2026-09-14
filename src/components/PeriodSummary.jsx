@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
-import { calculatePayrollEntries, calculateCongesIndemnity } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow } from "@/lib/payroll-calculations";
 import { jobCodeKind } from "@/lib/job-code";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import { formatHM } from "@/lib/time";
@@ -62,16 +62,18 @@ export default function PeriodSummary({ mode = "week" }) {
     (async () => {
       setLoading(true);
       const { start, end } = range;
-      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }] = await Promise.all([
+      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
         supabase.from("profiles").select("id, role, hourly_rate, km_rate, team_leader_premium, apprentice_level"),
         supabase.from("jobs").select("id, user_id, job_date, ot, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("employer_contributions").select("*").eq("active", true),
+        supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle(),
       ]);
       if (cancelled) return;
 
       const contributions = contribRows || [];
+      const congesRates = congesRatesFromRow(congesRow);
       const profileById = new Map((people || []).map((p) => [p.id, p]));
 
       const buckets = new Map();
@@ -115,7 +117,7 @@ export default function PeriodSummary({ mode = "week" }) {
             kmCost += e.totalKm * jobKmRate;
           });
           labor += empLabor;
-          conges += isNonCcq ? 0 : calculateCongesIndemnity(empLabor).total;
+          conges += isNonCcq ? 0 : calculateCongesIndemnity(empLabor, congesRates).total;
           if (rateKey) {
             const perHour = contributions.reduce((s, c) => s + (Number(c[rateKey]) || 0), 0);
             contribTotal += perHour * (empPaidMin / 60);
