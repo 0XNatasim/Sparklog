@@ -40,7 +40,9 @@ export function calculateFederalTax({
   const K2 = r.lowestRate * (annualRrq + annualEi + annualRqap); // contribution credits
   const K4 = r.lowestRate * Math.min(A, r.canadaEmploymentAmount); // Canada employment amount
 
-  const annualTax = Math.max(0, b.rate * A - b.K - K1 - K2 - K4);
+  const basicFederalTax = Math.max(0, b.rate * A - b.K - K1 - K2 - K4);
+  // Québec residents' federal tax is reduced by the Québec abatement (16.5%).
+  const annualTax = basicFederalTax * (1 - (r.quebecAbatement || 0));
   const periodTax = annualTax / P + additionalTax;
   const taxCents = Math.max(0, roundCents(periodTax));
 
