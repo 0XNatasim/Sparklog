@@ -107,35 +107,45 @@ export const FEDERAL_TAX = {
 // ── Québec income tax (Revenu Québec TP-1015.F) ─────────────────────────────────
 // Spec steps 10-11. Computed separately from the federal formula — never a switch.
 export const QUEBEC_TAX = {
+  // Source: Revenu Québec TP-1015.F (2026-01).
   brackets: [
-    { upTo: 53255, rate: 0.14, K: 0 }, // _PLACEHOLDER
-    { upTo: 106495, rate: 0.19, K: 2663 }, // _PLACEHOLDER
-    { upTo: 129590, rate: 0.24, K: 7988 }, // _PLACEHOLDER
-    { upTo: Infinity, rate: 0.2575, K: 10250 }, // _PLACEHOLDER
+    { upTo: 54345, rate: 0.14, K: 0 },
+    { upTo: 108680, rate: 0.19, K: 2717 },
+    { upTo: 132245, rate: 0.24, K: 8151 },
+    { upTo: Infinity, rate: 0.2575, K: 10465 },
   ],
-  lowestRate: 0.14, // _PLACEHOLDER — value of personal credits (TP-1015.3)
-  basicPersonalAmount: 18571, // _PLACEHOLDER montant personnel de base
+  lowestRate: 0.14, // value of personal credits (TP-1015.3)
+  basicPersonalAmount: 18952, // montant personnel de base 2026
   // "Déduction pour travailleur" (annual, capped) reducing taxable income.
-  workerDeduction: 1420, // _PLACEHOLDER
-  unvalidated: true,
+  workerDeduction: 1450, // maximum 2026
+  unvalidated: false, // verified against TP-1015.F (2026-01)
 };
 
 // ── Employer: Fonds des services de santé (FSS) ─────────────────────────────────
 // Employer-only. Rate depends on total annual payroll + category. Spec step 12.
 // The in-year rate is an ESTIMATE; the real rate is set at the Sommaire 1.
+// Source: Revenu Québec TP-1015.F (2026-01), FSS rate table. Both "general" and
+// "primary_manufacturing" use the same sliding formula shape between $1M and $7.8M:
+//   rate% = slideBase + slideFactor × (annualPayroll / 1,000,000).
 export const FSS = {
   general: {
-    lowPayrollThreshold: 1000000, // _PLACEHOLDER
-    highPayrollThreshold: 7800000, // _PLACEHOLDER
-    lowRate: 0.0165, // _PLACEHOLDER ≤ threshold
-    highRate: 0.0426, // _PLACEHOLDER ≥ threshold
-    // Sliding formula between the thresholds: a + b × (payroll / 1,000,000).
-    slideBase: 1.2662, // _PLACEHOLDER (percent)
-    slideFactor: 0.3838, // _PLACEHOLDER (percent per $1M)
+    lowPayrollThreshold: 1000000,
+    highPayrollThreshold: 7800000,
+    lowRate: 0.0165, // ≤ $1M
+    highRate: 0.0426, // ≥ $7.8M
+    slideBase: 1.2662, // percent
+    slideFactor: 0.3838, // percent per $1M
   },
-  primary_manufacturing: { flatRate: 0.0165, unvalidated: true }, // _PLACEHOLDER distinct grid
-  public: { flatRate: 0.0426, unvalidated: true }, // _PLACEHOLDER
-  unvalidated: true,
+  primary_manufacturing: {
+    lowPayrollThreshold: 1000000,
+    highPayrollThreshold: 7800000,
+    lowRate: 0.0125, // ≤ $1M
+    highRate: 0.0426, // ≥ $7.8M
+    slideBase: 0.8074, // percent
+    slideFactor: 0.4426, // percent per $1M
+  },
+  public: { flatRate: 0.0426 },
+  unvalidated: false, // verified against TP-1015.F (2026-01)
 };
 
 // ── Employer: Normes du travail (CNT / labour standards) ────────────────────────

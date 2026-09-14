@@ -7,9 +7,7 @@ import { money } from "../money.js";
 export function fssRate(rules, { annualPayrollEstimate = 0, fssCategory = "general" }) {
   const r = rules.fss;
   if (fssCategory === "public") return r.public.flatRate;
-  if (fssCategory === "primary_manufacturing") return r.primary_manufacturing.flatRate;
-
-  const g = r.general;
+  const g = fssCategory === "primary_manufacturing" ? r.primary_manufacturing : r.general;
   if (annualPayrollEstimate <= g.lowPayrollThreshold) return g.lowRate;
   if (annualPayrollEstimate >= g.highPayrollThreshold) return g.highRate;
   // Sliding scale: (base + factor × payroll/1,000,000) percent.
