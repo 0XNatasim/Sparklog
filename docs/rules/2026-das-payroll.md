@@ -159,21 +159,35 @@ federal base. This table shows the real MÉDIC benefit is 135,08 $ (3,377 $/h); 
 0,80 (rounding)` — three different items merged into one delta, exactly the net-delta
 shortcut to avoid. Only the sourced MÉDIC exclusion is now modelled.
 
-**Result & remaining gap (kept `requires_review`):** RRQ/EI/RQAP and Québec income tax
-reproduce **to the cent**. The federal base computes **2 251,49 $** and federal tax
-**266,55 $**, vs the stub's printed **2 203,56 $** / **259,95 $**. The ~48 $ base gap
-is the **union dues (29,93 $, U1** — a sourced T4127 deduction) plus the **prélèvement
-CCQ (17,22 $)**, neither modelled here because they are withheld *amounts* that are not
-engine inputs (and the prélèvement's federal deductibility is unconfirmed — per
-ccq.org it is a 0,75 % regulatory levy, likely not deductible). F5A (RRQ enhancement)
-is applied per T4127 (factor `A = [P × (I − F − F2 − F5A − U1)] − HD − F1`,
-t4127-01-26f.pdf; `U1 = cotisations syndicales versées pour la période`). The engine
-deliberately does **not** close the gap with an unsourced net delta.
+**Union dues (U1) — modelled as a separate federal deduction.** Per T4127, `U1 =
+cotisations syndicales versées pour la période`; they reduce the **federal** base but
+are a **Québec credit** (not a base deduction), so they are NOT applied to the Québec
+side. The bench takes the union dues as a per-period **amount** (union-specific), fed
+to the federal deduction only. For Simon (29,93 $), federal tax then computes **261,43
+$** vs the stub's **259,95 $**.
 
-**Still to source before validation:** union dues (U1) and any admissible prélèvement
-as *separate* federal deductions (they need to become inputs, not a fudge); the
-federal *timing* of the vacances (remitted to a CCQ fund and paid later per ccq.org,
-yet present in this period's base); and the whole federal chain against **PDOC**.
+Union dues are union-specific (ccq.org, "Cotisations redistribuées aux associations
+syndicales"): CSD (50 % de la 1re h + 0,035 $/h), CSN (50 % de la 1re h; apprentis
+9,90–11,70 $/sem), SQC (compagnon 15,25 $/sem; apprentis 9,95–11,95 $/sem), FTQ, and
+**FIPOE section locale 568** (compagnons électriciens : 65 % d'une heure/semaine sur le
+taux compagnon de l'**annexe B du secteur industriel** + 0,05 $/h). Simon's 29,93 $
+does not reconcile against the ICI rate (50,79 $) but fits FIPOE 568 at an implied
+industrial rate of ~42,97 $ — so the amount needs the industrial annexe B rate (not in
+scope) and is entered manually meanwhile.
+
+**Result & remaining gap (kept `requires_review`):** RRQ/EI/RQAP and Québec income tax
+reproduce **to the cent**; with the sourced MÉDIC exclusion + U1 union dues, federal
+tax is **261,43 $** vs the stub's **259,95 $**. The remaining **~1,50 $** is the
+**prélèvement CCQ (17,22 $)** — per ccq.org a 0,75 % regulatory levy, **not** a federal
+deduction — plus TD1/rounding/cumulative-method, to settle against **PDOC**. F5A (RRQ
+enhancement) is applied per T4127 (factor `A = [P × (I − F − F2 − F5A − U1)] − HD −
+F1`, t4127-01-26f.pdf). The engine does **not** close the last dollar with an unsourced
+net delta.
+
+**Still to source before validation:** the exact union-dues amount from the FIPOE 568
+industrial annexe B rate (to compute it rather than enter it); the federal *timing* of
+the vacances (remitted to a CCQ fund and paid later per ccq.org, yet present in this
+period's base); and the whole federal chain against **PDOC**.
 
 ## Validation checklist (before flipping to `validated`)
 

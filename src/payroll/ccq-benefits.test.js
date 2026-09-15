@@ -59,9 +59,12 @@ describe("engine baseAdjustments", () => {
     const hours = 40, baseRate = 50.79, premium = 4.06;
     const wages = hours * (baseRate + premium);
     const ccq = computeCcqBenefits({ hours, hourlyWage: baseRate, employeePensionRate: 0.09 });
+    // Union dues (cotisation syndicale, 29,93 $) are a federal-only deduction (T4127
+    // U1) — annualized here; Québec treats them as a credit, so no Québec entry.
+    const unionDues = 29.93;
     const r = calculatePayroll({
       taxYear: 2026, provinceOfEmployment: "QC", payPeriod: { frequency: "weekly" },
-      employee: { federalTaxProfile: {}, quebecTaxProfile: {} },
+      employee: { federalTaxProfile: { annualDeductions: unionDues * 52 }, quebecTaxProfile: {} },
       employer: { annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 0.02 },
       earnings: [{ type: "regular", amount: wages }],
       baseAdjustments: ccq.baseAdjustments,
@@ -88,15 +91,15 @@ describe("engine baseAdjustments", () => {
 
     // The federal source base EXCLUDES the MÉDIC taxable benefit (3,377 $/h, CCQ
     // Avantages imposables table) — a Québec-only taxable benefit not withheld
-    // federally at source (T4A). So the federal base = Québec base − avantage
-    // imposable = salaire + indemnité − retraite = 2 251,49 $. The stub's printed
-    // federal base (2 203,56 $) is ~48 $ lower because of the U1 union dues (sourced
-    // T4127) + the prélèvement CCQ — neither modelled here (not engine inputs). So
-    // federal tax computes 266,55 $ vs the stub's 259,95 $; that gap is documented,
-    // NOT masked with a net-delta fudge.
+    // federally at source (T4A) — so the base = salaire + indemnité − retraite =
+    // 2 251,49 $; then the U1 union dues (29,93 $) are deducted federally. Federal tax
+    // computes 261,43 $ vs the stub's 259,95 $. The remaining ~1,50 $ is the
+    // prélèvement CCQ (not a federal deduction) + TD1/rounding — documented, NOT
+    // masked with a net-delta fudge. Québec tax is unaffected (union dues are a QC
+    // credit, not a base deduction) and stays exact.
     const fedBase = wages + ccq.baseAdjustments.taxableFederal;
     expect(fedBase).toBeCloseTo(2251.49, 1);
-    expect(r.employee.federalTax).toBeCloseTo(266.55, 2);
+    expect(r.employee.federalTax).toBeCloseTo(261.43, 2);
   });
 
   // A second, structural scenario (an apprentice at different hours) guards the base

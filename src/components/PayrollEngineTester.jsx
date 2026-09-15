@@ -5,7 +5,7 @@ import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-re
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS } from "@/payroll";
+import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, PAY_PERIODS_PER_YEAR } from "@/payroll";
 import { calculatePayrollEntries } from "@/lib/payroll-calculations";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -114,6 +114,9 @@ export default function PayrollEngineTester() {
     imposablePerHour: CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
     medicPerHour: CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
     medicTaxPct: CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate * 100,
+    // Union dues (cotisation syndicale): a FEDERAL deduction (T4127 U1) — a Québec
+    // credit, not a base deduction. Union-specific amount; entered manually.
+    unionDuesPerPeriod: 0,
   });
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
@@ -290,6 +293,9 @@ export default function PayrollEngineTester() {
         federalTaxProfile: {
           td1ClaimAmount: emp.td1ClaimAmount === "" ? undefined : Number(emp.td1ClaimAmount),
           additionalTax: Number(emp.additionalFederal) || 0,
+          // Union dues reduce the FEDERAL base only (T4127 U1); annualized here.
+          // Québec treats them as a credit, not a base deduction — so no Québec entry.
+          annualDeductions: ccq.enabled ? (Number(ccq.unionDuesPerPeriod) || 0) * (PAY_PERIODS_PER_YEAR[frequency] || 52) : 0,
         },
         quebecTaxProfile: {
           personalTaxCredits: emp.personalTaxCredits === "" ? undefined : Number(emp.personalTaxCredits),
@@ -416,6 +422,7 @@ export default function PayrollEngineTester() {
                 <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" />
                 <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" />
                 <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" />
+                <Field label={t("payroll.ccqUnionDues")} value={ccq.unionDuesPerPeriod} onChange={setC("unionDuesPerPeriod")} step="0.01" />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqNote")}</p>
             </>
