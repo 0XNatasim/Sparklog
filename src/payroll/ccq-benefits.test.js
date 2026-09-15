@@ -25,8 +25,16 @@ describe("computeCcqBenefits", () => {
   it("computes MÉDIC + provincial tax as a net withholding, separate from the pension", () => {
     const b = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
     expect(b.medicWithholding).toBeCloseTo(40 * 0.68 * 1.09, 6); // 0,7412 $/h → 29,648
-    // Take-home withholding = pension + MÉDIC; MÉDIC must NOT be in the tax deduction.
-    expect(b.netWithholdings).toBeCloseTo(b.pensionDeduction + b.medicWithholding, 6);
+    // Take-home withholding = pension + MÉDIC + union dues; none of MÉDIC is a tax deduction.
+    expect(b.netWithholdings).toBeCloseTo(b.pensionDeduction + b.medicWithholding + b.unionDues, 6);
+  });
+
+  it("auto-computes the FTQ-FIPOE union dues (federal U1 deduction)", () => {
+    // 55 % of one hour's wage per week + 0,05 $/h → 0,55 × 50,79 + 0,05 × 40 = 29,93.
+    const b = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
+    expect(b.unionDues).toBeCloseTo(0.55 * 50.79 + 0.05 * 40, 6);
+    expect(b.unionDues).toBeCloseTo(29.93, 2);
+    expect(b.federalDeduction).toBe(b.unionDues); // U1: federal only, Québec is a credit
   });
 
   it("maps benefits onto the right statutory bases (MÉDIC is not a tax deduction)", () => {
@@ -59,12 +67,12 @@ describe("engine baseAdjustments", () => {
     const hours = 40, baseRate = 50.79, premium = 4.06;
     const wages = hours * (baseRate + premium);
     const ccq = computeCcqBenefits({ hours, hourlyWage: baseRate, employeePensionRate: 0.09 });
-    // Union dues (cotisation syndicale, 29,93 $) are a federal-only deduction (T4127
-    // U1) — annualized here; Québec treats them as a credit, so no Québec entry.
-    const unionDues = 29.93;
+    // Union dues (FTQ-FIPOE) are auto-computed (55 % × wage + 0,05 $/h = 29,93 $) and
+    // applied as a federal-only deduction (T4127 U1), annualized; Québec = credit.
+    expect(ccq.federalDeduction).toBeCloseTo(29.93, 2);
     const r = calculatePayroll({
       taxYear: 2026, provinceOfEmployment: "QC", payPeriod: { frequency: "weekly" },
-      employee: { federalTaxProfile: { annualDeductions: unionDues * 52 }, quebecTaxProfile: {} },
+      employee: { federalTaxProfile: { annualDeductions: ccq.federalDeduction * 52 }, quebecTaxProfile: {} },
       employer: { annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 0.02 },
       earnings: [{ type: "regular", amount: wages }],
       baseAdjustments: ccq.baseAdjustments,

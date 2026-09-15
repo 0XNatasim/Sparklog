@@ -58,6 +58,15 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   medicEmployeePerHour: 0.68,
   medicProvincialTaxRate: 0.09,
 
+  // Cotisation syndicale FTQ-FIPOE (Fraternité interprovinciale des ouvriers en
+  // électricité) — a FEDERAL deduction (T4127 U1), a Québec credit (not a base
+  // deduction). Formula: 55 % of one hour's wage per week + 0,05 $ per hour worked.
+  // Confirmed against Simon B.'s stub: 0,55 × 50,79 + 0,05 × 40 = 29,93 $ to the cent.
+  // ⚠️ The 55 % is confirmed for this FTQ-FIPOE membership; other unions/annexes
+  // differ (e.g. FIPOE 568 quotes 65 %). Verify per member's local before reuse.
+  unionDuesRateOfHourlyWage: 0.55,
+  unionDuesPerHour: 0.05,
+
   // Salaires C3 en vigueur le 26 avril 2026 + taux de cotisation retraite salariale.
   levels: {
     journeyman:  { label: "Compagnon",  hourlyWage: 50.79, employeePensionRate: 0.09 },
@@ -86,6 +95,8 @@ export function computeCcqBenefits({
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
   medicEmployeePerHour = CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
   medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
+  unionDuesRateOfHourlyWage = CCQ_ELECTRICIAN_IC_C3.unionDuesRateOfHourlyWage,
+  unionDuesPerHour = CCQ_ELECTRICIAN_IC_C3.unionDuesPerHour,
 } = {}) {
   const h = Math.max(0, Number(hours) || 0);
   const wage = Number(hourlyWage) || 0;
@@ -99,6 +110,9 @@ export function computeCcqBenefits({
   const pensionDeduction = baseWage * (1 + vacationHolidaySickRate) * employeePensionRate;
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
+  // Union dues (FTQ-FIPOE): 55 % of one hour's wage per week + 0,05 $/h. Withheld from
+  // pay AND a federal income-tax deduction (U1); a Québec credit (not a base deduction).
+  const unionDues = unionDuesRateOfHourlyWage * wage + unionDuesPerHour * h;
 
   // Québec taxable income: salaire + indemnity + avantage imposable − deductible pension.
   const taxableQuebec = vacation + taxableBenefit - pensionDeduction;
@@ -108,9 +122,13 @@ export function computeCcqBenefits({
     taxableBenefit,
     pensionDeduction,
     medicWithholding,
-    // Both the pension contribution and the MÉDIC premium are withheld from pay,
-    // so the caller subtracts this from the engine's (statutory-only) net pay.
-    netWithholdings: pensionDeduction + medicWithholding,
+    unionDues,
+    // The pension, MÉDIC premium and union dues are all withheld from pay, so the
+    // caller subtracts this from the engine's (statutory-only) net pay.
+    netWithholdings: pensionDeduction + medicWithholding + unionDues,
+    // Union dues reduce the FEDERAL taxable income only (T4127 U1); the caller passes
+    // this to the federal tax profile (annualized). Québec treats them as a credit.
+    federalDeduction: unionDues,
     baseAdjustments: {
       // 13 % indemnity is insurable (EI/RQAP) and pensionable (RRQ).
       insurableEI: vacation,
@@ -121,8 +139,7 @@ export function computeCcqBenefits({
       // Federal source-deduction base EXCLUDES the MÉDIC taxable benefit (Québec taxes
       // it; the CRA does not withhold on it at source → T4A). So the federal base is
       // the Québec base minus that same avantage imposable = salaire + indemnité −
-      // retraite. Any further federal/Québec gap (union dues U1, prélèvement) is NOT
-      // modelled here — see docs/rules/2026-das-payroll.md.
+      // retraite. Union dues are applied separately as a federal income deduction (U1).
       taxableFederal: taxableQuebec - taxableBenefit,
     },
   };
