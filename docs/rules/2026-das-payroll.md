@@ -159,21 +159,24 @@ federal base. This table shows the real MÉDIC benefit is 135,08 $ (3,377 $/h); 
 0,80 (rounding)` — three different items merged into one delta, exactly the net-delta
 shortcut to avoid. Only the sourced MÉDIC exclusion is now modelled.
 
-**Union dues (U1) — modelled as a separate federal deduction.** Per T4127, `U1 =
-cotisations syndicales versées pour la période`; they reduce the **federal** base but
-are a **Québec credit** (not a base deduction), so they are NOT applied to the Québec
-side. The bench takes the union dues as a per-period **amount** (union-specific), fed
-to the federal deduction only. For Simon (29,93 $), federal tax then computes **261,43
-$** vs the stub's **259,95 $**.
+**Union dues (U1) — modelled as a separate federal deduction, auto-computed.** Per
+T4127, `U1 = cotisations syndicales versées pour la période`; they reduce the
+**federal** base but are a **Québec credit** (not a base deduction), so they are NOT
+applied to the Québec side. Simon B. is a member of **FTQ-FIPOE**, whose dues are
+**55 % of one hour's wage per week + 0,05 $/h** — the engine computes this
+(`unionDuesRateOfHourlyWage 0.55`, `unionDuesPerHour 0.05`): 0,55 × 50,79 + 0,05 × 40 =
+**29,93 $**, to the cent. Federal tax then computes **261,43 $** vs the stub's
+**259,95 $**.
 
 Union dues are union-specific (ccq.org, "Cotisations redistribuées aux associations
 syndicales"): CSD (50 % de la 1re h + 0,035 $/h), CSN (50 % de la 1re h; apprentis
 9,90–11,70 $/sem), SQC (compagnon 15,25 $/sem; apprentis 9,95–11,95 $/sem), FTQ, and
-**FIPOE section locale 568** (compagnons électriciens : 65 % d'une heure/semaine sur le
-taux compagnon de l'**annexe B du secteur industriel** + 0,05 $/h). Simon's 29,93 $
-does not reconcile against the ICI rate (50,79 $) but fits FIPOE 568 at an implied
-industrial rate of ~42,97 $ — so the amount needs the industrial annexe B rate (not in
-scope) and is entered manually meanwhile.
+FIPOE 568 (65 % d'une heure/semaine + 0,05 $/h). The CCQ **Annexe B — secteur
+industriel** (au 26 avril 2026) confirms the compagnon électricien rate = **50,79 $** —
+identical to the ICI rate. So FIPOE 568's 65 % would give 35,01 $; Simon's actual
+FTQ-FIPOE dues use **55 %** (`0,55 × 50,79 + 0,05 × 40 = 29,93 $`, confirmed by the
+member). The 55 % is confirmed for this membership only — other unions/annexes differ,
+so the rate stays a per-membership constant to verify before reuse.
 
 **Result & remaining gap (kept `requires_review`):** RRQ/EI/RQAP and Québec income tax
 reproduce **to the cent**; with the sourced MÉDIC exclusion + U1 union dues, federal
@@ -184,10 +187,10 @@ enhancement) is applied per T4127 (factor `A = [P × (I − F − F2 − F5A −
 F1`, t4127-01-26f.pdf). The engine does **not** close the last dollar with an unsourced
 net delta.
 
-**Still to source before validation:** the exact union-dues amount from the FIPOE 568
-industrial annexe B rate (to compute it rather than enter it); the federal *timing* of
-the vacances (remitted to a CCQ fund and paid later per ccq.org, yet present in this
-period's base); and the whole federal chain against **PDOC**.
+**Still to source before validation:** the FTQ-FIPOE 55 % rate against the union's own
+schedule (confirmed by the member, not yet against a published table); the federal
+*timing* of the vacances (remitted to a CCQ fund and paid later per ccq.org, yet
+present in this period's base); and the whole federal chain against **PDOC**.
 
 ## Validation checklist (before flipping to `validated`)
 

@@ -114,9 +114,6 @@ export default function PayrollEngineTester() {
     imposablePerHour: CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
     medicPerHour: CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
     medicTaxPct: CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate * 100,
-    // Union dues (cotisation syndicale): a FEDERAL deduction (T4127 U1) — a Québec
-    // credit, not a base deduction. Union-specific amount; entered manually.
-    unionDuesPerPeriod: 0,
   });
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
@@ -267,6 +264,7 @@ export default function PayrollEngineTester() {
     // indemnity / taxable benefit / social-benefits deduction into the DAS bases.
     const totalHours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
     let baseAdjustments;
+    let unionDuesFederalAnnual = 0; // U1 federal deduction, annualized
     if (ccq.enabled) {
       const pensionRate = CCQ_ELECTRICIAN_IC_C3.levels[ccq.status]?.employeePensionRate
         ?? CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate;
@@ -280,6 +278,9 @@ export default function PayrollEngineTester() {
         medicProvincialTaxRate: (Number(ccq.medicTaxPct) || 0) / 100,
       });
       baseAdjustments = benefits.baseAdjustments;
+      // Union dues (FTQ-FIPOE) — a federal-only deduction (U1), computed per week and
+      // annualized. Québec treats them as a credit, so they never touch the QC side.
+      unionDuesFederalAnnual = (benefits.federalDeduction || 0) * (PAY_PERIODS_PER_YEAR[frequency] || 52);
       setCcqAmounts(benefits);
     } else {
       setCcqAmounts(null);
@@ -293,9 +294,9 @@ export default function PayrollEngineTester() {
         federalTaxProfile: {
           td1ClaimAmount: emp.td1ClaimAmount === "" ? undefined : Number(emp.td1ClaimAmount),
           additionalTax: Number(emp.additionalFederal) || 0,
-          // Union dues reduce the FEDERAL base only (T4127 U1); annualized here.
+          // Union dues reduce the FEDERAL base only (T4127 U1), auto-computed above.
           // Québec treats them as a credit, not a base deduction — so no Québec entry.
-          annualDeductions: ccq.enabled ? (Number(ccq.unionDuesPerPeriod) || 0) * (PAY_PERIODS_PER_YEAR[frequency] || 52) : 0,
+          annualDeductions: unionDuesFederalAnnual,
         },
         quebecTaxProfile: {
           personalTaxCredits: emp.personalTaxCredits === "" ? undefined : Number(emp.personalTaxCredits),
@@ -422,7 +423,6 @@ export default function PayrollEngineTester() {
                 <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" />
                 <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" />
                 <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" />
-                <Field label={t("payroll.ccqUnionDues")} value={ccq.unionDuesPerPeriod} onChange={setC("unionDuesPerPeriod")} step="0.01" />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqNote")}</p>
             </>
@@ -582,6 +582,7 @@ function Results({ result, reimb, ccq, open, setOpen, t }) {
             <>
               <Row label={t("payroll.ccqPensionRow")} value={money(-ccq.pensionDeduction)} />
               <Row label={t("payroll.ccqMedicRow")} value={money(-ccq.medicWithholding)} />
+              <Row label={t("payroll.ccqUnionRow")} value={money(-ccq.unionDues)} />
               <Row label={t("payroll.ccqNetAfter")} value={money(employee.netPay - ccq.netWithholdings)} strong />
             </>
           )}
