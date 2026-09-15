@@ -141,11 +141,21 @@ the **prélèvement CCQ (17,22 $)** is *also* deducted federally — and that de
 is **not sourced**. So the federal base is **not** reconciled; three things remain
 open, each needing a primary source (do not assume):
 
-1. **Is the CCQ vacances (264,11 $) federal employment income this period?** (vs
-   accrued/paid later). Assumed above; unconfirmed.
-2. **Is the prélèvement CCQ (17,22 $) an admissible federal deduction?** Not sourced.
-   Do not treat every CCQ withholding as deductible union dues — only the 29,93 $
-   cotisation syndicale is sourced as U1.
+1. **Is the CCQ vacances (264,11 $) federal employment income this period?** Likely
+   **not**: the CCQ (ccq.org/avantages) states the 13 % indemnity is *remitted by the
+   employer to a CCQ fund and paid to the worker later* (before the summer/winter
+   holidays). It is pensionable/insurable/QC-taxable in the period earned (matched to
+   the cent), but its *federal* timing is unconfirmed — and excluding it drops the
+   federal base far below the printed 2 203,56 $, so the reconciliation is still open.
+2. **Is the prélèvement CCQ (17,22 $) an admissible federal deduction?** Almost
+   certainly **not**. Per the CCQ (ccq.org/avantages), the prélèvement is **0,75 % de
+   la rémunération, à parts égales employeur/employé** — a regulatory levy that
+   finances the CCQ ("assurer la conformité dans l'industrie"), **not** union dues and
+   **not** an RPP contribution. So it does not belong in T4127 F or U1. This removes it
+   as a reconciliation candidate (the earlier 0,80 $ figure wrongly deducted it). Note
+   also that the 29,93 $ "cotisations redistribuées" bundles the union dues *and* a
+   sectoral training contribution (ccq.org), so even that may not be 100 % deductible
+   U1 — to confirm.
 3. **Why is the avantage imposable additionnel (135,08 $) taxable in Québec but not
    federally?** The likely nature is an **employer-paid group-insurance premium**
    (taxable QC benefit on the RL-1, exempt federally as an employer PHSP contribution)
