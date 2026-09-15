@@ -80,10 +80,10 @@ C3 (aussi C4-C5), en vigueur du **2026-04-26 au 2027-04-24**. Salaires C3 : comp
 | Benefit | Rate | Bases affected | Source / status |
 |---------|------|----------------|-----------------|
 | Indemnité de congés | 13 % of the **base wage** (vacances 6 % + fériés 5,5 % + maladie 1,5 %) | RRQ pensionable, EI + RQAP insurable, Québec taxable | CCQ; `conges_indemnity_rate` (migration 0038); verified to the cent |
-| Avantage imposable additionnel | 3,377 $/h (all levels of the trade) | RRQ pensionable, Québec taxable | `tests/Tableau-Institutionnel-Commercial-2026-2027.pdf`; verified to the cent |
+| Avantage imposable MÉDIC (assurance vie + maladie) | 3,377 $/h (C3/C4-C5; 3,408 $/h C6/C7-C8) | RRQ pensionable, Québec taxable; **excluded** from the federal source base (T4A) | CCQ "Avantages sociaux MÉDIC Construction — Avantages imposables" ICI 2026-04-26 → 2027-04-24, Électricien (220); verified to the cent |
 | Cotisation salariale au régime de retraite | wage × (1 + 13 %) × **9 %** compagnon / **4,5 %** apprenti (compagnon C3 = 5,165343 $/h) | Québec taxable (**reduces** it) + withheld from pay | CCQ agreement; deductible from taxable income. Computed from the wage — follows the annual increase, never hardcoded |
 | MÉDIC Construction (employee) + Québec 9 % insurance tax | 0,68 $/h × 1,09 = 0,7412 $/h | **none** (net withholding only, not a tax deduction) | CCQ held the premium at 0,68 $/h through 2027-04-24 |
-| Federal taxable | wages | (kept at wages) | ⚠️ The printed federal base is 2 203,56 $ (see the reconciliation below); it is explained to within 0,80 $ by the avantage imposable being Québec-only + union dues being a federal deduction / Québec credit, but the residual is not rate-derivable, so `taxableFederal` stays 0 (no fabricated delta) pending the payroll provider's breakdown + PDOC validation |
+| Federal taxable | provincial base − MÉDIC taxable benefit | salaire + indemnité − retraite (2 251,49 $) | The MÉDIC avantage imposable (3,377 $/h, sourced — CCQ Avantages imposables table) is Québec-taxable + pensionable but not withheld federally at source (T4A) → `taxableFederal = taxableQuebec − taxableBenefit`. The remaining gap to the printed 2 203,56 $ (union dues U1 + prélèvement) is documented, not fudged; see the reconciliation below |
 
 **Correction (important):** an earlier draft used a reverse-engineered
 `socialBenefitsDeductionPerHour = 5,797 $/h` chosen only to hit the stub's Québec
@@ -111,45 +111,83 @@ tier-2 (MSGA 85 000 $, 4 %, max 416 $); RQAP 2026 is confirmed at 103 000 $, 0,4
 ### Printed taxable-base reconciliation (D0033-0007)
 
 The real stub prints two taxable-income bases for the period: **federal 2 203,56 $**
-and **provincial 2 386,59 $**. These are the ground truth for factor A (T4127) and
-its Québec equivalent (TP-1015.F). Reconciling them against the period components
-(salaire 2 194,00 ; vacances CCQ 264,11 ; avantage imposable additionnel CCQ 135,08 ;
-retraite CCQ 206,60 ; cotisation syndicale 29,93 ; prélèvement CCQ 17,22) :
+and **provincial 2 386,59 $** — the ground truth for factor A (T4127) and its Québec
+equivalent (TP-1015.F). Period components: salaire 2 194,00 ; vacances CCQ 264,11 ;
+avantage imposable additionnel CCQ 135,08 ; retraite CCQ 206,60 ; cotisation syndicale
+29,93 ; prélèvement CCQ 17,22.
 
-| Base | Formula | Amount | Printed | Δ |
-|------|---------|--------|---------|---|
-| **Provincial** | salaire + vacances + avantage imposable − retraite | 2 386,57 $ | 2 386,59 $ | **0,02 $** (rounding) |
-| **Federal** | salaire + vacances − retraite − cotisation syndicale − prélèvement CCQ | 2 204,36 $ | 2 203,56 $ | **0,80 $** |
+#### Provincial base — reproduced to the cent (rounding policy confirmed)
 
-The provincial base reproduces **to the cent** (2¢, from per-hour rounding), which
-confirms the CCQ composition (vacances + avantage imposable + retraite déductible).
-The federal base is explained to within **0,80 $** by two real federal-vs-Québec
-rules — **not** by the reverse-engineered deltas Gemini proposed (its 355 $ figure
-is a *cumulative* column, and adding it makes RRQ 172,99 $ ≠ 159,13 $):
+`2 194,00 + 264,11 + 135,08 − 206,60 = 2 386,59 $` = the printed provincial base,
+**exactly**. This confirms the CCQ composition (vacances + avantage imposable −
+retraite déductible) AND the payroll's **rounding policy**: each component is rounded
+to the cent before the base is built. The retraite is the tell — the payroll rounds
+the pensionable hourly base first (`50,79 × 1,13 = 57,3927 → 57,39`, then × 9 % × 40 h
+= 206,60 $), whereas the engine's full-precision path gives 206,6137 → 206,61 and a
+base of 2 386,57 $. The 2¢ is a per-component rounding difference (see the rounding
+test in `ccq-benefits.test.js`), not a composition error.
 
-- **Avantage imposable additionnel CCQ (135,08 $) — Québec-only taxable benefit.**
-  It is in the provincial base but not the federal base (a construction benefit
-  reported on the RL-1 but not the T4). This is the largest federal/Québec gap.
-- **Cotisation syndicale (29,93 $) + prélèvement CCQ (17,22 $) — federal deductions,
-  Québec credits.** Union dues reduce federal taxable income (CRA line 21200) but
-  are a *credit* in Québec (they do not reduce the Québec base). Source: CRA
-  (deduction) vs Revenu Québec (crédit d'impôt).
+#### Federal base — MÉDIC taxable benefit excluded (sourced), remaining gap documented
 
-**Unresolved (kept `requires_review`, NOT hardcoded):** a **0,80 $** residual on the
-federal base and a further **~1,60 $** on the federal tax remain. They cannot be
-derived from a rate — the union dues / levy are withheld *amounts*, not formulas, and
-the exact federal taxable-benefit split needs the payroll provider's period
-breakdown. So the engine keeps `ccqBenefits.baseAdjustments.taxableFederal = 0`
-(federal base = wages) rather than fabricate a +9,56 $ delta: federal computes
-**256,71 $** vs the stub's **259,95 $**. F5 (the RRQ enhancement) IS applied per
-T4127 (factor A = [P × (I − F − F2 − **F5A** − U1)] − HD − F1, t4127-01-26f.pdf).
+The MÉDIC avantage imposable is now **sourced**: the CCQ table *"Avantages sociaux
+MÉDIC Construction — Avantages imposables"* (secteur institutionnel-commercial,
+2026-04-26 → 2027-04-24) lists, for **Électricien (code 220)**, **3,377 $/h**
+(colonne C3/C4-C5) and 3,408 $/h (colonne C6/C7-C8). That is exactly the engine's
+`taxableBenefitPerHour`, so the value is confirmed against a primary CCQ source.
 
-**To close it, request from the payroll provider:** the period breakdown of the
-"gains imposables — fédéral" line (2 203,56 $), specifically (1) which CCQ benefits
-are federal taxable vs Québec-only, (2) the union dues / levy federal deduction
-amounts, and (3) the TD1 federal claim actually used. Then validate against PDOC
-(federal) and WebRAS (Québec). The rule set stays `draft` (every result
-`requires_review`).
+The chain:
+
+```
+base cotisable (RRQ) = salaire + vacances + avantage imposable MÉDIC
+                     = 2 194,00 + 264,11 + 135,08 = 2 593,19   ✓ (RRQ to the cent)
+imposable Québec     = base cotisable − déduction retraite CCQ
+                     = 2 593,19 − 206,60 = 2 386,59            ✓ (printed provincial)
+imposable fédéral    = imposable Québec − avantage imposable MÉDIC
+                     = 2 386,59 − 135,08 = 2 251,49
+```
+
+**The rule (CCQ Avantages imposables):** the MÉDIC contribution (assurance vie +
+maladie) is a **Québec** taxable benefit, but the CRA does **not** require the
+employer to withhold on it at source (reported on a **T4A** at year-end). So the
+federal source base excludes it: `taxableFederal = taxableQuebec − taxableBenefit`
+= salaire + indemnité − retraite.
+
+**Correction — the earlier 183,03 $ was a conflated net delta, removed.** The prior
+draft subtracted a single seeded "insurance" figure of 183,03 $ to hit the printed
+federal base. This table shows the real MÉDIC benefit is 135,08 $ (3,377 $/h); the
+183,03 $ was actually `135,08 (MÉDIC) + 29,93 (union dues U1) + 17,22 (prélèvement) −
+0,80 (rounding)` — three different items merged into one delta, exactly the net-delta
+shortcut to avoid. Only the sourced MÉDIC exclusion is now modelled.
+
+**Union dues (U1) — modelled as a separate federal deduction.** Per T4127, `U1 =
+cotisations syndicales versées pour la période`; they reduce the **federal** base but
+are a **Québec credit** (not a base deduction), so they are NOT applied to the Québec
+side. The bench takes the union dues as a per-period **amount** (union-specific), fed
+to the federal deduction only. For Simon (29,93 $), federal tax then computes **261,43
+$** vs the stub's **259,95 $**.
+
+Union dues are union-specific (ccq.org, "Cotisations redistribuées aux associations
+syndicales"): CSD (50 % de la 1re h + 0,035 $/h), CSN (50 % de la 1re h; apprentis
+9,90–11,70 $/sem), SQC (compagnon 15,25 $/sem; apprentis 9,95–11,95 $/sem), FTQ, and
+**FIPOE section locale 568** (compagnons électriciens : 65 % d'une heure/semaine sur le
+taux compagnon de l'**annexe B du secteur industriel** + 0,05 $/h). Simon's 29,93 $
+does not reconcile against the ICI rate (50,79 $) but fits FIPOE 568 at an implied
+industrial rate of ~42,97 $ — so the amount needs the industrial annexe B rate (not in
+scope) and is entered manually meanwhile.
+
+**Result & remaining gap (kept `requires_review`):** RRQ/EI/RQAP and Québec income tax
+reproduce **to the cent**; with the sourced MÉDIC exclusion + U1 union dues, federal
+tax is **261,43 $** vs the stub's **259,95 $**. The remaining **~1,50 $** is the
+**prélèvement CCQ (17,22 $)** — per ccq.org a 0,75 % regulatory levy, **not** a federal
+deduction — plus TD1/rounding/cumulative-method, to settle against **PDOC**. F5A (RRQ
+enhancement) is applied per T4127 (factor `A = [P × (I − F − F2 − F5A − U1)] − HD −
+F1`, t4127-01-26f.pdf). The engine does **not** close the last dollar with an unsourced
+net delta.
+
+**Still to source before validation:** the exact union-dues amount from the FIPOE 568
+industrial annexe B rate (to compute it rather than enter it); the federal *timing* of
+the vacances (remitted to a CCQ fund and paid later per ccq.org, yet present in this
+period's base); and the whole federal chain against **PDOC**.
 
 ## Validation checklist (before flipping to `validated`)
 

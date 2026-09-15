@@ -36,7 +36,10 @@ describe("computeCcqBenefits", () => {
     expect(baseAdjustments.pensionable).toBeCloseTo(vacation + taxableBenefit, 6);
     // Only the pension (not MÉDIC) lowers Québec taxable income.
     expect(baseAdjustments.taxableQuebec).toBeCloseTo(vacation + taxableBenefit - pensionDeduction, 6);
-    expect(baseAdjustments.taxableFederal).toBe(0);
+    // Federal source base EXCLUDES the MÉDIC taxable benefit (Québec taxes it; the CRA
+    // does not withhold on it at source → T4A) = Québec base − avantage imposable.
+    expect(baseAdjustments.taxableFederal).toBeCloseTo(baseAdjustments.taxableQuebec - taxableBenefit, 6);
+    expect(baseAdjustments.taxableFederal).toBeCloseTo(vacation - pensionDeduction, 6);
   });
 });
 
@@ -56,9 +59,12 @@ describe("engine baseAdjustments", () => {
     const hours = 40, baseRate = 50.79, premium = 4.06;
     const wages = hours * (baseRate + premium);
     const ccq = computeCcqBenefits({ hours, hourlyWage: baseRate, employeePensionRate: 0.09 });
+    // Union dues (cotisation syndicale, 29,93 $) are a federal-only deduction (T4127
+    // U1) — annualized here; Québec treats them as a credit, so no Québec entry.
+    const unionDues = 29.93;
     const r = calculatePayroll({
       taxYear: 2026, provinceOfEmployment: "QC", payPeriod: { frequency: "weekly" },
-      employee: { federalTaxProfile: {}, quebecTaxProfile: {} },
+      employee: { federalTaxProfile: { annualDeductions: unionDues * 52 }, quebecTaxProfile: {} },
       employer: { annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 0.02 },
       earnings: [{ type: "regular", amount: wages }],
       baseAdjustments: ccq.baseAdjustments,
@@ -83,13 +89,17 @@ describe("engine baseAdjustments", () => {
     const qcBase = wages + ccq.baseAdjustments.taxableQuebec;
     expect(qcBase).toBeCloseTo(2386.59, 1);
 
-    // Federal: the engine keeps the base at wages (taxableFederal = 0) rather than
-    // fabricate the +9,56 $ needed to reach the printed federal base of 2 203,56 $.
-    // The enhancement deduction (T4127 factor F5A) IS applied → federal 256,71 $ vs
-    // the stub's 259,95 $. The ~3 $ gap (Québec-only avantage imposable + union-dues
-    // federal-deduction/Québec-credit + rounding) is documented, not masked.
-    expect(wages + ccq.baseAdjustments.taxableFederal).toBeCloseTo(2194.0, 2);
-    expect(r.employee.federalTax).toBeCloseTo(256.71, 2);
+    // The federal source base EXCLUDES the MÉDIC taxable benefit (3,377 $/h, CCQ
+    // Avantages imposables table) — a Québec-only taxable benefit not withheld
+    // federally at source (T4A) — so the base = salaire + indemnité − retraite =
+    // 2 251,49 $; then the U1 union dues (29,93 $) are deducted federally. Federal tax
+    // computes 261,43 $ vs the stub's 259,95 $. The remaining ~1,50 $ is the
+    // prélèvement CCQ (not a federal deduction) + TD1/rounding — documented, NOT
+    // masked with a net-delta fudge. Québec tax is unaffected (union dues are a QC
+    // credit, not a base deduction) and stays exact.
+    const fedBase = wages + ccq.baseAdjustments.taxableFederal;
+    expect(fedBase).toBeCloseTo(2251.49, 1);
+    expect(r.employee.federalTax).toBeCloseTo(261.43, 2);
   });
 
   // A second, structural scenario (an apprentice at different hours) guards the base
@@ -103,6 +113,31 @@ describe("engine baseAdjustments", () => {
     expect(b.baseAdjustments.insurableEI).toBeCloseTo(vac, 6);
     expect(b.baseAdjustments.pensionable).toBeCloseTo(vac + imp, 6);
     expect(b.baseAdjustments.taxableQuebec).toBeCloseTo(vac + imp - pension, 6);
-    expect(b.baseAdjustments.taxableFederal).toBe(0);
+    // Federal base = Québec base − MÉDIC taxable benefit (structural, same shape).
+    expect(b.baseAdjustments.taxableFederal).toBeCloseTo(b.baseAdjustments.taxableQuebec - imp, 6);
+  });
+
+  // Rounding policy: the payroll rounds each component to the cent (and rounds the
+  // pensionable hourly base BEFORE applying 9 %) when building the printed base. The
+  // engine currently carries full precision, hence a 2¢ gap on the provincial base.
+  // This test documents the difference so the policy is a conscious validation item.
+  it("shows the payroll's per-component rounding reproduces the printed provincial base", () => {
+    const round2 = (x) => Math.round(x * 100) / 100;
+    const hours = 40, base = 50.79;
+    const wages = 2194.0;
+    const vac = round2(hours * base * 0.13);       // 264,11
+    const imp = round2(hours * 3.377);             // 135,08
+
+    // Payroll: round the pensionable hourly base (50,79 × 1,13 = 57,3927 → 57,39)
+    // to the cent before × 9 % → 206,60. Engine: full precision → 206,6137 → 206,61.
+    const pensionPayroll = round2(round2(base * 1.13) * 0.09 * hours);
+    const pensionEngine = round2(hours * base * 1.13 * 0.09);
+    expect(pensionPayroll).toBe(206.6);
+    expect(pensionEngine).toBe(206.61);
+
+    // Per-component-rounded (payroll) path reproduces the printed provincial base 2 386,59.
+    expect(round2(wages + vac + imp - pensionPayroll)).toBe(2386.59);
+    // Engine's full-precision pension lands 1¢ lower.
+    expect(round2(wages + vac + imp - pensionEngine)).toBe(2386.58);
   });
 });

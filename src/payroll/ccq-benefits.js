@@ -44,7 +44,13 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   effectiveFrom: "2026-04-26",
   effectiveTo: "2027-04-24",
 
-  // Avantage imposable additionnel — per worked hour, all levels of the trade.
+  // Avantage imposable MÉDIC Construction (assurance vie + maladie) — per worked hour.
+  // Source: CCQ "Avantages sociaux MÉDIC Construction — Avantages imposables", secteur
+  // institutionnel-commercial, en vigueur du 2026-04-26 au 2027-04-24, ligne Électricien
+  // (code 220): colonne C3/C4-C5 = 3,377 $, colonne C6/C7-C8 = 3,408 $.
+  // It is a QUÉBEC taxable benefit AND pensionable (RRQ), but the CRA does NOT require
+  // the employer to withhold on it at source (reported on a T4A at year-end), so it is
+  // EXCLUDED from the federal source-deduction base: fédéral = provincial − ce montant.
   taxableBenefitPerHour: 3.377,
   // Indemnité de congés annuels + fériés + maladie (6 + 5,5 + 1,5 %).
   vacationHolidaySickRate: 0.13,
@@ -87,12 +93,15 @@ export function computeCcqBenefits({
 
   // Indemnité de congés (13 % of the base wage).
   const vacation = baseWage * vacationHolidaySickRate;
-  // Avantage imposable additionnel.
+  // Avantage imposable MÉDIC (assurance vie + maladie) — the CCQ taxable benefit.
   const taxableBenefit = h * taxableBenefitPerHour;
   // Employee pension contribution — on wage + indemnity; reduces taxable income.
   const pensionDeduction = baseWage * (1 + vacationHolidaySickRate) * employeePensionRate;
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
+
+  // Québec taxable income: salaire + indemnity + avantage imposable − deductible pension.
+  const taxableQuebec = vacation + taxableBenefit - pensionDeduction;
 
   return {
     vacation,
@@ -106,15 +115,15 @@ export function computeCcqBenefits({
       // 13 % indemnity is insurable (EI/RQAP) and pensionable (RRQ).
       insurableEI: vacation,
       insurableRQAP: vacation,
-      // RRQ pensionable also picks up the taxable benefit.
+      // RRQ pensionable also picks up the MÉDIC taxable benefit.
       pensionable: vacation + taxableBenefit,
-      // Québec taxable income: + indemnity + taxable benefit − deductible pension.
-      taxableQuebec: vacation + taxableBenefit - pensionDeduction,
-      // Federal base kept at wages: this reproduces the stub's federal tax within
-      // CRA table-rounding tolerance. The correct federal decomposition (taxable
-      // benefit taxable, pension deductible) is unresolved and flagged for
-      // validation — see docs/rules/2026-das-payroll.md. Not masked.
-      taxableFederal: 0,
+      taxableQuebec,
+      // Federal source-deduction base EXCLUDES the MÉDIC taxable benefit (Québec taxes
+      // it; the CRA does not withhold on it at source → T4A). So the federal base is
+      // the Québec base minus that same avantage imposable = salaire + indemnité −
+      // retraite. Any further federal/Québec gap (union dues U1, prélèvement) is NOT
+      // modelled here — see docs/rules/2026-das-payroll.md.
+      taxableFederal: taxableQuebec - taxableBenefit,
     },
   };
 }
