@@ -58,6 +58,16 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   medicEmployeePerHour: 0.68,
   medicProvincialTaxRate: 0.09,
 
+  // Safety-equipment allowance — a NON-taxable amount paid on top (like KM). Per hour.
+  // Source: stub D0033-0007 transaction line "Équipement de sécurité" @ 0,8000 $/h.
+  safetyEquipmentPerHour: 0.80,
+
+  // Employer "avantages sociaux" contribution shown on the stub as an imputed gain then
+  // deducted back (a display wash — NOT cash, NOT in any tax base). Per worked hour.
+  // ⚠️ SEEDED from stub D0033-0007 (355,00 $ / 40 h = 8,875 $/h); source the exact CCQ
+  // employer avantages-sociaux rate before finalized use.
+  employerSocialBenefitPerHour: 8.875,
+
   // Salaires C3 en vigueur le 26 avril 2026 + taux de cotisation retraite salariale.
   levels: {
     journeyman:  { label: "Compagnon",  hourlyWage: 50.79, employeePensionRate: 0.09 },
@@ -142,8 +152,15 @@ export function computeCcqBenefits({
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
   medicEmployeePerHour = CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
   medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
+  safetyEquipmentPerHour = CCQ_ELECTRICIAN_IC_C3.safetyEquipmentPerHour,
+  employerSocialBenefitPerHour = CCQ_ELECTRICIAN_IC_C3.employerSocialBenefitPerHour,
   union = "ftq_fipoe",
   level = "journeyman",
+  // Union/professional withholdings that are ALSO federal U1 deductions but whose CCQ
+  // rate/base isn't yet sourced — passed as period amounts (Québec credit, not a base
+  // deduction). See docs/rules/2026-das-payroll.md.
+  prelevementCcq = 0,
+  caisseEducationSyndicale = 0,
 } = {}) {
   const h = Math.max(0, Number(hours) || 0);
   const wage = Number(hourlyWage) || 0;
@@ -160,6 +177,13 @@ export function computeCcqBenefits({
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax
   // deduction (U1); a Québec credit (not a base deduction).
   const unionDues = computeUnionDues({ union, level, hourlyWage: wage, hours: h });
+  // Safety-equipment allowance — a NON-taxable amount paid on top of net (like KM).
+  const safetyEquipment = h * safetyEquipmentPerHour;
+  // Employer avantages-sociaux contribution — imputed gain shown then reversed (a
+  // display wash: not cash, not taxed). Used only for the gross-up presentation.
+  const employerSocialBenefit = h * employerSocialBenefitPerHour;
+  const prelevement = Number(prelevementCcq) || 0;
+  const caisse = Number(caisseEducationSyndicale) || 0;
 
   // Québec taxable income: salaire + indemnity + avantage imposable − deductible pension.
   const taxableQuebec = vacation + taxableBenefit - pensionDeduction;
@@ -170,12 +194,17 @@ export function computeCcqBenefits({
     pensionDeduction,
     medicWithholding,
     unionDues,
-    // The pension, MÉDIC premium and union dues are all withheld from pay, so the
-    // caller subtracts this from the engine's (statutory-only) net pay.
-    netWithholdings: pensionDeduction + medicWithholding + unionDues,
-    // Union dues reduce the FEDERAL taxable income only (T4127 U1); the caller passes
-    // this to the federal tax profile (annualized). Québec treats them as a credit.
-    federalDeduction: unionDues,
+    safetyEquipment,
+    employerSocialBenefit,
+    prelevementCcq: prelevement,
+    caisseEducationSyndicale: caisse,
+    // The pension, MÉDIC premium, union dues, prélèvement and caisse are all withheld
+    // from pay, so the caller subtracts this from the engine's (statutory-only) net.
+    netWithholdings: pensionDeduction + medicWithholding + unionDues + prelevement + caisse,
+    // Federal income-tax deductions (T4127 U1): union dues + prélèvement CCQ + caisse
+    // d'éducation. Québec treats them as credits (not base deductions). The caller
+    // passes this to the federal tax profile (annualized).
+    federalDeduction: unionDues + prelevement + caisse,
     baseAdjustments: {
       // 13 % indemnity is insurable (EI/RQAP) and pensionable (RRQ).
       insurableEI: vacation,

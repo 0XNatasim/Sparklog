@@ -115,6 +115,8 @@ export default function PayrollEngineTester() {
     imposablePerHour: CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
     medicPerHour: CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
     medicTaxPct: CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate * 100,
+    prelevementCcq: 0,        // CCQ remittance withholding (federal U1 deduction)
+    caisseEducation: 0,       // union education fund (federal U1 deduction)
   });
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
@@ -255,17 +257,18 @@ export default function PayrollEngineTester() {
     if (overtime) earnings.push({ type: "overtime", amount: overtime });
     if (Number(pay.taxableBenefit)) earnings.push({ type: "taxableBenefit", amount: Number(pay.taxableBenefit) });
 
-    // Non-taxable reimbursements (outside the DAS calc): KM + weekly phone/data.
+    // Non-taxable reimbursements/allowances (outside the DAS calc): KM + weekly
+    // phone/data + CCQ safety-equipment allowance (added once CCQ is computed).
     const profile = employees.find((e) => e.id === selectedId);
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
     const phoneReimb = Number(profile?.phone_data_reimbursement) || 0;
-    setReimb({ km: kmReimb, phone: phoneReimb, total: kmReimb + phoneReimb });
 
     // CCQ benefits (upstream of the tax engine): fold the collective-agreement
     // indemnity / taxable benefit / social-benefits deduction into the DAS bases.
     const totalHours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
     let baseAdjustments;
     let unionDuesFederalAnnual = 0; // U1 federal deduction, annualized
+    let safetyEquip = 0;
     if (ccq.enabled) {
       const pensionRate = CCQ_ELECTRICIAN_IC_C3.levels[ccq.status]?.employeePensionRate
         ?? CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate;
@@ -279,15 +282,19 @@ export default function PayrollEngineTester() {
         medicProvincialTaxRate: (Number(ccq.medicTaxPct) || 0) / 100,
         union: ccq.union,
         level: ccq.status,
+        prelevementCcq: Number(ccq.prelevementCcq) || 0,
+        caisseEducationSyndicale: Number(ccq.caisseEducation) || 0,
       });
       baseAdjustments = benefits.baseAdjustments;
-      // Union dues (FTQ-FIPOE) — a federal-only deduction (U1), computed per week and
-      // annualized. Québec treats them as a credit, so they never touch the QC side.
+      // Union dues + prélèvement + caisse are federal-only deductions (U1), computed
+      // per week and annualized. Québec treats them as credits, so they never touch QC.
       unionDuesFederalAnnual = (benefits.federalDeduction || 0) * (PAY_PERIODS_PER_YEAR[frequency] || 52);
+      safetyEquip = benefits.safetyEquipment || 0;
       setCcqAmounts(benefits);
     } else {
       setCcqAmounts(null);
     }
+    setReimb({ km: kmReimb, phone: phoneReimb, safety: safetyEquip, total: kmReimb + phoneReimb + safetyEquip });
 
     setResult(calculatePayroll({
       taxYear: 2026,
@@ -434,6 +441,8 @@ export default function PayrollEngineTester() {
                 <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" />
                 <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" />
                 <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" />
+                <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" />
+                <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqNote")}</p>
             </>
@@ -575,35 +584,54 @@ function Results({ result, reimb, ccq, open, setOpen, t }) {
       <div className="grid gap-3 lg:grid-cols-3">
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employee")}</div>
-          <Row label={t("payroll.grossTotal")} value={money(gross.total)} />
-          {ccq && (
-            <>
-              <Row label={t("payroll.ccqVacation")} value={money(ccq.vacation)} />
-              <Row label={t("payroll.ccqImposableRow")} value={money(ccq.taxableBenefit)} />
-            </>
-          )}
-          <Row label={t("payroll.federalTax")} value={money(employee.federalTax)} />
-          <Row label={t("payroll.quebecTax")} value={money(employee.quebecTax)} />
-          <Row label="RRQ" value={money(employee.rrq.total)} />
-          <Row label={t("payroll.ei")} value={money(employee.ei)} />
-          <Row label="RQAP" value={money(employee.rqap)} />
-          <Row label={t("payroll.totalDeductions")} value={money(employee.totalDeductions)} />
-          <Row label={t("payroll.netPay")} value={money(employee.netPay)} strong />
-          {ccq && (
-            <>
-              <Row label={t("payroll.ccqPensionRow")} value={money(-ccq.pensionDeduction)} />
-              <Row label={t("payroll.ccqMedicRow")} value={money(-ccq.medicWithholding)} />
-              <Row label={t("payroll.ccqUnionRow")} value={money(-ccq.unionDues)} />
-              <Row label={t("payroll.ccqNetAfter")} value={money(employee.netPay - ccq.netWithholdings)} strong />
-            </>
-          )}
-          {reimb && reimb.total > 0 && (
-            <>
-              <Row label={t("payroll.reimbKm")} value={money(reimb.km)} />
-              <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} />
-              <Row label={t("payroll.netPlusReimb")} value={money(employee.netPay - (ccq?.netWithholdings || 0) + reimb.total)} strong />
-            </>
-          )}
+          {(() => {
+            const statutory = employee.federalTax + employee.quebecTax + employee.rrq.total + employee.ei + employee.rqap;
+            // Gross-up presentation (matches the CCQ stub): non-cash benefits are shown
+            // as gains, then reversed in the deductions; safety equipment is a paid,
+            // non-taxable allowance. Net = grossUp − (reversals + all withholdings).
+            const reversals = ccq ? ccq.vacation + ccq.taxableBenefit + ccq.employerSocialBenefit : 0;
+            const grossUp = gross.total + (ccq ? reversals + ccq.safetyEquipment : 0);
+            const withheld = statutory + (ccq ? ccq.netWithholdings : 0);
+            const totalRetenues = reversals + withheld;
+            const net = grossUp - totalRetenues; // includes the paid safety allowance
+            const extraReimb = reimb ? (reimb.km || 0) + (reimb.phone || 0) : 0;
+            return (
+              <>
+                <Row label={t("payroll.grossTotal")} value={money(grossUp)} strong />
+                {ccq && (
+                  <>
+                    <Row label={t("payroll.ccqVacation")} value={money(ccq.vacation)} />
+                    <Row label={t("payroll.ccqImposableRow")} value={money(ccq.taxableBenefit)} />
+                    <Row label={t("payroll.ccqEmployerSocial")} value={money(ccq.employerSocialBenefit)} />
+                    <Row label={t("payroll.ccqSafety")} value={money(ccq.safetyEquipment)} />
+                  </>
+                )}
+                <Row label={t("payroll.federalTax")} value={money(employee.federalTax)} />
+                <Row label={t("payroll.quebecTax")} value={money(employee.quebecTax)} />
+                <Row label="RRQ" value={money(employee.rrq.total)} />
+                <Row label={t("payroll.ei")} value={money(employee.ei)} />
+                <Row label="RQAP" value={money(employee.rqap)} />
+                {ccq && (
+                  <>
+                    <Row label={t("payroll.ccqPensionRow")} value={money(ccq.pensionDeduction)} />
+                    <Row label={t("payroll.ccqMedicRow")} value={money(ccq.medicWithholding)} />
+                    <Row label={t("payroll.ccqUnionRow")} value={money(ccq.unionDues)} />
+                    <Row label={t("payroll.ccqPrelevementRow")} value={money(ccq.prelevementCcq)} />
+                    <Row label={t("payroll.ccqCaisseRow")} value={money(ccq.caisseEducationSyndicale)} />
+                  </>
+                )}
+                <Row label={t("payroll.totalDeductions")} value={money(totalRetenues)} />
+                <Row label={t("payroll.netPay")} value={money(net)} strong />
+                {extraReimb > 0 && (
+                  <>
+                    {reimb.km > 0 && <Row label={t("payroll.reimbKm")} value={money(reimb.km)} />}
+                    {reimb.phone > 0 && <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} />}
+                    <Row label={t("payroll.netPlusReimb")} value={money(net + extraReimb)} strong />
+                  </>
+                )}
+              </>
+            );
+          })()}
         </CardContent></Card>
 
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
