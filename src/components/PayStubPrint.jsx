@@ -52,6 +52,9 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     n(reimb?.phone) ? { label: "Remboursement données cellulaire", montant: n(reimb.phone) } : null,
   ].filter(Boolean);
   const reimbTotal = reimbursements.reduce((s, r) => s + r.montant, 0);
+  // CCQ pension + MÉDIC are withheld from pay on top of the statutory deductions.
+  const ccqWithhold = n(ccqPeriod?.netWithholdings);
+  const netAfterCcq = n(emp.netPay) - ccqWithhold;
 
   // Sommaire: statutory lines carry a Période (from the calc) + Cumulatif (YTD + période).
   const stat = [
@@ -66,16 +69,17 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     { label: "Gains RQAP", per: g.total, cum: n(ytd.insurableIncomeRQAP) + g.total },
     { label: "Heures", per: hours, cum: n(ytd.hoursYtd) + hours, hours: true },
   ];
-  // CCQ lines. The three benefits the engine models carry a computed Période (and
-  // add it to the running Cumulatif); the rest stay record-only (Cumulatif = YTD).
+  // CCQ lines. The modelled benefits carry a computed Période (added to the running
+  // Cumulatif); the rest stay record-only (Cumulatif = YTD). The pension + MÉDIC are
+  // withheld from pay; the pension also lowers Québec taxable income (see engine).
   const ccq = [
     { label: "Vacances CCQ", per: ccqPeriod?.vacation, cum: n(ytd.vacancesCcq) + n(ccqPeriod?.vacation) },
     { label: "Cotisation syndicale", cum: ytd.unionDues },
     { label: "Prélèvement CCQ", cum: ytd.ccqLevy },
-    { label: "Av. sociaux CCQ (déd.)", per: ccqPeriod ? -n(ccqPeriod.socialDeduction) : undefined, cum: n(ytd.ccqBenefitsDeduction) - n(ccqPeriod?.socialDeduction) },
+    { label: "Cotisation retraite CCQ", per: ccqPeriod ? -n(ccqPeriod.pensionDeduction) : undefined, cum: n(ytd.ccqBenefitsDeduction) - n(ccqPeriod?.pensionDeduction) },
+    { label: "MÉDIC + taxe", per: ccqPeriod ? -n(ccqPeriod.medicWithholding) : undefined, cum: ytd.medicInsurance },
     { label: "Av. sociaux CCQ (avantage)", cum: ytd.ccqBenefitsAdvantage },
     { label: "Avantage imposable add. CCQ", per: ccqPeriod?.taxableBenefit, cum: n(ytd.ccqTaxableBenefit) + n(ccqPeriod?.taxableBenefit) },
-    { label: "Assurance MÉDIC", cum: ytd.medicInsurance },
     { label: "Caisse d'éducation syndicale", cum: ytd.unionEducationFund },
     { label: "Taxe de vente assurance", cum: ytd.insuranceSalesTax },
     { label: "Équipement de sécurité", cum: ytd.safetyEquipment },
@@ -131,7 +135,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
           <div className="grid grid-cols-3 gap-4 border-b py-2 font-semibold">
             <div>Gains <span className="float-right font-mono">{money(g.total)}</span></div>
             <div>Retenues <span className="float-right font-mono">{money(emp.totalDeductions)}</span></div>
-            <div>Paie nette <span className="float-right font-mono">{money(emp.netPay)}</span></div>
+            <div>Paie nette <span className="float-right font-mono">{money(netAfterCcq)}</span></div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-2">
@@ -165,7 +169,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                       ))}
                       <tr className="font-semibold">
                         <td className="py-0.5">Paie nette + remboursements</td>
-                        <td className="text-right font-mono">{money(emp.netPay + reimbTotal)}</td>
+                        <td className="text-right font-mono">{money(netAfterCcq + reimbTotal)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -200,7 +204,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
           <p className="mt-3 border-t pt-2 text-[9px]">
             BROUILLON — paie non finalisée · Nécessite une révision de la paie. Jeu de règles {result.meta?.rulesVersion?.quebec} / {result.meta?.rulesVersion?.federal} (non validé).
-            Seules les lignes CCQ modélisées (vacances 13 %, avantage imposable, déduction avantages sociaux) portent une « Période » calculée; les autres sont pour référence. Ce document ne remplace pas le talon de paie officiel.
+            Seules les lignes CCQ modélisées (vacances 13 %, avantage imposable, cotisation retraite, MÉDIC + taxe) portent une « Période » calculée; les autres sont pour référence. La retraite et MÉDIC sont prélevées de la paie nette. Ce document ne remplace pas le talon de paie officiel.
           </p>
         </div>
       </DialogContent>
