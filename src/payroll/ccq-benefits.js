@@ -58,15 +58,6 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   medicEmployeePerHour: 0.68,
   medicProvincialTaxRate: 0.09,
 
-  // Cotisation syndicale FTQ-FIPOE (Fraternité interprovinciale des ouvriers en
-  // électricité) — a FEDERAL deduction (T4127 U1), a Québec credit (not a base
-  // deduction). Formula: 55 % of one hour's wage per week + 0,05 $ per hour worked.
-  // Confirmed against Simon B.'s stub: 0,55 × 50,79 + 0,05 × 40 = 29,93 $ to the cent.
-  // ⚠️ The 55 % is confirmed for this FTQ-FIPOE membership; other unions/annexes
-  // differ (e.g. FIPOE 568 quotes 65 %). Verify per member's local before reuse.
-  unionDuesRateOfHourlyWage: 0.55,
-  unionDuesPerHour: 0.05,
-
   // Salaires C3 en vigueur le 26 avril 2026 + taux de cotisation retraite salariale.
   levels: {
     journeyman:  { label: "Compagnon",  hourlyWage: 50.79, employeePensionRate: 0.09 },
@@ -79,6 +70,62 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
 
 // Ordered level keys, for building a picker.
 export const CCQ_LEVELS = Object.keys(CCQ_ELECTRICIAN_IC_C3.levels);
+
+// ── Union dues (cotisation syndicale) by union ─────────────────────────────────
+// A FEDERAL income-tax deduction (T4127 U1); a Québec credit (not a base deduction).
+// Each union's weekly formula, from ccq.org "Cotisations redistribuées aux
+// associations syndicales" (+ the member's stub where confirmed):
+//   • rateOfHourlyWage — % of ONE hour's wage per week (compagnon)
+//   • apprenticeRateOfHourlyWage — the apprentice % where it differs
+//   • perHour — added per hour worked
+//   • flatByLevel — a fixed weekly amount that REPLACES the formula for that level
+// ⚠️ Draft: compagnon rates are the best-sourced; some apprentice figures are
+// partial. Confirm per member's local/annexe before finalized use.
+export const CCQ_UNIONS = {
+  ftq_fipoe: {
+    label: "FTQ-FIPOE",
+    // 55 % + 0,05 $/h — confirmed against Simon B.'s stub (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
+    dues: { rateOfHourlyWage: 0.55, perHour: 0.05 },
+  },
+  international_568: {
+    label: "International (FIPOE 568)",
+    // Compagnon 65 % + 0,05 $/h; apprenti 50 % du taux compagnon + 0,05 $/h.
+    dues: { rateOfHourlyWage: 0.65, apprenticeRateOfHourlyWage: 0.50, perHour: 0.05 },
+  },
+  csd: {
+    label: "CSD Construction",
+    // 50 % de la 1re heure déclarée + 0,035 $/h (tous les membres).
+    dues: { rateOfHourlyWage: 0.50, perHour: 0.035 },
+  },
+  csn: {
+    label: "CSN-Construction",
+    // Compagnon 50 % de la 1re heure/semaine; apprentis montant fixe/semaine.
+    dues: { rateOfHourlyWage: 0.50, perHour: 0, flatByLevel: { apprentice1: 9.90, apprentice2: 10.45, apprentice3: 11.70, apprentice4: 11.70 } },
+  },
+  sqc: {
+    label: "SQC",
+    // Montant fixe par semaine, par niveau.
+    dues: { flatByLevel: { journeyman: 15.25, apprentice1: 9.95, apprentice2: 10.75, apprentice3: 11.95, apprentice4: 11.95 } },
+  },
+};
+
+export const CCQ_UNION_KEYS = Object.keys(CCQ_UNIONS);
+
+// Weekly union dues for a member. `level` is a CCQ_LEVELS key (for flat/apprentice
+// lookups). Returns dollars.
+export function computeUnionDues({ union = "ftq_fipoe", level = "journeyman", hourlyWage = 0, hours = 0 } = {}) {
+  const u = CCQ_UNIONS[union];
+  if (!u) return 0;
+  const d = u.dues;
+  const flat = d.flatByLevel?.[level];
+  if (flat != null) return flat; // fixed weekly amount replaces the formula
+  const wage = Number(hourlyWage) || 0;
+  const h = Math.max(0, Number(hours) || 0);
+  const rate = level !== "journeyman" && d.apprenticeRateOfHourlyWage != null
+    ? d.apprenticeRateOfHourlyWage
+    : (d.rateOfHourlyWage || 0);
+  return rate * wage + (d.perHour || 0) * h;
+}
 
 // Compute the CCQ benefit amounts, engine base adjustments and net withholdings
 // for one period. Dollar amounts (the engine converts to cents).
@@ -95,8 +142,8 @@ export function computeCcqBenefits({
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
   medicEmployeePerHour = CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
   medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
-  unionDuesRateOfHourlyWage = CCQ_ELECTRICIAN_IC_C3.unionDuesRateOfHourlyWage,
-  unionDuesPerHour = CCQ_ELECTRICIAN_IC_C3.unionDuesPerHour,
+  union = "ftq_fipoe",
+  level = "journeyman",
 } = {}) {
   const h = Math.max(0, Number(hours) || 0);
   const wage = Number(hourlyWage) || 0;
@@ -110,9 +157,9 @@ export function computeCcqBenefits({
   const pensionDeduction = baseWage * (1 + vacationHolidaySickRate) * employeePensionRate;
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
-  // Union dues (FTQ-FIPOE): 55 % of one hour's wage per week + 0,05 $/h. Withheld from
-  // pay AND a federal income-tax deduction (U1); a Québec credit (not a base deduction).
-  const unionDues = unionDuesRateOfHourlyWage * wage + unionDuesPerHour * h;
+  // Union dues (per the member's union) — withheld from pay AND a federal income-tax
+  // deduction (U1); a Québec credit (not a base deduction).
+  const unionDues = computeUnionDues({ union, level, hourlyWage: wage, hours: h });
 
   // Québec taxable income: salaire + indemnity + avantage imposable − deductible pension.
   const taxableQuebec = vacation + taxableBenefit - pensionDeduction;

@@ -159,14 +159,23 @@ federal base. This table shows the real MÉDIC benefit is 135,08 $ (3,377 $/h); 
 0,80 (rounding)` — three different items merged into one delta, exactly the net-delta
 shortcut to avoid. Only the sourced MÉDIC exclusion is now modelled.
 
-**Union dues (U1) — modelled as a separate federal deduction, auto-computed.** Per
-T4127, `U1 = cotisations syndicales versées pour la période`; they reduce the
-**federal** base but are a **Québec credit** (not a base deduction), so they are NOT
-applied to the Québec side. Simon B. is a member of **FTQ-FIPOE**, whose dues are
-**55 % of one hour's wage per week + 0,05 $/h** — the engine computes this
-(`unionDuesRateOfHourlyWage 0.55`, `unionDuesPerHour 0.05`): 0,55 × 50,79 + 0,05 × 40 =
-**29,93 $**, to the cent. Federal tax then computes **261,43 $** vs the stub's
-**259,95 $**.
+**Union dues (U1) — a separate federal deduction, auto-computed per union.** Per T4127,
+`U1 = cotisations syndicales versées pour la période`; they reduce the **federal** base
+but are a **Québec credit** (not a base deduction), so they are NOT applied to the
+Québec side. The bench has a **union selector** (`CCQ_UNIONS` / `computeUnionDues`) that
+computes the weekly dues from each union's own formula:
+
+| Union | Compagnon | Apprentis |
+|-------|-----------|-----------|
+| **FTQ-FIPOE** (Simon B.) | 55 % × 1 h + 0,05 $/h | idem |
+| International (FIPOE 568) | 65 % × 1 h + 0,05 $/h | 50 % × 1 h + 0,05 $/h |
+| CSD | 50 % × 1 h + 0,035 $/h | idem |
+| CSN | 50 % × 1 h | flat 9,90 / 10,45 / 11,70 $/sem |
+| SQC | flat 15,25 $/sem | flat 9,95 / 10,75 / 11,95 $/sem |
+
+For Simon (FTQ-FIPOE): 0,55 × 50,79 + 0,05 × 40 = **29,93 $** to the cent → federal tax
+**261,43 $** vs the stub's **259,95 $**. Compagnon rates are the best-sourced; some
+apprentice figures are partial (ccq.org) — flagged to confirm per member's local/annexe.
 
 Union dues are union-specific (ccq.org, "Cotisations redistribuées aux associations
 syndicales"): CSD (50 % de la 1re h + 0,035 $/h), CSN (50 % de la 1re h; apprentis

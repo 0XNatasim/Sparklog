@@ -5,7 +5,7 @@ import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-re
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, PAY_PERIODS_PER_YEAR } from "@/payroll";
+import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR } from "@/payroll";
 import { calculatePayrollEntries } from "@/lib/payroll-calculations";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -110,6 +110,7 @@ export default function PayrollEngineTester() {
   const [ccq, setCcq] = useState({
     enabled: true,
     status: "journeyman",
+    union: "ftq_fipoe",
     vacationRatePct: CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate * 100,
     imposablePerHour: CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
     medicPerHour: CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
@@ -276,6 +277,8 @@ export default function PayrollEngineTester() {
         vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
         medicEmployeePerHour: Number(ccq.medicPerHour) || 0,
         medicProvincialTaxRate: (Number(ccq.medicTaxPct) || 0) / 100,
+        union: ccq.union,
+        level: ccq.status,
       });
       baseAdjustments = benefits.baseAdjustments;
       // Union dues (FTQ-FIPOE) — a federal-only deduction (U1), computed per week and
@@ -416,6 +419,14 @@ export default function PayrollEngineTester() {
                       <option key={k} value={k}>
                         {CCQ_ELECTRICIAN_IC_C3.levels[k].label} · {(CCQ_ELECTRICIAN_IC_C3.levels[k].employeePensionRate * 100).toFixed(1)}%
                       </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-xs">
+                  <span className="text-muted-foreground">{t("payroll.ccqUnion")}</span>
+                  <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                    {CCQ_UNION_KEYS.map((k) => (
+                      <option key={k} value={k}>{CCQ_UNIONS[k].label}</option>
                     ))}
                   </select>
                 </label>
