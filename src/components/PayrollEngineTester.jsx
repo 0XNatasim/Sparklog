@@ -5,7 +5,7 @@ import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-re
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_BENEFIT_RATES } from "@/payroll";
+import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS } from "@/payroll";
 import { calculatePayrollEntries } from "@/lib/payroll-calculations";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -104,12 +104,16 @@ export default function PayrollEngineTester() {
   const [result, setResult] = useState(null);
   const [reimb, setReimb] = useState({ km: 0, phone: 0, total: 0 });
   // CCQ benefit modelling (folded into the DAS bases via baseAdjustments). Rates
-  // seed from the confirmed électricien-C3 defaults but stay editable per métier.
+  // seed from the sourced électricien-C3 config but stay editable per métier. The
+  // pension rate follows the level (compagnon 9 % / apprenti 4,5 %); the deductible
+  // pension amount is computed from the wage (never hardcoded).
   const [ccq, setCcq] = useState({
     enabled: true,
-    vacationRatePct: CCQ_BENEFIT_RATES.vacationRateOfBaseWage * 100,
-    imposablePerHour: CCQ_BENEFIT_RATES.taxableBenefitPerHour,
-    deductionPerHour: CCQ_BENEFIT_RATES.socialBenefitsDeductionPerHour,
+    status: "journeyman",
+    vacationRatePct: CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate * 100,
+    imposablePerHour: CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
+    medicPerHour: CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
+    medicTaxPct: CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate * 100,
   });
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
@@ -151,6 +155,10 @@ export default function PayrollEngineTester() {
         kmRate: Number(profile.km_rate) || 0,
       }));
     }
+    // CCQ level → pension rate: an apprentice_level (1-4) maps to apprenticeN;
+    // anything else is treated as compagnon (journeyman).
+    const lvl = Number(profile?.apprentice_level);
+    setCcq((s) => ({ ...s, status: lvl >= 1 && lvl <= 4 ? `apprentice${lvl}` : "journeyman" }));
 
     // Build a week picker from the employee's recent jobs (last ~16 weeks).
     const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
@@ -257,14 +265,16 @@ export default function PayrollEngineTester() {
     const totalHours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
     let baseAdjustments;
     if (ccq.enabled) {
+      const pensionRate = CCQ_ELECTRICIAN_IC_C3.levels[ccq.status]?.employeePensionRate
+        ?? CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate;
       const benefits = computeCcqBenefits({
         hours: totalHours,
-        baseRate: base,
-        rates: {
-          vacationRateOfBaseWage: (Number(ccq.vacationRatePct) || 0) / 100,
-          taxableBenefitPerHour: Number(ccq.imposablePerHour) || 0,
-          socialBenefitsDeductionPerHour: Number(ccq.deductionPerHour) || 0,
-        },
+        hourlyWage: base,
+        employeePensionRate: pensionRate,
+        taxableBenefitPerHour: Number(ccq.imposablePerHour) || 0,
+        vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
+        medicEmployeePerHour: Number(ccq.medicPerHour) || 0,
+        medicProvincialTaxRate: (Number(ccq.medicTaxPct) || 0) / 100,
       });
       baseAdjustments = benefits.baseAdjustments;
       setCcqAmounts(benefits);
@@ -392,9 +402,20 @@ export default function PayrollEngineTester() {
           {ccq.enabled && (
             <>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <label className="block text-xs">
+                  <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
+                  <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                    {CCQ_LEVELS.map((k) => (
+                      <option key={k} value={k}>
+                        {CCQ_ELECTRICIAN_IC_C3.levels[k].label} · {(CCQ_ELECTRICIAN_IC_C3.levels[k].employeePensionRate * 100).toFixed(1)}%
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" />
                 <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" />
-                <Field label={t("payroll.ccqDeduction")} value={ccq.deductionPerHour} onChange={setC("deductionPerHour")} step="0.001" />
+                <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" />
+                <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" />
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqNote")}</p>
             </>
@@ -541,7 +562,6 @@ function Results({ result, reimb, ccq, open, setOpen, t }) {
             <>
               <Row label={t("payroll.ccqVacation")} value={money(ccq.vacation)} />
               <Row label={t("payroll.ccqImposableRow")} value={money(ccq.taxableBenefit)} />
-              <Row label={t("payroll.ccqDeductionRow")} value={money(-ccq.socialDeduction)} />
             </>
           )}
           <Row label={t("payroll.federalTax")} value={money(employee.federalTax)} />
@@ -551,11 +571,18 @@ function Results({ result, reimb, ccq, open, setOpen, t }) {
           <Row label="RQAP" value={money(employee.rqap)} />
           <Row label={t("payroll.totalDeductions")} value={money(employee.totalDeductions)} />
           <Row label={t("payroll.netPay")} value={money(employee.netPay)} strong />
+          {ccq && (
+            <>
+              <Row label={t("payroll.ccqPensionRow")} value={money(-ccq.pensionDeduction)} />
+              <Row label={t("payroll.ccqMedicRow")} value={money(-ccq.medicWithholding)} />
+              <Row label={t("payroll.ccqNetAfter")} value={money(employee.netPay - ccq.netWithholdings)} strong />
+            </>
+          )}
           {reimb && reimb.total > 0 && (
             <>
               <Row label={t("payroll.reimbKm")} value={money(reimb.km)} />
               <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} />
-              <Row label={t("payroll.netPlusReimb")} value={money(employee.netPay + reimb.total)} strong />
+              <Row label={t("payroll.netPlusReimb")} value={money(employee.netPay - (ccq?.netWithholdings || 0) + reimb.total)} strong />
             </>
           )}
         </CardContent></Card>

@@ -71,21 +71,35 @@ The tax engine is fed pre-computed gross earnings plus optional **base adjustmen
 (`calculatePayroll({ baseAdjustments })`). The CCQ layer (`src/payroll/ccq-benefits.js`)
 folds collective-agreement benefits into the correct statutory bases *before* the
 engine runs, keeping construction rules out of the tax engine (spec step 17: TIME →
-CCQ → GROSS → PAYROLL). For the ICI sector, électricien (métier 220), annexe C3:
+CCQ → GROSS → PAYROLL).
+
+**Source:** CCQ, secteur institutionnel-commercial, électricien (métier 220), annexe
+C3 (aussi C4-C5), en vigueur du **2026-04-26 au 2027-04-24**. Salaires C3 : compagnon
+50,79 $, apprenti 1 25,40 $, apprenti 2 30,47 $, apprenti 3 35,55 $, apprenti 4 43,17 $.
 
 | Benefit | Rate | Bases affected | Source / status |
 |---------|------|----------------|-----------------|
-| Indemnité de congés (vacances) | 13 % of the **base wage** (hours × base rate, excl. premium/OT multiplier) | RRQ pensionable, EI + RQAP insurable, Québec taxable | 13 % = 6 % + 5,5 % + 1,5 % (`conges_indemnity_rate`, migration 0038); verified to the cent against the stub |
-| Avantage imposable additionnel | 3,377 $/h | RRQ pensionable, Québec taxable | `tests/Tableau-Institutionnel-Commercial-2026-2027.pdf` ("Avantage imposable", ligne Électricien C3); verified to the cent |
-| Déduction avantages sociaux | 5,797 $/h | Québec taxable (reduces it) | ⚠️ **DERIVED** to reproduce the stub; not yet cross-checked against a published CCQ avantages-sociaux schedule |
-| Federal taxable | — | (unchanged) | Indemnity/benefit are taxed federally on payout, not in the period earned |
+| Indemnité de congés | 13 % of the **base wage** (vacances 6 % + fériés 5,5 % + maladie 1,5 %) | RRQ pensionable, EI + RQAP insurable, Québec taxable | CCQ; `conges_indemnity_rate` (migration 0038); verified to the cent |
+| Avantage imposable additionnel | 3,377 $/h (all levels of the trade) | RRQ pensionable, Québec taxable | `tests/Tableau-Institutionnel-Commercial-2026-2027.pdf`; verified to the cent |
+| Cotisation salariale au régime de retraite | wage × (1 + 13 %) × **9 %** compagnon / **4,5 %** apprenti (compagnon C3 = 5,165343 $/h) | Québec taxable (**reduces** it) + withheld from pay | CCQ agreement; deductible from taxable income. Computed from the wage — follows the annual increase, never hardcoded |
+| MÉDIC Construction (employee) + Québec 9 % insurance tax | 0,68 $/h × 1,09 = 0,7412 $/h | **none** (net withholding only, not a tax deduction) | CCQ held the premium at 0,68 $/h through 2027-04-24 |
+| Federal taxable | wages | (kept at wages) | ⚠️ empirical — reproduces the stub's federal within ~1 $. The correct federal decomposition (avantage imposable taxable, pension deductible) is **unresolved** and flagged; the pension is RPP-deductible federally too but adding it broke the match, so it is not applied pending WebRAS/PDOC validation |
+
+**Correction (important):** an earlier draft used a reverse-engineered
+`socialBenefitsDeductionPerHour = 5,797 $/h` chosen only to hit the stub's Québec
+tax. That is **wrong** and has been removed — it masked a real base difference. The
+sourced pension deduction is 5,165343 $/h (compagnon C3), which yields Québec tax
+**358,31 $ vs the stub's 352,25 $**. This ~6 $ residual is left **visible and
+unresolved** (a remaining difference in the Québec taxable base to investigate at
+validation), not papered over.
 
 Validation against Simon Bellerive's D0033-0007 stub (week 2026-08-30 → 09-05, 40 h,
-base 50,79 $ + prime 4,06 $, seeded YTD through 2026-08-29): **RRQ, EI, RQAP and
-Québec income tax all reproduce to the cent**; federal income tax lands within CRA
-table-rounding tolerance (~1 $ of 259,95 $). Per-level (apprenti) rates and the
-avantages-sociaux déduction schedule still need sourcing before sign-off. The rule
-set stays `draft` (every result `requires_review`).
+compagnon C3 base 50,79 $ + prime 4,06 $, seeded YTD through 2026-08-29): **RRQ, EI,
+RQAP reproduce to the cent**; federal is within CRA table-rounding tolerance (~1 $ of
+259,95 $); **Québec tax is ~6 $ over** the stub with the correct pension rate. Still
+to source before sign-off: the residual Québec-base difference, and whether the
+avantage imposable / pension belong in the federal base. The rule set stays `draft`
+(every result `requires_review`).
 
 ## Validation checklist (before flipping to `validated`)
 
