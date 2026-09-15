@@ -65,6 +65,28 @@ citation + effective date here, then flip `RULE_VERSION.status` to `"validated"`
 - **CNESST:** no statutory default — employer-file specific; missing rate returns
   `requires_review`.
 
+## CCQ benefit accounting (upstream of the tax engine)
+
+The tax engine is fed pre-computed gross earnings plus optional **base adjustments**
+(`calculatePayroll({ baseAdjustments })`). The CCQ layer (`src/payroll/ccq-benefits.js`)
+folds collective-agreement benefits into the correct statutory bases *before* the
+engine runs, keeping construction rules out of the tax engine (spec step 17: TIME →
+CCQ → GROSS → PAYROLL). For the ICI sector, électricien (métier 220), annexe C3:
+
+| Benefit | Rate | Bases affected | Source / status |
+|---------|------|----------------|-----------------|
+| Indemnité de congés (vacances) | 13 % of the **base wage** (hours × base rate, excl. premium/OT multiplier) | RRQ pensionable, EI + RQAP insurable, Québec taxable | 13 % = 6 % + 5,5 % + 1,5 % (`conges_indemnity_rate`, migration 0038); verified to the cent against the stub |
+| Avantage imposable additionnel | 3,377 $/h | RRQ pensionable, Québec taxable | `tests/Tableau-Institutionnel-Commercial-2026-2027.pdf` ("Avantage imposable", ligne Électricien C3); verified to the cent |
+| Déduction avantages sociaux | 5,797 $/h | Québec taxable (reduces it) | ⚠️ **DERIVED** to reproduce the stub; not yet cross-checked against a published CCQ avantages-sociaux schedule |
+| Federal taxable | — | (unchanged) | Indemnity/benefit are taxed federally on payout, not in the period earned |
+
+Validation against Simon Bellerive's D0033-0007 stub (week 2026-08-30 → 09-05, 40 h,
+base 50,79 $ + prime 4,06 $, seeded YTD through 2026-08-29): **RRQ, EI, RQAP and
+Québec income tax all reproduce to the cent**; federal income tax lands within CRA
+table-rounding tolerance (~1 $ of 259,95 $). Per-level (apprenti) rates and the
+avantages-sociaux déduction schedule still need sourcing before sign-off. The rule
+set stays `draft` (every result `requires_review`).
+
 ## Validation checklist (before flipping to `validated`)
 
 1. Replace every `_PLACEHOLDER` with a verified 2026 figure + citation above.
