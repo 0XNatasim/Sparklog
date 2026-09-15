@@ -101,8 +101,12 @@ The enhancement — plus all of tier-2 — is **deducted from taxable income** f
 Québec (TP-1015.F) and federal (T4127 factor F5), and only the base portion is
 credited. `rrq.js` returns `baseCreditCents` + `enhancementDeductionCents`; the
 engine credits the base and deducts the enhancement (annualized) from both tax
-bases. The 5,30 % / 1,00 % split is derived from the RRQ structure + the stub
-(reproduces Québec tax to the cent) and is flagged to confirm against TP-1015.F.
+bases. The 5,30 % / 1,00 % split is **confirmed** against the Revenu Québec RRQ 2026
+table (revenuquebec.ca): "taux de cotisation de base de 5,30 % et taux de première
+cotisation supplémentaire de 1 %" (total 6,30 %). The same table confirms YMPE
+74 600 $, exemption 3 500 $, max. cotisable 71 100 $, cotisation max 4 479,30 $, and
+tier-2 (MSGA 85 000 $, 4 %, max 416 $); RQAP 2026 is confirmed at 103 000 $, 0,430 %
+(employee) / 0,602 % (employer).
 
 Validation against Simon Bellerive's D0033-0007 stub (week 2026-08-30 → 09-05, 40 h,
 compagnon C3 base 50,79 $ + prime 4,06 $, seeded YTD through 2026-08-29): **RRQ, EI,

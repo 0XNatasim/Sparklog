@@ -40,32 +40,33 @@ export const PAY_PERIODS_PER_YEAR = {
 };
 
 // ── Régime de rentes du Québec (RRQ / QPP) — two-tier since 2024 ────────────────
-// Source: Revenu Québec TP-1015.F / TP-1015.TR. Spec steps 3-5.
+// Source: Revenu Québec RRQ 2026 (revenuquebec.ca) + TP-1015.F / TP-1015.TR.
+// Spec steps 3-5. All figures confirmed against the Revenu Québec 2026 table.
 export const RRQ = {
-  ympe: 74600, // _PLACEHOLDER maximum des gains admissibles
-  basicExemption: 3500, // _PLACEHOLDER exemption générale annuelle
+  ympe: 74600, // maximum des gains admissibles (max. cotisable = 71 100 = 74 600 − 3 500)
+  basicExemption: 3500, // exemption générale annuelle
   tier1: {
-    employeeRate: 0.063, // _PLACEHOLDER (régime de base + 1re cotisation supplémentaire)
-    employerRate: 0.063, // _PLACEHOLDER
+    employeeRate: 0.063, // 6,30 % = base 5,30 % + 1re cotisation supplémentaire 1 %
+    employerRate: 0.063,
     // The 6,30 % splits into the base plan (creditable) + the "première cotisation
     // supplémentaire" (the RRQ enhancement), which is DEDUCTIBLE from income (not a
     // credit) for both Québec and federal tax. baseRate = employeeRate − 1,00 %.
-    // Derived from the RRQ structure + Simon's D0033-0007 stub (reproduces Québec
-    // tax to the cent); confirm the 5,30 % / 1,00 % split against TP-1015.F.
+    // CONFIRMED against Revenu Québec RRQ 2026: "taux de cotisation de base de
+    // 5,30 % et taux de première cotisation supplémentaire de 1 %" (revenuquebec.ca).
     baseRate: 0.053,
-    employeeMaximum: 4479.30, // _PLACEHOLDER cotisation max employé (base + 1re suppl.)
-    employerMaximum: 4479.30, // _PLACEHOLDER
+    employeeMaximum: 4479.30, // cotisation max employé (base + 1re suppl.)
+    employerMaximum: 4479.30,
   },
   // 2e cotisation supplémentaire: earnings between YMPE and the second ceiling.
   tier2: {
-    lowerLimit: 74600, // _PLACEHOLDER = ympe
-    upperLimit: 85000, // _PLACEHOLDER deuxième plafond (MSGA)
-    employeeRate: 0.04, // _PLACEHOLDER
-    employerRate: 0.04, // _PLACEHOLDER
-    employeeMaximum: 416, // _PLACEHOLDER
-    employerMaximum: 416, // _PLACEHOLDER
+    lowerLimit: 74600, // = ympe
+    upperLimit: 85000, // maximum supplémentaire des gains admissibles (MSGA)
+    employeeRate: 0.04, // taux de deuxième cotisation supplémentaire
+    employerRate: 0.04,
+    employeeMaximum: 416, // max. suppl. cotisable 10 400 × 4 %
+    employerMaximum: 416,
   },
-  unvalidated: false, // verified against T4127 Tableau 8.4 (RRQ 2026)
+  unvalidated: false, // confirmed against Revenu Québec RRQ 2026 + T4127 Tableau 8.4
 };
 
 // ── Assurance-emploi (EI / AE) — Québec rate (reduced because of RQAP) ──────────
@@ -82,12 +83,12 @@ export const EI = {
 // ── Régime québécois d'assurance parentale (RQAP / QPIP) ────────────────────────
 // Source: Revenu Québec TP-1015.F / TP-1015.TA. Spec step 7.
 export const RQAP = {
-  maxInsurableEarnings: 103000,
-  employeeRate: 0.00430,
-  employerRate: 0.00602,
+  maxInsurableEarnings: 103000, // maximum de revenus assurables
+  employeeRate: 0.00430, // 0,430 % → max 442,90 (103 000 × 0,00430)
+  employerRate: 0.00602, // 0,602 % → max 620,06 (103 000 × 0,00602)
   employeeMaximum: 442.90,
   employerMaximum: 620.06,
-  unvalidated: false, // verified against T4127 Tableau 8.8 (RQAP 2026)
+  unvalidated: false, // confirmed against Revenu Québec RQAP 2026 + T4127 Tableau 8.8
 };
 
 // ── Federal income tax (CRA T4127 Option 1 annualized formula) ──────────────────
