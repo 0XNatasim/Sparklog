@@ -73,10 +73,13 @@ describe("engine baseAdjustments", () => {
     expect(r.employee.rrq.total).toBeCloseTo(159.13, 2);
     expect(r.employee.ei).toBeCloseTo(31.96, 2);
     expect(r.employee.rqap).toBeCloseTo(10.57, 2);
-    // With the CORRECT pension deduction (not the reverse-engineered 5,797), Québec
-    // tax lands ~6 $ over the stub (352,25) — a residual base difference we do NOT
-    // mask. Federal is within CRA table-rounding tolerance of 259,95.
-    expect(r.employee.quebecTax).toBeCloseTo(358.31, 2);
-    expect(Math.abs(r.employee.federalTax - 259.95)).toBeLessThan(1.5);
+    // Québec tax reproduces the stub to the cent once the RRQ enhancement ("première
+    // cotisation supplémentaire", 1,0 %) is deducted from taxable income alongside
+    // the CCQ pension contribution.
+    expect(r.employee.quebecTax).toBeCloseTo(352.25, 2);
+    // Federal applies the same enhancement deduction (T4127 factor F5) → 256,71.
+    // The stub's federal withholding (259,95) does not reflect it (evidently a
+    // simplified at-source method); the difference is left visible, not masked.
+    expect(r.employee.federalTax).toBeCloseTo(256.71, 2);
   });
 });

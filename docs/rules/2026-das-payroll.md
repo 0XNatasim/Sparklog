@@ -87,17 +87,31 @@ C3 (aussi C4-C5), en vigueur du **2026-04-26 au 2027-04-24**. Salaires C3 : comp
 
 **Correction (important):** an earlier draft used a reverse-engineered
 `socialBenefitsDeductionPerHour = 5,797 $/h` chosen only to hit the stub's Québec
-tax. That is **wrong** and has been removed — it masked a real base difference. The
-sourced pension deduction is 5,165343 $/h (compagnon C3), which yields Québec tax
-**358,31 $ vs the stub's 352,25 $**. This ~6 $ residual is left **visible and
-unresolved** (a remaining difference in the Québec taxable base to investigate at
-validation), not papered over.
+tax. It was removed for the sourced pension deduction (5,165343 $/h compagnon C3),
+which left a ~6 $ Québec residual. That residual is now **explained and resolved**:
+it was the **deduction for the RRQ enhancement** ("première cotisation
+supplémentaire", 1,0 %), which Revenu Québec deducts from taxable income and the
+engine was not applying.
+
+### RRQ enhancement deduction (base plan credit vs enhancement deduction)
+
+The 6,30 % tier-1 employee rate splits into the base plan (5,30 %, a non-refundable
+tax credit) and the enhancement (1,00 %, the "première cotisation supplémentaire").
+The enhancement — plus all of tier-2 — is **deducted from taxable income** for BOTH
+Québec (TP-1015.F) and federal (T4127 factor F5), and only the base portion is
+credited. `rrq.js` returns `baseCreditCents` + `enhancementDeductionCents`; the
+engine credits the base and deducts the enhancement (annualized) from both tax
+bases. The 5,30 % / 1,00 % split is derived from the RRQ structure + the stub
+(reproduces Québec tax to the cent) and is flagged to confirm against TP-1015.F.
 
 Validation against Simon Bellerive's D0033-0007 stub (week 2026-08-30 → 09-05, 40 h,
 compagnon C3 base 50,79 $ + prime 4,06 $, seeded YTD through 2026-08-29): **RRQ, EI,
-RQAP reproduce to the cent**; federal is within CRA table-rounding tolerance (~1 $ of
-259,95 $); **Québec tax is ~6 $ over** the stub with the correct pension rate. Still
-to source before sign-off: the residual Québec-base difference, and whether the
+RQAP and Québec income tax reproduce to the cent**. Federal income tax computes
+**256,71 $** (applying the same T4127-correct enhancement deduction) vs the stub's
+**259,95 $**: the stub's federal withholding does not appear to apply the enhancement
+deduction at source (its 259,95 $ is closer to the no-deduction 261,04 $), a
+simplified employer at-source method. This federal divergence is left **visible**,
+not masked, and flagged for WebRAS/PDOC validation along with whether the CCQ
 avantage imposable / pension belong in the federal base. The rule set stays `draft`
 (every result `requires_review`).
 

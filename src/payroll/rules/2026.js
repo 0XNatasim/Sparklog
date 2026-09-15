@@ -45,8 +45,14 @@ export const RRQ = {
   ympe: 74600, // _PLACEHOLDER maximum des gains admissibles
   basicExemption: 3500, // _PLACEHOLDER exemption générale annuelle
   tier1: {
-    employeeRate: 0.063, // _PLACEHOLDER
+    employeeRate: 0.063, // _PLACEHOLDER (régime de base + 1re cotisation supplémentaire)
     employerRate: 0.063, // _PLACEHOLDER
+    // The 6,30 % splits into the base plan (creditable) + the "première cotisation
+    // supplémentaire" (the RRQ enhancement), which is DEDUCTIBLE from income (not a
+    // credit) for both Québec and federal tax. baseRate = employeeRate − 1,00 %.
+    // Derived from the RRQ structure + Simon's D0033-0007 stub (reproduces Québec
+    // tax to the cent); confirm the 5,30 % / 1,00 % split against TP-1015.F.
+    baseRate: 0.053,
     employeeMaximum: 4479.30, // _PLACEHOLDER cotisation max employé (base + 1re suppl.)
     employerMaximum: 4479.30, // _PLACEHOLDER
   },
