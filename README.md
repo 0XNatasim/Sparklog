@@ -39,7 +39,7 @@ The Manager workspace has six sections:
 | **Notifications** | Review overtime authorizations, supper claims, and parking receipts in one place. |
 | **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, set day/week time off, manage company holidays, and pause accounts (or delete already-inactive ones) without losing history. The list is grouped by role (owner → admin → manager → employee, alphabetical within each). Owners can assign roles here; `admin` staff show a flat-hourly pay field instead of CCQ metadata. |
 | **Forms** | Open company forms and control which forms employees can see. |
-| **Testing** | Tools and previews: the costing dashboard (full employer cost — see below), the CCQ JSON export/download, the CCQ rate / ACQ employer-cost tables, and the sensitive-actions audit log. |
+| **Testing** | Tools and previews: the costing dashboard (full employer cost — see below), the CCQ JSON export/download, the CCQ rate / ACQ employer-cost tables, the **Payroll DAS test bench** (deterministic source-deductions engine — see below), and the sensitive-actions audit log. |
 
 Managers can also broadcast announcements, synchronize CCQ rates, view the app as any employee, and force a manual refresh from the header (useful in installed PWA/App mode).
 
@@ -324,6 +324,33 @@ keep it responsive despite cold starts:
 
 This is best-effort, not an SLA. When uptime becomes critical, move to **Supabase Pro**
 (no pausing, steadier compute, daily backups). See `docs/ops/supabase-reliability.md`.
+
+## Payroll DAS engine (Testing → Payroll)
+
+A deterministic, pure source-deductions (DAS) engine lives under `src/payroll/` and is
+exercised from the **Testing → Payroll** bench. It is a **test bench only** — every
+result is labeled *"Not finalized payroll · Requires payroll review"* and the rule set
+stays `draft` (`requires_review = true`) until validated against WebRAS/PDOC with
+specialist sign-off (per the payroll-rule gate). Money is computed in integer cents.
+
+- **Statutory deductions** — federal income tax (CRA T4127 Option-1 formula, Québec
+  abatement), Québec income tax (TP-1015.F), RRQ two-tier, EI (Québec rate), RQAP,
+  plus employer FSS/CNT/FDRCMO/CNESST. 2026 RRQ/RQAP and the RRQ 5,30 % / 1,00 % base
+  vs. enhancement split are confirmed against the Revenu Québec 2026 tables; the RRQ
+  enhancement is deducted from taxable income (T4127 factor F5A / TP-1015.F).
+- **CCQ layer** (`src/payroll/ccq-benefits.js`) — folds collective-agreement items into
+  the right bases *before* the tax engine (électricien, annexe C3): 13 % vacation
+  indemnity (pensionable/insurable), the MÉDIC *avantage imposable* (3,377 $/h — CCQ
+  Avantages imposables table; Québec-taxable + pensionable but excluded from the federal
+  source base → T4A), the employee pension contribution (wage × 1,13 × 9 %, deductible),
+  the MÉDIC premium withholding, and **union dues** auto-computed per union
+  (`CCQ_UNIONS`: FTQ-FIPOE, International/FIPOE 568, CSD, CSN, SQC) as a federal U1
+  deduction / Québec credit.
+- **Validation status** — against a real compagnon-électricien stub, RRQ/EI/RQAP and
+  Québec income tax reproduce to the cent; federal lands ~1,50 $ from the printed
+  withholding (the CCQ *prélèvement* is not a federal deduction; residual is
+  TD1/rounding), to settle against PDOC. Constants and their sources are registered in
+  `docs/rules/2026-das-payroll.md`.
 
 ## Governance & documentation
 
