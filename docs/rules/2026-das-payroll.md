@@ -169,11 +169,13 @@ $** vs the stub's **259,95 $**.
 Union dues are union-specific (ccq.org, "Cotisations redistribuées aux associations
 syndicales"): CSD (50 % de la 1re h + 0,035 $/h), CSN (50 % de la 1re h; apprentis
 9,90–11,70 $/sem), SQC (compagnon 15,25 $/sem; apprentis 9,95–11,95 $/sem), FTQ, and
-**FIPOE section locale 568** (compagnons électriciens : 65 % d'une heure/semaine sur le
-taux compagnon de l'**annexe B du secteur industriel** + 0,05 $/h). Simon's 29,93 $
-does not reconcile against the ICI rate (50,79 $) but fits FIPOE 568 at an implied
-industrial rate of ~42,97 $ — so the amount needs the industrial annexe B rate (not in
-scope) and is entered manually meanwhile.
+FIPOE (65 % d'une heure/semaine sur le taux compagnon de l'annexe B du secteur
+industriel + 0,05 $/h). The CCQ **Annexe B — secteur industriel** (au 26 avril 2026)
+confirms the compagnon électricien rate = **50,79 $** — identical to the ICI rate. So
+FIPOE's 65 % would give 35,01 $, not the stub's 29,93 $; instead Simon's dues reconcile
+**exactly** as `55 % × 50,79 + 0,05 $/h × 40 = 29,93 $` — a **55 %** union rate. The
+amount is entered manually pending confirmation of which union/annexe applies that
+55 % compagnon rate (it is not FIPOE 568).
 
 **Result & remaining gap (kept `requires_review`):** RRQ/EI/RQAP and Québec income tax
 reproduce **to the cent**; with the sourced MÉDIC exclusion + U1 union dues, federal
@@ -184,10 +186,10 @@ enhancement) is applied per T4127 (factor `A = [P × (I − F − F2 − F5A −
 F1`, t4127-01-26f.pdf). The engine does **not** close the last dollar with an unsourced
 net delta.
 
-**Still to source before validation:** the exact union-dues amount from the FIPOE 568
-industrial annexe B rate (to compute it rather than enter it); the federal *timing* of
-the vacances (remitted to a CCQ fund and paid later per ccq.org, yet present in this
-period's base); and the whole federal chain against **PDOC**.
+**Still to source before validation:** which union / annexe applies the 55 % compagnon
+rate that yields Simon's 29,93 $ (so the dues can be computed rather than entered); the
+federal *timing* of the vacances (remitted to a CCQ fund and paid later per ccq.org,
+yet present in this period's base); and the whole federal chain against **PDOC**.
 
 ## Validation checklist (before flipping to `validated`)
 
