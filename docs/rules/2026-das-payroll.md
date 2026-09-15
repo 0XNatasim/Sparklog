@@ -83,7 +83,7 @@ C3 (aussi C4-C5), en vigueur du **2026-04-26 au 2027-04-24**. Salaires C3 : comp
 | Avantage imposable additionnel | 3,377 $/h (all levels of the trade) | RRQ pensionable, Québec taxable | `tests/Tableau-Institutionnel-Commercial-2026-2027.pdf`; verified to the cent |
 | Cotisation salariale au régime de retraite | wage × (1 + 13 %) × **9 %** compagnon / **4,5 %** apprenti (compagnon C3 = 5,165343 $/h) | Québec taxable (**reduces** it) + withheld from pay | CCQ agreement; deductible from taxable income. Computed from the wage — follows the annual increase, never hardcoded |
 | MÉDIC Construction (employee) + Québec 9 % insurance tax | 0,68 $/h × 1,09 = 0,7412 $/h | **none** (net withholding only, not a tax deduction) | CCQ held the premium at 0,68 $/h through 2027-04-24 |
-| Federal taxable | wages | (kept at wages) | ⚠️ empirical — reproduces the stub's federal within ~1 $. The correct federal decomposition (avantage imposable taxable, pension deductible) is **unresolved** and flagged; the pension is RPP-deductible federally too but adding it broke the match, so it is not applied pending WebRAS/PDOC validation |
+| Federal taxable | wages | (kept at wages) | ⚠️ The printed federal base is 2 203,56 $ (see the reconciliation below); it is explained to within 0,80 $ by the avantage imposable being Québec-only + union dues being a federal deduction / Québec credit, but the residual is not rate-derivable, so `taxableFederal` stays 0 (no fabricated delta) pending the payroll provider's breakdown + PDOC validation |
 
 **Correction (important):** an earlier draft used a reverse-engineered
 `socialBenefitsDeductionPerHour = 5,797 $/h` chosen only to hit the stub's Québec
@@ -108,16 +108,48 @@ cotisation supplémentaire de 1 %" (total 6,30 %). The same table confirms YMPE
 tier-2 (MSGA 85 000 $, 4 %, max 416 $); RQAP 2026 is confirmed at 103 000 $, 0,430 %
 (employee) / 0,602 % (employer).
 
-Validation against Simon Bellerive's D0033-0007 stub (week 2026-08-30 → 09-05, 40 h,
-compagnon C3 base 50,79 $ + prime 4,06 $, seeded YTD through 2026-08-29): **RRQ, EI,
-RQAP and Québec income tax reproduce to the cent**. Federal income tax computes
-**256,71 $** (applying the same T4127-correct enhancement deduction) vs the stub's
-**259,95 $**: the stub's federal withholding does not appear to apply the enhancement
-deduction at source (its 259,95 $ is closer to the no-deduction 261,04 $), a
-simplified employer at-source method. This federal divergence is left **visible**,
-not masked, and flagged for WebRAS/PDOC validation along with whether the CCQ
-avantage imposable / pension belong in the federal base. The rule set stays `draft`
-(every result `requires_review`).
+### Printed taxable-base reconciliation (D0033-0007)
+
+The real stub prints two taxable-income bases for the period: **federal 2 203,56 $**
+and **provincial 2 386,59 $**. These are the ground truth for factor A (T4127) and
+its Québec equivalent (TP-1015.F). Reconciling them against the period components
+(salaire 2 194,00 ; vacances CCQ 264,11 ; avantage imposable additionnel CCQ 135,08 ;
+retraite CCQ 206,60 ; cotisation syndicale 29,93 ; prélèvement CCQ 17,22) :
+
+| Base | Formula | Amount | Printed | Δ |
+|------|---------|--------|---------|---|
+| **Provincial** | salaire + vacances + avantage imposable − retraite | 2 386,57 $ | 2 386,59 $ | **0,02 $** (rounding) |
+| **Federal** | salaire + vacances − retraite − cotisation syndicale − prélèvement CCQ | 2 204,36 $ | 2 203,56 $ | **0,80 $** |
+
+The provincial base reproduces **to the cent** (2¢, from per-hour rounding), which
+confirms the CCQ composition (vacances + avantage imposable + retraite déductible).
+The federal base is explained to within **0,80 $** by two real federal-vs-Québec
+rules — **not** by the reverse-engineered deltas Gemini proposed (its 355 $ figure
+is a *cumulative* column, and adding it makes RRQ 172,99 $ ≠ 159,13 $):
+
+- **Avantage imposable additionnel CCQ (135,08 $) — Québec-only taxable benefit.**
+  It is in the provincial base but not the federal base (a construction benefit
+  reported on the RL-1 but not the T4). This is the largest federal/Québec gap.
+- **Cotisation syndicale (29,93 $) + prélèvement CCQ (17,22 $) — federal deductions,
+  Québec credits.** Union dues reduce federal taxable income (CRA line 21200) but
+  are a *credit* in Québec (they do not reduce the Québec base). Source: CRA
+  (deduction) vs Revenu Québec (crédit d'impôt).
+
+**Unresolved (kept `requires_review`, NOT hardcoded):** a **0,80 $** residual on the
+federal base and a further **~1,60 $** on the federal tax remain. They cannot be
+derived from a rate — the union dues / levy are withheld *amounts*, not formulas, and
+the exact federal taxable-benefit split needs the payroll provider's period
+breakdown. So the engine keeps `ccqBenefits.baseAdjustments.taxableFederal = 0`
+(federal base = wages) rather than fabricate a +9,56 $ delta: federal computes
+**256,71 $** vs the stub's **259,95 $**. F5 (the RRQ enhancement) IS applied per
+T4127 (factor A = [P × (I − F − F2 − **F5A** − U1)] − HD − F1, t4127-01-26f.pdf).
+
+**To close it, request from the payroll provider:** the period breakdown of the
+"gains imposables — fédéral" line (2 203,56 $), specifically (1) which CCQ benefits
+are federal taxable vs Québec-only, (2) the union dues / levy federal deduction
+amounts, and (3) the TD1 federal claim actually used. Then validate against PDOC
+(federal) and WebRAS (Québec). The rule set stays `draft` (every result
+`requires_review`).
 
 ## Validation checklist (before flipping to `validated`)
 

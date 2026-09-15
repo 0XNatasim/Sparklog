@@ -77,9 +77,32 @@ describe("engine baseAdjustments", () => {
     // cotisation supplémentaire", 1,0 %) is deducted from taxable income alongside
     // the CCQ pension contribution.
     expect(r.employee.quebecTax).toBeCloseTo(352.25, 2);
-    // Federal applies the same enhancement deduction (T4127 factor F5) → 256,71.
-    // The stub's federal withholding (259,95) does not reflect it (evidently a
-    // simplified at-source method); the difference is left visible, not masked.
+    // The Québec period taxable BASE composes to the stub's printed "gains imposables
+    // provinciaux" (2 386,59 $) within rounding: salaire + vacances + avantage
+    // imposable − retraite. This confirms the CCQ composition against primary data.
+    const qcBase = wages + ccq.baseAdjustments.taxableQuebec;
+    expect(qcBase).toBeCloseTo(2386.59, 1);
+
+    // Federal: the engine keeps the base at wages (taxableFederal = 0) rather than
+    // fabricate the +9,56 $ needed to reach the printed federal base of 2 203,56 $.
+    // The enhancement deduction (T4127 factor F5A) IS applied → federal 256,71 $ vs
+    // the stub's 259,95 $. The ~3 $ gap (Québec-only avantage imposable + union-dues
+    // federal-deduction/Québec-credit + rounding) is documented, not masked.
+    expect(wages + ccq.baseAdjustments.taxableFederal).toBeCloseTo(2194.0, 2);
     expect(r.employee.federalTax).toBeCloseTo(256.71, 2);
+  });
+
+  // A second, structural scenario (an apprentice at different hours) guards the base
+  // COMPOSITION formulas so the model can't be silently overfit to one stub.
+  it("composes the CCQ bases consistently for an apprentice (no stub-specific numbers)", () => {
+    const hours = 32, wage = 30.47; // apprenti 2 C3
+    const b = computeCcqBenefits({ hours, hourlyWage: wage, employeePensionRate: 0.045 });
+    const vac = hours * wage * 0.13;
+    const imp = hours * 3.377;
+    const pension = hours * wage * 1.13 * 0.045;
+    expect(b.baseAdjustments.insurableEI).toBeCloseTo(vac, 6);
+    expect(b.baseAdjustments.pensionable).toBeCloseTo(vac + imp, 6);
+    expect(b.baseAdjustments.taxableQuebec).toBeCloseTo(vac + imp - pension, 6);
+    expect(b.baseAdjustments.taxableFederal).toBe(0);
   });
 });
