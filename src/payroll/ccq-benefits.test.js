@@ -37,6 +37,22 @@ describe("computeCcqBenefits", () => {
     expect(b.federalDeduction).toBe(b.unionDues); // U1: federal only, Québec is a credit
   });
 
+  it("assembles the complete stub gross-up and net (D0033-0007)", () => {
+    const hours = 40, base = 50.79, prem = 4.06;
+    const wages = hours * (base + prem); // 2194.00 cash earnings (salaire + prime)
+    const b = computeCcqBenefits({ hours, hourlyWage: base, employeePensionRate: 0.09, union: "ftq_fipoe", level: "journeyman", prelevementCcq: 17.22, caisseEducationSyndicale: 0.80 });
+    // Gross-up = cash + vacation + MÉDIC benefit + employer social benefit + safety equip.
+    const grossUp = wages + b.vacation + b.taxableBenefit + b.employerSocialBenefit + b.safetyEquipment;
+    expect(grossUp).toBeCloseTo(2980.19, 1); // matches the stub's printed "Gains"
+    expect(b.safetyEquipment).toBeCloseTo(32.00, 2); // 0,80 $/h × 40
+    expect(b.employerSocialBenefit).toBeCloseTo(355.00, 2); // 8,875 $/h × 40
+    // Net = cash + safety allowance − statutory − CCQ withholdings. Uses the stub's
+    // table-rounded federal (259,95, option B) for the statutory total.
+    const statutory = 259.95 + 352.25 + 159.13 + 31.96 + 10.57;
+    const net = wages + b.safetyEquipment - statutory - b.netWithholdings;
+    expect(net).toBeCloseTo(1127.94, 1); // matches the stub's printed "Paie nette"
+  });
+
   it("maps benefits onto the right statutory bases (MÉDIC is not a tax deduction)", () => {
     const { vacation, taxableBenefit, pensionDeduction, baseAdjustments } = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
     expect(baseAdjustments.insurableEI).toBeCloseTo(vacation, 6);
