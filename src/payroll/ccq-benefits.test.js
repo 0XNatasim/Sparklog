@@ -105,4 +105,28 @@ describe("engine baseAdjustments", () => {
     expect(b.baseAdjustments.taxableQuebec).toBeCloseTo(vac + imp - pension, 6);
     expect(b.baseAdjustments.taxableFederal).toBe(0);
   });
+
+  // Rounding policy: the payroll rounds each component to the cent (and rounds the
+  // pensionable hourly base BEFORE applying 9 %) when building the printed base. The
+  // engine currently carries full precision, hence a 2¢ gap on the provincial base.
+  // This test documents the difference so the policy is a conscious validation item.
+  it("shows the payroll's per-component rounding reproduces the printed provincial base", () => {
+    const round2 = (x) => Math.round(x * 100) / 100;
+    const hours = 40, base = 50.79;
+    const wages = 2194.0;
+    const vac = round2(hours * base * 0.13);       // 264,11
+    const imp = round2(hours * 3.377);             // 135,08
+
+    // Payroll: round the pensionable hourly base (50,79 × 1,13 = 57,3927 → 57,39)
+    // to the cent before × 9 % → 206,60. Engine: full precision → 206,6137 → 206,61.
+    const pensionPayroll = round2(round2(base * 1.13) * 0.09 * hours);
+    const pensionEngine = round2(hours * base * 1.13 * 0.09);
+    expect(pensionPayroll).toBe(206.6);
+    expect(pensionEngine).toBe(206.61);
+
+    // Per-component-rounded (payroll) path reproduces the printed provincial base 2 386,59.
+    expect(round2(wages + vac + imp - pensionPayroll)).toBe(2386.59);
+    // Engine's full-precision pension lands 1¢ lower.
+    expect(round2(wages + vac + imp - pensionEngine)).toBe(2386.58);
+  });
 });
