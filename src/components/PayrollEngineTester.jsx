@@ -112,6 +112,7 @@ export default function PayrollEngineTester() {
     status: "journeyman",
     vacationRatePct: CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate * 100,
     imposablePerHour: CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
+    insurancePerHour: CCQ_ELECTRICIAN_IC_C3.insuranceTaxableBenefitPerHour,
     medicPerHour: CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
     medicTaxPct: CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate * 100,
   });
@@ -272,6 +273,7 @@ export default function PayrollEngineTester() {
         hourlyWage: base,
         employeePensionRate: pensionRate,
         taxableBenefitPerHour: Number(ccq.imposablePerHour) || 0,
+        insuranceTaxableBenefitPerHour: Number(ccq.insurancePerHour) || 0,
         vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
         medicEmployeePerHour: Number(ccq.medicPerHour) || 0,
         medicProvincialTaxRate: (Number(ccq.medicTaxPct) || 0) / 100,
@@ -414,6 +416,7 @@ export default function PayrollEngineTester() {
                 </label>
                 <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" />
                 <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" />
+                <Field label={t("payroll.ccqInsurance")} value={ccq.insurancePerHour} onChange={setC("insurancePerHour")} step="0.0001" />
                 <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" />
                 <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" />
               </div>

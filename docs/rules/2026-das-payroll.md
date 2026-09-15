@@ -83,7 +83,7 @@ C3 (aussi C4-C5), en vigueur du **2026-04-26 au 2027-04-24**. Salaires C3 : comp
 | Avantage imposable additionnel | 3,377 $/h (all levels of the trade) | RRQ pensionable, Québec taxable | `tests/Tableau-Institutionnel-Commercial-2026-2027.pdf`; verified to the cent |
 | Cotisation salariale au régime de retraite | wage × (1 + 13 %) × **9 %** compagnon / **4,5 %** apprenti (compagnon C3 = 5,165343 $/h) | Québec taxable (**reduces** it) + withheld from pay | CCQ agreement; deductible from taxable income. Computed from the wage — follows the annual increase, never hardcoded |
 | MÉDIC Construction (employee) + Québec 9 % insurance tax | 0,68 $/h × 1,09 = 0,7412 $/h | **none** (net withholding only, not a tax deduction) | CCQ held the premium at 0,68 $/h through 2027-04-24 |
-| Federal taxable | wages | (kept at wages) | ⚠️ The printed federal base is 2 203,56 $ (see the reconciliation below). Sourced T4127 components (U1 union dues, F pension, F5A enhancement) only reach 2 221,58 $ — an unconfirmed hypothesis, still 18 $ off; so `taxableFederal` stays 0 (no fabricated delta) pending the payroll provider's breakdown + PDOC validation |
+| Federal taxable | provincial base − CCQ insurance benefit | reproduces the printed 2 203,56 $ | The CCQ insurance benefit (vie + maladie) is Québec-taxable but not withheld federally at source (T4A) → `taxableFederal = taxableQuebec − insuranceBenefit`. The insurance per-hour amount is SEEDED from the stub and flagged (CCQ Avantages imposables table); see the reconciliation below |
 
 **Correction (important):** an earlier draft used a reverse-engineered
 `socialBenefitsDeductionPerHour = 5,797 $/h` chosen only to hit the stub's Québec
@@ -127,55 +127,49 @@ the pensionable hourly base first (`50,79 × 1,13 = 57,3927 → 57,39`, then × 
 base of 2 386,57 $. The 2¢ is a per-component rounding difference (see the rounding
 test in `ccq-benefits.test.js`), not a composition error.
 
-#### Federal base — UNCONFIRMED hypothesis (not reconciled from sourced rules alone)
+#### Federal base — modelled as *provincial base − CCQ insurance benefit*
 
-With only the components sourced against **T4127** (t4127-01-26f.pdf) — factor
-`A = [P × (I − F − F2 − F5A − U1)] − HD − F1`, where `U1 = cotisations syndicales
-versées pour la période`, `F` includes RPA/pension contributions, and `F5A =
-déduction des cotisations supplémentaires du RRQ` — the federal base is:
+The chain that ties the two printed bases together (product owner, from the CCQ
+"Avantages imposables" tables):
 
-`salaire 2 194,00 + vacances 264,11 − retraite 206,60 − U1 29,93 = 2 221,58 $`
+```
+base cotisable (RRQ) = salaire + vacances CCQ + avantage imposable additionnel
+                     = 2 194,00 + 264,11 + 135,08 = 2 593,19   ✓
+imposable Québec     = base cotisable − déduction avantages sociaux CCQ
+                     = 2 593,19 − 206,60 = 2 386,59            ✓ (printed)
+imposable fédéral    = imposable Québec − avantage assurance CCQ
+                     = 2 386,59 − 183,03 = 2 203,56            ✓ (printed)
+```
 
-which is **18,02 $ OVER** the printed 2 203,56 $. It only comes within **0,80 $** if
-the **prélèvement CCQ (17,22 $)** is *also* deducted federally — and that deduction
-is **not sourced**. So the federal base is **not** reconciled; three things remain
-open, each needing a primary source (do not assume):
+**The rule (CCQ Avantages imposables):** the CCQ group-insurance contribution
+(assurance **vie** + assurance **maladie**) is a **Québec** taxable benefit, but for
+**federal** purposes the CRA does **not** require the employer to withhold on it at
+source — the CCQ reports it on a **T4A** at year-end. So the federal source-deduction
+base is the Québec base minus the whole insurance benefit. `ccq-benefits.js` now
+returns `taxableFederal = taxableQuebec − insuranceBenefit`.
 
-1. **Is the CCQ vacances (264,11 $) federal employment income this period?** Likely
-   **not**: the CCQ (ccq.org/avantages) states the 13 % indemnity is *remitted by the
-   employer to a CCQ fund and paid to the worker later* (before the summer/winter
-   holidays). It is pensionable/insurable/QC-taxable in the period earned (matched to
-   the cent), but its *federal* timing is unconfirmed — and excluding it drops the
-   federal base far below the printed 2 203,56 $, so the reconciliation is still open.
-2. **Is the prélèvement CCQ (17,22 $) an admissible federal deduction?** Almost
-   certainly **not**. Per the CCQ (ccq.org/avantages), the prélèvement is **0,75 % de
-   la rémunération, à parts égales employeur/employé** — a regulatory levy that
-   finances the CCQ ("assurer la conformité dans l'industrie"), **not** union dues and
-   **not** an RPP contribution. So it does not belong in T4127 F or U1. This removes it
-   as a reconciliation candidate (the earlier 0,80 $ figure wrongly deducted it). Note
-   also that the 29,93 $ "cotisations redistribuées" bundles the union dues *and* a
-   sectoral training contribution (ccq.org), so even that may not be 100 % deductible
-   U1 — to confirm.
-3. **Why is the avantage imposable additionnel (135,08 $) taxable in Québec but not
-   federally?** The likely nature is an **employer-paid group-insurance premium**
-   (taxable QC benefit on the RL-1, exempt federally as an employer PHSP contribution)
-   — but this must be confirmed against the CCQ benefit schedule / RL-1 guide, **not**
-   inferred from the numeric reconciliation alone.
+**⚠️ The insurance amount is the one figure that cannot be derived from the stub.**
+It comes from the CCQ "Avantages imposables" table (per trade/sector, updated several
+times a year). `insuranceTaxableBenefitPerHour` is currently **SEEDED** from
+D0033-0007 (183,03 $ / 40 h = 4,5758 $/h) and flagged — replace it with the in-force
+CCQ table value. It must cover the **entire** insurance benefit (vie + maladie); if it
+covered only maladie the assurance-vie portion would be federally double-taxed at
+source.
 
-**Production stays honest (NOT hardcoded):** the engine keeps
-`ccqBenefits.baseAdjustments.taxableFederal = 0` (federal base = wages) rather than
-fabricate the +9,56 $ delta. F5A (the RRQ enhancement) **is** applied per T4127.
-Federal computes **256,71 $** vs the stub's **259,95 $**; the ~3 $ gap is left
-visible. Only once the three points above are sourced will the federal components be
-modelled **separately** (federal-taxable indemnity, federally-deductible pension,
-admissible U1 union dues) — never as a net delta.
+**Result:** RRQ/EI/RQAP and Québec income tax reproduce **to the cent**; the federal
+base reproduces the printed 2 203,56 $, and federal tax computes **258,34 $** vs the
+stub's **259,95 $**. The remaining **~1,60 $** is *not* forced — the model reproduces
+the base, not the target tax; the residual is TD1/rounding or the cumulative method,
+to settle against **PDOC**. F5A (the RRQ enhancement) is applied per T4127 (factor
+`A = [P × (I − F − F2 − F5A − U1)] − HD − F1`, t4127-01-26f.pdf; `U1 = cotisations
+syndicales versées pour la période`).
 
-**To close it, request from the payroll provider:** the period breakdown of the
-"gains imposables — fédéral" line (2 203,56 $): which CCQ benefits are federal
-taxable vs Québec-only, the exact federal deduction amounts (RPA, U1, and whether the
-prélèvement is deductible), and the TD1 federal claim used. Then validate against
-PDOC (federal) and WebRAS (Québec). The rule set stays `draft` (every result
-`requires_review`).
+**Still to confirm** (rule set stays `draft`/`requires_review`): the exact CCQ
+insurance table value for the trade/sector; the ~1,60 $ federal residual against
+PDOC; and the federal *timing* of the vacances (remitted to a CCQ fund and paid
+later per ccq.org, yet present in this period's base). The prélèvement CCQ (0,75 %,
+ccq.org) is a regulatory levy — **not** a federal deduction — and correctly plays no
+part in the base above.
 
 ## Validation checklist (before flipping to `validated`)
 

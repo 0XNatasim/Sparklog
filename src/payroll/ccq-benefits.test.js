@@ -30,13 +30,15 @@ describe("computeCcqBenefits", () => {
   });
 
   it("maps benefits onto the right statutory bases (MÉDIC is not a tax deduction)", () => {
-    const { vacation, taxableBenefit, pensionDeduction, baseAdjustments } = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
+    const { vacation, taxableBenefit, pensionDeduction, insuranceBenefit, baseAdjustments } = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
     expect(baseAdjustments.insurableEI).toBeCloseTo(vacation, 6);
     expect(baseAdjustments.insurableRQAP).toBeCloseTo(vacation, 6);
     expect(baseAdjustments.pensionable).toBeCloseTo(vacation + taxableBenefit, 6);
     // Only the pension (not MÉDIC) lowers Québec taxable income.
     expect(baseAdjustments.taxableQuebec).toBeCloseTo(vacation + taxableBenefit - pensionDeduction, 6);
-    expect(baseAdjustments.taxableFederal).toBe(0);
+    // Federal source-deduction base = Québec base − the CCQ insurance taxable benefit
+    // (Québec taxes it; the CRA does not withhold on it at source → T4A).
+    expect(baseAdjustments.taxableFederal).toBeCloseTo(baseAdjustments.taxableQuebec - insuranceBenefit, 6);
   });
 });
 
@@ -83,13 +85,16 @@ describe("engine baseAdjustments", () => {
     const qcBase = wages + ccq.baseAdjustments.taxableQuebec;
     expect(qcBase).toBeCloseTo(2386.59, 1);
 
-    // Federal: the engine keeps the base at wages (taxableFederal = 0) rather than
-    // fabricate the +9,56 $ needed to reach the printed federal base of 2 203,56 $.
-    // The enhancement deduction (T4127 factor F5A) IS applied → federal 256,71 $ vs
-    // the stub's 259,95 $. The ~3 $ gap (Québec-only avantage imposable + union-dues
-    // federal-deduction/Québec-credit + rounding) is documented, not masked.
-    expect(wages + ccq.baseAdjustments.taxableFederal).toBeCloseTo(2194.0, 2);
-    expect(r.employee.federalTax).toBeCloseTo(256.71, 2);
+    // The federal source-deduction base = Québec base − CCQ insurance taxable benefit
+    // (Québec taxes assurance vie + maladie; the CRA does not withhold on it at
+    // source → T4A). With the seeded CCQ insurance rate this reproduces the stub's
+    // printed federal base (2 203,56 $) within rounding.
+    const fedBase = wages + ccq.baseAdjustments.taxableFederal;
+    expect(fedBase).toBeCloseTo(2203.56, 1);
+    // Federal tax then computes 258,34 $ (F5A enhancement applied) vs the stub's
+    // 259,95 $ — a ~1,60 $ residual (TD1/rounding/cumulative method) left visible,
+    // NOT forced: the model reproduces the base, not the target tax.
+    expect(r.employee.federalTax).toBeCloseTo(258.34, 2);
   });
 
   // A second, structural scenario (an apprentice at different hours) guards the base
@@ -103,7 +108,8 @@ describe("engine baseAdjustments", () => {
     expect(b.baseAdjustments.insurableEI).toBeCloseTo(vac, 6);
     expect(b.baseAdjustments.pensionable).toBeCloseTo(vac + imp, 6);
     expect(b.baseAdjustments.taxableQuebec).toBeCloseTo(vac + imp - pension, 6);
-    expect(b.baseAdjustments.taxableFederal).toBe(0);
+    // Federal base = Québec base − insurance benefit (structural, same shape).
+    expect(b.baseAdjustments.taxableFederal).toBeCloseTo(b.baseAdjustments.taxableQuebec - b.insuranceBenefit, 6);
   });
 
   // Rounding policy: the payroll rounds each component to the cent (and rounds the

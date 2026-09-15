@@ -46,6 +46,16 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
 
   // Avantage imposable additionnel — per worked hour, all levels of the trade.
   taxableBenefitPerHour: 3.377,
+  // CCQ group-insurance taxable benefit (assurance vie + maladie) — per worked hour.
+  // It is a QUÉBEC taxable benefit, but the CRA does NOT require the employer to
+  // withhold on it at source (the CCQ reports it on a T4A at year-end), so it is
+  // REMOVED from the federal source-deduction base: fédéral = provincial − assurance.
+  // ⚠️ SEEDED from stub D0033-0007 (183,03 $ / 40 h = 4,5758 $/h). The real figure
+  // comes from the CCQ "Avantages imposables" table (per trade/sector, updated
+  // several times a year) — replace with the in-force value. It must cover the WHOLE
+  // insurance benefit (vie + maladie), not just maladie, or the federal base
+  // double-taxes the assurance-vie portion.
+  insuranceTaxableBenefitPerHour: 4.5758,
   // Indemnité de congés annuels + fériés + maladie (6 + 5,5 + 1,5 %).
   vacationHolidaySickRate: 0.13,
   // MÉDIC Construction employee premium + Québec insurance tax (net withholding).
@@ -77,6 +87,7 @@ export function computeCcqBenefits({
   hourlyWage = 0,
   employeePensionRate = CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate,
   taxableBenefitPerHour = CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
+  insuranceTaxableBenefitPerHour = CCQ_ELECTRICIAN_IC_C3.insuranceTaxableBenefitPerHour,
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
   medicEmployeePerHour = CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
   medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
@@ -93,12 +104,19 @@ export function computeCcqBenefits({
   const pensionDeduction = baseWage * (1 + vacationHolidaySickRate) * employeePensionRate;
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
+  // CCQ group-insurance taxable benefit (vie + maladie): a Québec taxable benefit
+  // NOT withheld federally at source (T4A at year-end).
+  const insuranceBenefit = h * insuranceTaxableBenefitPerHour;
+
+  // Québec taxable income: salaire + indemnity + avantage imposable − deductible pension.
+  const taxableQuebec = vacation + taxableBenefit - pensionDeduction;
 
   return {
     vacation,
     taxableBenefit,
     pensionDeduction,
     medicWithholding,
+    insuranceBenefit,
     // Both the pension contribution and the MÉDIC premium are withheld from pay,
     // so the caller subtracts this from the engine's (statutory-only) net pay.
     netWithholdings: pensionDeduction + medicWithholding,
@@ -108,13 +126,12 @@ export function computeCcqBenefits({
       insurableRQAP: vacation,
       // RRQ pensionable also picks up the taxable benefit.
       pensionable: vacation + taxableBenefit,
-      // Québec taxable income: + indemnity + taxable benefit − deductible pension.
-      taxableQuebec: vacation + taxableBenefit - pensionDeduction,
-      // Federal base kept at wages: this reproduces the stub's federal tax within
-      // CRA table-rounding tolerance. The correct federal decomposition (taxable
-      // benefit taxable, pension deductible) is unresolved and flagged for
-      // validation — see docs/rules/2026-das-payroll.md. Not masked.
-      taxableFederal: 0,
+      taxableQuebec,
+      // Federal source-deduction base = Québec base − the CCQ insurance taxable
+      // benefit (Québec taxes it; the CRA does not withhold on it at source). This
+      // reproduces the stub's printed federal base (2 203,56 $) once the insurance
+      // amount is the in-force CCQ value; see docs/rules/2026-das-payroll.md.
+      taxableFederal: taxableQuebec - insuranceBenefit,
     },
   };
 }
