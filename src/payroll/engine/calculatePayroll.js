@@ -79,20 +79,24 @@ export function calculatePayroll(input) {
   const ei = calculateEi({ insurableThisPeriod: bases.ei, ytd, rules });
   const rqap = calculateRqap({ insurableThisPeriod: bases.rqap, ytd, rules });
 
-  const credits = { rrqBaseCents: rrq.tier1.employeeCents, eiCents: ei.employeeCents, rqapCents: rqap.employeeCents };
+  // The base RRQ contribution is valued as a credit; the enhancement ("première
+  // cotisation supplémentaire" + tier-2) is DEDUCTED from taxable income, for both
+  // Québec and federal tax. Annualize the period enhancement to match annual income.
+  const credits = { rrqBaseCents: rrq.baseCreditCents, eiCents: ei.employeeCents, rqapCents: rqap.employeeCents };
+  const rrqEnhancementAnnualCents = (rrq.enhancementDeductionCents || 0) * periodsPerYear;
 
   const federal = calculateFederalTax({
     taxableThisPeriod: bases.federalTax,
     periodsPerYear, rules, credits,
     td1ClaimAmount: employee.federalTaxProfile?.td1ClaimAmount,
-    annualDeductions: roundCents(employee.federalTaxProfile?.annualDeductions || 0),
+    annualDeductions: roundCents(employee.federalTaxProfile?.annualDeductions || 0) + rrqEnhancementAnnualCents,
     additionalTax: employee.federalTaxProfile?.additionalTax || 0,
   });
   const quebec = calculateQuebecTax({
     taxableThisPeriod: bases.quebecTax,
     periodsPerYear, rules, credits,
     personalTaxCredits: employee.quebecTaxProfile?.personalTaxCredits,
-    annualDeductions: roundCents(employee.quebecTaxProfile?.annualDeductions || 0),
+    annualDeductions: roundCents(employee.quebecTaxProfile?.annualDeductions || 0) + rrqEnhancementAnnualCents,
     additionalTax: employee.quebecTaxProfile?.additionalTax || 0,
   });
 

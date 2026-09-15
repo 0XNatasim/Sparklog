@@ -36,6 +36,15 @@ describe("RRQ two-tier", () => {
     expect(r.tier2.employeeCents).toBe(0);
   });
 
+  it("splits tier-1 into a creditable base and a deductible enhancement", () => {
+    const r = calculateRrq({ pensionableThisPeriod: toCents(2000), ytd: {}, periodsPerYear: 52, rules });
+    // base = round(193269 * 0.053) = 10243c; enhancement = tier1 - base.
+    expect(r.baseCreditCents).toBe(10243);
+    expect(r.enhancementDeductionCents).toBe(r.tier1.employeeCents - r.baseCreditCents);
+    // The two always sum back to the (clamped) employee contribution.
+    expect(r.baseCreditCents + r.enhancementDeductionCents).toBe(r.employeeCents);
+  });
+
   it("stops at the tier-1 annual maximum (YTD clamp)", () => {
     const nearMax = toCents(rules.rrq.tier1.employeeMaximum) - 100; // 1$ of room left
     const r = calculateRrq({ pensionableThisPeriod: toCents(5000), ytd: { rrqEmployee: nearMax }, periodsPerYear: 52, rules });

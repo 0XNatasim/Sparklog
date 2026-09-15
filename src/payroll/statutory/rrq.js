@@ -20,6 +20,12 @@ export function calculateRrq({ pensionableThisPeriod, ytd, periodsPerYear, rules
   const rawEr1 = Math.round(contributory1 * r.tier1.employerRate);
   const employee1 = clampToRemaining(rawEmp1, ytd?.rrqEmployee || 0, toCents(r.tier1.employeeMaximum));
   const employer1 = clampToRemaining(rawEr1, ytd?.rrqEmployer || 0, toCents(r.tier1.employerMaximum));
+  // Split tier-1 into the base plan (a tax CREDIT) and the enhancement / "première
+  // cotisation supplémentaire" (a tax DEDUCTION from income). base = the creditable
+  // portion; the remainder is the deductible enhancement (kept consistent with the
+  // clamped total so the two always sum back to `employee1`).
+  const employee1Base = Math.min(employee1, Math.round(contributory1 * (r.tier1.baseRate ?? r.tier1.employeeRate)));
+  const employee1Enhancement = employee1 - employee1Base;
 
   // ── Tier 2 (earnings in the band YMPE → upperLimit) ──
   const bandLower = toCents(r.tier2.lowerLimit);
@@ -31,11 +37,20 @@ export function calculateRrq({ pensionableThisPeriod, ytd, periodsPerYear, rules
   const employee2 = clampToRemaining(rawEmp2, ytd?.rrq2Employee || 0, toCents(r.tier2.employeeMaximum));
   const employer2 = clampToRemaining(rawEr2, ytd?.rrq2Employer || 0, toCents(r.tier2.employerMaximum));
 
+  // Employee contribution portions for the income-tax modules:
+  //   baseCreditCents      — base plan, valued as a non-refundable credit
+  //   enhancementDeductionCents — enhancement (tier-1 supplément + all of tier-2),
+  //                          deducted from taxable income (Québec + federal).
+  const baseCreditCents = employee1Base;
+  const enhancementDeductionCents = employee1Enhancement + employee2;
+
   return {
     employeeCents: employee1 + employee2,
     employerCents: employer1 + employer2,
     tier1: { employeeCents: employee1, employerCents: employer1 },
     tier2: { employeeCents: employee2, employerCents: employer2 },
+    baseCreditCents,
+    enhancementDeductionCents,
     pensionableAfter: ytdAfter,
     explanation: {
       module: "rrq",
