@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeUnionDues, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 
 const c = (d) => Math.round(d * 100);
@@ -29,7 +29,7 @@ describe("computeCcqBenefits", () => {
     expect(b.netWithholdings).toBeCloseTo(b.pensionDeduction + b.medicWithholding + b.unionDues, 6);
   });
 
-  it("auto-computes the FTQ-FIPOE union dues (federal U1 deduction)", () => {
+  it("auto-computes the FTQ-FIPOE union dues (federal U1 deduction) by default", () => {
     // 55 % of one hour's wage per week + 0,05 $/h → 0,55 × 50,79 + 0,05 × 40 = 29,93.
     const b = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
     expect(b.unionDues).toBeCloseTo(0.55 * 50.79 + 0.05 * 40, 6);
@@ -147,5 +147,30 @@ describe("engine baseAdjustments", () => {
     expect(round2(wages + vac + imp - pensionPayroll)).toBe(2386.59);
     // Engine's full-precision pension lands 1¢ lower.
     expect(round2(wages + vac + imp - pensionEngine)).toBe(2386.58);
+  });
+});
+
+describe("computeUnionDues (per union)", () => {
+  const wage = 50.79, hours = 40;
+  it("FTQ-FIPOE: 55 % + 0,05 $/h", () => {
+    expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.55 * wage + 0.05 * hours, 6);
+  });
+  it("International (FIPOE 568): 65 % compagnon, 50 % apprenti, + 0,05 $/h", () => {
+    expect(computeUnionDues({ union: "international_568", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.65 * wage + 0.05 * hours, 6);
+    expect(computeUnionDues({ union: "international_568", level: "apprentice1", hourlyWage: 25.40, hours })).toBeCloseTo(0.50 * 25.40 + 0.05 * hours, 6);
+  });
+  it("CSD: 50 % + 0,035 $/h", () => {
+    expect(computeUnionDues({ union: "csd", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.50 * wage + 0.035 * hours, 6);
+  });
+  it("CSN: 50 % compagnon; flat weekly apprentices", () => {
+    expect(computeUnionDues({ union: "csn", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.50 * wage, 6);
+    expect(computeUnionDues({ union: "csn", level: "apprentice1", hourlyWage: 25.40, hours })).toBe(9.90);
+  });
+  it("SQC: flat weekly by level (independent of hours/rate)", () => {
+    expect(computeUnionDues({ union: "sqc", level: "journeyman", hourlyWage: wage, hours })).toBe(15.25);
+    expect(computeUnionDues({ union: "sqc", level: "apprentice2", hourlyWage: 30.47, hours: 12 })).toBe(10.75);
+  });
+  it("unknown union → 0 (no dues assumed)", () => {
+    expect(computeUnionDues({ union: "nope", hourlyWage: wage, hours })).toBe(0);
   });
 });
