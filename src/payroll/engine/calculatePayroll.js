@@ -31,6 +31,7 @@ export function calculatePayroll(input) {
     employer = {},
     earnings = [],
     ytd = {},
+    baseAdjustments = {},
   } = input || {};
 
   const reviewReasons = [];
@@ -54,6 +55,24 @@ export function calculatePayroll(input) {
   // ── Gross (spec step 16-17) ──
   const { bases, unknownTypes } = computeGross(earnings);
   if (unknownTypes.length) reviewReasons.push(`Unknown earning type(s): ${[...new Set(unknownTypes)].join(", ")}.`);
+
+  // ── Upstream base adjustments (spec step 17: TIME → CCQ → GROSS → PAYROLL) ──
+  // The CCQ layer (or any caller) may fold collective-agreement benefits into the
+  // statutory bases BEFORE the tax engine runs. Each value is a dollar delta added
+  // to one base only; it never changes cash paid out (that stays `bases.cash`).
+  // Example (CCQ construction): the 13% vacation indemnity is pensionable/insurable,
+  // the "avantage imposable" is taxable + pensionable, and the "avantages sociaux"
+  // deduction lowers taxable income — each lands in a different base.
+  if (baseAdjustments && typeof baseAdjustments === "object") {
+    const add = (baseKey, dollars) => { bases[baseKey] += roundCents(dollars || 0); };
+    add("federalTax", baseAdjustments.taxableFederal);
+    add("quebecTax", baseAdjustments.taxableQuebec);
+    add("rrq", baseAdjustments.pensionable);
+    add("ei", baseAdjustments.insurableEI);
+    add("rqap", baseAdjustments.insurableRQAP);
+    add("fss", baseAdjustments.fss);
+    add("labourStandards", baseAdjustments.labourStandards);
+  }
 
   // ── Employee statutory deductions ──
   const rrq = calculateRrq({ pensionableThisPeriod: bases.rrq, ytd, periodsPerYear, rules });

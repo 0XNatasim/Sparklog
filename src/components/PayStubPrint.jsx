@@ -10,7 +10,7 @@ const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2
 // cumulatives. It is a DRAFT: the DAS figures come from the unvalidated placeholder
 // rule set, and the CCQ Période cells that the app doesn't compute are left blank.
 // Never a substitute for the official pay stub.
-export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, employee, frequency, week }) {
+export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week }) {
   const [hdr, setHdr] = useState({
     periodStart: week?.start ? week.start.format("YYYY-MM-DD") : "",
     periodEnd: week?.end ? week.end.format("YYYY-MM-DD") : "",
@@ -66,14 +66,15 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     { label: "Gains RQAP", per: g.total, cum: n(ytd.insurableIncomeRQAP) + g.total },
     { label: "Heures", per: hours, cum: n(ytd.hoursYtd) + hours, hours: true },
   ];
-  // CCQ record-only lines: no Période computed, Cumulatif = stored YTD.
+  // CCQ lines. The three benefits the engine models carry a computed Période (and
+  // add it to the running Cumulatif); the rest stay record-only (Cumulatif = YTD).
   const ccq = [
-    { label: "Vacances CCQ", cum: ytd.vacancesCcq },
+    { label: "Vacances CCQ", per: ccqPeriod?.vacation, cum: n(ytd.vacancesCcq) + n(ccqPeriod?.vacation) },
     { label: "Cotisation syndicale", cum: ytd.unionDues },
     { label: "Prélèvement CCQ", cum: ytd.ccqLevy },
-    { label: "Av. sociaux CCQ (déd.)", cum: ytd.ccqBenefitsDeduction },
+    { label: "Av. sociaux CCQ (déd.)", per: ccqPeriod ? -n(ccqPeriod.socialDeduction) : undefined, cum: n(ytd.ccqBenefitsDeduction) - n(ccqPeriod?.socialDeduction) },
     { label: "Av. sociaux CCQ (avantage)", cum: ytd.ccqBenefitsAdvantage },
-    { label: "Avantage imposable add. CCQ", cum: ytd.ccqTaxableBenefit },
+    { label: "Avantage imposable add. CCQ", per: ccqPeriod?.taxableBenefit, cum: n(ytd.ccqTaxableBenefit) + n(ccqPeriod?.taxableBenefit) },
     { label: "Assurance MÉDIC", cum: ytd.medicInsurance },
     { label: "Caisse d'éducation syndicale", cum: ytd.unionEducationFund },
     { label: "Taxe de vente assurance", cum: ytd.insuranceSalesTax },
@@ -188,7 +189,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                   {ccq.map((r, i) => (
                     <tr key={`c${i}`} className="border-b last:border-0 text-muted-foreground">
                       <td className="py-0.5">{r.label}</td>
-                      <td className="text-right">—</td>
+                      <td className="text-right font-mono">{r.per != null ? money(r.per) : "—"}</td>
                       <td className="text-right font-mono">{money(r.cum)}</td>
                     </tr>
                   ))}
@@ -199,7 +200,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
           <p className="mt-3 border-t pt-2 text-[9px]">
             BROUILLON — paie non finalisée · Nécessite une révision de la paie. Jeu de règles {result.meta?.rulesVersion?.quebec} / {result.meta?.rulesVersion?.federal} (non validé).
-            Les cellules « Période » des lignes CCQ ne sont pas calculées par l'application. Ce document ne remplace pas le talon de paie officiel.
+            Seules les lignes CCQ modélisées (vacances 13 %, avantage imposable, déduction avantages sociaux) portent une « Période » calculée; les autres sont pour référence. Ce document ne remplace pas le talon de paie officiel.
           </p>
         </div>
       </DialogContent>

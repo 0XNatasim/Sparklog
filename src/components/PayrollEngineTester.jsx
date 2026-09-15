@@ -5,7 +5,7 @@ import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-re
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayroll, RULE_VERSION } from "@/payroll";
+import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_BENEFIT_RATES } from "@/payroll";
 import { calculatePayrollEntries } from "@/lib/payroll-calculations";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -103,6 +103,15 @@ export default function PayrollEngineTester() {
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
   const [result, setResult] = useState(null);
   const [reimb, setReimb] = useState({ km: 0, phone: 0, total: 0 });
+  // CCQ benefit modelling (folded into the DAS bases via baseAdjustments). Rates
+  // seed from the confirmed électricien-C3 defaults but stay editable per métier.
+  const [ccq, setCcq] = useState({
+    enabled: true,
+    vacationRatePct: CCQ_BENEFIT_RATES.vacationRateOfBaseWage * 100,
+    imposablePerHour: CCQ_BENEFIT_RATES.taxableBenefitPerHour,
+    deductionPerHour: CCQ_BENEFIT_RATES.socialBenefitsDeductionPerHour,
+  });
+  const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
 
@@ -224,6 +233,7 @@ export default function PayrollEngineTester() {
   const setE = (k) => (v) => setEmp((s) => ({ ...s, [k]: v }));
   const setY = (k) => (v) => setYtd((s) => ({ ...s, [k]: v }));
   const setEr = (k) => (v) => setEmployer((s) => ({ ...s, [k]: v }));
+  const setC = (k) => (v) => setCcq((s) => ({ ...s, [k]: v }));
 
   function handleCalculate() {
     const earnings = [];
@@ -241,6 +251,26 @@ export default function PayrollEngineTester() {
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
     const phoneReimb = Number(profile?.phone_data_reimbursement) || 0;
     setReimb({ km: kmReimb, phone: phoneReimb, total: kmReimb + phoneReimb });
+
+    // CCQ benefits (upstream of the tax engine): fold the collective-agreement
+    // indemnity / taxable benefit / social-benefits deduction into the DAS bases.
+    const totalHours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
+    let baseAdjustments;
+    if (ccq.enabled) {
+      const benefits = computeCcqBenefits({
+        hours: totalHours,
+        baseRate: base,
+        rates: {
+          vacationRateOfBaseWage: (Number(ccq.vacationRatePct) || 0) / 100,
+          taxableBenefitPerHour: Number(ccq.imposablePerHour) || 0,
+          socialBenefitsDeductionPerHour: Number(ccq.deductionPerHour) || 0,
+        },
+      });
+      baseAdjustments = benefits.baseAdjustments;
+      setCcqAmounts(benefits);
+    } else {
+      setCcqAmounts(null);
+    }
 
     setResult(calculatePayroll({
       taxYear: 2026,
@@ -263,6 +293,7 @@ export default function PayrollEngineTester() {
         workforceSkillsFundApplicable: employer.workforceSkillsFundApplicable,
       },
       earnings,
+      baseAdjustments,
       ytd: {
         grossIncome: toCents(ytd.grossIncome),
         rrqEmployee: toCents(ytd.rrqEmployee),
@@ -349,6 +380,25 @@ export default function PayrollEngineTester() {
             <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" />
             <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <label className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <input type="checkbox" checked={ccq.enabled} onChange={(e) => setC("enabled")(e.target.checked)} />
+            <span>{t("payroll.ccqEnabled")}</span>
+          </label>
+          {ccq.enabled && (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" />
+                <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" />
+                <Field label={t("payroll.ccqDeduction")} value={ccq.deductionPerHour} onChange={setC("deductionPerHour")} step="0.001" />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqNote")}</p>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -445,7 +495,7 @@ export default function PayrollEngineTester() {
         )}
       </div>
 
-      {result && <Results result={result} reimb={reimb} open={openExplain} setOpen={setOpenExplain} t={t} />}
+      {result && <Results result={result} reimb={reimb} ccq={ccqAmounts} open={openExplain} setOpen={setOpenExplain} t={t} />}
 
       <PayStubPrint
         open={showStub}
@@ -454,6 +504,7 @@ export default function PayrollEngineTester() {
         ytd={ytd}
         pay={pay}
         reimb={reimb}
+        ccq={ccqAmounts}
         employee={employees.find((e) => e.id === selectedId) || null}
         frequency={frequency}
         week={weekOptions.find((w) => w.key === selectedWeek) || null}
@@ -462,7 +513,7 @@ export default function PayrollEngineTester() {
   );
 }
 
-function Results({ result, reimb, open, setOpen, t }) {
+function Results({ result, reimb, ccq, open, setOpen, t }) {
   if (!result.gross) {
     return (
       <Card>
@@ -486,6 +537,13 @@ function Results({ result, reimb, open, setOpen, t }) {
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employee")}</div>
           <Row label={t("payroll.grossTotal")} value={money(gross.total)} />
+          {ccq && (
+            <>
+              <Row label={t("payroll.ccqVacation")} value={money(ccq.vacation)} />
+              <Row label={t("payroll.ccqImposableRow")} value={money(ccq.taxableBenefit)} />
+              <Row label={t("payroll.ccqDeductionRow")} value={money(-ccq.socialDeduction)} />
+            </>
+          )}
           <Row label={t("payroll.federalTax")} value={money(employee.federalTax)} />
           <Row label={t("payroll.quebecTax")} value={money(employee.quebecTax)} />
           <Row label="RRQ" value={money(employee.rrq.total)} />
