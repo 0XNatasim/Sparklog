@@ -122,6 +122,11 @@ export default function PayrollEngineTester() {
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
   const [advanceOnPrint, setAdvanceOnPrint] = useState(false); // advance cumulatives when printing/saving the stub
+  // Snapshot captured at "Calculer" time: the YTD baseline + period-ending date the
+  // result was computed against, plus whether it has already been posted. Posting
+  // reads from this snapshot (never the live YTD) so it is idempotent — comptabiliser
+  // the same calculation twice never double-counts.
+  const [calcCtx, setCalcCtx] = useState(null);
 
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -188,6 +193,7 @@ export default function PayrollEngineTester() {
       };
     }).sort((a, b) => (a.key < b.key ? 1 : -1));
     setWeekOptions(opts);
+    setResult(null); setCalcCtx(null); // stale for the new employee
 
     setSaveState({ status: "loading", message: "" });
     const { data, error } = await supabase
@@ -249,25 +255,30 @@ export default function PayrollEngineTester() {
   // date to the period end, and save. Guarded so the same period is never counted
   // twice. `silent` skips the "already posted" message (used by the print hook).
   async function postPayroll({ silent = false } = {}) {
-    if (!selectedId || !result || !result.employee) {
+    if (!selectedId || !result || !result.employee || !calcCtx) {
       if (!silent) setSaveState({ status: "error", message: t("payroll.postNoResult") });
       return false;
     }
-    const end = currentPeriodEnd();
-    if (asOfDate && !dayjs(end).isAfter(asOfDate)) {
+    const end = calcCtx.periodEnd;
+    // Guard: never count a period twice. Blocked if this calculation was already
+    // posted, or its period end is on/before the stored "as of" date.
+    if (calcCtx.posted || (asOfDate && !dayjs(end).isAfter(asOfDate))) {
       if (!silent) setSaveState({ status: "error", message: t("payroll.alreadyPosted") });
-      return false; // this period is already included in the cumulatives
+      return false;
     }
     setSaveState({ status: "saving", message: "" });
     const a = result.ytdAfter;
+    const snap = calcCtx.ytdSnapshot; // baseline the result was computed against
     const fromCents = (v) => (Number(v) || 0) / 100;
-    const add = (k, v) => (Number(ytd[k]) || 0) + (Number(v) || 0);
+    // CCQ record-only lines advance from the SNAPSHOT (not the live YTD), so posting
+    // the same calculation more than once yields the same totals — never compounding.
+    const add = (k, v) => (Number(snap[k]) || 0) + (Number(v) || 0);
     const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
     const c = ccqAmounts;
     const medicPrem = c ? c.medicWithholding / 1.09 : 0;
     const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
     const newYtd = {
-      ...ytd,
+      ...snap, // untouched cumulative lines keep the snapshot baseline (idempotent)
       // Statutory cumulatives: taken from the engine's authoritative ytdAfter (cents).
       grossIncome: fromCents(a.grossIncome),
       rrqEmployee: fromCents(a.rrqEmployee),
@@ -300,6 +311,7 @@ export default function PayrollEngineTester() {
     if (error) { setSaveState({ status: "error", message: error.message }); return false; }
     setYtd(newYtd);
     setAsOfDate(end);
+    setCalcCtx((s) => (s ? { ...s, posted: true } : s)); // this calculation is now posted
     setSaveState({ status: "saved", message: t("payroll.posted", { date: end }) });
     return true;
   }
@@ -433,6 +445,8 @@ export default function PayrollEngineTester() {
         labourStandardsIncome: toCents(ytd.labourStandardsIncome),
       },
     }));
+    // Snapshot the baseline this result was computed against, so posting is idempotent.
+    setCalcCtx({ ytdSnapshot: { ...ytd }, periodEnd: currentPeriodEnd(), posted: false });
     setOpenExplain(false);
   }
 
