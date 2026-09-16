@@ -264,6 +264,14 @@ employer's talon and PDOC exactly (period taxable 2 178,30 $), but a primary CRA
 citation for their deductibility is still needed. The **K2 base-plan cap** and the
 federal chain are now confirmed against **PDOC** to the cent for this scenario.
 
+Both levies are now **auto-computed** (`computeCcqLevies`), like the union dues, so
+they no longer need manual entry: **prélèvement CCQ = 0,75 % × (salaire de base +
+vacances)** (rate per ccq.org; base derived from D0033-0007: 0,0075 × 2 295,71 =
+17,22 $) and **caisse d'éducation = 0,02 $/h** for FTQ-FIPOE (0,02 × 40 = 0,80 $,
+derived from the same stub). Both rates are **draft** — confirm the prélèvement base
+(premium in/out) and each union's caisse rate against a primary CCQ source, and add
+the caisse rate for the other unions (0 until sourced).
+
 ## Validation checklist (before flipping to `validated`)
 
 1. Replace every `_PLACEHOLDER` with a verified 2026 figure + citation above.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCcqBenefits, computeUnionDues, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeUnionDues, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 
 const c = (d) => Math.round(d * 100);
@@ -197,5 +197,20 @@ describe("computeUnionDues (per union)", () => {
   });
   it("unknown union → 0 (no dues assumed)", () => {
     expect(computeUnionDues({ union: "nope", hourlyWage: wage, hours })).toBe(0);
+  });
+});
+
+describe("computeCcqLevies (prélèvement + caisse d'éducation)", () => {
+  it("reproduces the D0033-0007 levies: prélèvement 17,22 $ + caisse 0,80 $", () => {
+    const l = computeCcqLevies({ hours: 40, hourlyWage: 50.79, vacationHolidaySickRate: 0.13, union: "ftq_fipoe" });
+    // 0,75 % × (40 × 50,79 + 264,11 vacances) = 0,0075 × 2 295,71 = 17,22
+    expect(l.prelevementCcq).toBe(17.22);
+    // FTQ-FIPOE caisse 0,02 $/h × 40 = 0,80
+    expect(l.caisseEducationSyndicale).toBe(0.80);
+  });
+  it("caisse d'éducation is 0 for a union without a sourced rate", () => {
+    const l = computeCcqLevies({ hours: 40, hourlyWage: 50.79, union: "csd" });
+    expect(l.caisseEducationSyndicale).toBe(0);
+    expect(l.prelevementCcq).toBeGreaterThan(0); // prélèvement applies to all
   });
 });

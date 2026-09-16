@@ -91,11 +91,20 @@ export const CCQ_LEVELS = Object.keys(CCQ_ELECTRICIAN_IC_C3.levels);
 //   • flatByLevel — a fixed weekly amount that REPLACES the formula for that level
 // ⚠️ Draft: compagnon rates are the best-sourced; some apprentice figures are
 // partial. Confirm per member's local/annexe before finalized use.
+// CCQ prélèvement (regulatory levy) rate: 0,75 % of the CCQ-reportable wage (base
+// wage, EXCLUDING the team-leader premium) + the vacation indemnity. The 0,75 % rate
+// is documented (ccq.org); the base was derived from stub D0033-0007
+// (0,0075 × (2 031,60 + 264,11) = 17,22 $, to the cent). Draft — confirm the base
+// (premium in/out) against the CCQ prélèvement rule before finalized use.
+export const CCQ_PRELEVEMENT_RATE = 0.0075;
+
 export const CCQ_UNIONS = {
   ftq_fipoe: {
     label: "FTQ-FIPOE",
     // 55 % + 0,05 $/h — confirmed against Simon B.'s stub (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
     dues: { rateOfHourlyWage: 0.55, perHour: 0.05 },
+    // Caisse d'éducation syndicale — 0,02 $/h (derived from D0033-0007: 0,02 × 40 = 0,80 $). Draft.
+    caisseEducationPerHour: 0.02,
   },
   international_568: {
     label: "International (FIPOE 568)",
@@ -118,6 +127,27 @@ export const CCQ_UNIONS = {
     dues: { flatByLevel: { journeyman: 15.25, apprentice1: 9.95, apprentice2: 10.75, apprentice3: 11.95, apprentice4: 11.95 } },
   },
 };
+
+// Auto-computed CCQ levies withheld from pay (also federal U1 deductions): the
+// prélèvement CCQ and the caisse d'éducation syndicale. Returns period dollars.
+// Rates are draft (see CCQ_PRELEVEMENT_RATE + each union's caisseEducationPerHour).
+export function computeCcqLevies({
+  hours = 0,
+  hourlyWage = 0,
+  vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
+  union = "ftq_fipoe",
+  prelevementRate = CCQ_PRELEVEMENT_RATE,
+} = {}) {
+  const round2 = (x) => Math.round(x * 100) / 100;
+  const h = Math.max(0, Number(hours) || 0);
+  const wage = Number(hourlyWage) || 0;
+  const baseWage = h * wage; // base wage only (no team-leader premium)
+  const vacation = round2(baseWage * vacationHolidaySickRate);
+  const prelevementCcq = round2(prelevementRate * (baseWage + vacation));
+  const caissePerHour = CCQ_UNIONS[union]?.caisseEducationPerHour || 0;
+  const caisseEducationSyndicale = round2(caissePerHour * h);
+  return { prelevementCcq, caisseEducationSyndicale };
+}
 
 export const CCQ_UNION_KEYS = Object.keys(CCQ_UNIONS);
 
