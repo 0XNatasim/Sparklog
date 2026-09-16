@@ -4,6 +4,7 @@ import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-re
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR } from "@/payroll";
 import { calculatePayrollEntries } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
@@ -172,6 +173,7 @@ export default function PayrollEngineTester() {
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
   const [advanceOnPrint, setAdvanceOnPrint] = useState(false); // advance cumulatives when printing/saving the stub
+  const [phonePromptOpen, setPhonePromptOpen] = useState(false); // styled confirm for the phone-data reimbursement
   // Snapshot captured at "Calculer" time: the YTD baseline + period-ending date the
   // result was computed against, plus whether it has already been posted. Posting
   // reads from this snapshot (never the live YTD) so it is idempotent — comptabiliser
@@ -431,7 +433,9 @@ export default function PayrollEngineTester() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled]);
 
-  function handleCalculate() {
+  // Run the calculation. `includePhone` decides whether the profile's phone-data
+  // reimbursement is added (asked via a styled modal, never auto-added).
+  function runCalculate(includePhone) {
     const earnings = [];
     const base = Number(pay.baseRate);
     const prem = Number(pay.premium);
@@ -446,10 +450,8 @@ export default function PayrollEngineTester() {
     // phone/data + CCQ safety-equipment allowance (added once CCQ is computed).
     const profile = employees.find((e) => e.id === selectedId);
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
-    // Phone-data reimbursement is never added automatically: if the employee has one
-    // configured, ask at calculate time whether to include it for this pay run.
-    const phoneAmt = Number(profile?.phone_data_reimbursement) || 0;
-    const phoneReimb = phoneAmt > 0 && window.confirm(t("payroll.confirmPhoneReimb", { amount: money(phoneAmt) })) ? phoneAmt : 0;
+    // Phone-data reimbursement is never added automatically (see handleCalculate's modal).
+    const phoneReimb = includePhone ? (Number(profile?.phone_data_reimbursement) || 0) : 0;
 
     // CCQ benefits (upstream of the tax engine): fold the collective-agreement
     // indemnity / taxable benefit / social-benefits deduction into the DAS bases.
@@ -530,6 +532,14 @@ export default function PayrollEngineTester() {
     // Snapshot the baseline this result was computed against, so posting is idempotent.
     setCalcCtx({ ytdSnapshot: { ...ytd }, periodEnd: currentPeriodEnd(), posted: false });
     setOpenExplain(false);
+  }
+
+  // "Calculer": if the employee has a phone-data reimbursement, ask (styled modal)
+  // whether to include it; otherwise calculate straight away.
+  function handleCalculate() {
+    const phoneAmt = Number(employees.find((e) => e.id === selectedId)?.phone_data_reimbursement) || 0;
+    if (phoneAmt > 0) { setPhonePromptOpen(true); return; }
+    runCalculate(false);
   }
 
   // Opening balances are read-only once entered (seedLocked) or when a week is
@@ -771,6 +781,23 @@ export default function PayrollEngineTester() {
         week={weekOptions.find((w) => w.key === selectedWeek) || null}
         onOutput={advanceOnPrint && selectedId ? () => postPayroll({ silent: true }) : undefined}
       />
+
+      {/* Styled confirm for the phone-data reimbursement (replaces window.confirm) */}
+      <Dialog open={phonePromptOpen} onOpenChange={setPhonePromptOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("payroll.confirmPhoneReimb", { amount: money(Number(employees.find((e) => e.id === selectedId)?.phone_data_reimbursement) || 0) })}</DialogTitle>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => { setPhonePromptOpen(false); runCalculate(false); }}>
+              {t("common.no")}
+            </Button>
+            <Button type="button" onClick={() => { setPhonePromptOpen(false); runCalculate(true); }}>
+              {t("common.yes")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
