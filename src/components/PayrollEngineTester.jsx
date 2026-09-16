@@ -67,6 +67,16 @@ function ledgerRowToSnapshot(row) {
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
 
+// Employee-profile union_association code → CCQ_UNIONS key (used to auto-select the
+// union from the profile, so nothing is picked by hand in the CCQ section).
+const UNION_CODE_TO_KEY = {
+  FTQ: "ftq_fipoe",
+  CPQMCI: "international_568",
+  CSD: "csd",
+  CSN: "csn",
+  SQC: "sqc",
+};
+
 // ── Small controlled inputs ──────────────────────────────────────────────────
 function Field({ label, value, onChange, type = "number", step = "0.01", suffix, disabled = false }) {
   return (
@@ -180,7 +190,7 @@ export default function PayrollEngineTester() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, employee_number, ccq_number, phone_data_reimbursement")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement")
         .order("full_name", { ascending: true });
       if (!cancelled) setEmployees(data || []);
     })();
@@ -204,10 +214,15 @@ export default function PayrollEngineTester() {
         kmRate: Number(profile.km_rate) || 0,
       }));
     }
-    // CCQ level → pension rate: an apprentice_level (1-4) maps to apprenticeN;
-    // anything else is treated as compagnon (journeyman).
+    // CCQ level + union come from the employee's profile (no manual selection):
+    //   apprentice_level (1-4) → apprenticeN, else compagnon (journeyman);
+    //   union_association code → the CCQ_UNIONS key.
     const lvl = Number(profile?.apprentice_level);
-    setCcq((s) => ({ ...s, status: lvl >= 1 && lvl <= 4 ? `apprentice${lvl}` : "journeyman" }));
+    setCcq((s) => ({
+      ...s,
+      status: lvl >= 1 && lvl <= 4 ? `apprentice${lvl}` : "journeyman",
+      union: UNION_CODE_TO_KEY[profile?.union_association] || "ftq_fipoe",
+    }));
 
     // Build a week picker from the employee's recent jobs (last ~16 weeks).
     const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
@@ -667,7 +682,7 @@ export default function PayrollEngineTester() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
-                <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
                   {CCQ_LEVELS.map((k) => (
                     <option key={k} value={k}>
                       {CCQ_ELECTRICIAN_IC_C3.levels[k].label} · {(CCQ_ELECTRICIAN_IC_C3.levels[k].employeePensionRate * 100).toFixed(1)}%
@@ -677,7 +692,7 @@ export default function PayrollEngineTester() {
               </label>
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqUnion")}</span>
-                <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
                   {CCQ_UNION_KEYS.map((k) => (
                     <option key={k} value={k}>{CCQ_UNIONS[k].label}</option>
                   ))}
