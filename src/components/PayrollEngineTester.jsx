@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, BookOpen, Calculator, ChevronDown, Printer, Save } from "lucide-react";
+import { AlertTriangle, BookOpen, Calculator, ChevronDown, Pencil, Printer, Save } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -212,6 +212,7 @@ export default function PayrollEngineTester() {
   const [advanceOnPrint, setAdvanceOnPrint] = useState(false); // advance cumulatives when printing/saving the stub
   const [phonePromptOpen, setPhonePromptOpen] = useState(false); // styled confirm for the phone-data reimbursement
   const [sourcesOpen, setSourcesOpen] = useState(false); // "Sources" modal
+  const [payEditable, setPayEditable] = useState(false); // unlock the auto-filled Paie fields of a selected week
   // Snapshot captured at "Calculer" time: the YTD baseline + period-ending date the
   // result was computed against, plus whether it has already been posted. Posting
   // reads from this snapshot (never the live YTD) so it is idempotent — comptabiliser
@@ -437,7 +438,7 @@ export default function PayrollEngineTester() {
   // the seed). "" = manual → fall back to the seed opening.
   function handleSelectWeek(key) {
     setSelectedWeek(key);
-    setResult(null); setCalcCtx(null);
+    setResult(null); setCalcCtx(null); setPayEditable(false); // re-lock Paie on the new week
     if (!key) { setYtd(seed); setAsOfDate(seedDate); return; }
     const w = weekOptions.find((o) => o.key === key);
     if (!w) return;
@@ -588,6 +589,10 @@ export default function PayrollEngineTester() {
   // selected (the opening is then derived from the ledger, not typed).
   const openingLocked = seedLocked || !!selectedWeek;
 
+  // Paie fields are read-only when a week is selected (they mirror the week's real
+  // jobs) until the user clicks "Éditer"; always editable in manual mode.
+  const payLocked = !!selectedWeek && !payEditable;
+
   // CCQ section title reflects the profile's level: "Électricien" (compagnon) or the
   // apprentice label ("Apprenti N").
   const ccqLevelLabel = ccq.status === "journeyman"
@@ -723,15 +728,23 @@ export default function PayrollEngineTester() {
 
       {/* ── Paie (cette période) — foldable ── */}
       <Collapsible title={t("payroll.paySection")}>
+        {selectedWeek && (
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <span>{payEditable ? t("payroll.payEditingHint") : t("payroll.payLockedHint")}</span>
+            <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" onClick={() => setPayEditable((v) => !v)}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" /> {payEditable ? t("payroll.payDone") : t("payroll.payEdit")}
+            </Button>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
-          <Field label={t("payroll.baseRate")} value={pay.baseRate} onChange={setP("baseRate")} />
-          <Field label={t("payroll.premium")} value={pay.premium} onChange={setP("premium")} />
-          <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" />
-          <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" />
-          <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" />
-          <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" />
-          <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
+          <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" disabled={payLocked} />
+          <Field label={t("payroll.baseRate")} value={pay.baseRate} onChange={setP("baseRate")} disabled={payLocked} />
+          <Field label={t("payroll.premium")} value={pay.premium} onChange={setP("premium")} disabled={payLocked} />
+          <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" disabled={payLocked} />
+          <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" disabled={payLocked} />
+          <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" disabled={payLocked} />
+          <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" disabled={payLocked} />
+          <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} disabled={payLocked} />
         </div>
       </Collapsible>
 
