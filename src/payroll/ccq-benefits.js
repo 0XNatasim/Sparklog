@@ -215,8 +215,13 @@ export function computeCcqBenefits({
     baseAdjustments: {
       // 13 % indemnity is insurable (EI/RQAP) and pensionable (RRQ).
       insurableEI: vacation,
+      // RQAP insurable does NOT pick up the MÉDIC taxable benefit: an "avantage
+      // imposable EN NATURE" (the employer's group-insurance contribution) is not
+      // subject to RQAP. Confirmed against Revenu Québec (rémunérations non
+      // assujetties au RQAP) — verified vs WebRAS (which returns 11,15 $ only when the
+      // benefit is wrongly entered as insurable; the sourced value is 10,57 $).
       insurableRQAP: vacation,
-      // RRQ pensionable also picks up the MÉDIC taxable benefit.
+      // RRQ pensionable DOES pick up the MÉDIC taxable benefit (it is pensionable).
       pensionable: vacation + taxableBenefit,
       taxableQuebec,
       // Federal source-deduction base EXCLUDES the MÉDIC taxable benefit (Québec taxes

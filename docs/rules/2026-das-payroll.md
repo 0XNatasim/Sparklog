@@ -229,6 +229,31 @@ impôt fédéral     = 259,95 $   ✓ (stub + PDOC, à la cent)
 tax now reproduce the stub **to the cent**, cross-checked against PDOC. The engine closes
 the calculation with sourced formula corrections, never an unsourced net delta.
 
+#### Québec side — validated against WebRAS (Revenu Québec)
+
+WebRAS (calculateur officiel de Revenu Québec) reproduces the Québec side for
+D0033-0007 to the cent:
+
+| Poste | WebRAS | Moteur | |
+|---|---|---|---|
+| Gross income (period) | 2 593,19 | 2 593,19 | ✓ |
+| Taxable income (period) | 2 333,45 | 2 333,45 | ✓ |
+| **Impôt du Québec** | **352,25** | **352,25** | ✓ |
+| **QPP (RRQ)** | **159,13** | **159,13** | ✓ |
+| QPP 2e cotisation suppl. | 0,00 | 0,00 | ✓ |
+
+The taxable income confirms the Québec chain: `2 386,59 − 25,26 (1re cotisation
+supplémentaire RRQ) − 27,88 (déduction pour travailleur, 1 450 / 52) = 2 333,45 $`.
+
+**RQAP in-kind exclusion — now sourced.** WebRAS returned QPIP 11,15 $ only because the
+MÉDIC avantage imposable (135,08 $) was entered in an insurable field. Per Revenu Québec,
+an **avantage imposable en nature** (the employer's group-insurance / assurance maladie
+contribution) is **not subject to RQAP** ("rémunérations non assujetties au RQAP",
+revenuquebec.ca). So the assurable base excludes it: `2 458,11 × 0,430 % = 10,57 $`
+(employee) and `× 0,602 % = 14,80 $` (employer) — exactly what the engine computes and
+what the stub prints. The engine's RQAP treatment is therefore **confirmed against a
+primary Revenu Québec source**, not merely fitted to the talon.
+
 **Still to source before validation:** the FTQ-FIPOE 55 % rate against the union's own
 schedule (confirmed by the member, not yet against a published table); the federal
 *timing* of the vacances (remitted to a CCQ fund and paid later per ccq.org, yet
