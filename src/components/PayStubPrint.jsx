@@ -124,13 +124,15 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
       <td>${esc(r.label)}</td>
       <td class="num">${r.unit === "" ? "" : n(r.unit).toFixed(2)}</td>
       <td class="num">${r.taux === "" ? "" : n(r.taux).toFixed(4)}</td>
-      <td class="num">${money(r.montant)}</td></tr>`).join("");
+      <td class="num add">${money(r.montant)}</td></tr>`).join("");
+    const somTone = (g) => g === "gain" ? "add" : g === "ded" ? "ded" : "";
     let lastGroup = null;
     const somRows = sommaire.map((r) => {
       const head = r.group !== lastGroup ? (lastGroup = r.group, `<tr class="grp"><td colspan="3">${groupLabel[r.group]}</td></tr>`) : "";
       const per = r.hours ? n(r.per).toFixed(2) : money(r.per);
       const cum = r.hours ? n(r.cum).toFixed(2) : money(r.cum);
-      return `${head}<tr><td>${esc(r.label)}</td><td class="num">${per}</td><td class="num">${cum}</td></tr>`;
+      const tc = r.hours ? "" : somTone(r.group);
+      return `${head}<tr><td>${esc(r.label)}</td><td class="num ${tc}">${per}</td><td class="num ${tc}">${cum}</td></tr>`;
     }).join("");
 
     return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
@@ -165,6 +167,9 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
   td { padding: 2px 4px; border-bottom: 1px solid #eef2f7; }
   tr.grp td { background: #f8fafc; font-weight: 700; font-size: 9px; text-transform: uppercase; color: #334155; border-bottom: 1px solid #cbd5e1; padding-top: 5px; }
   .foot { padding: 8px 12px; border-top: 1px solid #111; font-size: 9px; color: #334155; }
+  .add { color: #15803d; }  /* gain / addition — green */
+  .ded { color: #dc2626; }  /* déduction — red */
+  @media print { .add { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .ded { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   @page { size: letter; margin: 12mm; }
 </style></head>
 <body>
@@ -176,8 +181,8 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     </div>
     <div class="info">${infoRows}</div>
     <div class="totals">
-      <div><div class="lbl">Gains</div><div class="val">${money(grossUp)}</div></div>
-      <div><div class="lbl">Retenues</div><div class="val">${money(totalRetenues)}</div></div>
+      <div><div class="lbl">Gains</div><div class="val add">${money(grossUp)}</div></div>
+      <div><div class="lbl">Retenues</div><div class="val ded">${money(totalRetenues)}</div></div>
       <div><div class="lbl">Paie nette</div><div class="val">${money(net)}</div></div>
     </div>
     <div class="cols">
@@ -215,13 +220,18 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     setTimeout(() => { try { w.focus(); w.print(); } catch { /* onload handles it */ } }, 400);
   }
 
-  const Row = ({ r }) => (
-    <tr className="border-b last:border-0">
-      <td className="py-0.5">{r.label}</td>
-      <td className="text-right font-mono">{r.hours ? n(r.per).toFixed(2) : money(r.per)}</td>
-      <td className="text-right font-mono">{r.hours ? n(r.cum).toFixed(2) : money(r.cum)}</td>
-    </tr>
-  );
+  // Green = gain/addition, red = deduction, neutral = informational base (or hours).
+  const toneClass = (group) => group === "gain" ? "text-green-700" : group === "ded" ? "text-red-600" : "";
+  const Row = ({ r }) => {
+    const tc = r.hours ? "" : toneClass(r.group);
+    return (
+      <tr className="border-b last:border-0">
+        <td className="py-0.5">{r.label}</td>
+        <td className={`text-right font-mono ${tc}`}>{r.hours ? n(r.per).toFixed(2) : money(r.per)}</td>
+        <td className={`text-right font-mono ${tc}`}>{r.hours ? n(r.cum).toFixed(2) : money(r.cum)}</td>
+      </tr>
+    );
+  };
 
   let lastGroup = null;
 
@@ -289,12 +299,12 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
             ))}
           </div>
 
-          {/* Totals band */}
+          {/* Totals band — Gains green, Retenues red, Paie nette neutral */}
           <div className="grid grid-cols-3">
-            {[["Gains", grossUp], ["Retenues", totalRetenues], ["Paie nette", net]].map(([lbl, val], i) => (
+            {[["Gains", grossUp, "text-green-700"], ["Retenues", totalRetenues, "text-red-600"], ["Paie nette", net, ""]].map(([lbl, val, tc], i) => (
               <div key={i} className={`border-b border-neutral-900 px-3 py-2 ${i < 2 ? "border-r border-neutral-900" : "bg-slate-100"}`}>
                 <div className="text-[10px] uppercase tracking-wide text-slate-500">{lbl}</div>
-                <div className="font-mono text-base font-extrabold">{money(val)}</div>
+                <div className={`font-mono text-base font-extrabold ${tc}`}>{money(val)}</div>
               </div>
             ))}
           </div>
@@ -311,7 +321,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                       <td className="py-0.5">{r.label}</td>
                       <td className="text-right font-mono">{r.unit === "" ? "" : n(r.unit).toFixed(2)}</td>
                       <td className="text-right font-mono">{r.taux === "" ? "" : n(r.taux).toFixed(4)}</td>
-                      <td className="text-right font-mono">{money(r.montant)}</td>
+                      <td className="text-right font-mono text-green-700">{money(r.montant)}</td>
                     </tr>
                   ))}
                 </tbody>
