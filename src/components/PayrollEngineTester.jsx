@@ -41,10 +41,28 @@ const CCQ_CUMUL = [
   ["hoursYtd", "hours_ytd", "Heures"],
 ];
 
+// Statutory cumulative fields: [stateKey, dbColumn].
+const YTD_STATUTORY = [
+  ["grossIncome", "gross_income"], ["rrqEmployee", "rrq_employee"], ["rrq2Employee", "rrq2_employee"],
+  ["eiEmployee", "ei_employee"], ["rqapEmployee", "rqap_employee"], ["federalTax", "federal_tax"],
+  ["quebecTax", "quebec_tax"], ["pensionableIncomeRRQ", "pensionable_income_rrq"],
+  ["insurableIncomeEI", "insurable_income_ei"], ["insurableIncomeRQAP", "insurable_income_rqap"],
+  ["labourStandardsIncome", "labour_standards_income"],
+];
+// Every cumulative field (statutory + CCQ record-only) as [stateKey, dbColumn].
+const YTD_ALL = [...YTD_STATUTORY, ...CCQ_CUMUL.map(([k, col]) => [k, col])];
+
 const EMPTY_YTD = {
   grossIncome: 0, rrqEmployee: 0, rrq2Employee: 0, eiEmployee: 0, rqapEmployee: 0, federalTax: 0, quebecTax: 0, pensionableIncomeRRQ: 0, insurableIncomeEI: 0, insurableIncomeRQAP: 0, labourStandardsIncome: 0,
   ...Object.fromEntries(CCQ_CUMUL.map(([k]) => [k, 0])),
 };
+
+// Map a ledger DB row → a YTD snapshot object (stateKeys, dollars).
+function ledgerRowToSnapshot(row) {
+  const snap = { ...EMPTY_YTD };
+  for (const [k, col] of YTD_ALL) snap[k] = Number(row[col]) || 0;
+  return snap;
+}
 
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
@@ -98,7 +116,10 @@ export default function PayrollEngineTester() {
   const [frequency, setFrequency] = useState("weekly");
   const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
-  const [ytd, setYtd] = useState({ ...EMPTY_YTD });
+  const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
+  const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
+  const [seedDate, setSeedDate] = useState(""); // as-of date of the seed
+  const [ledger, setLedger] = useState([]); // per-week closing snapshots: [{ periodEnd, periodStart, snapshot }]
   const [asOfDate, setAsOfDate] = useState("");
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
   const [result, setResult] = useState(null);
@@ -193,31 +214,35 @@ export default function PayrollEngineTester() {
       };
     }).sort((a, b) => (a.key < b.key ? 1 : -1));
     setWeekOptions(opts);
-    setResult(null); setCalcCtx(null); // stale for the new employee
+    setResult(null); setCalcCtx(null); setSelectedWeek(""); // stale for the new employee
 
     setSaveState({ status: "loading", message: "" });
-    const { data, error } = await supabase
-      .from("payroll_ytd")
-      .select("*")
-      .eq("user_id", id)
-      .eq("tax_year", TAX_YEAR)
-      .maybeSingle();
-    if (error) { setSaveState({ status: "error", message: error.message }); setYtd({ ...EMPTY_YTD }); setAsOfDate(""); return; }
-    if (data) {
-      setYtd({
-        grossIncome: data.gross_income, rrqEmployee: data.rrq_employee, rrq2Employee: data.rrq2_employee,
-        eiEmployee: data.ei_employee, rqapEmployee: data.rqap_employee, federalTax: data.federal_tax,
-        quebecTax: data.quebec_tax, pensionableIncomeRRQ: data.pensionable_income_rrq,
-        insurableIncomeEI: data.insurable_income_ei, insurableIncomeRQAP: data.insurable_income_rqap,
-        labourStandardsIncome: data.labour_standards_income,
-        ...Object.fromEntries(CCQ_CUMUL.map(([k, col]) => [k, data[col] ?? 0])),
-      });
-      setAsOfDate(data.as_of_date || "");
-      setSaveState({ status: "saved", message: t("payroll.loaded") });
-    } else {
-      setYtd({ ...EMPTY_YTD }); setAsOfDate("");
-      setSaveState({ status: "idle", message: t("payroll.noSaved") });
-    }
+    // Opening seed (pre-SparkLog balances) + the per-week ledger (snapshots).
+    const [{ data, error }, { data: ledgerRows, error: ledgerErr }] = await Promise.all([
+      supabase.from("payroll_ytd").select("*").eq("user_id", id).eq("tax_year", TAX_YEAR).maybeSingle(),
+      supabase.from("payroll_period_ledger").select("*").eq("user_id", id).eq("tax_year", TAX_YEAR).order("period_end", { ascending: true }),
+    ]);
+    if (error) { setSaveState({ status: "error", message: error.message }); setYtd({ ...EMPTY_YTD }); setSeed({ ...EMPTY_YTD }); setAsOfDate(""); return; }
+    const seedSnap = data ? ledgerRowToSnapshot(data) : { ...EMPTY_YTD };
+    const seedAsOf = data?.as_of_date || "";
+    setSeed(seedSnap); setSeedDate(seedAsOf);
+    setYtd(seedSnap); setAsOfDate(seedAsOf);
+    setLedger(ledgerErr ? [] : (ledgerRows || []).map((r) => ({
+      periodEnd: r.period_end, periodStart: r.period_start, snapshot: ledgerRowToSnapshot(r),
+    })));
+    setSaveState(data || (ledgerRows && ledgerRows.length)
+      ? { status: "saved", message: t("payroll.loaded") }
+      : { status: "idle", message: t("payroll.noSaved") });
+  }
+
+  // Opening balance for a week = the latest ledger snapshot ending BEFORE the week
+  // starts, else the seed. Returns { snapshot, date }.
+  function openingForWeekStart(weekStart) {
+    const before = ledger
+      .filter((r) => r.periodEnd && dayjs(r.periodEnd).isBefore(weekStart))
+      .sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1));
+    if (before.length) return { snapshot: before[0].snapshot, date: before[0].periodEnd };
+    return { snapshot: seed, date: seedDate };
   }
 
   // Persist a YTD row (dollars) for the selected employee. Returns a Supabase error or null.
@@ -235,11 +260,15 @@ export default function PayrollEngineTester() {
     return error;
   }
 
+  // Save the opening seed (pre-SparkLog balances) to payroll_ytd. Only meaningful with
+  // no week selected — the per-week ledger owns balances once weeks are posted.
   async function handleSaveYtd() {
     if (!selectedId) return;
     setSaveState({ status: "saving", message: "" });
     const error = await saveYtdRow(ytd, asOfDate);
-    setSaveState(error ? { status: "error", message: error.message } : { status: "saved", message: t("payroll.saved") });
+    if (error) { setSaveState({ status: "error", message: error.message }); return; }
+    setSeed(ytd); setSeedDate(asOfDate);
+    setSaveState({ status: "saved", message: t("payroll.saved") });
   }
 
   // The Saturday that ends the current period (from the selected week, else derived).
@@ -251,35 +280,44 @@ export default function PayrollEngineTester() {
     return dayjs().add((6 - dayjs().day() + 7) % 7, "day").format("YYYY-MM-DD");
   }
 
-  // Comptabiliser: advance the stored cumulatives by this period, move the "as of"
-  // date to the period end, and save. Guarded so the same period is never counted
-  // twice. `silent` skips the "already posted" message (used by the print hook).
+  // Persist one week's CLOSING snapshot to the ledger (upsert by period_end → idempotent).
+  async function saveLedgerRow(closing, periodEnd, periodStart) {
+    const num = (v) => Number(v) || 0;
+    const { error } = await supabase.from("payroll_period_ledger").upsert({
+      user_id: selectedId, tax_year: TAX_YEAR, period_end: periodEnd, period_start: periodStart || null,
+      ...Object.fromEntries(YTD_ALL.map(([k, col]) => [col, num(closing[k])])),
+    }, { onConflict: "user_id,period_end" });
+    return error;
+  }
+
+  // Comptabiliser: record this week's CLOSING snapshot in the ledger. Idempotent —
+  // it always recomputes from the week's opening (the prior period's snapshot, which
+  // never includes this week), so re-posting the same week replaces its row instead of
+  // compounding. Requires a selected week (the ledger is keyed by the period-ending
+  // Saturday). `silent` skips messages (used by the print hook).
   async function postPayroll({ silent = false } = {}) {
     if (!selectedId || !result || !result.employee || !calcCtx) {
       if (!silent) setSaveState({ status: "error", message: t("payroll.postNoResult") });
       return false;
     }
-    const end = calcCtx.periodEnd;
-    // Guard: never count a period twice. Blocked if this calculation was already
-    // posted, or its period end is on/before the stored "as of" date.
-    if (calcCtx.posted || (asOfDate && !dayjs(end).isAfter(asOfDate))) {
-      if (!silent) setSaveState({ status: "error", message: t("payroll.alreadyPosted") });
+    const w = weekOptions.find((o) => o.key === selectedWeek);
+    if (!w?.end) {
+      if (!silent) setSaveState({ status: "error", message: t("payroll.postNeedsWeek") });
       return false;
     }
+    const periodEnd = w.end.format("YYYY-MM-DD");
+    const periodStart = w.start.format("YYYY-MM-DD");
     setSaveState({ status: "saving", message: "" });
     const a = result.ytdAfter;
-    const snap = calcCtx.ytdSnapshot; // baseline the result was computed against
+    const snap = calcCtx.ytdSnapshot; // the week's opening balance
     const fromCents = (v) => (Number(v) || 0) / 100;
-    // CCQ record-only lines advance from the SNAPSHOT (not the live YTD), so posting
-    // the same calculation more than once yields the same totals — never compounding.
     const add = (k, v) => (Number(snap[k]) || 0) + (Number(v) || 0);
     const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
     const c = ccqAmounts;
     const medicPrem = c ? c.medicWithholding / 1.09 : 0;
     const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
-    const newYtd = {
-      ...snap, // untouched cumulative lines keep the snapshot baseline (idempotent)
-      // Statutory cumulatives: taken from the engine's authoritative ytdAfter (cents).
+    const closing = {
+      ...snap, // untouched lines keep the opening baseline
       grossIncome: fromCents(a.grossIncome),
       rrqEmployee: fromCents(a.rrqEmployee),
       rrq2Employee: fromCents(a.rrq2Employee),
@@ -291,7 +329,6 @@ export default function PayrollEngineTester() {
       insurableIncomeEI: fromCents(a.insurableIncomeEI),
       insurableIncomeRQAP: fromCents(a.insurableIncomeRQAP),
       labourStandardsIncome: fromCents(a.labourStandardsIncome),
-      // CCQ record-only cumulatives: add this period's components.
       regularEarnings: add("regularEarnings", result.gross?.cashTotal),
       vacancesCcq: add("vacancesCcq", c?.vacation),
       ccqTaxableBenefit: add("ccqTaxableBenefit", c?.taxableBenefit),
@@ -306,25 +343,36 @@ export default function PayrollEngineTester() {
       kmIndemnity: add("kmIndemnity", reimb?.km),
       hoursYtd: add("hoursYtd", hours),
     };
-    Object.keys(newYtd).forEach((k) => { if (typeof newYtd[k] === "number") newYtd[k] = round2(newYtd[k]); });
-    const error = await saveYtdRow(newYtd, end);
+    Object.keys(closing).forEach((k) => { if (typeof closing[k] === "number") closing[k] = round2(closing[k]); });
+    const error = await saveLedgerRow(closing, periodEnd, periodStart);
     if (error) { setSaveState({ status: "error", message: error.message }); return false; }
-    setYtd(newYtd);
-    setAsOfDate(end);
-    setCalcCtx((s) => (s ? { ...s, posted: true } : s)); // this calculation is now posted
-    setSaveState({ status: "saved", message: t("payroll.posted", { date: end }) });
+    // Replace/insert the row in local ledger state, keep sorted by period end.
+    setLedger((rows) => {
+      const others = rows.filter((r) => r.periodEnd !== periodEnd);
+      return [...others, { periodEnd, periodStart, snapshot: closing }].sort((x, y) => (x.periodEnd < y.periodEnd ? -1 : 1));
+    });
+    setYtd(closing);
+    setAsOfDate(periodEnd);
+    setCalcCtx((s) => (s ? { ...s, posted: true } : s));
+    setSaveState({ status: "saved", message: t("payroll.posted", { date: periodEnd }) });
     return true;
   }
 
-  // Selecting a week fills the hours + km from that week's actual jobs; "" = manual.
+  // Selecting a week fills the hours + km from that week's jobs AND loads the opening
+  // balance for that week from the ledger (snapshot of the prior period's close, else
+  // the seed). "" = manual → fall back to the seed opening.
   function handleSelectWeek(key) {
     setSelectedWeek(key);
-    if (!key) return;
+    setResult(null); setCalcCtx(null);
+    if (!key) { setYtd(seed); setAsOfDate(seedDate); return; }
     const w = weekOptions.find((o) => o.key === key);
     if (!w) return;
     const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
     setFrequency("weekly");
     setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), km: r2(w.km) }));
+    const opening = openingForWeekStart(w.start);
+    setYtd(opening.snapshot);
+    setAsOfDate(opening.date);
   }
 
   const setP = (k) => (v) => setPay((s) => ({ ...s, [k]: v }));
@@ -564,12 +612,18 @@ export default function PayrollEngineTester() {
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {t("payroll.ytdTitle", { year: TAX_YEAR })}
             </div>
-            {selectedId && (
+            {selectedId && !selectedWeek && (
               <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs">
                 <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
               </Button>
             )}
           </div>
+
+          {selectedId && selectedWeek && (
+            <div className="mb-3 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              {t("payroll.openingHint", { date: asOfDate || "—" })}
+            </div>
+          )}
 
           <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <label className="block text-xs">
