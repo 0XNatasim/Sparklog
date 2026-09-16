@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 import ManagerDownloads from "@/components/ManagerDownloads";
 import CostingDashboard from "@/components/CostingDashboard";
 import PeriodSummary from "@/components/PeriodSummary";
@@ -368,6 +369,9 @@ export default function Testing() {
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <span className="font-mono text-[10px] text-muted-foreground" title="Version">V{APP_VERSION}</span>
+      </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6" aria-label={t("manager.sections.testing")}>
         {sections.map(({ id, icon: Icon, label, description }) => (
           <button
