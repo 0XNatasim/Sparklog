@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-react";
+import { AlertTriangle, BookOpen, Calculator, ChevronDown, Printer, Save } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,43 @@ function ledgerRowToSnapshot(row) {
 
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
+
+// Primary sources behind the 2026 rule set + the D0033-0007 reconciliation, shown in
+// the "Sources" modal. `draft: true` marks a figure still to confirm.
+const SOURCES = [
+  {
+    group: "Fédéral (ARC)",
+    items: [
+      { name: "T4127 — Formules pour le calcul des retenues sur la paie (123ᵉ édition, en vigueur le 1ᵉʳ juillet 2026)", note: "Impôt fédéral (Option 1), AE (taux QC), crédit K2, abattement Québec 16,5 %." },
+      { name: "PDOC — Calculateur en ligne des retenues sur la paie (ARC)", note: "Validation : impôt fédéral 259,95 $ + AE 31,96 $ (talon D0033-0007), à la cent." },
+    ],
+  },
+  {
+    group: "Québec (Revenu Québec)",
+    items: [
+      { name: "TP-1015.F — Formules pour le calcul des retenues à la source et des cotisations", note: "Impôt du Québec, déduction pour travailleur, crédits personnels." },
+      { name: "WebRAS — Calculateur officiel des retenues à la source", note: "Validation : impôt QC 352,25 $, RRQ 159,13 $, RQAP 10,57 $ (talon D0033-0007)." },
+      { name: "RRQ 2026 (revenuquebec.ca)", note: "MGA 74 600 $, exemption 3 500 $, base 5,30 % + 1ʳᵉ suppl. 1 %, MSGA 85 000 $ (2ᵉ suppl. 4 %)." },
+      { name: "RQAP 2026 (revenuquebec.ca)", note: "Max assurable 103 000 $, 0,430 % (employé) / 0,602 % (employeur). Avantage en nature non assujetti." },
+    ],
+  },
+  {
+    group: "CCQ — convention & tables",
+    items: [
+      { name: "Convention collective — secteur institutionnel-commercial, électricien (métier 220), annexe C3, du 2026-04-26 au 2027-04-24", note: "Salaires, indemnité de congés 13 %, cotisation retraite (9 % compagnon / 4,5 % apprenti)." },
+      { name: "CCQ — « Avantages sociaux MÉDIC Construction — Avantages imposables »", note: "Avantage imposable 3,377 $/h (C3) ; prime MÉDIC 0,68 $/h × 1,09." },
+      { name: "CCQ — « Cotisations redistribuées aux associations syndicales » (ccq.org)", note: "Cotisation syndicale par syndicat (FTQ-FIPOE 55 % + 0,05 $/h, etc.)." },
+      { name: "CCQ — prélèvement 0,75 % et caisse d'éducation syndicale par syndicat", note: "Dérivés du talon ; base et taux à confirmer.", draft: true },
+    ],
+  },
+  {
+    group: "Terrain & registre",
+    items: [
+      { name: "Talon de paie réel D0033-0007 — Simon Bellerive, semaine 37 (2026-08-30 → 09-05)", note: "Compagnon C3, FTQ-FIPOE, 40 h. Reproduit à la cent des deux côtés." },
+      { name: "docs/rules/2026-das-payroll.md (dépôt)", note: "Registre des règles + notes de réconciliation." },
+    ],
+  },
+];
 
 // Employee-profile union_association code → CCQ_UNIONS key (used to auto-select the
 // union from the profile, so nothing is picked by hand in the CCQ section).
@@ -174,6 +211,7 @@ export default function PayrollEngineTester() {
   const [showStub, setShowStub] = useState(false);
   const [advanceOnPrint, setAdvanceOnPrint] = useState(false); // advance cumulatives when printing/saving the stub
   const [phonePromptOpen, setPhonePromptOpen] = useState(false); // styled confirm for the phone-data reimbursement
+  const [sourcesOpen, setSourcesOpen] = useState(false); // "Sources" modal
   // Snapshot captured at "Calculer" time: the YTD baseline + period-ending date the
   // result was computed against, plus whether it has already been posted. Posting
   // reads from this snapshot (never the live YTD) so it is idempotent — comptabiliser
@@ -561,6 +599,11 @@ export default function PayrollEngineTester() {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <b>{t("payroll.banner.title")}</b> {t("payroll.banner.body", { quebec: RULE_VERSION.quebec, federal: RULE_VERSION.federal })}
+            <div className="mt-2">
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSourcesOpen(true)}>
+                <BookOpen className="mr-1.5 h-3.5 w-3.5" /> {t("payroll.sourcesBtn")}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -796,6 +839,34 @@ export default function PayrollEngineTester() {
               {t("common.yes")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sources modal — every primary reference behind the rule set */}
+      <Dialog open={sourcesOpen} onOpenChange={setSourcesOpen}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("payroll.sourcesTitle")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">{t("payroll.sourcesIntro")}</p>
+          <div className="mt-2 space-y-4">
+            {SOURCES.map((sec) => (
+              <div key={sec.group}>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{sec.group}</div>
+                <ul className="space-y-1.5">
+                  {sec.items.map((it, i) => (
+                    <li key={i} className="rounded-md border bg-muted/20 p-2 text-xs">
+                      <div className="font-medium">
+                        {it.name}
+                        {it.draft && <span className="ml-2 rounded bg-amber-200 px-1 py-0.5 text-[10px] font-semibold uppercase text-amber-900 dark:bg-amber-900/50 dark:text-amber-200">draft</span>}
+                      </div>
+                      {it.note && <div className="mt-0.5 text-muted-foreground">{it.note}</div>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
