@@ -464,6 +464,8 @@ export default function PayrollEngineTester() {
     const levies = computeCcqLevies({
       hours,
       hourlyWage: Number(pay.baseRate) || 0,
+      overtime150Hours: Number(pay.ot150Hours) || 0,
+      overtime200Hours: Number(pay.ot200Hours) || 0,
       vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
       union: ccq.union,
     });
@@ -503,6 +505,8 @@ export default function PayrollEngineTester() {
       const benefits = computeCcqBenefits({
         hours: totalHours,
         hourlyWage: base,
+        overtime150Hours: Number(pay.ot150Hours) || 0,
+        overtime200Hours: Number(pay.ot200Hours) || 0,
         employeePensionRate: pensionRate,
         taxableBenefitPerHour: Number(ccq.imposablePerHour) || 0,
         vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,

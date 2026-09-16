@@ -214,3 +214,28 @@ describe("computeCcqLevies (prélèvement + caisse d'éducation)", () => {
     expect(l.prelevementCcq).toBeGreaterThan(0); // prélèvement applies to all
   });
 });
+
+describe("13% indemnity base includes overtime at its multiplier (talon method)", () => {
+  // D0034-0008 (week 38): 31 h régulier + 2 h temps double, base 50,79.
+  // Vacationable wage = (31 + 2×2) × 50,79 = 35 × 50,79 = 1 777,65 → 13 % = 231,09.
+  it("vacation on 31h + 2h double = 231,09 (not the straight 33h × base)", () => {
+    const b = computeCcqBenefits({ hours: 33, hourlyWage: 50.79, employeePensionRate: 0.09, overtime200Hours: 2 });
+    expect(b.vacation).toBe(231.09);
+    // Pension stays on total worked hours at the base rate (OT at straight): 57,39 × 9 % × 33.
+    expect(b.pensionDeduction).toBe(170.45);
+  });
+  it("prélèvement follows the same OT-weighted base: 15,07", () => {
+    const l = computeCcqLevies({ hours: 33, hourlyWage: 50.79, overtime200Hours: 2, union: "ftq_fipoe" });
+    // 0,75 % × (1 777,65 + 231,09) = 0,0075 × 2 008,74 = 15,07
+    expect(l.prelevementCcq).toBe(15.07);
+  });
+  it("temps et demi (1,5×) is weighted too", () => {
+    // 30 h régulier + 2 h temps et demi = (30 + 2×1,5) × 50,79 = 33 × 50,79 = 1 676,07 → 217,89.
+    const b = computeCcqBenefits({ hours: 32, hourlyWage: 50.79, employeePensionRate: 0.09, overtime150Hours: 2 });
+    expect(b.vacation).toBe(217.89);
+  });
+  it("no overtime → unchanged (33 h × base × 13 %)", () => {
+    const b = computeCcqBenefits({ hours: 33, hourlyWage: 50.79, employeePensionRate: 0.09 });
+    expect(b.vacation).toBe(217.89);
+  });
+});
