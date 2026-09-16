@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button";
 const n = (v) => Number(v) || 0;
 const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// A print-friendly CCQ-style pay stub built from the bench result + stored YTD
-// cumulatives. It is a DRAFT: the DAS figures come from the unvalidated placeholder
-// rule set, and the CCQ Période cells that the app doesn't compute are left blank.
-// Never a substitute for the official pay stub.
+// A print-friendly CCQ-style pay stub built from the bench result + the CCQ benefit
+// breakdown + stored YTD cumulatives. It is a DRAFT: the DAS figures come from the
+// unvalidated placeholder rule set. Never a substitute for the official pay stub.
 export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week }) {
   const [hdr, setHdr] = useState({
     periodStart: week?.start ? week.start.format("YYYY-MM-DD") : "",
@@ -18,7 +17,6 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
   });
   const setH = (k) => (e) => setHdr((s) => ({ ...s, [k]: e.target.value }));
 
-  // When opened, sync the period/week header from the currently selected week.
   useEffect(() => {
     if (!open || !week) return;
     setHdr((s) => ({
@@ -36,55 +34,68 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
   const regHrs = n(pay.regularHours);
   const hours = regHrs + n(pay.ot150Hours) + n(pay.ot200Hours);
 
-  // Transactions (gains detail): unit / rate / amount. Regular is split into the
-  // base-rate line + the premium line ("Régulier à taux horaire"); OT is on base.
+  // ── CCQ period components (from computeCcqBenefits) ──
+  const cash = n(g.total);                               // salaire + prime (cash earnings)
+  const vac = n(ccqPeriod?.vacation);                    // indemnité de congés (13 %)
+  const imposable = n(ccqPeriod?.taxableBenefit);        // avantage imposable add. CCQ
+  const empSocial = n(ccqPeriod?.employerSocialBenefit); // avantages sociaux (avantage)
+  const safety = n(ccqPeriod?.safetyEquipment);          // équipement de sécurité (payé)
+  const pension = n(ccqPeriod?.pensionDeduction);        // avantages sociaux (déduction)
+  const medicTotal = n(ccqPeriod?.medicWithholding);     // MÉDIC + taxe
+  const medicPremium = medicTotal / 1.09;                // Assurance MÉDIC
+  const medicTax = medicTotal - medicPremium;            // Taxe de vente assurance
+  const union = n(ccqPeriod?.unionDues);                 // cotisation syndicale
+  const prel = n(ccqPeriod?.prelevementCcq);             // prélèvement CCQ
+  const caisse = n(ccqPeriod?.caisseEducationSyndicale); // caisse d'éducation syndicale
+  const kmReimb = n(reimb?.km);
+  const phoneReimb = n(reimb?.phone);
+
+  // ── Gross-up presentation (matches the CCQ stub) ──
+  const statutory = n(emp.federalTax) + n(emp.quebecTax) + n(emp.rrq.total) + n(emp.ei) + n(emp.rqap);
+  const reversals = vac + imposable + empSocial;         // non-cash benefits, reversed
+  const grossUp = cash + reversals + safety;             // "Gains"
+  const withheld = statutory + pension + medicTotal + union + prel + caisse;
+  const totalRetenues = reversals + withheld;            // "Retenues"
+  const net = grossUp - totalRetenues;                   // "Paie nette" (incl. safety)
+
+  const gainsRRQ = cash + vac + imposable;               // pensionable this period
+  const gainsAE = cash + vac;                            // insurable EI/RQAP this period
+
+  // ── Transactions (pay + non-taxable allowances) ──
   const gains = [
-    { label: "Salaire régulier fixe", unit: pay.regularHours, taux: base, montant: regHrs * base },
-    { label: "Temps et demi", unit: pay.ot150Hours, taux: base * 1.5, montant: n(pay.ot150Hours) * base * 1.5 },
-    { label: "Temps double", unit: pay.ot200Hours, taux: base * 2, montant: n(pay.ot200Hours) * base * 2 },
-    prem ? { label: "Régulier à taux horaire", unit: pay.regularHours, taux: prem, montant: regHrs * prem } : null,
-    n(pay.taxableBenefit) ? { label: "Avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
+    { label: "Salaire régulier fixe", unit: regHrs, taux: base, montant: regHrs * base },
+    { label: "Temps et demi", unit: n(pay.ot150Hours), taux: base * 1.5, montant: n(pay.ot150Hours) * base * 1.5 },
+    { label: "Temps double", unit: n(pay.ot200Hours), taux: base * 2, montant: n(pay.ot200Hours) * base * 2 },
+    prem ? { label: "Régulier à taux horaire", unit: regHrs, taux: prem, montant: regHrs * prem } : null,
+    safety ? { label: "Équipement de sécurité", unit: hours, taux: safety / (hours || 1), montant: safety } : null,
+    kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, taux: pay.kmRate, montant: kmReimb } : null,
+    phoneReimb ? { label: "Remboursement données cellulaire", unit: "", taux: "", montant: phoneReimb } : null,
+    n(pay.taxableBenefit) ? { label: "Autre avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
   ].filter(Boolean);
 
-  // Non-taxable reimbursements — paid on top of net, outside the DAS calc.
-  const reimbursements = [
-    n(reimb?.km) ? { label: "Indemnité KM", montant: n(reimb.km) } : null,
-    n(reimb?.phone) ? { label: "Remboursement données cellulaire", montant: n(reimb.phone) } : null,
-  ].filter(Boolean);
-  const reimbTotal = reimbursements.reduce((s, r) => s + r.montant, 0);
-  // CCQ pension + MÉDIC are withheld from pay on top of the statutory deductions.
-  const ccqWithhold = n(ccqPeriod?.netWithholdings);
-  const netAfterCcq = n(emp.netPay) - ccqWithhold;
-
-  // Sommaire: statutory lines carry a Période (from the calc) + Cumulatif (YTD + période).
-  const stat = [
-    { label: "Gains", per: g.total, cum: n(ytd.grossIncome) + g.total },
-    { label: "Impôt Québec", per: emp.quebecTax, cum: n(ytd.quebecTax) + emp.quebecTax },
-    { label: "Impôt Fédéral", per: emp.federalTax, cum: n(ytd.federalTax) + emp.federalTax },
-    { label: "Contr. au RRQ", per: emp.rrq.total, cum: n(ytd.rrqEmployee) + emp.rrq.total },
-    { label: "Contr. à AE", per: emp.ei, cum: n(ytd.eiEmployee) + emp.ei },
-    { label: "Contr. au RQAP", per: emp.rqap, cum: n(ytd.rqapEmployee) + emp.rqap },
-    { label: "Gains RRQ", per: g.total, cum: n(ytd.pensionableIncomeRRQ) + g.total },
-    { label: "Gains AE", per: g.total, cum: n(ytd.insurableIncomeEI) + g.total },
-    { label: "Gains RQAP", per: g.total, cum: n(ytd.insurableIncomeRQAP) + g.total },
-    { label: "Heures", per: hours, cum: n(ytd.hoursYtd) + hours, hours: true },
-  ];
-  // CCQ lines. The modelled benefits carry a computed Période (added to the running
-  // Cumulatif); the rest stay record-only (Cumulatif = YTD). The pension + MÉDIC are
-  // withheld from pay; the pension also lowers Québec taxable income (see engine).
-  const ccq = [
-    { label: "Vacances CCQ", per: ccqPeriod?.vacation, cum: n(ytd.vacancesCcq) + n(ccqPeriod?.vacation) },
-    { label: "Cotisation syndicale", cum: ytd.unionDues },
-    { label: "Prélèvement CCQ", cum: ytd.ccqLevy },
-    { label: "Cotisation retraite CCQ", per: ccqPeriod ? -n(ccqPeriod.pensionDeduction) : undefined, cum: n(ytd.ccqBenefitsDeduction) - n(ccqPeriod?.pensionDeduction) },
-    { label: "MÉDIC + taxe", per: ccqPeriod ? -n(ccqPeriod.medicWithholding) : undefined, cum: ytd.medicInsurance },
-    { label: "Av. sociaux CCQ (avantage)", cum: ytd.ccqBenefitsAdvantage },
-    { label: "Avantage imposable add. CCQ", per: ccqPeriod?.taxableBenefit, cum: n(ytd.ccqTaxableBenefit) + n(ccqPeriod?.taxableBenefit) },
-    { label: "Caisse d'éducation syndicale", cum: ytd.unionEducationFund },
-    { label: "Taxe de vente assurance", cum: ytd.insuranceSalesTax },
-    { label: "Équipement de sécurité", cum: ytd.safetyEquipment },
-    { label: "Indemnité KM", cum: ytd.kmIndemnity },
-    { label: "Autre revenu", cum: ytd.otherIncome },
+  // ── Sommaire (période + cumulatif), mirroring the real stub's line set ──
+  const line = (label, per, cum, opts = {}) => ({ label, per, cum, ...opts });
+  const sommaire = [
+    line("Salaire régulier", cash, n(ytd.regularEarnings) + cash),
+    line("Vacances CCQ", vac, n(ytd.vacancesCcq) + vac),
+    line("Avantage imposable add. CCQ", imposable, n(ytd.ccqTaxableBenefit) + imposable),
+    line("Avantages sociaux CCQ (avantage)", empSocial, n(ytd.ccqBenefitsAdvantage) + empSocial),
+    line("Équipement de sécurité", safety, n(ytd.safetyEquipment) + safety),
+    line("Impôt Québec", n(emp.quebecTax), n(ytd.quebecTax) + n(emp.quebecTax)),
+    line("Impôt Fédéral", n(emp.federalTax), n(ytd.federalTax) + n(emp.federalTax)),
+    line("Contr. au RRQ", n(emp.rrq.total), n(ytd.rrqEmployee) + n(emp.rrq.total)),
+    line("Contr. à AE", n(emp.ei), n(ytd.eiEmployee) + n(emp.ei)),
+    line("Contr. au RQAP", n(emp.rqap), n(ytd.rqapEmployee) + n(emp.rqap)),
+    line("Av. sociaux CCQ (déd.) — retraite", pension, n(ytd.ccqBenefitsDeduction) + pension),
+    line("Assurance MÉDIC", medicPremium, n(ytd.medicInsurance) + medicPremium),
+    line("Taxe de vente assurance", medicTax, n(ytd.insuranceSalesTax) + medicTax),
+    line("Cotisation syndicale", union, n(ytd.unionDues) + union),
+    line("Prélèvement CCQ", prel, n(ytd.ccqLevy) + prel),
+    line("Caisse d'éducation syndicale", caisse, n(ytd.unionEducationFund) + caisse),
+    line("Gains RRQ", gainsRRQ, n(ytd.pensionableIncomeRRQ) + gainsRRQ),
+    line("Gains AE", gainsAE, n(ytd.insurableIncomeEI) + gainsAE),
+    line("Gains RQAP", gainsAE, n(ytd.insurableIncomeRQAP) + gainsAE),
+    line("Heures", hours, n(ytd.hoursYtd) + hours, { hours: true }),
   ];
 
   return (
@@ -133,9 +144,9 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
           {/* Totals band */}
           <div className="grid grid-cols-3 gap-4 border-b py-2 font-semibold">
-            <div>Gains <span className="float-right font-mono">{money(g.total)}</span></div>
-            <div>Retenues <span className="float-right font-mono">{money(emp.totalDeductions)}</span></div>
-            <div>Paie nette <span className="float-right font-mono">{money(netAfterCcq)}</span></div>
+            <div>Gains <span className="float-right font-mono">{money(grossUp)}</span></div>
+            <div>Retenues <span className="float-right font-mono">{money(totalRetenues)}</span></div>
+            <div>Paie nette <span className="float-right font-mono">{money(net)}</span></div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-2">
@@ -155,26 +166,10 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                   ))}
                 </tbody>
               </table>
-
-              {reimbursements.length > 0 && (
-                <div className="mt-2">
-                  <div className="mb-1 font-semibold italic">Remboursements <span className="font-normal">(non imposables)</span></div>
-                  <table className="w-full">
-                    <tbody>
-                      {reimbursements.map((r, i) => (
-                        <tr key={i} className="border-b last:border-0">
-                          <td className="py-0.5">{r.label}</td>
-                          <td className="text-right font-mono">{money(r.montant)}</td>
-                        </tr>
-                      ))}
-                      <tr className="font-semibold">
-                        <td className="py-0.5">Paie nette + remboursements</td>
-                        <td className="text-right font-mono">{money(netAfterCcq + reimbTotal)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <p className="mt-2 text-[10px] text-neutral-500">
+                Équipement de sécurité et indemnités (KM, données) sont des montants non
+                imposables payés; ils sont inclus dans la paie nette.
+              </p>
             </div>
 
             {/* Sommaire */}
@@ -183,18 +178,11 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
               <table className="w-full">
                 <thead><tr className="border-b text-left"><th className="py-0.5">Description</th><th className="text-right">Période</th><th className="text-right">Cumulatif</th></tr></thead>
                 <tbody>
-                  {stat.map((r, i) => (
+                  {sommaire.map((r, i) => (
                     <tr key={`s${i}`} className="border-b last:border-0">
                       <td className="py-0.5">{r.label}</td>
                       <td className="text-right font-mono">{r.hours ? n(r.per).toFixed(2) : money(r.per)}</td>
                       <td className="text-right font-mono">{r.hours ? n(r.cum).toFixed(2) : money(r.cum)}</td>
-                    </tr>
-                  ))}
-                  {ccq.map((r, i) => (
-                    <tr key={`c${i}`} className="border-b last:border-0 text-muted-foreground">
-                      <td className="py-0.5">{r.label}</td>
-                      <td className="text-right font-mono">{r.per != null ? money(r.per) : "—"}</td>
-                      <td className="text-right font-mono">{money(r.cum)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -204,7 +192,10 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
           <p className="mt-3 border-t pt-2 text-[9px]">
             BROUILLON — paie non finalisée · Nécessite une révision de la paie. Jeu de règles {result.meta?.rulesVersion?.quebec} / {result.meta?.rulesVersion?.federal} (non validé).
-            Seules les lignes CCQ modélisées (vacances 13 %, avantage imposable, cotisation retraite, MÉDIC + taxe) portent une « Période » calculée; les autres sont pour référence. La retraite et MÉDIC sont prélevées de la paie nette. Ce document ne remplace pas le talon de paie officiel.
+            Présentation « gross-up » : les avantages non-cash (vacances, avantage imposable,
+            avantages sociaux employeur) figurent dans les Gains puis sont repris dans les
+            Retenues; la paie nette = Gains − Retenues. Ce document ne remplace pas le talon
+            de paie officiel.
           </p>
         </div>
       </DialogContent>
