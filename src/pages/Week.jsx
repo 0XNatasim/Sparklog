@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
-import isoWeek from "dayjs/plugin/isoWeek";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import "dayjs/locale/en";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -14,9 +13,9 @@ import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
 import { calculateDailyTotals } from "@/lib/payroll-calculations";
+import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { useViewMode } from "@/contexts/ViewModeContext";
 
-dayjs.extend(isoWeek);
 dayjs.extend(customParseFormat);
 dayjs.locale("en");
 
@@ -106,12 +105,12 @@ export default function Week() {
 
     const weeklyMap = new Map();
     for (const day of dailyMap.values()) {
-      const weekStart = day.date.startOf("isoWeek");
+      const weekStart = weekStartSundayD(day.date); // CCQ pay week: Sunday → Saturday
       const weekKey = weekStart.format("YYYY-MM-DD");
       if (!weeklyMap.has(weekKey)) {
         weeklyMap.set(weekKey, {
           start: weekStart,
-          end: weekStart.endOf("isoWeek"),
+          end: weekStart.add(6, "day"),
           regularHours: 0,
           ot15: 0,
           ot20: 0,
@@ -185,7 +184,7 @@ export default function Week() {
                   <div className="grid grid-cols-[1fr_auto] items-center gap-4">
                     <div className="grid gap-1.5">
                       <div className="flex items-center gap-2 text-xl font-extrabold">
-                        {t("week.weekNum", { num: w.start.isoWeek() })}
+                        {t("week.weekNum", { num: ccqWeekNumber(w.start) })}
                         {isOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
                       </div>
                       <div className="text-sm text-muted-foreground">
