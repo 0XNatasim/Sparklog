@@ -68,7 +68,7 @@ const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
 
 // ── Small controlled inputs ──────────────────────────────────────────────────
-function Field({ label, value, onChange, type = "number", step = "0.01", suffix }) {
+function Field({ label, value, onChange, type = "number", step = "0.01", suffix, disabled = false }) {
   return (
     <label className="block text-xs">
       <span className="text-muted-foreground">{label}</span>
@@ -77,8 +77,9 @@ function Field({ label, value, onChange, type = "number", step = "0.01", suffix 
           type={type}
           step={step}
           value={value}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={`w-full rounded-md border px-2 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}
         />
         {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
       </div>
@@ -119,6 +120,7 @@ export default function PayrollEngineTester() {
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
   const [seedDate, setSeedDate] = useState(""); // as-of date of the seed
+  const [seedLocked, setSeedLocked] = useState(false); // opening entered once → read-only afterwards
   const [ledger, setLedger] = useState([]); // per-week closing snapshots: [{ periodEnd, periodStart, snapshot }]
   const [asOfDate, setAsOfDate] = useState("");
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
@@ -225,7 +227,7 @@ export default function PayrollEngineTester() {
     if (error) { setSaveState({ status: "error", message: error.message }); setYtd({ ...EMPTY_YTD }); setSeed({ ...EMPTY_YTD }); setAsOfDate(""); return; }
     const seedSnap = data ? ledgerRowToSnapshot(data) : { ...EMPTY_YTD };
     const seedAsOf = data?.as_of_date || "";
-    setSeed(seedSnap); setSeedDate(seedAsOf);
+    setSeed(seedSnap); setSeedDate(seedAsOf); setSeedLocked(!!data); // a saved seed is locked
     setYtd(seedSnap); setAsOfDate(seedAsOf);
     setLedger(ledgerErr ? [] : (ledgerRows || []).map((r) => ({
       periodEnd: r.period_end, periodStart: r.period_start, snapshot: ledgerRowToSnapshot(r),
@@ -267,7 +269,7 @@ export default function PayrollEngineTester() {
     setSaveState({ status: "saving", message: "" });
     const error = await saveYtdRow(ytd, asOfDate);
     if (error) { setSaveState({ status: "error", message: error.message }); return; }
-    setSeed(ytd); setSeedDate(asOfDate);
+    setSeed(ytd); setSeedDate(asOfDate); setSeedLocked(true); // entered once → now locked
     setSaveState({ status: "saved", message: t("payroll.saved") });
   }
 
@@ -498,6 +500,10 @@ export default function PayrollEngineTester() {
     setOpenExplain(false);
   }
 
+  // Opening balances are read-only once entered (seedLocked) or when a week is
+  // selected (the opening is then derived from the ledger, not typed).
+  const openingLocked = seedLocked || !!selectedWeek;
+
   return (
     <div className="space-y-3">
       {/* ── Boundary banner (ADR 0001 / payroll-rule gate) ── */}
@@ -633,8 +639,14 @@ export default function PayrollEngineTester() {
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.role && e.role !== "employee" ? ` · ${e.role}` : ""}</option>)}
               </select>
             </label>
-            <Field label={t("payroll.asOf")} value={asOfDate} onChange={setAsOfDate} type="date" step={undefined} />
+            <Field label={t("payroll.asOf")} value={asOfDate} onChange={setAsOfDate} type="date" step={undefined} disabled={openingLocked} />
           </div>
+
+          {selectedId && seedLocked && !selectedWeek && (
+            <div className="mb-3 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              {t("payroll.seedLocked")}
+            </div>
+          )}
 
           {saveState.message && (
             <div className={`mb-3 text-xs ${saveState.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
@@ -643,16 +655,16 @@ export default function PayrollEngineTester() {
           )}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label={t("payroll.grossYtd")} value={ytd.grossIncome} onChange={setY("grossIncome")} />
-            <Field label={t("payroll.rrqYtd")} value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} />
-            <Field label={t("payroll.rrq2Ytd")} value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} />
-            <Field label={t("payroll.eiYtd")} value={ytd.eiEmployee} onChange={setY("eiEmployee")} />
-            <Field label={t("payroll.rqapYtd")} value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} />
-            <Field label={t("payroll.federalTaxYtd")} value={ytd.federalTax} onChange={setY("federalTax")} />
-            <Field label={t("payroll.quebecTaxYtd")} value={ytd.quebecTax} onChange={setY("quebecTax")} />
-            <Field label={t("payroll.pensionableYtd")} value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} />
-            <Field label={t("payroll.insurableEiYtd")} value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} />
-            <Field label={t("payroll.insurableRqapYtd")} value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} />
+            <Field label={t("payroll.grossYtd")} value={ytd.grossIncome} onChange={setY("grossIncome")} disabled={openingLocked} />
+            <Field label={t("payroll.rrqYtd")} value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} disabled={openingLocked} />
+            <Field label={t("payroll.rrq2Ytd")} value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} disabled={openingLocked} />
+            <Field label={t("payroll.eiYtd")} value={ytd.eiEmployee} onChange={setY("eiEmployee")} disabled={openingLocked} />
+            <Field label={t("payroll.rqapYtd")} value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} disabled={openingLocked} />
+            <Field label={t("payroll.federalTaxYtd")} value={ytd.federalTax} onChange={setY("federalTax")} disabled={openingLocked} />
+            <Field label={t("payroll.quebecTaxYtd")} value={ytd.quebecTax} onChange={setY("quebecTax")} disabled={openingLocked} />
+            <Field label={t("payroll.pensionableYtd")} value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} disabled={openingLocked} />
+            <Field label={t("payroll.insurableEiYtd")} value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} disabled={openingLocked} />
+            <Field label={t("payroll.insurableRqapYtd")} value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} disabled={openingLocked} />
           </div>
 
           <details className="mt-3 group rounded-lg border">
@@ -663,7 +675,7 @@ export default function PayrollEngineTester() {
             <div className="border-t p-3">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {CCQ_CUMUL.map(([k, , label]) => (
-                  <Field key={k} label={label} value={ytd[k]} onChange={setY(k)} />
+                  <Field key={k} label={label} value={ytd[k]} onChange={setY(k)} disabled={openingLocked} />
                 ))}
               </div>
               <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
