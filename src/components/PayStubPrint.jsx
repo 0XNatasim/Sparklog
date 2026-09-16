@@ -59,6 +59,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
   const withheld = statutory + pension + medicTotal + union + prel + caisse;
   const totalRetenues = reversals + withheld;            // "Retenues"
   const net = grossUp - totalRetenues;                   // "Paie nette" (incl. safety)
+  const netPlusReimb = net + kmReimb + phoneReimb;       // amount actually deposited
 
   const gainsRRQ = cash + vac + imposable;               // pensionable this period
   const gainsAE = cash + vac;                            // insurable EI/RQAP this period
@@ -169,6 +170,10 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
   .foot { padding: 8px 12px; border-top: 1px solid #111; font-size: 9px; color: #334155; }
   .add { color: #15803d; }  /* gain / addition — green */
   .ded { color: #dc2626; }  /* déduction — red */
+  .paid { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; background: #0f172a; color: #fff; padding: 8px 12px; border-bottom: 1px solid #111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .paid-detail { font-size: 11px; }
+  .paid-total { font-weight: 600; }
+  .paid-total b { font-family: ui-monospace, monospace; font-size: 16px; margin-left: 8px; }
   @media print { .add { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .ded { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   @page { size: letter; margin: 12mm; }
 </style></head>
@@ -184,6 +189,10 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
       <div><div class="lbl">Gains</div><div class="val add">${money(grossUp)}</div></div>
       <div><div class="lbl">Retenues</div><div class="val ded">${money(totalRetenues)}</div></div>
       <div><div class="lbl">Paie nette</div><div class="val">${money(net)}</div></div>
+    </div>
+    <div class="paid">
+      <span class="paid-detail">Paie nette ${money(net)}${kmReimb > 0 ? ` + Indemnité KM ${money(kmReimb)}` : ""}${phoneReimb > 0 ? ` + Données cellulaire ${money(phoneReimb)}` : ""}</span>
+      <span class="paid-total">Paie nette + remboursements <b>${money(netPlusReimb)}</b></span>
     </div>
     <div class="cols">
       <div>
@@ -313,6 +322,16 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                 <div className={`font-mono text-base font-extrabold ${tc}`}>{money(val)}</div>
               </div>
             ))}
+          </div>
+
+          {/* Amount actually paid = paie nette + non-taxable reimbursements (KM, phone) */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-neutral-900 bg-slate-900 px-3 py-2 text-white">
+            <span className="text-[11px]">
+              Paie nette {money(net)}
+              {kmReimb > 0 && <> + Indemnité KM <span className="text-green-300">{money(kmReimb)}</span></>}
+              {phoneReimb > 0 && <> + Données cellulaire <span className="text-green-300">{money(phoneReimb)}</span></>}
+            </span>
+            <span className="font-semibold">Paie nette + remboursements <span className="ml-2 font-mono text-lg font-extrabold">{money(netPlusReimb)}</span></span>
           </div>
 
           {/* Body: Transactions + Sommaire */}
