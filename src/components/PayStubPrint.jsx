@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { Printer } from "lucide-react";
+import { Printer, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 const n = (v) => Number(v) || 0;
 const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // A print-friendly CCQ-style pay stub built from the bench result + the CCQ benefit
 // breakdown + stored YTD cumulatives. It is a DRAFT: the DAS figures come from the
 // unvalidated placeholder rule set. Never a substitute for the official pay stub.
 export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week }) {
   const [hdr, setHdr] = useState({
+    employer: "",
     periodStart: week?.start ? week.start.format("YYYY-MM-DD") : "",
     periodEnd: week?.end ? week.end.format("YYYY-MM-DD") : "",
     payDate: "", week: week?.weekNo ? String(week.weekNo) : "", ref: "",
@@ -66,37 +68,162 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     { label: "Salaire régulier fixe", unit: regHrs, taux: base, montant: regHrs * base },
     { label: "Temps et demi", unit: n(pay.ot150Hours), taux: base * 1.5, montant: n(pay.ot150Hours) * base * 1.5 },
     { label: "Temps double", unit: n(pay.ot200Hours), taux: base * 2, montant: n(pay.ot200Hours) * base * 2 },
-    prem ? { label: "Régulier à taux horaire", unit: regHrs, taux: prem, montant: regHrs * prem } : null,
+    prem ? { label: "Prime chef d'équipe", unit: regHrs, taux: prem, montant: regHrs * prem } : null,
     safety ? { label: "Équipement de sécurité", unit: hours, taux: safety / (hours || 1), montant: safety } : null,
     kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, taux: pay.kmRate, montant: kmReimb } : null,
     phoneReimb ? { label: "Remboursement données cellulaire", unit: "", taux: "", montant: phoneReimb } : null,
     n(pay.taxableBenefit) ? { label: "Autre avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
-  ].filter(Boolean);
+  ].filter((r) => r && (r.montant || r.label));
 
   // ── Sommaire (période + cumulatif), mirroring the real stub's line set ──
-  const line = (label, per, cum, opts = {}) => ({ label, per, cum, ...opts });
+  // group: "gain" | "ded" | "base" — drives the section split on the stub.
+  const line = (label, per, cum, group, opts = {}) => ({ label, per, cum, group, ...opts });
   const sommaire = [
-    line("Salaire régulier", cash, n(ytd.regularEarnings) + cash),
-    line("Vacances CCQ", vac, n(ytd.vacancesCcq) + vac),
-    line("Avantage imposable add. CCQ", imposable, n(ytd.ccqTaxableBenefit) + imposable),
-    line("Avantages sociaux CCQ (avantage)", empSocial, n(ytd.ccqBenefitsAdvantage) + empSocial),
-    line("Équipement de sécurité", safety, n(ytd.safetyEquipment) + safety),
-    line("Impôt Québec", n(emp.quebecTax), n(ytd.quebecTax) + n(emp.quebecTax)),
-    line("Impôt Fédéral", n(emp.federalTax), n(ytd.federalTax) + n(emp.federalTax)),
-    line("Contr. au RRQ", n(emp.rrq.total), n(ytd.rrqEmployee) + n(emp.rrq.total)),
-    line("Contr. à AE", n(emp.ei), n(ytd.eiEmployee) + n(emp.ei)),
-    line("Contr. au RQAP", n(emp.rqap), n(ytd.rqapEmployee) + n(emp.rqap)),
-    line("Av. sociaux CCQ (déd.) — retraite", pension, n(ytd.ccqBenefitsDeduction) + pension),
-    line("Assurance MÉDIC", medicPremium, n(ytd.medicInsurance) + medicPremium),
-    line("Taxe de vente assurance", medicTax, n(ytd.insuranceSalesTax) + medicTax),
-    line("Cotisation syndicale", union, n(ytd.unionDues) + union),
-    line("Prélèvement CCQ", prel, n(ytd.ccqLevy) + prel),
-    line("Caisse d'éducation syndicale", caisse, n(ytd.unionEducationFund) + caisse),
-    line("Gains RRQ", gainsRRQ, n(ytd.pensionableIncomeRRQ) + gainsRRQ),
-    line("Gains AE", gainsAE, n(ytd.insurableIncomeEI) + gainsAE),
-    line("Gains RQAP", gainsAE, n(ytd.insurableIncomeRQAP) + gainsAE),
-    line("Heures", hours, n(ytd.hoursYtd) + hours, { hours: true }),
+    line("Salaire régulier", cash, n(ytd.regularEarnings) + cash, "gain"),
+    line("Vacances CCQ", vac, n(ytd.vacancesCcq) + vac, "gain"),
+    line("Avantage imposable add. CCQ", imposable, n(ytd.ccqTaxableBenefit) + imposable, "gain"),
+    line("Avantages sociaux CCQ (avantage)", empSocial, n(ytd.ccqBenefitsAdvantage) + empSocial, "gain"),
+    line("Équipement de sécurité", safety, n(ytd.safetyEquipment) + safety, "gain"),
+    line("Impôt Québec", n(emp.quebecTax), n(ytd.quebecTax) + n(emp.quebecTax), "ded"),
+    line("Impôt Fédéral", n(emp.federalTax), n(ytd.federalTax) + n(emp.federalTax), "ded"),
+    line("Contr. au RRQ", n(emp.rrq.total), n(ytd.rrqEmployee) + n(emp.rrq.total), "ded"),
+    line("Contr. à AE", n(emp.ei), n(ytd.eiEmployee) + n(emp.ei), "ded"),
+    line("Contr. au RQAP", n(emp.rqap), n(ytd.rqapEmployee) + n(emp.rqap), "ded"),
+    line("Av. sociaux CCQ (déd.) — retraite", pension, n(ytd.ccqBenefitsDeduction) + pension, "ded"),
+    line("Assurance MÉDIC", medicPremium, n(ytd.medicInsurance) + medicPremium, "ded"),
+    line("Taxe de vente assurance", medicTax, n(ytd.insuranceSalesTax) + medicTax, "ded"),
+    line("Cotisation syndicale", union, n(ytd.unionDues) + union, "ded"),
+    line("Prélèvement CCQ", prel, n(ytd.ccqLevy) + prel, "ded"),
+    line("Caisse d'éducation syndicale", caisse, n(ytd.unionEducationFund) + caisse, "ded"),
+    line("Gains RRQ", gainsRRQ, n(ytd.pensionableIncomeRRQ) + gainsRRQ, "base"),
+    line("Gains AE", gainsAE, n(ytd.insurableIncomeEI) + gainsAE, "base"),
+    line("Gains RQAP", gainsAE, n(ytd.insurableIncomeRQAP) + gainsAE, "base"),
+    line("Heures travaillées", hours, n(ytd.hoursYtd) + hours, "base", { hours: true }),
   ];
+  const groupLabel = { gain: "Gains", ded: "Retenues", base: "Bases cumulatives" };
+
+  const rulesTag = `${result.meta?.rulesVersion?.quebec || "—"} / ${result.meta?.rulesVersion?.federal || "—"}`;
+
+  // ── Standalone HTML (for the PDF download / new-window print) ──────────────
+  // Rebuilds the stub with self-contained CSS (no Tailwind in the new window).
+  function buildStubHtml() {
+    const info = [
+      ["Employé", employee?.employee_number || "—"],
+      ["Nom", employee?.full_name || "—"],
+      ["Occupation", "Électricien"],
+      ["CCQ #", employee?.ccq_number || "—"],
+      ["Province", "Québec"],
+      ["Fréquence", frequency || "—"],
+      ["Période de paie", `${hdr.periodStart || "—"} au ${hdr.periodEnd || "—"}`],
+      ["Date de paie", hdr.payDate || "—"],
+      ["Semaine", hdr.week || "—"],
+      ["No. réf.", hdr.ref || "—"],
+    ];
+    const infoRows = info.map(([k, v]) => `<div class="i"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("");
+    const gainRows = gains.map((r) => `<tr>
+      <td>${esc(r.label)}</td>
+      <td class="num">${r.unit === "" ? "" : n(r.unit).toFixed(2)}</td>
+      <td class="num">${r.taux === "" ? "" : n(r.taux).toFixed(4)}</td>
+      <td class="num">${money(r.montant)}</td></tr>`).join("");
+    let lastGroup = null;
+    const somRows = sommaire.map((r) => {
+      const head = r.group !== lastGroup ? (lastGroup = r.group, `<tr class="grp"><td colspan="3">${groupLabel[r.group]}</td></tr>`) : "";
+      const per = r.hours ? n(r.per).toFixed(2) : money(r.per);
+      const cum = r.hours ? n(r.cum).toFixed(2) : money(r.cum);
+      return `${head}<tr><td>${esc(r.label)}</td><td class="num">${per}</td><td class="num">${cum}</td></tr>`;
+    }).join("");
+
+    return `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<title>Talon de paie${hdr.week ? " — sem. " + esc(hdr.week) : ""}</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #111; background: #fff; padding: 16px; font-size: 11px; line-height: 1.35; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
+  .sheet { max-width: 760px; margin: 0 auto; border: 1px solid #111; position: relative; }
+  .wm { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .wm span { transform: rotate(-24deg); font-size: 64px; font-weight: 900; letter-spacing: 6px; color: rgba(220,38,38,.10); }
+  .band { background: #1f2937; color: #fff; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+  .band h1 { font-size: 14px; margin: 0; letter-spacing: 1px; }
+  .band .sub { font-size: 10px; opacity: .85; }
+  .band .emp { font-size: 12px; font-weight: 700; text-align: right; }
+  .info { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; padding: 8px 12px; border-bottom: 1px solid #111; }
+  .i { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dotted #cbd5e1; padding: 2px 0; }
+  .i span { color: #64748b; }
+  .totals { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  .totals > div { padding: 8px 12px; border-right: 1px solid #111; border-bottom: 1px solid #111; }
+  .totals > div:last-child { border-right: 0; background: #f1f5f9; }
+  .totals .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #475569; }
+  .totals .val { font-size: 15px; font-weight: 800; font-family: ui-monospace, monospace; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; }
+  .cols > div { padding: 8px 12px; }
+  .cols > div:first-child { border-right: 1px solid #111; }
+  .sec { font-weight: 700; text-transform: uppercase; letter-spacing: .5px; font-size: 10px; background: #e2e8f0; padding: 3px 6px; margin: 0 0 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; border-bottom: 1px solid #111; padding: 3px 4px; font-size: 9px; text-transform: uppercase; color: #475569; }
+  th.num { text-align: right; }
+  td { padding: 2px 4px; border-bottom: 1px solid #eef2f7; }
+  tr.grp td { background: #f8fafc; font-weight: 700; font-size: 9px; text-transform: uppercase; color: #334155; border-bottom: 1px solid #cbd5e1; padding-top: 5px; }
+  .foot { padding: 8px 12px; border-top: 1px solid #111; font-size: 9px; color: #334155; }
+  @page { size: letter; margin: 12mm; }
+</style></head>
+<body>
+  <div class="sheet">
+    <div class="wm"><span>BROUILLON · DRAFT</span></div>
+    <div class="band">
+      <div><h1>TALON DE PAIE</h1><div class="sub">Pay stub — reproduction (moteur SparkLog)</div></div>
+      <div class="emp">${esc(hdr.employer || "Employeur")}<div class="sub">${esc(employee?.full_name || "")}</div></div>
+    </div>
+    <div class="info">${infoRows}</div>
+    <div class="totals">
+      <div><div class="lbl">Gains</div><div class="val">${money(grossUp)}</div></div>
+      <div><div class="lbl">Retenues</div><div class="val">${money(totalRetenues)}</div></div>
+      <div><div class="lbl">Paie nette</div><div class="val">${money(net)}</div></div>
+    </div>
+    <div class="cols">
+      <div>
+        <p class="sec">Transactions</p>
+        <table><thead><tr><th>Description</th><th class="num">Unité</th><th class="num">Taux</th><th class="num">Montant</th></tr></thead>
+        <tbody>${gainRows}</tbody></table>
+      </div>
+      <div>
+        <p class="sec">Sommaire — Période / Cumulatif</p>
+        <table><thead><tr><th>Description</th><th class="num">Période</th><th class="num">Cumulatif</th></tr></thead>
+        <tbody>${somRows}</tbody></table>
+      </div>
+    </div>
+    <div class="foot">
+      <b>BROUILLON — paie non finalisée · Nécessite une révision de la paie.</b>
+      Jeu de règles ${esc(rulesTag)} (non validé). Présentation « gross-up » : les avantages
+      non-cash (vacances, avantage imposable, avantages sociaux employeur) figurent dans les
+      Gains puis sont repris dans les Retenues; paie nette = Gains − Retenues. L'équipement de
+      sécurité et les indemnités (KM, données) sont des montants non imposables payés, inclus
+      dans la paie nette. Ce document ne remplace pas le talon de paie officiel.
+    </div>
+  </div>
+</body></html>`;
+  }
+
+  function downloadPdf() {
+    const w = window.open("", "_blank", "width=820,height=1060");
+    if (!w) { window.print(); return; } // popup blocked → fall back to in-place print
+    w.document.open();
+    w.document.write(buildStubHtml());
+    w.document.close();
+    // Let layout settle, then open the print dialog (user chooses "Enregistrer en PDF").
+    w.onload = () => { w.focus(); w.print(); };
+    setTimeout(() => { try { w.focus(); w.print(); } catch { /* onload handles it */ } }, 400);
+  }
+
+  const Row = ({ r }) => (
+    <tr className="border-b last:border-0">
+      <td className="py-0.5">{r.label}</td>
+      <td className="text-right font-mono">{r.hours ? n(r.per).toFixed(2) : money(r.per)}</td>
+      <td className="text-right font-mono">{r.hours ? n(r.cum).toFixed(2) : money(r.cum)}</td>
+    </tr>
+  );
+
+  let lastGroup = null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -111,53 +238,76 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
         `}</style>
 
         {/* Controls (not printed) */}
-        <div className="payslip-noprint mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="payslip-noprint mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <label className="text-xs"><span className="text-muted-foreground">Employeur</span><input value={hdr.employer} onChange={setH("employer")} placeholder="Nom de l'employeur" className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
           <label className="text-xs"><span className="text-muted-foreground">Période du</span><input type="date" value={hdr.periodStart} onChange={setH("periodStart")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
           <label className="text-xs"><span className="text-muted-foreground">au</span><input type="date" value={hdr.periodEnd} onChange={setH("periodEnd")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
           <label className="text-xs"><span className="text-muted-foreground">Date de paie</span><input type="date" value={hdr.payDate} onChange={setH("payDate")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
           <label className="text-xs"><span className="text-muted-foreground">Semaine</span><input value={hdr.week} onChange={setH("week")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
           <label className="text-xs"><span className="text-muted-foreground">No. réf.</span><input value={hdr.ref} onChange={setH("ref")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
         </div>
-        <div className="payslip-noprint mb-3 flex justify-end">
-          <Button size="sm" onClick={() => window.print()}><Printer className="mr-1.5 h-4 w-4" />Imprimer</Button>
+        <div className="payslip-noprint mb-3 flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="mr-1.5 h-4 w-4" />Imprimer</Button>
+          <Button size="sm" onClick={downloadPdf}><Download className="mr-1.5 h-4 w-4" />Télécharger PDF</Button>
         </div>
 
-        {/* The stub */}
-        <div className="payslip-print relative rounded border bg-white p-4 text-[11px] leading-tight text-black">
+        {/* The stub — calqué sur un talon de paie construction (QC) */}
+        <div className="payslip-print relative overflow-hidden rounded border border-neutral-900 bg-white text-[11px] leading-tight text-black">
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="rotate-[-24deg] text-5xl font-black tracking-widest text-red-500/15">BROUILLON · DRAFT</span>
+            <span className="rotate-[-24deg] text-5xl font-black tracking-widest text-red-500/10">BROUILLON · DRAFT</span>
           </div>
 
-          {/* Header */}
-          <div className="grid grid-cols-3 gap-x-4 gap-y-1 border-b pb-2">
-            <div><b>Employé</b> {employee?.employee_number || "—"}</div>
-            <div className="col-span-2"><b>Nom</b> {employee?.full_name || "—"}</div>
-            <div><b>Occupation</b> Électricien</div>
-            <div><b>Province</b> Québec</div>
-            <div><b>Date</b> {hdr.payDate || "—"}</div>
-            <div><b>Période de paie</b> {hdr.periodStart || "—"} au {hdr.periodEnd || "—"}</div>
-            <div><b>Semaine</b> {hdr.week || "—"}</div>
-            <div><b>No. réf.</b> {hdr.ref || "—"}</div>
-            <div><b>CCQ #</b> {employee?.ccq_number || "—"}</div>
-            <div className="col-span-2"><b>Fréquence</b> {frequency}</div>
+          {/* Title band */}
+          <div className="flex items-center justify-between bg-slate-800 px-3 py-2 text-white">
+            <div>
+              <div className="text-sm font-bold tracking-wide">TALON DE PAIE</div>
+              <div className="text-[10px] opacity-80">Pay stub — reproduction (moteur SparkLog)</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs font-bold">{hdr.employer || "Employeur"}</div>
+              <div className="text-[10px] opacity-80">{employee?.full_name || ""}</div>
+            </div>
+          </div>
+
+          {/* Info grid */}
+          <div className="grid grid-cols-2 gap-x-5 border-b border-neutral-900 px-3 py-2">
+            {[
+              ["Employé", employee?.employee_number || "—"],
+              ["Nom", employee?.full_name || "—"],
+              ["Occupation", "Électricien"],
+              ["CCQ #", employee?.ccq_number || "—"],
+              ["Province", "Québec"],
+              ["Fréquence", frequency || "—"],
+              ["Période de paie", `${hdr.periodStart || "—"} au ${hdr.periodEnd || "—"}`],
+              ["Date de paie", hdr.payDate || "—"],
+              ["Semaine", hdr.week || "—"],
+              ["No. réf.", hdr.ref || "—"],
+            ].map(([k, v], i) => (
+              <div key={i} className="flex justify-between gap-2 border-b border-dotted border-slate-300 py-0.5">
+                <span className="text-slate-500">{k}</span><b className="text-right">{v}</b>
+              </div>
+            ))}
           </div>
 
           {/* Totals band */}
-          <div className="grid grid-cols-3 gap-4 border-b py-2 font-semibold">
-            <div>Gains <span className="float-right font-mono">{money(grossUp)}</span></div>
-            <div>Retenues <span className="float-right font-mono">{money(totalRetenues)}</span></div>
-            <div>Paie nette <span className="float-right font-mono">{money(net)}</span></div>
+          <div className="grid grid-cols-3">
+            {[["Gains", grossUp], ["Retenues", totalRetenues], ["Paie nette", net]].map(([lbl, val], i) => (
+              <div key={i} className={`border-b border-neutral-900 px-3 py-2 ${i < 2 ? "border-r border-neutral-900" : "bg-slate-100"}`}>
+                <div className="text-[10px] uppercase tracking-wide text-slate-500">{lbl}</div>
+                <div className="font-mono text-base font-extrabold">{money(val)}</div>
+              </div>
+            ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            {/* Transactions */}
-            <div>
-              <div className="mb-1 font-semibold italic">Transactions</div>
+          {/* Body: Transactions + Sommaire */}
+          <div className="grid grid-cols-2">
+            <div className="border-r border-neutral-900 px-3 py-2">
+              <div className="mb-1 bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Transactions</div>
               <table className="w-full">
-                <thead><tr className="border-b text-left"><th className="py-0.5">Description</th><th className="text-right">Unité</th><th className="text-right">Taux</th><th className="text-right">Montant</th></tr></thead>
+                <thead><tr className="border-b border-neutral-900 text-left text-[9px] uppercase text-slate-500"><th className="py-0.5">Description</th><th className="text-right">Unité</th><th className="text-right">Taux</th><th className="text-right">Montant</th></tr></thead>
                 <tbody>
                   {gains.map((r, i) => (
-                    <tr key={i} className="border-b last:border-0">
+                    <tr key={i} className="border-b border-slate-100 last:border-0">
                       <td className="py-0.5">{r.label}</td>
                       <td className="text-right font-mono">{r.unit === "" ? "" : n(r.unit).toFixed(2)}</td>
                       <td className="text-right font-mono">{r.taux === "" ? "" : n(r.taux).toFixed(4)}</td>
@@ -166,36 +316,35 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                   ))}
                 </tbody>
               </table>
-              <p className="mt-2 text-[10px] text-neutral-500">
-                Équipement de sécurité et indemnités (KM, données) sont des montants non
-                imposables payés; ils sont inclus dans la paie nette.
-              </p>
             </div>
 
-            {/* Sommaire */}
-            <div>
-              <div className="mb-1 font-semibold italic">Sommaire</div>
+            <div className="px-3 py-2">
+              <div className="mb-1 bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Sommaire — Période / Cumulatif</div>
               <table className="w-full">
-                <thead><tr className="border-b text-left"><th className="py-0.5">Description</th><th className="text-right">Période</th><th className="text-right">Cumulatif</th></tr></thead>
+                <thead><tr className="border-b border-neutral-900 text-left text-[9px] uppercase text-slate-500"><th className="py-0.5">Description</th><th className="text-right">Période</th><th className="text-right">Cumulatif</th></tr></thead>
                 <tbody>
-                  {sommaire.map((r, i) => (
-                    <tr key={`s${i}`} className="border-b last:border-0">
-                      <td className="py-0.5">{r.label}</td>
-                      <td className="text-right font-mono">{r.hours ? n(r.per).toFixed(2) : money(r.per)}</td>
-                      <td className="text-right font-mono">{r.hours ? n(r.cum).toFixed(2) : money(r.cum)}</td>
-                    </tr>
-                  ))}
+                  {sommaire.map((r, i) => {
+                    const head = r.group !== lastGroup ? (lastGroup = r.group, true) : false;
+                    return (
+                      <React.Fragment key={`s${i}`}>
+                        {head && (
+                          <tr className="border-b border-slate-300 bg-slate-50"><td colSpan={3} className="py-1 text-[9px] font-bold uppercase text-slate-600">{groupLabel[r.group]}</td></tr>
+                        )}
+                        <Row r={r} />
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
 
-          <p className="mt-3 border-t pt-2 text-[9px]">
-            BROUILLON — paie non finalisée · Nécessite une révision de la paie. Jeu de règles {result.meta?.rulesVersion?.quebec} / {result.meta?.rulesVersion?.federal} (non validé).
-            Présentation « gross-up » : les avantages non-cash (vacances, avantage imposable,
-            avantages sociaux employeur) figurent dans les Gains puis sont repris dans les
-            Retenues; la paie nette = Gains − Retenues. Ce document ne remplace pas le talon
-            de paie officiel.
+          <p className="border-t border-neutral-900 px-3 py-2 text-[9px] text-slate-600">
+            <b>BROUILLON — paie non finalisée · Nécessite une révision de la paie.</b> Jeu de règles {rulesTag} (non validé).
+            Présentation « gross-up » : les avantages non-cash (vacances, avantage imposable, avantages sociaux
+            employeur) figurent dans les Gains puis sont repris dans les Retenues; paie nette = Gains − Retenues.
+            L'équipement de sécurité et les indemnités (KM, données) sont des montants non imposables payés, inclus
+            dans la paie nette. Ce document ne remplace pas le talon de paie officiel.
           </p>
         </div>
       </DialogContent>
