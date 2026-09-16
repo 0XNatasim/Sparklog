@@ -10,7 +10,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 // A print-friendly CCQ-style pay stub built from the bench result + the CCQ benefit
 // breakdown + stored YTD cumulatives. It is a DRAFT: the DAS figures come from the
 // unvalidated placeholder rule set. Never a substitute for the official pay stub.
-export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week }) {
+export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week, onOutput }) {
   const [hdr, setHdr] = useState({
     employer: "",
     periodStart: week?.start ? week.start.format("YYYY-MM-DD") : "",
@@ -209,15 +209,21 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 </body></html>`;
   }
 
+  // Advance the cumulatives (if the parent opted in) after the stub is output.
+  function afterOutput() { try { onOutput?.(); } catch { /* non-fatal */ } }
+
+  function printStub() { window.print(); afterOutput(); }
+
   function downloadPdf() {
     const w = window.open("", "_blank", "width=820,height=1060");
-    if (!w) { window.print(); return; } // popup blocked → fall back to in-place print
+    if (!w) { window.print(); afterOutput(); return; } // popup blocked → fall back to in-place print
     w.document.open();
     w.document.write(buildStubHtml());
     w.document.close();
     // Let layout settle, then open the print dialog (user chooses "Enregistrer en PDF").
     w.onload = () => { w.focus(); w.print(); };
     setTimeout(() => { try { w.focus(); w.print(); } catch { /* onload handles it */ } }, 400);
+    afterOutput();
   }
 
   // Green = gain/addition, red = deduction, neutral = informational base (or hours).
@@ -257,7 +263,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
           <label className="text-xs"><span className="text-muted-foreground">No. réf.</span><input value={hdr.ref} onChange={setH("ref")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
         </div>
         <div className="payslip-noprint mb-3 flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="mr-1.5 h-4 w-4" />Imprimer</Button>
+          <Button size="sm" variant="outline" onClick={printStub}><Printer className="mr-1.5 h-4 w-4" />Imprimer</Button>
           <Button size="sm" onClick={downloadPdf}><Download className="mr-1.5 h-4 w-4" />Télécharger PDF</Button>
         </div>
 

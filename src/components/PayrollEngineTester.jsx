@@ -121,6 +121,7 @@ export default function PayrollEngineTester() {
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
+  const [advanceOnPrint, setAdvanceOnPrint] = useState(false); // advance cumulatives when printing/saving the stub
 
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -213,20 +214,94 @@ export default function PayrollEngineTester() {
     }
   }
 
+  // Persist a YTD row (dollars) for the selected employee. Returns a Supabase error or null.
+  async function saveYtdRow(y, asOf) {
+    const num = (v) => Number(v) || 0;
+    const { error } = await supabase.from("payroll_ytd").upsert({
+      user_id: selectedId, tax_year: TAX_YEAR, as_of_date: asOf || null,
+      gross_income: num(y.grossIncome), rrq_employee: num(y.rrqEmployee), rrq2_employee: num(y.rrq2Employee),
+      ei_employee: num(y.eiEmployee), rqap_employee: num(y.rqapEmployee), federal_tax: num(y.federalTax),
+      quebec_tax: num(y.quebecTax), pensionable_income_rrq: num(y.pensionableIncomeRRQ),
+      insurable_income_ei: num(y.insurableIncomeEI), insurable_income_rqap: num(y.insurableIncomeRQAP),
+      labour_standards_income: num(y.labourStandardsIncome),
+      ...Object.fromEntries(CCQ_CUMUL.map(([k, col]) => [col, num(y[k])])),
+    }, { onConflict: "user_id,tax_year" });
+    return error;
+  }
+
   async function handleSaveYtd() {
     if (!selectedId) return;
     setSaveState({ status: "saving", message: "" });
-    const num = (v) => Number(v) || 0;
-    const { error } = await supabase.from("payroll_ytd").upsert({
-      user_id: selectedId, tax_year: TAX_YEAR, as_of_date: asOfDate || null,
-      gross_income: num(ytd.grossIncome), rrq_employee: num(ytd.rrqEmployee), rrq2_employee: num(ytd.rrq2Employee),
-      ei_employee: num(ytd.eiEmployee), rqap_employee: num(ytd.rqapEmployee), federal_tax: num(ytd.federalTax),
-      quebec_tax: num(ytd.quebecTax), pensionable_income_rrq: num(ytd.pensionableIncomeRRQ),
-      insurable_income_ei: num(ytd.insurableIncomeEI), insurable_income_rqap: num(ytd.insurableIncomeRQAP),
-      labour_standards_income: num(ytd.labourStandardsIncome),
-      ...Object.fromEntries(CCQ_CUMUL.map(([k, col]) => [col, num(ytd[k])])),
-    }, { onConflict: "user_id,tax_year" });
+    const error = await saveYtdRow(ytd, asOfDate);
     setSaveState(error ? { status: "error", message: error.message } : { status: "saved", message: t("payroll.saved") });
+  }
+
+  // The Saturday that ends the current period (from the selected week, else derived).
+  function currentPeriodEnd() {
+    const w = weekOptions.find((o) => o.key === selectedWeek);
+    if (w?.end) return w.end.format("YYYY-MM-DD");
+    const days = { weekly: 7, biweekly: 14, semimonthly: 15, monthly: 30 }[frequency] || 7;
+    if (asOfDate) return dayjs(asOfDate).add(days, "day").format("YYYY-MM-DD");
+    return dayjs().add((6 - dayjs().day() + 7) % 7, "day").format("YYYY-MM-DD");
+  }
+
+  // Comptabiliser: advance the stored cumulatives by this period, move the "as of"
+  // date to the period end, and save. Guarded so the same period is never counted
+  // twice. `silent` skips the "already posted" message (used by the print hook).
+  async function postPayroll({ silent = false } = {}) {
+    if (!selectedId || !result || !result.employee) {
+      if (!silent) setSaveState({ status: "error", message: t("payroll.postNoResult") });
+      return false;
+    }
+    const end = currentPeriodEnd();
+    if (asOfDate && !dayjs(end).isAfter(asOfDate)) {
+      if (!silent) setSaveState({ status: "error", message: t("payroll.alreadyPosted") });
+      return false; // this period is already included in the cumulatives
+    }
+    setSaveState({ status: "saving", message: "" });
+    const a = result.ytdAfter;
+    const fromCents = (v) => (Number(v) || 0) / 100;
+    const add = (k, v) => (Number(ytd[k]) || 0) + (Number(v) || 0);
+    const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const c = ccqAmounts;
+    const medicPrem = c ? c.medicWithholding / 1.09 : 0;
+    const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
+    const newYtd = {
+      ...ytd,
+      // Statutory cumulatives: taken from the engine's authoritative ytdAfter (cents).
+      grossIncome: fromCents(a.grossIncome),
+      rrqEmployee: fromCents(a.rrqEmployee),
+      rrq2Employee: fromCents(a.rrq2Employee),
+      eiEmployee: fromCents(a.eiEmployee),
+      rqapEmployee: fromCents(a.rqapEmployee),
+      federalTax: fromCents(a.federalTax),
+      quebecTax: fromCents(a.quebecTax),
+      pensionableIncomeRRQ: fromCents(a.pensionableIncomeRRQ),
+      insurableIncomeEI: fromCents(a.insurableIncomeEI),
+      insurableIncomeRQAP: fromCents(a.insurableIncomeRQAP),
+      labourStandardsIncome: fromCents(a.labourStandardsIncome),
+      // CCQ record-only cumulatives: add this period's components.
+      regularEarnings: add("regularEarnings", result.gross?.cashTotal),
+      vacancesCcq: add("vacancesCcq", c?.vacation),
+      ccqTaxableBenefit: add("ccqTaxableBenefit", c?.taxableBenefit),
+      ccqBenefitsDeduction: add("ccqBenefitsDeduction", c?.pensionDeduction),
+      ccqBenefitsAdvantage: add("ccqBenefitsAdvantage", c?.employerSocialBenefit),
+      medicInsurance: add("medicInsurance", medicPrem),
+      insuranceSalesTax: add("insuranceSalesTax", c ? c.medicWithholding - medicPrem : 0),
+      unionDues: add("unionDues", c?.unionDues),
+      ccqLevy: add("ccqLevy", c?.prelevementCcq),
+      unionEducationFund: add("unionEducationFund", c?.caisseEducationSyndicale),
+      safetyEquipment: add("safetyEquipment", c?.safetyEquipment),
+      kmIndemnity: add("kmIndemnity", reimb?.km),
+      hoursYtd: add("hoursYtd", hours),
+    };
+    Object.keys(newYtd).forEach((k) => { if (typeof newYtd[k] === "number") newYtd[k] = round2(newYtd[k]); });
+    const error = await saveYtdRow(newYtd, end);
+    if (error) { setSaveState({ status: "error", message: error.message }); return false; }
+    setYtd(newYtd);
+    setAsOfDate(end);
+    setSaveState({ status: "saved", message: t("payroll.posted", { date: end }) });
+    return true;
   }
 
   // Selecting a week fills the hours + km from that week's actual jobs; "" = manual.
@@ -532,16 +607,30 @@ export default function PayrollEngineTester() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button onClick={handleCalculate} className="w-full sm:w-auto">
           <Calculator className="mr-2 h-4 w-4" /> {t("payroll.calculate")}
         </Button>
         {result && result.gross && (
-          <Button variant="outline" onClick={() => setShowStub(true)} className="w-full sm:w-auto">
-            <Printer className="mr-2 h-4 w-4" /> {t("payroll.printStub")}
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setShowStub(true)} className="w-full sm:w-auto">
+              <Printer className="mr-2 h-4 w-4" /> {t("payroll.printStub")}
+            </Button>
+            {selectedId && (
+              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full sm:w-auto">
+                <Save className="mr-2 h-4 w-4" /> {t("payroll.post")}
+              </Button>
+            )}
+          </>
         )}
       </div>
+
+      {result && result.gross && selectedId && (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={advanceOnPrint} onChange={(e) => setAdvanceOnPrint(e.target.checked)} />
+          {t("payroll.advanceOnPrint")}
+        </label>
+      )}
 
       {result && <Results result={result} reimb={reimb} ccq={ccqAmounts} open={openExplain} setOpen={setOpenExplain} t={t} />}
 
@@ -556,6 +645,7 @@ export default function PayrollEngineTester() {
         employee={employees.find((e) => e.id === selectedId) || null}
         frequency={frequency}
         week={weekOptions.find((w) => w.key === selectedWeek) || null}
+        onOutput={advanceOnPrint && selectedId ? () => postPayroll({ silent: true }) : undefined}
       />
     </div>
   );
