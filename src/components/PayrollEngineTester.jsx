@@ -122,7 +122,6 @@ export default function PayrollEngineTester() {
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
   const [advanceOnPrint, setAdvanceOnPrint] = useState(false); // advance cumulatives when printing/saving the stub
-  const [includePhoneReimb, setIncludePhoneReimb] = useState(false); // opt-in: add the profile's phone-data reimbursement
 
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -353,9 +352,10 @@ export default function PayrollEngineTester() {
     // phone/data + CCQ safety-equipment allowance (added once CCQ is computed).
     const profile = employees.find((e) => e.id === selectedId);
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
-    // Phone-data reimbursement is opt-in (never added automatically): only when the
-    // user checks the box for this pay run.
-    const phoneReimb = includePhoneReimb ? (Number(profile?.phone_data_reimbursement) || 0) : 0;
+    // Phone-data reimbursement is never added automatically: if the employee has one
+    // configured, ask at calculate time whether to include it for this pay run.
+    const phoneAmt = Number(profile?.phone_data_reimbursement) || 0;
+    const phoneReimb = phoneAmt > 0 && window.confirm(t("payroll.confirmPhoneReimb", { amount: money(phoneAmt) })) ? phoneAmt : 0;
 
     // CCQ benefits (upstream of the tax engine): fold the collective-agreement
     // indemnity / taxable benefit / social-benefits deduction into the DAS bases.
@@ -501,16 +501,6 @@ export default function PayrollEngineTester() {
             <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" />
             <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
           </div>
-          {(() => {
-            const phoneAmt = Number(employees.find((e) => e.id === selectedId)?.phone_data_reimbursement) || 0;
-            if (phoneAmt <= 0) return null;
-            return (
-              <label className="mt-3 flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={includePhoneReimb} onChange={(e) => setIncludePhoneReimb(e.target.checked)} />
-                <span>{t("payroll.addPhoneReimb", { amount: money(phoneAmt) })}</span>
-              </label>
-            );
-          })()}
         </CardContent>
       </Card>
 
