@@ -56,6 +56,12 @@ export const RRQ = {
     baseRate: 0.053,
     employeeMaximum: 4479.30, // cotisation max employé (base + 1re suppl.)
     employerMaximum: 4479.30,
+    // Base-plan maximum = the CREDITABLE portion only (base rate 5,30 % × maximum
+    // cotisable 71 100 = 74 600 − 3 500). The T4127 K2 factor values the QPP credit
+    // at the base contribution; the "première cotisation supplémentaire" (enhancement)
+    // is a DEDUCTION from income (F5A), never a credit — so the credit caps here, NOT
+    // at employeeMaximum. Source: CRA T4127 (K2 QPP) + Revenu Québec RRQ 2026.
+    baseMaximum: 3768.30, // 71 100 × 5,30 %
   },
   // 2e cotisation supplémentaire: earnings between YMPE and the second ceiling.
   tier2: {

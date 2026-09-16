@@ -83,7 +83,7 @@ C3 (aussi C4-C5), en vigueur du **2026-04-26 au 2027-04-24**. Salaires C3 : comp
 | Avantage imposable MÉDIC (assurance vie + maladie) | 3,377 $/h (C3/C4-C5; 3,408 $/h C6/C7-C8) | RRQ pensionable, Québec taxable; **excluded** from the federal source base (T4A) | CCQ "Avantages sociaux MÉDIC Construction — Avantages imposables" ICI 2026-04-26 → 2027-04-24, Électricien (220); verified to the cent |
 | Cotisation salariale au régime de retraite | wage × (1 + 13 %) × **9 %** compagnon / **4,5 %** apprenti (compagnon C3 = 5,165343 $/h) | Québec taxable (**reduces** it) + withheld from pay | CCQ agreement; deductible from taxable income. Computed from the wage — follows the annual increase, never hardcoded |
 | MÉDIC Construction (employee) + Québec 9 % insurance tax | 0,68 $/h × 1,09 = 0,7412 $/h | **none** (net withholding only, not a tax deduction) | CCQ held the premium at 0,68 $/h through 2027-04-24 |
-| Federal taxable | provincial base − MÉDIC taxable benefit | salaire + indemnité − retraite (2 251,49 $) | The MÉDIC avantage imposable (3,377 $/h, sourced — CCQ Avantages imposables table) is Québec-taxable + pensionable but not withheld federally at source (T4A) → `taxableFederal = taxableQuebec − taxableBenefit`. The remaining gap to the printed 2 203,56 $ (union dues U1 + prélèvement) is documented, not fudged; see the reconciliation below |
+| Federal taxable | provincial base − MÉDIC taxable benefit, then − U1 deductions − F5A | pré-déduction 2 251,49 $ → période imposable 2 178,30 $ | The MÉDIC avantage imposable (3,377 $/h, sourced — CCQ Avantages imposables table) is Québec-taxable + pensionable but not withheld federally at source (T4A) → `taxableFederal = taxableQuebec − taxableBenefit`. The U1 deductions (union + prélèvement + caisse = 47,95 $) and the RRQ enhancement (F5A, 25,26 $) then bring the period taxable to **2 178,30 $** — the value **PDOC** computes. See the reconciliation below |
 
 **Correction (important):** an earlier draft used a reverse-engineered
 `socialBenefitsDeductionPerHour = 5,797 $/h` chosen only to hit the stub's Québec
@@ -116,16 +116,17 @@ equivalent (TP-1015.F). Period components: salaire 2 194,00 ; vacances CCQ 264,1
 avantage imposable additionnel CCQ 135,08 ; retraite CCQ 206,60 ; cotisation syndicale
 29,93 ; prélèvement CCQ 17,22.
 
-#### Provincial base — reproduced to the cent (rounding policy confirmed)
+#### Provincial base — reproduced to the cent (rounding policy adopted)
 
 `2 194,00 + 264,11 + 135,08 − 206,60 = 2 386,59 $` = the printed provincial base,
 **exactly**. This confirms the CCQ composition (vacances + avantage imposable −
-retraite déductible) AND the payroll's **rounding policy**: each component is rounded
-to the cent before the base is built. The retraite is the tell — the payroll rounds
-the pensionable hourly base first (`50,79 × 1,13 = 57,3927 → 57,39`, then × 9 % × 40 h
-= 206,60 $), whereas the engine's full-precision path gives 206,6137 → 206,61 and a
-base of 2 386,57 $. The 2¢ is a per-component rounding difference (see the rounding
-test in `ccq-benefits.test.js`), not a composition error.
+retraite déductible) AND the payroll's **rounding policy**, which the CCQ layer now
+adopts: each component is rounded to the cent before the base is built. The retraite is
+the tell — the payroll rounds the pensionable hourly base first (`50,79 × 1,13 =
+57,3927 → 57,39`, then × 9 % × 40 h = 206,60 $), whereas the old full-precision path
+gave 206,6137 → 206,61 and a base 2¢ low. `ccq-benefits.js` now rounds the pensionable
+hourly base (and each per-hour component) to the cent, so the engine reproduces the
+printed provincial base **to the cent** (see the rounding test in `ccq-benefits.test.js`).
 
 #### Federal base — MÉDIC taxable benefit excluded (sourced), remaining gap documented
 
@@ -173,9 +174,9 @@ computes the weekly dues from each union's own formula:
 | CSN | 50 % × 1 h | flat 9,90 / 10,45 / 11,70 $/sem |
 | SQC | flat 15,25 $/sem | flat 9,95 / 10,75 / 11,95 $/sem |
 
-For Simon (FTQ-FIPOE): 0,55 × 50,79 + 0,05 × 40 = **29,93 $** to the cent → federal tax
-**261,43 $** vs the stub's **259,95 $**. Compagnon rates are the best-sourced; some
-apprentice figures are partial (ccq.org) — flagged to confirm per member's local/annexe.
+For Simon (FTQ-FIPOE): 0,55 × 50,79 + 0,05 × 40 = **29,93 $** to the cent. Compagnon
+rates are the best-sourced; some apprentice figures are partial (ccq.org) — flagged to
+confirm per member's local/annexe.
 
 Union dues are union-specific (ccq.org, "Cotisations redistribuées aux associations
 syndicales"): CSD (50 % de la 1re h + 0,035 $/h), CSN (50 % de la 1re h; apprentis
@@ -187,19 +188,56 @@ FTQ-FIPOE dues use **55 %** (`0,55 × 50,79 + 0,05 × 40 = 29,93 $`, confirmed b
 member). The 55 % is confirmed for this membership only — other unions/annexes differ,
 so the rate stays a per-membership constant to verify before reuse.
 
-**Result & remaining gap (kept `requires_review`):** RRQ/EI/RQAP and Québec income tax
-reproduce **to the cent**; with the sourced MÉDIC exclusion + U1 union dues, federal
-tax is **261,43 $** vs the stub's **259,95 $**. The remaining **~1,50 $** is the
-**prélèvement CCQ (17,22 $)** — per ccq.org a 0,75 % regulatory levy, **not** a federal
-deduction — plus TD1/rounding/cumulative-method, to settle against **PDOC**. F5A (RRQ
-enhancement) is applied per T4127 (factor `A = [P × (I − F − F2 − F5A − U1)] − HD −
-F1`, t4127-01-26f.pdf). The engine does **not** close the last dollar with an unsourced
-net delta.
+#### Federal tax — reproduced to the cent, validated against PDOC
+
+The engine now reproduces the stub's federal income tax (**259,95 $**) **to the cent**,
+confirmed against **PDOC** (CRA Payroll Deductions Online Calculator), the authoritative
+T4127 implementation. Two **sourced** corrections close the earlier ~1,50 $ gap, with
+**no** net-delta fudge:
+
+**1. K2 QPP credit capped at the base-plan maximum (T4127 factor K2).** The federal
+non-refundable credit for QPP values only the **base** contribution (5,30 %); the
+"première cotisation supplémentaire" (enhancement) is a **deduction** from income (F5A),
+never a credit. So the creditable QPP amount caps at the **base-plan maximum** =
+`5,30 % × 71 100 = 3 768,30 $`, **not** the base+enhancement maximum (4 479,30 $). The
+engine had been capping at the full 4 479,30 $, over-crediting QPP and understating tax
+by ~1,60 $/période at incomes above the base ceiling. Fixed in `rules/2026.js`
+(`rrq.tier1.baseMaximum`) + `statutory/federal-tax.js`. **Verified independently of the
+stub:** on PDOC's own reported period taxable (2 178,30 $), the old cap gave 258,35 $
+and PDOC gives 259,95 $; the base-plan cap gives **259,95 $**, matching PDOC exactly.
+
+**2. Federal U1 = full CCQ union/professional deduction set.** To reproduce the employer's
+talon (and PDOC), the U1 deduction is `cotisation syndicale 29,93 + prélèvement CCQ 17,22
++ caisse d'éducation syndicale 0,80 = 47,95 $`. With this set, the period taxable is
+`2 251,49 − 47,95 (U1) − 25,26 (F5A) = 2 178,30 $` — **exactly** PDOC's reported taxable
+income for the period. (This reverses the earlier draft's note that the prélèvement was
+*not* a federal deduction: the talon and PDOC both deduct it. Whether the CCQ prélèvement
++ caisse are strictly CRA-deductible "union/professional dues" is flagged below as a
+validation item — but modelling them as U1 is what reproduces the employer's exact talon,
+per the owner's "match the talon" choice.)
+
+**Chain (factor A, T4127 `A = [P × (I − F − F2 − F5A − U1)] − HD − F1`, t4127-jul-26f.pdf):**
+
+```
+période imposable = 2 251,49 (base fédérale) − 47,95 (U1) − 25,26 (F5A enh.) = 2 178,30
+A                 = 52 × 2 178,30 = 113 271,60
+K2 (crédit QPP)   = 14 % × (3 768,30 base QPP + 895,70 AE + 442,90 RQAP)   ← base-plan cap
+impôt fédéral     = 259,95 $   ✓ (stub + PDOC, à la cent)
+```
+
+**Result (kept `requires_review`):** RRQ/EI/RQAP, Québec income tax AND federal income
+tax now reproduce the stub **to the cent**, cross-checked against PDOC. The engine closes
+the calculation with sourced formula corrections, never an unsourced net delta.
 
 **Still to source before validation:** the FTQ-FIPOE 55 % rate against the union's own
 schedule (confirmed by the member, not yet against a published table); the federal
 *timing* of the vacances (remitted to a CCQ fund and paid later per ccq.org, yet
-present in this period's base); and the whole federal chain against **PDOC**.
+present in this period's base); and — **new** — whether the **prélèvement CCQ (17,22 $)**
+and the **caisse d'éducation syndicale (0,80 $)** qualify as CRA-deductible
+union/professional dues (U1). They are modelled as U1 because that reproduces the
+employer's talon and PDOC exactly (period taxable 2 178,30 $), but a primary CRA/CCQ
+citation for their deductibility is still needed. The **K2 base-plan cap** and the
+federal chain are now confirmed against **PDOC** to the cent for this scenario.
 
 ## Validation checklist (before flipping to `validated`)
 
