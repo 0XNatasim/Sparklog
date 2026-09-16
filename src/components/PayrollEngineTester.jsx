@@ -98,6 +98,23 @@ function Section({ title, children }) {
   );
 }
 
+// A collapsible card section. Collapsed by default (native <details>, no `open`).
+function Collapsible({ title, children }) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
+            <span>{title}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t p-4">{children}</div>
+        </details>
+      </CardContent>
+    </Card>
+  );
+}
+
 // tone: "add" = a gain/addition (green), "ded" = a deduction (red), undefined = neutral.
 function Row({ label, value, strong, tone }) {
   const toneClass = tone === "add" ? "text-green-600 dark:text-green-400" : tone === "ded" ? "text-red-600 dark:text-red-400" : "";
@@ -516,122 +533,10 @@ export default function PayrollEngineTester() {
         </div>
       </div>
 
-      {/* ── Inputs ── */}
+      {/* ── Always-visible picker: employee + week ── */}
       <Card>
         <CardContent className="p-4">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employee")}</div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <label className="block text-xs">
-              <span className="text-muted-foreground">{t("payroll.province")}</span>
-              <input value="Québec" disabled className="mt-1 w-full rounded-md border bg-muted/40 px-2 py-1.5 text-sm" />
-            </label>
-            <label className="block text-xs">
-              <span className="text-muted-foreground">{t("payroll.frequency")}</span>
-              <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-                <option value="weekly">{t("payroll.freq.weekly")}</option>
-                <option value="biweekly">{t("payroll.freq.biweekly")}</option>
-                <option value="semimonthly">{t("payroll.freq.semimonthly")}</option>
-                <option value="monthly">{t("payroll.freq.monthly")}</option>
-              </select>
-            </label>
-            <Field label={t("payroll.td1")} value={emp.td1ClaimAmount} onChange={setE("td1ClaimAmount")} step="1" />
-            <Field label={t("payroll.qcCredits")} value={emp.personalTaxCredits} onChange={setE("personalTaxCredits")} step="1" />
-            <Field label={t("payroll.extraFederal")} value={emp.additionalFederal} onChange={setE("additionalFederal")} />
-            <Field label={t("payroll.extraQuebec")} value={emp.additionalQuebec} onChange={setE("additionalQuebec")} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.paySection")}</div>
-          {selectedId && (
-            <label className="mb-3 block text-xs">
-              <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-              <select value={selectedWeek} onChange={(e) => handleSelectWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-                <option value="">{t("payroll.weekManual")}</option>
-                {weekOptions.map((w) => (
-                  <option key={w.key} value={w.key}>
-                    {t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM")} · {(w.regularHours + w.ot150Hours + w.ot200Hours).toFixed(2)}h · {w.km.toFixed(0)}km
-                  </option>
-                ))}
-                {weekOptions.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
-              </select>
-            </label>
-          )}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
-            <Field label={t("payroll.baseRate")} value={pay.baseRate} onChange={setP("baseRate")} />
-            <Field label={t("payroll.premium")} value={pay.premium} onChange={setP("premium")} />
-            <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" />
-            <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" />
-            <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" />
-            <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" />
-            <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <label className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <input type="checkbox" checked={ccq.enabled} onChange={(e) => setC("enabled")(e.target.checked)} />
-            <span>{t("payroll.ccqEnabled")}</span>
-          </label>
-          {ccq.enabled && (
-            <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <label className="block text-xs">
-                  <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
-                  <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-                    {CCQ_LEVELS.map((k) => (
-                      <option key={k} value={k}>
-                        {CCQ_ELECTRICIAN_IC_C3.levels[k].label} · {(CCQ_ELECTRICIAN_IC_C3.levels[k].employeePensionRate * 100).toFixed(1)}%
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block text-xs">
-                  <span className="text-muted-foreground">{t("payroll.ccqUnion")}</span>
-                  <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-                    {CCQ_UNION_KEYS.map((k) => (
-                      <option key={k} value={k}>{CCQ_UNIONS[k].label}</option>
-                    ))}
-                  </select>
-                </label>
-                <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" />
-                <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" />
-                <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" />
-                <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" />
-                <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" />
-                <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" />
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqNote")}</p>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t("payroll.ytdTitle", { year: TAX_YEAR })}
-            </div>
-            {selectedId && !selectedWeek && (
-              <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs">
-                <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
-              </Button>
-            )}
-          </div>
-
-          {selectedId && selectedWeek && (
-            <div className="mb-3 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              {t("payroll.openingHint", { date: asOfDate || "—" })}
-            </div>
-          )}
-
-          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-xs">
               <span className="text-muted-foreground">{t("payroll.employee")}</span>
               <select value={selectedId} onChange={(e) => handleSelectEmployee(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
@@ -639,50 +544,156 @@ export default function PayrollEngineTester() {
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.role && e.role !== "employee" ? ` · ${e.role}` : ""}</option>)}
               </select>
             </label>
-            <Field label={t("payroll.asOf")} value={asOfDate} onChange={setAsOfDate} type="date" step={undefined} disabled={openingLocked} />
+            {selectedId && (
+              <label className="block text-xs">
+                <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
+                <select value={selectedWeek} onChange={(e) => handleSelectWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                  <option value="">{t("payroll.weekManual")}</option>
+                  {weekOptions.map((w) => (
+                    <option key={w.key} value={w.key}>
+                      {t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM")} · {(w.regularHours + w.ot150Hours + w.ot200Hours).toFixed(2)}h · {w.km.toFixed(0)}km
+                    </option>
+                  ))}
+                  {weekOptions.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
+                </select>
+              </label>
+            )}
           </div>
-
-          {selectedId && seedLocked && !selectedWeek && (
-            <div className="mb-3 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              {t("payroll.seedLocked")}
-            </div>
-          )}
-
           {saveState.message && (
-            <div className={`mb-3 text-xs ${saveState.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+            <div className={`mt-3 text-xs ${saveState.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
               {saveState.status === "error" ? t("payroll.saveUnavailable", { message: saveState.message }) : saveState.message}
             </div>
           )}
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label={t("payroll.grossYtd")} value={ytd.grossIncome} onChange={setY("grossIncome")} disabled={openingLocked} />
-            <Field label={t("payroll.rrqYtd")} value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} disabled={openingLocked} />
-            <Field label={t("payroll.rrq2Ytd")} value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} disabled={openingLocked} />
-            <Field label={t("payroll.eiYtd")} value={ytd.eiEmployee} onChange={setY("eiEmployee")} disabled={openingLocked} />
-            <Field label={t("payroll.rqapYtd")} value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} disabled={openingLocked} />
-            <Field label={t("payroll.federalTaxYtd")} value={ytd.federalTax} onChange={setY("federalTax")} disabled={openingLocked} />
-            <Field label={t("payroll.quebecTaxYtd")} value={ytd.quebecTax} onChange={setY("quebecTax")} disabled={openingLocked} />
-            <Field label={t("payroll.pensionableYtd")} value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} disabled={openingLocked} />
-            <Field label={t("payroll.insurableEiYtd")} value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} disabled={openingLocked} />
-            <Field label={t("payroll.insurableRqapYtd")} value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} disabled={openingLocked} />
-          </div>
-
-          <details className="mt-3 group rounded-lg border">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
-              <span>{t("payroll.ccqCumulTitle")}</span>
-              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="border-t p-3">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {CCQ_CUMUL.map(([k, , label]) => (
-                  <Field key={k} label={label} value={ytd[k]} onChange={setY(k)} disabled={openingLocked} />
-                ))}
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
-            </div>
-          </details>
         </CardContent>
       </Card>
+
+      {/* ── Solde d'ouverture — foldable, at the top ── */}
+      <Collapsible title={t("payroll.ytdTitle", { year: TAX_YEAR })}>
+        {selectedId && selectedWeek && (
+          <div className="mb-3 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            {t("payroll.openingHint", { date: asOfDate || "—" })}
+          </div>
+        )}
+        {selectedId && seedLocked && !selectedWeek && (
+          <div className="mb-3 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            {t("payroll.seedLocked")}
+          </div>
+        )}
+
+        <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Field label={t("payroll.asOf")} value={asOfDate} onChange={setAsOfDate} type="date" step={undefined} disabled={openingLocked} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Field label={t("payroll.grossYtd")} value={ytd.grossIncome} onChange={setY("grossIncome")} disabled={openingLocked} />
+          <Field label={t("payroll.rrqYtd")} value={ytd.rrqEmployee} onChange={setY("rrqEmployee")} disabled={openingLocked} />
+          <Field label={t("payroll.rrq2Ytd")} value={ytd.rrq2Employee} onChange={setY("rrq2Employee")} disabled={openingLocked} />
+          <Field label={t("payroll.eiYtd")} value={ytd.eiEmployee} onChange={setY("eiEmployee")} disabled={openingLocked} />
+          <Field label={t("payroll.rqapYtd")} value={ytd.rqapEmployee} onChange={setY("rqapEmployee")} disabled={openingLocked} />
+          <Field label={t("payroll.federalTaxYtd")} value={ytd.federalTax} onChange={setY("federalTax")} disabled={openingLocked} />
+          <Field label={t("payroll.quebecTaxYtd")} value={ytd.quebecTax} onChange={setY("quebecTax")} disabled={openingLocked} />
+          <Field label={t("payroll.pensionableYtd")} value={ytd.pensionableIncomeRRQ} onChange={setY("pensionableIncomeRRQ")} disabled={openingLocked} />
+          <Field label={t("payroll.insurableEiYtd")} value={ytd.insurableIncomeEI} onChange={setY("insurableIncomeEI")} disabled={openingLocked} />
+          <Field label={t("payroll.insurableRqapYtd")} value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} disabled={openingLocked} />
+        </div>
+
+        {selectedId && !selectedWeek && !seedLocked && (
+          <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="mt-3 text-xs">
+            <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
+          </Button>
+        )}
+
+        <details className="mt-3 group rounded-lg border">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground select-none [&::-webkit-details-marker]:hidden">
+            <span>{t("payroll.ccqCumulTitle")}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t p-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {CCQ_CUMUL.map(([k, , label]) => (
+                <Field key={k} label={label} value={ytd[k]} onChange={setY(k)} disabled={openingLocked} />
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
+          </div>
+        </details>
+      </Collapsible>
+
+      {/* ── Employé — foldable ── */}
+      <Collapsible title={t("payroll.employee")}>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <label className="block text-xs">
+            <span className="text-muted-foreground">{t("payroll.province")}</span>
+            <input value="Québec" disabled className="mt-1 w-full rounded-md border bg-muted/40 px-2 py-1.5 text-sm" />
+          </label>
+          <label className="block text-xs">
+            <span className="text-muted-foreground">{t("payroll.frequency")}</span>
+            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+              <option value="weekly">{t("payroll.freq.weekly")}</option>
+              <option value="biweekly">{t("payroll.freq.biweekly")}</option>
+              <option value="semimonthly">{t("payroll.freq.semimonthly")}</option>
+              <option value="monthly">{t("payroll.freq.monthly")}</option>
+            </select>
+          </label>
+          <Field label={t("payroll.td1")} value={emp.td1ClaimAmount} onChange={setE("td1ClaimAmount")} step="1" />
+          <Field label={t("payroll.qcCredits")} value={emp.personalTaxCredits} onChange={setE("personalTaxCredits")} step="1" />
+          <Field label={t("payroll.extraFederal")} value={emp.additionalFederal} onChange={setE("additionalFederal")} />
+          <Field label={t("payroll.extraQuebec")} value={emp.additionalQuebec} onChange={setE("additionalQuebec")} />
+        </div>
+      </Collapsible>
+
+      {/* ── Paie (cette période) — foldable ── */}
+      <Collapsible title={t("payroll.paySection")}>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" />
+          <Field label={t("payroll.baseRate")} value={pay.baseRate} onChange={setP("baseRate")} />
+          <Field label={t("payroll.premium")} value={pay.premium} onChange={setP("premium")} />
+          <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" />
+          <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" />
+          <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" />
+          <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" />
+          <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} />
+        </div>
+      </Collapsible>
+
+      {/* ── Modéliser les avantages CCQ — foldable; rates auto-filled + locked ── */}
+      <Collapsible title={t("payroll.ccqEnabled")}>
+        <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={ccq.enabled} onChange={(e) => setC("enabled")(e.target.checked)} />
+          <span>{t("payroll.ccqEnabled")}</span>
+        </label>
+        {ccq.enabled && (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <label className="block text-xs">
+                <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
+                <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                  {CCQ_LEVELS.map((k) => (
+                    <option key={k} value={k}>
+                      {CCQ_ELECTRICIAN_IC_C3.levels[k].label} · {(CCQ_ELECTRICIAN_IC_C3.levels[k].employeePensionRate * 100).toFixed(1)}%
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs">
+                <span className="text-muted-foreground">{t("payroll.ccqUnion")}</span>
+                <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                  {CCQ_UNION_KEYS.map((k) => (
+                    <option key={k} value={k}>{CCQ_UNIONS[k].label}</option>
+                  ))}
+                </select>
+              </label>
+              <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" disabled />
+              <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" disabled />
+              <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" disabled />
+              <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" disabled />
+              <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" disabled />
+              <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" disabled />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqAutoNote")}</p>
+          </>
+        )}
+      </Collapsible>
 
       <Card>
         <CardContent className="p-4">
