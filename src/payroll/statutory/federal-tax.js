@@ -32,7 +32,12 @@ export function calculateFederalTax({
   const claim = td1ClaimAmount != null ? td1ClaimAmount : r.basicPersonalAmount;
 
   // Annualized employee contributions, each capped at its statutory credit max.
-  const annualRrq = Math.min(P * toDollars(credits?.rrqBaseCents || 0), rules.rrq.tier1.employeeMaximum);
+  // The QPP credit (K2) values only the BASE contribution (5,30 %); the enhancement
+  // is a deduction from income, not a credit, so it caps at the base-plan maximum —
+  // NOT the full base+enhancement maximum. (credits.rrqBaseCents already carries the
+  // base-only period portion.) Source: CRA T4127 factor K2 (QPP).
+  const rrqCreditMax = rules.rrq.tier1.baseMaximum ?? rules.rrq.tier1.employeeMaximum;
+  const annualRrq = Math.min(P * toDollars(credits?.rrqBaseCents || 0), rrqCreditMax);
   const annualEi = Math.min(P * toDollars(credits?.eiCents || 0), rules.ei.employeeMaximum);
   const annualRqap = Math.min(P * toDollars(credits?.rqapCents || 0), rules.rqap.employeeMaximum);
 

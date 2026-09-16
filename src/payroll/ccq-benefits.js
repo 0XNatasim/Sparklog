@@ -162,16 +162,23 @@ export function computeCcqBenefits({
   prelevementCcq = 0,
   caisseEducationSyndicale = 0,
 } = {}) {
+  const round2 = (x) => Math.round(x * 100) / 100; // to the cent
   const h = Math.max(0, Number(hours) || 0);
   const wage = Number(hourlyWage) || 0;
   const baseWage = h * wage; // straight-time base wage, no premium
 
   // Indemnité de congés (13 % of the base wage).
-  const vacation = baseWage * vacationHolidaySickRate;
+  const vacation = round2(baseWage * vacationHolidaySickRate);
   // Avantage imposable MÉDIC (assurance vie + maladie) — the CCQ taxable benefit.
-  const taxableBenefit = h * taxableBenefitPerHour;
+  const taxableBenefit = round2(h * taxableBenefitPerHour);
   // Employee pension contribution — on wage + indemnity; reduces taxable income.
-  const pensionDeduction = baseWage * (1 + vacationHolidaySickRate) * employeePensionRate;
+  // The employer (and CCQ) rounds the pensionable hourly base to the cent BEFORE
+  // applying the rate: 50,79 × 1,13 = 57,3927 → 57,39 → × 9 % × 40 h = 206,60 $.
+  // Carrying full precision here lands 1¢ high and shifts the printed taxable bases
+  // (and thus federal tax) by 1-2¢. Matching the per-component rounding reproduces the
+  // stub's printed "gains imposables" (2 386,59 $) and federal tax (259,95 $) exactly.
+  const pensionableHourlyBase = round2(wage * (1 + vacationHolidaySickRate));
+  const pensionDeduction = round2(pensionableHourlyBase * employeePensionRate * h);
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax
