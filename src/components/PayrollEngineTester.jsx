@@ -4,7 +4,7 @@ import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-re
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR } from "@/payroll";
+import { calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR } from "@/payroll";
 import { calculatePayrollEntries } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
@@ -320,6 +320,22 @@ export default function PayrollEngineTester() {
   const setY = (k) => (v) => setYtd((s) => ({ ...s, [k]: v }));
   const setEr = (k) => (v) => setEmployer((s) => ({ ...s, [k]: v }));
   const setC = (k) => (v) => setCcq((s) => ({ ...s, [k]: v }));
+
+  // Auto-fill the CCQ levies (prélèvement + caisse d'éducation) from hours/wage/union,
+  // the same way the union dues are auto-computed. They stay editable (a manual entry
+  // is overwritten only when hours/wage/union/vacation change).
+  useEffect(() => {
+    if (!ccq.enabled) return;
+    const hours = (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0);
+    const levies = computeCcqLevies({
+      hours,
+      hourlyWage: Number(pay.baseRate) || 0,
+      vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
+      union: ccq.union,
+    });
+    setCcq((s) => ({ ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled]);
 
   function handleCalculate() {
     const earnings = [];
