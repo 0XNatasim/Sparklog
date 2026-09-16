@@ -536,6 +536,13 @@ export default function PayrollEngineTester() {
   // selected (the opening is then derived from the ledger, not typed).
   const openingLocked = seedLocked || !!selectedWeek;
 
+  // CCQ section title reflects the profile's level: "Électricien" (compagnon) or the
+  // apprentice label ("Apprenti N").
+  const ccqLevelLabel = ccq.status === "journeyman"
+    ? t("payroll.ccqTradeElectrician")
+    : (CCQ_ELECTRICIAN_IC_C3.levels[ccq.status]?.label || t("payroll.ccqTradeElectrician"));
+  const ccqTitle = t("payroll.ccqBenefitsTitle", { level: ccqLevelLabel });
+
   return (
     <div className="space-y-3">
       {/* ── Boundary banner (ADR 0001 / payroll-rule gate) ── */}
@@ -671,14 +678,8 @@ export default function PayrollEngineTester() {
         </div>
       </Collapsible>
 
-      {/* ── Modéliser les avantages CCQ — foldable; rates auto-filled + locked ── */}
-      <Collapsible title={t("payroll.ccqEnabled")}>
-        <label className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={ccq.enabled} onChange={(e) => setC("enabled")(e.target.checked)} />
-          <span>{t("payroll.ccqEnabled")}</span>
-        </label>
-        {ccq.enabled && (
-          <>
+      {/* ── Avantages CCQ — foldable; level/union from profile, rates auto-filled + locked ── */}
+      <Collapsible title={ccqTitle}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
@@ -706,8 +707,6 @@ export default function PayrollEngineTester() {
               <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" disabled />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqAutoNote")}</p>
-          </>
-        )}
       </Collapsible>
 
       <Card>
