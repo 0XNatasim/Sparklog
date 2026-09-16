@@ -79,11 +79,13 @@ function Section({ title, children }) {
   );
 }
 
-function Row({ label, value, strong }) {
+// tone: "add" = a gain/addition (green), "ded" = a deduction (red), undefined = neutral.
+function Row({ label, value, strong, tone }) {
+  const toneClass = tone === "add" ? "text-green-600 dark:text-green-400" : tone === "ded" ? "text-red-600 dark:text-red-400" : "";
   return (
     <div className={`flex items-baseline justify-between gap-2 ${strong ? "border-t pt-2 font-semibold" : ""}`}>
       <span className={strong ? "" : "text-muted-foreground"}>{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className={`font-mono ${toneClass}`}>{value}</span>
     </div>
   );
 }
@@ -598,32 +600,32 @@ function Results({ result, reimb, ccq, open, setOpen, t }) {
                 <Row label={t("payroll.grossTotal")} value={money(grossUp)} strong />
                 {ccq && (
                   <>
-                    <Row label={t("payroll.ccqVacation")} value={money(ccq.vacation)} />
-                    <Row label={t("payroll.ccqImposableRow")} value={money(ccq.taxableBenefit)} />
-                    <Row label={t("payroll.ccqEmployerSocial")} value={money(ccq.employerSocialBenefit)} />
-                    <Row label={t("payroll.ccqSafety")} value={money(ccq.safetyEquipment)} />
+                    <Row label={t("payroll.ccqVacation")} value={money(ccq.vacation)} tone="add" />
+                    <Row label={t("payroll.ccqImposableRow")} value={money(ccq.taxableBenefit)} tone="add" />
+                    <Row label={t("payroll.ccqEmployerSocial")} value={money(ccq.employerSocialBenefit)} tone="add" />
+                    <Row label={t("payroll.ccqSafety")} value={money(ccq.safetyEquipment)} tone="add" />
                   </>
                 )}
-                <Row label={t("payroll.federalTax")} value={money(employee.federalTax)} />
-                <Row label={t("payroll.quebecTax")} value={money(employee.quebecTax)} />
-                <Row label="RRQ" value={money(employee.rrq.total)} />
-                <Row label={t("payroll.ei")} value={money(employee.ei)} />
-                <Row label="RQAP" value={money(employee.rqap)} />
+                <Row label={t("payroll.federalTax")} value={money(employee.federalTax)} tone="ded" />
+                <Row label={t("payroll.quebecTax")} value={money(employee.quebecTax)} tone="ded" />
+                <Row label="RRQ" value={money(employee.rrq.total)} tone="ded" />
+                <Row label={t("payroll.ei")} value={money(employee.ei)} tone="ded" />
+                <Row label="RQAP" value={money(employee.rqap)} tone="ded" />
                 {ccq && (
                   <>
-                    <Row label={t("payroll.ccqPensionRow")} value={money(ccq.pensionDeduction)} />
-                    <Row label={t("payroll.ccqMedicRow")} value={money(ccq.medicWithholding)} />
-                    <Row label={t("payroll.ccqUnionRow")} value={money(ccq.unionDues)} />
-                    <Row label={t("payroll.ccqPrelevementRow")} value={money(ccq.prelevementCcq)} />
-                    <Row label={t("payroll.ccqCaisseRow")} value={money(ccq.caisseEducationSyndicale)} />
+                    <Row label={t("payroll.ccqPensionRow")} value={money(ccq.pensionDeduction)} tone="ded" />
+                    <Row label={t("payroll.ccqMedicRow")} value={money(ccq.medicWithholding)} tone="ded" />
+                    <Row label={t("payroll.ccqUnionRow")} value={money(ccq.unionDues)} tone="ded" />
+                    <Row label={t("payroll.ccqPrelevementRow")} value={money(ccq.prelevementCcq)} tone="ded" />
+                    <Row label={t("payroll.ccqCaisseRow")} value={money(ccq.caisseEducationSyndicale)} tone="ded" />
                   </>
                 )}
-                <Row label={t("payroll.totalDeductions")} value={money(totalRetenues)} />
+                <Row label={t("payroll.totalDeductions")} value={money(totalRetenues)} tone="ded" />
                 <Row label={t("payroll.netPay")} value={money(net)} strong />
                 {extraReimb > 0 && (
                   <>
-                    {reimb.km > 0 && <Row label={t("payroll.reimbKm")} value={money(reimb.km)} />}
-                    {reimb.phone > 0 && <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} />}
+                    {reimb.km > 0 && <Row label={t("payroll.reimbKm")} value={money(reimb.km)} tone="add" />}
+                    {reimb.phone > 0 && <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} tone="add" />}
                     <Row label={t("payroll.netPlusReimb")} value={money(net + extraReimb)} strong />
                   </>
                 )}
