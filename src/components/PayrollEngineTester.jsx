@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import isoWeek from "dayjs/plugin/isoWeek";
 import { AlertTriangle, Calculator, ChevronDown, Printer, Save } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayroll, RULE_VERSION, computeCcqBenefits, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR } from "@/payroll";
 import { calculatePayrollEntries } from "@/lib/payroll-calculations";
+import { ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
-
-dayjs.extend(isoWeek);
 
 const TAX_YEAR = 2026;
 
@@ -182,7 +180,7 @@ export default function PayrollEngineTester() {
         retMin += e.returnRegularMinutes; km += e.totalKm;
       });
       return {
-        key: w.key, start: w.start, end: w.end, weekNo: w.end.isoWeek(),
+        key: w.key, start: w.start, end: w.end, weekNo: ccqWeekNumber(w.end),
         regularHours: (regMin + retMin) / 60, ot150Hours: ot50 / 60, ot200Hours: ot100 / 60, km,
       };
     }).sort((a, b) => (a.key < b.key ? 1 : -1));
