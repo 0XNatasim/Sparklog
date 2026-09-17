@@ -510,6 +510,9 @@ export default function PayrollEngineTester() {
         ?? CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate;
       const benefits = computeCcqBenefits({
         hours: totalHours,
+        // Équipement de sécurité is a per-hour indemnity (not a social benefit), so it
+        // is still paid on the return time carved out of the avantages-sociaux base.
+        safetyEquipmentHours: totalHours + (Number(pay.returnNbHours) || 0),
         hourlyWage: base,
         overtime150Hours: Number(pay.ot150Hours) || 0,
         overtime200Hours: Number(pay.ot200Hours) || 0,

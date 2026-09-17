@@ -201,6 +201,11 @@ export function computeCcqBenefits({
   medicEmployeePerHour = CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
   medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
   safetyEquipmentPerHour = CCQ_ELECTRICIAN_IC_C3.safetyEquipmentPerHour,
+  // Hours the safety-equipment allowance is paid on. Defaults to `hours`, but the
+  // caller can pass more: the équipement de sécurité is a per-hour INDEMNITY (like KM),
+  // NOT a social benefit, so it is still paid on return-to-warehouse time that is
+  // otherwise carved out of the "avantages sociaux" (pension/MÉDIC/13%) base.
+  safetyEquipmentHours = null,
   employerSocialBenefitPerHour = CCQ_ELECTRICIAN_IC_C3.employerSocialBenefitPerHour,
   union = "ftq_fipoe",
   level = "journeyman",
@@ -235,7 +240,9 @@ export function computeCcqBenefits({
   // deduction (U1); a Québec credit (not a base deduction).
   const unionDues = computeUnionDues({ union, level, hourlyWage: wage, hours: h });
   // Safety-equipment allowance — a NON-taxable amount paid on top of net (like KM).
-  const safetyEquipment = h * safetyEquipmentPerHour;
+  // Paid on `safetyEquipmentHours` when given (includes return time), else on `hours`.
+  const safetyHours = safetyEquipmentHours == null ? h : Math.max(0, Number(safetyEquipmentHours) || 0);
+  const safetyEquipment = safetyHours * safetyEquipmentPerHour;
   // Employer avantages-sociaux contribution — imputed gain shown then reversed (a
   // display wash: not cash, not taxed). Used only for the gross-up presentation.
   const employerSocialBenefit = h * employerSocialBenefitPerHour;

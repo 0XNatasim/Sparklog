@@ -31,6 +31,17 @@ describe("computeCcqBenefits", () => {
     expect(b.netWithholdings).toBeCloseTo(b.pensionDeduction + b.medicWithholding + b.unionDues, 6);
   });
 
+  it("pays the safety-equipment allowance on safetyEquipmentHours (return time included)", () => {
+    // Base benefit hours 35.18h, plus 2.75h of carved-out return time still gets the
+    // équipement de sécurité (indemnity, not a social benefit).
+    const withReturn = computeCcqBenefits({ hours: 35.18, hourlyWage: 50.79, employeePensionRate: 0.09, safetyEquipmentHours: 35.18 + 2.75 });
+    const baseOnly = computeCcqBenefits({ hours: 35.18, hourlyWage: 50.79, employeePensionRate: 0.09 });
+    expect(withReturn.safetyEquipment).toBeCloseTo((35.18 + 2.75) * 0.80, 6);
+    // Pension/MÉDIC still key off the base hours only (avantages sociaux excluded on return).
+    expect(withReturn.pensionDeduction).toBe(baseOnly.pensionDeduction);
+    expect(withReturn.medicWithholding).toBe(baseOnly.medicWithholding);
+  });
+
   it("auto-computes the FTQ-FIPOE union dues (federal U1 deduction) by default", () => {
     // 55 % of one hour's wage per week + 0,05 $/h → 0,55 × 50,79 + 0,05 × 40 = 29,93.
     const b = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
