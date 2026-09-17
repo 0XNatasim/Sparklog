@@ -1,8 +1,26 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
+import headerLight from "../../public/header-light.jpg";
+import headerDark from "../../public/header-dark.jpg";
 import { useAuth } from "../contexts/AuthContext";
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
+
+// A calm, branded full-screen status page (logo + message). Used for the
+// "service unreachable" and "awaiting approval" states so a new employee always
+// sees SparkLog, never a raw technical error.
+function BrandedScreen({ title, children }) {
+  return (
+    <div className="grid min-h-screen place-items-center bg-background p-6 text-foreground">
+      <div className="w-full max-w-sm space-y-4 text-center">
+        <img src={headerLight} alt="SparkLog" className="mx-auto w-56 max-w-full rounded dark:hidden" />
+        <img src={headerDark} alt="SparkLog" className="mx-auto hidden w-56 max-w-full dark:block" />
+        <div className="text-xl font-bold">{title}</div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function ProtectedRoute({ children, requireRole }) {
   const { user, role, isPaused, loading, authError, signOut } = useAuth();
@@ -11,22 +29,24 @@ export default function ProtectedRoute({ children, requireRole }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground grid place-items-center p-6">
-        <div className="text-lg font-bold">Loading…</div>
+        <div className="text-lg font-bold">{t("common.loading")}</div>
       </div>
     );
   }
 
   if (authError) {
     return (
-      <div className="min-h-screen bg-background text-foreground grid place-items-center p-6">
-        <div className="max-w-xl text-center space-y-2">
-          <div className="text-lg font-extrabold">Authentication service unreachable</div>
-          <div className="text-muted-foreground">{authError}</div>
-          <div className="text-sm text-muted-foreground">
-            Check your Supabase URL/key env vars and network access, then refresh.
-          </div>
-        </div>
-      </div>
+      <BrandedScreen title={t("auth.unreachable.title")}>
+        <p className="text-muted-foreground">{t("auth.unreachable.body")}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          {t("auth.retry")}
+        </button>
+        <p className="text-[11px] text-muted-foreground/70">{authError}</p>
+      </BrandedScreen>
     );
   }
 
@@ -34,13 +54,12 @@ export default function ProtectedRoute({ children, requireRole }) {
 
   if (isPaused && !isManagerRole(role)) {
     return (
-      <div className="grid min-h-screen place-items-center bg-background p-6 text-foreground">
-        <div className="max-w-md space-y-4 text-center">
-          <div className="text-xl font-bold">{t("auth.paused.title")}</div>
-          <p className="text-muted-foreground">{t("auth.paused.description")}</p>
-          <button type="button" onClick={signOut} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">{t("nav.signOut")}</button>
-        </div>
-      </div>
+      <BrandedScreen title={t("auth.paused.title")}>
+        <p className="text-muted-foreground">{t("auth.paused.description")}</p>
+        <button type="button" onClick={signOut} className="rounded-md border px-4 py-2 text-sm font-semibold">
+          {t("nav.signOut")}
+        </button>
+      </BrandedScreen>
     );
   }
 

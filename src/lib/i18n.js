@@ -25,8 +25,11 @@ export const dictionaries = {
     "common.off": "Off",
     "common.show": "Show",
     "common.hide": "Hide",
-    "auth.paused.title": "Account paused",
-    "auth.paused.description": "Your work account is paused. Your existing time records are preserved. Contact your manager if this should be changed.",
+    "auth.paused.title": "Awaiting approval",
+    "auth.paused.description": "Your account was created and is waiting for a manager to activate it. You'll get access as soon as it's approved. Your information is saved in the meantime.",
+    "auth.unreachable.title": "Connecting…",
+    "auth.unreachable.body": "We couldn't reach the service just now. Check your connection and try again in a moment.",
+    "auth.retry": "Try again",
 
     // nav
     "nav.form": "Job card",
@@ -868,8 +871,11 @@ export const dictionaries = {
     "common.off": "Désactivé",
     "common.show": "Afficher",
     "common.hide": "Masquer",
-    "auth.paused.title": "Compte en pause",
-    "auth.paused.description": "Votre compte de travail est en pause. Vos données de temps existantes sont conservées. Communiquez avec votre gestionnaire si la situation doit être modifiée.",
+    "auth.paused.title": "En attente d'approbation",
+    "auth.paused.description": "Votre compte a été créé et attend qu'un gestionnaire l'active. Vous aurez accès dès qu'il sera approuvé. Vos informations sont conservées entre-temps.",
+    "auth.unreachable.title": "Connexion en cours…",
+    "auth.unreachable.body": "Impossible de joindre le service pour l'instant. Vérifiez votre connexion et réessayez dans un moment.",
+    "auth.retry": "Réessayer",
 
     "nav.form": "Fiche de travail",
     "offline.banner": "Vous êtes hors ligne. N’envoyez pas et ne fermez pas cette page; les modifications non envoyées pourraient être perdues.",
