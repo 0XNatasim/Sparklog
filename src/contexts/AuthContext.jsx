@@ -78,19 +78,27 @@ export function AuthProvider({ children }) {
 
       setLoading(true);
 
+      // getSession is usually instant (local storage), but the email-confirmation
+      // redirect can make the first call race with token processing. Retry a few times
+      // before giving up so a transient hiccup doesn't dead-end a brand-new employee.
       let data = null;
       let error = null;
-      try {
-        const result = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Supabase session request timed out.")), 8000)
-          ),
-        ]);
-        data = result?.data ?? null;
-        error = result?.error ?? null;
-      } catch (e) {
-        error = e;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const result = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("Supabase session request timed out.")), 7000)
+            ),
+          ]);
+          data = result?.data ?? null;
+          error = result?.error ?? null;
+          if (!error) break;
+        } catch (e) {
+          error = e;
+        }
+        if (cancelled) return;
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
       }
 
       if (error) {
