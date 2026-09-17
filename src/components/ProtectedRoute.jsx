@@ -63,7 +63,8 @@ export default function ProtectedRoute({ children, requireRole }) {
     );
   }
 
-  // A "manager" requirement is satisfied by any manager-tier role (manager or admin).
+  // A "manager" requirement is satisfied by any manager-tier role (manager or owner).
+  // Administration (admin) is a non-manager office employee and is intentionally excluded.
   const meetsRole = requireRole === "manager" ? isManagerRole(role) : role === requireRole;
   if (requireRole && !meetsRole) return <Navigate to="/" replace />;
 

@@ -15,7 +15,8 @@ import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { isManagerRole } from "@/lib/roles";
 import InstallPrompt from "@/components/InstallPrompt";
 
-// Landing route: managers (and admins) start on the Manager dashboard, employees on the form.
+// Landing route: managers/owners start on the Manager dashboard; employees — including
+// administration (office) staff, who are non-manager employees — start on the form.
 function RoleLanding() {
   const { role } = useAuth();
   // Role loads just after `loading` clears; wait for it so a manager is not
