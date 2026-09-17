@@ -330,10 +330,10 @@ function StorageTemperatureReference() {
 
 function ContactsReference() {
   const britton = [
-    { name: "Olivier Dagenais", role: "Superviseur", email: "odagenais@britton.ca", phone: "438-828-7070" },
-    { name: "Mélanie Noël-Richard", role: null, email: "mrichard@britton.ca", phone: "514-799-0097" },
-    { name: "Marc-Antoine Charette", role: "Superviseur", email: "mcharette@britton.ca", phone: "514-912-7847" },
-    { name: "Yanni Chabot-Valin", role: null, email: "yvalin@britton.ca", phone: "514-668-3736" },
+    { name: "Olivier Dagenais", role: "Contremaître", email: "odagenais@britton.ca", phone: "438-828-7070" },
+    { name: "Mélanie Noël-Richard", role: "Contremaître", email: "mrichard@britton.ca", phone: "514-799-0097" },
+    { name: "Marc-Antoine Charette", role: "Contremaître", email: "mcharette@britton.ca", phone: "514-912-7847" },
+    { name: "Yanni Chabot-Valin", role: "Contremaître", email: "yvalin@britton.ca", phone: "514-668-3736" },
   ];
   // Shown inline inside its collapsible card — no dialog. Unfolding the card reveals
   // the contacts directly.
@@ -348,7 +348,7 @@ function ContactsReference() {
         </div>
       </ReferenceSection>
 
-      <ReferenceSection title="CIE — Britton">
+      <ReferenceSection title="Britton">
         <div className="space-y-2">
           {britton.map((c) => (
             <div key={c.email} className="rounded-md border p-3">
