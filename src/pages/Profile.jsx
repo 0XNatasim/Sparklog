@@ -66,7 +66,7 @@ export default function Profile() {
         {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
         {!loading && !error && (
           <>
-            <CollapsibleCard icon={UserRound} title={t("profile.information")} defaultOpen>
+            <CollapsibleCard icon={UserRound} title={t("profile.information")}>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label={t("auth.fullName")} value={profile?.full_name} icon={UserRound} />
                 <Info label={t("auth.phone")} value={profile?.phone} icon={Phone} href={profile?.phone ? `tel:${profile.phone}` : undefined} />
@@ -333,45 +333,39 @@ function ContactsReference() {
     { name: "Olivier Dagenais", role: "Superviseur", email: "odagenais@britton.ca", phone: "438-828-7070" },
     { name: "Mélanie Noël-Richard", role: null, email: "mrichard@britton.ca", phone: "514-799-0097" },
     { name: "Marc-Antoine Charette", role: "Superviseur", email: "mcharette@britton.ca", phone: "514-912-7847" },
+    { name: "Yanni Chabot-Valin", role: null, email: "yvalin@britton.ca", phone: "514-668-3736" },
   ];
+  // Shown inline inside its collapsible card — no dialog. Unfolding the card reveals
+  // the contacts directly.
   return (
-    <Dialog>
-      <DialogTrigger asChild><ReferenceButton label="Contacts" /></DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Contacts</DialogTitle>
-          <DialogDescription>Superviseurs CIE (Britton) et répartition HILO.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-5 text-sm leading-relaxed">
-          <ReferenceSection title="HILO — Répartition">
-            <div className="rounded-md border p-3">
-              <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
-                <Phone className="h-3.5 w-3.5" />438-289-4456
-              </a>
-              <p className="mt-1 text-xs text-muted-foreground">Choix caché : composez le 7.</p>
-            </div>
-          </ReferenceSection>
-
-          <ReferenceSection title="CIE — Britton">
-            <div className="space-y-2">
-              {britton.map((c) => (
-                <div key={c.email} className="rounded-md border p-3">
-                  <div className="font-medium">{c.name}{c.role ? <span className="ml-2 text-xs font-normal text-muted-foreground">{c.role}</span> : null}</div>
-                  {c.phone && (
-                    <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
-                      <Phone className="h-3.5 w-3.5" />{c.phone}
-                    </a>
-                  )}
-                  <a href={`mailto:${c.email}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
-                    <Mail className="h-3.5 w-3.5" />{c.email}
-                  </a>
-                </div>
-              ))}
-            </div>
-          </ReferenceSection>
+    <div className="space-y-5 text-sm leading-relaxed">
+      <ReferenceSection title="HILO — Répartition">
+        <div className="rounded-md border p-3">
+          <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
+            <Phone className="h-3.5 w-3.5" />438-289-4456
+          </a>
+          <p className="mt-1 text-xs text-muted-foreground">Choix caché : composez le 7.</p>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ReferenceSection>
+
+      <ReferenceSection title="CIE — Britton">
+        <div className="space-y-2">
+          {britton.map((c) => (
+            <div key={c.email} className="rounded-md border p-3">
+              <div className="font-medium">{c.name}{c.role ? <span className="ml-2 text-xs font-normal text-muted-foreground">{c.role}</span> : null}</div>
+              {c.phone && (
+                <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
+                  <Phone className="h-3.5 w-3.5" />{c.phone}
+                </a>
+              )}
+              <a href={`mailto:${c.email}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
+                <Mail className="h-3.5 w-3.5" />{c.email}
+              </a>
+            </div>
+          ))}
+        </div>
+      </ReferenceSection>
+    </div>
   );
 }
 
