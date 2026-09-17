@@ -231,7 +231,7 @@ export default function PayrollEngineTester() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double")
         .order("full_name", { ascending: true });
       if (!cancelled) setEmployees(data || []);
     })();
@@ -279,7 +279,7 @@ export default function PayrollEngineTester() {
     });
     const opts = [...byWeek.values()].map((w) => {
       let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, km = 0;
-      calculatePayrollEntries(w.jobs).forEach((e) => {
+      calculatePayrollEntries(w.jobs, { firstOtHourDouble: Boolean(profile?.overtime_first_hour_double) }).forEach((e) => {
         regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
         retMin += e.returnRegularMinutes; km += e.totalKm;
       });

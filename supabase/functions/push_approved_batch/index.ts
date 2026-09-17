@@ -176,7 +176,7 @@ serve(async (req) => {
     const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone, role, hourly_rate")
+      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -214,6 +214,10 @@ serve(async (req) => {
         // Flat hourly rate for administration ('admin') staff — the sheet multiplies paid
         // hours by this for their pay. Empty for CCQ employees (the sheet uses the CCQ grid).
         employee_hourly_rate: prof?.role === "admin" ? (prof?.hourly_rate ?? "") : "",
+        // Overtime policy: when true, the first overtime hour of the week is paid at
+        // double time (no 1.5x tier). The sheet applies the CCQ overtime split, so it
+        // needs this flag to match SparkLog's calculation.
+        employee_ot_first_hour_double: Boolean(prof?.overtime_first_hour_double),
         approved_at: approved_at_label,
         approved_by: approved_by_value,
       };

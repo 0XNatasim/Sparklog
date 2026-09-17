@@ -45,7 +45,8 @@ export function payrollWeekKey(jobDate) {
   return d.toISOString().slice(0, 10);
 }
 
-export function calculatePayrollEntries(jobs) {
+// `firstOtHourDouble` (per-employee policy): when true, no 1.5x tier — all overtime 2x.
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false } = {}) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
   const dayWorkMinutes = new Map();
   const weekOvertimeMinutes = new Map();
@@ -60,7 +61,7 @@ export function calculatePayrollEntries(jobs) {
     const regularRoom = Math.max(0, 480 - priorDayWork);
     const regularWorkMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - regularWorkMinutes;
-    const overtime50Room = Math.max(0, 60 - priorWeekOvertime);
+    const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
     const overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
     // Return travel time is NOT paid separately: the crew already logs the drive back
@@ -107,9 +108,9 @@ export function calculateCongesIndemnity(weeklyWageDollars) {
   return { vacation, statutoryHolidays, sick, total: vacation + statutoryHolidays + sick };
 }
 
-export function computeWeek(jobs) {
+export function computeWeek(jobs, options) {
   const list = Array.isArray(jobs) ? jobs.filter(Boolean) : [];
-  const entriesMap = calculatePayrollEntries(list);
+  const entriesMap = calculatePayrollEntries(list, options);
   const perJob = [];
   const warnings = [];
   const weeks = new Map();

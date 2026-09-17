@@ -39,6 +39,13 @@ describe("overtime 50%/100% split", () => {
     expect(e.overtime50Minutes).toBe(60);
     expect(e.overtime100Minutes).toBe(60);
   });
+  it("firstOtHourDouble: no 1.5x tier — all overtime is 2x", () => {
+    const job = { id: "j1", job_date: "2026-06-01", depart: "08:00", fin: "18:00", return_time_minutes: 0 };
+    const e = calculatePayrollEntries([job], { firstOtHourDouble: true }).get("j1");
+    expect(e.regularWorkMinutes).toBe(480);
+    expect(e.overtime50Minutes).toBe(0);
+    expect(e.overtime100Minutes).toBe(120);
+  });
   it("accumulates across two jobs on the same day (5h + 5h)", () => {
     const jobs = [
       { id: "a", job_date: "2026-06-01", depart: "08:00", fin: "13:00", return_time_minutes: 0 },
