@@ -67,7 +67,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -191,6 +191,17 @@ export default function EmployeesPanel() {
     else { setInfo(`${field} ✓`); setTimeout(() => setInfo(""), 1500); }
   }
 
+  // Choosing the employee type (Administration vs Employé CCQ) is the prerequisite for
+  // activating a new account. It sets the role (owner-only, enforced in the DB by
+  // enforce_role_change_privileged) and flags the type as confirmed so the activation
+  // toggle unlocks. Roles are stored lowercase: 'admin' = office, 'employee' = CCQ.
+  async function chooseType(id, roleValue) {
+    setLocal(id, "role", roleValue);
+    setLocal(id, "type_confirmed", true);
+    await saveField(id, "role", roleValue);
+    await saveField(id, "type_confirmed", true);
+  }
+
   async function handleDelete(profile) {
     setDeleting(true);
     setErr("");
@@ -295,6 +306,28 @@ export default function EmployeesPanel() {
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedIds.has(p.id) ? "rotate-180" : ""}`} />
           </button>
           {expandedIds.has(p.id) && <CardContent className="space-y-3 border-t p-4">
+            {/* Type gate: a new account must be typed (Administration vs Employé CCQ)
+                before it can be activated. Until then the activation toggle stays locked. */}
+            {!p.type_confirmed && (
+              <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <Briefcase className="h-4 w-4" />{t("employees.chooseTypeTitle")}
+                </div>
+                <p className="text-xs text-muted-foreground">{t("employees.chooseTypeHint")}</p>
+                {privileged ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "employee")}>
+                      {t("employees.typeCcq")}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "admin")}>
+                      {t("employees.typeAdmin")}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">{t("employees.chooseTypeOwnerOnly")}</p>
+                )}
+              </div>
+            )}
             {p.id !== user?.id && (
               <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => navigate(`/form?employee=${p.id}&employeeName=${encodeURIComponent(p.full_name || p.email || "")}`)}>
                 <Eye className="mr-1.5 h-4 w-4" />{t("employees.viewAs")}
@@ -307,8 +340,9 @@ export default function EmployeesPanel() {
               </div>
             )}
             {/* Role — only the owner may assign roles (see is_privileged / 0031, 0032).
-                The owner's own row is locked to avoid demoting the last owner by accident. */}
-            {privileged && (
+                The owner's own row is locked to avoid demoting the last owner by accident.
+                Hidden until the type is confirmed — the type gate above owns that first choice. */}
+            {privileged && p.type_confirmed && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Field label={t("employees.roleLabel")}>
                   <Select
@@ -368,19 +402,21 @@ export default function EmployeesPanel() {
                 </div>
               </Field>
               <Field label={t("employees.pauseAccount")}>
-                <label className="flex h-9 cursor-pointer items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3">
+                <label className={`flex h-9 items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 ${p.type_confirmed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
                   <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />{p.is_paused ? t("employees.paused") : t("employees.active")}</span>
                   <input
                     type="checkbox"
                     checked={Boolean(p.is_paused)}
+                    disabled={!p.type_confirmed}
                     onChange={(e) => {
                       const checked = e.target.checked;
                       setLocal(p.id, "is_paused", checked);
                       saveField(p.id, "is_paused", checked);
                     }}
-                    className="h-5 w-5 rounded border-input accent-amber-600"
+                    className="h-5 w-5 rounded border-input accent-amber-600 disabled:cursor-not-allowed"
                   />
                 </label>
+                {!p.type_confirmed && <span className="text-[11px] text-amber-700 dark:text-amber-300">{t("employees.activateNeedsType")}</span>}
               </Field>
             </div>
 
