@@ -1,16 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import isoWeek from "dayjs/plugin/isoWeek";
 import { ChevronRight } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow } from "@/lib/payroll-calculations";
+import { weekStartSundayD } from "@/lib/ccq-week";
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
 import CongesIndemnityManager from "@/components/CongesIndemnityManager";
-
-dayjs.extend(isoWeek);
 
 function montrealToday() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -37,16 +35,17 @@ const LEVEL_RATE_KEY = {
 
 export default function CostingDashboard() {
   const t = useT();
-  const [period, setPeriod] = useState("month");
+  const [period, setPeriod] = useState("week");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(new Set());
 
   const range = useMemo(() => {
     const end = montrealToday();
-    const start = period === "week"
-      ? dayjs(end).startOf("isoWeek").format("YYYY-MM-DD")
-      : dayjs(end).startOf("month").format("YYYY-MM-DD");
+    let start;
+    if (period === "week") start = weekStartSundayD(end).format("YYYY-MM-DD"); // CCQ week (dimanche)
+    else if (period === "year") start = dayjs(end).startOf("year").format("YYYY-MM-DD");
+    else start = dayjs(end).startOf("month").format("YYYY-MM-DD");
     return { start, end };
   }, [period]);
 
@@ -173,7 +172,7 @@ export default function CostingDashboard() {
               <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{t("costing.reviewNotice")}</p>
             </div>
             <div className="flex overflow-hidden rounded-md border">
-              {["week", "month"].map((p) => (
+              {["week", "month", "year"].map((p) => (
                 <Button key={p} type="button" size="sm" variant={period === p ? "default" : "ghost"} className="rounded-none" onClick={() => setPeriod(p)}>
                   {t(`costing.period.${p}`)}
                 </Button>

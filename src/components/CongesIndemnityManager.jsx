@@ -57,19 +57,12 @@ export default function CongesIndemnityManager() {
             {err && <div className="mb-2 text-xs text-destructive dark:text-red-300">{err}</div>}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {FIELDS.map((f) => (
-                <label key={f.key} className="block text-xs">
+                <div key={f.key} className="block text-xs">
                   <span className="text-muted-foreground">{t(f.labelKey)}</span>
-                  <div className="mt-1 flex items-center gap-1">
-                    <Input
-                      type="number" step="0.001" min="0" inputMode="decimal"
-                      value={asPct(row?.[f.key])}
-                      onChange={(e) => setLocal(f.key, e.target.value)}
-                      onBlur={(e) => saveField(f.key, e.target.value)}
-                      className="h-9 text-right font-mono"
-                    />
-                    <span className="text-xs text-muted-foreground">%</span>
+                  <div className="mt-1 flex h-9 items-center justify-end rounded-md border bg-muted/40 px-2 font-mono text-sm">
+                    {asPct(row?.[f.key]) || "0"}<span className="ml-1 text-xs text-muted-foreground">%</span>
                   </div>
-                </label>
+                </div>
               ))}
               <div className="block text-xs">
                 <span className="text-muted-foreground">{t("costing.conges.total")}</span>
