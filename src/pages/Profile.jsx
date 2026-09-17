@@ -335,10 +335,28 @@ function ContactsReference() {
     { name: "Marc-Antoine Charette", role: "Contremaître", email: "mcharette@britton.ca", phone: "514-912-7847" },
     { name: "Yanni Chabot-Valin", role: "Contremaître", email: "yvalin@britton.ca", phone: "514-668-3736" },
   ];
+  // Priority contacts for on-site installation support (phone only).
+  const installSupport = [
+    { name: "François Belhumeur", phone: "438-396-8405" },
+    { name: "Jonathan Charron", phone: "438-402-1023" },
+  ];
   // Shown inline inside its collapsible card — no dialog. Unfolding the card reveals
   // the contacts directly.
   return (
     <div className="space-y-5 text-sm leading-relaxed">
+      <ReferenceSection title="Support installation">
+        <div className="space-y-2">
+          {installSupport.map((c) => (
+            <div key={c.phone} className="rounded-md border p-3">
+              <div className="font-medium">{c.name}<span className="ml-2 text-xs font-normal text-muted-foreground">Prioritaire</span></div>
+              <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
+                <Phone className="h-3.5 w-3.5" />{c.phone}
+              </a>
+            </div>
+          ))}
+        </div>
+      </ReferenceSection>
+
       <ReferenceSection title="HILO — Répartition">
         <div className="rounded-md border p-3">
           <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
