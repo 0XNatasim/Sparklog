@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { useT } from "@/lib/use-t";
-import { isManagerRole } from "@/lib/roles";
+import { isAdminEmployee, isManagerRole } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
@@ -32,6 +32,9 @@ export default function RegionOnboarding() {
 
   useEffect(() => {
     if (!user?.id || !role) return;
+    // Administration (office, non-CCQ) staff have no CCQ card, region or union
+    // association, so skip the onboarding prompts entirely for them.
+    if (isAdminEmployee(role)) return;
     supabase.from("profiles").select("work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path").eq("id", user.id).single()
       .then(({ data, error: loadError }) => {
         if (loadError) return;
