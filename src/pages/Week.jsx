@@ -53,6 +53,7 @@ export default function Week() {
 
   const [jobs, setJobs] = useState([]);
   const [otFirstHourDouble, setOtFirstHourDouble] = useState(false);
+  const [returnOtNoBenefits, setReturnOtNoBenefits] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -78,10 +79,11 @@ export default function Week() {
       );
       if (error) throw error;
       setJobs(data || []);
-      // Per-employee overtime policy drives the 1.5x/2x split in the weekly totals.
+      // Per-employee overtime policies drive the split in the weekly totals.
       const { data: prof } = await supabase
-        .from("profiles").select("overtime_first_hour_double").eq("id", effectiveUserId).maybeSingle();
+        .from("profiles").select("overtime_first_hour_double, return_overtime_no_benefits").eq("id", effectiveUserId).maybeSingle();
       setOtFirstHourDouble(Boolean(prof?.overtime_first_hour_double));
+      setReturnOtNoBenefits(Boolean(prof?.return_overtime_no_benefits));
     } catch (e) {
       setErr(e?.message || t("week.errors.failedLoad"));
       setJobs([]);
@@ -96,7 +98,7 @@ export default function Week() {
   }, [effectiveUserId]);
 
   const { weekly, dailyByKey } = useMemo(() => {
-    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble });
+    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnOtNoBenefits });
     const dailyMap = new Map([...calculatedDays].map(([dayKey, totals]) => [dayKey, {
       ...totals,
       date: parseJobDate(dayKey),
@@ -104,6 +106,7 @@ export default function Week() {
       regularHours: (totals.regularWorkMinutes + totals.returnRegularMinutes) / 60,
       ot15: totals.overtime50Minutes / 60,
       ot20: totals.overtime100Minutes / 60,
+      returnNb: totals.returnNoBenefitMinutes / 60,
       km: totals.totalKm,
       otCount: jobs.filter((job) => job.job_date === dayKey && isNonEmptyOT(job.ot)).length,
     }]));
@@ -119,6 +122,7 @@ export default function Week() {
           regularHours: 0,
           ot15: 0,
           ot20: 0,
+          returnNb: 0,
           totalKm: 0,
           dayKeys: [],
         });
@@ -127,6 +131,7 @@ export default function Week() {
       w.regularHours += day.regularHours;
       w.ot15 += day.ot15;
       w.ot20 += day.ot20;
+      w.returnNb += day.returnNb;
       w.totalKm += day.km;
       w.dayKeys.push(day.date.format("YYYY-MM-DD"));
     }
@@ -137,14 +142,14 @@ export default function Week() {
       );
       return {
         ...w,
-        totalHours: w.regularHours + w.ot15 + w.ot20,
+        totalHours: w.regularHours + w.ot15 + w.ot20 + w.returnNb,
         dayKeys: uniqueDayKeys,
       };
     });
 
     weeklyArr.sort((a, b) => (a.start.isAfter(b.start) ? -1 : 1));
     return { weekly: weeklyArr, dailyByKey: dailyMap };
-  }, [jobs, otFirstHourDouble]);
+  }, [jobs, otFirstHourDouble, returnOtNoBenefits]);
 
   function toggleWeek(weekKey) {
     setOpenWeekKey((prev) => (prev === weekKey ? null : weekKey));
@@ -215,6 +220,12 @@ export default function Week() {
                         <span className="font-bold text-muted-foreground">{t("week.ot20")}:</span>
                         <span className="font-bold text-lg">{formatHoursHM(w.ot20)}</span>
                       </div>
+                      {w.returnNb > 0 && (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="font-bold text-muted-foreground">{t("week.returnNoBenefit")}:</span>
+                          <span className="font-bold text-lg">{formatHoursHM(w.returnNb)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>

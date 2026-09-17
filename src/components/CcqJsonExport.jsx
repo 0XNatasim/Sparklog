@@ -27,7 +27,7 @@ export default function CcqJsonExport() {
         const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }, { data: nasRows }] = await withTimeout(
           Promise.all([
             supabase.from("jobs").select("id, user_id, job_date, depart, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }),
-            supabase.from("profiles").select("id, full_name, email, role, work_region, wage_schedule, union_association, hourly_rate, overtime_first_hour_double").order("full_name"),
+            supabase.from("profiles").select("id, full_name, email, role, work_region, wage_schedule, union_association, hourly_rate, overtime_first_hour_double, return_overtime_no_benefits").order("full_name"),
             // NAS comes from the restricted vault; RLS returns rows only to privileged
             // users (owner/dev), so a non-privileged export simply has no NAS.
             supabase.from("employee_sensitive").select("user_id, nas"),

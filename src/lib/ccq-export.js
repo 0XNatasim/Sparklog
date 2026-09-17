@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { calculatePayrollEntries, roundHours } from "./payroll-calculations";
+import { calculatePayrollEntries, overtimeOptionsFromProfile, roundHours } from "./payroll-calculations";
 
 const COMMERCIAL_SECTOR_CODE = "C";
 const ELECTRICIAN_TRADE_CODE = "220";
@@ -33,8 +33,8 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
   }
   const payrollEntries = new Map();
   for (const [userId, userJobs] of jobsByUser) {
-    const firstOtHourDouble = Boolean((profilesById.get(userId) || {}).overtime_first_hour_double);
-    for (const [jobId, entry] of calculatePayrollEntries(userJobs, { firstOtHourDouble })) {
+    const options = overtimeOptionsFromProfile(profilesById.get(userId));
+    for (const [jobId, entry] of calculatePayrollEntries(userJobs, options)) {
       payrollEntries.set(jobId, entry);
     }
   }
@@ -58,11 +58,13 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
         heuresRegulieres: 0,
         heuresSup50: 0,
         heuresSup100: 0,
+        heuresRetourSansAvantages: 0,
         heuresTotal: 0,
         _regularMinutes: 0,
         _regularWorkMinutes: 0,
         _sup50Minutes: 0,
         _sup100Minutes: 0,
+        _returnNbMinutes: 0,
       });
     }
 
@@ -86,17 +88,22 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     record._regularMinutes += regularWork + entry.returnRegularMinutes;
     record._sup50Minutes += sup50;
     record._sup100Minutes += sup100;
+    // Return time carved out beyond 8h: paid at base rate, no social benefits. Kept
+    // as its own line so the CCQ report / sheet excludes it from the benefit base.
+    record._returnNbMinutes += entry.returnNoBenefitMinutes;
   }
 
   return [...groups.values()].map((record) => {
     record.heuresRegulieres = roundHours(record._regularMinutes);
     record.heuresSup50 = roundHours(record._sup50Minutes);
     record.heuresSup100 = roundHours(record._sup100Minutes);
-    record.heuresTotal = roundHours(record._regularMinutes + record._sup50Minutes + record._sup100Minutes);
+    record.heuresRetourSansAvantages = roundHours(record._returnNbMinutes);
+    record.heuresTotal = roundHours(record._regularMinutes + record._sup50Minutes + record._sup100Minutes + record._returnNbMinutes);
     delete record._regularMinutes;
     delete record._regularWorkMinutes;
     delete record._sup50Minutes;
     delete record._sup100Minutes;
+    delete record._returnNbMinutes;
     return record;
   });
 }

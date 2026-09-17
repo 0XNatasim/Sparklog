@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR } from "@/payroll";
-import { calculatePayrollEntries } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -180,7 +180,7 @@ function Row({ label, value, strong, tone }) {
 export default function PayrollEngineTester() {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
@@ -231,7 +231,7 @@ export default function PayrollEngineTester() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits")
         .order("full_name", { ascending: true });
       if (!cancelled) setEmployees(data || []);
     })();
@@ -278,14 +278,14 @@ export default function PayrollEngineTester() {
       byWeek.get(w.key).jobs.push(j);
     });
     const opts = [...byWeek.values()].map((w) => {
-      let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, km = 0;
-      calculatePayrollEntries(w.jobs, { firstOtHourDouble: Boolean(profile?.overtime_first_hour_double) }).forEach((e) => {
+      let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, retNbMin = 0, km = 0;
+      calculatePayrollEntries(w.jobs, overtimeOptionsFromProfile(profile)).forEach((e) => {
         regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
-        retMin += e.returnRegularMinutes; km += e.totalKm;
+        retMin += e.returnRegularMinutes; retNbMin += e.returnNoBenefitMinutes; km += e.totalKm;
       });
       return {
         key: w.key, start: w.start, end: w.end, weekNo: ccqWeekNumber(w.end),
-        regularHours: (regMin + retMin) / 60, ot150Hours: ot50 / 60, ot200Hours: ot100 / 60, km,
+        regularHours: (regMin + retMin) / 60, ot150Hours: ot50 / 60, ot200Hours: ot100 / 60, returnNbHours: retNbMin / 60, km,
       };
     }).sort((a, b) => (a.key < b.key ? 1 : -1));
     setWeekOptions(opts);
@@ -444,7 +444,7 @@ export default function PayrollEngineTester() {
     if (!w) return;
     const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
     setFrequency("weekly");
-    setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), km: r2(w.km) }));
+    setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), returnNbHours: r2(w.returnNbHours), km: r2(w.km) }));
     const opening = openingForWeekStart(w.start);
     setYtd(opening.snapshot);
     setAsOfDate(opening.date);
@@ -483,8 +483,13 @@ export default function PayrollEngineTester() {
     // Regular is paid at base + premium; overtime is on the base rate only (CCQ).
     const regular = Number(pay.regularHours) * (base + prem);
     const overtime = Number(pay.ot150Hours) * base * 1.5 + Number(pay.ot200Hours) * base * 2;
+    // Return time carved out beyond 8h: paid at base rate (no premium). It is taxable
+    // income (so it stays a DAS-subject earning) but is EXCLUDED from the CCQ social
+    // benefits below (not added to `totalHours`), i.e. paid without social benefits.
+    const returnNoBenefit = Number(pay.returnNbHours) * base;
     if (regular) earnings.push({ type: "regular", amount: regular });
     if (overtime) earnings.push({ type: "overtime", amount: overtime });
+    if (returnNoBenefit) earnings.push({ type: "regular", amount: returnNoBenefit });
     if (Number(pay.taxableBenefit)) earnings.push({ type: "taxableBenefit", amount: Number(pay.taxableBenefit) });
 
     // Non-taxable reimbursements/allowances (outside the DAS calc): KM + weekly
@@ -742,6 +747,7 @@ export default function PayrollEngineTester() {
           <Field label={t("payroll.premium")} value={pay.premium} onChange={setP("premium")} disabled={payLocked} />
           <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" disabled={payLocked} />
+          <Field label={t("payroll.returnNbHours")} value={pay.returnNbHours} onChange={setP("returnNbHours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" disabled={payLocked} />
           <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" disabled={payLocked} />
           <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} disabled={payLocked} />

@@ -70,7 +70,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, overtime_first_hour_double, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, overtime_first_hour_double, return_overtime_no_benefits, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -717,6 +717,22 @@ export default function EmployeesPanel() {
                     const checked = e.target.checked;
                     setLocal(p.id, "overtime_first_hour_double", checked);
                     saveField(p.id, "overtime_first_hour_double", checked);
+                  }}
+                  className="h-5 w-5 rounded border-input accent-primary"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
+                <span className="text-sm font-medium">
+                  {t("employees.returnNoBenefits")}
+                  <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{t("employees.returnNoBenefitsHint")}</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(p.return_overtime_no_benefits)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setLocal(p.id, "return_overtime_no_benefits", checked);
+                    saveField(p.id, "return_overtime_no_benefits", checked);
                   }}
                   className="h-5 w-5 rounded border-input accent-primary"
                 />

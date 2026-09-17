@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
-import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { jobCodeKind } from "@/lib/job-code";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import { formatHM } from "@/lib/time";
@@ -63,7 +63,7 @@ export default function PeriodSummary({ mode = "week" }) {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double"),
+        supabase.from("profiles").select("id, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits"),
         supabase.from("jobs").select("id, user_id, job_date, ot, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
@@ -108,18 +108,20 @@ export default function PeriodSummary({ mode = "week" }) {
           const level = profile?.apprentice_level || null;
           const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
-          let empLabor = 0, empPaidMin = 0;
-          calculatePayrollEntries(ujobs, { firstOtHourDouble: Boolean(profile?.overtime_first_hour_double) }).forEach((e) => {
+          let empLabor = 0, empLaborNoBenefit = 0, empPaidMin = 0;
+          calculatePayrollEntries(ujobs, overtimeOptionsFromProfile(profile)).forEach((e) => {
             workedMin += e.regularWorkMinutes + e.overtimeWorkMinutes;
-            empPaidMin += e.regularWorkMinutes + e.returnRegularMinutes + e.overtime50Minutes + e.overtime100Minutes;
+            empPaidMin += e.regularWorkMinutes + e.returnRegularMinutes + e.returnNoBenefitMinutes + e.overtime50Minutes + e.overtime100Minutes;
             if (e.overtimeWorkMinutes > 0) otJobs += 1;
             const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
             const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;
             const jobKmRate = Number(e.job?.km_rate_snapshot ?? profile?.km_rate) || 0;
             empLabor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
+            // Return time carved out beyond 8h: base rate, no premium, no social benefits.
+            empLaborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
             kmCost += e.totalKm * jobKmRate;
           });
-          labor += empLabor;
+          labor += empLabor + empLaborNoBenefit;
           conges += isNonCcq ? 0 : calculateCongesIndemnity(empLabor, congesRates).total;
           if (rateKey) {
             const perHour = contributions.reduce((s, c) => s + (Number(c[rateKey]) || 0), 0);

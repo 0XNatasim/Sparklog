@@ -176,7 +176,7 @@ serve(async (req) => {
     const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double")
+      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double, return_overtime_no_benefits")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -218,6 +218,9 @@ serve(async (req) => {
         // double time (no 1.5x tier). The sheet applies the CCQ overtime split, so it
         // needs this flag to match SparkLog's calculation.
         employee_ot_first_hour_double: Boolean(prof?.overtime_first_hour_double),
+        // When true and the day exceeds 8h, the return-to-warehouse time is paid at the
+        // base rate without social benefits (the sheet applies this).
+        employee_return_ot_no_benefits: Boolean(prof?.return_overtime_no_benefits),
         approved_at: approved_at_label,
         approved_by: approved_by_value,
       };

@@ -69,8 +69,11 @@ serve(async (req) => {
     // Per-employee overtime policy: some employers pay the first overtime hour at
     // double time (no 1.5x tier). Read the target employee's flag for the split.
     const { data: targetProfile } = await admin
-      .from("profiles").select("overtime_first_hour_double").eq("id", employeeId).maybeSingle();
-    const result = computeWeek(jobs || [], { firstOtHourDouble: Boolean(targetProfile?.overtime_first_hour_double) });
+      .from("profiles").select("overtime_first_hour_double, return_overtime_no_benefits").eq("id", employeeId).maybeSingle();
+    const result = computeWeek(jobs || [], {
+      firstOtHourDouble: Boolean(targetProfile?.overtime_first_hour_double),
+      returnOtNoBenefits: Boolean(targetProfile?.return_overtime_no_benefits),
+    });
     return json({
       ok: true,
       source: "authority",

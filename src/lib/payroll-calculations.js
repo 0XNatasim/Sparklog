@@ -50,15 +50,43 @@ export function payrollWeekKey(jobDate) {
   return d.toISOString().slice(0, 10);
 }
 
-// `firstOtHourDouble` (per-employee policy): when true the employer pays the first
-// overtime hour at double time too, so there is NO 1.5x tier — all overtime is 2x.
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false } = {}) {
+// Map an employee profile row to the per-employee overtime options used by the
+// calculation. Keeps every caller in sync as policies are added.
+export function overtimeOptionsFromProfile(profile) {
+  return {
+    firstOtHourDouble: Boolean(profile?.overtime_first_hour_double),
+    returnOtNoBenefits: Boolean(profile?.return_overtime_no_benefits),
+  };
+}
+
+// Return minutes already logged inside a job's Départ→Fin span, clamped so it can
+// never exceed the span itself.
+function jobReturnMinutes(job) {
+  const span = minutesBetween(job.depart, job.fin);
+  return Math.min(Math.max(0, Number(job.return_time_minutes) || 0), span);
+}
+
+// Options (per-employee policies):
+//  - firstOtHourDouble: no 1.5x tier — all overtime is 2x.
+//  - returnOtNoBenefits: when a day (Départ→Fin, return included) exceeds 8h, the
+//    return-to-warehouse portion is carved out and paid at the base rate with NO social
+//    benefits (returnNoBenefitMinutes), and the 8h/overtime split is computed on the
+//    remaining work only. A day of 8h or less is unaffected (return stays regular, with
+//    benefits) — matching the current behaviour.
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnOtNoBenefits = false } = {}) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
+  // Pre-pass: total worked span per day (return is inside the span). The return
+  // carve-out only applies on days whose total exceeds 8h.
+  const daySpanMinutes = new Map();
+  for (const job of sorted) {
+    daySpanMinutes.set(job.job_date, (daySpanMinutes.get(job.job_date) || 0) + minutesBetween(job.depart, job.fin));
+  }
+
   // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
   // per WEEK at 1.5x, everything beyond that is 2x. Jobs are processed chronologically
   // so the earliest overtime of the week consumes the 1.5x allowance first. When the
   // employee's policy is "first hour at double time", the 1.5x allowance is 0.
-  const dayWorkMinutes = new Map();      // job_date -> minutes worked so far that day
+  const dayWorkMinutes = new Map();      // job_date -> WORK minutes so far that day (return carved out)
   const weekOvertimeMinutes = new Map(); // week key -> overtime minutes so far that week
   const entries = new Map();
 
@@ -67,18 +95,22 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false } = {}
     const priorDayWork = dayWorkMinutes.get(job.job_date) || 0;
     const priorWeekOvertime = weekOvertimeMinutes.get(wk) || 0;
 
-    const workMinutes = minutesBetween(job.depart, job.fin);
+    const spanMinutes = minutesBetween(job.depart, job.fin);
+    // Carve out the return portion only when the policy is on AND the whole day exceeds
+    // 8h. Otherwise the return stays inside the paid work span exactly as before.
+    const carve = returnOtNoBenefits && (daySpanMinutes.get(job.job_date) || 0) > 480;
+    const returnNoBenefitMinutes = carve ? jobReturnMinutes(job) : 0;
+    const workMinutes = spanMinutes - returnNoBenefitMinutes; // benefits-eligible work
+
     const regularRoom = Math.max(0, 480 - priorDayWork);
     const regularWorkMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - regularWorkMinutes;
     const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
     const overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
-    // Return travel time is NOT paid separately: the crew already logs the drive back
-    // inside the job's Départ→Fin span (the work order covers it), so Départ→Fin is the
-    // single source of paid time. Adding return_time_minutes on top would double-count.
-    // The return_time_minutes / km_retour columns are kept on the row for mileage and
-    // reference, but only km_retour feeds pay (as kilometres), never the minutes.
+    // Legacy field: return travel was never paid as separate minutes on top of the span.
+    // It is kept at 0; the carve-out above re-categorises minutes that are already in the
+    // span, so no minute is added or lost.
     const returnRegularMinutes = 0;
     const kilometres = getKilometreBreakdown(job);
 
@@ -89,8 +121,9 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false } = {}
       overtime100Minutes,
       overtimeWorkMinutes,
       returnRegularMinutes,
+      returnNoBenefitMinutes,
       regularPaidMinutes: regularWorkMinutes + returnRegularMinutes,
-      totalPaidMinutes: workMinutes + returnRegularMinutes,
+      totalPaidMinutes: spanMinutes + returnRegularMinutes,
       ...kilometres,
     });
     dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes);
@@ -111,13 +144,14 @@ export function calculateDailyTotals(jobs, options) {
       overtime100Minutes: 0,
       overtimeWorkMinutes: 0,
       returnRegularMinutes: 0,
+      returnNoBenefitMinutes: 0,
       totalPaidMinutes: 0,
       clientKm: 0,
       returnKm: 0,
       totalKm: 0,
       jobCount: 0,
     };
-    for (const key of ["regularWorkMinutes", "overtime50Minutes", "overtime100Minutes", "overtimeWorkMinutes", "returnRegularMinutes", "totalPaidMinutes", "clientKm", "returnKm", "totalKm"]) {
+    for (const key of ["regularWorkMinutes", "overtime50Minutes", "overtime100Minutes", "overtimeWorkMinutes", "returnRegularMinutes", "returnNoBenefitMinutes", "totalPaidMinutes", "clientKm", "returnKm", "totalKm"]) {
       day[key] += entry[key];
     }
     day.jobCount += 1;
@@ -194,15 +228,17 @@ export function computeWeek(jobs, options) {
       overtime50Minutes: e.overtime50Minutes,
       overtime100Minutes: e.overtime100Minutes,
       returnRegularMinutes: e.returnRegularMinutes,
+      returnNoBenefitMinutes: e.returnNoBenefitMinutes,
     });
     const w = weeks.get(weekEnding) || {
       weekEnding, regularMinutes: 0, overtime50Minutes: 0, overtime100Minutes: 0,
-      returnRegularMinutes: 0, workedMinutes: 0,
+      returnRegularMinutes: 0, returnNoBenefitMinutes: 0, workedMinutes: 0,
     };
     w.regularMinutes += e.regularWorkMinutes;
     w.overtime50Minutes += e.overtime50Minutes;
     w.overtime100Minutes += e.overtime100Minutes;
     w.returnRegularMinutes += e.returnRegularMinutes;
+    w.returnNoBenefitMinutes += e.returnNoBenefitMinutes;
     w.workedMinutes += e.regularWorkMinutes + e.overtimeWorkMinutes;
     weeks.set(weekEnding, w);
   }
