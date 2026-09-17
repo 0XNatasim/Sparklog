@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
-import { isManagerRole } from "@/lib/roles";
+import { isAdminEmployee, isManagerRole } from "@/lib/roles";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
@@ -171,6 +171,9 @@ export default function EmployeeForm() {
   const [parkingAmount, setParkingAmount] = useState("");
   const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
+  // Administration (office, non-CCQ) employees log a simplified timesheet: no
+  // auto-fill, no Arrivée, "Départ" is labelled "Début", and no kilometres.
+  const [officeEmployee, setOfficeEmployee] = useState(false);
   const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
 
@@ -265,11 +268,12 @@ export default function EmployeeForm() {
 
   useEffect(() => {
     if (!effectiveUserId) return;
-    supabase.from("profiles").select("parking_receipts_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
+    supabase.from("profiles").select("role, parking_receipts_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
         setErr(error.message);
         return;
       }
+      setOfficeEmployee(isAdminEmployee(data?.role));
       const enabled = Boolean(data?.parking_receipts_enabled);
       setParkingReceiptsEnabled(enabled);
       if (!enabled) {
@@ -315,6 +319,9 @@ export default function EmployeeForm() {
     setPendingSaveMode("draft");
     setReturnMinutes(null);
     setReturnKm("");
+    // Office employees don't travel to sites, so skip the warehouse-return
+    // (time + km) question entirely and save straight away.
+    if (officeEmployee) { await saveWithReturn(0, 0); return; }
     setReturnStep("ask");
   }
 
@@ -322,6 +329,7 @@ export default function EmployeeForm() {
     setPendingSaveMode("submit");
     setReturnMinutes(null);
     setReturnKm("");
+    if (officeEmployee) { await saveWithReturn(0, 0); return; }
     setReturnStep("ask");
   }
 
@@ -378,7 +386,7 @@ export default function EmployeeForm() {
         job_date,
         ot,
         depart,
-        arrivee,
+        arrivee: arrivee || null,
         fin,
         km_total: kmTotalNum,
         km_aller: kmClientNum,
@@ -527,6 +535,8 @@ export default function EmployeeForm() {
   }
 
   async function requiresOvertimeEvidence(candidateReturnMinutes) {
+    // CCQ overtime authorization (the screenshot) does not apply to office staff.
+    if (officeEmployee) return false;
     // Known locally without any network call, so it stays valid even if the
     // day-jobs lookup below fails.
     const thisMinutes = Math.round(hoursDecimal * 60);
@@ -575,6 +585,8 @@ export default function EmployeeForm() {
   }
 
   async function shouldRequestMealClaim(jobId) {
+    // Meal (supper) claims are a CCQ field-crew benefit; office staff are non-CCQ.
+    if (officeEmployee) return false;
     if (!isMealEligible({ jobDate: job_date, dailyWorkMinutes: overtimeDailyMinutes })) return false;
     const { data, error } = await supabase
       .from("meal_claims")
@@ -848,8 +860,10 @@ export default function EmployeeForm() {
   // Save/Submit only appear once every field is filled — including parking
   // (amount + receipt) when the parking box is checked.
   const parkingComplete = !parkingRequested || (normalizeNumber(parkingAmount) > 0 && (Boolean(parkingFile) || hasParkingReceipt));
-  const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(arrivee) && Boolean(fin)
-    && String(km_aller).trim() !== "" && parkingComplete;
+  // Office (administration) timesheets have no Arrivée and no kilometres, so those
+  // two fields are not required to complete the form for them.
+  const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(fin)
+    && (officeEmployee || (Boolean(arrivee) && String(km_aller).trim() !== "")) && parkingComplete;
 
   return (
     <AppShell>
@@ -884,7 +898,7 @@ export default function EmployeeForm() {
               </Badge>
             </div>
 
-            {!locked && !editId && (
+            {!locked && !editId && !officeEmployee && (
               <>
                 <Button
                   type="button"
@@ -938,7 +952,7 @@ export default function EmployeeForm() {
               </div>
 
               <div className="grid gap-1 sm:gap-1.5">
-                <Label htmlFor="depart" className="text-xs sm:text-sm">{t("form.depart")}</Label>
+                <Label htmlFor="depart" className="text-xs sm:text-sm">{officeEmployee ? t("form.debut") : t("form.depart")}</Label>
                 <Input
                   id="depart"
                   type="time"
@@ -949,6 +963,7 @@ export default function EmployeeForm() {
                 />
               </div>
 
+              {!officeEmployee && (
               <div className="grid gap-1 sm:gap-1.5">
                 <Label htmlFor="arrivee" className="text-xs sm:text-sm">{t("form.arrival")}</Label>
                 <Input
@@ -960,6 +975,7 @@ export default function EmployeeForm() {
                   className="h-9 sm:h-10"
                 />
               </div>
+              )}
 
               <div className="grid gap-1 sm:gap-1.5">
                 <Label htmlFor="fin" className="text-xs sm:text-sm">{t("form.end")}</Label>
@@ -973,6 +989,7 @@ export default function EmployeeForm() {
                 />
               </div>
 
+              {!officeEmployee && (
               <div className="grid gap-1 sm:gap-1.5">
                 <Label htmlFor="km" className="text-xs sm:text-sm"><span className="sm:hidden">{t("history.km")}</span><span className="hidden sm:inline">{t("form.kmTotal")}</span></Label>
                 <Input
@@ -985,6 +1002,7 @@ export default function EmployeeForm() {
                   className="h-9 sm:h-10"
                 />
               </div>
+              )}
 
             </div>
 
