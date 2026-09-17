@@ -52,6 +52,7 @@ export default function Week() {
   const effectiveUserId = isViewMode ? viewedEmployee.id : (isManagerViewingEmployee ? employeeIdParam : user?.id);
 
   const [jobs, setJobs] = useState([]);
+  const [otFirstHourDouble, setOtFirstHourDouble] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -77,6 +78,10 @@ export default function Week() {
       );
       if (error) throw error;
       setJobs(data || []);
+      // Per-employee overtime policy drives the 1.5x/2x split in the weekly totals.
+      const { data: prof } = await supabase
+        .from("profiles").select("overtime_first_hour_double").eq("id", effectiveUserId).maybeSingle();
+      setOtFirstHourDouble(Boolean(prof?.overtime_first_hour_double));
     } catch (e) {
       setErr(e?.message || t("week.errors.failedLoad"));
       setJobs([]);
@@ -91,7 +96,7 @@ export default function Week() {
   }, [effectiveUserId]);
 
   const { weekly, dailyByKey } = useMemo(() => {
-    const calculatedDays = calculateDailyTotals(jobs);
+    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble });
     const dailyMap = new Map([...calculatedDays].map(([dayKey, totals]) => [dayKey, {
       ...totals,
       date: parseJobDate(dayKey),
@@ -139,7 +144,7 @@ export default function Week() {
 
     weeklyArr.sort((a, b) => (a.start.isAfter(b.start) ? -1 : 1));
     return { weekly: weeklyArr, dailyByKey: dailyMap };
-  }, [jobs]);
+  }, [jobs, otFirstHourDouble]);
 
   function toggleWeek(weekKey) {
     setOpenWeekKey((prev) => (prev === weekKey ? null : weekKey));

@@ -50,11 +50,14 @@ export function payrollWeekKey(jobDate) {
   return d.toISOString().slice(0, 10);
 }
 
-export function calculatePayrollEntries(jobs) {
+// `firstOtHourDouble` (per-employee policy): when true the employer pays the first
+// overtime hour at double time too, so there is NO 1.5x tier — all overtime is 2x.
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false } = {}) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
   // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
   // per WEEK at 1.5x, everything beyond that is 2x. Jobs are processed chronologically
-  // so the earliest overtime of the week consumes the 1.5x allowance first.
+  // so the earliest overtime of the week consumes the 1.5x allowance first. When the
+  // employee's policy is "first hour at double time", the 1.5x allowance is 0.
   const dayWorkMinutes = new Map();      // job_date -> minutes worked so far that day
   const weekOvertimeMinutes = new Map(); // week key -> overtime minutes so far that week
   const entries = new Map();
@@ -68,7 +71,7 @@ export function calculatePayrollEntries(jobs) {
     const regularRoom = Math.max(0, 480 - priorDayWork);
     const regularWorkMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - regularWorkMinutes;
-    const overtime50Room = Math.max(0, 60 - priorWeekOvertime);
+    const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
     const overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
     // Return travel time is NOT paid separately: the crew already logs the drive back
@@ -96,8 +99,8 @@ export function calculatePayrollEntries(jobs) {
   return entries;
 }
 
-export function calculateDailyTotals(jobs) {
-  const entries = calculatePayrollEntries(jobs);
+export function calculateDailyTotals(jobs, options) {
+  const entries = calculatePayrollEntries(jobs, options);
   const days = new Map();
   for (const entry of entries.values()) {
     const date = entry.job.job_date;
@@ -166,9 +169,9 @@ export function calculateCongesIndemnity(weeklyWageDollars, rates = CONGES_INDEM
 // warnings for inputs that need review. Every worked minute is accounted for exactly
 // once (regular + ot50 + ot100). This is the contract the Edge Function returns and the
 // approval snapshot records.
-export function computeWeek(jobs) {
+export function computeWeek(jobs, options) {
   const list = Array.isArray(jobs) ? jobs.filter(Boolean) : [];
-  const entriesMap = calculatePayrollEntries(list);
+  const entriesMap = calculatePayrollEntries(list, options);
   const perJob = [];
   const warnings = [];
   const weeks = new Map();

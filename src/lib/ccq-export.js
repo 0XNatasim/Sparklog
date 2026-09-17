@@ -22,7 +22,22 @@ export function formatAppendixCode(code) {
 export function buildCcqWeeklyRecords(jobs, profilesById) {
   const groups = new Map();
   const sortedJobs = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}`.localeCompare(`${b.job_date}${b.depart || ""}`));
-  const payrollEntries = calculatePayrollEntries(sortedJobs);
+  // The overtime split (daily 8h → 1.5x/2x, with a per-week first-hour allowance) is
+  // per employee AND depends on each employee's first-hour policy, so compute entries
+  // per user — never once across everyone, which would mix the weekly allowance and
+  // ignore each person's policy.
+  const jobsByUser = new Map();
+  for (const job of sortedJobs) {
+    if (!jobsByUser.has(job.user_id)) jobsByUser.set(job.user_id, []);
+    jobsByUser.get(job.user_id).push(job);
+  }
+  const payrollEntries = new Map();
+  for (const [userId, userJobs] of jobsByUser) {
+    const firstOtHourDouble = Boolean((profilesById.get(userId) || {}).overtime_first_hour_double);
+    for (const [jobId, entry] of calculatePayrollEntries(userJobs, { firstOtHourDouble })) {
+      payrollEntries.set(jobId, entry);
+    }
+  }
 
   for (const job of sortedJobs) {
     const profile = profilesById.get(job.user_id) || {};
@@ -57,9 +72,14 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
     let sup50 = entry.overtime50Minutes;
     let sup100 = entry.overtime100Minutes;
 
+    // Weekly overtime: hours beyond 40 regular/week are overtime. Normally the first
+    // hour of the week is 1.5x, but an employee whose policy pays the first hour at
+    // double time gets this weekly overflow at 2x as well.
     const weeklyRegularRoom = Math.max(0, 40 * 60 - record._regularWorkMinutes);
     if (regularWork > weeklyRegularRoom) {
-      sup50 += regularWork - weeklyRegularRoom;
+      const overflow = regularWork - weeklyRegularRoom;
+      if (profile.overtime_first_hour_double) sup100 += overflow;
+      else sup50 += overflow;
       regularWork = weeklyRegularRoom;
     }
     record._regularWorkMinutes += regularWork;

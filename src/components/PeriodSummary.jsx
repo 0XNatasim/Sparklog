@@ -63,7 +63,7 @@ export default function PeriodSummary({ mode = "week" }) {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement"),
+        supabase.from("profiles").select("id, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double"),
         supabase.from("jobs").select("id, user_id, job_date, ot, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
@@ -109,7 +109,7 @@ export default function PeriodSummary({ mode = "week" }) {
           const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
           let empLabor = 0, empPaidMin = 0;
-          calculatePayrollEntries(ujobs).forEach((e) => {
+          calculatePayrollEntries(ujobs, { firstOtHourDouble: Boolean(profile?.overtime_first_hour_double) }).forEach((e) => {
             workedMin += e.regularWorkMinutes + e.overtimeWorkMinutes;
             empPaidMin += e.regularWorkMinutes + e.returnRegularMinutes + e.overtime50Minutes + e.overtime100Minutes;
             if (e.overtimeWorkMinutes > 0) otJobs += 1;
