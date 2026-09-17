@@ -45,7 +45,7 @@ export default function AppShell({ children }) {
     try {
       await signOut();
     } finally {
-      navigate("/login");
+      navigate("/login", { replace: true });
     }
   }
 

@@ -34,6 +34,9 @@ export function AuthProvider({ children }) {
   const isBootstrappedRef = useRef(false);
   const resumeInFlightRef = useRef(false);
   const resumeDebounceRef = useRef(null);
+  // Set the instant the user asks to sign out, so the focus/visibility "resume"
+  // recovery below can't silently re-hydrate the session and log them back in.
+  const signedOutRef = useRef(false);
 
   const subscribeToProfile = useCallback((userId) => {
     if (profileChannelRef.current) {
@@ -117,6 +120,7 @@ export function AuthProvider({ children }) {
         setUser(sessionUser);
         setLoading(false);
         if (sessionUser) {
+          signedOutRef.current = false;
           const r = await fetchRoleForUser(sessionUser.id);
           if (!cancelled) {
             setRole(r.role);
@@ -147,6 +151,7 @@ export function AuthProvider({ children }) {
         setAuthError("");
 
         if (nextUser) {
+          signedOutRef.current = false;
           const r = await fetchRoleForUser(nextUser.id);
           setRole(r.role);
           setFullName(r.full_name);
@@ -188,7 +193,7 @@ export function AuthProvider({ children }) {
     let cancelled = false;
 
     async function recoverSessionOnResume() {
-      if (cancelled || resumeInFlightRef.current) return;
+      if (cancelled || resumeInFlightRef.current || signedOutRef.current) return;
       resumeInFlightRef.current = true;
       try {
         let session = null;
@@ -262,16 +267,29 @@ export function AuthProvider({ children }) {
       loading,
       authError,
       async signOut() {
-        // Clear the local session first (works offline / in the PWA); the
-        // network revoke is best-effort so a failed request can't leave the
-        // user stuck signed in.
+        // Block the resume-recovery from re-hydrating the session mid sign-out.
+        signedOutRef.current = true;
+        // Best-effort server-side revoke, but never let a slow/offline network
+        // request hang the button — race it against a short timer.
+        try {
+          await Promise.race([
+            supabase.auth.signOut(),
+            new Promise((resolve) => setTimeout(resolve, 2500)),
+          ]);
+        } catch (e) {
+          /* ignore — local clear + state reset below cover it */
+        }
+        // Always clear the locally persisted session (works offline / in the PWA)
+        // so the app can't re-hydrate and log the user straight back in.
         try {
           await supabase.auth.signOut({ scope: "local" });
         } catch (e) {
-          /* ignore — state is cleared below regardless */
+          /* ignore */
         }
         setUser(null);
         setRole(null);
+        setFullName(null);
+        setIsPaused(false);
         setAdminSections([]);
       }
     }),
