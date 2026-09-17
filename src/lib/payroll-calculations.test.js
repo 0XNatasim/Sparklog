@@ -111,6 +111,32 @@ describe("return-to-storage time", () => {
     expect(e.returnRegularMinutes).toBe(0);
     expect(e.regularPaidMinutes).toBe(480);
     expect(e.totalPaidMinutes).toBe(480);
+    expect(e.returnNoBenefitMinutes).toBe(0);
+  });
+});
+
+describe("returnOtNoBenefits: return paid without social benefits over 8h", () => {
+  // 7h work + 2h return = 9h span (08:00→17:00, return_time_minutes=120), day > 8h.
+  const job = { id: "j1", job_date: "2026-06-01", depart: "08:00", fin: "17:00", return_time_minutes: 120 };
+  it("day ≤ 8h → return stays inside regular hours (not carved)", () => {
+    const short = { id: "j2", job_date: "2026-06-02", depart: "08:00", fin: "16:00", return_time_minutes: 120 };
+    const e = calculatePayrollEntries([short], { returnOtNoBenefits: true }).get("j2");
+    expect(e.returnNoBenefitMinutes).toBe(0);
+    expect(e.regularWorkMinutes).toBe(480);
+  });
+  it("day > 8h → return (120min) carved out at base rate, no benefits; work split on the rest", () => {
+    const e = calculatePayrollEntries([job], { returnOtNoBenefits: true }).get("j1");
+    expect(e.returnNoBenefitMinutes).toBe(120);
+    expect(e.regularWorkMinutes).toBe(420); // 7h work, all regular (< 8h)
+    expect(e.overtime50Minutes).toBe(0);
+    expect(e.overtime100Minutes).toBe(0);
+    expect(e.totalPaidMinutes).toBe(540); // 9h still fully paid, just recategorised
+  });
+  it("off by default → 9h span splits 8h reg + 1h ot, return not carved", () => {
+    const e = calculatePayrollEntries([job]).get("j1");
+    expect(e.returnNoBenefitMinutes).toBe(0);
+    expect(e.regularWorkMinutes).toBe(480);
+    expect(e.overtimeWorkMinutes).toBe(60);
   });
 });
 

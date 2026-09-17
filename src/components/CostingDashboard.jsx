@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { weekStartSundayD } from "@/lib/ccq-week";
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
@@ -63,7 +63,7 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double"),
+        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits"),
         supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, amount").gte("job_date", start).lte("job_date", end),
@@ -97,24 +97,28 @@ export default function CostingDashboard() {
         const isNonCcq = profile?.role === "admin";
         const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
-        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, totalKm = 0, labor = 0, kmCost = 0;
-        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], { firstOtHourDouble: Boolean(profile?.overtime_first_hour_double) });
+        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, totalKm = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
+        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], overtimeOptionsFromProfile(profile));
         entries.forEach((e) => {
           regMin += e.regularWorkMinutes;
           ot50Min += e.overtime50Minutes;
           ot100Min += e.overtime100Minutes;
           returnMin += e.returnRegularMinutes;
+          returnNbMin += e.returnNoBenefitMinutes;
           totalKm += e.totalKm;
           // Rate frozen on the job at submission (0034); fall back to current profile rate.
           const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
           const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;
           const jobKmRate = Number(e.job?.km_rate_snapshot ?? profile?.km_rate) || 0;
           labor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
+          // Return time carved out when the day exceeds 8h: base rate, no premium, and
+          // excluded from the CCQ social-benefits (13% congés) base.
+          laborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
           kmCost += e.totalKm * jobKmRate;
         });
 
         const conges = isNonCcq ? 0 : calculateCongesIndemnity(labor, congesRates).total;
-        const paidHours = (regMin + returnMin + ot50Min + ot100Min) / 60;
+        const paidHours = (regMin + returnMin + returnNbMin + ot50Min + ot100Min) / 60;
         // Employer contributions: per-hour rate for this employee's level × paid hours.
         const contribLines = rateKey
           ? contributions.map((c) => ({ code: c.code, label: c.label, amount: (Number(c[rateKey]) || 0) * paidHours })).filter((l) => l.amount !== 0)
@@ -138,8 +142,9 @@ export default function CostingDashboard() {
           premium,
           regHours: (regMin + returnMin) / 60,
           otHours: (ot50Min + ot100Min) / 60,
-          labor, conges, contribTotal, contribLines, kmCost, mealsCost, parkingCost, phoneData,
-          total: labor + conges + contribTotal + kmCost + mealsCost + parkingCost + phoneData,
+          returnNbHours: returnNbMin / 60,
+          labor: labor + laborNoBenefit, conges, contribTotal, contribLines, kmCost, mealsCost, parkingCost, phoneData,
+          total: labor + laborNoBenefit + conges + contribTotal + kmCost + mealsCost + parkingCost + phoneData,
         });
       });
       result.sort((a, b) => b.total - a.total);
