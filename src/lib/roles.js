@@ -35,3 +35,21 @@ export function isAdminEmployee(role) {
 export function isPrivileged(role) {
   return isOwnerRole(role);
 }
+
+// Management (Gestion) sections an owner may grant to an office (admin) employee,
+// stored in profiles.admin_sections. The order here is the order they appear.
+export const GRANTABLE_ADMIN_SECTIONS = ["live", "timesheet", "notifications", "employees", "forms"];
+
+// True when the user may open the Gestion dashboard at all: any manager-tier role,
+// or an admin the owner granted at least one section.
+export function hasManagementAccess(role, adminSections) {
+  if (isManagerRole(role)) return true;
+  return isAdminEmployee(role) && Array.isArray(adminSections) && adminSections.length > 0;
+}
+
+// True when the user may open a specific Gestion section. Managers/owners see all;
+// a granted admin sees only the sections the owner ticked.
+export function canAccessSection(role, adminSections, sectionId) {
+  if (isManagerRole(role)) return true;
+  return isAdminEmployee(role) && Array.isArray(adminSections) && adminSections.includes(sectionId);
+}

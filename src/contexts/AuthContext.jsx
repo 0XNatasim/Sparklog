@@ -7,17 +7,17 @@ export const SESSION_RESUMED_EVENT = "sparklog:session-resumed";
 async function fetchRoleForUser(userId) {
   const { data, error } = await supabase
     .from("profiles")
-    .select("role, full_name, is_paused")
+    .select("role, full_name, is_paused, admin_sections")
     .eq("id", userId)
     .maybeSingle();
 
   if (error) {
     console.warn("[Auth] fetchRole error:", error);
-    return { role: "Employee", full_name: null, is_paused: false };
+    return { role: "Employee", full_name: null, is_paused: false, admin_sections: [] };
   }
-  if (!data) return { role: "Employee", full_name: null, is_paused: false };
+  if (!data) return { role: "Employee", full_name: null, is_paused: false, admin_sections: [] };
 
-  return { role: data.role || "Employee", full_name: data.full_name || null, is_paused: Boolean(data.is_paused) };
+  return { role: data.role || "Employee", full_name: data.full_name || null, is_paused: Boolean(data.is_paused), admin_sections: Array.isArray(data.admin_sections) ? data.admin_sections : [] };
 }
 
 export function AuthProvider({ children }) {
@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [fullName, setFullName] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [adminSections, setAdminSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
 
@@ -46,6 +47,7 @@ export function AuthProvider({ children }) {
         setRole(payload.new?.role || "Employee");
         setFullName(payload.new?.full_name || null);
         setIsPaused(Boolean(payload.new?.is_paused));
+        setAdminSections(Array.isArray(payload.new?.admin_sections) ? payload.new.admin_sections : []);
       })
       .subscribe();
   }, []);
@@ -120,11 +122,13 @@ export function AuthProvider({ children }) {
             setRole(r.role);
             setFullName(r.full_name);
             setIsPaused(r.is_paused);
+            setAdminSections(r.admin_sections);
           }
         } else {
           setRole(null);
           setFullName(null);
           setIsPaused(false);
+          setAdminSections([]);
         }
       }
 
@@ -147,11 +151,13 @@ export function AuthProvider({ children }) {
           setRole(r.role);
           setFullName(r.full_name);
           setIsPaused(r.is_paused);
+          setAdminSections(r.admin_sections);
           subscribeToProfile(nextUser.id);
         } else {
           setRole(null);
           setFullName(null);
           setIsPaused(false);
+          setAdminSections([]);
           subscribeToProfile(null);
         }
       });
@@ -209,6 +215,7 @@ export function AuthProvider({ children }) {
           setRole(profile.role);
           setFullName(profile.full_name);
           setIsPaused(profile.is_paused);
+          setAdminSections(profile.admin_sections);
         }
         subscribeToProfile(session?.user?.id ?? null);
         window.dispatchEvent(new CustomEvent(SESSION_RESUMED_EVENT));
@@ -251,6 +258,7 @@ export function AuthProvider({ children }) {
       role,
       fullName,
       isPaused,
+      adminSections,
       loading,
       authError,
       async signOut() {
@@ -264,9 +272,10 @@ export function AuthProvider({ children }) {
         }
         setUser(null);
         setRole(null);
+        setAdminSections([]);
       }
     }),
-    [user, role, fullName, isPaused, loading, authError]
+    [user, role, fullName, isPaused, adminSections, loading, authError]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

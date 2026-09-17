@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { isManagerRole } from "@/lib/roles";
+import { hasManagementAccess, isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import NotificationsBell from "@/components/NotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
@@ -36,7 +36,7 @@ function NavItem({ to, children }) {
 }
 
 export default function AppShell({ children }) {
-  const { role, signOut } = useAuth();
+  const { role, adminSections, signOut } = useAuth();
   const navigate = useNavigate();
   const t = useT();
   const { isViewMode, viewedEmployee } = useViewMode();
@@ -115,7 +115,7 @@ export default function AppShell({ children }) {
           <NavItem to={`/history${viewSuffix}`}>{t("nav.history")}</NavItem>
           <NavItem to={`/week${viewSuffix}`}>{t("nav.week")}</NavItem>
           <NavItem to={`/profile${viewSuffix}`}>{t("nav.profile")}</NavItem>
-          {isManagerRole(role) && !isViewMode && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
+          {hasManagementAccess(role, adminSections) && !isViewMode && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
         </nav>
       </header>
 
