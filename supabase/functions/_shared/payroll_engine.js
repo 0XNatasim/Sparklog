@@ -4,7 +4,7 @@
 // Supabase Edge Function (authority), and under vitest. `src/lib/payroll-calculations.js`
 // mirrors this file and a parity test (payroll-engine-parity.test.js) fails CI if they
 // ever diverge. Bump ENGINE_VERSION on any change that can alter a classified value.
-export const ENGINE_VERSION = "1.1.0";
+export const ENGINE_VERSION = "1.2.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
