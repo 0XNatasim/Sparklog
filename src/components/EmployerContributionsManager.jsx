@@ -85,14 +85,9 @@ export default function EmployerContributionsManager() {
                       </td>
                       {LEVEL_COLUMNS.map((c) => (
                         <td key={c.key} className="px-2 py-1.5 text-right">
-                          <Input
-                            type="number" step="0.001" min="0" inputMode="decimal"
-                            value={r[c.key] ?? ""}
-                            onChange={(e) => setLocal(r.code, c.key, e.target.value)}
-                            onBlur={(e) => saveField(r.code, c.key, e.target.value)}
-                            className="h-8 w-24 text-right font-mono"
-                            aria-label={`${r.label} ${c.label}`}
-                          />
+                          <div className="ml-auto flex h-8 w-24 items-center justify-end rounded-md border bg-muted/40 px-2 font-mono text-sm text-muted-foreground" aria-label={`${r.label} ${c.label}`}>
+                            {r[c.key] ?? "—"}
+                          </div>
                         </td>
                       ))}
                     </tr>
