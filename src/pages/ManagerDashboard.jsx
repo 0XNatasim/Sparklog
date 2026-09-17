@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { canAccessSection } from "@/lib/roles";
 import { formatHM } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,14 +58,18 @@ function weekKeyFromDate(dateStr) {
 export default function ManagerDashboard() {
   const PAGE_SIZE = 200;
   const t = useT();
-  const { user } = useAuth();
+  const { user, role, adminSections } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
   const requestedSection = searchParams.get("section");
-  const activeSection = ["live", "employees", "forms", "timesheet", "notifications", "testing"].includes(requestedSection)
-    ? requestedSection
-    : ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications"
-    : "live";
+  // Which dashboard sections this user may open. Managers/owners get all; an admin
+  // (office employee) sees only the sections the owner granted (profiles.admin_sections).
+  const allSections = ["live", "timesheet", "notifications", "employees", "forms", "testing"];
+  const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id));
+  const fallbackSection = allowedSections[0] || "live";
+  const normalizedRequest = ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications" : requestedSection;
+  // Clamp to an allowed section so a granted admin can't reach an ungranted one by URL.
+  const activeSection = allowedSections.includes(normalizedRequest) ? normalizedRequest : fallbackSection;
   const [notificationFilter, setNotificationFilter] = useState(["overtime", "meals", "parking"].includes(requestedSection) ? requestedSection : "all");
   const [focusedEvidence, setFocusedEvidence] = useState(null);
   const [overtimeJobs, setOvertimeJobs] = useState([]);
@@ -907,7 +912,7 @@ export default function ManagerDashboard() {
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
-          ].map(({ id, icon: Icon, label, description }) => (
+          ].filter(({ id }) => allowedSections.includes(id)).map(({ id, icon: Icon, label, description }) => (
             <button
               key={id}
               type="button"

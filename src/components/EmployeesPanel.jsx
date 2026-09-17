@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
-import { isManagerRole, isPrivileged } from "@/lib/roles";
+import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isPrivileged } from "@/lib/roles";
 import NasField from "./NasField";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -49,6 +49,9 @@ export default function EmployeesPanel() {
   const [rates, setRates] = useState(new Map());
   const [annexes, setAnnexes] = useState(new Map());
   const [cardViews, setCardViews] = useState({});
+  // Ids of admin cards whose "Gestion" checklist is expanded (also implicitly open
+  // whenever the admin already has at least one granted section).
+  const [mgmtOpen, setMgmtOpen] = useState(new Set());
 
   async function toggleCard(profile) {
     if (cardViews[profile.id]?.open) {
@@ -67,7 +70,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -202,6 +205,31 @@ export default function EmployeesPanel() {
     await saveField(id, "type_confirmed", true);
   }
 
+  // Management (Gestion) access for an admin (office) employee. Persisted as the
+  // profiles.admin_sections array; writes are owner-only (enforced in the DB by
+  // enforce_admin_sections_privileged, migration 0045).
+  async function toggleManagement(profile, checked) {
+    setMgmtOpen((current) => {
+      const next = new Set(current);
+      if (checked) next.add(profile.id); else next.delete(profile.id);
+      return next;
+    });
+    if (!checked) {
+      // Turning Gestion off revokes every section.
+      setLocal(profile.id, "admin_sections", []);
+      await saveField(profile.id, "admin_sections", []);
+    }
+  }
+
+  async function toggleAdminSection(profile, sectionId, checked) {
+    const current = Array.isArray(profile.admin_sections) ? profile.admin_sections : [];
+    const next = checked
+      ? [...new Set([...current, sectionId])]
+      : current.filter((section) => section !== sectionId);
+    setLocal(profile.id, "admin_sections", next);
+    await saveField(profile.id, "admin_sections", next);
+  }
+
   async function handleDelete(profile) {
     setDeleting(true);
     setErr("");
@@ -328,7 +356,9 @@ export default function EmployeesPanel() {
                 )}
               </div>
             )}
-            {p.id !== user?.id && (
+            {/* "View as" enters view mode, which is manager-tier only. A granted admin
+                (office employee) manages here but cannot impersonate, so hide it for them. */}
+            {p.id !== user?.id && isManagerRole(role) && (
               <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => navigate(`/form?employee=${p.id}&employeeName=${encodeURIComponent(p.full_name || p.email || "")}`)}>
                 <Eye className="mr-1.5 h-4 w-4" />{t("employees.viewAs")}
               </Button>
@@ -485,6 +515,45 @@ export default function EmployeesPanel() {
                     </div>
                     <span className="text-[11px] text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
                   </Field>
+                </div>
+              </details>
+            )}
+
+            {/* Management (Gestion) access for an office employee — owner only. Tick
+                "Gestion" to reveal the section checklist; each ticked section becomes a
+                tab the admin can open in the manager dashboard. */}
+            {p.role === "admin" && privileged && (
+              <details className="group rounded-lg border" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
+                  <span className="truncate">{t("employees.managementAccess")}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="space-y-3 border-t p-3">
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
+                    <span className="text-sm font-medium">{t("employees.managementEnable")}</span>
+                    <input
+                      type="checkbox"
+                      checked={mgmtOpen.has(p.id) || (p.admin_sections?.length > 0)}
+                      onChange={(e) => toggleManagement(p, e.target.checked)}
+                      className="h-5 w-5 rounded border-input accent-primary"
+                    />
+                  </label>
+                  {(mgmtOpen.has(p.id) || (p.admin_sections?.length > 0)) && (
+                    <div className="space-y-1 rounded-md border p-3">
+                      <p className="mb-1 text-xs text-muted-foreground">{t("employees.managementHint")}</p>
+                      {GRANTABLE_ADMIN_SECTIONS.map((sectionId) => (
+                        <label key={sectionId} className="flex cursor-pointer items-center justify-between gap-3 py-1 text-sm">
+                          <span>{t(`manager.sections.${sectionId}`)}</span>
+                          <input
+                            type="checkbox"
+                            checked={(p.admin_sections || []).includes(sectionId)}
+                            onChange={(e) => toggleAdminSection(p, sectionId, e.target.checked)}
+                            className="h-5 w-5 rounded border-input accent-primary"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </details>
             )}

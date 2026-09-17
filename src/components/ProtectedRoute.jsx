@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import headerLight from "../../public/header-light.jpg";
 import headerDark from "../../public/header-dark.jpg";
 import { useAuth } from "../contexts/AuthContext";
-import { isManagerRole } from "@/lib/roles";
+import { hasManagementAccess, isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 
 // A calm, branded full-screen status page (logo + message). Used for the
@@ -23,7 +23,7 @@ function BrandedScreen({ title, children }) {
 }
 
 export default function ProtectedRoute({ children, requireRole }) {
-  const { user, role, isPaused, loading, authError, signOut } = useAuth();
+  const { user, role, isPaused, adminSections, loading, authError, signOut } = useAuth();
   const t = useT();
 
   if (loading) {
@@ -63,9 +63,10 @@ export default function ProtectedRoute({ children, requireRole }) {
     );
   }
 
-  // A "manager" requirement is satisfied by any manager-tier role (manager or owner).
-  // Administration (admin) is a non-manager office employee and is intentionally excluded.
-  const meetsRole = requireRole === "manager" ? isManagerRole(role) : role === requireRole;
+  // A "manager" requirement is satisfied by any manager-tier role (manager or owner),
+  // and by an administration (office) employee the owner granted management access to
+  // (they then see only the sections they were granted; enforced in ManagerDashboard).
+  const meetsRole = requireRole === "manager" ? hasManagementAccess(role, adminSections) : role === requireRole;
   if (requireRole && !meetsRole) return <Navigate to="/" replace />;
 
   return children;
