@@ -69,7 +69,9 @@ export default function NotificationsBell() {
   }, [load, subscribeToNotifications]);
 
   if (!isManagerRole(role)) return null;
-  const unread = notifications.filter((notification) => !notification.read).length;
+  // Only unread notifications are listed: once opened (seen) they drop off the list.
+  const visible = notifications.filter((notification) => !notification.read);
+  const unread = visible.length;
 
   async function openNotification(notification) {
     await supabase.from("manager_notification_reads").upsert({ notification_id: notification.id, manager_id: user.id });
@@ -93,9 +95,9 @@ export default function NotificationsBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-96 w-[calc(100vw-1rem)] overflow-y-auto sm:w-80">
         <div className="px-2 py-2 text-sm font-semibold">{t("notifications.title")}</div>
-        {notifications.length === 0 && <div className="px-2 py-4 text-center text-xs text-muted-foreground">{t("notifications.empty")}</div>}
-        {notifications.map((notification) => (
-          <DropdownMenuItem key={notification.id} onSelect={() => openNotification(notification)} className={`block border-t px-3 py-3 ${notification.read ? "opacity-65" : "bg-red-500/10"}`}>
+        {visible.length === 0 && <div className="px-2 py-4 text-center text-xs text-muted-foreground">{t("notifications.empty")}</div>}
+        {visible.map((notification) => (
+          <DropdownMenuItem key={notification.id} onSelect={() => openNotification(notification)} className="block border-t px-3 py-3 bg-red-500/10">
             <div className="font-semibold">{notification.employeeName}</div>
             <div className="text-xs text-muted-foreground">
               {notification.type === "meal_claim"
