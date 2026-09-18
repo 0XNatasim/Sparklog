@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
-import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isPrivileged } from "@/lib/roles";
+import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged } from "@/lib/roles";
 import NasField from "./NasField";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -300,9 +300,8 @@ export default function EmployeesPanel() {
       )}
 
       {!loading && profiles.map((p) => {
-        // Admin (administration) staff are non-CCQ, so the CCQ "missing fields" check
-        // does not apply to them.
-        const missingFields = p.role === "admin" ? [] : getMissingEmployeeFields(p, t);
+        // Non-CCQ roles (administration + owner) skip the CCQ "missing fields" check.
+        const missingFields = isNonCcqRole(p.role) ? [] : getMissingEmployeeFields(p, t);
         return (
         <Card key={p.id} className={p.is_paused ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-amber-500/40" : ""}>
           <button
@@ -488,9 +487,9 @@ export default function EmployeesPanel() {
               </div>
             </details>
 
-            {/* Administration staff are non-CCQ: show a simple flat hourly pay field
-                instead of the CCQ classification / metadata. */}
-            {p.role === "admin" && (
+            {/* Non-CCQ roles (administration + owner): show a simple flat hourly pay
+                field instead of the CCQ classification / metadata. */}
+            {isNonCcqRole(p.role) && (
               <details className="group rounded-lg border" open>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
                   <span className="truncate">{t("employees.adminPayroll")}</span>
@@ -558,8 +557,8 @@ export default function EmployeesPanel() {
               </details>
             )}
 
-            {/* Employee payroll and CCQ details stay out of the way until a manager needs to edit them. */}
-            {p.role !== "admin" && (
+            {/* CCQ payroll/export metadata — only for CCQ tradespeople (not admin/owner). */}
+            {!isNonCcqRole(p.role) && (
             <details className="group rounded-lg border">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
                 <span className="flex min-w-0 items-center gap-2">
