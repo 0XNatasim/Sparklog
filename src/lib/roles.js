@@ -31,6 +31,13 @@ export function isAdminEmployee(role) {
   return role === "admin";
 }
 
+// True when the role is NOT a CCQ tradesperson: administration/office staff and the
+// owner (management). These use the flat-hourly presentation and carry no CCQ export
+// metadata (annexe, wage schedule, NAS, etc.).
+export function isNonCcqRole(role) {
+  return role === "admin" || role === "owner";
+}
+
 // True when the role may see sensitive data (NAS/SIN) and assign roles. Owner only.
 export function isPrivileged(role) {
   return isOwnerRole(role);

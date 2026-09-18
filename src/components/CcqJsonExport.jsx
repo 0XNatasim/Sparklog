@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { Download } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { buildCcqWeeklyRecords, missingCcqFields } from "@/lib/ccq-export";
+import { isNonCcqRole } from "@/lib/roles";
 import { withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
@@ -49,9 +50,9 @@ export default function CcqJsonExport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The CCQ report covers CCQ tradespeople only. Administration ('admin') staff are
-  // paid flat-hourly off the CCQ grid, so they are excluded from this export entirely.
-  const ccqProfiles = useMemo(() => profiles.filter((profile) => profile.role !== "admin"), [profiles]);
+  // The CCQ report covers CCQ tradespeople only. Non-CCQ roles (administration + owner)
+  // are paid flat-hourly off the CCQ grid, so they are excluded from this export.
+  const ccqProfiles = useMemo(() => profiles.filter((profile) => !isNonCcqRole(profile.role)), [profiles]);
 
   const records = useMemo(() => {
     const profileMap = new Map(ccqProfiles.map((profile) => [profile.id, profile]));
