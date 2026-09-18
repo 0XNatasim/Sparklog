@@ -57,10 +57,14 @@ export default function NotificationsBell() {
       load();
       subscribeToNotifications();
     }
+    // Fired when a notification is marked read elsewhere (e.g. opening the SMS proof).
+    function handleRefresh() { load(); }
 
     window.addEventListener(SESSION_RESUMED_EVENT, handleSessionResumed);
+    window.addEventListener("sparklog:notifications-refresh", handleRefresh);
     return () => {
       window.removeEventListener(SESSION_RESUMED_EVENT, handleSessionResumed);
+      window.removeEventListener("sparklog:notifications-refresh", handleRefresh);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;

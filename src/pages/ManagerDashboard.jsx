@@ -416,9 +416,20 @@ export default function ManagerDashboard() {
     });
   }
 
+  // Opening the SMS proof counts as seeing the overtime notification: mark this job's
+  // notifications read so they drop off the header bell.
+  async function markJobNotificationsRead(jobId) {
+    if (!jobId || !user?.id) return;
+    const { data: notifs } = await supabase.from("manager_notifications").select("id").eq("job_id", jobId);
+    const rows = (notifs || []).map((n) => ({ notification_id: n.id, manager_id: user.id }));
+    if (rows.length === 0) return;
+    await supabase.from("manager_notification_reads").upsert(rows);
+    window.dispatchEvent(new CustomEvent("sparklog:notifications-refresh"));
+  }
+
   async function toggleProof(jobId) {
     const opening = !visibleProof.has(jobId);
-    if (opening) await ensureEvidenceImage(jobId);
+    if (opening) { await ensureEvidenceImage(jobId); markJobNotificationsRead(jobId); }
     setVisibleProof((current) => {
       const next = new Set(current);
       if (next.has(jobId)) next.delete(jobId);
