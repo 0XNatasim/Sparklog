@@ -98,13 +98,18 @@ export const CCQ_LEVELS = Object.keys(CCQ_ELECTRICIAN_IC_C3.levels);
 // (premium in/out) against the CCQ prélèvement rule before finalized use.
 export const CCQ_PRELEVEMENT_RATE = 0.0075;
 
+// Caisse d'éducation syndicale — a SECTORAL contribution (NOT per-union): the CCQ has
+// the employer deduct 0,02 $ per hour worked in the Industriel, Institutionnel-commercial
+// (ICI) and Génie civil et voirie sectors. (In the Résidentiel sector this contribution
+// is instead paid by the employer.) SparkLog is ICI, so it is an employee deduction here,
+// the same 0,02 $/h regardless of the worker's union. Source: ccq.org — règles de paie.
+export const CCQ_CAISSE_EDUCATION_PER_HOUR = 0.02;
+
 export const CCQ_UNIONS = {
   ftq_fipoe: {
     label: "FTQ-FIPOE",
     // 55 % + 0,05 $/h — confirmed against Simon B.'s stub (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
     dues: { rateOfHourlyWage: 0.55, perHour: 0.05 },
-    // Caisse d'éducation syndicale — 0,02 $/h (derived from D0033-0007: 0,02 × 40 = 0,80 $). Draft.
-    caisseEducationPerHour: 0.02,
   },
   international_568: {
     label: "International (FIPOE 568)",
@@ -142,16 +147,17 @@ export function vacationableWage({ hours = 0, hourlyWage = 0, overtime150Hours =
 }
 
 // Auto-computed CCQ levies withheld from pay (also federal U1 deductions): the
-// prélèvement CCQ and the caisse d'éducation syndicale. Returns period dollars.
-// Rates are draft (see CCQ_PRELEVEMENT_RATE + each union's caisseEducationPerHour).
+// prélèvement CCQ (0,75 % of the reportable wage — NOT per-union) and the caisse
+// d'éducation syndicale (0,02 $/h sectoral — NOT per-union). Returns period dollars.
+// The per-union cotisation syndicale is a SEPARATE deduction (computeUnionDues).
 export function computeCcqLevies({
   hours = 0,
   hourlyWage = 0,
   overtime150Hours = 0,
   overtime200Hours = 0,
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
-  union = "ftq_fipoe",
   prelevementRate = CCQ_PRELEVEMENT_RATE,
+  caisseEducationPerHour = CCQ_CAISSE_EDUCATION_PER_HOUR,
 } = {}) {
   const round2 = (x) => Math.round(x * 100) / 100;
   const h = Math.max(0, Number(hours) || 0);
@@ -160,8 +166,8 @@ export function computeCcqLevies({
   const vacBase = vacationableWage({ hours: h, hourlyWage: wage, overtime150Hours, overtime200Hours });
   const vacation = round2(vacBase * vacationHolidaySickRate);
   const prelevementCcq = round2(prelevementRate * (vacBase + vacation));
-  const caissePerHour = CCQ_UNIONS[union]?.caisseEducationPerHour || 0;
-  const caisseEducationSyndicale = round2(caissePerHour * h);
+  // Caisse d'éducation syndicale = worked hours × 0,02 $ (sectoral ICI), same for every union.
+  const caisseEducationSyndicale = round2((Number(caisseEducationPerHour) || 0) * h);
   return { prelevementCcq, caisseEducationSyndicale };
 }
 

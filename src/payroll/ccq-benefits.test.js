@@ -216,13 +216,15 @@ describe("computeCcqLevies (prélèvement + caisse d'éducation)", () => {
     const l = computeCcqLevies({ hours: 40, hourlyWage: 50.79, vacationHolidaySickRate: 0.13, union: "ftq_fipoe" });
     // 0,75 % × (40 × 50,79 + 264,11 vacances) = 0,0075 × 2 295,71 = 17,22
     expect(l.prelevementCcq).toBe(17.22);
-    // FTQ-FIPOE caisse 0,02 $/h × 40 = 0,80
+    // Caisse d'éducation 0,02 $/h × 40 = 0,80
     expect(l.caisseEducationSyndicale).toBe(0.80);
   });
-  it("caisse d'éducation is 0 for a union without a sourced rate", () => {
-    const l = computeCcqLevies({ hours: 40, hourlyWage: 50.79, union: "csd" });
-    expect(l.caisseEducationSyndicale).toBe(0);
-    expect(l.prelevementCcq).toBeGreaterThan(0); // prélèvement applies to all
+  it("caisse d'éducation is SECTORAL (0,02 $/h), the same for every union", () => {
+    const ftq = computeCcqLevies({ hours: 40, hourlyWage: 50.79, union: "ftq_fipoe" });
+    const csd = computeCcqLevies({ hours: 40, hourlyWage: 50.79, union: "csd" });
+    expect(csd.caisseEducationSyndicale).toBe(0.80);       // not per-union: 0,02 × 40
+    expect(csd.caisseEducationSyndicale).toBe(ftq.caisseEducationSyndicale);
+    expect(csd.prelevementCcq).toBeGreaterThan(0);         // prélèvement applies to all
   });
 });
 
