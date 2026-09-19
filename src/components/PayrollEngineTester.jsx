@@ -835,7 +835,7 @@ export default function PayrollEngineTester() {
         </label>
       )}
 
-      {result && <Results result={result} reimb={reimb} ccq={ccqAmounts} open={openExplain} setOpen={setOpenExplain} t={t} />}
+      {result && <Results result={result} reimb={reimb} ccq={ccqAmounts} pay={pay} open={openExplain} setOpen={setOpenExplain} t={t} />}
 
       <PayStubPrint
         open={showStub}
@@ -899,7 +899,21 @@ export default function PayrollEngineTester() {
   );
 }
 
-function Results({ result, reimb, ccq, open, setOpen, t }) {
+// One readable line: bold label, muted formula, right-aligned amount.
+function DetailRow({ label, formula, value, tone }) {
+  const toneClass = tone === "add" ? "text-green-600 dark:text-green-400" : tone === "ded" ? "text-red-600 dark:text-red-400" : "";
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-0.5">
+      <span className="text-muted-foreground">
+        <span className="text-foreground">{label}</span>
+        {formula ? <span className="ml-1 text-[11px]">— {formula}</span> : null}
+      </span>
+      <span className={`shrink-0 font-mono ${toneClass}`}>{value}</span>
+    </div>
+  );
+}
+
+function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
   if (!result.gross) {
     return (
       <Card>
@@ -1003,11 +1017,67 @@ function Results({ result, reimb, ccq, open, setOpen, t }) {
             <span>{t("payroll.calcDetails")}</span>
             <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
-          {open && (
-            <pre className="max-h-96 overflow-auto border-t bg-muted/30 p-4 text-xs">
-              {JSON.stringify(result.explanation, null, 2)}
-            </pre>
-          )}
+          {open && (() => {
+            const e = result.explanation || {};
+            const pct = (r) => `${(Number(r) * 100).toFixed(2).replace(/\.?0+$/, "")} %`;
+            const base = Number(pay?.baseRate) || 0;
+            const prem = Number(pay?.premium) || 0;
+            const reg = Number(pay?.regularHours) || 0;
+            const ot15 = Number(pay?.ot150Hours) || 0;
+            const ot20 = Number(pay?.ot200Hours) || 0;
+            const retNb = Number(pay?.returnNbHours) || 0;
+            const tb = Number(pay?.taxableBenefit) || 0;
+            const rrqTotal = e.rrq ? (e.rrq.tier1?.contribution || 0) + (e.rrq.tier2?.contribution || 0) : 0;
+            return (
+              <div className="space-y-4 border-t p-4 text-sm">
+                {/* Gains */}
+                <div>
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.detailEarnings")}</div>
+                  {reg > 0 && <DetailRow label={t("payroll.regularHours")} formula={`${reg} h × ${money(base + prem)}`} value={money(reg * (base + prem))} tone="add" />}
+                  {ot15 > 0 && <DetailRow label={t("payroll.ot150Hours")} formula={`${ot15} h × ${money(base * 1.5)}`} value={money(ot15 * base * 1.5)} tone="add" />}
+                  {ot20 > 0 && <DetailRow label={t("payroll.ot200Hours")} formula={`${ot20} h × ${money(base * 2)}`} value={money(ot20 * base * 2)} tone="add" />}
+                  {retNb > 0 && <DetailRow label={t("payroll.returnNbHours")} formula={`${retNb} h × ${money(base)}`} value={money(retNb * base)} tone="add" />}
+                  {tb > 0 && <DetailRow label={t("payroll.taxableBenefits")} value={money(tb)} tone="add" />}
+                  {ccq && <>
+                    <DetailRow label={t("payroll.ccqVacation")} formula="13 %" value={money(ccq.vacation)} tone="add" />
+                    <DetailRow label={t("payroll.ccqImposableRow")} value={money(ccq.taxableBenefit)} tone="add" />
+                    <DetailRow label={t("payroll.ccqSafety")} value={money(ccq.safetyEquipment)} tone="add" />
+                  </>}
+                </div>
+
+                {/* Retenues du salarié — formules */}
+                <div>
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.detailWithheld")}</div>
+                  {e.federalTax && <DetailRow label={t("payroll.federalTax")} formula={`${money(e.federalTax.annualTaxable)}/an → ${money(e.federalTax.annualTax)} ÷ ${e.federalTax.periodsPerYear}`} value={money(e.federalTax.tax)} tone="ded" />}
+                  {e.quebecTax && <DetailRow label={t("payroll.quebecTax")} formula={`${money(e.quebecTax.annualTaxable)}/an → ${money(e.quebecTax.annualTax)} ÷ ${e.quebecTax.periodsPerYear}`} value={money(e.quebecTax.tax)} tone="ded" />}
+                  {e.rrq && <DetailRow label="RRQ" formula={`(${money(e.rrq.tier1.contributory)} × ${pct(e.rrq.tier1.rate)})${e.rrq.tier2?.contribution ? ` + ${money(e.rrq.tier2.contribution)}` : ""}`} value={money(rrqTotal)} tone="ded" />}
+                  {e.ei && <DetailRow label={t("payroll.ei")} formula={`${money(e.ei.insurableThisPeriod)} × ${pct(e.ei.employeeRate)}`} value={money(e.ei.employee)} tone="ded" />}
+                  {e.rqap && <DetailRow label="RQAP" formula={`${money(e.rqap.insurableThisPeriod)} × ${pct(e.rqap.employeeRate)}`} value={money(e.rqap.employee)} tone="ded" />}
+                  {ccq && <>
+                    <DetailRow label={t("payroll.ccqPensionRow")} value={money(ccq.pensionDeduction)} tone="ded" />
+                    <DetailRow label={t("payroll.ccqMedicRow")} value={money(ccq.medicWithholding)} tone="ded" />
+                    <DetailRow label={t("payroll.ccqUnionRow")} value={money(ccq.unionDues)} tone="ded" />
+                    <DetailRow label={t("payroll.ccqPrelevementRow")} value={money(ccq.prelevementCcq)} tone="ded" />
+                    <DetailRow label={t("payroll.ccqCaisseRow")} value={money(ccq.caisseEducationSyndicale)} tone="ded" />
+                  </>}
+                </div>
+
+                {/* Charges de l'employeur */}
+                <div>
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.detailEmployer")}</div>
+                  {e.fss && <DetailRow label="FSS" formula={`${money(e.fss.base)} × ${pct(e.fss.rate)}`} value={money(e.fss.contribution)} />}
+                  {e.labourStandards && <DetailRow label={t("payroll.labourStandards")} formula={`${money(e.labourStandards.assessableThisPeriod)} × ${pct(e.labourStandards.rate)}`} value={money(e.labourStandards.contribution)} />}
+                  {e.workforceFund?.applicable && <DetailRow label="FDRCMO" formula={`${money(e.workforceFund.base)} × ${pct(e.workforceFund.rate)}`} value={money(e.workforceFund.contribution)} />}
+                  {e.cnesst && <DetailRow label="CNESST" formula={`${money(e.cnesst.base)} × ${pct(e.cnesst.rate)}`} value={money(e.cnesst.contribution)} />}
+                </div>
+
+                <details className="text-[11px] text-muted-foreground">
+                  <summary className="cursor-pointer select-none">{t("payroll.detailRawJson")}</summary>
+                  <pre className="mt-2 max-h-64 overflow-auto rounded bg-muted/30 p-2">{JSON.stringify(result.explanation, null, 2)}</pre>
+                </details>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
