@@ -105,30 +105,55 @@ export const CCQ_PRELEVEMENT_RATE = 0.0075;
 // the same 0,02 $/h regardless of the worker's union. Source: ccq.org — règles de paie.
 export const CCQ_CAISSE_EDUCATION_PER_HOUR = 0.02;
 
+// Source officielle des taux actuels : CCQ — « Cotisations syndicales »
+//   https://www.ccq.org/fr-CA/avantages-sociaux/salaire-taux/cotisations-syndicales
+// ⚠️ Les cotisations NE PARTAGENT PAS une date d'entrée en vigueur unique — chacune a la
+// sienne (`effectiveFrom` ci-dessous). Le changement CCQ du 28 juin 2026 ne touche QUE
+// CSN-Construction et SQC (confirmé par le membre + la CCQ) : NE PAS reculer/avancer les
+// autres associations sur cette date. FTQ-FIPOE et International 568 ne sont PAS un « taux
+// unique par association » : ce sont les formules ÉLECTRICIEN (métier 220) du syndicat/
+// local, qui varient selon le local, le métier et la période d'apprentissage — vérifier
+// le local/métier/période avant tout usage finalisé.
+export const CCQ_UNION_DUES_SOURCE = "https://www.ccq.org/fr-CA/avantages-sociaux/salaire-taux/cotisations-syndicales";
+
 export const CCQ_UNIONS = {
   ftq_fipoe: {
     label: "FTQ-FIPOE",
-    // 55 % + 0,05 $/h — confirmed against Simon B.'s stub (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
+    effectiveFrom: "2024-06-30",
+    // Électricien : 55 % du taux horaire (apprenti selon sa période, basé sur ICI-I)
+    // + 0,05 $/h travaillée. Formule du syndicat/métier, pas un taux unique. Confirmé vs
+    // le talon de Simon B. (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
     dues: { rateOfHourlyWage: 0.55, perHour: 0.05 },
   },
   international_568: {
     label: "International (FIPOE 568)",
-    // Compagnon 65 % + 0,05 $/h; apprenti 50 % du taux compagnon + 0,05 $/h.
+    effectiveFrom: "2023-12-31",
+    // Électricien (local 568, celui des électriciens au Québec) : compagnon 65 % du taux
+    // compagnon électricien INDUSTRIEL + 0,05 $/h; apprenti 50 % du taux compagnon
+    // industriel + 0,05 $/h. Formule du local, pas un taux unique.
     dues: { rateOfHourlyWage: 0.65, apprenticeRateOfHourlyWage: 0.50, perHour: 0.05 },
   },
   csd: {
     label: "CSD Construction",
-    // 50 % de la 1re heure déclarée + 0,035 $/h (tous les membres).
+    effectiveFrom: "2024-12-29", // inchangé depuis déc. 2024 (NON touché par le 28 juin 2026)
+    // 50 % de la 1re heure déclarée + 0,035 $ × heures déclarées (tous les membres).
     dues: { rateOfHourlyWage: 0.50, perHour: 0.035 },
   },
   csn: {
     label: "CSN-Construction",
-    // Compagnon 50 % de la 1re heure/semaine; apprentis montant fixe/semaine.
+    effectiveFrom: "2026-06-28", // nouveau mode de calcul (rapport de juillet 2026)
+    // Depuis le 28 juin 2026 : compagnon/occupation 50 % de la 1re heure travaillée;
+    // apprenti P1 9,90 $/sem, P2 10,45 $/sem, P3+ 11,70 $/sem.
+    // AVANT (28 déc. 2025 → 27 juin 2026) : compagnon/occupation 19,95 $/sem,
+    // apprenti 9,90 $/sem (tous). Conservé ici pour l'historique — non utilisé.
     dues: { rateOfHourlyWage: 0.50, perHour: 0, flatByLevel: { apprentice1: 9.90, apprentice2: 10.45, apprentice3: 11.70, apprentice4: 11.70 } },
   },
   sqc: {
     label: "SQC",
-    // Montant fixe par semaine, par niveau.
+    effectiveFrom: "2026-06-28", // nouveau mode de calcul (rapport de juillet 2026)
+    // Montant fixe/semaine par niveau. Depuis le 28 juin 2026 : compagnon 15,25 $,
+    // P1 9,95 $, P2 10,75 $, P3-P5 11,95 $.
+    // AVANT (→ 27 juin 2026) : compagnon 14,90 $, P1 9,95 $, P2 10,50 $, P3-P5 11,75 $.
     dues: { flatByLevel: { journeyman: 15.25, apprentice1: 9.95, apprentice2: 10.75, apprentice3: 11.95, apprentice4: 11.95 } },
   },
 };
