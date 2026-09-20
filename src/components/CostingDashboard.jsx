@@ -5,7 +5,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
-import { weekStartSundayD } from "@/lib/ccq-week";
+import { weekStartSundayD, weekEndingSaturdayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
 import CongesIndemnityManager from "@/components/CongesIndemnityManager";
@@ -36,18 +36,32 @@ const LEVEL_RATE_KEY = {
 export default function CostingDashboard() {
   const t = useT();
   const [period, setPeriod] = useState("week");
+  const [weekEnd, setWeekEnd] = useState(() => weekEndingSaturdayD(montrealToday()).format("YYYY-MM-DD"));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(new Set());
 
+  // Last 16 CCQ weeks (ending Saturday) for the week picker.
+  const weekOptions = useMemo(() => {
+    const opts = [];
+    let end = weekEndingSaturdayD(montrealToday());
+    for (let i = 0; i < 16; i++) {
+      opts.push({ key: end.format("YYYY-MM-DD"), start: end.subtract(6, "day"), end, weekNo: ccqWeekNumber(end) });
+      end = end.subtract(7, "day");
+    }
+    return opts;
+  }, []);
+
   const range = useMemo(() => {
+    if (period === "week") {
+      return { start: weekStartSundayD(weekEnd).format("YYYY-MM-DD"), end: weekEnd }; // CCQ week (dim → sam)
+    }
     const end = montrealToday();
-    let start;
-    if (period === "week") start = weekStartSundayD(end).format("YYYY-MM-DD"); // CCQ week (dimanche)
-    else if (period === "year") start = dayjs(end).startOf("year").format("YYYY-MM-DD");
-    else start = dayjs(end).startOf("month").format("YYYY-MM-DD");
+    const start = period === "year"
+      ? dayjs(end).startOf("year").format("YYYY-MM-DD")
+      : dayjs(end).startOf("month").format("YYYY-MM-DD");
     return { start, end };
-  }, [period]);
+  }, [period, weekEnd]);
 
   function toggleRow(id) {
     setExpanded((cur) => {
@@ -176,12 +190,28 @@ export default function CostingDashboard() {
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.description")}</p>
               <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{t("costing.reviewNotice")}</p>
             </div>
-            <div className="flex overflow-hidden rounded-md border">
-              {["week", "month", "year"].map((p) => (
-                <Button key={p} type="button" size="sm" variant={period === p ? "default" : "ghost"} className="rounded-none" onClick={() => setPeriod(p)}>
-                  {t(`costing.period.${p}`)}
-                </Button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              {period === "week" && (
+                <select
+                  value={weekEnd}
+                  onChange={(e) => setWeekEnd(e.target.value)}
+                  className="rounded-md border bg-background px-2 py-1.5 text-sm"
+                  aria-label={t("costing.selectWeek")}
+                >
+                  {weekOptions.map((w) => (
+                    <option key={w.key} value={w.key}>
+                      {t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="flex overflow-hidden rounded-md border">
+                {["week", "month", "year"].map((p) => (
+                  <Button key={p} type="button" size="sm" variant={period === p ? "default" : "ghost"} className="rounded-none" onClick={() => setPeriod(p)}>
+                    {t(`costing.period.${p}`)}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
