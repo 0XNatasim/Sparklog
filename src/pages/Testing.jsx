@@ -13,7 +13,26 @@ import CostingDashboard from "@/components/CostingDashboard";
 import PeriodSummary from "@/components/PeriodSummary";
 import ElectricianCostSheet from "@/components/ElectricianCostSheet";
 import PayrollEngineTester from "@/components/PayrollEngineTester";
+import TalonTab from "@/components/TalonTab";
+import DasTab from "@/components/DasTab";
 import AuditLog from "@/components/AuditLog";
+
+// ── Paie section: Calcul (bench) · Talon (aperçu) · DAS (centralisation) ──────
+function PayrollSection() {
+  const t = useT();
+  return (
+    <Tabs defaultValue="calcul" className="w-full">
+      <TabsList>
+        <TabsTrigger value="calcul">{t("payroll.subtabs.calcul")}</TabsTrigger>
+        <TabsTrigger value="talon">{t("payroll.subtabs.talon")}</TabsTrigger>
+        <TabsTrigger value="das">{t("payroll.subtabs.das")}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="calcul" className="mt-3"><PayrollEngineTester /></TabsContent>
+      <TabsContent value="talon" className="mt-3"><TalonTab /></TabsContent>
+      <TabsContent value="das" className="mt-3"><DasTab /></TabsContent>
+    </Tabs>
+  );
+}
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -392,7 +411,7 @@ export default function Testing() {
       {section === "ccq" && <CcqRatesPanel />}
       {section === "week" && <PeriodSummary mode="week" />}
       {section === "month" && <PeriodSummary mode="month" />}
-      {section === "payroll" && <PayrollEngineTester />}
+      {section === "payroll" && <PayrollSection />}
       {section === "audit" && <AuditLog />}
     </div>
   );
