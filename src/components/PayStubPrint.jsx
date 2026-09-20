@@ -5,17 +5,22 @@ import { Button } from "@/components/ui/button";
 
 const n = (v) => Number(v) || 0;
 const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Fixed employer on every talon.
+const EMPLOYER = "Messier Connexion inc.";
+// Pay date = the Thursday FOLLOWING the pay week (which ends on a Saturday): +5 days.
+const payDateFor = (weekEnd) => (weekEnd ? weekEnd.add(5, "day").format("YYYY-MM-DD") : "");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // A print-friendly CCQ-style pay stub built from the bench result + the CCQ benefit
 // breakdown + stored YTD cumulatives. It is a DRAFT: the DAS figures come from the
 // unvalidated placeholder rule set. Never a substitute for the official pay stub.
-export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week, onOutput }) {
+export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week, reference, onOutput }) {
   const [hdr, setHdr] = useState({
-    employer: "",
+    employer: EMPLOYER,
     periodStart: week?.start ? week.start.format("YYYY-MM-DD") : "",
     periodEnd: week?.end ? week.end.format("YYYY-MM-DD") : "",
-    payDate: "", week: week?.weekNo ? String(week.weekNo) : "", ref: "",
+    payDate: payDateFor(week?.end), week: week?.weekNo ? String(week.weekNo) : "", ref: reference || "",
   });
   const setH = (k) => (e) => setHdr((s) => ({ ...s, [k]: e.target.value }));
 
@@ -23,11 +28,14 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     if (!open || !week) return;
     setHdr((s) => ({
       ...s,
+      employer: s.employer || EMPLOYER,
       periodStart: week.start ? week.start.format("YYYY-MM-DD") : s.periodStart,
       periodEnd: week.end ? week.end.format("YYYY-MM-DD") : s.periodEnd,
+      payDate: week.end ? payDateFor(week.end) : s.payDate,
       week: week.weekNo ? String(week.weekNo) : s.week,
+      ref: reference || s.ref,
     }));
-  }, [open, week]);
+  }, [open, week, reference]);
 
   if (!result || !result.gross) return null;
   const g = result.gross, emp = result.employee;

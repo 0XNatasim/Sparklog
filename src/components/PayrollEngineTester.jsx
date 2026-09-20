@@ -5,7 +5,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
-import { calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR } from "@/payroll";
+import { calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
@@ -224,6 +224,8 @@ export default function PayrollEngineTester() {
   const [weekOptions, setWeekOptions] = useState([]); // [{key, label, start, end, weekNo, regularHours, ot150Hours, ot200Hours, km}]
   const [selectedWeek, setSelectedWeek] = useState(""); // "" = manual
   const [saveState, setSaveState] = useState({ status: "idle", message: "" }); // idle|loading|saving|saved|error
+  const [seqByEnd, setSeqByEnd] = useState({}); // period_end → talon_seq (from the ledger)
+  const [talonRef, setTalonRef] = useState(""); // cumulative talon reference for the selected week
 
   // Load the roster once. Errors are non-fatal — the bench still works manually.
   useEffect(() => {
@@ -305,6 +307,8 @@ export default function PayrollEngineTester() {
     setLedger(ledgerErr ? [] : (ledgerRows || []).map((r) => ({
       periodEnd: r.period_end, periodStart: r.period_start, snapshot: ledgerRowToSnapshot(r),
     })));
+    setSeqByEnd(ledgerErr ? {} : Object.fromEntries((ledgerRows || []).filter((r) => r.talon_seq != null).map((r) => [r.period_end, r.talon_seq])));
+    setTalonRef("");
     setSaveState(data || (ledgerRows && ledgerRows.length)
       ? { status: "saved", message: t("payroll.loaded") }
       : { status: "idle", message: t("payroll.noSaved") });
@@ -356,13 +360,26 @@ export default function PayrollEngineTester() {
   }
 
   // Persist one week's CLOSING snapshot to the ledger (upsert by period_end → idempotent).
-  async function saveLedgerRow(closing, periodEnd, periodStart) {
+  async function saveLedgerRow(closing, periodEnd, periodStart, talonSeq) {
     const num = (v) => Number(v) || 0;
     const { error } = await supabase.from("payroll_period_ledger").upsert({
       user_id: selectedId, tax_year: TAX_YEAR, period_end: periodEnd, period_start: periodStart || null,
+      talon_seq: talonSeq ?? null,
       ...Object.fromEntries(YTD_ALL.map(([k, col]) => [col, num(closing[k])])),
     }, { onConflict: "user_id,period_end" });
     return error;
+  }
+
+  // Cumulative talon reference: keep an already-assigned one (idempotent re-post), else the
+  // next global sequence number (D0034-#### rendered via formatTalonRef). Comptabilisation
+  // order = numbering order; the first ever is 1.
+  async function nextTalonSeq(periodEnd) {
+    const { data: mine } = await supabase.from("payroll_period_ledger")
+      .select("talon_seq").eq("user_id", selectedId).eq("period_end", periodEnd).maybeSingle();
+    if (mine?.talon_seq) return mine.talon_seq;
+    const { data: top } = await supabase.from("payroll_period_ledger")
+      .select("talon_seq").not("talon_seq", "is", null).order("talon_seq", { ascending: false }).limit(1).maybeSingle();
+    return (top?.talon_seq || 0) + 1;
   }
 
   // Comptabiliser: record this week's CLOSING snapshot in the ledger. Idempotent —
@@ -419,17 +436,20 @@ export default function PayrollEngineTester() {
       hoursYtd: add("hoursYtd", hours),
     };
     Object.keys(closing).forEach((k) => { if (typeof closing[k] === "number") closing[k] = round2(closing[k]); });
-    const error = await saveLedgerRow(closing, periodEnd, periodStart);
+    const talonSeq = await nextTalonSeq(periodEnd);
+    const error = await saveLedgerRow(closing, periodEnd, periodStart, talonSeq);
     if (error) { setSaveState({ status: "error", message: error.message }); return false; }
     // Replace/insert the row in local ledger state, keep sorted by period end.
     setLedger((rows) => {
       const others = rows.filter((r) => r.periodEnd !== periodEnd);
       return [...others, { periodEnd, periodStart, snapshot: closing }].sort((x, y) => (x.periodEnd < y.periodEnd ? -1 : 1));
     });
+    setSeqByEnd((m) => ({ ...m, [periodEnd]: talonSeq }));
+    setTalonRef(formatTalonRef(talonSeq));
     setYtd(closing);
     setAsOfDate(periodEnd);
     setCalcCtx((s) => (s ? { ...s, posted: true } : s));
-    setSaveState({ status: "saved", message: t("payroll.posted", { date: periodEnd }) });
+    setSaveState({ status: "saved", message: t("payroll.postedRef", { date: periodEnd, ref: formatTalonRef(talonSeq) }) });
     return true;
   }
 
@@ -439,6 +459,7 @@ export default function PayrollEngineTester() {
   function handleSelectWeek(key) {
     setSelectedWeek(key);
     setResult(null); setCalcCtx(null); setPayEditable(false); // re-lock Paie on the new week
+    setTalonRef(formatTalonRef(seqByEnd[key])); // existing ref if this week is comptabilisé
     if (!key) { setYtd(seed); setAsOfDate(seedDate); return; }
     const w = weekOptions.find((o) => o.key === key);
     if (!w) return;
@@ -853,6 +874,7 @@ export default function PayrollEngineTester() {
         employee={employees.find((e) => e.id === selectedId) || null}
         frequency={frequency}
         week={weekOptions.find((w) => w.key === selectedWeek) || null}
+        reference={talonRef}
         onOutput={advanceOnPrint && selectedId ? () => postPayroll({ silent: true }) : undefined}
       />
 

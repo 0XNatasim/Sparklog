@@ -16,6 +16,16 @@ import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payro
 
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
 
+// Cumulative talon reference. A single global counter (assigned at comptabilisation, in
+// comptabilisation order — the first ever is 1) rendered with a fixed batch prefix:
+//   seq 1 → "D0034-0001", seq 2 → "D0034-0002", …
+// Change the prefix here if a new batch is opened. Empty for an unassigned (aperçu) talon.
+export const TALON_REF_PREFIX = "D0034";
+export function formatTalonRef(seq) {
+  const nseq = Number(seq);
+  return nseq > 0 ? `${TALON_REF_PREFIX}-${String(nseq).padStart(4, "0")}` : "";
+}
+
 // profiles.union_association code → CCQ_UNIONS key.
 const UNION_CODE_TO_KEY = { FTQ: "ftq_fipoe", CPQMCI: "international_568", CSD: "csd", CSN: "csn", SQC: "sqc" };
 
