@@ -104,7 +104,7 @@ export default function DasTab() {
       }
       let talon = null;
       try {
-        talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, week.start), frequency: "weekly" });
+        talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, week.start), frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD") });
       } catch { /* skip on compute error */ }
       if (!talon) { out.push({ profile, pending: 0, approved: approved.length, failed: true }); continue; }
       const emp = talon.result.employee, empr = talon.result.employer, das = talon.result.das;

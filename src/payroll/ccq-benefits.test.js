@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCcqBenefits, computeUnionDues, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeUnionDues, unionDuesRuleFor, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 
 const c = (d) => Math.round(d * 100);
@@ -208,6 +208,39 @@ describe("computeUnionDues (per union)", () => {
   });
   it("unknown union → 0 (no dues assumed)", () => {
     expect(computeUnionDues({ union: "nope", hourlyWage: wage, hours })).toBe(0);
+  });
+});
+
+describe("computeUnionDues — dated rule selection (28 June 2026 change)", () => {
+  const wage = 50.79, hours = 40;
+  it("no date → the CURRENT rule (post-28-June for CSN/SQC)", () => {
+    expect(computeUnionDues({ union: "csn", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.50 * wage, 6);
+    expect(computeUnionDues({ union: "sqc", level: "journeyman", hourlyWage: wage, hours })).toBe(15.25);
+    expect(computeUnionDues({ union: "sqc", level: "apprentice2", hourlyWage: 30.47, hours })).toBe(10.75);
+  });
+  it("CSN before 28 June 2026 → prior flat rule (journeyman 19,95 $; apprentices 9,90 $)", () => {
+    expect(computeUnionDues({ union: "csn", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-27" })).toBe(19.95);
+    expect(computeUnionDues({ union: "csn", level: "apprentice2", hourlyWage: wage, hours, date: "2026-05-01" })).toBe(9.90);
+  });
+  it("CSN on/after 28 June 2026 → new rule (50 % compagnon; apprentice2 10,45 $)", () => {
+    expect(computeUnionDues({ union: "csn", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-28" })).toBeCloseTo(0.50 * wage, 6);
+    expect(computeUnionDues({ union: "csn", level: "apprentice2", hourlyWage: wage, hours, date: "2026-07-04" })).toBe(10.45);
+  });
+  it("SQC before/after 28 June 2026 → prior vs new flat amounts", () => {
+    expect(computeUnionDues({ union: "sqc", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-27" })).toBe(14.90);
+    expect(computeUnionDues({ union: "sqc", level: "apprentice2", hourlyWage: wage, hours, date: "2026-06-27" })).toBe(10.50);
+    expect(computeUnionDues({ union: "sqc", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-28" })).toBe(15.25);
+  });
+  it("date-agnostic unions (CSD/FTQ) are unaffected by the 28 June boundary", () => {
+    expect(computeUnionDues({ union: "csd", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-27" })).toBeCloseTo(0.50 * wage + 0.035 * hours, 6);
+    expect(computeUnionDues({ union: "csd", level: "journeyman", hourlyWage: wage, hours, date: "2026-07-01" })).toBeCloseTo(0.50 * wage + 0.035 * hours, 6);
+    expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-27" })).toBeCloseTo(0.55 * wage + 0.05 * hours, 6);
+  });
+  it("unionDuesRuleFor selects the window; unknown union → null", () => {
+    expect(unionDuesRuleFor("csn", "2026-06-27").effectiveFrom).toBe("2025-12-28");
+    expect(unionDuesRuleFor("csn", "2026-06-28").effectiveFrom).toBe("2026-06-28");
+    expect(unionDuesRuleFor("csn").effectiveFrom).toBe("2026-06-28"); // no date → current
+    expect(unionDuesRuleFor("nope", "2026-06-28")).toBe(null);
   });
 });
 

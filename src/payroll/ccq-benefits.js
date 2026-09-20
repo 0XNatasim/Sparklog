@@ -116,47 +116,103 @@ export const CCQ_CAISSE_EDUCATION_PER_HOUR = 0.02;
 // le local/métier/période avant tout usage finalisé.
 export const CCQ_UNION_DUES_SOURCE = "https://www.ccq.org/fr-CA/avantages-sociaux/salaire-taux/cotisations-syndicales";
 
+// Each union carries a DATED list of rules (`rules`, ascending by `effectiveFrom`) so a
+// pay computed for a past week uses the formula that was in force THAT week — see
+// `unionDuesRuleFor(union, date)` / the `date` arg on `computeUnionDues`. A rule shape:
+//   • rateOfHourlyWage         — % of ONE hour's wage per week (compagnon)
+//   • apprenticeRateOfHourlyWage — the apprentice % where it differs
+//   • perHour                  — added per hour worked
+//   • flatByLevel              — a fixed weekly amount that REPLACES the formula for a level
 export const CCQ_UNIONS = {
   ftq_fipoe: {
     label: "FTQ-FIPOE",
-    effectiveFrom: "2024-06-30",
-    // Électricien : 55 % du taux horaire (apprenti selon sa période, basé sur ICI-I)
-    // + 0,05 $/h travaillée. Formule du syndicat/métier, pas un taux unique. Confirmé vs
-    // le talon de Simon B. (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
-    dues: { rateOfHourlyWage: 0.55, perHour: 0.05 },
+    rules: [
+      {
+        effectiveFrom: "2024-06-30",
+        // Électricien : 55 % du taux horaire (apprenti selon sa période, basé sur ICI-I)
+        // + 0,05 $/h travaillée. Formule du syndicat/métier, pas un taux unique. Confirmé
+        // vs le talon de Simon B. (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
+        dues: { rateOfHourlyWage: 0.55, perHour: 0.05 },
+      },
+    ],
   },
   international_568: {
     label: "International (FIPOE 568)",
-    effectiveFrom: "2023-12-31",
-    // Électricien (local 568, celui des électriciens au Québec) : compagnon 65 % du taux
-    // compagnon électricien INDUSTRIEL + 0,05 $/h; apprenti 50 % du taux compagnon
-    // industriel + 0,05 $/h. Formule du local, pas un taux unique.
-    dues: { rateOfHourlyWage: 0.65, apprenticeRateOfHourlyWage: 0.50, perHour: 0.05 },
+    rules: [
+      {
+        effectiveFrom: "2023-12-31",
+        // Électricien (local 568, celui des électriciens au Québec) : compagnon 65 % du
+        // taux compagnon électricien INDUSTRIEL + 0,05 $/h; apprenti 50 % du taux
+        // compagnon industriel + 0,05 $/h. Formule du local, pas un taux unique.
+        dues: { rateOfHourlyWage: 0.65, apprenticeRateOfHourlyWage: 0.50, perHour: 0.05 },
+      },
+    ],
   },
   csd: {
     label: "CSD Construction",
-    effectiveFrom: "2024-12-29", // inchangé depuis déc. 2024 (NON touché par le 28 juin 2026)
-    // 50 % de la 1re heure déclarée + 0,035 $ × heures déclarées (tous les membres).
-    dues: { rateOfHourlyWage: 0.50, perHour: 0.035 },
+    rules: [
+      {
+        effectiveFrom: "2024-12-29", // inchangé depuis déc. 2024 (NON touché par le 28 juin 2026)
+        // 50 % de la 1re heure déclarée + 0,035 $ × heures déclarées (tous les membres).
+        dues: { rateOfHourlyWage: 0.50, perHour: 0.035 },
+      },
+    ],
   },
   csn: {
     label: "CSN-Construction",
-    effectiveFrom: "2026-06-28", // nouveau mode de calcul (rapport de juillet 2026)
-    // Depuis le 28 juin 2026 : compagnon/occupation 50 % de la 1re heure travaillée;
-    // apprenti P1 9,90 $/sem, P2 10,45 $/sem, P3+ 11,70 $/sem.
-    // AVANT (28 déc. 2025 → 27 juin 2026) : compagnon/occupation 19,95 $/sem,
-    // apprenti 9,90 $/sem (tous). Conservé ici pour l'historique — non utilisé.
-    dues: { rateOfHourlyWage: 0.50, perHour: 0, flatByLevel: { apprentice1: 9.90, apprentice2: 10.45, apprentice3: 11.70, apprentice4: 11.70 } },
+    rules: [
+      {
+        effectiveFrom: "2025-12-28", effectiveTo: "2026-06-27", // fenêtre antérieure (source: membre)
+        // Compagnon/occupation 19,95 $/sem; apprenti (tous) 9,90 $/sem.
+        dues: { flatByLevel: { journeyman: 19.95, apprentice1: 9.90, apprentice2: 9.90, apprentice3: 9.90, apprentice4: 9.90 } },
+      },
+      {
+        effectiveFrom: "2026-06-28", // nouveau mode de calcul (rapport de juillet 2026)
+        // Compagnon/occupation 50 % de la 1re heure travaillée; apprenti P1 9,90 $/sem,
+        // P2 10,45 $/sem, P3+ 11,70 $/sem.
+        dues: { rateOfHourlyWage: 0.50, perHour: 0, flatByLevel: { apprentice1: 9.90, apprentice2: 10.45, apprentice3: 11.70, apprentice4: 11.70 } },
+      },
+    ],
   },
   sqc: {
     label: "SQC",
-    effectiveFrom: "2026-06-28", // nouveau mode de calcul (rapport de juillet 2026)
-    // Montant fixe/semaine par niveau. Depuis le 28 juin 2026 : compagnon 15,25 $,
-    // P1 9,95 $, P2 10,75 $, P3-P5 11,95 $.
-    // AVANT (→ 27 juin 2026) : compagnon 14,90 $, P1 9,95 $, P2 10,50 $, P3-P5 11,75 $.
-    dues: { flatByLevel: { journeyman: 15.25, apprentice1: 9.95, apprentice2: 10.75, apprentice3: 11.95, apprentice4: 11.95 } },
+    rules: [
+      {
+        // Date de début exacte non sourcée; seule la fin (27 juin 2026) est confirmée.
+        // Sert de repli pour toute semaine ≤ 2026-06-27.
+        effectiveTo: "2026-06-27", effectiveFromUnconfirmed: true,
+        // Compagnon 14,90 $, P1 9,95 $, P2 10,50 $, P3-P5 11,75 $ (montant fixe/semaine).
+        dues: { flatByLevel: { journeyman: 14.90, apprentice1: 9.95, apprentice2: 10.50, apprentice3: 11.75, apprentice4: 11.75 } },
+      },
+      {
+        effectiveFrom: "2026-06-28", // nouveau mode de calcul (rapport de juillet 2026)
+        // Compagnon 15,25 $, P1 9,95 $, P2 10,75 $, P3-P5 11,95 $ (montant fixe/semaine).
+        dues: { flatByLevel: { journeyman: 15.25, apprentice1: 9.95, apprentice2: 10.75, apprentice3: 11.95, apprentice4: 11.95 } },
+      },
+    ],
   },
 };
+
+// Pick the union-dues rule in force for `date` (YYYY-MM-DD). A rule matches when
+// `date` is within [effectiveFrom, effectiveTo] (either bound may be open). With no
+// `date`, returns the CURRENT rule (the one with the latest effectiveFrom, i.e. no
+// effectiveTo). A `date` outside every window clamps to the nearest rule (earliest if
+// before all, latest if after all) so a computation always resolves to a real formula.
+export function unionDuesRuleFor(union, date) {
+  const u = CCQ_UNIONS[union];
+  if (!u || !Array.isArray(u.rules) || u.rules.length === 0) return null;
+  // Sort ascending; a missing effectiveFrom sorts earliest (open lower bound).
+  const rules = [...u.rules].sort((a, b) => String(a.effectiveFrom || "").localeCompare(String(b.effectiveFrom || "")));
+  const current = rules[rules.length - 1]; // latest window = the one in force today
+  if (!date) return current;
+  const d = String(date).slice(0, 10);
+  const inWindow = (r) => (r.effectiveFrom == null || d >= r.effectiveFrom) && (r.effectiveTo == null || d <= r.effectiveTo);
+  const match = rules.filter(inWindow);
+  if (match.length) return match[match.length - 1]; // latest matching window
+  // Outside every window: clamp to the nearest edge.
+  if (d < String(rules[0].effectiveFrom || "")) return rules[0];
+  return current;
+}
 
 // Base for the 13 % indemnité de congés (and the prélèvement): the wage EARNED at the
 // regular + overtime rates — regular hours at the base rate plus overtime hours weighted
@@ -199,11 +255,12 @@ export function computeCcqLevies({
 export const CCQ_UNION_KEYS = Object.keys(CCQ_UNIONS);
 
 // Weekly union dues for a member. `level` is a CCQ_LEVELS key (for flat/apprentice
-// lookups). Returns dollars.
-export function computeUnionDues({ union = "ftq_fipoe", level = "journeyman", hourlyWage = 0, hours = 0 } = {}) {
-  const u = CCQ_UNIONS[union];
-  if (!u) return 0;
-  const d = u.dues;
+// lookups). `date` (YYYY-MM-DD, the pay week) selects the dated rule in force that week;
+// omit it for the current rule. Returns dollars.
+export function computeUnionDues({ union = "ftq_fipoe", level = "journeyman", hourlyWage = 0, hours = 0, date } = {}) {
+  const rule = unionDuesRuleFor(union, date);
+  if (!rule) return 0;
+  const d = rule.dues;
   const flat = d.flatByLevel?.[level];
   if (flat != null) return flat; // fixed weekly amount replaces the formula
   const wage = Number(hourlyWage) || 0;
@@ -240,6 +297,9 @@ export function computeCcqBenefits({
   employerSocialBenefitPerHour = CCQ_ELECTRICIAN_IC_C3.employerSocialBenefitPerHour,
   union = "ftq_fipoe",
   level = "journeyman",
+  // Pay week (YYYY-MM-DD). Selects the dated union-dues rule in force that week; omit for
+  // the current rule. Only the per-union cotisation syndicale is dated so far.
+  date,
   // Union/professional withholdings that are ALSO federal U1 deductions but whose CCQ
   // rate/base isn't yet sourced — passed as period amounts (Québec credit, not a base
   // deduction). See docs/rules/2026-das-payroll.md.
@@ -269,7 +329,7 @@ export function computeCcqBenefits({
   const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax
   // deduction (U1); a Québec credit (not a base deduction).
-  const unionDues = computeUnionDues({ union, level, hourlyWage: wage, hours: h });
+  const unionDues = computeUnionDues({ union, level, hourlyWage: wage, hours: h, date });
   // Safety-equipment allowance — a NON-taxable amount paid on top of net (like KM).
   // Paid on `safetyEquipmentHours` when given (includes return time), else on `hours`.
   const safetyHours = safetyEquipmentHours == null ? h : Math.max(0, Number(safetyEquipmentHours) || 0);

@@ -141,7 +141,7 @@ export default function TalonTab() {
     if (!ready || !profile || !opening) return null;
     const approvedJobs = week.jobs.filter((j) => j.status === "approved");
     try {
-      return computeEmployeeWeekTalon({ profile, jobs: approvedJobs, opening, frequency: "weekly" });
+      return computeEmployeeWeekTalon({ profile, jobs: approvedJobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD") });
     } catch {
       return null;
     }

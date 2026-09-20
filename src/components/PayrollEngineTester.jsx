@@ -508,8 +508,13 @@ export default function PayrollEngineTester() {
     if (ccq.enabled) {
       const pensionRate = CCQ_ELECTRICIAN_IC_C3.levels[ccq.status]?.employeePensionRate
         ?? CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate;
+      // Pay-week date for the dated union-dues rule: the selected week's start, else the
+      // opening as-of date, else today (current rule).
+      const selWeek = weekOptions.find((o) => o.key === selectedWeek);
+      const unionDate = selWeek?.start ? selWeek.start.format("YYYY-MM-DD") : (asOfDate || undefined);
       const benefits = computeCcqBenefits({
         hours: totalHours,
+        date: unionDate,
         // Équipement de sécurité is a per-hour indemnity (not a social benefit), so it
         // is still paid on the return time carved out of the avantages-sociaux base.
         safetyEquipmentHours: totalHours + (Number(pay.returnNbHours) || 0),
