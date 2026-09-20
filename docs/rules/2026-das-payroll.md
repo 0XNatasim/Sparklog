@@ -188,6 +188,17 @@ FTQ-FIPOE et International 568 ne sont **pas** un taux unique par association : 
 les formules **électricien** (métier 220) du syndicat/local, variables selon local,
 métier et période d'apprentissage.
 
+**Sélecteur par date.** Chaque association porte une liste **datée** de règles
+(`CCQ_UNIONS[union].rules`, triée par `effectiveFrom`, avec un `effectiveTo` optionnel).
+`unionDuesRuleFor(union, date)` — et l'argument `date` de `computeUnionDues` /
+`computeCcqBenefits` (fil : `computeEmployeeWeekTalon({ weekDate })`) — choisit la règle
+en vigueur **la semaine payée**, de sorte qu'une paie recalculée pour une semaine passée
+utilise la formule de l'époque. Sans `date`, la règle **courante** (dernier
+`effectiveFrom`) s'applique. Les onglets Talon/DAS passent le **début de la semaine CCQ**
+(dimanche), et le banc passe la semaine sélectionnée (sinon la date d'ouverture, sinon
+aujourd'hui). Note : la borne inférieure de l'ancienne règle SQC n'est pas sourcée (seule
+la fin, 27 juin 2026, l'est) — modélisée en fenêtre ouverte à gauche.
+
 For Simon (FTQ-FIPOE): 0,55 × 50,79 + 0,05 × 40 = **29,93 $** to the cent. Compagnon
 rates are the best-sourced; some apprentice figures are partial (ccq.org) — flagged to
 confirm per member's local/annexe.

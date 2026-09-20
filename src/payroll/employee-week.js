@@ -66,7 +66,10 @@ export function snapshotFromRow(row) {
 
 // Compute one employee's talon for a set of jobs (normally one CCQ week) on top of the
 // opening YTD balance. Returns everything PayStubPrint + the DAS tab need.
-export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, employer = DEFAULT_EMPLOYER }) {
+export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, employer = DEFAULT_EMPLOYER, weekDate }) {
+  // Pay-week date used to pick the dated union-dues rule. Explicit wins; else the
+  // earliest job_date in the set (any day of a CCQ week resolves the same rule window).
+  const payWeekDate = weekDate || (jobs || []).reduce((min, j) => (j?.job_date && (!min || j.job_date < min) ? j.job_date : min), null) || undefined;
   const base = Number(profile?.hourly_rate) || 0;
   const prem = Number(profile?.team_leader_premium) || 0;
   const status = levelToStatus(profile?.apprentice_level);
@@ -107,6 +110,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
     overtime150Hours: ot150Hours, overtime200Hours: ot200Hours,
     employeePensionRate: pensionRate,
     union, level: status,
+    date: payWeekDate,
     prelevementCcq: levies.prelevementCcq,
     caisseEducationSyndicale: levies.caisseEducationSyndicale,
   });
