@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { Clock, FileText } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
-import { computeEmployeeWeekTalon, snapshotFromRow } from "@/payroll";
+import { computeEmployeeWeekTalon, snapshotFromRow, formatTalonRef } from "@/payroll";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -105,7 +105,10 @@ export default function TalonTab() {
     try {
       const opening = openingFor(profile.id, week.start);
       const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD") });
-      setStub({ profile, weekObj: { start: week.start, end: week.end, weekNo: week.weekNo }, talon, opening });
+      // Reference is assigned at comptabilisation only; blank for an aperçu.
+      const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
+      const reference = formatTalonRef(ledgerRow?.talon_seq);
+      setStub({ profile, weekObj: { start: week.start, end: week.end, weekNo: week.weekNo }, talon, opening, reference });
     } catch (e) {
       setError(e?.message || String(e));
     }
@@ -196,6 +199,7 @@ export default function TalonTab() {
           employee={stub.profile}
           frequency="weekly"
           week={stub.weekObj}
+          reference={stub.reference}
         />
       )}
     </div>
