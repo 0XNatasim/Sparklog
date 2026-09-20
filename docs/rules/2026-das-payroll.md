@@ -166,13 +166,27 @@ but are a **Québec credit** (not a base deduction), so they are NOT applied to 
 Québec side. The bench has a **union selector** (`CCQ_UNIONS` / `computeUnionDues`) that
 computes the weekly dues from each union's own formula:
 
-| Union | Compagnon | Apprentis |
-|-------|-----------|-----------|
-| **FTQ-FIPOE** (Simon B.) | 55 % × 1 h + 0,05 $/h | idem |
-| International (FIPOE 568) | 65 % × 1 h + 0,05 $/h | 50 % × 1 h + 0,05 $/h |
-| CSD | 50 % × 1 h + 0,035 $/h | idem |
-| CSN | 50 % × 1 h | flat 9,90 / 10,45 / 11,70 $/sem |
-| SQC | flat 15,25 $/sem | flat 9,95 / 10,75 / 11,95 $/sem |
+| Union | Compagnon | Apprentis | En vigueur |
+|-------|-----------|-----------|-----------|
+| **FTQ-FIPOE** (Simon B.) | 55 % × 1 h + 0,05 $/h | 55 % × 1 h (taux apprenti, ICI-I) + 0,05 $/h | 2024-06-30 |
+| International (FIPOE 568) | 65 % × 1 h + 0,05 $/h | 50 % × 1 h + 0,05 $/h | 2023-12-31 |
+| CSD | 50 % × 1 h décl. + 0,035 $/h décl. | idem | 2024-12-29 |
+| CSN | 50 % × 1 h travaillée | flat 9,90 / 10,45 / 11,70 $/sem (P3+) | **2026-06-28** |
+| SQC | flat 15,25 $/sem | flat 9,95 / 10,75 / 11,95 $/sem (P3-P5) | **2026-06-28** |
+
+Source officielle (taux actuels) : CCQ — « Cotisations syndicales »,
+<https://www.ccq.org/fr-CA/avantages-sociaux/salaire-taux/cotisations-syndicales>.
+
+**Chaque association a sa propre date d'entrée en vigueur** (`effectiveFrom` dans
+`CCQ_UNIONS`) — il n'y a **pas** de date unique. Le changement CCQ du **28 juin 2026**
+(applicable au rapport mensuel de juillet 2026) ne touche **que CSN et SQC** ; CSD, FTQ
+et International gardent leurs propres dates et ne doivent pas être déplacées sur le
+28 juin. Anciens taux conservés en commentaire dans `CCQ_UNIONS` pour l'historique :
+CSN avant le 28 juin (28 déc. 2025 → 27 juin 2026) = compagnon 19,95 $/sem, apprenti
+9,90 $/sem ; SQC avant = compagnon 14,90 $, P1 9,95 $, P2 10,50 $, P3-P5 11,75 $.
+FTQ-FIPOE et International 568 ne sont **pas** un taux unique par association : ce sont
+les formules **électricien** (métier 220) du syndicat/local, variables selon local,
+métier et période d'apprentissage.
 
 For Simon (FTQ-FIPOE): 0,55 × 50,79 + 0,05 × 40 = **29,93 $** to the cent. Compagnon
 rates are the best-sourced; some apprentice figures are partial (ccq.org) — flagged to
