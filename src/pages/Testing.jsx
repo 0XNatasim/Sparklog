@@ -4,7 +4,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, CalendarRange, DollarSign, Download, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
+import { Calculator, DollarSign, Download, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
@@ -16,6 +16,23 @@ import PayrollEngineTester from "@/components/PayrollEngineTester";
 import TalonTab from "@/components/TalonTab";
 import DasTab from "@/components/DasTab";
 import AuditLog from "@/components/AuditLog";
+
+// ── Coûts section: Coûts (tableau) · Semaine · Mois ──────────────────────────
+function CostingSection() {
+  const t = useT();
+  return (
+    <Tabs defaultValue="costs" className="w-full">
+      <TabsList>
+        <TabsTrigger value="costs">{t("testing.sections.costing")}</TabsTrigger>
+        <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
+        <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="costs" className="mt-3"><CostingDashboard /></TabsContent>
+      <TabsContent value="week" className="mt-3"><PeriodSummary mode="week" /></TabsContent>
+      <TabsContent value="month" className="mt-3"><PeriodSummary mode="month" /></TabsContent>
+    </Tabs>
+  );
+}
 
 // ── Paie section: Calcul (bench) · Talon (aperçu) · DAS (centralisation) ──────
 function PayrollSection() {
@@ -380,8 +397,6 @@ export default function Testing() {
     { id: "costing", icon: Calculator, label: t("testing.sections.costing"), description: t("testing.sections.costingDescription") },
     { id: "downloads", icon: Download, label: t("testing.sections.downloads"), description: t("testing.sections.downloadsDescription") },
     { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
-    { id: "week", icon: CalendarDays, label: t("testing.tabs.week"), description: t("testing.sections.weekDescription") },
-    { id: "month", icon: CalendarRange, label: t("testing.tabs.month"), description: t("testing.sections.monthDescription") },
     { id: "payroll", icon: Wallet, label: t("testing.tabs.payroll"), description: t("testing.sections.payrollDescription") },
     { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
   ];
@@ -406,11 +421,9 @@ export default function Testing() {
         ))}
       </div>
 
-      {section === "costing" && <CostingDashboard />}
+      {section === "costing" && <CostingSection />}
       {section === "downloads" && <ManagerDownloads />}
       {section === "ccq" && <CcqRatesPanel />}
-      {section === "week" && <PeriodSummary mode="week" />}
-      {section === "month" && <PeriodSummary mode="month" />}
       {section === "payroll" && <PayrollSection />}
       {section === "audit" && <AuditLog />}
     </div>
