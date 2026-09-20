@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Clock, FileText } from "lucide-react";
+import { Clock, FileText, Printer } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { computeEmployeeWeekTalon, snapshotFromRow, formatTalonRef } from "@/payroll";
+import { buildStubModel, defaultHeader, openStubsPrint } from "@/lib/paystub";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -31,6 +33,8 @@ export default function TalonTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stub, setStub] = useState(null); // { profile, weekObj, talon, opening }
+  const [batchWeek, setBatchWeek] = useState(""); // week key for the "generate all" export
+  const [batchMsg, setBatchMsg] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +72,7 @@ export default function TalonTab() {
 
         const wk = [...weekMap.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, NB_WEEKS);
         setWeeks(wk);
+        setBatchWeek(wk[0]?.key || "");
       } catch (e) {
         if (!cancelled) setError(e?.message || String(e));
       } finally {
@@ -114,6 +119,31 @@ export default function TalonTab() {
     }
   }
 
+  // Build every talon for a week (comptabilisé + approved aperçu) and open one print
+  // window with all of them (one page per employee) → a single PDF for the whole crew.
+  function generateAll(weekKey) {
+    setBatchMsg("");
+    const week = weeks.find((w) => w.key === weekKey);
+    if (!week) return;
+    const items = [];
+    for (const profile of rows) {
+      const st = cellState(profile, week);
+      if (st.kind !== "comptabilise" && st.kind !== "apercu") continue;
+      try {
+        const opening = openingFor(profile.id, week.start);
+        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD") });
+        const model = buildStubModel({ result: talon.result, ytd: opening, pay: talon.pay, reimb: talon.reimb, ccq: talon.ccqAmounts });
+        if (!model) continue;
+        const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
+        const hdr = defaultHeader({ week: { start: week.start, end: week.end, weekNo: week.weekNo }, reference: formatTalonRef(ledgerRow?.talon_seq) });
+        items.push({ model, hdr, employee: profile, frequency: "weekly" });
+      } catch { /* skip an employee that fails to compute */ }
+    }
+    if (!items.length) { setBatchMsg(t("payroll.talon.batchNone")); return; }
+    const ok = openStubsPrint(items, `${t("payroll.subtabs.talon")} — S${week.weekNo}`);
+    setBatchMsg(ok ? t("payroll.talon.batchDone", { count: items.length }) : t("payroll.talon.batchPopupBlocked"));
+  }
+
   function Cell({ profile, week }) {
     const st = cellState(profile, week);
     if (st.kind === "none") return <span className="text-muted-foreground/40">·</span>;
@@ -147,6 +177,29 @@ export default function TalonTab() {
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 opacity-70" strokeWidth={1.6} /> {t("payroll.talon.cell.apercu")}</span>
         <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-amber-500" /> {t("payroll.talon.cell.pending")}</span>
       </div>
+
+      {/* Batch: generate every talon for a week at once */}
+      {!loading && weeks.length > 0 && (
+        <Card>
+          <CardContent className="flex flex-wrap items-end justify-between gap-3 p-4">
+            <div>
+              <div className="text-sm font-semibold">{t("payroll.talon.batchTitle")}</div>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t("payroll.talon.batchHint")}</p>
+              {batchMsg && <p className="mt-1 text-xs text-muted-foreground">{batchMsg}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              <select value={batchWeek} onChange={(e) => { setBatchWeek(e.target.value); setBatchMsg(""); }} className="rounded-md border bg-background px-2 py-1.5 text-sm">
+                {weeks.map((w) => (
+                  <option key={w.key} value={w.key}>S{w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
+                ))}
+              </select>
+              <Button size="sm" onClick={() => generateAll(batchWeek)} disabled={!batchWeek}>
+                <Printer className="mr-1.5 h-4 w-4" /> {t("payroll.talon.batchBtn")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-0">
