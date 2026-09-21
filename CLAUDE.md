@@ -160,7 +160,10 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
   field change (role not whitelisted), silently rejecting the whole upsert (incl. phone/email) for a
   returning signup. Not an escalation — `handle_new_user` already owns the row.
 - **Fix:** never send `role` from the client; standardize lowercase.
-- **Status:** ☐ open
+- **Status:** ✅ **Resolved.** `Login.ensureProfile()` no longer sends `role` — it syncs only the
+  whitelisted `full_name`/`phone`/`email`, so the `0018` trigger no longer rejects the upsert; the DB
+  trigger owns the lowercase role. (The sync error is still only `console.warn` — surfacing a typed,
+  retryable error to the user remains an optional robustness follow-up.)
 
 ### S-6 — OCR sends evidence to a third party with no content controls — MEDIUM
 - `EmployeeForm.jsx:759-792` posts the screenshot to `api.ocr.space`; no magic-byte/size validation,
@@ -195,7 +198,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | Employee | Offline Save, then reload | Draft lost (memory only) | Durable on-device draft | C-8 (offline, below) |
 | Employee | Dropped conn after upload | Orphaned object / flagged job w/o metadata | Atomic or queued | S-3b |
 | Employee | Edit submitted job as manager approves | Manager exports stale in-memory version; or force-approve-no-export | Approval targets reviewed version | C-2 + optimistic concurrency |
-| Employee | Returning signup | Profile upsert rejected by whitelist (role casing) | Clean update | S-1 |
+| Employee | Returning signup | ✅ role no longer sent from client; contact fields sync cleanly | Clean update | S-1 (done) |
 | Employee | Company tz ≠ America/Toronto near midnight | UI (configurable tz) vs DB trigger (hardcoded Toronto) disagree | One company tz everywhere | C-6 (tz, below) |
 | Manager | Two managers approve same job | Atomic claim prevents double-export (OK); no reviewed-version check | Explicit conflict on stale version | partially handled; add version/hash |
 | Manager | Approve after employee edit | Job locked approved, not exported | Re-review prompt | C-2 |
@@ -236,10 +239,10 @@ now folded in above:
 - **Wildcard CORS** — present on the approval functions but **low value** (they validate bearer tokens);
   deprioritized behind CSP/XSS, short sessions, reauth for sensitive ops, and audit correlation.
 
-Verified status snapshot (2026-09-21, current `main`): **C-1 + C-2 + P-6 resolved**; **C-3, C-4 (status
-filter half), C-5, S-1, S-3 still open**; **S-2 partially addressed** (privilege now role-based). The
-recent work on `claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues) plus
-the C-2 approval fix and the P-6 read-only-load fix.
+Verified status snapshot (2026-09-21, current `main`): **C-1 + C-2 + P-6 + S-1 resolved**; **C-3,
+C-4 (status filter half), C-5, S-3 still open**; **S-2 partially addressed** (privilege now role-based).
+The recent work on `claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues)
+plus the C-2 approval fix, the P-6 read-only-load fix and the S-1 role-casing fix.
 
 ---
 
