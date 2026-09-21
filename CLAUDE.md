@@ -15,6 +15,8 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 - `push_approved_batch` re-checks manager role server-side, does an **atomic claim** to prevent
   double-export, and returns a **typed per-job result** so the client never force-approves.
 - NAS/SIN live in the RLS-gated `employee_sensitive` vault (`0026`); privilege is role-based (`owner`).
+- Job submission is idempotent: a per-new-entry `submission_key` + a `(user_id, submission_key)` unique
+  constraint (client upserts on it) + a synchronous double-tap guard prevent duplicate timecards.
 
 ---
 
@@ -22,35 +24,24 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 
 | # | ID | Severity | Title | Anchor |
 |---|----|----------|-------|--------|
-| 1 | C-3 | High | Duplicate jobs: no unique key + timeout-retry + direct-submit bypass | schema `0000:193-216`, `EmployeeForm.jsx`, `0018:57-59` |
-| 2 | C-5 | High | No DB validity constraints on the time interval (null/zero/overlap) | `0000:198-200` |
-| 3 | S-3 | High | Approval audit actor is null (service-role write vs `auth.uid()` trigger) | `push_approved_batch/index.ts:97,145` + `0015` |
-| 4 | S-4 | Medium | Manager job updates have no state-transition allowlist | `0000:451` |
+| 1 | C-5 | High | No DB validity constraints on the time interval (null/zero/overlap) + direct-submit bypass | `0000:198-200`, `0018:57-59` |
+| 2 | S-3 | High | Approval audit actor is null (service-role write vs `auth.uid()` trigger) | `push_approved_batch/index.ts:97,145` + `0015` |
+| 3 | S-4 | Medium | Manager job updates have no state-transition allowlist | `0000:451` |
 
 ---
 
 ## 1. Critical / Blocking Bugs
 
-### C-3 — Duplicate job entries (no uniqueness + timeout-retry + direct submit)
-- **Files:** schema `supabase/migrations/0000_baseline_schema.sql:193-216` (indexes only, **no unique key**);
-  `EmployeeForm.jsx` (async `saving` guard; the friendly duplicate-OT handler maps Postgres `23505` that
-  **nothing can raise** → dead code); `utils.js` (`withTimeout` rejects while the insert may still commit);
-  RLS `0018:57-59` allows a crafted API call to insert `status='submitted', locked=true` directly.
-- **Impact:** duplicate timecards → inflated payroll/OT/meal claims; forged submitted rows.
-- **Fix:** do NOT assume `(user_id, job_date, ot)` is a safe business key (an employee can legitimately
-  log several intervals for one day/work order). Prefer a dedicated **`submission_key uuid`** with a
-  partial unique index `(user_id, submission_key) where submission_key is not null`, generated + persisted
-  **before** the first request and reused on every retry (return the prior row when the key already exists).
-  Keep the client `forcedId` path + a synchronous ref guard for double-taps, but DB idempotency is the real
-  fix. Restrict the employee insert policy to `status='saved'` and route submission through a validating RPC.
-- **Status:** ☐ open
-
-### C-5 — No DB-level validity constraint on the work interval
+### C-5 — No DB validity constraint on the work interval + direct-submit bypass
 - **File:** `0000:198-200` — `depart/arrivee/fin` nullable `time`, no chronology/duration/overlap check.
-- **Impact:** zero-hour and incomplete jobs can be submitted and approved; overlapping jobs double-count.
-- **Fix:** validating `submit_job` RPC (lock row, require all three times, bound duration to ≤16h, reject
-  overlap) + block direct submitted inserts. Ties into C-3.
-- **Status:** ☐ open
+  RLS `0018:57-59` also lets a crafted API call insert `status='submitted', locked=true` directly.
+- **Impact:** zero-hour and incomplete jobs can be submitted and approved; overlapping jobs double-count;
+  forged submitted rows bypass all client validation.
+- **Fix:** restrict the employee **insert** policy to `status='saved'` (drafts only); route submission
+  through a validating `submit_job` RPC (lock row, require all three times, bound duration to ≤16h, reject
+  overlap/zero, reject on blocking classification warnings). The idempotency key from C-3 already threads
+  through — the RPC should carry it too.
+- **Status:** ☐ open (idempotency half done in C-3; the RLS-restrict + validating RPC remain here)
 
 ---
 
@@ -127,9 +118,7 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 
 | Persona | Scenario | Found Behavior | Expected | Patch |
 |---|---|---|---|---|
-| Employee | Slow-network Save then retry | Insert may commit yet timeout → duplicate job | Idempotent single row | C-3 |
-| Employee | Rapid double-tap Save | Stale `saving` closure allows 2 inserts | 2nd ignored | C-3 |
-| Employee | Direct API submit (`status=submitted`) | RLS allows it, bypassing client validation | Server-validated transition only | C-3/C-5 |
+| Employee | Direct API submit (`status=submitted`) | RLS allows it, bypassing client validation | Server-validated transition only | C-5 |
 | Employee | Zero/equal times | Submittable; engine only warns | Rejected | C-5 |
 | Employee | Overlapping jobs | Summed, not detected | Rejected/flagged | C-5 |
 | Employee | Offline Save, then reload | Draft lost (memory only) | Durable on-device draft | C-8 |
