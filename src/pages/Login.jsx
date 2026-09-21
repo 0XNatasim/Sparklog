@@ -64,13 +64,16 @@ export default function Login() {
 
   async function ensureProfile(userId, name, phoneRaw, emailValue) {
     const phoneNorm = normalizePhone(phoneRaw);
+    // S-1: NEVER send `role` from the client. The `handle_new_user` DB trigger owns the
+    // row + its (lowercase) role; `role` is not in the `0018` whitelist, so including it
+    // makes the trigger reject the WHOLE upsert (dropping the phone/email/name sync too),
+    // e.g. for a returning signup. Sync only the whitelisted contact fields here.
     const { error } = await supabase.from("profiles").upsert(
       {
         id: userId,
         full_name: name || null,
         phone: phoneNorm || null,
         email: emailValue || null,
-        role: "Employee",
       },
       { onConflict: "id" }
     );
