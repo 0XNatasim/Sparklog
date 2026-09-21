@@ -27,7 +27,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 |---|----|----------|-------|--------|
 | — | C-1 | ✅ Resolved | Overnight shifts compute 0h in employee views (client/server duration split) | `time.js:14-24` |
 | — | C-2 | ✅ Resolved | Manager approve force-locks job as approved WITHOUT export on `skipped` | `ManagerDashboard.jsx:608-627` |
-| 3 | C-4 | Critical | Costing dashboard mixes all statuses + recomputes with current rates | `CostingDashboard.jsx:42-44,63` |
+| — | C-4 | ✅ Resolved | Costing dashboard mixes all statuses + recomputes with current rates | `CostingDashboard.jsx:79-86` |
 | 4 | C-3 | High | Duplicate jobs: no unique constraint + timeout-retry + direct-submit bypass | schema `0000:193-216`, `EmployeeForm.jsx`, `0018:57-59` |
 | — | P-6 | ✅ Resolved | EmployeesPanel writes pay rates as a side effect of loading | `EmployeesPanel.jsx:108-119` |
 | 6 | C-5 | High | No DB validity constraints on the time interval (null/zero/overlap) | `0000:198-200` |
@@ -83,7 +83,15 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 - **Fix (min):** `.in("status", ["submitted","approved"])` for jobs, `.in("status", ["pending","approved"])`
   for claims; present separate totals per status bucket. **Durable:** report from approval snapshots +
   effective-dated rates.
-- **Status:** ☐ open
+- **Status:** ✅ **Resolved (min fix).** Both halves addressed:
+  1. **Statuses** — `CostingDashboard.load()` now filters jobs to `submitted`+`approved` and claims
+     (`meal_claims`, `parking_receipts`) to `pending`+`approved`, so drafts and rejected expenses no
+     longer inflate totals. A scope note (`costing.scopeNote`) states this in the UI.
+  2. **Rates** — labor already reads the per-job `hourly_rate_snapshot` / `team_leader_premium_snapshot`
+     / `km_rate_snapshot` (frozen at submission, migration 0034), so changing a current profile rate no
+     longer rewrites historical cost.
+  **Follow-up (durable, not done):** present separate per-status buckets (submitted vs approved vs
+  exported) rather than one blended estimate, reconcilable to an approval/export.
 
 ### C-3 — Duplicate job entries (no uniqueness + timeout-retry + direct submit)
 - **Files:** schema `supabase/migrations/0000_baseline_schema.sql:193-216` (indexes only, **no unique key**
@@ -118,7 +126,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | P-2 | Notifications panel does unbounded full-table reads | `ManagerDashboard.jsx:237-239,301-304,347-349` | date/status window + `.limit()` + indexes |
 | P-3 | 4 exact-count queries per filter change | `ManagerDashboard.jsx:117-146` | single RPC with `count(*) filter (where …)` |
 | P-4 | Employee History/Week fetch all-time jobs | `History.jsx`, `Week.jsx` | default 8–12 weeks + cursor paging |
-| P-5 | Costing does full client-side joins/aggregation | `CostingDashboard.jsx` | server aggregation endpoint |
+| P-5 | Costing does full client-side joins/aggregation (now status-scoped, still client-side) | `CostingDashboard.jsx` | server aggregation endpoint |
 | ~~P-6~~ | ✅ **Resolved** — load is read-only; rate mismatches are a dry-run banner + explicit `applyRateSuggestions` batch | `EmployeesPanel.jsx:108-119` | done |
 | P-7 | LiveCrew polls roster every 30s | `LiveCrew.jsx` | cache roster; realtime; pause when hidden; abort in-flight |
 | P-8 | Missing review indexes on `created_at`/status | `overtime_evidence`, `parking_receipts`, `meal_claims` | partial indexes |
@@ -202,7 +210,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | Employee | Company tz ≠ America/Toronto near midnight | UI (configurable tz) vs DB trigger (hardcoded Toronto) disagree | One company tz everywhere | C-6 (tz, below) |
 | Manager | Two managers approve same job | Atomic claim prevents double-export (OK); no reviewed-version check | Explicit conflict on stale version | partially handled; add version/hash |
 | Manager | Approve after employee edit | Job locked approved, not exported | Re-review prompt | C-2 |
-| Manager | Costing with drafts/rejected present | All summed; historical rate drift | Status-scoped, effective-dated | C-4 |
+| Manager | Costing with drafts/rejected present | ✅ Drafts/rejected excluded; labor uses frozen snapshots | Status-scoped, effective-dated | C-4 (min fix done; per-status buckets = follow-up) |
 | Manager | Open EmployeesPanel | ✅ Read-only load; mismatches shown as a banner + explicit "apply" batch | Read-only load | P-6 (done) |
 | Manager | 100+ employees notifications | Unbounded full-table reads | Paginated review RPC | P-2/P-8 |
 | Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | P-9 + AbortController |
@@ -239,10 +247,11 @@ now folded in above:
 - **Wildcard CORS** — present on the approval functions but **low value** (they validate bearer tokens);
   deprioritized behind CSP/XSS, short sessions, reauth for sensitive ops, and audit correlation.
 
-Verified status snapshot (2026-09-21, current `main`): **C-1 + C-2 + P-6 + S-1 resolved**; **C-3,
-C-4 (status filter half), C-5, S-3 still open**; **S-2 partially addressed** (privilege now role-based).
-The recent work on `claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues)
-plus the C-2 approval fix, the P-6 read-only-load fix and the S-1 role-casing fix.
+Verified status snapshot (2026-09-21, current `main`): **C-1 + C-2 + C-4 + P-6 + S-1 resolved**
+(C-4 = min fix: status-scoped + snapshot rates; per-status buckets still a follow-up); **C-3, C-5, S-3
+still open**; **S-2 partially addressed** (privilege now role-based). The recent work on
+`claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues) plus the C-2 approval
+fix, the P-6 read-only-load fix, the S-1 role-casing fix and the C-4 status-scoping fix.
 
 ---
 
