@@ -898,6 +898,7 @@ export const dictionaries = {
     "manager.errors.exportFailedFor": "Export failed for OT {ot} ({date}).",
     "manager.errors.jobNotFound": "Job not found in list.",
     "manager.errors.approveFailed": "Approve failed.",
+    "manager.errors.jobChangedReReview": "This job changed since you opened it and was not exported. It has been reloaded — please re-review before approving.",
     "manager.errors.unlockFailed": "Unlock failed.",
     "manager.errors.approveWeekFailed": "Approve week failed.",
 
@@ -1807,6 +1808,7 @@ export const dictionaries = {
     "manager.errors.exportFailedFor": "Échec de l'export pour OT {ot} ({date}).",
     "manager.errors.jobNotFound": "Job introuvable dans la liste.",
     "manager.errors.approveFailed": "Échec de l'approbation.",
+    "manager.errors.jobChangedReReview": "Cette job a changé depuis son ouverture et n'a pas été exportée. Elle a été rechargée — révise-la de nouveau avant d'approuver.",
     "manager.errors.unlockFailed": "Échec du déverrouillage.",
     "manager.errors.approveWeekFailed": "Échec de l'approbation de la semaine.",
 

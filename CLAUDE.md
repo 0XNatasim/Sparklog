@@ -26,7 +26,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | # | ID | Severity | Title | Anchor |
 |---|----|----------|-------|--------|
 | — | C-1 | ✅ Resolved | Overnight shifts compute 0h in employee views (client/server duration split) | `time.js:14-24` |
-| 2 | C-2 | Critical | Manager approve force-locks job as approved WITHOUT export on `skipped` | `ManagerDashboard.jsx:575-578` |
+| — | C-2 | ✅ Resolved | Manager approve force-locks job as approved WITHOUT export on `skipped` | `ManagerDashboard.jsx:608-627` |
 | 3 | C-4 | Critical | Costing dashboard mixes all statuses + recomputes with current rates | `CostingDashboard.jsx:42-44,63` |
 | 4 | C-3 | High | Duplicate jobs: no unique constraint + timeout-retry + direct-submit bypass | schema `0000:193-216`, `EmployeeForm.jsx`, `0018:57-59` |
 | 5 | P-6 | High | EmployeesPanel writes pay rates as a side effect of loading | `EmployeesPanel.jsx:93-99` |
@@ -66,7 +66,13 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
   omission of freshly-changed, unreviewed data.
 - **Fix:** trust the fn's atomic result; on `exported===0` do NOT force-approve — reload and surface
   "job changed, re-review". Only treat already-exported as benign.
-- **Status:** ☐ open
+- **Status:** ✅ **Resolved.** `push_approved_batch` now returns a **typed per-job `results[]`**
+  (`exported | already_exported | state_changed | already_claimed | not_found`); deployed as v16.
+  `ManagerDashboard.approve()` **removed the client force-approve** — it only marks a job approved on
+  `exported`/`already_exported`, and on `state_changed`/`already_claimed`/`not_found` it reloads and
+  shows `manager.errors.jobChangedReReview` instead. A stale/edited job can no longer be locked
+  "approved" without an export. (Optimistic-concurrency version/hash on the reviewed row remains the
+  broader S-4 redesign.)
 
 ### C-4 — Costing dashboard combines incompatible statuses and uses current rates
 - **File:** `src/components/CostingDashboard.jsx:42-44` (jobs/meal/parking queries have a date range
@@ -230,10 +236,10 @@ now folded in above:
 - **Wildcard CORS** — present on the approval functions but **low value** (they validate bearer tokens);
   deprioritized behind CSP/XSS, short sessions, reauth for sensitive ops, and audit correlation.
 
-Verified status snapshot (2026-09-21, current `main`): **C-1 resolved**; **C-2, C-3, C-4 (status filter
+Verified status snapshot (2026-09-21, current `main`): **C-1 + C-2 resolved**; **C-3, C-4 (status filter
 half), C-5, P-6, S-1, S-3 still open**; **S-2 partially addressed** (privilege now role-based). The
-recent work on `claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues), not
-these remediations.
+recent work on `claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues) plus
+the C-2 approval fix.
 
 ---
 
