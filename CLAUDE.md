@@ -29,7 +29,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | — | C-2 | ✅ Resolved | Manager approve force-locks job as approved WITHOUT export on `skipped` | `ManagerDashboard.jsx:608-627` |
 | 3 | C-4 | Critical | Costing dashboard mixes all statuses + recomputes with current rates | `CostingDashboard.jsx:42-44,63` |
 | 4 | C-3 | High | Duplicate jobs: no unique constraint + timeout-retry + direct-submit bypass | schema `0000:193-216`, `EmployeeForm.jsx`, `0018:57-59` |
-| 5 | P-6 | High | EmployeesPanel writes pay rates as a side effect of loading | `EmployeesPanel.jsx:93-99` |
+| — | P-6 | ✅ Resolved | EmployeesPanel writes pay rates as a side effect of loading | `EmployeesPanel.jsx:108-119` |
 | 6 | C-5 | High | No DB validity constraints on the time interval (null/zero/overlap) | `0000:198-200` |
 | 7 | S-3 | High | Approval audit actor is null (service-role write vs `auth.uid()` trigger) | `push_approved_batch/index.ts:97,145` + `0015` |
 
@@ -119,7 +119,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | P-3 | 4 exact-count queries per filter change | `ManagerDashboard.jsx:117-146` | single RPC with `count(*) filter (where …)` |
 | P-4 | Employee History/Week fetch all-time jobs | `History.jsx`, `Week.jsx` | default 8–12 weeks + cursor paging |
 | P-5 | Costing does full client-side joins/aggregation | `CostingDashboard.jsx` | server aggregation endpoint |
-| **P-6** | **EmployeesPanel updates pay rates on load** (write-per-employee) | `EmployeesPanel.jsx:93-99` | never mutate on render; explicit manager batch action |
+| ~~P-6~~ | ✅ **Resolved** — load is read-only; rate mismatches are a dry-run banner + explicit `applyRateSuggestions` batch | `EmployeesPanel.jsx:108-119` | done |
 | P-7 | LiveCrew polls roster every 30s | `LiveCrew.jsx` | cache roster; realtime; pause when hidden; abort in-flight |
 | P-8 | Missing review indexes on `created_at`/status | `overtime_evidence`, `parking_receipts`, `meal_claims` | partial indexes |
 | P-9 | Offset pagination over mutable `updated_at` sort skips/dupes | `ManagerDashboard.jsx:178-180` | keyset pagination on `(job_date, id)` |
@@ -200,7 +200,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | Manager | Two managers approve same job | Atomic claim prevents double-export (OK); no reviewed-version check | Explicit conflict on stale version | partially handled; add version/hash |
 | Manager | Approve after employee edit | Job locked approved, not exported | Re-review prompt | C-2 |
 | Manager | Costing with drafts/rejected present | All summed; historical rate drift | Status-scoped, effective-dated | C-4 |
-| Manager | Open EmployeesPanel | Writes pay rates for mismatched employees | Read-only load | P-6 |
+| Manager | Open EmployeesPanel | ✅ Read-only load; mismatches shown as a banner + explicit "apply" batch | Read-only load | P-6 (done) |
 | Manager | 100+ employees notifications | Unbounded full-table reads | Paginated review RPC | P-2/P-8 |
 | Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | P-9 + AbortController |
 | Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
@@ -236,10 +236,10 @@ now folded in above:
 - **Wildcard CORS** — present on the approval functions but **low value** (they validate bearer tokens);
   deprioritized behind CSP/XSS, short sessions, reauth for sensitive ops, and audit correlation.
 
-Verified status snapshot (2026-09-21, current `main`): **C-1 + C-2 resolved**; **C-3, C-4 (status filter
-half), C-5, P-6, S-1, S-3 still open**; **S-2 partially addressed** (privilege now role-based). The
+Verified status snapshot (2026-09-21, current `main`): **C-1 + C-2 + P-6 resolved**; **C-3, C-4 (status
+filter half), C-5, S-1, S-3 still open**; **S-2 partially addressed** (privilege now role-based). The
 recent work on `claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues) plus
-the C-2 approval fix.
+the C-2 approval fix and the P-6 read-only-load fix.
 
 ---
 

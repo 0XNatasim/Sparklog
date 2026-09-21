@@ -48,6 +48,8 @@ export default function EmployeesPanel() {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [rates, setRates] = useState(new Map());
   const [annexes, setAnnexes] = useState(new Map());
+  const [rateSuggestions, setRateSuggestions] = useState(new Map()); // id → { rate, annex, current } (dry-run, P-6)
+  const [applyingRates, setApplyingRates] = useState(false);
   const [cardViews, setCardViews] = useState({});
   // Ids of admin cards whose "Gestion" checklist is expanded (also implicitly open
   // whenever the admin already has at least one granted section).
@@ -105,15 +107,18 @@ export default function EmployeesPanel() {
         const { data: nasRows } = await supabase.from("employee_sensitive").select("user_id").not("nas", "is", null);
         setNasSet(new Set((nasRows || []).map((r) => r.user_id)));
       }
-      await Promise.all(nextProfiles.map(async (profile) => {
+      // P-6: loading is READ-ONLY. Never write compensation as a side effect of a render.
+      // Instead compute a dry-run comparison of each profile's stored rate vs the current
+      // CCQ rate for its level/annex; the manager applies them explicitly (applyRateSuggestions).
+      const suggestions = new Map();
+      nextProfiles.forEach((profile) => {
         const availableAnnexes = nextAnnexes.get(COMMERCIAL_RATE_SECTOR) || [];
         const annex = profile.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
         const rate = nextRates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
         if (rate == null || (Number(profile.hourly_rate) === rate && profile.wage_schedule === annex)) return;
-        await supabase.from("profiles").update({ hourly_rate: rate, wage_schedule: annex }).eq("id", profile.id);
-        setLocal(profile.id, "hourly_rate", rate);
-        setLocal(profile.id, "wage_schedule", annex);
-      }));
+        suggestions.set(profile.id, { rate, annex, current: profile.hourly_rate });
+      });
+      setRateSuggestions(suggestions);
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
     } finally {
@@ -277,6 +282,32 @@ export default function EmployeesPanel() {
     }
   }
 
+  // P-6: explicit, manager-triggered batch that writes the dry-run rate suggestions to the
+  // matching profiles. This is the ONLY path that mutates compensation on load-derived data,
+  // and it never runs as a side effect of rendering.
+  async function applyRateSuggestions() {
+    if (rateSuggestions.size === 0 || applyingRates) return;
+    if (!window.confirm(t("employees.rates.applyConfirm", { count: rateSuggestions.size }))) return;
+    setApplyingRates(true);
+    setErr("");
+    try {
+      const entries = [...rateSuggestions.entries()];
+      for (const [id, { rate, annex }] of entries) {
+        const { error } = await supabase.from("profiles").update({ hourly_rate: rate, wage_schedule: annex }).eq("id", id);
+        if (error) throw error;
+        setLocal(id, "hourly_rate", rate);
+        setLocal(id, "wage_schedule", annex);
+      }
+      setRateSuggestions(new Map());
+      setInfo(t("employees.rates.applied", { count: entries.length }));
+      setTimeout(() => setInfo(""), 2500);
+    } catch (e) {
+      setErr(e?.message || "Failed to apply rates.");
+    } finally {
+      setApplyingRates(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       {err && (
@@ -289,6 +320,15 @@ export default function EmployeesPanel() {
       )}
       {info && (
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
+      )}
+
+      {!loading && rateSuggestions.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <span>{t("employees.rates.pending", { count: rateSuggestions.size })}</span>
+          <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={applyRateSuggestions} disabled={applyingRates}>
+            {applyingRates ? t("common.working") : t("employees.rates.applyBtn")}
+          </Button>
+        </div>
       )}
 
       {loading && (
