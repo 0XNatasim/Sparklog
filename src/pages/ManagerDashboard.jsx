@@ -605,19 +605,26 @@ export default function ManagerDashboard() {
         throw new Error(data?.error || t("manager.errors.exportFailed"));
       }
 
-      // The batch function normally updates the job atomically. A previously
-      // exported job is skipped, so finish its approval without exporting it a
-      // second time (the same idempotent behaviour as the former endpoint).
-      if (Number(data.skipped || 0) > 0) {
-        const { error } = await supabase.from("jobs").update({ status: "approved", locked: true }).eq("id", jobId);
-        if (error) throw error;
-      }
+      // Trust the edge fn's ATOMIC per-job result — never force-approve locally (C-2).
+      // The fn already sets approved+locked+exported for jobs it exports. A job it could
+      // not export because its STATE CHANGED (e.g. the employee edited it → 'updated')
+      // must be reloaded and re-reviewed, NOT silently approved+locked.
+      //   exported | already_exported → genuinely approved
+      //   state_changed | already_claimed | not_found → stale, re-review
+      const outcome = Array.isArray(data.results)
+        ? data.results.find((r) => r.job_id === jobId)?.outcome
+        : (Number(data.exported || 0) >= 1 ? "exported" : "state_changed"); // safe fallback for old fn
+      const isApproved = outcome === "exported" || outcome === "already_exported";
 
-      setInfo(Number(data.skipped || 0) > 0 ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
-      const markApproved = (rows) => rows.map((row) => row.id === jobId ? { ...row, status: "approved", locked: true } : row);
-      setOvertimeJobs(markApproved);
-      setParkingJobs(markApproved);
-      setNotificationMealJobs(markApproved);
+      if (isApproved) {
+        setInfo(outcome === "already_exported" ? t("manager.toasts.approvedSkipped") : t("manager.toasts.approvedAndExported"));
+        const markApproved = (rows) => rows.map((row) => row.id === jobId ? { ...row, status: "approved", locked: true } : row);
+        setOvertimeJobs(markApproved);
+        setParkingJobs(markApproved);
+        setNotificationMealJobs(markApproved);
+      } else {
+        setErr(t("manager.errors.jobChangedReReview"));
+      }
       await load();
     } catch (e) {
       setErr(e?.message || t("manager.errors.approveFailed"));

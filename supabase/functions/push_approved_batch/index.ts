@@ -123,12 +123,27 @@ serve(async (req) => {
       (j) => j.status !== "submitted" || j.exported_to_sheet
     );
 
+    // Per-job typed outcome for the client, so a single-job approval can tell an
+    // ALREADY-EXPORTED (benign) job apart from one whose STATE CHANGED (e.g. the
+    // employee edited it → 'updated'): the latter must NOT be force-approved (C-2).
+    //   exported | already_exported | state_changed | already_claimed | not_found
+    const jobMap = new Map((jobs || []).map((j) => [j.id, j]));
+    const buildResults = (claimedSet: Set<string>) => job_ids.map((id) => {
+      const j = jobMap.get(id);
+      if (!j) return { job_id: id, outcome: "not_found" };
+      if (claimedSet.has(id)) return { job_id: id, outcome: "exported" };
+      if (j.exported_to_sheet) return { job_id: id, outcome: "already_exported" };
+      if (j.status === "submitted") return { job_id: id, outcome: "already_claimed" };
+      return { job_id: id, outcome: "state_changed" };
+    });
+
     if (eligible.length === 0) {
       return json({
         ok: true,
         exported: 0,
         skipped: alreadySkipped.length,
         skipped_ids: alreadySkipped.map((j) => j.id),
+        results: buildResults(new Set<string>()),
       });
     }
 
@@ -160,7 +175,7 @@ serve(async (req) => {
     const claimedIds = (claimedRows || []).map((r) => r.id);
     if (claimedIds.length === 0) {
       // Another concurrent call already claimed these — do not export again.
-      return json({ ok: true, exported: 0, skipped: (jobs || []).length, note: "already_claimed" });
+      return json({ ok: true, exported: 0, skipped: (jobs || []).length, note: "already_claimed", results: buildResults(new Set<string>()) });
     }
     const claimedSet = new Set(claimedIds);
     const claimedJobs = eligible.filter((j) => claimedSet.has(j.id));
@@ -277,6 +292,7 @@ serve(async (req) => {
       exported: claimedIds.length,
       skipped: (jobs || []).length - claimedIds.length,
       skipped_ids: alreadySkipped.map((j) => j.id),
+      results: buildResults(claimedSet),
       sheet_written: sheetResult?.written,
       sheet_skipped: sheetResult?.skipped,
       approved_by: approved_by_value,
