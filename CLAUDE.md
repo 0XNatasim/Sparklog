@@ -17,6 +17,8 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 - NAS/SIN live in the RLS-gated `employee_sensitive` vault (`0026`); privilege is role-based (`owner`).
 - Job submission is idempotent: a per-new-entry `submission_key` + a `(user_id, submission_key)` unique
   constraint (client upserts on it) + a synchronous double-tap guard prevent duplicate timecards.
+- Submitted intervals are DB-validated: trigger `trg_validate_job_submission` rejects any transition to
+  `status='submitted'` (app or forged direct insert) with missing départ/fin or a duration outside (0h, 16h].
 
 ---
 
@@ -24,24 +26,28 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 
 | # | ID | Severity | Title | Anchor |
 |---|----|----------|-------|--------|
-| 1 | C-5 | High | No DB validity constraints on the time interval (null/zero/overlap) + direct-submit bypass | `0000:198-200`, `0018:57-59` |
-| 2 | S-3 | High | Approval audit actor is null (service-role write vs `auth.uid()` trigger) | `push_approved_batch/index.ts:97,145` + `0015` |
-| 3 | S-4 | Medium | Manager job updates have no state-transition allowlist | `0000:451` |
+| 1 | S-3 | High | Approval audit actor is null (service-role write vs `auth.uid()` trigger) | `push_approved_batch/index.ts:97,145` + `0015` |
+| 2 | S-4 | Medium | Manager job updates have no state-transition allowlist | `0000:451` |
+| 3 | C-5* | Medium | Remaining: overlap detection + RLS-restrict-to-`saved` + validating `submit_job` RPC | `0018:57-59` |
 
 ---
 
 ## 1. Critical / Blocking Bugs
 
-### C-5 — No DB validity constraint on the work interval + direct-submit bypass
-- **File:** `0000:198-200` — `depart/arrivee/fin` nullable `time`, no chronology/duration/overlap check.
-  RLS `0018:57-59` also lets a crafted API call insert `status='submitted', locked=true` directly.
-- **Impact:** zero-hour and incomplete jobs can be submitted and approved; overlapping jobs double-count;
-  forged submitted rows bypass all client validation.
-- **Fix:** restrict the employee **insert** policy to `status='saved'` (drafts only); route submission
-  through a validating `submit_job` RPC (lock row, require all three times, bound duration to ≤16h, reject
-  overlap/zero, reject on blocking classification warnings). The idempotency key from C-3 already threads
-  through — the RPC should carry it too.
-- **Status:** ☐ open (idempotency half done in C-3; the RLS-restrict + validating RPC remain here)
+### C-5 — Work-interval validity — mostly RESOLVED (overlap + RLS/RPC remain)
+- **Done (DB validity):** trigger `trg_validate_job_submission` (migration `validate_job_submission_interval`)
+  fires on any write that puts a job into `status='submitted'` — the app AND a forged direct insert — and
+  rejects missing départ/fin or a duration outside (0h, 16h] (`check_violation`; client maps it to
+  `form.errors.invalidInterval`). Manager approval (submitted→approved), drafts and existing rows are
+  untouched. This closes the zero-hour / incomplete / excessive-duration hole for every write path.
+- **Remaining (tracked as C-5\*):**
+  1. **Overlap detection** — intentionally deferred: with time-only columns (no date/offset) a
+     midnight-crossing overlap is ambiguous; it belongs with the timezone/instant work (C-6).
+  2. **Direct-submit hardening** — a forged insert can still create a *valid* `submitted` row for oneself
+     (no escalation, but it bypasses client UX). Durable fix: restrict the employee **insert** policy to
+     `status='saved'` and route submission through a validating `submit_job` RPC (lock row, carry the C-3
+     idempotency key, reject on blocking classification warnings).
+- **Status:** ✅ interval validity done · ☐ overlap + RLS-restrict/RPC (C-5*)
 
 ---
 
@@ -118,9 +124,9 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 
 | Persona | Scenario | Found Behavior | Expected | Patch |
 |---|---|---|---|---|
-| Employee | Direct API submit (`status=submitted`) | RLS allows it, bypassing client validation | Server-validated transition only | C-5 |
-| Employee | Zero/equal times | Submittable; engine only warns | Rejected | C-5 |
-| Employee | Overlapping jobs | Summed, not detected | Rejected/flagged | C-5 |
+| Employee | Direct API submit (`status=submitted`) | Invalid data now rejected by DB trigger; a *valid* forged submit still allowed | Server-validated transition only | C-5* (RLS/RPC) |
+| Employee | Zero/equal times | ✅ Rejected by `trg_validate_job_submission` | Rejected | C-5 (done) |
+| Employee | Overlapping jobs | Summed, not detected | Rejected/flagged | C-5* (needs tz/instants, C-6) |
 | Employee | Offline Save, then reload | Draft lost (memory only) | Durable on-device draft | C-8 |
 | Employee | Dropped conn after upload | Orphaned object / flagged job w/o metadata | Atomic or queued | S-3b |
 | Employee | Company tz ≠ America/Toronto near midnight | UI (configurable tz) vs DB trigger (hardcoded Toronto) disagree | One company tz everywhere | C-6 |
