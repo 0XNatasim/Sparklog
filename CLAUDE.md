@@ -2,8 +2,10 @@
 
 > Working document for the Employee/Manager workflow audit. Every finding below was
 > verified against the source at the cited `file:line`. Use this to track fixes.
-> Two independent audits were merged and de-duplicated; severities were recalibrated
-> against what is actually exploitable today vs. desirable redesign.
+> Two independent source-level audits (Claude + the former `GPT.md`, 2026-09-09) were
+> merged and de-duplicated here; `GPT.md` has since been deleted — this is the single
+> tracker. Severities were recalibrated against what is actually exploitable today vs.
+> desirable redesign. See §5 for the GPT-only nuances folded in.
 
 **Stack:** React 18 + Vite PWA, Supabase (Postgres + RLS + Edge Functions), payroll
 export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
@@ -23,7 +25,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 
 | # | ID | Severity | Title | Anchor |
 |---|----|----------|-------|--------|
-| 1 | C-1 | Critical | Overnight shifts compute 0h in employee views (client/server duration split) | `time.js:14-24` |
+| — | C-1 | ✅ Resolved | Overnight shifts compute 0h in employee views (client/server duration split) | `time.js:14-24` |
 | 2 | C-2 | Critical | Manager approve force-locks job as approved WITHOUT export on `skipped` | `ManagerDashboard.jsx:575-578` |
 | 3 | C-4 | Critical | Costing dashboard mixes all statuses + recomputes with current rates | `CostingDashboard.jsx:42-44,63` |
 | 4 | C-3 | High | Duplicate jobs: no unique constraint + timeout-retry + direct-submit bypass | schema `0000:193-216`, `EmployeeForm.jsx`, `0018:57-59` |
@@ -49,7 +51,10 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
   3. `overtimeDailyMinutes=0` → `isMealEligible` → supper claim never auto-created for night crews.
 - **Repro:** log Départ 22:00 / Fin 06:00 → form shows `0h00`; manager timesheet + export show 8h.
 - **Fix:** make `hoursBetween` delegate to `minutesBetween` so there is one wrapping source of truth.
-- **Status:** ☐ open
+- **Status:** ✅ **Resolved.** `src/lib/time.js:15-24` now validates its Day.js inputs and delegates the
+  duration to `minutesBetween()`, so EmployeeForm / History / Live Crew / Meal Claims use the same
+  midnight-wrapping convention as manager timecards + payroll. (Explicit overnight confirmation +
+  max-duration + server-side rejection of ambiguous intervals remain under C-5.)
 
 ### C-2 — Manager `approve()` locks a job "approved" but never exports it, on `skipped`
 - **File:** `src/pages/ManagerDashboard.jsx:575-578`.
@@ -81,9 +86,13 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
   (`withTimeout` rejects while the insert may still commit); RLS `0018:57-59` allows a crafted API call to
   insert `status='submitted', locked=true` directly, bypassing all client validation.
 - **Impact:** duplicate timecards → inflated payroll/OT/meal claims; forged submitted rows.
-- **Fix:** add partial unique index `(user_id, job_date, ot) where ot is not null`; generate the job id
-  client-side and upsert-on-conflict so a retried timeout is idempotent (code already threads `forcedId`);
-  restrict the employee insert policy to `status='saved'` and route submission through a validating RPC.
+- **Fix:** ~~add partial unique index `(user_id, job_date, ot)`~~ — the second audit (GPT) flags that
+  `(user_id, job_date, ot)` may **not** be a safe business key: an employee can legitimately log several
+  intervals for one day/work order. Prefer a dedicated **`submission_key uuid`** with a partial unique
+  index `(user_id, submission_key) where submission_key is not null`, generated + persisted **before** the
+  first request and reused on every retry (return the prior row when the key already exists). Keep the
+  client `forcedId` path + a synchronous ref guard for double-taps, but DB idempotency is the real fix.
+  Restrict the employee insert policy to `status='saved'` and route submission through a validating RPC.
 - **Status:** ☐ open
 
 ### C-5 — No DB-level validity constraint on the work interval
@@ -109,6 +118,7 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 | P-8 | Missing review indexes on `created_at`/status | `overtime_evidence`, `parking_receipts`, `meal_claims` | partial indexes |
 | P-9 | Offset pagination over mutable `updated_at` sort skips/dupes | `ManagerDashboard.jsx:178-180` | keyset pagination on `(job_date, id)` |
 | P-10 | Card renderers recreated each render; lists unmemoized | `ManagerDashboard.jsx:685,793` | `React.memo` card + `useCallback` handlers |
+| P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts` | one bulk lookup, or avoid exporting contact data (from GPT audit 4.7) |
 
 ---
 
@@ -121,13 +131,16 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
 - **Status:** ☐ open
 
 ### S-2 — Privileged NAS access bypasses the audited reveal — MEDIUM (scoped)
-- `is_privileged()` gates on 2 **hardcoded** UUIDs (`boss.js:9-13`, `0026:6-9`). Those users can
-  `select * from employee_sensitive` directly (`CcqJsonExport.jsx:33`) and bulk-read NAS **un-audited**,
-  bypassing the per-reveal `reveal_nas` audit.
+- **Update (2026-09):** the "2 **hardcoded** UUIDs" part is now **outdated** — `is_privileged()` is
+  **role-based** (`owner`) since migrations `0043`+ (see `src/lib/roles.js` `isPrivileged`); the old
+  `boss.js` id list is gone. So privilege is now revocable by changing a role. The **residual** concern
+  still stands: a privileged (owner) account can `select * from employee_sensitive` directly from the
+  browser (`CcqJsonExport.jsx`) and bulk-read NAS **un-audited**, bypassing the per-reveal `reveal_nas`.
 - Note: the older "NAS leaks via broad `profiles` select" concern is **stale** — column dropped in `0026:34`.
-- **Fix:** revocable permission table instead of hardcoded ids; server-side export op; no direct vault SELECT
-  in the browser; audit bulk access. Low practical risk (2 trusted accounts) but weak model.
-- **Status:** ☐ open
+- **Fix (remaining):** no direct vault SELECT in the browser; generate sensitive exports server-side under
+  a distinct permission; require a purpose/reason and audit each bulk access; mask + rate-limit. Low
+  practical risk (few trusted accounts) but weak model.
+- **Status:** ☐ open (partially addressed — privilege is now role-based/revocable)
 
 ### S-4 — Manager job updates have no state-transition allowlist — MEDIUM
 - `0000:451` manager update policy is unconditional (not narrowed by later migrations). A forged manager
@@ -193,6 +206,34 @@ export to Google Apps Script. Roles: `employee` / `manager` (stored lowercase).
   → shared `companyDate()` helper; trigger reads the configured tz.
 - **C-8 offline drafts:** form state is memory-only; no IndexedDB persistence (only `autofill_tip_seen`
   in localStorage). → schema-versioned IndexedDB draft keyed by owner + idempotency key.
+- **C-6b DST ambiguity (from GPT audit):** stored date/time facts carry no offset/fold semantics, so a
+  fall-back DST hour is ambiguous. → normalize to instants under the approved company tz, or reject/flag
+  the ambiguous hour.
+
+---
+
+## 5. Second-audit (former `GPT.md`) reconciliation
+
+`GPT.md` (source-level audit, 2026-09-09) was a parallel pass. It overlapped ~90 % with the findings
+above (its 1.2 = C-2, 1.4 = C-4, 1.7 = P-6, 1.8 = S-1, 2.2 = S-3, 2.3 = S-4, 3.3 = S-6, 3.4 = S-7,
+1.6 = S-3b). It has been merged into this tracker and deleted. The distinct points it contributed,
+now folded in above:
+
+- **Idempotency key shape** — do NOT assume `(user_id, job_date, ot)` is unique; use a `submission_key`
+  uuid instead (folded into **C-3**).
+- **Batch approval N+1** — `getUserById` per employee (added as **P-11**).
+- **DST ambiguity** — no offset/fold on stored times (added as **C-6b**).
+- **Approval workflow completeness (its §2.1)** — reviewed-input hash, immutable approval snapshots,
+  durable export-attempt records, and "external timeout → unknown/reconcile" (not assumed failure).
+  This extends **S-3 / S-4 / S-3b**: the fix there should persist a snapshot + input hash + actor and
+  record export attempts for reconciliation.
+- **Wildcard CORS** — present on the approval functions but **low value** (they validate bearer tokens);
+  deprioritized behind CSP/XSS, short sessions, reauth for sensitive ops, and audit correlation.
+
+Verified status snapshot (2026-09-21, current `main`): **C-1 resolved**; **C-2, C-3, C-4 (status filter
+half), C-5, P-6, S-1, S-3 still open**; **S-2 partially addressed** (privilege now role-based). The
+recent work on `claude/new-admin-role-t33fe4` was the payroll pipeline (talons, DAS, union dues), not
+these remediations.
 
 ---
 
