@@ -151,6 +151,11 @@ export default function EmployeeForm() {
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
   const lastSaveErrorRef = useRef("");
+  // C-3: synchronous double-tap guard (React `saving` state updates async, too late for a
+  // fast second tap) + a per-new-entry idempotency key reused across retries so a timeout
+  // that still commits, or a double submit, upserts one row instead of duplicating it.
+  const savingRef = useRef(false);
+  const submissionKeyRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
   const [kmMissingAlert, setKmMissingAlert] = useState(false);
@@ -266,6 +271,11 @@ export default function EmployeeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, effectiveUserId]);
 
+  // C-3: a fresh idempotency key per new-entry form. Editing an existing job (editId set)
+  // uses UPDATE, not the key. Within one new-entry session the key is stable, so retries
+  // reuse it (idempotent upsert); a brand-new form gets a new key.
+  useEffect(() => { submissionKeyRef.current = null; }, [editId]);
+
   useEffect(() => {
     if (!effectiveUserId) return;
     supabase.from("profiles").select("role, parking_receipts_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
@@ -339,7 +349,7 @@ export default function EmployeeForm() {
       setErr(t("form.errors.notSignedIn"));
       return;
     }
-    if (saving) return;
+    if (saving || savingRef.current) return; // sync guard blocks a rapid double-tap
     if (entryBlockedReason) {
       lastSaveErrorRef.current = entryBlockedReason;
       setErr(entryBlockedReason);
@@ -358,6 +368,7 @@ export default function EmployeeForm() {
 
     setErr("");
     setInfo("");
+    savingRef.current = true; // set synchronously (before the first await) — see the guard above
     setSaving(true);
 
     try {
@@ -415,12 +426,26 @@ export default function EmployeeForm() {
         setLocked(nextLocked);
         setDirty(false);
       } else {
-        const { data, error } = await withTimeout(
-          supabase.from("jobs").insert(forcedId ? { ...payload, id: forcedId } : payload).select("id").single(),
+        // C-3: attach a per-new-entry idempotency key and UPSERT on (user_id, submission_key).
+        // A retried timeout that already committed, or a double submit, resolves to the SAME
+        // row instead of inserting a duplicate.
+        if (!submissionKeyRef.current) submissionKeyRef.current = crypto.randomUUID();
+        const submissionKey = submissionKeyRef.current;
+        const insertPayload = { ...payload, submission_key: submissionKey, ...(forcedId ? { id: forcedId } : {}) };
+        let data, error;
+        ({ data, error } = await withTimeout(
+          supabase.from("jobs").upsert(insertPayload, { onConflict: "user_id,submission_key" }).select("id").single(),
           15000,
           "Save"
-        );
-        if (error) throw error;
+        ));
+        if (error) {
+          // Idempotent recovery: if a row for this key already committed (e.g. a prior
+          // attempt whose response we lost, now locked so the conflicting UPDATE is
+          // refused), adopt it instead of surfacing an error or making a duplicate.
+          const { data: existing } = await supabase.from("jobs").select("id").eq("user_id", user.id).eq("submission_key", submissionKey).maybeSingle();
+          if (existing?.id) { data = existing; error = null; }
+          else throw error;
+        }
         if (!data?.id) throw new Error(t("form.errors.insertNoId"));
         savedJobId = data.id;
 
@@ -451,6 +476,7 @@ export default function EmployeeForm() {
       setErr(lastSaveErrorRef.current);
       return false;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
