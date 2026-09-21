@@ -470,6 +470,9 @@ export default function EmployeeForm() {
       const msg = String(e?.message || "");
       if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
         lastSaveErrorRef.current = t("form.errors.duplicateOt", { ot: ot || "" });
+      } else if (/invalid_job_interval/i.test(msg)) {
+        // Server-side interval guard (C-5): départ/fin required, duration 0–16h.
+        lastSaveErrorRef.current = t("form.errors.invalidInterval");
       } else {
         lastSaveErrorRef.current = e?.message || t("form.errors.saveFailed");
       }
