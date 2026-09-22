@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Banknote, Building2, FileJson } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import CcqJsonExport from "@/components/CcqJsonExport";
+import DasTab from "@/components/DasTab";
 import { useT } from "@/lib/use-t";
 
 export default function ManagerDownloads() {
@@ -22,7 +23,9 @@ export default function ManagerDownloads() {
           </button>
         ))}
       </div>
-      {section === "ccq" ? <CcqJsonExport /> : (
+      {section === "ccq" && <CcqJsonExport />}
+      {section === "das" && <DasTab />}
+      {section !== "ccq" && section !== "das" && (
         <Card><CardContent className="p-6"><h2 className="font-semibold">{cards.find((card) => card.id === section)?.title}</h2><p className="mt-2 text-sm text-muted-foreground">{t("downloads.comingSoon")}</p></CardContent></Card>
       )}
     </div>
