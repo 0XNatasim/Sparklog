@@ -17,6 +17,11 @@ function ccqWeekOf(dateStr) {
   return { key: end.format("YYYY-MM-DD"), start: weekStartSundayD(dateStr), end };
 }
 
+// DAS follow the PAY date, not the work week: a CCQ week ending Saturday is paid the
+// following Thursday (end + 5 days). The month a week's DAS belongs to is that pay date's.
+const payDateOf = (weekEnd) => weekEnd.add(5, "day");
+const payMonthOf = (weekEnd) => payDateOf(weekEnd).format("YYYY-MM");
+
 const EMPTY = { hours: 0, gross: 0, federalTax: 0, quebecTax: 0, rrq: 0, ei: 0, rqap: 0, fss: 0, remArc: 0, remQc: 0, remTotal: 0, net: 0 };
 
 // ── DAS (déductions à la source) centralization sub-tab ──────────────────────
@@ -75,7 +80,7 @@ export default function DasTab() {
         const wk = [...weeks.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
         setWeekKeys(wk);
         setSelectedWeek(wk[0]?.key || "");
-        setSelectedMonth(wk[0]?.end.format("YYYY-MM") || dayjs().format("YYYY-MM"));
+        setSelectedMonth(wk[0] ? payMonthOf(wk[0].end) : dayjs().format("YYYY-MM"));
       } catch (e) {
         if (!cancelled) setError(e?.message || String(e));
       } finally {
@@ -85,17 +90,17 @@ export default function DasTab() {
     return () => { cancelled = true; };
   }, []);
 
-  // Months present (a CCQ week belongs to the month of its ending Saturday), newest first.
+  // Months present, keyed by PAY date (week end + 5 days = the following Thursday), newest first.
   const months = useMemo(() => {
     const m = new Map();
-    weekKeys.forEach((w) => { const k = w.end.format("YYYY-MM"); if (!m.has(k)) m.set(k, w.end); });
+    weekKeys.forEach((w) => { const pd = payDateOf(w.end); const k = pd.format("YYYY-MM"); if (!m.has(k)) m.set(k, pd); });
     return [...m.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([key, d]) => ({ key, label: d.format("MMMM YYYY") }));
   }, [weekKeys]);
 
-  // The CCQ weeks in scope for the current selection.
+  // The CCQ weeks in scope for the current selection. Month = weeks PAID in that month.
   const scopeWeeks = useMemo(() => {
     if (period === "week") return weekKeys.filter((w) => w.key === selectedWeek);
-    return weekKeys.filter((w) => w.end.format("YYYY-MM") === selectedMonth);
+    return weekKeys.filter((w) => payMonthOf(w.end) === selectedMonth);
   }, [period, weekKeys, selectedWeek, selectedMonth]);
 
   function openingFor(userId, weekStart) {
