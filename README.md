@@ -200,6 +200,9 @@ supabase functions deploy send_announcement
 supabase functions deploy ccq_rates
 supabase functions deploy ccq_rates_daily_sync
 supabase functions deploy cleanup_overtime_evidence
+supabase functions deploy create_employee
+supabase functions deploy reset_employee_password
+supabase functions deploy delete_user
 ```
 
 | Function | Purpose |
@@ -213,6 +216,8 @@ supabase functions deploy cleanup_overtime_evidence
 | `process_overtime_evidence` | Background OCR of overtime authorization screenshots (ocr.space). |
 | `cleanup_overtime_evidence` | Service-role-only deletion of expired overtime images and records. |
 | `delete_user` | Manager-only hard delete of an inactive account, with guards and an audit-log entry. |
+| `create_employee` | Manager/owner creation of an already-confirmed employee account with an optional generated temporary password. |
+| `reset_employee_password` | Manager/owner generation of a new one-time-displayed temporary password without deleting payroll history. |
 
 The frontend sends authenticated bearer tokens to user-facing functions. Keep normal JWT verification/authentication behavior aligned with each function's own authorization checks; do not expose service-role credentials to the browser.
 
