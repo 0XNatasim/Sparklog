@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, KeyRound, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
+import { Briefcase, CalendarDays, ChevronDown, Copy, Crown, Eye, KeyRound, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
 import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged } from "@/lib/roles";
 import NasField from "./NasField";
@@ -281,11 +281,22 @@ export default function EmployeesPanel() {
         throw new Error(message);
       }
       if (!data?.ok) throw new Error(data?.error || t("employees.passwordResetFailed"));
-      setTemporaryCredentials({ email: data.email, password: data.password });
+      setTemporaryCredentials({ userId: profile.id, email: data.email, password: data.password });
     } catch (error) {
       setErr(error?.message || t("employees.passwordResetFailed"));
     } finally {
       setPasswordResetId(null);
+    }
+  }
+
+  async function copyTemporaryPassword() {
+    if (!temporaryCredentials?.password) return;
+    try {
+      await navigator.clipboard.writeText(temporaryCredentials.password);
+      setInfo(t("employees.passwordCopied"));
+      setTimeout(() => setInfo(""), 2500);
+    } catch {
+      setErr(t("employees.passwordCopyFailed"));
     }
   }
 
@@ -383,20 +394,6 @@ export default function EmployeesPanel() {
       {info && (
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
       )}
-      {temporaryCredentials && (
-        <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="font-semibold">{t("employees.passwordResetDone")}</div>
-              <div className="mt-1 font-mono text-xs">{temporaryCredentials.email}</div>
-              <div className="font-mono text-xs">{t("employees.add.tempPassword")}: <b>{temporaryCredentials.password}</b></div>
-              <p className="mt-1 text-[11px]">{t("employees.add.share")}</p>
-            </div>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setTemporaryCredentials(null)} aria-label={t("common.cancel")}><X className="h-4 w-4" /></Button>
-          </div>
-        </div>
-      )}
-
       {!loading && rateSuggestions.size > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <span>{t("employees.rates.pending", { count: rateSuggestions.size })}</span>
@@ -919,6 +916,34 @@ export default function EmployeesPanel() {
                     {passwordResetId === p.id ? t("common.working") : t("employees.passwordResetButton")}
                   </Button>
                 </div>
+                {temporaryCredentials?.userId === p.id && (
+                  <div className="mt-3 rounded-md border border-green-300 bg-green-50 p-3 text-green-950 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100" role="status">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold">{t("employees.passwordResetDone")}</div>
+                        <div className="mt-1 break-all text-xs">{temporaryCredentials.email}</div>
+                        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Input
+                            type="text"
+                            readOnly
+                            value={temporaryCredentials.password}
+                            aria-label={t("employees.add.tempPassword")}
+                            className="h-10 bg-white font-mono text-base font-bold tracking-wider text-slate-950 dark:bg-slate-950 dark:text-white sm:max-w-xs"
+                            onFocus={(event) => event.currentTarget.select()}
+                          />
+                          <Button type="button" size="sm" variant="outline" onClick={copyTemporaryPassword}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            {t("employees.copyPassword")}
+                          </Button>
+                        </div>
+                        <p className="mt-2 text-xs">{t("employees.add.share")}</p>
+                      </div>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setTemporaryCredentials(null)} aria-label={t("common.cancel")}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
