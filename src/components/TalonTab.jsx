@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Clock, FileText, Printer } from "lucide-react";
+import { BadgeCheck, Clock, FileText, Printer } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { computeEmployeeWeekTalon, snapshotFromRow, formatTalonRef } from "@/payroll";
 import { buildStubModel, defaultHeader, openStubsPrint } from "@/lib/paystub";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
+import { isOwnerRole } from "@/lib/roles";
+import { useAuth } from "@/contexts/AuthContext";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 
@@ -25,6 +27,8 @@ function ccqWeekOf(dateStr) {
 // recomputed live). Clicking opens the full talon (PayStubPrint). Rien n'est persisté ici.
 export default function TalonTab() {
   const t = useT();
+  const { role } = useAuth();
+  const isOwner = isOwnerRole(role); // only the boss (owner) can mark a talon official
   const [employees, setEmployees] = useState([]);
   const [jobsByEmp, setJobsByEmp] = useState(new Map());
   const [seedByEmp, setSeedByEmp] = useState(new Map());
@@ -99,8 +103,8 @@ export default function TalonTab() {
     if (!jobs.length) return { kind: "none" };
     const pending = jobs.filter((j) => isPending(j.status)).length;
     const approved = jobs.filter((j) => j.status === "approved");
-    const comptabilise = (ledgerByEmp.get(profile.id) || []).some((r) => r.period_end === week.key);
-    if (comptabilise && approved.length) return { kind: "comptabilise", jobs: approved };
+    const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
+    if (ledgerRow && approved.length) return { kind: ledgerRow.boss_approved ? "official" : "comptabilise", jobs: approved };
     if (pending > 0) return { kind: "pending" };
     if (approved.length) return { kind: "apercu", jobs: approved };
     return { kind: "draft" };
@@ -113,10 +117,34 @@ export default function TalonTab() {
       // Reference is assigned at comptabilisation only; blank for an aperçu.
       const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
       const reference = formatTalonRef(ledgerRow?.talon_seq);
-      setStub({ profile, weekObj: { start: week.start, end: week.end, weekNo: week.weekNo }, talon, opening, reference });
+      // The boss (owner) can approve only a comptabilisé week (a ledger row exists).
+      setStub({
+        profile, weekObj: { start: week.start, end: week.end, weekNo: week.weekNo }, talon, opening, reference,
+        weekKey: week.key, official: !!ledgerRow?.boss_approved, canApprove: isOwner && !!ledgerRow,
+      });
     } catch (e) {
       setError(e?.message || String(e));
     }
+  }
+
+  // Owner toggles a talon "official" (boss-approved) → drops the DRAFT watermark.
+  async function toggleOfficial(next) {
+    if (!stub) return;
+    const { profile, weekKey } = stub;
+    setStub((s) => (s ? { ...s, official: next } : s)); // optimistic
+    const { error: rpcErr } = await supabase.rpc("set_talon_boss_approval", { p_user_id: profile.id, p_period_end: weekKey, p_approved: next });
+    if (rpcErr) {
+      setStub((s) => (s ? { ...s, official: !next } : s)); // revert
+      setError(rpcErr.message);
+      return;
+    }
+    // Reflect in the matrix (cell colour) without a reload.
+    setLedgerByEmp((prev) => {
+      const map = new Map(prev);
+      const list = (map.get(profile.id) || []).map((r) => (r.period_end === weekKey ? { ...r, boss_approved: next } : r));
+      map.set(profile.id, list);
+      return map;
+    });
   }
 
   // Build every talon for a week (comptabilisé + approved aperçu) and open one print
@@ -136,7 +164,7 @@ export default function TalonTab() {
         if (!model) continue;
         const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
         const hdr = defaultHeader({ week: { start: week.start, end: week.end, weekNo: week.weekNo }, reference: formatTalonRef(ledgerRow?.talon_seq) });
-        items.push({ model, hdr, employee: profile, frequency: "weekly" });
+        items.push({ model, hdr, employee: profile, frequency: "weekly", official: !!ledgerRow?.boss_approved });
       } catch { /* skip an employee that fails to compute */ }
     }
     if (!items.length) { setBatchMsg(t("payroll.talon.batchNone")); return; }
@@ -149,15 +177,24 @@ export default function TalonTab() {
     if (st.kind === "none") return <span className="text-muted-foreground/40">·</span>;
     if (st.kind === "draft") return <span className="text-muted-foreground/60" title={t("payroll.talon.cell.draft")}>—</span>;
     if (st.kind === "pending") return <Clock className="mx-auto h-4 w-4 text-amber-500" title={t("payroll.talon.cell.pending")} />;
+    const official = st.kind === "official";
     const comptabilise = st.kind === "comptabilise";
+    const cls = official
+      ? "text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/40"
+      : comptabilise
+      ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+      : "text-muted-foreground hover:bg-accent";
+    const title = official ? t("payroll.talon.cell.official") : comptabilise ? t("payroll.talon.cell.comptabilise") : t("payroll.talon.cell.apercu");
     return (
       <button
         type="button"
         onClick={() => openTalon(profile, week, st.jobs)}
-        title={comptabilise ? t("payroll.talon.cell.comptabilise") : t("payroll.talon.cell.apercu")}
-        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${comptabilise ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40" : "text-muted-foreground hover:bg-accent"}`}
+        title={title}
+        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cls}`}
       >
-        <FileText className={`h-4 w-4 ${comptabilise ? "" : "opacity-70"}`} strokeWidth={comptabilise ? 2.2 : 1.6} />
+        {official
+          ? <BadgeCheck className="h-4 w-4" strokeWidth={2.2} />
+          : <FileText className={`h-4 w-4 ${comptabilise ? "" : "opacity-70"}`} strokeWidth={comptabilise ? 2.2 : 1.6} />}
       </button>
     );
   }
@@ -173,6 +210,7 @@ export default function TalonTab() {
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5"><BadgeCheck className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={2.2} /> {t("payroll.talon.cell.official")}</span>
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={2.2} /> {t("payroll.talon.cell.comptabilise")}</span>
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 opacity-70" strokeWidth={1.6} /> {t("payroll.talon.cell.apercu")}</span>
         <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-amber-500" /> {t("payroll.talon.cell.pending")}</span>
@@ -253,6 +291,9 @@ export default function TalonTab() {
           frequency="weekly"
           week={stub.weekObj}
           reference={stub.reference}
+          official={stub.official}
+          canApproveOfficial={stub.canApprove}
+          onToggleOfficial={toggleOfficial}
         />
       )}
     </div>

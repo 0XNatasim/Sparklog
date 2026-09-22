@@ -11,7 +11,7 @@ const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2
 // breakdown + stored YTD cumulatives. It is a DRAFT: the DAS figures come from the
 // unvalidated placeholder rule set. Never a substitute for the official pay stub.
 // The stub math + printable HTML live in src/lib/paystub.js (shared with the batch export).
-export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week, reference, onOutput }) {
+export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, reimb, ccq: ccqPeriod, employee, frequency, week, reference, official = false, canApproveOfficial = false, onToggleOfficial, onOutput }) {
   const [hdr, setHdr] = useState({
     employer: EMPLOYER,
     periodStart: week?.start ? week.start.format("YYYY-MM-DD") : "",
@@ -46,7 +46,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     const w = window.open("", "_blank", "width=820,height=1060");
     if (!w) { window.print(); afterOutput(); return; } // popup blocked → fall back to in-place print
     w.document.open();
-    w.document.write(buildStubHtml({ model, hdr, employee, frequency }));
+    w.document.write(buildStubHtml({ model, hdr, employee, frequency, official }));
     w.document.close();
     // Let layout settle, then open the print dialog (user chooses "Enregistrer en PDF").
     w.onload = () => { w.focus(); w.print(); };
@@ -90,16 +90,24 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
           <label className="text-xs"><span className="text-muted-foreground">Semaine</span><input value={hdr.week} onChange={setH("week")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
           <label className="text-xs"><span className="text-muted-foreground">No. réf.</span><input value={hdr.ref} onChange={setH("ref")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
         </div>
-        <div className="payslip-noprint mb-3 flex justify-end gap-2">
+        <div className="payslip-noprint mb-3 flex flex-wrap items-center justify-end gap-2">
+          {canApproveOfficial && (
+            <label className="mr-auto flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={official} onChange={(e) => onToggleOfficial?.(e.target.checked)} />
+              <span className="font-medium text-green-700 dark:text-green-400">Approved by Boss (officiel)</span>
+            </label>
+          )}
           <Button size="sm" variant="outline" onClick={printStub}><Printer className="mr-1.5 h-4 w-4" />Imprimer</Button>
           <Button size="sm" onClick={downloadPdf}><Download className="mr-1.5 h-4 w-4" />Télécharger PDF</Button>
         </div>
 
         {/* The stub — calqué sur un talon de paie construction (QC) */}
         <div className="payslip-print relative overflow-hidden rounded border border-neutral-900 bg-white text-[11px] leading-tight text-black">
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="rotate-[-24deg] text-5xl font-black tracking-widest text-red-500/10">BROUILLON · DRAFT</span>
-          </div>
+          {!official && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="rotate-[-24deg] text-5xl font-black tracking-widest text-red-500/10">BROUILLON · DRAFT</span>
+            </div>
+          )}
 
           {/* Title band */}
           <div className="flex items-center justify-between bg-slate-800 px-3 py-2 text-white">
@@ -194,7 +202,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
           </div>
 
           <p className="border-t border-neutral-900 px-3 py-2 text-[9px] text-slate-600">
-            <b>BROUILLON — paie non finalisée · Nécessite une révision de la paie.</b> Jeu de règles {rulesTag} (non validé).
+            <b>{official ? "OFFICIEL — approuvé par le boss." : "BROUILLON — paie non finalisée · Nécessite une révision de la paie."}</b> Jeu de règles {rulesTag} (non validé).
             Présentation « gross-up » : les avantages non-cash (vacances, avantage imposable, avantages sociaux
             employeur) figurent dans les Gains puis sont repris dans les Retenues; paie nette = Gains − Retenues.
             L'équipement de sécurité et les indemnités (KM, données) sont des montants non imposables payés, inclus
