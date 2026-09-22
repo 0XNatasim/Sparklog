@@ -151,8 +151,9 @@ export const STUB_STYLES = `
   @page { size: letter; margin: 12mm; }
 `;
 
-// The inner `.sheet` markup for one talon.
-export function stubSheetHtml({ model, hdr, employee, frequency }) {
+// The inner `.sheet` markup for one talon. `official` (boss-approved) drops the DRAFT
+// watermark and swaps the footer to an "official" note.
+export function stubSheetHtml({ model, hdr, employee, frequency, official = false }) {
   const info = [
     ["Employé", employee?.employee_number || "—"],
     ["Nom", employee?.full_name || "—"],
@@ -182,7 +183,7 @@ export function stubSheetHtml({ model, hdr, employee, frequency }) {
   }).join("");
 
   return `<div class="sheet">
-    <div class="wm"><span>BROUILLON · DRAFT</span></div>
+    ${official ? "" : `<div class="wm"><span>BROUILLON · DRAFT</span></div>`}
     <div class="band">
       <div><h1>TALON DE PAIE</h1><div class="sub">Pay stub — reproduction (moteur SparkLog)</div></div>
       <div class="emp">${esc(hdr.employer || "Employeur")}<div class="sub">${esc(employee?.full_name || "")}</div></div>
@@ -210,7 +211,7 @@ export function stubSheetHtml({ model, hdr, employee, frequency }) {
       </div>
     </div>
     <div class="foot">
-      <b>BROUILLON — paie non finalisée · Nécessite une révision de la paie.</b>
+      <b>${official ? "OFFICIEL — approuvé par le boss." : "BROUILLON — paie non finalisée · Nécessite une révision de la paie."}</b>
       Jeu de règles ${esc(model.rulesTag)} (non validé). Présentation « gross-up » : les avantages
       non-cash (vacances, avantage imposable, avantages sociaux employeur) figurent dans les
       Gains puis sont repris dans les Retenues; paie nette = Gains − Retenues. L'équipement de
@@ -229,9 +230,9 @@ export function stubDocument(sheets, title = "Talons de paie") {
 }
 
 // One-stub HTML document (used by PayStubPrint's single download).
-export function buildStubHtml({ model, hdr, employee, frequency }) {
+export function buildStubHtml({ model, hdr, employee, frequency, official = false }) {
   const title = `Talon de paie${hdr.week ? " — sem. " + hdr.week : ""}`;
-  return stubDocument([stubSheetHtml({ model, hdr, employee, frequency })], title);
+  return stubDocument([stubSheetHtml({ model, hdr, employee, frequency, official })], title);
 }
 
 // Open a print window for a batch of talons: items = [{ model, hdr, employee, frequency }].
