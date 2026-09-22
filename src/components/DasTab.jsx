@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { AlertTriangle, Landmark } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { computeEmployeeWeekTalon, snapshotFromRow } from "@/payroll";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { useT } from "@/lib/use-t";
@@ -16,18 +17,24 @@ function ccqWeekOf(dateStr) {
   return { key: end.format("YYYY-MM-DD"), start: weekStartSundayD(dateStr), end };
 }
 
+const EMPTY = { hours: 0, gross: 0, federalTax: 0, quebecTax: 0, rrq: 0, ei: 0, rqap: 0, fss: 0, remArc: 0, remQc: 0, remTotal: 0, net: 0 };
+
 // ── DAS (déductions à la source) centralization sub-tab ──────────────────────
-// One row per employee for a chosen CCQ week: statutory withholdings (employee + employer)
-// grouped into the two remittance buckets — Revenu Québec (impôt QC, RRQ, RQAP, FSS) and
-// ARC (impôt féd, AE). Draft figures from the unvalidated rule set; never a remittance filing.
+// Statutory withholdings (employee + employer) grouped into the two remittance buckets —
+// Revenu Québec (impôt QC, RRQ, RQAP, FSS) and ARC (impôt féd, AE) — by CCQ week or by
+// month (DAS are remitted monthly), for all employees or one. Draft figures from the
+// unvalidated rule set; never a remittance filing.
 export default function DasTab() {
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByEmp, setJobsByEmp] = useState(new Map());
-  const [seedByEmp, setSeedByEmp] = useState(new Map());   // user_id → payroll_ytd row
-  const [ledgerByEmp, setLedgerByEmp] = useState(new Map()); // user_id → [ledger rows]
-  const [weekKeys, setWeekKeys] = useState([]); // [{key,start,end,weekNo}]
+  const [seedByEmp, setSeedByEmp] = useState(new Map());
+  const [ledgerByEmp, setLedgerByEmp] = useState(new Map());
+  const [weekKeys, setWeekKeys] = useState([]); // [{key,start,end,weekNo}] newest first
+  const [period, setPeriod] = useState("month"); // "month" | "week"
   const [selectedWeek, setSelectedWeek] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(""); // YYYY-MM
+  const [selectedEmp, setSelectedEmp] = useState(""); // "" = all
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -36,7 +43,7 @@ export default function DasTab() {
     (async () => {
       setLoading(true);
       try {
-        const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
+        const since = dayjs().subtract(14, "month").format("YYYY-MM-DD");
         const [{ data: profs, error: pErr }, { data: jobs, error: jErr }, { data: seeds }, { data: ledgers }] = await Promise.all([
           supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits").order("full_name", { ascending: true }),
           supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes, status").gte("job_date", since),
@@ -68,6 +75,7 @@ export default function DasTab() {
         const wk = [...weeks.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
         setWeekKeys(wk);
         setSelectedWeek(wk[0]?.key || "");
+        setSelectedMonth(wk[0]?.end.format("YYYY-MM") || dayjs().format("YYYY-MM"));
       } catch (e) {
         if (!cancelled) setError(e?.message || String(e));
       } finally {
@@ -77,10 +85,19 @@ export default function DasTab() {
     return () => { cancelled = true; };
   }, []);
 
-  const week = useMemo(() => weekKeys.find((w) => w.key === selectedWeek) || null, [weekKeys, selectedWeek]);
+  // Months present (a CCQ week belongs to the month of its ending Saturday), newest first.
+  const months = useMemo(() => {
+    const m = new Map();
+    weekKeys.forEach((w) => { const k = w.end.format("YYYY-MM"); if (!m.has(k)) m.set(k, w.end); });
+    return [...m.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([key, d]) => ({ key, label: d.format("MMMM YYYY") }));
+  }, [weekKeys]);
 
-  // Opening balance for one employee for the selected week (latest ledger snapshot ending
-  // before the week starts, else the seed).
+  // The CCQ weeks in scope for the current selection.
+  const scopeWeeks = useMemo(() => {
+    if (period === "week") return weekKeys.filter((w) => w.key === selectedWeek);
+    return weekKeys.filter((w) => w.end.format("YYYY-MM") === selectedMonth);
+  }, [period, weekKeys, selectedWeek, selectedMonth]);
+
   function openingFor(userId, weekStart) {
     const before = (ledgerByEmp.get(userId) || [])
       .filter((r) => r.period_end && dayjs(r.period_end).isBefore(weekStart))
@@ -88,75 +105,110 @@ export default function DasTab() {
     return snapshotFromRow(before[0] || seedByEmp.get(userId) || null);
   }
 
-  // One DAS row per employee who has jobs this week. `pending` marks a week not yet fully
-  // approved (its figures are withheld until approval, like the Talon tab).
+  // One row per employee, summing the DAS over every fully-approved CCQ week in scope.
   const rows = useMemo(() => {
-    if (!week) return [];
+    const targets = selectedEmp ? employees.filter((e) => e.id === selectedEmp) : employees;
     const out = [];
-    for (const profile of employees) {
-      const jobs = (jobsByEmp.get(profile.id) || []).filter((j) => ccqWeekOf(j.job_date).key === week.key);
-      if (!jobs.length) continue;
-      const pending = jobs.filter((j) => isPending(j.status)).length;
-      const approved = jobs.filter((j) => j.status === "approved");
-      if (pending > 0 || approved.length === 0) {
-        out.push({ profile, pending, approved: approved.length });
-        continue;
+    for (const profile of targets) {
+      const acc = { ...EMPTY };
+      let anyJobs = false, pendingWeeks = 0, countedWeeks = 0;
+      for (const w of scopeWeeks) {
+        const jobs = (jobsByEmp.get(profile.id) || []).filter((j) => ccqWeekOf(j.job_date).key === w.key);
+        if (!jobs.length) continue;
+        anyJobs = true;
+        const pending = jobs.filter((j) => isPending(j.status)).length;
+        const approved = jobs.filter((j) => j.status === "approved");
+        if (pending > 0) { pendingWeeks += 1; continue; }
+        if (!approved.length) continue;
+        let talon = null;
+        try {
+          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", weekDate: w.start.format("YYYY-MM-DD") });
+        } catch { /* skip */ }
+        if (!talon) continue;
+        const emp = talon.result.employee, empr = talon.result.employer, das = talon.result.das;
+        acc.hours += talon.hours.totalHours;
+        acc.gross += n(talon.result.gross?.total);
+        acc.federalTax += n(emp.federalTax); acc.quebecTax += n(emp.quebecTax);
+        acc.rrq += n(emp.rrq?.total) + n(empr.rrq); acc.ei += n(emp.ei) + n(empr.ei); acc.rqap += n(emp.rqap) + n(empr.rqap);
+        acc.fss += n(empr.fss);
+        acc.remArc += n(das.arc); acc.remQc += n(das.quebec); acc.remTotal += n(das.total);
+        acc.net += n(emp.netPay);
+        countedWeeks += 1;
       }
-      let talon = null;
-      try {
-        talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, week.start), frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD") });
-      } catch { /* skip on compute error */ }
-      if (!talon) { out.push({ profile, pending: 0, approved: approved.length, failed: true }); continue; }
-      const emp = talon.result.employee, empr = talon.result.employer, das = talon.result.das;
-      out.push({
-        profile, pending: 0, approved: approved.length,
-        hours: talon.hours.totalHours,
-        gross: n(talon.result.gross?.total),
-        federalTax: n(emp.federalTax), quebecTax: n(emp.quebecTax),
-        rrq: n(emp.rrq?.total) + n(empr.rrq), ei: n(emp.ei) + n(empr.ei), rqap: n(emp.rqap) + n(empr.rqap),
-        fss: n(empr.fss),
-        remArc: n(das.arc), remQc: n(das.quebec), remTotal: n(das.total),
-        net: n(emp.netPay),
-      });
+      if (!anyJobs) continue;
+      out.push({ profile, pendingWeeks, countedWeeks, ...acc });
     }
     return out;
-  }, [week, employees, jobsByEmp, seedByEmp, ledgerByEmp]);
+  }, [scopeWeeks, employees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp]);
+
+  const computed = rows.filter((r) => r.countedWeeks > 0);
+  const blocked = rows.filter((r) => r.pendingWeeks > 0);
 
   const totals = useMemo(() => {
-    const acc = { hours: 0, gross: 0, federalTax: 0, quebecTax: 0, rrq: 0, ei: 0, rqap: 0, fss: 0, remArc: 0, remQc: 0, remTotal: 0, net: 0 };
-    rows.forEach((r) => { if (!r.pending && !r.failed && r.approved) for (const k of Object.keys(acc)) acc[k] += n(r[k]); });
+    const acc = { ...EMPTY };
+    computed.forEach((r) => { for (const k of Object.keys(acc)) acc[k] += n(r[k]); });
     return acc;
-  }, [rows]);
+  }, [computed]);
 
-  const computed = rows.filter((r) => !r.pending && !r.failed && r.approved);
-  const blocked = rows.filter((r) => r.pending > 0);
+  const hasScope = scopeWeeks.length > 0;
 
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-xs text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
         <div className="flex items-start gap-2">
           <Landmark className="mt-0.5 h-4 w-4 shrink-0" />
-          <div><b>{t("payroll.das.title")}</b> {t("payroll.das.intro")}</div>
+          <div><b>{t("payroll.das.title")}</b> {t("payroll.das.intro")} {t("payroll.das.freqNote")}</div>
         </div>
       </div>
 
       <Card>
-        <CardContent className="p-4">
-          <label className="block text-xs sm:max-w-sm">
-            <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-            <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
-              {weekKeys.map((w) => (
-                <option key={w.key} value={w.key}>{t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Period toggle */}
+            <div className="flex overflow-hidden rounded-md border">
+              {["month", "week"].map((p) => (
+                <Button key={p} type="button" size="sm" variant={period === p ? "default" : "ghost"} className="rounded-none" onClick={() => setPeriod(p)}>
+                  {t(p === "month" ? "payroll.das.periodMonth" : "payroll.das.periodWeek")}
+                </Button>
               ))}
-              {weekKeys.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
-            </select>
-          </label>
-          {error && <div className="mt-3 text-xs text-destructive">{error}</div>}
-          {loading && <div className="mt-3 text-xs text-muted-foreground">{t("common.working")}</div>}
+            </div>
+
+            {/* Month or week selector */}
+            {period === "month" ? (
+              <label className="block text-xs">
+                <span className="text-muted-foreground">{t("payroll.das.monthSelect")}</span>
+                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                  {months.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                  {months.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
+                </select>
+              </label>
+            ) : (
+              <label className="block text-xs">
+                <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
+                <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                  {weekKeys.map((w) => (
+                    <option key={w.key} value={w.key}>{t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
+                  ))}
+                  {weekKeys.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
+                </select>
+              </label>
+            )}
+
+            {/* Employee filter */}
+            <label className="block text-xs">
+              <span className="text-muted-foreground">{t("payroll.employee")}</span>
+              <select value={selectedEmp} onChange={(e) => setSelectedEmp(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <option value="">{t("payroll.das.allEmployees")}</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
+              </select>
+            </label>
+          </div>
+          {error && <div className="text-xs text-destructive">{error}</div>}
+          {loading && <div className="text-xs text-muted-foreground">{t("common.working")}</div>}
         </CardContent>
       </Card>
 
-      {!loading && week && (
+      {!loading && hasScope && (
         <>
           {blocked.length > 0 && (
             <Card>
