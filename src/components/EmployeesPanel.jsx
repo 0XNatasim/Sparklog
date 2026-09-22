@@ -50,6 +50,11 @@ export default function EmployeesPanel() {
   const [annexes, setAnnexes] = useState(new Map());
   const [rateSuggestions, setRateSuggestions] = useState(new Map()); // id → { rate, annex, current } (dry-run, P-6)
   const [applyingRates, setApplyingRates] = useState(false);
+  // Owner/manager account creation (bypasses the signup email rate limit).
+  const [addForm, setAddForm] = useState({ full_name: "", email: "", phone: "", password: "" });
+  const [addOpen, setAddOpen] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addResult, setAddResult] = useState(null); // { email, password } after a successful create
   const [cardViews, setCardViews] = useState({});
   // Ids of admin cards whose "Gestion" checklist is expanded (also implicitly open
   // whenever the admin already has at least one granted section).
@@ -308,6 +313,37 @@ export default function EmployeesPanel() {
     }
   }
 
+  // Create an employee account server-side (no confirmation email → no rate limit).
+  async function createEmployee(e) {
+    e?.preventDefault?.();
+    if (addBusy) return;
+    setErr(""); setInfo(""); setAddResult(null);
+    setAddBusy(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error(t("auth.failed"));
+      const { data, error } = await supabase.functions.invoke("create_employee", {
+        body: { full_name: addForm.full_name, email: addForm.email, phone: addForm.phone, password: addForm.password || undefined },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (error) {
+        let message = error.message;
+        try { const ctx = await error.context?.json?.(); if (ctx?.error) message = ctx.error; } catch { /* keep default */ }
+        throw new Error(message);
+      }
+      if (data && data.ok === false) throw new Error(data.error || "Create failed");
+      setAddResult({ email: data.email, password: data.password });
+      setAddForm({ full_name: "", email: "", phone: "", password: "" });
+      setInfo(t("employees.add.created"));
+      await load();
+    } catch (e2) {
+      setErr(e2?.message || "Create failed");
+    } finally {
+      setAddBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       {err && (
@@ -329,6 +365,43 @@ export default function EmployeesPanel() {
             {applyingRates ? t("common.working") : t("employees.rates.applyBtn")}
           </Button>
         </div>
+      )}
+
+      {isManagerRole(role) && (
+        <Card>
+          <CardContent className="p-4">
+            {!addOpen ? (
+              <Button size="sm" onClick={() => { setAddOpen(true); setAddResult(null); }}>{t("employees.add.button")}</Button>
+            ) : (
+              <form onSubmit={createEmployee} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">{t("employees.add.title")}</div>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setAddOpen(false)}>{t("common.cancel")}</Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{t("employees.add.hint")}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs"><span className="text-muted-foreground">{t("auth.fullName")}</span>
+                    <Input value={addForm.full_name} onChange={(e) => setAddForm((s) => ({ ...s, full_name: e.target.value }))} className="mt-1" required /></label>
+                  <label className="block text-xs"><span className="text-muted-foreground">{t("auth.email")}</span>
+                    <Input type="email" value={addForm.email} onChange={(e) => setAddForm((s) => ({ ...s, email: e.target.value }))} className="mt-1" required /></label>
+                  <label className="block text-xs"><span className="text-muted-foreground">{t("auth.phone")}</span>
+                    <Input value={addForm.phone} onChange={(e) => setAddForm((s) => ({ ...s, phone: e.target.value }))} className="mt-1" /></label>
+                  <label className="block text-xs"><span className="text-muted-foreground">{t("employees.add.passwordOptional")}</span>
+                    <Input value={addForm.password} onChange={(e) => setAddForm((s) => ({ ...s, password: e.target.value }))} className="mt-1" placeholder={t("employees.add.passwordPlaceholder")} /></label>
+                </div>
+                <Button type="submit" size="sm" disabled={addBusy}>{addBusy ? t("common.working") : t("employees.add.submit")}</Button>
+              </form>
+            )}
+            {addResult && (
+              <div className="mt-3 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
+                <div className="font-semibold">{t("employees.add.credentials")}</div>
+                <div className="mt-1 font-mono text-xs">{addResult.email}</div>
+                <div className="font-mono text-xs">{t("employees.add.tempPassword")}: <b>{addResult.password}</b></div>
+                <p className="mt-1 text-[11px]">{t("employees.add.share")}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {loading && (
