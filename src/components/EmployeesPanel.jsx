@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
+import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, KeyRound, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
 import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged } from "@/lib/roles";
 import NasField from "./NasField";
@@ -39,6 +39,8 @@ export default function EmployeesPanel() {
   const [nasSet, setNasSet] = useState(new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [passwordResetId, setPasswordResetId] = useState(null);
+  const [temporaryCredentials, setTemporaryCredentials] = useState(null);
   const [timeOff, setTimeOff] = useState(new Map());
   const [timeOffDraft, setTimeOffDraft] = useState({});
   const today = dayjs().format("YYYY-MM-DD");
@@ -263,6 +265,30 @@ export default function EmployeesPanel() {
     }
   }
 
+  async function resetTemporaryPassword(profile) {
+    if (passwordResetId) return;
+    if (!window.confirm(t("employees.passwordResetConfirm", { name: profile.full_name || profile.email }))) return;
+    setPasswordResetId(profile.id);
+    setTemporaryCredentials(null);
+    setErr("");
+    try {
+      const { data, error } = await supabase.functions.invoke("reset_employee_password", {
+        body: { userId: profile.id },
+      });
+      if (error) {
+        let message = error.message;
+        try { const context = await error.context?.json?.(); if (context?.error) message = context.error; } catch { /* keep default */ }
+        throw new Error(message);
+      }
+      if (!data?.ok) throw new Error(data?.error || t("employees.passwordResetFailed"));
+      setTemporaryCredentials({ email: data.email, password: data.password });
+    } catch (error) {
+      setErr(error?.message || t("employees.passwordResetFailed"));
+    } finally {
+      setPasswordResetId(null);
+    }
+  }
+
   async function saveClassification(profile, field, value) {
     setLocal(profile.id, field, value);
     await saveField(profile.id, field, value);
@@ -356,6 +382,19 @@ export default function EmployeesPanel() {
       )}
       {info && (
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
+      )}
+      {temporaryCredentials && (
+        <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-semibold">{t("employees.passwordResetDone")}</div>
+              <div className="mt-1 font-mono text-xs">{temporaryCredentials.email}</div>
+              <div className="font-mono text-xs">{t("employees.add.tempPassword")}: <b>{temporaryCredentials.password}</b></div>
+              <p className="mt-1 text-[11px]">{t("employees.add.share")}</p>
+            </div>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setTemporaryCredentials(null)} aria-label={t("common.cancel")}><X className="h-4 w-4" /></Button>
+          </div>
+        </div>
       )}
 
       {!loading && rateSuggestions.size > 0 && (
@@ -866,6 +905,21 @@ export default function EmployeesPanel() {
                 </div>
               </div>
             </details>
+            )}
+
+            {!isManagerRole(p.role) && p.id !== user?.id && (
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">{t("employees.passwordResetTitle")}</div>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("employees.passwordResetHint")}</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" disabled={passwordResetId === p.id} onClick={() => resetTemporaryPassword(p)}>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    {passwordResetId === p.id ? t("common.working") : t("employees.passwordResetButton")}
+                  </Button>
+                </div>
+              </div>
             )}
 
             {p.is_paused && !isManagerRole(p.role) && p.id !== user?.id && (
