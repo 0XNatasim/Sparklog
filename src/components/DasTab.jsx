@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, Landmark } from "lucide-react";
+import { AlertTriangle, Download, Landmark } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,22 @@ export default function DasTab() {
 
   const hasScope = scopeWeeks.length > 0;
 
+  // Download the current DAS table (per-employee + total) as CSV.
+  function exportCsv() {
+    if (!computed.length) return;
+    const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const cols = [t("payroll.employee"), t("payroll.das.hours"), t("payroll.das.gross"), t("payroll.das.fed"), t("payroll.das.qc"), t("payroll.das.rrq"), t("payroll.das.ei"), t("payroll.das.rqap"), t("payroll.das.fss"), t("payroll.das.remArc"), t("payroll.das.remQc"), t("payroll.das.net")];
+    const row = (name, r) => [esc(name), n(r.hours).toFixed(2), n(r.gross).toFixed(2), n(r.federalTax).toFixed(2), n(r.quebecTax).toFixed(2), n(r.rrq).toFixed(2), n(r.ei).toFixed(2), n(r.rqap).toFixed(2), n(r.fss).toFixed(2), n(r.remArc).toFixed(2), n(r.remQc).toFixed(2), n(r.net).toFixed(2)].join(",");
+    const lines = [cols.map(esc).join(","), ...computed.map((r) => row(r.profile.full_name || r.profile.id, r)), row(t("payroll.das.total"), totals)];
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `DAS_${period === "month" ? selectedMonth : selectedWeek}${selectedEmp ? "_1emp" : ""}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-xs text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
@@ -207,6 +223,10 @@ export default function DasTab() {
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
               </select>
             </label>
+
+            <Button size="sm" variant="outline" onClick={exportCsv} disabled={!computed.length} className="ml-auto">
+              <Download className="mr-1.5 h-4 w-4" /> {t("payroll.das.exportCsv")}
+            </Button>
           </div>
           {error && <div className="text-xs text-destructive">{error}</div>}
           {loading && <div className="text-xs text-muted-foreground">{t("common.working")}</div>}
