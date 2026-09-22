@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, BookOpen, Calculator, ChevronDown, Pencil, Printer, Save } from "lucide-react";
+import { AlertTriangle, BookOpen, Calculator, ChevronDown, Pencil, Printer, Save, Upload } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -226,6 +226,29 @@ export default function PayrollEngineTester() {
   const [saveState, setSaveState] = useState({ status: "idle", message: "" }); // idle|loading|saving|saved|error
   const [seqByEnd, setSeqByEnd] = useState({}); // period_end → talon_seq (from the ledger)
   const [talonRef, setTalonRef] = useState(""); // cumulative talon reference for the selected week
+  const [stubParse, setStubParse] = useState({ status: "idle", message: "" }); // last-stub PDF → YTD prefill
+  const stubInputRef = useRef(null);
+
+  // Upload an employee's last pay stub (PDF, page 2/2) → extract the "Cumulatif" YTD values
+  // client-side (pdf.js text layer) and PRE-FILL the opening-balance fields for review.
+  async function handleStubUpload(e) {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = "";
+    if (!file) return;
+    setStubParse({ status: "loading", message: "" });
+    try {
+      // Dynamic import keeps pdf.js out of the initial bundle (loaded only on upload).
+      const { parsePayStubPdf } = await import("@/lib/paystub-parse");
+      const { ytd: detected, matched, asOf } = await parsePayStubPdf(file);
+      if (!matched.length) { setStubParse({ status: "error", message: t("payroll.stub.none") }); return; }
+      setYtd((s) => ({ ...s, ...detected }));
+      if (asOf) setAsOfDate(asOf);
+      setStubParse({ status: "done", message: t("payroll.stub.detected", { count: matched.length }) });
+    } catch (err) {
+      const message = err?.code === "no_text_layer" ? t("payroll.stub.noText") : (err?.message || t("payroll.stub.failed"));
+      setStubParse({ status: "error", message });
+    }
+  }
 
   // Load the roster once. Errors are non-fatal — the bench still works manually.
   useEffect(() => {
@@ -716,9 +739,18 @@ export default function PayrollEngineTester() {
         </div>
 
         {selectedId && !selectedWeek && !seedLocked && (
-          <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="mt-3 text-xs">
-            <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
-          </Button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input ref={stubInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleStubUpload} />
+            <Button size="sm" variant="outline" onClick={() => stubInputRef.current?.click()} disabled={stubParse.status === "loading"} className="text-xs">
+              <Upload className="mr-1.5 h-3.5 w-3.5" /> {stubParse.status === "loading" ? t("payroll.stub.reading") : t("payroll.stub.upload")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs">
+              <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
+            </Button>
+            {stubParse.message && (
+              <span className={`text-xs ${stubParse.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>{stubParse.message}</span>
+            )}
+          </div>
         )}
 
         <details className="mt-3 group rounded-lg border">
