@@ -9,7 +9,7 @@ import { weekStartSundayD, weekEndingSaturdayD, ccqWeekNumber } from "@/lib/ccq-
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
 import CongesIndemnityManager from "@/components/CongesIndemnityManager";
-import { isNonCcqRole } from "@/lib/roles";
+import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 
 function montrealToday() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -78,7 +78,7 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits"),
+        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits"),
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
         // 'saved' drafts and 'updated' un-reviewed edits). Claims: pending + approved
         // (exclude rejected — a rejected expense must not inflate the estimate).
@@ -113,7 +113,10 @@ export default function CostingDashboard() {
         // Administration staff are non-CCQ: no CCQ level → no employer contributions,
         // and no 13% CCQ congés indemnity (that is a CCQ advantage they don't get).
         const isNonCcq = isNonCcqRole(profile?.role);
+        const isSub = isSubcontractorRole(profile?.role);
         const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
+        // Subcontractor: negotiated double-time rate for hours over 8h/day (not 2x simple).
+        const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
 
         let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, totalKm = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
         const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], overtimeOptionsFromProfile(profile));
@@ -128,10 +131,18 @@ export default function CostingDashboard() {
           const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
           const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;
           const jobKmRate = Number(e.job?.km_rate_snapshot ?? profile?.km_rate) || 0;
-          labor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
-          // Return time carved out when the day exceeds 8h: base rate, no premium, and
-          // excluded from the CCQ social-benefits (13% congés) base.
-          laborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
+          if (isSub) {
+            // Simple rate for the first 8h/day and the return time; the negotiated double
+            // rate for hours beyond 8h. The engine already carves the return to simple and
+            // routes all overtime to overtime100 (no 1.5x tier) for subcontractors.
+            labor += jobBase * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60) + subDoubleRate * (e.overtime100Minutes / 60);
+            laborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
+          } else {
+            labor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
+            // Return time carved out when the day exceeds 8h: base rate, no premium, and
+            // excluded from the CCQ social-benefits (13% congés) base.
+            laborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
+          }
           kmCost += e.totalKm * jobKmRate;
         });
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Briefcase, CalendarDays, ChevronDown, Copy, Crown, Eye, KeyRound, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
-import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged } from "@/lib/roles";
+import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
 import NasField from "./NasField";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -79,7 +79,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, overtime_first_hour_double, return_overtime_no_benefits, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, overtime_first_hour_double, return_overtime_no_benefits, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -655,8 +655,9 @@ export default function EmployeesPanel() {
             </details>
 
             {/* Non-CCQ roles (administration + owner): show a simple flat hourly pay
-                field instead of the CCQ classification / metadata. */}
-            {isNonCcqRole(p.role) && (
+                field instead of the CCQ classification / metadata. Subcontractors are handled
+                in the panel below (they carry the full config plus a simple + double rate). */}
+            {isNonCcqRole(p.role) && !isSubcontractorRole(p.role) && (
               <details className="group rounded-lg border" open>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
                   <span className="truncate">{p.role === "subcontractor_1" ? t("employees.subcontractorTerms") : t("employees.adminPayroll")}</span>
@@ -724,8 +725,9 @@ export default function EmployeesPanel() {
               </details>
             )}
 
-            {/* CCQ payroll/export metadata — only for CCQ tradespeople (not admin/owner). */}
-            {!isNonCcqRole(p.role) && (
+            {/* CCQ payroll/export metadata — CCQ tradespeople AND subcontractors (who carry
+                the same config, but with a manual simple + double rate). Not admin/owner. */}
+            {(!isNonCcqRole(p.role) || isSubcontractorRole(p.role)) && (
             <details className="group rounded-lg border">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
                 <span className="flex min-w-0 items-center gap-2">
@@ -798,9 +800,11 @@ export default function EmployeesPanel() {
 
                 <div className="rounded-lg bg-muted/20 p-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {!isSubcontractorRole(p.role) && (
                 <Field label={t("employees.nasEmployee")}>
                   <NasField employeeId={p.id} initialHasNas={nasSet.has(p.id)} privileged={privileged} />
                 </Field>
+                )}
                 <Field label={t("employees.tradeCode")}>
                   <Input value="220" readOnly className="h-9 bg-muted" />
                 </Field>
@@ -837,14 +841,35 @@ export default function EmployeesPanel() {
                   )}
                   <span className="text-[11px] text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
                 </Field>
-                <Field label={t("employees.hourlyRate")}>
-                  <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
-                  <span className="text-[11px] text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
-                </Field>
+                {isSubcontractorRole(p.role) ? (
+                  <>
+                    <Field label={t("employees.simpleHourlyRate")}>
+                      <div className="flex h-9 items-center gap-1">
+                        <span className="text-sm text-muted-foreground">$</span>
+                        <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.hourly_rate ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)} placeholder="0.00" className="h-9" />
+                        <span className="text-xs text-muted-foreground">/h</span>
+                      </div>
+                    </Field>
+                    <Field label={t("employees.doubleHourlyRate")}>
+                      <div className="flex h-9 items-center gap-1">
+                        <span className="text-sm text-muted-foreground">$</span>
+                        <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.hourly_rate_double ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate_double", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate_double", e.target.value)} placeholder="0.00" className="h-9" />
+                        <span className="text-xs text-muted-foreground">/h</span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">{t("employees.doubleHourlyRateHint")}</span>
+                    </Field>
+                  </>
+                ) : (
+                  <Field label={t("employees.hourlyRate")}>
+                    <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
+                    <span className="text-[11px] text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
+                  </Field>
+                )}
               </div>
                 </div>
 
                 <div className="grid gap-2 border-t pt-3 md:grid-cols-2">
+              {!isSubcontractorRole(p.role) && (
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
                 <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
                 <input
@@ -858,6 +883,7 @@ export default function EmployeesPanel() {
                   className="h-5 w-5 rounded border-input accent-primary"
                 />
               </label>
+              )}
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
                 <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
                 <input
@@ -871,6 +897,13 @@ export default function EmployeesPanel() {
                   className="h-5 w-5 rounded border-input accent-amber-600"
                 />
               </label>
+              {isSubcontractorRole(p.role) ? (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs md:col-span-2">
+                <div className="font-semibold text-primary">{t("employees.subcontractorRuleTitle")}</div>
+                <p className="mt-1 text-muted-foreground">{t("employees.subcontractorRuleHint")}</p>
+              </div>
+              ) : (
+              <>
               <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
                 <span className="text-sm font-medium">
                   {t("employees.otFirstHourDouble")}
@@ -903,6 +936,8 @@ export default function EmployeesPanel() {
                   className="h-5 w-5 rounded border-input accent-primary"
                 />
               </label>
+              </>
+              )}
               {p.ccq_card_path && (
                 <div className="rounded-lg border bg-muted/20 p-3">
                   <Button type="button" size="sm" variant="outline" onClick={() => toggleCard(p)}>

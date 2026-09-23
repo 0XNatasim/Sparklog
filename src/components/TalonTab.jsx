@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { computeEmployeeWeekTalon, snapshotFromRow, formatTalonRef } from "@/payroll";
 import { buildStubModel, defaultHeader, openStubsPrint } from "@/lib/paystub";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
-import { isOwnerRole } from "@/lib/roles";
+import { isOwnerRole, isNonCcqRole } from "@/lib/roles";
 import { useAuth } from "@/contexts/AuthContext";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
@@ -55,7 +55,9 @@ export default function TalonTab() {
         if (pErr) throw pErr;
         if (jErr) throw jErr;
         if (cancelled) return;
-        setEmployees(profs || []);
+        // Talons are a CCQ payroll artifact — subcontractors (billed by the trade) and other
+        // non-CCQ roles never get one.
+        setEmployees((profs || []).filter((e) => !isNonCcqRole(e.role)));
 
         const jByE = new Map();
         const weekMap = new Map();

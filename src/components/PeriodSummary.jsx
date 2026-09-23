@@ -8,7 +8,7 @@ import { jobCodeKind } from "@/lib/job-code";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import { formatHM } from "@/lib/time";
 import { useT } from "@/lib/use-t";
-import { isNonCcqRole } from "@/lib/roles";
+import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 
 dayjs.extend(isoWeek);
 
@@ -64,7 +64,7 @@ export default function PeriodSummary({ mode = "week" }) {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits"),
+        supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits"),
         supabase.from("jobs").select("id, user_id, job_date, ot, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
@@ -103,6 +103,8 @@ export default function PeriodSummary({ mode = "week" }) {
         for (const [uid, ujobs] of byUser) {
           const profile = profileById.get(uid);
           const isNonCcq = isNonCcqRole(profile?.role);
+          const isSub = isSubcontractorRole(profile?.role);
+          const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
           // Weekly phone/data reimbursement × distinct CCQ weeks worked in this bucket.
           const weeksWorked = new Set(ujobs.map((j) => ccqWeek(j.job_date).key)).size;
           phoneData += weeksWorked * (Number(profile?.phone_data_reimbursement) || 0);
@@ -117,7 +119,12 @@ export default function PeriodSummary({ mode = "week" }) {
             const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
             const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;
             const jobKmRate = Number(e.job?.km_rate_snapshot ?? profile?.km_rate) || 0;
-            empLabor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
+            if (isSub) {
+              // Subcontractor: simple rate ≤8h + return, negotiated double rate beyond 8h.
+              empLabor += jobBase * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60) + subDoubleRate * (e.overtime100Minutes / 60);
+            } else {
+              empLabor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
+            }
             // Return time carved out beyond 8h: base rate, no premium, no social benefits.
             empLaborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
             kmCost += e.totalKm * jobKmRate;
