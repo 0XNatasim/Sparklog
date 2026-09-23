@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { hoursBetween, formatHM } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
+import { isOffOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
 
 const REFRESH_MS = 30000;
@@ -32,11 +33,14 @@ export default function LiveCrew() {
     const [{ data: people }, { data: jobs }, { data: timeOff }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, updated_at").eq("job_date", today),
-      supabase.from("employee_time_off").select("user_id").lte("start_date", today).gte("end_date", today),
+      supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays").lte("start_date", today).or(`end_date.gte.${today},end_date.is.null`),
     ]);
-    // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone
-    // scheduled off for the day.
-    const offToday = new Set((timeOff || []).map((row) => row.user_id));
+    // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone off for the
+    // FULL day — a full-day range or a weekly recurrence (e.g. never Fridays). A partial
+    // hours congé (start_time set) still leaves them on the board for the rest of the day.
+    const offToday = new Set(
+      (timeOff || []).filter((row) => isOffOn(row, today) && !row.start_time).map((row) => row.user_id)
+    );
     const activePeople = (people || []).filter(
       (person) => !person.is_paused && person.show_on_boards !== false && !offToday.has(person.id)
     );

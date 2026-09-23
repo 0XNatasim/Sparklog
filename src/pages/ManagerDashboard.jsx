@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Bell, ClipboardList, Clock3, Image, ImageOff, Radio, TriangleAlert, Users } from "lucide-react";
+import { Beaker, Bell, CalendarDays, ClipboardList, Clock3, Image, ImageOff, Radio, TriangleAlert, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -20,6 +20,7 @@ import { jobCodeTintClass } from "@/lib/job-code";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
+import CongesManager from "@/components/CongesManager";
 import TimeRulesManager from "@/components/TimeRulesManager";
 import BroadcastManager from "@/components/BroadcastManager";
 import Testing from "@/pages/Testing";
@@ -64,7 +65,7 @@ export default function ManagerDashboard() {
   const requestedSection = searchParams.get("section");
   // Which dashboard sections this user may open. Managers/owners get all; an admin
   // (office employee) sees only the sections the owner granted (profiles.admin_sections).
-  const allSections = ["live", "timesheet", "notifications", "employees", "forms", "testing"];
+  const allSections = ["live", "timesheet", "notifications", "employees", "conges", "forms", "testing"];
   const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id));
   const fallbackSection = allowedSections[0] || "live";
   const normalizedRequest = ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications" : requestedSection;
@@ -928,6 +929,7 @@ export default function ManagerDashboard() {
             { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
             { id: "notifications", icon: Bell, label: t("manager.sections.notifications"), description: t("manager.sections.notificationsDescription") },
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
+            { id: "conges", icon: CalendarDays, label: t("manager.sections.conges"), description: t("manager.sections.congesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
           ].filter(({ id }) => allowedSections.includes(id)).map(({ id, icon: Icon, label, description }) => (
@@ -947,6 +949,8 @@ export default function ManagerDashboard() {
         {activeSection === "live" && <LiveCrew />}
 
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
+
+        {activeSection === "conges" && <CongesManager />}
 
         {activeSection === "forms" && <FormsManager collapsible={false} />}
 
