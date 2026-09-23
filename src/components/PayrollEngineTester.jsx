@@ -10,6 +10,7 @@ import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payro
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
+import { isSubcontractorRole } from "@/lib/roles";
 
 const TAX_YEAR = 2026;
 
@@ -258,7 +259,8 @@ export default function PayrollEngineTester() {
         .from("profiles")
         .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits")
         .order("full_name", { ascending: true });
-      if (!cancelled) setEmployees(data || []);
+      // Subcontractors record time but are never part of the company's DAS payroll run.
+      if (!cancelled) setEmployees((data || []).filter((employee) => !isSubcontractorRole(employee.role)));
     })();
     return () => { cancelled = true; };
   }, []);

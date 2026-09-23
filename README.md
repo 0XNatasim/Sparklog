@@ -9,6 +9,7 @@ Roles are stored lowercase in `profiles.role`:
 | Role | Access |
 |---|---|
 | `employee` | Records and submits their own jobs; sees only their own data. |
+| `subcontractor_1` | Sous-traitant-1: uses the employee time-entry workflow but is excluded from DAS payroll calculations and CCQ reports. |
 | `manager` | Full manager workspace: review, approve, export, employee settings, costing. |
 | `admin` | Administration/office staff. Manager-tier access to every screen **except** NAS/SIN, but **non-CCQ**: paid a flat hourly rate, and excluded from CCQ advantages (no leave indemnity, employer contributions, or meal allowance in costing). |
 | `owner` | The company owner — manager-tier **and** privileged (NAS/SIN reveal, role assignment, crown). Replaces the former hard-coded owner/dev accounts, so a fork just marks one account `owner`. |
@@ -27,6 +28,9 @@ Roles are stored lowercase in `profiles.role`:
 - Review job history and weekly totals.
 - Complete first-login work-region and union-association onboarding.
 - View manager-enabled company forms from the Profile page.
+- New profiles default to `compagnon`, CCQ schedule `C3` (general daytime work), a
+  `$0.65/km` mileage rate, and a `$7/week` cell-data reimbursement; managers can
+  adjust these values per employee.
 
 ### Managers
 
@@ -178,7 +182,9 @@ where email = 'owner@example.com';
 ```
 
 Use `role = 'manager'` for additional supervisors, `role = 'admin'` for non-CCQ
-administration staff. Once an owner exists, roles can be assigned from Manager → Employees.
+administration staff, and `role = 'subcontractor_1'` for subcontractors who enter time
+but must stay outside DAS and CCQ reports. Once an owner exists, roles can be assigned
+from Manager → Employees.
 
 ## Private evidence storage
 
@@ -200,6 +206,9 @@ supabase functions deploy send_announcement
 supabase functions deploy ccq_rates
 supabase functions deploy ccq_rates_daily_sync
 supabase functions deploy cleanup_overtime_evidence
+supabase functions deploy create_employee
+supabase functions deploy reset_employee_password
+supabase functions deploy delete_user
 ```
 
 | Function | Purpose |
@@ -213,6 +222,8 @@ supabase functions deploy cleanup_overtime_evidence
 | `process_overtime_evidence` | Background OCR of overtime authorization screenshots (ocr.space). |
 | `cleanup_overtime_evidence` | Service-role-only deletion of expired overtime images and records. |
 | `delete_user` | Manager-only hard delete of an inactive account, with guards and an audit-log entry. |
+| `create_employee` | Manager/owner creation of an already-confirmed employee account with an optional generated temporary password. |
+| `reset_employee_password` | Manager/owner generation of a new one-time-displayed temporary password without deleting payroll history. |
 
 The frontend sends authenticated bearer tokens to user-facing functions. Keep normal JWT verification/authentication behavior aligned with each function's own authorization checks; do not expose service-role credentials to the browser.
 

@@ -33,6 +33,25 @@ function json(data: unknown, status = 200) {
   });
 }
 
+async function removeUserStorage(admin: ReturnType<typeof createClient>, userId: string) {
+  const buckets = ["ccq-cards", "meal-receipts", "overtime-evidence", "parking-receipts"];
+  for (const bucket of buckets) {
+    let offset = 0;
+    while (true) {
+      const { data, error } = await admin.storage.from(bucket).list(userId, { limit: 100, offset });
+      if (error) throw new Error(`Unable to clean ${bucket}: ${error.message}`);
+      const paths = (data || []).filter((item) => item.id).map((item) => `${userId}/${item.name}`);
+      if (paths.length > 0) {
+        const { error: removeError } = await admin.storage.from(bucket).remove(paths);
+        if (removeError) throw new Error(`Unable to clean ${bucket}: ${removeError.message}`);
+      }
+      if ((data || []).length < 100) break;
+      // Removed rows disappear from the first page; continue at offset zero.
+      offset = 0;
+    }
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
 
@@ -93,7 +112,11 @@ serve(async (req) => {
       }, 409);
     }
 
-    // Delete the auth user; profile and the user's own rows cascade automatically.
+    // Storage objects do not cascade when an Auth user is deleted. Remove every known
+    // per-user folder first so "delete" really removes the employee's account data.
+    await removeUserStorage(admin, userId);
+
+    // Delete the auth user; profile and the user's own database rows cascade automatically.
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr) return json({ ok: false, error: delErr.message }, 500);
 

@@ -225,10 +225,10 @@ serve(async (req) => {
         // Pay basis for the Apps Script sheet: 'admin' (administration/office) staff are
         // paid a flat hourly rate, NOT on the CCQ wage grid, so the sheet must apply flat
         // pay (no CCQ premiums/overtime rules) for these rows. Everyone else is 'ccq'.
-        employee_pay_basis: prof?.role === "admin" ? "flat_hourly" : "ccq",
+        employee_pay_basis: prof?.role === "subcontractor_1" ? "subcontractor" : prof?.role === "admin" ? "flat_hourly" : "ccq",
         // Flat hourly rate for administration ('admin') staff — the sheet multiplies paid
         // hours by this for their pay. Empty for CCQ employees (the sheet uses the CCQ grid).
-        employee_hourly_rate: prof?.role === "admin" ? (prof?.hourly_rate ?? "") : "",
+        employee_hourly_rate: ["admin", "subcontractor_1"].includes(prof?.role ?? "") ? (prof?.hourly_rate ?? "") : "",
         // Overtime policy: when true, the first overtime hour of the week is paid at
         // double time (no 1.5x tier). The sheet applies the CCQ overtime split, so it
         // needs this flag to match SparkLog's calculation.
