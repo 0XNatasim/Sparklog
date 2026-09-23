@@ -9,6 +9,7 @@ import { weekStartSundayD, weekEndingSaturdayD, ccqWeekNumber } from "@/lib/ccq-
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
 import CongesIndemnityManager from "@/components/CongesIndemnityManager";
+import { isNonCcqRole } from "@/lib/roles";
 
 function montrealToday() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -111,7 +112,7 @@ export default function CostingDashboard() {
         const level = profile?.apprentice_level || null;
         // Administration staff are non-CCQ: no CCQ level → no employer contributions,
         // and no 13% CCQ congés indemnity (that is a CCQ advantage they don't get).
-        const isNonCcq = profile?.role === "admin";
+        const isNonCcq = isNonCcqRole(profile?.role);
         const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
         let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, totalKm = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;

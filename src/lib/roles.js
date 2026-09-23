@@ -1,4 +1,5 @@
-// Role helpers. Roles are stored lowercase: 'employee', 'manager', 'admin', 'owner'.
+// Role helpers. Roles are stored lowercase: 'employee', 'subcontractor_1', 'manager',
+// 'admin', 'owner'.
 //
 // Tiers:
 //   employee — the crew (CCQ tradesperson)
@@ -31,11 +32,17 @@ export function isAdminEmployee(role) {
   return role === "admin";
 }
 
+// A subcontractor records time like an employee, but is outside the company's payroll
+// and CCQ reporting populations.
+export function isSubcontractorRole(role) {
+  return role === "subcontractor_1";
+}
+
 // True when the role is NOT a CCQ tradesperson: administration/office staff and the
 // owner (management). These use the flat-hourly presentation and carry no CCQ export
 // metadata (annexe, wage schedule, NAS, etc.).
 export function isNonCcqRole(role) {
-  return role === "admin" || role === "owner";
+  return role === "admin" || role === "owner" || isSubcontractorRole(role);
 }
 
 // True when the role may see sensitive data (NAS/SIN) and assign roles. Owner only.

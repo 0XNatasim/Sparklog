@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
+import { Briefcase, CalendarDays, ChevronDown, Copy, Crown, Eye, KeyRound, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
 import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged } from "@/lib/roles";
 import NasField from "./NasField";
@@ -27,7 +27,7 @@ const LEVELS = [
 
 // Ordering of the employees list: owner first, then administration, then managers,
 // then employees. Within each group the list stays alphabetical (paused sink last).
-const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3 };
+const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3, subcontractor_1: 4 };
 const roleRank = (role) => (role in ROLE_ORDER ? ROLE_ORDER[role] : 4);
 
 export default function EmployeesPanel() {
@@ -39,6 +39,8 @@ export default function EmployeesPanel() {
   const [nasSet, setNasSet] = useState(new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [passwordResetId, setPasswordResetId] = useState(null);
+  const [temporaryCredentials, setTemporaryCredentials] = useState(null);
   const [timeOff, setTimeOff] = useState(new Map());
   const [timeOffDraft, setTimeOffDraft] = useState({});
   const today = dayjs().format("YYYY-MM-DD");
@@ -263,6 +265,41 @@ export default function EmployeesPanel() {
     }
   }
 
+  async function resetTemporaryPassword(profile) {
+    if (passwordResetId) return;
+    if (!window.confirm(t("employees.passwordResetConfirm", { name: profile.full_name || profile.email }))) return;
+    setPasswordResetId(profile.id);
+    setTemporaryCredentials(null);
+    setErr("");
+    try {
+      const { data, error } = await supabase.functions.invoke("reset_employee_password", {
+        body: { userId: profile.id },
+      });
+      if (error) {
+        let message = error.message;
+        try { const context = await error.context?.json?.(); if (context?.error) message = context.error; } catch { /* keep default */ }
+        throw new Error(message);
+      }
+      if (!data?.ok) throw new Error(data?.error || t("employees.passwordResetFailed"));
+      setTemporaryCredentials({ userId: profile.id, email: data.email, password: data.password });
+    } catch (error) {
+      setErr(error?.message || t("employees.passwordResetFailed"));
+    } finally {
+      setPasswordResetId(null);
+    }
+  }
+
+  async function copyTemporaryPassword() {
+    if (!temporaryCredentials?.password) return;
+    try {
+      await navigator.clipboard.writeText(temporaryCredentials.password);
+      setInfo(t("employees.passwordCopied"));
+      setTimeout(() => setInfo(""), 2500);
+    } catch {
+      setErr(t("employees.passwordCopyFailed"));
+    }
+  }
+
   async function saveClassification(profile, field, value) {
     setLocal(profile.id, field, value);
     await saveField(profile.id, field, value);
@@ -357,7 +394,6 @@ export default function EmployeesPanel() {
       {info && (
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
       )}
-
       {!loading && rateSuggestions.size > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <span>{t("employees.rates.pending", { count: rateSuggestions.size })}</span>
@@ -455,12 +491,15 @@ export default function EmployeesPanel() {
                 </div>
                 <p className="text-xs text-muted-foreground">{t("employees.chooseTypeHint")}</p>
                 {privileged ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "employee")}>
                       {t("employees.typeCcq")}
                     </Button>
                     <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "admin")}>
                       {t("employees.typeAdmin")}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "subcontractor_1")}>
+                      {t("employees.typeSubcontractor1")}
                     </Button>
                   </div>
                 ) : (
@@ -494,6 +533,7 @@ export default function EmployeesPanel() {
                     className="h-9"
                   >
                     <option value="employee">{t("manager.employee")}</option>
+                    <option value="subcontractor_1">{t("manager.subcontractor1Label")}</option>
                     {/* `manager` is hidden from the picker (owner + admin + employee cover this
                         deployment); still shown if a profile already has it, so it isn't lost. */}
                     {p.role === "manager" && <option value="manager">{t("manager.roleLabel")}</option>}
@@ -605,7 +645,7 @@ export default function EmployeesPanel() {
             {isNonCcqRole(p.role) && (
               <details className="group rounded-lg border" open>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
-                  <span className="truncate">{t("employees.adminPayroll")}</span>
+                  <span className="truncate">{p.role === "subcontractor_1" ? t("employees.subcontractorTerms") : t("employees.adminPayroll")}</span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="space-y-3 border-t p-3">
@@ -733,7 +773,7 @@ export default function EmployeesPanel() {
                     value={p.phone_data_reimbursement ?? ""}
                     onChange={(e) => setLocal(p.id, "phone_data_reimbursement", e.target.value)}
                     onBlur={(e) => saveField(p.id, "phone_data_reimbursement", e.target.value)}
-                    placeholder="0.00"
+                    placeholder="7.00"
                     className="h-9"
                   />
                   <span className="text-xs text-muted-foreground">/{t("employees.perWeek")}</span>
@@ -866,6 +906,49 @@ export default function EmployeesPanel() {
                 </div>
               </div>
             </details>
+            )}
+
+            {!isManagerRole(p.role) && p.id !== user?.id && (
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">{t("employees.passwordResetTitle")}</div>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("employees.passwordResetHint")}</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" disabled={passwordResetId === p.id} onClick={() => resetTemporaryPassword(p)}>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    {passwordResetId === p.id ? t("common.working") : t("employees.passwordResetButton")}
+                  </Button>
+                </div>
+                {temporaryCredentials?.userId === p.id && (
+                  <div className="mt-3 rounded-md border border-green-300 bg-green-50 p-3 text-green-950 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100" role="status">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold">{t("employees.passwordResetDone")}</div>
+                        <div className="mt-1 break-all text-xs">{temporaryCredentials.email}</div>
+                        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Input
+                            type="text"
+                            readOnly
+                            value={temporaryCredentials.password}
+                            aria-label={t("employees.add.tempPassword")}
+                            className="h-10 bg-white font-mono text-base font-bold tracking-wider text-slate-950 dark:bg-slate-950 dark:text-white sm:max-w-xs"
+                            onFocus={(event) => event.currentTarget.select()}
+                          />
+                          <Button type="button" size="sm" variant="outline" onClick={copyTemporaryPassword}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            {t("employees.copyPassword")}
+                          </Button>
+                        </div>
+                        <p className="mt-2 text-xs">{t("employees.add.share")}</p>
+                      </div>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setTemporaryCredentials(null)} aria-label={t("common.cancel")}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {p.is_paused && !isManagerRole(p.role) && p.id !== user?.id && (

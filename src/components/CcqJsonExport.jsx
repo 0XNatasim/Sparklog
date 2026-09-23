@@ -50,7 +50,8 @@ export default function CcqJsonExport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The CCQ report covers CCQ tradespeople only. Non-CCQ roles (administration + owner)
+  // The CCQ report covers CCQ tradespeople only. Non-CCQ roles (administration,
+  // subcontractors, and owner)
   // are paid flat-hourly off the CCQ grid, so they are excluded from this export.
   const ccqProfiles = useMemo(() => profiles.filter((profile) => !isNonCcqRole(profile.role)), [profiles]);
 
