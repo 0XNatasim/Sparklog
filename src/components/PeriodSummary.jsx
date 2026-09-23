@@ -8,6 +8,7 @@ import { jobCodeKind } from "@/lib/job-code";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import { formatHM } from "@/lib/time";
 import { useT } from "@/lib/use-t";
+import { isNonCcqRole } from "@/lib/roles";
 
 dayjs.extend(isoWeek);
 
@@ -85,7 +86,7 @@ export default function PeriodSummary({ mode = "week" }) {
       (jobs || []).forEach((j) => bucket(j.job_date).jobs.push(j));
       (meals || []).forEach((m) => {
         const prof = profileById.get(m.user_id);
-        if (prof?.role !== "admin") bucket(m.job_date).meals += Number(m.amount) || 0; // meals = CCQ supper, not for admin
+        if (!isNonCcqRole(prof?.role)) bucket(m.job_date).meals += Number(m.amount) || 0; // CCQ supper only
       });
       (parking || []).forEach((p) => { bucket(p.job_date).parking += Number(p.amount) || 0; });
 
@@ -101,7 +102,7 @@ export default function PeriodSummary({ mode = "week" }) {
         let labor = 0, conges = 0, contribTotal = 0, kmCost = 0, workedMin = 0, otJobs = 0, phoneData = 0;
         for (const [uid, ujobs] of byUser) {
           const profile = profileById.get(uid);
-          const isNonCcq = profile?.role === "admin";
+          const isNonCcq = isNonCcqRole(profile?.role);
           // Weekly phone/data reimbursement × distinct CCQ weeks worked in this bucket.
           const weeksWorked = new Set(ujobs.map((j) => ccqWeek(j.job_date).key)).size;
           phoneData += weeksWorked * (Number(profile?.phone_data_reimbursement) || 0);
