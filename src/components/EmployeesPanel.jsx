@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Briefcase, CalendarDays, ChevronDown, Copy, Crown, Eye, KeyRound, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
 import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
+import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
+import TimeOffControls from "@/components/TimeOffControls";
 import NasField from "./NasField";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -42,7 +44,6 @@ export default function EmployeesPanel() {
   const [passwordResetId, setPasswordResetId] = useState(null);
   const [temporaryCredentials, setTemporaryCredentials] = useState(null);
   const [timeOff, setTimeOff] = useState(new Map());
-  const [timeOffDraft, setTimeOffDraft] = useState({});
   const today = dayjs().format("YYYY-MM-DD");
   const [loading, setLoading]   = useState(true);
   const [err, setErr]           = useState("");
@@ -137,11 +138,12 @@ export default function EmployeesPanel() {
   }
 
   async function loadTimeOff() {
-    // Upcoming / current time off (anything not fully in the past).
+    // Upcoming / current dated time off (not fully past) plus live weekly recurrences
+    // (open-ended, i.e. end_date is null, or an "until" still in the future).
     const { data } = await supabase
       .from("employee_time_off")
-      .select("id, user_id, start_date, end_date")
-      .gte("end_date", today)
+      .select(TIME_OFF_COLUMNS)
+      .or(`end_date.gte.${today},end_date.is.null`)
       .order("start_date", { ascending: true });
     const map = new Map();
     (data || []).forEach((row) => {
@@ -152,31 +154,6 @@ export default function EmployeesPanel() {
   }
 
   useEffect(() => { load(); loadTimeOff(); }, []);
-
-  async function addTimeOff(employeeId) {
-    const draft = timeOffDraft[employeeId] || {};
-    const from = draft.from;
-    const to = draft.to || draft.from;
-    if (!from) return;
-    if (to < from) { setErr(t("timeOff.rangeError")); return; }
-    setErr("");
-    const { error } = await supabase.from("employee_time_off").insert({ user_id: employeeId, start_date: from, end_date: to });
-    if (error) { setErr(error.message); return; }
-    setTimeOffDraft((current) => ({ ...current, [employeeId]: { from: "", to: "" } }));
-    await loadTimeOff();
-  }
-
-  async function removeTimeOff(id) {
-    const { error } = await supabase.from("employee_time_off").delete().eq("id", id);
-    if (error) { setErr(error.message); return; }
-    await loadTimeOff();
-  }
-
-  function fmtRange(row) {
-    return row.start_date === row.end_date
-      ? dayjs(row.start_date).format("DD MMM YYYY")
-      : `${dayjs(row.start_date).format("DD MMM")} – ${dayjs(row.end_date).format("DD MMM YYYY")}`;
-  }
 
   function setLocal(id, field, value) {
     setProfiles((prev) =>
@@ -629,28 +606,7 @@ export default function EmployeesPanel() {
               </summary>
               <div className="border-t p-3">
               <p className="mb-2 text-xs text-muted-foreground">{t("timeOff.description")}</p>
-              {(timeOff.get(p.id) || []).length > 0 && (
-                <div className="mb-2 space-y-1">
-                  {(timeOff.get(p.id) || []).map((row) => (
-                    <div key={row.id} className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-sm">
-                      <span>{fmtRange(row)}</span>
-                      <button type="button" onClick={() => removeTimeOff(row.id)} aria-label={t("common.cancel")} className="rounded p-1 text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="text-xs">
-                  <span className="mb-1 block text-muted-foreground">{t("timeOff.from")}</span>
-                  <Input type="date" value={timeOffDraft[p.id]?.from || ""} onChange={(e) => setTimeOffDraft((c) => ({ ...c, [p.id]: { ...(c[p.id] || {}), from: e.target.value } }))} className="h-9" />
-                </label>
-                <label className="text-xs">
-                  <span className="mb-1 block text-muted-foreground">{t("timeOff.to")}</span>
-                  <Input type="date" value={timeOffDraft[p.id]?.to || ""} onChange={(e) => setTimeOffDraft((c) => ({ ...c, [p.id]: { ...(c[p.id] || {}), to: e.target.value } }))} className="h-9" />
-                </label>
-                <Button type="button" size="sm" onClick={() => addTimeOff(p.id)}>{t("timeOff.add")}</Button>
-              </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">{t("timeOff.hint")}</p>
+              <TimeOffControls employeeId={p.id} rows={timeOff.get(p.id) || []} onChanged={loadTimeOff} />
               </div>
             </details>
 
