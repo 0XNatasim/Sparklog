@@ -27,7 +27,7 @@ const LEVELS = [
 
 // Ordering of the employees list: owner first, then administration, then managers,
 // then employees. Within each group the list stays alphabetical (paused sink last).
-const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3 };
+const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3, subcontractor_1: 4 };
 const roleRank = (role) => (role in ROLE_ORDER ? ROLE_ORDER[role] : 4);
 
 export default function EmployeesPanel() {
@@ -491,12 +491,15 @@ export default function EmployeesPanel() {
                 </div>
                 <p className="text-xs text-muted-foreground">{t("employees.chooseTypeHint")}</p>
                 {privileged ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "employee")}>
                       {t("employees.typeCcq")}
                     </Button>
                     <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "admin")}>
                       {t("employees.typeAdmin")}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "subcontractor_1")}>
+                      {t("employees.typeSubcontractor1")}
                     </Button>
                   </div>
                 ) : (
@@ -530,6 +533,7 @@ export default function EmployeesPanel() {
                     className="h-9"
                   >
                     <option value="employee">{t("manager.employee")}</option>
+                    <option value="subcontractor_1">{t("manager.subcontractor1Label")}</option>
                     {/* `manager` is hidden from the picker (owner + admin + employee cover this
                         deployment); still shown if a profile already has it, so it isn't lost. */}
                     {p.role === "manager" && <option value="manager">{t("manager.roleLabel")}</option>}
@@ -641,7 +645,7 @@ export default function EmployeesPanel() {
             {isNonCcqRole(p.role) && (
               <details className="group rounded-lg border" open>
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
-                  <span className="truncate">{t("employees.adminPayroll")}</span>
+                  <span className="truncate">{p.role === "subcontractor_1" ? t("employees.subcontractorTerms") : t("employees.adminPayroll")}</span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="space-y-3 border-t p-3">

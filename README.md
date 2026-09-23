@@ -9,6 +9,7 @@ Roles are stored lowercase in `profiles.role`:
 | Role | Access |
 |---|---|
 | `employee` | Records and submits their own jobs; sees only their own data. |
+| `subcontractor_1` | Sous-traitant-1: uses the employee time-entry workflow but is excluded from DAS payroll calculations and CCQ reports. |
 | `manager` | Full manager workspace: review, approve, export, employee settings, costing. |
 | `admin` | Administration/office staff. Manager-tier access to every screen **except** NAS/SIN, but **non-CCQ**: paid a flat hourly rate, and excluded from CCQ advantages (no leave indemnity, employer contributions, or meal allowance in costing). |
 | `owner` | The company owner — manager-tier **and** privileged (NAS/SIN reveal, role assignment, crown). Replaces the former hard-coded owner/dev accounts, so a fork just marks one account `owner`. |
@@ -178,7 +179,9 @@ where email = 'owner@example.com';
 ```
 
 Use `role = 'manager'` for additional supervisors, `role = 'admin'` for non-CCQ
-administration staff. Once an owner exists, roles can be assigned from Manager → Employees.
+administration staff, and `role = 'subcontractor_1'` for subcontractors who enter time
+but must stay outside DAS and CCQ reports. Once an owner exists, roles can be assigned
+from Manager → Employees.
 
 ## Private evidence storage
 
