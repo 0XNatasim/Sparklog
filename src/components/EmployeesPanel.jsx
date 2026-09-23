@@ -773,7 +773,7 @@ export default function EmployeesPanel() {
                     value={p.phone_data_reimbursement ?? ""}
                     onChange={(e) => setLocal(p.id, "phone_data_reimbursement", e.target.value)}
                     onBlur={(e) => saveField(p.id, "phone_data_reimbursement", e.target.value)}
-                    placeholder="0.00"
+                    placeholder="7.00"
                     className="h-9"
                   />
                   <span className="text-xs text-muted-foreground">/{t("employees.perWeek")}</span>

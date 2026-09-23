@@ -28,6 +28,8 @@ Roles are stored lowercase in `profiles.role`:
 - Review job history and weekly totals.
 - Complete first-login work-region and union-association onboarding.
 - View manager-enabled company forms from the Profile page.
+- New profiles default to `compagnon`, a `$0.65/km` mileage rate, and a `$7/week`
+  cell-data reimbursement; managers can adjust these values per employee.
 
 ### Managers
 
