@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { computeEmployeeWeekTalon, snapshotFromRow } from "@/payroll";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
+import { isNonCcqRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 
 const n = (v) => Number(v) || 0;
@@ -58,7 +59,9 @@ export default function DasTab() {
         if (pErr) throw pErr;
         if (jErr) throw jErr;
         if (cancelled) return;
-        setEmployees(profs || []);
+        // DAS are CCQ source deductions — subcontractors (billed by the trade, we receive
+        // their invoice) and other non-CCQ roles are not remitted here.
+        setEmployees((profs || []).filter((e) => !isNonCcqRole(e.role)));
 
         const jByE = new Map();
         const weeks = new Map();

@@ -53,6 +53,12 @@ export function payrollWeekKey(jobDate) {
 // Map an employee profile row to the per-employee overtime options used by the
 // calculation. Keeps every caller in sync as policies are added.
 export function overtimeOptionsFromProfile(profile) {
+  // Subcontractors bill simple up to 8h/day and double beyond (no 1.5x tier), and their
+  // return-to-warehouse time is always at the simple rate when the day exceeds 8h. Enforce
+  // this regardless of the stored toggles so the subcontractor rule always holds.
+  if (profile?.role === "subcontractor_1") {
+    return { firstOtHourDouble: true, returnOtNoBenefits: true };
+  }
   return {
     firstOtHourDouble: Boolean(profile?.overtime_first_hour_double),
     returnOtNoBenefits: Boolean(profile?.return_overtime_no_benefits),
