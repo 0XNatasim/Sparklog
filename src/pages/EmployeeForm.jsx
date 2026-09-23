@@ -224,7 +224,10 @@ export default function EmployeeForm() {
       const totalKm = Number(data.km_total) || (Number(data.km_aller) || 0) + (Number(data.km_retour) || 0);
       setKmAller(String(totalKm || ""));
       if (data.parking_receipt_captured) {
-        const { data: parkingReceipt } = await supabase.from("parking_receipts").select("amount").eq("job_id", data.id).maybeSingle();
+        const { data: parkingReceipt } = await withTimeout(
+          supabase.from("parking_receipts").select("amount").eq("job_id", data.id).maybeSingle(),
+          10000
+        );
         setParkingAmount(parkingReceipt?.amount == null ? "" : String(parkingReceipt.amount));
       } else {
         setParkingAmount("");
@@ -414,12 +417,13 @@ export default function EmployeeForm() {
       let savedJobId = editId || forcedId;
 
       if (editId) {
-        const { error } = await withTimeout(
-          supabase.from("jobs").update(payload).eq("id", editId),
-          15000,
-          "Save"
+        // withRetry caps each attempt with a timeout AND refreshes the session after the
+        // first failure — this is what un-sticks the "app stalls, refresh fixes it" case,
+        // which is a stale/hung auth token. It never waits forever. The update is idempotent.
+        await withRetry(
+          () => supabase.from("jobs").update(payload).eq("id", editId),
+          12000
         );
-        if (error) throw error;
 
         setInfo(nextStatus === "submitted" ? "form.toasts.submitted" : "form.toasts.updated");
         setStatus(nextStatus);
@@ -428,23 +432,28 @@ export default function EmployeeForm() {
       } else {
         // C-3: attach a per-new-entry idempotency key and UPSERT on (user_id, submission_key).
         // A retried timeout that already committed, or a double submit, resolves to the SAME
-        // row instead of inserting a duplicate.
+        // row instead of inserting a duplicate — so the automatic retry below is safe.
         if (!submissionKeyRef.current) submissionKeyRef.current = crypto.randomUUID();
         const submissionKey = submissionKeyRef.current;
         const insertPayload = { ...payload, submission_key: submissionKey, ...(forcedId ? { id: forcedId } : {}) };
-        let data, error;
-        ({ data, error } = await withTimeout(
-          supabase.from("jobs").upsert(insertPayload, { onConflict: "user_id,submission_key" }).select("id").single(),
-          15000,
-          "Save"
-        ));
-        if (error) {
+        let data;
+        try {
+          const result = await withRetry(
+            () => supabase.from("jobs").upsert(insertPayload, { onConflict: "user_id,submission_key" }).select("id").single(),
+            12000
+          );
+          data = result.data;
+        } catch (upsertErr) {
           // Idempotent recovery: if a row for this key already committed (e.g. a prior
           // attempt whose response we lost, now locked so the conflicting UPDATE is
-          // refused), adopt it instead of surfacing an error or making a duplicate.
-          const { data: existing } = await supabase.from("jobs").select("id").eq("user_id", user.id).eq("submission_key", submissionKey).maybeSingle();
-          if (existing?.id) { data = existing; error = null; }
-          else throw error;
+          // refused), adopt it instead of surfacing an error or making a duplicate. Timed
+          // out so it can never hang.
+          const { data: existing } = await withTimeout(
+            supabase.from("jobs").select("id").eq("user_id", user.id).eq("submission_key", submissionKey).maybeSingle(),
+            8000
+          );
+          if (existing?.id) data = existing;
+          else throw upsertErr;
         }
         if (!data?.id) throw new Error(t("form.errors.insertNoId"));
         savedJobId = data.id;
@@ -488,26 +497,35 @@ export default function EmployeeForm() {
     const receiptId = crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${receiptId}.jpg`;
     const image = await compressImage(file);
-    const { error: uploadError } = await supabase.storage
-      .from("parking-receipts")
-      .upload(storagePath, image, { contentType: "image/jpeg", upsert: false });
+    // Every call is timed out so a bad connection surfaces a retryable error instead of
+    // freezing the save button forever.
+    const { error: uploadError } = await withTimeout(
+      supabase.storage.from("parking-receipts").upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
+      20000
+    );
     if (uploadError) throw uploadError;
 
-    const { data: savedReceipt, error: receiptError } = await supabase.from("parking_receipts").upsert({
-      job_id: jobId,
-      user_id: user.id,
-      job_date,
-      storage_path: storagePath,
-      amount,
-    }, { onConflict: "job_id" }).select("id").single();
+    const { data: savedReceipt, error: receiptError } = await withTimeout(
+      supabase.from("parking_receipts").upsert({
+        job_id: jobId,
+        user_id: user.id,
+        job_date,
+        storage_path: storagePath,
+        amount,
+      }, { onConflict: "job_id" }).select("id").single(),
+      12000
+    );
     if (receiptError) throw receiptError;
-    const { error: notificationError } = await supabase.from("manager_notifications").insert({
-      type: "parking_receipt",
-      employee_id: user.id,
-      job_id: jobId,
-      parking_receipt_id: savedReceipt.id,
-      daily_minutes: 0,
-    });
+    const { error: notificationError } = await withTimeout(
+      supabase.from("manager_notifications").insert({
+        type: "parking_receipt",
+        employee_id: user.id,
+        job_id: jobId,
+        parking_receipt_id: savedReceipt.id,
+        daily_minutes: 0,
+      }),
+      12000
+    );
     if (notificationError) throw notificationError;
   }
 
@@ -617,12 +635,10 @@ export default function EmployeeForm() {
     // Meal (supper) claims are a CCQ field-crew benefit; office staff are non-CCQ.
     if (officeEmployee) return false;
     if (!isMealEligible({ jobDate: job_date, dailyWorkMinutes: overtimeDailyMinutes })) return false;
-    const { data, error } = await supabase
-      .from("meal_claims")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("job_date", job_date)
-      .limit(1);
+    const { data, error } = await withTimeout(
+      supabase.from("meal_claims").select("id").eq("user_id", user.id).eq("job_date", job_date).limit(1),
+      10000
+    );
     if (error) throw error;
     return (data || []).length === 0 && Boolean(jobId);
   }
@@ -630,26 +646,35 @@ export default function EmployeeForm() {
   async function createMealClaim(jobId) {
     try {
       const claimId = crypto.randomUUID();
-      const { error: claimError } = await supabase.from("meal_claims").insert({
-        id: claimId,
-        user_id: user.id,
-        job_id: jobId,
-        job_date,
-        amount: 30,
-        status: "pending",
-        storage_path: null,
-        daily_work_minutes: overtimeDailyMinutes,
-      });
+      const { error: claimError } = await withTimeout(
+        supabase.from("meal_claims").insert({
+          id: claimId,
+          user_id: user.id,
+          job_id: jobId,
+          job_date,
+          amount: 30,
+          status: "pending",
+          storage_path: null,
+          daily_work_minutes: overtimeDailyMinutes,
+        }),
+        12000
+      );
       if (claimError) throw claimError;
-      const { error: mealFlagError } = await supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", jobId);
+      const { error: mealFlagError } = await withTimeout(
+        supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", jobId),
+        12000
+      );
       if (mealFlagError) throw mealFlagError;
-      const { error: notificationError } = await supabase.from("manager_notifications").insert({
-        type: "meal_claim",
-        employee_id: user.id,
-        job_id: jobId,
-        meal_claim_id: claimId,
-        daily_minutes: overtimeDailyMinutes,
-      });
+      const { error: notificationError } = await withTimeout(
+        supabase.from("manager_notifications").insert({
+          type: "meal_claim",
+          employee_id: user.id,
+          job_id: jobId,
+          meal_claim_id: claimId,
+          daily_minutes: overtimeDailyMinutes,
+        }),
+        12000
+      );
       if (notificationError) throw notificationError;
       return true;
     } catch (error) {
@@ -698,7 +723,10 @@ export default function EmployeeForm() {
       if (!savedJobId) {
         savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
         if (!savedJobId) {
-          const { data: partiallySavedJob } = await supabase.from("jobs").select("id").eq("id", jobId).maybeSingle();
+          const { data: partiallySavedJob } = await withTimeout(
+            supabase.from("jobs").select("id").eq("id", jobId).maybeSingle(),
+            8000
+          );
           if (partiallySavedJob?.id) setPendingEvidenceJobId(partiallySavedJob.id);
           console.error("[overtime evidence] Job save or parking receipt save failed", { jobId, reason: lastSaveErrorRef.current });
           throw new Error(lastSaveErrorRef.current || t("form.evidence.jobSaveFailed"));
