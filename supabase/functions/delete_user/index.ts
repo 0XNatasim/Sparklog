@@ -33,23 +33,30 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function removeUserStorage(admin: ReturnType<typeof createClient>, userId: string) {
+// Best-effort per-user storage cleanup. Returns a list of non-fatal warnings instead of
+// throwing, so a storage hiccup can never block removing the account itself.
+async function removeUserStorage(admin: ReturnType<typeof createClient>, userId: string): Promise<string[]> {
   const buckets = ["ccq-cards", "meal-receipts", "overtime-evidence", "parking-receipts"];
+  const warnings: string[] = [];
   for (const bucket of buckets) {
-    let offset = 0;
-    while (true) {
-      const { data, error } = await admin.storage.from(bucket).list(userId, { limit: 100, offset });
-      if (error) throw new Error(`Unable to clean ${bucket}: ${error.message}`);
-      const paths = (data || []).filter((item) => item.id).map((item) => `${userId}/${item.name}`);
-      if (paths.length > 0) {
+    try {
+      // Removed rows disappear from the first page, so we always re-list from offset 0.
+      // A guard cap prevents an infinite loop if a remove silently fails to clear a page.
+      for (let guard = 0; guard < 100; guard++) {
+        const { data, error } = await admin.storage.from(bucket).list(userId, { limit: 100, offset: 0 });
+        if (error) { warnings.push(`list ${bucket}: ${error.message}`); break; }
+        const items = data || [];
+        const paths = items.filter((item) => item.id).map((item) => `${userId}/${item.name}`);
+        if (paths.length === 0) break;
         const { error: removeError } = await admin.storage.from(bucket).remove(paths);
-        if (removeError) throw new Error(`Unable to clean ${bucket}: ${removeError.message}`);
+        if (removeError) { warnings.push(`remove ${bucket}: ${removeError.message}`); break; }
+        if (items.length < 100) break;
       }
-      if ((data || []).length < 100) break;
-      // Removed rows disappear from the first page; continue at offset zero.
-      offset = 0;
+    } catch (e) {
+      warnings.push(`${bucket}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
+  return warnings;
 }
 
 serve(async (req) => {
@@ -113,12 +120,15 @@ serve(async (req) => {
     }
 
     // Storage objects do not cascade when an Auth user is deleted. Remove every known
-    // per-user folder first so "delete" really removes the employee's account data.
-    await removeUserStorage(admin, userId);
+    // per-user folder first so "delete" really removes the employee's account data. This
+    // is best-effort: any failure is collected as a warning, never thrown, so it cannot
+    // block the account deletion below (orphaned objects can be reconciled separately).
+    const storageWarnings = await removeUserStorage(admin, userId);
+    if (storageWarnings.length > 0) console.warn("[delete_user] storage cleanup warnings:", storageWarnings);
 
     // Delete the auth user; profile and the user's own database rows cascade automatically.
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
-    if (delErr) return json({ ok: false, error: delErr.message }, 500);
+    if (delErr) return json({ ok: false, error: `Account deletion failed: ${delErr.message}` }, 500);
 
     // Record the deletion in the audit log (target snapshot survives the delete).
     await admin.from("audit_log").insert({
@@ -130,7 +140,11 @@ serve(async (req) => {
       details: { email: target.email },
     });
 
-    return json({ ok: true, deleted: { id: target.id, name: target.full_name, email: target.email } });
+    return json({
+      ok: true,
+      deleted: { id: target.id, name: target.full_name, email: target.email },
+      storageWarnings,
+    });
   } catch (e) {
     console.error("[delete_user] unexpected:", e);
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);

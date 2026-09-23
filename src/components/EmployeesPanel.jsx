@@ -246,6 +246,16 @@ export default function EmployeesPanel() {
     setDeleting(true);
     setErr("");
     try {
+      // A privileged delete needs a live login token. If the session has lapsed, invoke()
+      // would send the anon key and the function replies "Invalid session token" — check
+      // first and surface a clear re-auth message. getSession() refreshes an expired access
+      // token when a valid refresh token is still available.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        setErr(t("employees.sessionExpired"));
+        setConfirmDelete(null);
+        return;
+      }
       const { data, error } = await supabase.functions.invoke("delete_user", { body: { userId: profile.id } });
       if (error) {
         let message = error.message;
@@ -258,7 +268,8 @@ export default function EmployeesPanel() {
       setInfo(t("employees.deleted"));
       setTimeout(() => setInfo(""), 2500);
     } catch (e) {
-      setErr(e?.message || "Delete failed");
+      const raw = e?.message || "Delete failed";
+      setErr(/invalid session token|missing bearer token/i.test(raw) ? t("employees.sessionExpired") : raw);
       setConfirmDelete(null);
     } finally {
       setDeleting(false);
