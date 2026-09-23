@@ -4,7 +4,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, DollarSign, Download, ExternalLink, ShieldCheck, Wallet } from "lucide-react";
+import { Calculator, CalendarDays, DollarSign, Download, ExternalLink, FileText, ShieldCheck, Wallet } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
@@ -16,6 +16,7 @@ import PayrollEngineTester from "@/components/PayrollEngineTester";
 import TalonTab from "@/components/TalonTab";
 import DasTab from "@/components/DasTab";
 import WeekViewTab from "@/components/WeekViewTab";
+import RecordOfEmploymentTab from "@/components/RecordOfEmploymentTab";
 import AuditLog from "@/components/AuditLog";
 
 // ── Coûts section: Coûts (tableau) · Semaine · Mois ──────────────────────────
@@ -399,6 +400,7 @@ export default function Testing() {
     { id: "downloads", icon: Download, label: t("testing.sections.downloads"), description: t("testing.sections.downloadsDescription") },
     { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
     { id: "weekview", icon: CalendarDays, label: t("testing.weekView.tab"), description: t("testing.weekView.description") },
+    { id: "roe", icon: FileText, label: t("testing.roe.tab"), description: t("testing.roe.description") },
     { id: "payroll", icon: Wallet, label: t("testing.tabs.payroll"), description: t("testing.sections.payrollDescription") },
     { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
   ];
@@ -427,6 +429,7 @@ export default function Testing() {
       {section === "downloads" && <ManagerDownloads />}
       {section === "ccq" && <CcqRatesPanel />}
       {section === "weekview" && <WeekViewTab />}
+      {section === "roe" && <RecordOfEmploymentTab />}
       {section === "payroll" && <PayrollSection />}
       {section === "audit" && <AuditLog />}
     </div>
