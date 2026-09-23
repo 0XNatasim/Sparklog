@@ -5,7 +5,7 @@ import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
-import { formatTimeOff, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
+import { formatTimeOff, categoryLabel, TIME_OFF_CATEGORIES, DEFAULT_CATEGORY, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
 
 // One reusable congés editor for a single employee: the list of their entries (with delete)
 // plus an add form supporting the three kinds — full day(s), a specific hours window, or a
@@ -14,6 +14,7 @@ import { formatTimeOff, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
 export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
   const t = useT();
   const [mode, setMode] = useState("range"); // 'range' | 'hours' | 'recurring'
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [draft, setDraft] = useState({ from: "", to: "", date: "", start: "", end: "", weekdays: [], until: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -29,15 +30,16 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
       const to = draft.to || draft.from;
       if (!from) return;
       if (to < from) { setErr(t("timeOff.rangeError")); return; }
-      payload = { user_id: employeeId, kind: "range", start_date: from, end_date: to };
+      payload = { user_id: employeeId, category, kind: "range", start_date: from, end_date: to };
     } else if (mode === "hours") {
       if (!draft.date || !draft.start || !draft.end) { setErr(t("timeOff.hoursError")); return; }
       if (draft.end <= draft.start) { setErr(t("timeOff.hoursError")); return; }
-      payload = { user_id: employeeId, kind: "range", start_date: draft.date, end_date: draft.date, start_time: draft.start, end_time: draft.end };
+      payload = { user_id: employeeId, category, kind: "range", start_date: draft.date, end_date: draft.date, start_time: draft.start, end_time: draft.end };
     } else {
       if (draft.weekdays.length === 0) { setErr(t("timeOff.weekdaysError")); return; }
       payload = {
         user_id: employeeId,
+        category,
         kind: "recurring_weekly",
         start_date: draft.from || dayjs().format("YYYY-MM-DD"),
         end_date: draft.until || null,
@@ -75,7 +77,8 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
         <div className="mb-3 space-y-1">
           {rows.map((row) => (
             <div key={row.id} className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-sm">
-              <span className="flex items-center gap-2">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">{categoryLabel(row.category, t)}</span>
                 {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
                 {formatTimeOff(row, t)}
               </span>
@@ -84,6 +87,13 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
           ))}
         </div>
       )}
+
+      <label className="mb-2 block text-xs sm:max-w-xs">
+        <span className="mb-1 block text-muted-foreground">{t("timeOff.category")}</span>
+        <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+          {TIME_OFF_CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c, t)}</option>)}
+        </select>
+      </label>
 
       <div className="mb-2 flex flex-wrap gap-1.5">
         {tabBtn("range", t("timeOff.modeDays"))}
