@@ -119,6 +119,9 @@ export default function EmployeesPanel() {
       // CCQ rate for its level/annex; the manager applies them explicitly (applyRateSuggestions).
       const suggestions = new Map();
       nextProfiles.forEach((profile) => {
+        // Only CCQ tradespeople follow the wage grid. Owner/admin/manager and subcontractors
+        // have negotiated or flat rates, so never flag their pay against the CCQ rate.
+        if (isNonCcqRole(profile.role) || isManagerRole(profile.role)) return;
         const availableAnnexes = nextAnnexes.get(COMMERCIAL_RATE_SECTOR) || [];
         const annex = profile.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
         const rate = nextRates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
