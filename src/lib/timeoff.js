@@ -43,5 +43,14 @@ export function isOffOn(row, dateStr) {
   return !d.isBefore(start, "day") && !d.isAfter(end, "day");
 }
 
+// Time-off categories (informational — no pay effect). Value stored in employee_time_off.category.
+export const TIME_OFF_CATEGORIES = ["conge", "vacances", "absence", "temps_partiel"];
+export const DEFAULT_CATEGORY = "conge";
+
+// Label for a category in the active language.
+export function categoryLabel(category, t) {
+  return t(`timeOff.categories.${TIME_OFF_CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY}`);
+}
+
 // Columns to select wherever a row is read, so the helpers above have what they need.
-export const TIME_OFF_COLUMNS = "id, user_id, kind, start_date, end_date, start_time, end_time, weekdays, note";
+export const TIME_OFF_COLUMNS = "id, user_id, category, kind, start_date, end_date, start_time, end_time, weekdays, note";
