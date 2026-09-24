@@ -162,3 +162,64 @@ export async function parsePayStubPdf(file) {
 
   return { ytd, matched, asOf };
 }
+
+// Find the latest plausible pay-period-end date anywhere in the text. Handles
+// "au YYYY-MM-DD", bare YYYY-MM-DD, and DD/MM/YYYY. Returns "YYYY-MM-DD" or "".
+function extractPeriodEnd(allText) {
+  const dates = [];
+  const au = allText.match(/au\s+(\d{4}-\d{2}-\d{2})/i);
+  if (au) dates.push(au[1]);
+  for (const m of allText.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)) dates.push(`${m[1]}-${m[2]}-${m[3]}`);
+  for (const m of allText.matchAll(/\b(\d{2})[/-](\d{2})[/-](\d{4})\b/g)) dates.push(`${m[3]}-${m[2]}-${m[1]}`); // DD/MM/YYYY
+  const valid = dates.filter((d) => !Number.isNaN(Date.parse(d)));
+  if (!valid.length) return "";
+  valid.sort(); // ISO strings sort chronologically; the latest is the period end
+  return valid[valid.length - 1];
+}
+
+// Parse ONE prior pay stub into the per-period figures a Record of Employment needs:
+// the pay-period end date, the period's insurable earnings (EI) and insurable hours. Unlike
+// parsePayStubPdf (which reads the CUMULATIF column), this reads the PÉRIODE column — the
+// leftmost number of each run. Best-effort on unknown/old-provider layouts; the caller must
+// let the manager verify before saving. Returns { periodEnd, insurableEarnings, insurableHours }.
+export async function parseHistoricalPayStub(file) {
+  const items = await readItems(file);
+  if (!items.length) {
+    const err = new Error("no_text_layer");
+    err.code = "no_text_layer";
+    throw err;
+  }
+  const rows = toRows(items);
+  const runs = [];
+  for (const row of rows) for (const run of rowRuns(row)) runs.push(run);
+
+  // Period value = leftmost number of the matching run.
+  const periodValue = (matchers) => {
+    for (const m of matchers) {
+      const cands = runs.filter((r) => (m.exact ? r.labelNorm === m.text : r.labelNorm.includes(m.text)) && r.nums.length);
+      if (cands.length) {
+        // Prefer the leftmost occurrence (Transactions block holds the per-period column).
+        const run = cands.reduce((best, r) => (r.x < best.x ? r : best));
+        return run.nums[0];
+      }
+    }
+    return null;
+  };
+
+  const insurableEarnings = periodValue([
+    { text: "gains ae" },
+    { text: "gains assurables" },
+    { text: "remuneration assurable" },
+    { text: "salaire regulier" },
+    { text: "gains" },
+  ]);
+  const insurableHours = periodValue([
+    { text: "heures", exact: true },
+    { text: "heures" },
+  ]);
+
+  const allText = rows.map((r) => r.items.map((i) => i.str).join(" ")).join("\n");
+  const periodEnd = extractPeriodEnd(allText);
+
+  return { periodEnd, insurableEarnings, insurableHours };
+}
