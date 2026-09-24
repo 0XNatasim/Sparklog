@@ -347,6 +347,13 @@ export default function EmployeesPanel() {
     }
   }
 
+  // Roster counts for the "add employee" card header.
+  const activeCount = profiles.filter((p) => !p.is_paused).length;
+  const inactiveCount = profiles.filter((p) => p.is_paused).length;
+  const attentionCount = profiles.filter(
+    (p) => !p.is_paused && !isNonCcqRole(p.role) && getMissingEmployeeFields(p, t).length > 0
+  ).length;
+
   return (
     <div className="space-y-3">
       {err && (
@@ -373,7 +380,22 @@ export default function EmployeesPanel() {
         <Card>
           <CardContent className="p-4">
             {!addOpen ? (
-              <Button size="sm" onClick={() => { setAddOpen(true); setAddResult(null); }}>{t("employees.add.button")}</Button>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Button size="sm" onClick={() => { setAddOpen(true); setAddResult(null); }}>{t("employees.add.button")}</Button>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-1 font-semibold text-emerald-700 dark:text-emerald-300">
+                    {activeCount} · {t("employees.active")}
+                  </span>
+                  {attentionCount > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-1 font-semibold text-amber-700 dark:text-amber-300">
+                      <TriangleAlert className="h-3.5 w-3.5" />{attentionCount} · {t("employees.needAttention")}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 font-semibold text-muted-foreground">
+                    {inactiveCount} · {t("employees.paused")}
+                  </span>
+                </div>
+              </div>
             ) : (
               <form onSubmit={createEmployee} className="space-y-3">
                 <div className="flex items-center justify-between">
