@@ -32,6 +32,15 @@ const LEVELS = [
 const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3, subcontractor_1: 4 };
 const roleRank = (role) => (role in ROLE_ORDER ? ROLE_ORDER[role] : 4);
 
+// Read-only display name for a role (used when the viewer may not reassign roles).
+function roleName(role, t) {
+  if (role === "owner") return t("manager.bossLabel");
+  if (role === "admin") return t("manager.adminLabel");
+  if (role === "manager") return t("manager.roleLabel");
+  if (role === "subcontractor_1") return t("manager.subcontractor1Label");
+  return t("manager.employee");
+}
+
 export default function EmployeesPanel() {
   const t = useT();
   const { user, role } = useAuth();
@@ -474,31 +483,7 @@ export default function EmployeesPanel() {
                 <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
               </div>
             )}
-            {/* Role — only the owner may assign roles (see is_privileged / 0031, 0032).
-                The owner's own row is locked to avoid demoting the last owner by accident.
-                Hidden until the type is confirmed — the type gate above owns that first choice. */}
-            {privileged && p.type_confirmed && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field label={t("employees.roleLabel")}>
-                  <Select
-                    value={p.role || "employee"}
-                    disabled={p.id === user?.id}
-                    onChange={(e) => { const v = e.target.value; setLocal(p.id, "role", v); saveField(p.id, "role", v); }}
-                    className="h-9"
-                  >
-                    <option value="employee">{t("manager.employee")}</option>
-                    <option value="subcontractor_1">{t("manager.subcontractor1Label")}</option>
-                    {/* `manager` is hidden from the picker (owner + admin + employee cover this
-                        deployment); still shown if a profile already has it, so it isn't lost. */}
-                    {p.role === "manager" && <option value="manager">{t("manager.roleLabel")}</option>}
-                    <option value="admin">{t("manager.adminLabel")}</option>
-                    <option value="owner">{t("manager.bossLabel")}</option>
-                  </Select>
-                </Field>
-              </div>
-            )}
-
-            {/* Identity */}
+            {/* Ligne : No d'employé · Rôle · Actif/Inactif */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label={t("employees.employeeNumber")}>
                 <Input
@@ -509,9 +494,46 @@ export default function EmployeesPanel() {
                   className="h-9"
                 />
               </Field>
+              <Field label={t("employees.roleLabel")}>
+                {/* Only the owner may assign roles (0031/0032); the owner's own row is locked
+                    to avoid demoting the last owner. Everyone else sees the role read-only. */}
+                {privileged && p.type_confirmed ? (
+                  <Select
+                    value={p.role || "employee"}
+                    disabled={p.id === user?.id}
+                    onChange={(e) => { const v = e.target.value; setLocal(p.id, "role", v); saveField(p.id, "role", v); }}
+                    className="h-9"
+                  >
+                    <option value="employee">{t("manager.employee")}</option>
+                    <option value="subcontractor_1">{t("manager.subcontractor1Label")}</option>
+                    {p.role === "manager" && <option value="manager">{t("manager.roleLabel")}</option>}
+                    <option value="admin">{t("manager.adminLabel")}</option>
+                    <option value="owner">{t("manager.bossLabel")}</option>
+                  </Select>
+                ) : (
+                  <Input value={roleName(p.role, t)} readOnly className="h-9 bg-muted" />
+                )}
+              </Field>
+              <Field label={t("employees.pauseAccount")}>
+                <label className={`flex h-9 items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 ${p.type_confirmed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
+                  <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />{p.is_paused ? t("employees.paused") : t("employees.active")}</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(p.is_paused)}
+                    disabled={!p.type_confirmed}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setLocal(p.id, "is_paused", checked);
+                      saveField(p.id, "is_paused", checked);
+                    }}
+                    className="h-5 w-5 rounded border-input accent-amber-600 disabled:cursor-not-allowed"
+                  />
+                </label>
+                {!p.type_confirmed && <span className="text-[11px] text-amber-700 dark:text-amber-300">{t("employees.activateNeedsType")}</span>}
+              </Field>
             </div>
 
-            {/* Contact */}
+            {/* Ligne : téléphone · courriel · carte CCQ */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label={t("manager.tbl.phone")}>
                 <div className="flex items-center gap-1">
@@ -537,24 +559,23 @@ export default function EmployeesPanel() {
                   ) : <span className="text-muted-foreground">—</span>}
                 </div>
               </Field>
-              <Field label={t("employees.pauseAccount")}>
-                <label className={`flex h-9 items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 ${p.type_confirmed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
-                  <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />{p.is_paused ? t("employees.paused") : t("employees.active")}</span>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(p.is_paused)}
-                    disabled={!p.type_confirmed}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setLocal(p.id, "is_paused", checked);
-                      saveField(p.id, "is_paused", checked);
-                    }}
-                    className="h-5 w-5 rounded border-input accent-amber-600 disabled:cursor-not-allowed"
-                  />
-                </label>
-                {!p.type_confirmed && <span className="text-[11px] text-amber-700 dark:text-amber-300">{t("employees.activateNeedsType")}</span>}
+              <Field label={t("ccqCard.title")}>
+                {p.ccq_card_path ? (
+                  <Button type="button" size="sm" variant="outline" className="h-9 w-full sm:w-auto" onClick={() => toggleCard(p)}>
+                    {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
+                  </Button>
+                ) : (
+                  <span className="flex h-9 items-center text-xs text-muted-foreground">—</span>
+                )}
               </Field>
             </div>
+            {p.ccq_card_path && cardViews[p.id]?.open && (
+              <div className="rounded-lg border bg-muted/20 p-3">
+                {cardViews[p.id]?.loading && <div className="text-xs text-muted-foreground">{t("common.loading")}</div>}
+                {cardViews[p.id]?.url && <img src={cardViews[p.id].url} alt={t("ccqCard.title")} className="max-h-80 w-full rounded-md border object-contain" />}
+                {cardViews[p.id]?.error && <div className="text-xs text-destructive dark:text-red-300">{cardViews[p.id].error}</div>}
+              </div>
+            )}
 
             {/* Time off (day off / week off) */}
             <details className="group rounded-lg border">
@@ -679,42 +700,6 @@ export default function EmployeesPanel() {
               <Field label={t("employees.sector")}>
                 <Input value={t("employees.commercialSector")} readOnly className="h-9 bg-muted" />
               </Field>
-              <Field label={t("employees.kmRate")}>
-                <div className="flex h-9 items-center gap-1">
-                  <span className="text-sm text-muted-foreground">$</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="9.99"
-                    inputMode="decimal"
-                    value={p.km_rate ?? ""}
-                    onChange={(e) => setLocal(p.id, "km_rate", e.target.value)}
-                    onBlur={(e) => saveField(p.id, "km_rate", e.target.value)}
-                    placeholder="0.65"
-                    className="h-9"
-                  />
-                  <span className="text-xs text-muted-foreground">/km</span>
-                </div>
-              </Field>
-              <Field label={t("employees.phoneData")}>
-                <div className="flex h-9 items-center gap-1">
-                  <span className="text-sm text-muted-foreground">$</span>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    inputMode="decimal"
-                    value={p.phone_data_reimbursement ?? ""}
-                    onChange={(e) => setLocal(p.id, "phone_data_reimbursement", e.target.value)}
-                    onBlur={(e) => saveField(p.id, "phone_data_reimbursement", e.target.value)}
-                    placeholder="7.00"
-                    className="h-9"
-                  />
-                  <span className="text-xs text-muted-foreground">/{t("employees.perWeek")}</span>
-                </div>
-                <span className="text-[11px] text-muted-foreground">{t("employees.phoneDataHint")}</span>
-              </Field>
                 </div>
 
                 <div className="rounded-lg bg-muted/20 p-3">
@@ -787,90 +772,69 @@ export default function EmployeesPanel() {
               </div>
                 </div>
 
-                <div className="grid gap-2 border-t pt-3 md:grid-cols-2">
-              {!isSubcontractorRole(p.role) && (
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
-                <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(p.storage_compensation)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLocal(p.id, "storage_compensation", checked);
-                    saveField(p.id, "storage_compensation", checked);
-                  }}
-                  className="h-5 w-5 rounded border-input accent-primary"
-                />
-              </label>
-              )}
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
-                <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(p.parking_receipts_enabled)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLocal(p.id, "parking_receipts_enabled", checked);
-                    saveField(p.id, "parking_receipts_enabled", checked);
-                  }}
-                  className="h-5 w-5 rounded border-input accent-amber-600"
-                />
-              </label>
-              {isSubcontractorRole(p.role) ? (
-              <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs md:col-span-2">
-                <div className="font-semibold text-primary">{t("employees.subcontractorRuleTitle")}</div>
-                <p className="mt-1 text-muted-foreground">{t("employees.subcontractorRuleHint")}</p>
               </div>
-              ) : (
-              <>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
-                <span className="text-sm font-medium">
-                  {t("employees.otFirstHourDouble")}
-                  <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{t("employees.otFirstHourDoubleHint")}</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(p.overtime_first_hour_double)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLocal(p.id, "overtime_first_hour_double", checked);
-                    saveField(p.id, "overtime_first_hour_double", checked);
-                  }}
-                  className="h-5 w-5 rounded border-input accent-primary"
-                />
-              </label>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
-                <span className="text-sm font-medium">
-                  {t("employees.returnNoBenefits")}
-                  <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{t("employees.returnNoBenefitsHint")}</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(p.return_overtime_no_benefits)}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setLocal(p.id, "return_overtime_no_benefits", checked);
-                    saveField(p.id, "return_overtime_no_benefits", checked);
-                  }}
-                  className="h-5 w-5 rounded border-input accent-primary"
-                />
-              </label>
-              </>
-              )}
-              {p.ccq_card_path && (
-                <div className="rounded-lg border bg-muted/20 p-3">
-                  <Button type="button" size="sm" variant="outline" onClick={() => toggleCard(p)}>
-                    {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
-                  </Button>
-                  {cardViews[p.id]?.open && (
-                    <div className="mt-2">
-                      {cardViews[p.id]?.loading && <div className="text-xs text-muted-foreground">{t("common.loading")}</div>}
-                      {cardViews[p.id]?.url && <img src={cardViews[p.id].url} alt={t("ccqCard.title")} className="max-h-80 w-full rounded-md border object-contain" />}
-                      {cardViews[p.id]?.error && <div className="text-xs text-destructive dark:text-red-300">{cardViews[p.id].error}</div>}
+            </details>
+            )}
+
+            {/* Avantages — compensation extras + politiques de temps supplémentaire. */}
+            {(!isNonCcqRole(p.role) || isSubcontractorRole(p.role)) && (
+            <details className="group rounded-lg border">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
+                <span className="truncate">{t("employees.benefitsTitle")}</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-3 border-t p-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label={t("employees.kmRate")}>
+                    <div className="flex h-9 items-center gap-1">
+                      <span className="text-sm text-muted-foreground">$</span>
+                      <Input type="number" step="0.01" min="0" max="9.99" inputMode="decimal" value={p.km_rate ?? ""} onChange={(e) => setLocal(p.id, "km_rate", e.target.value)} onBlur={(e) => saveField(p.id, "km_rate", e.target.value)} placeholder="0.65" className="h-9" />
+                      <span className="text-xs text-muted-foreground">/km</span>
                     </div>
-                  )}
+                  </Field>
+                  <Field label={t("employees.phoneData")}>
+                    <div className="flex h-9 items-center gap-1">
+                      <span className="text-sm text-muted-foreground">$</span>
+                      <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.phone_data_reimbursement ?? ""} onChange={(e) => setLocal(p.id, "phone_data_reimbursement", e.target.value)} onBlur={(e) => saveField(p.id, "phone_data_reimbursement", e.target.value)} placeholder="7.00" className="h-9" />
+                      <span className="text-xs text-muted-foreground">/{t("employees.perWeek")}</span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{t("employees.phoneDataHint")}</span>
+                  </Field>
                 </div>
-              )}
+                <div className="grid gap-2 md:grid-cols-2">
+                  {!isSubcontractorRole(p.role) && (
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
+                    <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
+                    <input type="checkbox" checked={Boolean(p.storage_compensation)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "storage_compensation", checked); saveField(p.id, "storage_compensation", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
+                  </label>
+                  )}
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
+                    <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
+                    <input type="checkbox" checked={Boolean(p.parking_receipts_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "parking_receipts_enabled", checked); saveField(p.id, "parking_receipts_enabled", checked); }} className="h-5 w-5 rounded border-input accent-amber-600" />
+                  </label>
+                  {isSubcontractorRole(p.role) ? (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs md:col-span-2">
+                    <div className="font-semibold text-primary">{t("employees.subcontractorRuleTitle")}</div>
+                    <p className="mt-1 text-muted-foreground">{t("employees.subcontractorRuleHint")}</p>
+                  </div>
+                  ) : (
+                  <>
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
+                    <span className="text-sm font-medium">
+                      {t("employees.otFirstHourDouble")}
+                      <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{t("employees.otFirstHourDoubleHint")}</span>
+                    </span>
+                    <input type="checkbox" checked={Boolean(p.overtime_first_hour_double)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "overtime_first_hour_double", checked); saveField(p.id, "overtime_first_hour_double", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
+                  </label>
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
+                    <span className="text-sm font-medium">
+                      {t("employees.returnNoBenefits")}
+                      <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{t("employees.returnNoBenefitsHint")}</span>
+                    </span>
+                    <input type="checkbox" checked={Boolean(p.return_overtime_no_benefits)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "return_overtime_no_benefits", checked); saveField(p.id, "return_overtime_no_benefits", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
+                  </label>
+                  </>
+                  )}
                 </div>
               </div>
             </details>
