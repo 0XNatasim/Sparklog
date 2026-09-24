@@ -125,26 +125,38 @@ export default function RecordOfEmploymentTab() {
   const roe = useMemo(() => {
     if (!employee || ledger.length === 0) return null;
     const otOptions = overtimeOptionsFromProfile(employee);
-    const periods = ledger.map((row) => ({
-      start: row.period_start,
-      end: row.period_end,
-      hours: insurableHoursInRange(jobs, row.period_start, row.period_end, otOptions),
-      earnings: Number(row.insurable_income_ei || 0),
-      vacation: Number(row.vacation_pay || 0) + Number(row.vacances_ccq || 0),
-    }));
-    // Window = the most recent 53 weekly pay periods.
-    const windowAsc = periods.slice(-ROE_MAX_WEEKLY_PERIODS);
-    const rows = [...windowAsc].reverse(); // Block 15C: most recent first
-    const totalHours = windowAsc.reduce((s, p) => s + p.hours, 0);
-    const totalEarnings = windowAsc.reduce((s, p) => s + p.earnings, 0);
-    const vacationFinal = windowAsc.length ? windowAsc[windowAsc.length - 1].vacation : 0;
+    // Accounted pay keyed by the pay-period end (Saturday) for lookup.
+    const byEnd = new Map(ledger.map((r) => [r.period_end, r]));
 
     const firstJob = jobs[0]?.job_date || null;
     const lastJob = jobs.length ? jobs[jobs.length - 1].job_date : null;
-    const firstDay = firstJob || periods[0]?.start || null;
-    const finalPeriodEnd = periods[periods.length - 1]?.end || null;
-    // Last day paid = last day actually worked, bounded by the final accounted period.
+    const firstDay = firstJob || ledger[0]?.period_start || null;
+    const finalPeriodEnd = ledger[ledger.length - 1]?.period_end || null;
     const lastDay = lastJob || finalPeriodEnd;
+
+    // Annexe D: report CONSECUTIVE weekly pay periods, counting back from the final pay
+    // period, up to 53 for a weekly pay. Weeks with no pay are still reported at 0.00 (they
+    // are part of the consecutive series), and we stop at the first day worked.
+    const rows = [];
+    let end = finalPeriodEnd ? dayjs(finalPeriodEnd) : null;
+    for (let i = 0; end && i < ROE_MAX_WEEKLY_PERIODS; i++) {
+      if (firstDay && end.isBefore(dayjs(firstDay), "day")) break; // before employment start
+      const endStr = end.format("YYYY-MM-DD");
+      const startStr = end.subtract(6, "day").format("YYYY-MM-DD");
+      const row = byEnd.get(endStr);
+      rows.push({
+        start: startStr,
+        end: endStr,
+        earnings: row ? Number(row.insurable_income_ei || 0) : 0,
+        hours: insurableHoursInRange(jobs, startStr, endStr, otOptions),
+        vacation: row ? Number(row.vacation_pay || 0) + Number(row.vacances_ccq || 0) : 0,
+      });
+      end = end.subtract(7, "day"); // previous weekly period (stays a Saturday)
+    }
+    // rows are already most-recent-first (Block 15C order).
+    const totalHours = rows.reduce((s, p) => s + p.hours, 0);
+    const totalEarnings = rows.reduce((s, p) => s + p.earnings, 0);
+    const vacationFinal = rows.length ? rows[0].vacation : 0;
 
     return { rows, totalHours, totalEarnings, vacationFinal, firstDay, lastDay, finalPeriodEnd };
   }, [employee, ledger, jobs]);
@@ -357,8 +369,9 @@ function buildRoeHtml({ employee, roe, reasonCode, reasonLabel, recall }) {
 
   <div class="foot">
     Rémunération assurable issue de la paie comptabilisée (assurance-emploi). Heures assurables calculées à partir des feuilles de temps
-    (heures réellement travaillées, temps supplémentaire inclus). Fenêtre : les 53 dernières périodes de paie hebdomadaires. Vérifiez les
-    montants et complétez le NAS et l'adresse dans ROE Web avant l'émission. Ce document ne remplace pas le relevé d'emploi officiel de Service Canada.
+    (heures réellement travaillées, temps supplémentaire inclus). Selon l'Annexe D de Service Canada : jusqu'à 53 périodes de paie
+    hebdomadaires <b>consécutives</b>, comptées à rebours depuis la dernière période payée — les semaines sans paie sont incluses à 0,00 $.
+    Vérifiez les montants et complétez le NAS et l'adresse dans ROE Web avant l'émission. Ce document ne remplace pas le relevé d'emploi officiel de Service Canada.
   </div>
 </div></body></html>`;
 }
