@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useT } from "@/lib/use-t";
+import { withRetry } from "@/lib/utils";
 import { EMPTY_YTD, YTD_STATUTORY, CCQ_CUMUL, snapshotToLedgerColumns, ledgerRowToSnapshot } from "@/lib/payroll-ledger-fields";
 import { legacyTalonSheet, legacyTalonDocument, printLegacyTalon } from "@/lib/legacy-talon-render";
 
@@ -97,8 +98,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
         ...snapshotToLedgerColumns(snapshot),
         imported_talon: importedTalon,
       };
-      const { error } = await supabase.from("payroll_period_ledger").upsert(payload, { onConflict: "user_id,period_end" });
-      if (error) throw error;
+      await withRetry(() => supabase.from("payroll_period_ledger").upsert(payload, { onConflict: "user_id,period_end" }), 15000);
       setMsg(t("payroll.legacy.inserted", { date: payload.period_end }));
       resetParse();
       await loadExisting();
@@ -200,7 +200,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
             </div>
 
             <div className="flex justify-end">
-              <Button type="button" disabled={saving || !periodEnd} onClick={insertWeek}>{saving ? t("common.working") : t("payroll.legacy.insert")}</Button>
+              <Button type="button" disabled={saving} onClick={insertWeek}>{saving ? t("common.working") : t("payroll.legacy.insert")}</Button>
             </div>
           </div>
         )}
