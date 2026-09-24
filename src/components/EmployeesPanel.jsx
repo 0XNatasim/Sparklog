@@ -19,6 +19,9 @@ import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, L
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 
+// Region code → administrative region name, for the label shown next to each employee.
+const REGION_NAME = new Map(QUEBEC_REGIONS.map((r) => [r.code, r.name]));
+
 const LEVELS = [
   { value: "compagnon",  label: "Compagnon" },
   { value: "apprenti_4", label: "Apprenti 4" },
@@ -432,6 +435,11 @@ export default function EmployeesPanel() {
                     : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
                 {Number(p.team_leader_premium) > 0 && <Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-500" aria-label={t("employees.teamLeader")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
+                {REGION_NAME.get(p.work_region) && (
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal text-muted-foreground" title={t("employees.workRegion")}>
+                    {p.work_region} — {REGION_NAME.get(p.work_region)}
+                  </span>
+                )}
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
             </div>
