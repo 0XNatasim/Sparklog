@@ -39,9 +39,13 @@ export function refreshSessionOnce() {
   if (Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS) return Promise.resolve();
   refreshInFlight = (async () => {
     try {
-      await supabase.auth.refreshSession();
+      // refreshSession() acquires the auth lock with NO timeout internally; if a
+      // stalled request is holding that lock it would otherwise wait forever and
+      // freeze the whole save. Bound it so withRetry always proceeds to its next
+      // (also timeout-bounded) attempt.
+      await withTimeout(supabase.auth.refreshSession(), 8000);
     } catch {
-      /* retry the query anyway; a failed refresh must not itself throw here */
+      /* retry the query anyway; a failed/stalled refresh must not itself throw here */
     } finally {
       lastRefreshAt = Date.now();
       refreshInFlight = null;

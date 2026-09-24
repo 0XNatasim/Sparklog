@@ -1,2 +1,2 @@
 // App version shown on the Testing screen. Bump the patch on every merge.
-export const APP_VERSION = "2.3.93";
+export const APP_VERSION = "2.3.94";

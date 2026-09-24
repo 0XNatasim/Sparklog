@@ -1,15 +1,23 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabaseClient";
+import { withTimeout } from "@/lib/utils";
 
 const AuthContext = createContext(null);
 export const SESSION_RESUMED_EVENT = "sparklog:session-resumed";
 
 async function fetchRoleForUser(userId) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("role, full_name, is_paused, admin_sections")
-    .eq("id", userId)
-    .maybeSingle();
+  let data, error;
+  try {
+    // Bound the profile read: it runs inside the auth-state callback and on resume,
+    // so an un-timed query here can hang those paths. On timeout, fall through to
+    // the safe default below rather than freezing.
+    ({ data, error } = await withTimeout(
+      supabase.from("profiles").select("role, full_name, is_paused, admin_sections").eq("id", userId).maybeSingle(),
+      8000
+    ));
+  } catch (e) {
+    error = e;
+  }
 
   if (error) {
     console.warn("[Auth] fetchRole error:", error);
@@ -144,7 +152,11 @@ export function AuthProvider({ children }) {
         subscriptionRef.current = null;
       }
 
-      const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // NOTE: this callback runs while GoTrue holds its auth lock. It must stay
+      // synchronous and must NOT await another supabase call, or it extends how long
+      // the lock is held (Supabase's documented guidance). We defer the profile read
+      // with setTimeout(0) so the lock is released immediately.
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
         const nextUser = session?.user ?? null;
         setUser(nextUser);
         setLoading(false);
@@ -152,12 +164,14 @@ export function AuthProvider({ children }) {
 
         if (nextUser) {
           signedOutRef.current = false;
-          const r = await fetchRoleForUser(nextUser.id);
-          setRole(r.role);
-          setFullName(r.full_name);
-          setIsPaused(r.is_paused);
-          setAdminSections(r.admin_sections);
           subscribeToProfile(nextUser.id);
+          setTimeout(async () => {
+            const r = await fetchRoleForUser(nextUser.id);
+            setRole(r.role);
+            setFullName(r.full_name);
+            setIsPaused(r.is_paused);
+            setAdminSections(r.admin_sections);
+          }, 0);
         } else {
           setRole(null);
           setFullName(null);
@@ -199,7 +213,10 @@ export function AuthProvider({ children }) {
         let session = null;
         let sessionError = null;
         try {
-          const result = await supabase.auth.getSession();
+          // Bound both auth calls: on a phone returning from the camera/photos, these
+          // can stall on the auth lock and otherwise leave resumeInFlightRef stuck true,
+          // blocking every future resume. Time them out so the app recovers.
+          const result = await withTimeout(supabase.auth.getSession(), 8000);
           session = result.data?.session ?? null;
           sessionError = result.error ?? null;
         } catch (error) {
@@ -208,7 +225,7 @@ export function AuthProvider({ children }) {
         const expiresSoon = session?.expires_at && session.expires_at * 1000 <= Date.now() + 60_000;
 
         if (sessionError || !session || expiresSoon) {
-          const refreshed = await supabase.auth.refreshSession();
+          const refreshed = await withTimeout(supabase.auth.refreshSession(), 8000);
           if (refreshed.error) throw refreshed.error;
           session = refreshed.data?.session ?? null;
         }
