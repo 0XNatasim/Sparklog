@@ -18,6 +18,7 @@ import DasTab from "@/components/DasTab";
 import WeekViewTab from "@/components/WeekViewTab";
 import RecordOfEmploymentTab from "@/components/RecordOfEmploymentTab";
 import AuditLog from "@/components/AuditLog";
+import InfraHealthCard from "@/components/InfraHealthCard";
 
 // ── Coûts section: Coûts (tableau) · Semaine · Mois ──────────────────────────
 function CostingSection() {
@@ -431,7 +432,12 @@ export default function Testing() {
       {section === "weekview" && <WeekViewTab />}
       {section === "roe" && <RecordOfEmploymentTab />}
       {section === "payroll" && <PayrollSection />}
-      {section === "audit" && <AuditLog />}
+      {section === "audit" && (
+        <div className="space-y-3">
+          <InfraHealthCard />
+          <AuditLog />
+        </div>
+      )}
     </div>
   );
 }
