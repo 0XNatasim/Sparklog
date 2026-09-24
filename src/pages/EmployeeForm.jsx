@@ -812,12 +812,18 @@ export default function EmployeeForm() {
   async function compressImage(file, maxEdge = 1600, quality = 0.7) {
     const url = URL.createObjectURL(file);
     try {
-      const img = await new Promise((resolve, reject) => {
-        const i = new Image();
-        i.onload = () => resolve(i);
-        i.onerror = reject;
-        i.src = url;
-      });
+      // A very large image, an odd format, or memory pressure on a phone can make
+      // decoding stall forever (onload/onerror never fire). Bound it so the whole
+      // evidence flow can't freeze on image prep — fall back to the original file.
+      const img = await withTimeout(
+        new Promise((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = () => reject(new Error("image_decode_failed"));
+          i.src = url;
+        }),
+        15000
+      );
       const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
@@ -825,9 +831,15 @@ export default function EmployeeForm() {
       canvas.width = w;
       canvas.height = h;
       canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      return await new Promise((resolve) =>
-        canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
+      const blob = await withTimeout(
+        new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality)),
+        15000
       );
+      // toBlob can hand back null (unsupported/again memory pressure); never upload null.
+      return blob || file;
+    } catch (error) {
+      console.warn("[compressImage] falling back to original file:", error?.message || error);
+      return file; // upload the original rather than dead-ending the evidence flow
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -1300,11 +1312,20 @@ export default function EmployeeForm() {
                   placeholder="0"
                 />
                 <p className="text-xs text-muted-foreground">{t("form.return.selectedTime", { time: formatReturnMinutes(returnMinutes || 0) })}</p>
-                {normalizeNumber(returnKm) !== null && (
+                {normalizeNumber(returnKm) !== null && normalizeNumber(returnKm) >= 0 && normalizeNumber(returnKm) <= (normalizeNumber(km_aller) || 0) && (
                   <p className="text-xs font-medium text-muted-foreground">
                     {t("form.return.kmBreakdown", { client: Math.max(0, (normalizeNumber(km_aller) || 0) - normalizeNumber(returnKm)), returnKm: normalizeNumber(returnKm), total: normalizeNumber(km_aller) || 0 })}
                   </p>
                 )}
+                {normalizeNumber(returnKm) !== null && normalizeNumber(returnKm) > (normalizeNumber(km_aller) || 0) && (
+                  <p className="text-xs font-medium text-destructive">
+                    {t("form.return.kmExceedsTotal")} ({t("form.return.kmBreakdown", { client: 0, returnKm: normalizeNumber(returnKm), total: normalizeNumber(km_aller) || 0 })})
+                  </p>
+                )}
+                {normalizeNumber(returnKm) !== null && normalizeNumber(returnKm) < 0 && (
+                  <p className="text-xs font-medium text-destructive">{t("form.return.kmNegative")}</p>
+                )}
+                {returnSaveError && <p className="text-xs font-medium text-destructive">{returnSaveError}</p>}
               </div>
               <DialogFooter>
                 <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0 || normalizeNumber(returnKm) > (normalizeNumber(km_aller) || 0)} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
