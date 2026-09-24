@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Printer, Upload, X } from "lucide-react";
+import { Printer } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,9 +62,6 @@ export default function RecordOfEmploymentTab() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [importRows, setImportRows] = useState([]); // parsed prior-stub previews awaiting save
-  const [importing, setImporting] = useState(false);
-  const importInputRef = useRef(null);
 
   // Employee roster (CCQ employees only — the people an ROE is ever issued for).
   useEffect(() => {
@@ -103,12 +100,11 @@ export default function RecordOfEmploymentTab() {
 
   // Pay ledger + time entries for the selected employee.
   useEffect(() => {
-    if (!selectedId) { setLedger([]); setJobs([]); setHistory([]); setImportRows([]); return; }
+    if (!selectedId) { setLedger([]); setJobs([]); setHistory([]); return; }
     let cancelled = false;
     (async () => {
       setBusy(true);
       setError("");
-      setImportRows([]);
       try {
         const [{ data: led, error: le }, { data: jb, error: je }] = await Promise.all([
           supabase
@@ -195,72 +191,6 @@ export default function RecordOfEmploymentTab() {
 
   const reasonLabel = SEPARATION_REASONS.find((r) => r.code === reason)?.label || "";
 
-  // ── Prior pay stubs (before SparkLog) — PDF import to build the ROE history ──────────
-  async function handleHistoryImport(e) {
-    const files = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (!files.length || !selectedId) return;
-    setImporting(true);
-    setError("");
-    try {
-      const { parseHistoricalPayStub } = await import("@/lib/paystub-parse");
-      const parsed = [];
-      for (const file of files) {
-        try {
-          const r = await parseHistoricalPayStub(file);
-          const ok = Boolean(r.periodEnd) && r.insurableEarnings != null;
-          parsed.push({
-            file: file.name,
-            periodEnd: r.periodEnd || "",
-            earnings: r.insurableEarnings != null ? Number(r.insurableEarnings) : null,
-            hours: r.insurableHours != null ? Number(r.insurableHours) : null,
-            ok,
-          });
-        } catch (err) {
-          parsed.push({ file: file.name, periodEnd: "", earnings: null, hours: null, ok: false, error: err?.code === "no_text_layer" ? t("testing.roe.hist.noText") : (err?.message || "") });
-        }
-      }
-      setImportRows((prev) => [...prev, ...parsed]);
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  async function saveImportRows() {
-    const ready = importRows.filter((r) => r.ok && r.periodEnd);
-    if (!ready.length || !selectedId) return;
-    setImporting(true);
-    setError("");
-    try {
-      const payload = ready.map((r) => {
-        const end = dayjs(r.periodEnd);
-        return {
-          user_id: selectedId,
-          tax_year: end.year(),
-          period_start: end.subtract(6, "day").format("YYYY-MM-DD"),
-          period_end: end.format("YYYY-MM-DD"),
-          insurable_earnings: Number(r.earnings || 0),
-          insurable_hours: Number(r.hours || 0),
-          source_file: r.file || null,
-        };
-      });
-      const { error: e } = await supabase.from("roe_history").upsert(payload, { onConflict: "user_id,period_end" });
-      if (e) throw e;
-      setImportRows([]);
-      await loadHistory();
-    } catch (e) {
-      setError(e?.message || String(e));
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  async function removeHistory(id) {
-    const { error: e } = await supabase.from("roe_history").delete().eq("id", id);
-    if (e) { setError(e.message); return; }
-    await loadHistory();
-  }
-
   function handlePrint() {
     if (!employee || !roe) return;
     const w = window.open("", "_blank", "width=820,height=1060");
@@ -316,64 +246,6 @@ export default function RecordOfEmploymentTab() {
           {loading && <div className="text-xs text-muted-foreground sm:col-span-2">{t("common.working")}</div>}
         </CardContent>
       </Card>
-
-      {selectedId && (
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-semibold">{t("testing.roe.hist.title")}</div>
-              <input ref={importInputRef} type="file" accept="application/pdf" multiple className="hidden" onChange={handleHistoryImport} />
-              <Button size="sm" variant="outline" disabled={importing} onClick={() => importInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" />{importing ? t("common.working") : t("testing.roe.hist.import")}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">{t("testing.roe.hist.hint")}</p>
-
-            {importRows.length > 0 && (
-              <div className="space-y-1">
-                {importRows.map((r, i) => (
-                  <div key={i} className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm ${r.ok ? "" : "border-destructive/40 bg-destructive/5"}`}>
-                    <span className="min-w-0 truncate">{r.file}</span>
-                    <span className="flex shrink-0 items-center gap-2 text-xs">
-                      {r.ok ? (
-                        <>
-                          <span>{r.periodEnd}</span>
-                          <span className="font-mono">{money(r.earnings || 0)}</span>
-                          <span className="font-mono">{hrs(r.hours || 0)} h</span>
-                        </>
-                      ) : (
-                        <span className="text-destructive">{r.error || t("testing.roe.hist.unreadable")}</span>
-                      )}
-                      <button type="button" onClick={() => setImportRows((prev) => prev.filter((_, j) => j !== i))} aria-label={t("common.cancel")} className="rounded p-1 text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
-                    </span>
-                  </div>
-                ))}
-                <div className="flex justify-end pt-1">
-                  <Button size="sm" disabled={importing || !importRows.some((r) => r.ok)} onClick={saveImportRows}>{t("testing.roe.hist.save")}</Button>
-                </div>
-              </div>
-            )}
-
-            {history.length > 0 && (
-              <div className="rounded-md border">
-                <div className="border-b px-3 py-2 text-xs font-semibold text-muted-foreground">{t("testing.roe.hist.saved")}</div>
-                <div className="divide-y">
-                  {history.map((h) => (
-                    <div key={h.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
-                      <span>{dayjs(h.period_start).format("DD MMM")} – {dayjs(h.period_end).format("DD MMM YYYY")}</span>
-                      <span className="flex items-center gap-3 text-xs">
-                        <span className="font-mono">{money(h.insurable_earnings)}</span>
-                        <span className="font-mono">{hrs(h.insurable_hours)} h</span>
-                        <button type="button" onClick={() => removeHistory(h.id)} aria-label={t("common.cancel")} className="rounded p-1 text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {selectedId && !busy && ledger.length === 0 && history.length === 0 && (
         <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("testing.roe.noLedger")}</CardContent></Card>
