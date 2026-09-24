@@ -90,7 +90,7 @@ export default function LiveCrew() {
   const over8Count = rows.filter((r) => r.dayTotal > 8).length;
 
   const recapTiles = [
-    { label: t("live.recap.withOt"), value: withOtCount, cls: "text-emerald-600 dark:text-emerald-400" },
+    { label: t("live.recap.withOt"), value: `${withOtCount}/${employees.length}`, cls: "text-emerald-600 dark:text-emerald-400" },
     { label: t("live.recap.totalOt"), value: totalOtCount, cls: "text-foreground" },
     { label: t("live.recap.over8"), value: over8Count, cls: "text-amber-600 dark:text-amber-400" },
     { label: t("live.recap.onLeave"), value: onLeaveCount, cls: "text-sky-600 dark:text-sky-400" },
@@ -110,6 +110,15 @@ export default function LiveCrew() {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">{t("live.description")}</p>
           </div>
+          {/* Day recap — centered, compact */}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
+            {recapTiles.map((tile) => (
+              <div key={tile.label} className="px-1">
+                <div className={`text-base font-bold leading-tight tabular-nums ${tile.cls}`}>{tile.value}</div>
+                <div className="text-[10px] leading-tight text-muted-foreground">{tile.label}</div>
+              </div>
+            ))}
+          </div>
           <div className="flex items-center gap-3">
             {updatedAt && <span className="text-xs text-muted-foreground">{t("live.updated", { time: dayjs(updatedAt).format("HH:mm:ss") })}</span>}
             <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
@@ -118,18 +127,6 @@ export default function LiveCrew() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Day recap */}
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {recapTiles.map((tile) => (
-          <Card key={tile.label}>
-            <CardContent className="p-3">
-              <div className={`text-2xl font-bold tabular-nums ${tile.cls}`}>{tile.value}</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">{tile.label}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows
