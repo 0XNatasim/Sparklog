@@ -1,25 +1,40 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { Upload } from "lucide-react";
+import { Upload, Printer } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useT } from "@/lib/use-t";
 import { EMPTY_YTD, YTD_STATUTORY, CCQ_CUMUL, snapshotToLedgerColumns, ledgerRowToSnapshot } from "@/lib/payroll-ledger-fields";
+import { legacyTalonSheet, legacyTalonDocument, printLegacyTalon } from "@/lib/legacy-talon-render";
 
 const money = (v) => `$${(Number(v) || 0).toFixed(2)}`;
 // CCQ week (Sun→Sat) start from the ending Saturday date string.
 const weekStartFromEnd = (endStr) => dayjs(endStr).subtract(6, "day").format("YYYY-MM-DD");
 
-// Import an OLD pay stub (PDF) → validate its Cumulatif figures → insert the week into the
-// pay ledger, recreating a past talon. A ledger row IS a week's cumulative snapshot, exactly
-// what the stub's "Cumulatif" column holds, so the Record of Employment (which reads the
-// ledger) then covers those weeks. Upsert by (user, period_end) — re-importing a week corrects it.
+// Render the reconstructed talon in the ORIGINAL layout, isolated in an iframe so its
+// generic table/body CSS never bleeds into the app.
+function TalonPreview({ talon }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !talon) return;
+    el.srcdoc = legacyTalonDocument([legacyTalonSheet(talon)]);
+  }, [talon]);
+  return <iframe ref={ref} title="talon-preview" className="h-[520px] w-full rounded-md border bg-white" />;
+}
+
+// Import an OLD pay stub (PDF) → parse the FULL talon (header + Transactions + Sommaire
+// Période/Cumulatif) in the original layout → validate → insert the week into the pay ledger.
+// The ledger row stores the "Cumulatif" figures (for the chain / Record of Employment) AND the
+// full talon JSON (imported_talon) so the past stub can be reproduced exactly. Upsert by
+// (user, period_end) — re-importing a week corrects it.
 export default function ImportLegacyStubsDialog({ open, onOpenChange, employees, onSaved }) {
   const t = useT();
   const [selectedId, setSelectedId] = useState("");
-  const [snapshot, setSnapshot] = useState(null); // editable YTD object once a PDF is parsed
+  const [talon, setTalon] = useState(null); // { header, transactions, sommaire, ytd, periodEnd }
+  const [snapshot, setSnapshot] = useState(null); // editable YTD object (Cumulatif) once parsed
   const [periodEnd, setPeriodEnd] = useState("");
   const [fileName, setFileName] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -31,12 +46,12 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
   useEffect(() => { if (!open) { setSelectedId(""); resetParse(); } }, [open]);
   useEffect(() => { if (selectedId) loadExisting(); else setExisting([]); /* eslint-disable-next-line */ }, [selectedId]);
 
-  function resetParse() { setSnapshot(null); setPeriodEnd(""); setFileName(""); setMsg(""); setErr(""); }
+  function resetParse() { setTalon(null); setSnapshot(null); setPeriodEnd(""); setFileName(""); setMsg(""); setErr(""); }
 
   async function loadExisting() {
     const { data } = await supabase
       .from("payroll_period_ledger")
-      .select("period_start, period_end, insurable_income_ei, hours_ytd, talon_seq")
+      .select("period_start, period_end, insurable_income_ei, hours_ytd, talon_seq, imported_talon")
       .eq("user_id", selectedId)
       .order("period_end", { ascending: false });
     setExisting(data || []);
@@ -46,14 +61,16 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !selectedId) return;
-    setParsing(true); setErr(""); setMsg("");
+    setParsing(true); setErr(""); setMsg(""); setTalon(null); setSnapshot(null);
     try {
-      const { parsePayStubPdf } = await import("@/lib/paystub-parse");
-      const { ytd, asOf, matched } = await parsePayStubPdf(file);
-      setSnapshot({ ...EMPTY_YTD, ...ytd });
-      setPeriodEnd(asOf || "");
+      const { parseFullTalon } = await import("@/lib/talon-import-parse");
+      const result = await parseFullTalon(file);
+      setTalon(result);
+      setSnapshot({ ...EMPTY_YTD, ...(result.ytd || {}) });
+      setPeriodEnd(result.periodEnd || result.header?.periodEnd || "");
       setFileName(file.name);
-      setMsg(t("payroll.legacy.detected", { count: (matched || []).length }));
+      const n = (result.transactions?.length || 0) + (result.sommaire?.length || 0);
+      setMsg(t("payroll.legacy.detected", { count: n }));
     } catch (e2) {
       setErr(e2?.code === "no_text_layer" ? t("payroll.legacy.noText") : (e2?.message || t("payroll.legacy.failed")));
     } finally {
@@ -67,12 +84,18 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
     if (!selectedId || !snapshot || !periodEnd) { setErr(t("payroll.legacy.needDate")); return; }
     setSaving(true); setErr(""); setMsg("");
     try {
+      const period_end = dayjs(periodEnd).format("YYYY-MM-DD");
+      // Keep the parsed header's period aligned with the (possibly edited) end date.
+      const importedTalon = talon
+        ? { header: { ...talon.header, periodEnd: period_end, periodStart: weekStartFromEnd(period_end) }, transactions: talon.transactions || [], sommaire: talon.sommaire || [] }
+        : null;
       const payload = {
         user_id: selectedId,
-        tax_year: dayjs(periodEnd).year(),
-        period_end: dayjs(periodEnd).format("YYYY-MM-DD"),
-        period_start: weekStartFromEnd(periodEnd),
+        tax_year: dayjs(period_end).year(),
+        period_end,
+        period_start: weekStartFromEnd(period_end),
         ...snapshotToLedgerColumns(snapshot),
+        imported_talon: importedTalon,
       };
       const { error } = await supabase.from("payroll_period_ledger").upsert(payload, { onConflict: "user_id,period_end" });
       if (error) throw error;
@@ -94,13 +117,17 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
     if (!data) return;
     setSnapshot(ledgerRowToSnapshot(data));
     setPeriodEnd(data.period_end);
+    setTalon(data.imported_talon || null);
     setFileName("");
-    setMsg("");
+    setErr(""); setMsg("");
   }
+
+  const emp = employees.find((e) => e.id === selectedId);
+  const printTitle = () => `${t("payroll.legacy.title")} — ${emp?.full_name || ""} — ${periodEnd}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("payroll.legacy.title")}</DialogTitle>
         </DialogHeader>
@@ -128,8 +155,21 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
         {msg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{msg}</p>}
         {err && <p className="text-xs text-destructive">{err}</p>}
 
+        {talon && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.preview")}</div>
+              <Button type="button" size="sm" variant="outline" onClick={() => printLegacyTalon(talon, printTitle())}>
+                <Printer className="mr-2 h-4 w-4" />{t("payroll.legacy.print")}
+              </Button>
+            </div>
+            <TalonPreview talon={talon} />
+          </div>
+        )}
+
         {snapshot && (
           <div className="space-y-3 rounded-lg border p-3">
+            <div className="text-[11px] text-muted-foreground">{t("payroll.legacy.verifyHint")}</div>
             <label className="block text-xs sm:max-w-xs">
               <span className="text-muted-foreground">{t("payroll.legacy.periodEnd")}</span>
               <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="mt-1 h-9" />
@@ -170,13 +210,20 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
             <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.existing")}</div>
             <div className="max-h-52 divide-y overflow-y-auto">
               {existing.map((r) => (
-                <button key={r.period_end} type="button" onClick={() => editExisting(r)} className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-sm hover:bg-accent">
-                  <span>{r.period_start ? `${dayjs(r.period_start).format("DD MMM")} – ` : ""}{dayjs(r.period_end).format("DD MMM YYYY")}{r.talon_seq ? "" : ` · ${t("payroll.legacy.imported")}`}</span>
+                <div key={r.period_end} className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-sm hover:bg-accent">
+                  <button type="button" onClick={() => editExisting(r)} className="flex flex-1 items-center gap-2 text-left">
+                    <span>{r.period_start ? `${dayjs(r.period_start).format("DD MMM")} – ` : ""}{dayjs(r.period_end).format("DD MMM YYYY")}{r.imported_talon ? ` · ${t("payroll.legacy.imported")}` : ""}</span>
+                  </button>
                   <span className="flex items-center gap-3 font-mono text-xs">
                     <span>{money(r.insurable_income_ei)}</span>
                     <span>{(Number(r.hours_ytd) || 0).toFixed(1)} h</span>
+                    {r.imported_talon && (
+                      <button type="button" title={t("payroll.legacy.print")} onClick={() => printLegacyTalon(r.imported_talon, `${t("payroll.legacy.title")} — ${emp?.full_name || ""} — ${r.period_end}`)} className="rounded p-1 hover:bg-background">
+                        <Printer className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </span>
-                </button>
+                </div>
               ))}
             </div>
           </div>
