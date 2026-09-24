@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { BadgeCheck, Clock, FileText, Printer } from "lucide-react";
+import { BadgeCheck, Clock, FileText, Printer, Upload } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-
 import { isOwnerRole, isNonCcqRole } from "@/lib/roles";
 import { useAuth } from "@/contexts/AuthContext";
 import PayStubPrint from "@/components/PayStubPrint";
+import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
 import { useT } from "@/lib/use-t";
 
 const isPending = (s) => s === "submitted" || s === "updated";
@@ -39,6 +40,8 @@ export default function TalonTab() {
   const [stub, setStub] = useState(null); // { profile, weekObj, talon, opening }
   const [batchWeek, setBatchWeek] = useState(""); // week key for the "generate all" export
   const [batchMsg, setBatchMsg] = useState("");
+  const [importOpen, setImportOpen] = useState(false); // legacy-stub import dialog
+  const [reloadKey, setReloadKey] = useState(0); // bump to reload after an import
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +89,7 @@ export default function TalonTab() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   // Employees that have at least one job in the window, in roster order.
   const rows = useMemo(() => employees.filter((e) => (jobsByEmp.get(e.id) || []).length > 0), [employees, jobsByEmp]);
@@ -216,7 +219,17 @@ export default function TalonTab() {
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={2.2} /> {t("payroll.talon.cell.comptabilise")}</span>
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 opacity-70" strokeWidth={1.6} /> {t("payroll.talon.cell.apercu")}</span>
         <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-amber-500" /> {t("payroll.talon.cell.pending")}</span>
+        <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" onClick={() => setImportOpen(true)}>
+          <Upload className="mr-1.5 h-3.5 w-3.5" /> {t("payroll.legacy.title")}
+        </Button>
       </div>
+
+      <ImportLegacyStubsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        employees={employees}
+        onSaved={() => setReloadKey((k) => k + 1)}
+      />
 
       {/* Batch: generate every talon for a week at once */}
       {!loading && weeks.length > 0 && (
