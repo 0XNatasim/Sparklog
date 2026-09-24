@@ -24,6 +24,7 @@ export default function LiveCrew() {
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByUser, setJobsByUser] = useState(new Map());
+  const [onLeaveCount, setOnLeaveCount] = useState(0);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +33,7 @@ export default function LiveCrew() {
     const today = montrealDate();
     const [{ data: people }, { data: jobs }, { data: timeOff }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
-      supabase.from("jobs").select("id, user_id, ot, depart, fin, job_date, updated_at").eq("job_date", today),
+      supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at").eq("job_date", today),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays").lte("start_date", today).or(`end_date.gte.${today},end_date.is.null`),
     ]);
     // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone off for the
@@ -41,6 +42,11 @@ export default function LiveCrew() {
     const offToday = new Set(
       (timeOff || []).filter((row) => isOffOn(row, today) && !row.start_time).map((row) => row.user_id)
     );
+    // Recap "en congé": everyone with time off applicable today (full day OR partial hours).
+    const onLeaveToday = new Set(
+      (timeOff || []).filter((row) => isOffOn(row, today)).map((row) => row.user_id)
+    );
+    setOnLeaveCount(onLeaveToday.size);
     const activePeople = (people || []).filter(
       (person) => !person.is_paused && person.show_on_boards !== false && !offToday.has(person.id)
     );
@@ -65,6 +71,31 @@ export default function LiveCrew() {
     return () => clearInterval(id);
   }, [load]);
 
+  const rows = employees
+    .map((employee) => {
+      const jobs = jobsByUser.get(employee.id) || [];
+      const dayTotal = jobs.reduce((sum, job) => sum + (hoursBetween(
+        job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,
+        job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
+      ) || 0), 0);
+      return { employee, jobs, dayTotal };
+    })
+    .sort((a, b) => b.dayTotal - a.dayTotal);
+
+  // Recap: an OT counts once it is saved or submitted (drafts excluded).
+  const COUNTED_STATUS = new Set(["saved", "updated", "submitted", "approved"]);
+  const countedJobs = (jobs) => jobs.filter((j) => COUNTED_STATUS.has(j.status));
+  const withOtCount = rows.filter((r) => countedJobs(r.jobs).length > 0).length;
+  const totalOtCount = rows.reduce((n, r) => n + countedJobs(r.jobs).length, 0);
+  const over8Count = rows.filter((r) => r.dayTotal > 8).length;
+
+  const recapTiles = [
+    { label: t("live.recap.withOt"), value: withOtCount, cls: "text-emerald-600 dark:text-emerald-400" },
+    { label: t("live.recap.totalOt"), value: totalOtCount, cls: "text-foreground" },
+    { label: t("live.recap.over8"), value: over8Count, cls: "text-amber-600 dark:text-amber-400" },
+    { label: t("live.recap.onLeave"), value: onLeaveCount, cls: "text-sky-600 dark:text-sky-400" },
+  ];
+
   return (
     <div className="space-y-3">
       <Card>
@@ -88,17 +119,20 @@ export default function LiveCrew() {
         </CardContent>
       </Card>
 
+      {/* Day recap */}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {recapTiles.map((tile) => (
+          <Card key={tile.label}>
+            <CardContent className="p-3">
+              <div className={`text-2xl font-bold tabular-nums ${tile.cls}`}>{tile.value}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{tile.label}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {employees
-          .map((employee) => {
-            const jobs = jobsByUser.get(employee.id) || [];
-            const dayTotal = jobs.reduce((sum, job) => sum + (hoursBetween(
-              job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,
-              job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
-            ) || 0), 0);
-            return { employee, jobs, dayTotal };
-          })
-          .sort((a, b) => b.dayTotal - a.dayTotal)
+        {rows
           .map(({ employee, jobs, dayTotal }) => (
             <Card key={employee.id}>
               <CardContent className="space-y-2 p-3">
