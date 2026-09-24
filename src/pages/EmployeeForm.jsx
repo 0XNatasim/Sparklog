@@ -99,7 +99,9 @@ function isEditableStatus(s) {
   return s === "saved" || s === "updated";
 }
 
-const RETURN_TIME_OPTIONS = Array.from({ length: 16 }, (_, index) => (index + 1) * 15);
+// Return-to-warehouse durations offered in the pop-up: short 5/10/20/25-min options plus the
+// 15-min steps up to 3h. (3h15–4h were removed.)
+const RETURN_TIME_OPTIONS = [5, 10, 15, 20, 25, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
 
 function formatReturnMinutes(minutes) {
   const hours = Math.floor(minutes / 60);
