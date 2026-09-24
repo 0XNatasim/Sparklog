@@ -1,5 +1,6 @@
 export function getMissingEmployeeFields(profile, t) {
   const required = [
+    ["employee_number", t("employees.employeeNumber")],
     ["phone", t("manager.tbl.phone")],
     ["email", t("manager.tbl.email")],
     ["ccq_number", "CCQ#"],

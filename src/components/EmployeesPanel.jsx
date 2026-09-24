@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, TriangleAlert, Trophy, X } from "lucide-react";
+import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, Star, TriangleAlert, Trophy, X } from "lucide-react";
 import dayjs from "dayjs";
 import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
 import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
@@ -87,7 +87,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, overtime_first_hour_double, return_overtime_no_benefits, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, overtime_first_hour_double, return_overtime_no_benefits, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -430,6 +430,7 @@ export default function EmployeesPanel() {
                   : p.role === "admin"
                     ? <Briefcase className="h-4 w-4 shrink-0 text-violet-500" aria-label={t("manager.adminLabel")} />
                     : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
+                {Number(p.team_leader_premium) > 0 && <Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-500" aria-label={t("employees.teamLeader")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
