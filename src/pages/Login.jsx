@@ -14,6 +14,22 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useT } from "@/lib/use-t";
 
+// Turn a Supabase auth error into a message an employee can act on. Under load the
+// auth server times out talking to Postgres and returns a 5xx whose body serialises
+// to "{}" — showing that raw is useless and scary, so transient/opaque failures map
+// to a "server busy, retry" hint while real credential errors stay specific.
+function authErrorMessage(err, t) {
+  const status = err?.status ?? err?.statusCode ?? 0;
+  const raw = typeof err?.message === "string" ? err.message.trim() : "";
+  if (/invalid login credentials/i.test(raw)) return t("auth.invalidCredentials");
+  if (/email not confirmed/i.test(raw)) return t("auth.emailNotConfirmed");
+  const opaque = raw === "" || raw === "{}" || raw.startsWith("{") || raw.startsWith("[");
+  const transient = status >= 500 || status === 429 || status === 408 ||
+    /timeout|timed out|context deadline|context canceled|failed to fetch|load failed|networkerror|fetch|refresh token/i.test(raw);
+  if (transient || opaque) return t("auth.serverBusy");
+  return raw || t("auth.failed");
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -133,7 +149,7 @@ export default function Login() {
         if (error) throw error;
       }
     } catch (err) {
-      setErrorMsg(err?.message || t("auth.failed"));
+      setErrorMsg(authErrorMessage(err, t));
     } finally {
       setLoading(false);
     }

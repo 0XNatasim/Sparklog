@@ -22,12 +22,42 @@ export function withTimeout(promise, ms) {
   ]);
 }
 
+// Single-flight, throttled session refresh. A page runs many queries at once
+// (dashboards fire several in parallel); when the DB or auth server is briefly
+// slow they ALL time out at roughly the same moment. If each one then called
+// supabase.auth.refreshSession() we'd fire a burst of concurrent refresh-token
+// requests — and because Supabase rotates the refresh token, the losers of that
+// race get "Invalid Refresh Token: Refresh Token Not Found" and the client signs
+// the user OUT. That is the "logged out at random / repeatedly" symptom. Collapse
+// any burst into ONE refresh, and don't refresh again for a short cooldown.
+let refreshInFlight = null;
+let lastRefreshAt = 0;
+const REFRESH_COOLDOWN_MS = 20_000;
+
+export function refreshSessionOnce() {
+  if (refreshInFlight) return refreshInFlight;
+  if (Date.now() - lastRefreshAt < REFRESH_COOLDOWN_MS) return Promise.resolve();
+  refreshInFlight = (async () => {
+    try {
+      await supabase.auth.refreshSession();
+    } catch {
+      /* retry the query anyway; a failed refresh must not itself throw here */
+    } finally {
+      lastRefreshAt = Date.now();
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
 // Runs a fresh Supabase query and, if it times out or fails, retries a few times
 // with a short growing backoff — after the first failure it also refreshes the
-// session once (guards the hourly JWT-refresh hang). This rides out a transient
-// stall such as a Supabase free-tier cold start without surfacing an error to the
-// user. The factory is intentional: Supabase query builders/promises must be
-// recreated for each attempt. Only the final failure is thrown.
+// session once (guards the hourly JWT-refresh hang), sharing a single throttled
+// refresh across all concurrent callers so a burst of timeouts can't stampede the
+// auth server and rotate the user out. This rides out a transient stall such as a
+// Supabase free-tier cold start without surfacing an error to the user. The factory
+// is intentional: Supabase query builders/promises must be recreated for each
+// attempt. Only the final failure is thrown.
 export async function withRetry(makeQuery, ms, { retries = 2, backoffMs = 400 } = {}) {
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -39,7 +69,7 @@ export async function withRetry(makeQuery, ms, { retries = 2, backoffMs = 400 } 
       lastError = e;
       if (attempt === retries) break;
       if (attempt === 0) {
-        try { await supabase.auth.refreshSession(); } catch { /* retry anyway */ }
+        await refreshSessionOnce();
       }
       await new Promise((resolve) => setTimeout(resolve, backoffMs * (attempt + 1)));
     }
