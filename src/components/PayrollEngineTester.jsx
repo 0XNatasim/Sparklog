@@ -178,7 +178,7 @@ function Row({ label, value, strong, tone }) {
 // The Testing → Payroll bench. It contains NO tax logic — it only gathers input,
 // calls calculatePayroll(input), and renders the result (spec steps 21-23 + the
 // golden rule). Everything shown is a test-bench estimate, never finalized pay.
-export default function PayrollEngineTester() {
+export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
   const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
@@ -306,7 +306,7 @@ export default function PayrollEngineTester() {
     });
     const opts = [...byWeek.values()].map((w) => {
       let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, retNbMin = 0, km = 0;
-      calculatePayrollEntries(w.jobs, overtimeOptionsFromProfile(profile)).forEach((e) => {
+      calculatePayrollEntries(w.jobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messier }).forEach((e) => {
         regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
         retMin += e.returnRegularMinutes; retNbMin += e.returnNoBenefitMinutes; km += e.totalKm;
       });

@@ -79,7 +79,11 @@ function jobReturnMinutes(job) {
 //    benefits (returnNoBenefitMinutes), and the 8h/overtime split is computed on the
 //    remaining work only. A day of 8h or less is unaffected (return stays regular, with
 //    benefits) — matching the current behaviour.
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnOtNoBenefits = false } = {}) {
+// `messierMethod` reproduces how Messier Connexion classified hours historically: the weekly
+// first hour of overtime that SparkLog pays at 1.5× (the "hors CCQ" tier) is instead counted
+// as REGULAR straight time. Double time (2×) is left exactly as-is. Used only by the parallel
+// "Façon Messier" comparison views — never by the authoritative export path.
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnOtNoBenefits = false, messierMethod = false } = {}) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
   // Pre-pass: total worked span per day (return is inside the span). The return
   // carve-out only applies on days whose total exceeds 8h.
@@ -94,12 +98,14 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
   // employee's policy is "first hour at double time", the 1.5x allowance is 0.
   const dayWorkMinutes = new Map();      // job_date -> WORK minutes so far that day (return carved out)
   const weekOvertimeMinutes = new Map(); // week key -> overtime minutes so far that week
+  const weekRegularMinutes = new Map();  // week key -> regular minutes so far that week (Messier cap)
   const entries = new Map();
 
   for (const job of sorted) {
     const wk = payrollWeekKey(job.job_date);
     const priorDayWork = dayWorkMinutes.get(job.job_date) || 0;
     const priorWeekOvertime = weekOvertimeMinutes.get(wk) || 0;
+    const priorWeekRegular = weekRegularMinutes.get(wk) || 0;
 
     const spanMinutes = minutesBetween(job.depart, job.fin);
     // Carve out the return portion only when the policy is on AND the whole day exceeds
@@ -109,11 +115,21 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const workMinutes = spanMinutes - returnNoBenefitMinutes; // benefits-eligible work
 
     const regularRoom = Math.max(0, 480 - priorDayWork);
-    const regularWorkMinutes = Math.min(workMinutes, regularRoom);
+    let regularWorkMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - regularWorkMinutes;
     const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
-    const overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
+    let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
+    // Façon Messier: the normal week is a full 40h of straight time. When short days have
+    // left the week's regular below 40h, backfill it from the 1.5× ("hors CCQ") hours —
+    // never past 40h/week — and leave double (overtime100Minutes) untouched. A week that
+    // already reaches 40h regular is unchanged (identical to the standard method).
+    if (messierMethod && overtime50Minutes > 0) {
+      const weeklyRegularRoom = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
+      const move = Math.min(overtime50Minutes, weeklyRegularRoom);
+      regularWorkMinutes += move;
+      overtime50Minutes -= move;
+    }
     // Legacy field: return travel was never paid as separate minutes on top of the span.
     // It is kept at 0; the carve-out above re-categorises minutes that are already in the
     // span, so no minute is added or lost.
@@ -134,6 +150,7 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     });
     dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes);
     weekOvertimeMinutes.set(wk, priorWeekOvertime + overtimeWorkMinutes);
+    weekRegularMinutes.set(wk, priorWeekRegular + regularWorkMinutes);
   }
   return entries;
 }

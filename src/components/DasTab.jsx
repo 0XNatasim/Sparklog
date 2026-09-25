@@ -30,7 +30,7 @@ const EMPTY = { hours: 0, gross: 0, federalTax: 0, quebecTax: 0, rrq: 0, ei: 0, 
 // Revenu Québec (impôt QC, RRQ, RQAP, FSS) and ARC (impôt féd, AE) — by CCQ week or by
 // month (DAS are remitted monthly), for all employees or one. Draft figures from the
 // unvalidated rule set; never a remittance filing.
-export default function DasTab() {
+export default function DasTab({ messier = false }) {
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByEmp, setJobsByEmp] = useState(new Map());
@@ -130,7 +130,7 @@ export default function DasTab() {
         if (!approved.length) continue;
         let talon = null;
         try {
-          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", weekDate: w.start.format("YYYY-MM-DD") });
+          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", weekDate: w.start.format("YYYY-MM-DD"), messierMethod: messier });
         } catch { /* skip */ }
         if (!talon) continue;
         const emp = talon.result.employee, empr = talon.result.employer, das = talon.result.das;

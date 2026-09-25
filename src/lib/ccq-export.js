@@ -19,7 +19,7 @@ export function formatAppendixCode(code) {
   return trimmed.replace(/^([A-Za-z]+)-?(\d.*)$/, "$1-$2");
 }
 
-export function buildCcqWeeklyRecords(jobs, profilesById) {
+export function buildCcqWeeklyRecords(jobs, profilesById, { messierMethod = false } = {}) {
   const groups = new Map();
   const sortedJobs = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}`.localeCompare(`${b.job_date}${b.depart || ""}`));
   // The overtime split (daily 8h → 1.5x/2x, with a per-week first-hour allowance) is
@@ -33,7 +33,7 @@ export function buildCcqWeeklyRecords(jobs, profilesById) {
   }
   const payrollEntries = new Map();
   for (const [userId, userJobs] of jobsByUser) {
-    const options = overtimeOptionsFromProfile(profilesById.get(userId));
+    const options = { ...overtimeOptionsFromProfile(profilesById.get(userId)), messierMethod };
     for (const [jobId, entry] of calculatePayrollEntries(userJobs, options)) {
       payrollEntries.set(jobId, entry);
     }
