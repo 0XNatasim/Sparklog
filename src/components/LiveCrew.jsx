@@ -25,16 +25,19 @@ export default function LiveCrew() {
   const [employees, setEmployees] = useState([]);
   const [jobsByUser, setJobsByUser] = useState(new Map());
   const [onLeaveCount, setOnLeaveCount] = useState(0);
+  const [notSubmittedYesterday, setNotSubmittedYesterday] = useState(0);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     const today = montrealDate();
-    const [{ data: people }, { data: jobs }, { data: timeOff }] = await Promise.all([
+    const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
+    const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at").eq("job_date", today),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays").lte("start_date", today).or(`end_date.gte.${today},end_date.is.null`),
+      supabase.from("jobs").select("user_id, status").eq("job_date", yesterday).in("status", ["submitted", "approved"]),
     ]);
     // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone off for the
     // FULL day — a full-day range or a weekly recurrence (e.g. never Fridays). A partial
@@ -50,6 +53,9 @@ export default function LiveCrew() {
     const activePeople = (people || []).filter(
       (person) => !person.is_paused && person.show_on_boards !== false && !offToday.has(person.id)
     );
+    // "Pas soumis hier": active roster minus anyone with a submitted/approved job dated yesterday.
+    const submittedYesterday = new Set((yJobs || []).map((j) => j.user_id));
+    setNotSubmittedYesterday(activePeople.filter((p) => !submittedYesterday.has(p.id)).length);
     const map = new Map();
     (jobs || []).forEach((job) => {
       if (!map.has(job.user_id)) map.set(job.user_id, []);
@@ -94,6 +100,7 @@ export default function LiveCrew() {
     { label: t("live.recap.totalOt"), value: totalOtCount, cls: "text-foreground" },
     { label: t("live.recap.over8"), value: over8Count, cls: "text-amber-600 dark:text-amber-400" },
     { label: t("live.recap.onLeave"), value: onLeaveCount, cls: "text-sky-600 dark:text-sky-400" },
+    { label: t("live.recap.notSubmittedYesterday"), value: notSubmittedYesterday, cls: notSubmittedYesterday > 0 ? "text-destructive dark:text-red-300" : "text-foreground" },
   ];
 
   return (
