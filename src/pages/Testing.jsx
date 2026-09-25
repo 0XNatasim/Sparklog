@@ -42,15 +42,33 @@ function PayrollSection() {
   const t = useT();
   return (
     <Tabs defaultValue="calcul" className="w-full">
-      <TabsList>
+      <TabsList className="flex-wrap">
         <TabsTrigger value="calcul">{t("payroll.subtabs.calcul")}</TabsTrigger>
         <TabsTrigger value="talon">{t("payroll.subtabs.talon")}</TabsTrigger>
         <TabsTrigger value="das">{t("payroll.subtabs.das")}</TabsTrigger>
+        <span className="mx-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">{t("payroll.subtabs.messierLabel")} →</span>
+        <TabsTrigger value="calcul-m">{t("payroll.subtabs.calcul")}</TabsTrigger>
+        <TabsTrigger value="talon-m">{t("payroll.subtabs.talon")}</TabsTrigger>
+        <TabsTrigger value="das-m">{t("payroll.subtabs.das")}</TabsTrigger>
       </TabsList>
       <TabsContent value="calcul" className="mt-3"><PayrollEngineTester /></TabsContent>
       <TabsContent value="talon" className="mt-3"><TalonTab /></TabsContent>
       <TabsContent value="das" className="mt-3"><DasTab /></TabsContent>
+      <TabsContent value="calcul-m" className="mt-3"><MessierNote /><PayrollEngineTester messier /></TabsContent>
+      <TabsContent value="talon-m" className="mt-3"><MessierNote /><TalonTab messier /></TabsContent>
+      <TabsContent value="das-m" className="mt-3"><MessierNote /><DasTab messier /></TabsContent>
     </Tabs>
+  );
+}
+
+// Explains the Façon Messier calculation difference at the top of each parallel tab.
+function MessierNote() {
+  const t = useT();
+  return (
+    <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+      <div className="font-semibold">{t("payroll.messierNote.title")}</div>
+      <p className="mt-1">{t("payroll.messierNote.body")}</p>
+    </div>
   );
 }
 

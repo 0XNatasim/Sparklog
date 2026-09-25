@@ -26,7 +26,7 @@ function ccqWeekOf(dateStr) {
 // week whose talon is available — filled/red once the week is COMPTABILISÉ (a ledger
 // snapshot exists), outlined/amber for an APERÇU (fully approved but not yet comptabilisé,
 // recomputed live). Clicking opens the full talon (PayStubPrint). Rien n'est persisté ici.
-export default function TalonTab() {
+export default function TalonTab({ messier = false }) {
   const t = useT();
   const { role } = useAuth();
   const isOwner = isOwnerRole(role); // only the boss (owner) can mark a talon official
@@ -118,7 +118,7 @@ export default function TalonTab() {
   function openTalon(profile, week, jobs) {
     try {
       const opening = openingFor(profile.id, week.start);
-      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD") });
+      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
       // Reference is assigned at comptabilisation only; blank for an aperçu.
       const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
       const reference = formatTalonRef(ledgerRow?.talon_seq);
@@ -164,7 +164,7 @@ export default function TalonTab() {
       if (st.kind !== "comptabilise" && st.kind !== "apercu") continue;
       try {
         const opening = openingFor(profile.id, week.start);
-        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD") });
+        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
         const model = buildStubModel({ result: talon.result, ytd: opening, pay: talon.pay, reimb: talon.reimb, ccq: talon.ccqAmounts });
         if (!model) continue;
         const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
