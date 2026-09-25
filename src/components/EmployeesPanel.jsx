@@ -12,6 +12,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import CcqCardCapture from "@/components/CcqCardCapture";
+import { IdCard } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
@@ -53,6 +56,7 @@ export default function EmployeesPanel() {
   const [nasSet, setNasSet] = useState(new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [ccqEdit, setCcqEdit] = useState(null); // employee profile whose CCQ card the manager is capturing
   const [timeOff, setTimeOff] = useState(new Map());
   const today = dayjs().format("YYYY-MM-DD");
   const [loading, setLoading]   = useState(true);
@@ -591,13 +595,16 @@ export default function EmployeesPanel() {
                 </div>
               </Field>
               <Field label={t("ccqCard.title")}>
-                {p.ccq_card_path ? (
-                  <Button type="button" size="sm" variant="outline" className="h-9 w-full sm:w-auto" onClick={() => toggleCard(p)}>
-                    {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
+                <div className="flex items-center gap-1.5">
+                  {p.ccq_card_path && (
+                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => toggleCard(p)}>
+                      {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
+                    </Button>
+                  )}
+                  <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setCcqEdit(p)}>
+                    <IdCard className="mr-1.5 h-4 w-4" />{p.ccq_card_path ? t("ccqCard.managerEdit") : t("ccqCard.managerAdd")}
                   </Button>
-                ) : (
-                  <span className="flex h-9 items-center text-xs text-muted-foreground">—</span>
-                )}
+                </div>
               </Field>
             </div>
             {p.ccq_card_path && cardViews[p.id]?.open && (
@@ -890,6 +897,23 @@ export default function EmployeesPanel() {
           </CardContent>}
         </Card>
       );})}
+
+      {/* Manager captures/edits an employee's CCQ card (photo + fields) — replaces the old
+          employee-facing prompt. */}
+      <Dialog open={!!ccqEdit} onOpenChange={(o) => { if (!o) setCcqEdit(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("ccqCard.title")} — {ccqEdit?.full_name || ccqEdit?.email || ""}</DialogTitle>
+          </DialogHeader>
+          {ccqEdit && (
+            <CcqCardCapture
+              userId={ccqEdit.id}
+              profile={ccqEdit}
+              onSaved={() => { load(); }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
