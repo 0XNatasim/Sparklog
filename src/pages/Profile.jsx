@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { BookOpen, Building2, ChevronDown, ClipboardList, ExternalLink, Eye, EyeOff, KeyRound, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
+import { BookOpen, Building2, ChevronDown, ClipboardList, ExternalLink, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { COMPANY_FORMS } from "@/lib/forms";
 import { useT } from "@/lib/use-t";
@@ -93,11 +91,7 @@ export default function Profile() {
               )}
             </CollapsibleCard>
 
-            {!isViewMode && (
-              <CollapsibleCard icon={KeyRound} title={t("profile.password.title")} description={t("profile.password.description")}>
-                <PasswordChangeForm userEmail={profile?.email || user?.email} />
-              </CollapsibleCard>
-            )}
+            <QuickReferenceCard />
 
             <CollapsibleCard icon={Phone} title={t("profile.contacts")} description={t("profile.contactsDescription")}>
               <ContactsReference />
@@ -110,32 +104,6 @@ export default function Profile() {
               </div>
             </CollapsibleCard>
 
-            <CollapsibleCard icon={BookOpen} title={t("profile.quickReference")} description={t("profile.quickReferenceDescription")}>
-              <div className="space-y-3">
-                <ReservationStatusReference />
-                <CalypsoV1Reference />
-                <ThermostatSpacingReference />
-                <StorageTemperatureReference />
-                <a
-                  href="https://support.sinopetech.com/wp-content/uploads/2026/04/660-0735-0022-E_TH1300ZB-ENG-Avec-GT130_web.pdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <span>Thermostat plancher chauffant — TH1300ZB (manuel)</span>
-                  <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </a>
-                <a
-                  href="https://support.sinopetech.com/wp-content/uploads/2026/01/660-0339-0000-29012026-Guide-dinstallation-RM3510WF-FR.pdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <span>Calypso V2 — RM3510WF (guide d&apos;installation)</span>
-                  <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </a>
-              </div>
-            </CollapsibleCard>
           </>
         )}
       </div>
@@ -143,81 +111,35 @@ export default function Profile() {
   );
 }
 
-function PasswordChangeForm({ userEmail }) {
+function QuickReferenceCard() {
   const t = useT();
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPasswords, setShowPasswords] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const passwordsMatch = newPassword === confirmPassword;
-  const canSubmit = Boolean(userEmail && currentPassword && newPassword.length >= 8 && passwordsMatch && !saving);
-
-  async function changePassword(event) {
-    event.preventDefault();
-    if (!canSubmit) return;
-    setSaving(true);
-    setError("");
-    setSuccess("");
-
-    const { error: authenticationError } = await supabase.auth.signInWithPassword({
-      email: userEmail,
-      password: currentPassword,
-    });
-    if (authenticationError) {
-      setError(t("profile.password.currentIncorrect"));
-      setSaving(false);
-      return;
-    }
-
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-    if (updateError) {
-      setError(updateError.message);
-      setSaving(false);
-      return;
-    }
-
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setSuccess(t("profile.password.success"));
-    setSaving(false);
-  }
-
   return (
-    <form className="max-w-lg space-y-4" onSubmit={changePassword}>
-      {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
-      {success && <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200" role="status">{success}</div>}
-
-      <label className="block space-y-1">
-        <span className="text-sm font-medium">{t("profile.password.current")}</span>
-        <Input type={showPasswords ? "text" : "password"} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" required />
-      </label>
-      <label className="block space-y-1">
-        <span className="text-sm font-medium">{t("profile.password.new")}</span>
-        <Input type={showPasswords ? "text" : "password"} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" minLength={8} required />
-        <span className="text-xs text-muted-foreground">{t("profile.password.requirement")}</span>
-      </label>
-      <label className="block space-y-1">
-        <span className="text-sm font-medium">{t("profile.password.confirm")}</span>
-        <Input type={showPasswords ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" minLength={8} required />
-        {confirmPassword && !passwordsMatch && <span className="text-xs text-destructive">{t("auth.passwordsDoNotMatch")}</span>}
-      </label>
-
-      <label className="flex cursor-pointer items-center gap-2 text-sm">
-        <input type="checkbox" checked={showPasswords} onChange={(event) => setShowPasswords(event.target.checked)} className="h-4 w-4 rounded border-input accent-primary" />
-        {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        {t("profile.password.show")}
-      </label>
-
-      <Button type="submit" disabled={!canSubmit}>
-        <KeyRound className="mr-2 h-4 w-4" />
-        {saving ? t("common.saving") : t("profile.password.save")}
-      </Button>
-    </form>
+    <CollapsibleCard icon={BookOpen} title={t("profile.quickReference")} description={t("profile.quickReferenceDescription")}>
+      <div className="space-y-3">
+        <ReservationStatusReference />
+        <CalypsoV1Reference />
+        <ThermostatSpacingReference />
+        <StorageTemperatureReference />
+        <a
+          href="https://support.sinopetech.com/wp-content/uploads/2026/04/660-0735-0022-E_TH1300ZB-ENG-Avec-GT130_web.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <span>Thermostat plancher chauffant — TH1300ZB (manuel)</span>
+          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </a>
+        <a
+          href="https://support.sinopetech.com/wp-content/uploads/2026/01/660-0339-0000-29012026-Guide-dinstallation-RM3510WF-FR.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <span>Calypso V2 — RM3510WF (guide d&apos;installation)</span>
+          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </a>
+      </div>
+    </CollapsibleCard>
   );
 }
 

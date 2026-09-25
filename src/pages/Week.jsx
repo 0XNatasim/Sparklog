@@ -212,14 +212,18 @@ export default function Week() {
                         <span className="font-bold text-muted-foreground">{t("week.regular")}:</span>
                         <span className="font-bold text-lg">{formatHoursHM(w.regularHours)}</span>
                       </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="font-bold text-muted-foreground">{t("week.ot15")}:</span>
-                        <span className="font-bold text-lg">{formatHoursHM(w.ot15)}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="font-bold text-muted-foreground">{t("week.ot20")}:</span>
-                        <span className="font-bold text-lg">{formatHoursHM(w.ot20)}</span>
-                      </div>
+                      {w.ot15 > 0 && (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="font-bold text-muted-foreground">{t("week.ot15")}:</span>
+                          <span className="font-bold text-lg">{formatHoursHM(w.ot15)}</span>
+                        </div>
+                      )}
+                      {w.ot20 > 0 && (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="font-bold text-muted-foreground">{t("week.ot20")}:</span>
+                          <span className="font-bold text-lg">{formatHoursHM(w.ot20)}</span>
+                        </div>
+                      )}
                       {w.returnNb > 0 && (
                         <div className="flex items-baseline justify-between gap-3">
                           <span className="font-bold text-muted-foreground">{t("week.returnNoBenefit")}:</span>
