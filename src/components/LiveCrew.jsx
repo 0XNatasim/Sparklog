@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Unlock } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { hoursBetween, formatHM } from "@/lib/time";
-import { cn } from "@/lib/utils";
+import { cn, withTimeout } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
 import { isOffOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
@@ -25,7 +26,11 @@ export default function LiveCrew() {
   const [employees, setEmployees] = useState([]);
   const [jobsByUser, setJobsByUser] = useState(new Map());
   const [onLeaveCount, setOnLeaveCount] = useState(0);
-  const [notSubmittedYesterday, setNotSubmittedYesterday] = useState(0);
+  const [notSubmittedList, setNotSubmittedList] = useState([]); // [{id, name}] not submitted yesterday
+  const [yesterdayDate, setYesterdayDate] = useState("");
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [unlockBusy, setUnlockBusy] = useState(false);
+  const [unlockMsg, setUnlockMsg] = useState("");
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,10 +38,11 @@ export default function LiveCrew() {
     setLoading(true);
     const today = montrealDate();
     const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
+    setYesterdayDate(yesterday);
     const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at").eq("job_date", today),
-      supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays").lte("start_date", today).or(`end_date.gte.${today},end_date.is.null`),
+      supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
       supabase.from("jobs").select("user_id, status").eq("job_date", yesterday).in("status", ["submitted", "approved"]),
     ]);
     // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone off for the
@@ -44,6 +50,10 @@ export default function LiveCrew() {
     // hours congé (start_time set) still leaves them on the board for the rest of the day.
     const offToday = new Set(
       (timeOff || []).filter((row) => isOffOn(row, today) && !row.start_time).map((row) => row.user_id)
+    );
+    // Full-day leave YESTERDAY — excluded from "not submitted yesterday" (nothing to submit).
+    const offYesterday = new Set(
+      (timeOff || []).filter((row) => isOffOn(row, yesterday) && !row.start_time).map((row) => row.user_id)
     );
     // Recap "en congé": everyone with time off applicable today (full day OR partial hours).
     const onLeaveToday = new Set(
@@ -53,9 +63,14 @@ export default function LiveCrew() {
     const activePeople = (people || []).filter(
       (person) => !person.is_paused && person.show_on_boards !== false && !offToday.has(person.id)
     );
-    // "Pas soumis hier": active roster minus anyone with a submitted/approved job dated yesterday.
+    // "Pas soumis hier": active roster minus anyone who submitted yesterday and minus anyone
+    // who was on FULL-day leave yesterday.
     const submittedYesterday = new Set((yJobs || []).map((j) => j.user_id));
-    setNotSubmittedYesterday(activePeople.filter((p) => !submittedYesterday.has(p.id)).length);
+    setNotSubmittedList(
+      activePeople
+        .filter((p) => !submittedYesterday.has(p.id) && !offYesterday.has(p.id))
+        .map((p) => ({ id: p.id, name: p.full_name || p.email || p.id }))
+    );
     const map = new Map();
     (jobs || []).forEach((job) => {
       if (!map.has(job.user_id)) map.set(job.user_id, []);
@@ -95,13 +110,38 @@ export default function LiveCrew() {
   const totalOtCount = rows.reduce((n, r) => n + countedJobs(r.jobs).length, 0);
   const over8Count = rows.filter((r) => r.dayTotal > 8).length;
 
+  const notSubmittedCount = notSubmittedList.length;
   const recapTiles = [
     { label: t("live.recap.withOt"), value: `${withOtCount}/${employees.length}`, cls: "text-emerald-600 dark:text-emerald-400" },
     { label: t("live.recap.totalOt"), value: totalOtCount, cls: "text-foreground" },
     { label: t("live.recap.over8"), value: over8Count, cls: "text-amber-600 dark:text-amber-400" },
     { label: t("live.recap.onLeave"), value: onLeaveCount, cls: "text-sky-600 dark:text-sky-400" },
-    { label: t("live.recap.notSubmittedYesterday"), value: notSubmittedYesterday, cls: notSubmittedYesterday > 0 ? "text-destructive dark:text-red-300" : "text-foreground" },
+    {
+      label: t("live.recap.notSubmittedYesterday"),
+      value: notSubmittedCount,
+      cls: notSubmittedCount > 0 ? "text-destructive dark:text-red-300" : "text-foreground",
+      onClick: notSubmittedCount > 0 ? () => { setUnlockMsg(""); setUnlockOpen(true); } : null,
+    },
   ];
+
+  async function unlockAllYesterday() {
+    if (!notSubmittedList.length || !yesterdayDate) return;
+    setUnlockBusy(true);
+    setUnlockMsg("");
+    try {
+      const payload = notSubmittedList.map((e) => ({ user_id: e.id, job_date: yesterdayDate, unlocked_until: null }));
+      const { error } = await withTimeout(
+        supabase.from("job_entry_unlocks").upsert(payload, { onConflict: "user_id,job_date" }),
+        12000
+      );
+      if (error) throw error;
+      setUnlockMsg(t("live.unlock.done", { count: payload.length }));
+    } catch (e) {
+      setUnlockMsg(e?.message || String(e));
+    } finally {
+      setUnlockBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -120,10 +160,17 @@ export default function LiveCrew() {
           {/* Day recap — centered, compact */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
             {recapTiles.map((tile) => (
-              <div key={tile.label} className="px-1">
-                <div className={`text-base font-bold leading-tight tabular-nums ${tile.cls}`}>{tile.value}</div>
-                <div className="text-[10px] leading-tight text-muted-foreground">{tile.label}</div>
-              </div>
+              tile.onClick ? (
+                <button key={tile.label} type="button" onClick={tile.onClick} title={t("live.unlock.open")} className="rounded px-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <div className={`text-base font-bold leading-tight tabular-nums underline decoration-dotted underline-offset-2 ${tile.cls}`}>{tile.value}</div>
+                  <div className="text-[10px] leading-tight text-muted-foreground">{tile.label}</div>
+                </button>
+              ) : (
+                <div key={tile.label} className="px-1">
+                  <div className={`text-base font-bold leading-tight tabular-nums ${tile.cls}`}>{tile.value}</div>
+                  <div className="text-[10px] leading-tight text-muted-foreground">{tile.label}</div>
+                </div>
+              )
             ))}
           </div>
           <div className="flex items-center gap-3">
@@ -170,6 +217,33 @@ export default function LiveCrew() {
             </Card>
           ))}
       </div>
+
+      <Dialog open={unlockOpen} onOpenChange={setUnlockOpen}>
+        <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("live.unlock.title", { date: yesterdayDate ? dayjs(yesterdayDate).format("DD MMM YYYY") : "" })}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">{t("live.unlock.hint")}</p>
+
+          {notSubmittedList.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("live.unlock.none")}</p>
+          ) : (
+            <div className="max-h-64 divide-y overflow-y-auto rounded-lg border">
+              {notSubmittedList.map((e) => (
+                <div key={e.id} className="px-3 py-2 text-sm">{e.name}</div>
+              ))}
+            </div>
+          )}
+
+          {unlockMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{unlockMsg}</p>}
+
+          <DialogFooter>
+            <Button type="button" disabled={unlockBusy || notSubmittedList.length === 0} onClick={unlockAllYesterday}>
+              <Unlock className="mr-1.5 h-4 w-4" />{unlockBusy ? t("common.working") : t("live.unlock.unlockAll")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
