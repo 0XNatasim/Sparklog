@@ -119,16 +119,18 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const overtimeWorkMinutes = workMinutes - regularWorkMinutes;
     const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
     let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
-    const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
-    // Façon Messier: the normal week is a full 40h of straight time. When short days have
-    // left the week's regular below 40h, backfill it from the 1.5× ("hors CCQ") hours —
-    // never past 40h/week — and leave double (overtime100Minutes) untouched. A week that
-    // already reaches 40h regular is unchanged (identical to the standard method).
-    if (messierMethod && overtime50Minutes > 0) {
-      const weeklyRegularRoom = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
-      const move = Math.min(overtime50Minutes, weeklyRegularRoom);
-      regularWorkMinutes += move;
-      overtime50Minutes -= move;
+    let overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
+    // Façon Messier: fill the week's regular (temps CCQ) to a full 40h BEFORE any hour
+    // becomes paid non-CCQ overtime. When short days leave the week's regular below 40h,
+    // backfill it — up to 40h/week — from the overtime hours, taking the 1.5× ("hors CCQ")
+    // hours first, then the double hours. A week that already reaches 40h regular is
+    // unchanged (identical to the standard method).
+    if (messierMethod) {
+      let room = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
+      const from50 = Math.min(overtime50Minutes, room);
+      overtime50Minutes -= from50; regularWorkMinutes += from50; room -= from50;
+      const from100 = Math.min(overtime100Minutes, room);
+      overtime100Minutes -= from100; regularWorkMinutes += from100;
     }
     // Legacy field: return travel was never paid as separate minutes on top of the span.
     // It is kept at 0; the carve-out above re-categorises minutes that are already in the
