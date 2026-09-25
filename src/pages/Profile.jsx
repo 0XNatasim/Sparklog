@@ -283,6 +283,11 @@ function ThermostatSpacingReference() {
             <p className="mt-1">6 pouces (15,24 cm) de dégagement de chaque côté (à gauche et à droite).</p>
           </div>
 
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+            <p className="font-semibold">Exception — plancher chauffant</p>
+            <p className="mt-1">Un thermostat de plancher chauffant n&apos;est pas considéré dans cette distance uniquement s&apos;il possède absolument une sonde de plancher.</p>
+          </div>
+
           <ReferenceSection title="Superposition (un au-dessus de l'autre)">
             <p>Il est impossible de garantir le fonctionnement de thermostats positionnés un au-dessus de l&apos;autre, puisque la chaleur dégagée par celui du dessous viendra biaiser la température de celui du haut.</p>
           </ReferenceSection>
