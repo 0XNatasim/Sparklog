@@ -415,6 +415,11 @@ function StorageTemperatureReference() {
 }
 
 function ContactsReference() {
+  // Our own company contacts, shown first.
+  const messier = [
+    { name: "Karine Messier", email: "messierconnexion@gmail.com", phone: "514-799-8879" },
+    { name: "Simon Bellerive", email: "simon1984bjeux@gmail.com", phone: "438-392-4672" },
+  ];
   const britton = [
     { name: "Olivier Dagenais", role: "Contremaître", email: "odagenais@britton.ca", phone: "438-828-7070" },
     { name: "Mélanie Noël-Richard", role: "Contremaître", email: "mrichard@britton.ca", phone: "514-799-0097" },
@@ -430,6 +435,24 @@ function ContactsReference() {
   // the contacts directly.
   return (
     <div className="space-y-5 text-sm leading-relaxed">
+      <ReferenceSection title="Messier Connexion inc.">
+        <div className="space-y-2">
+          {messier.map((c) => (
+            <div key={c.email} className="rounded-md border p-3">
+              <div className="font-medium">{c.name}</div>
+              {c.phone && (
+                <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
+                  <Phone className="h-3.5 w-3.5" />{c.phone}
+                </a>
+              )}
+              <a href={`mailto:${c.email}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
+                <Mail className="h-3.5 w-3.5" />{c.email}
+              </a>
+            </div>
+          ))}
+        </div>
+      </ReferenceSection>
+
       <ReferenceSection title="HILO — Répartition">
         <div className="rounded-md border p-3">
           <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
