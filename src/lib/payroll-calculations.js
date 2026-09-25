@@ -121,14 +121,16 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     let overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
     // Façon Messier: the "hors CCQ" hours are the paid non-CCQ hours (the return-to-shop time
-    // carved out with no CCQ benefits). Historically Messier counted those toward the 40h of
-    // CCQ regular first — so convert non-CCQ hours into regular (temps CCQ) up to 40h/week.
-    // Overtime (1.5× / double) is not touched. A week already at 40h regular is unchanged.
+    // carved out with no CCQ benefits). Historically Messier counted those toward the CCQ
+    // regular — so convert non-CCQ hours into regular (temps CCQ) up to a full 40h/week.
+    // Overtime (1.5× / double) is not touched. Any non-CCQ hours past 40h/week stay non-CCQ.
+    // (Simon's real week 39: 39h reg + 1.25h non-CCQ → 1h converts → 40 / 0.25 / 1.75.)
+    let messierConverted = 0;
     if (messierMethod && returnNoBenefitMinutes > 0) {
-      const room = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
-      const move = Math.min(returnNoBenefitMinutes, room);
-      returnNoBenefitMinutes -= move;
-      regularWorkMinutes += move;
+      const weekRoom = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
+      messierConverted = Math.min(returnNoBenefitMinutes, weekRoom);
+      returnNoBenefitMinutes -= messierConverted;
+      regularWorkMinutes += messierConverted;
     }
     // Legacy field: return travel was never paid as separate minutes on top of the span.
     // It is kept at 0; the carve-out above re-categorises minutes that are already in the
@@ -148,7 +150,8 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
       totalPaidMinutes: spanMinutes + returnRegularMinutes,
       ...kilometres,
     });
-    dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes);
+    // Count Messier-converted non-CCQ minutes as day work so the 8h/day cap holds across jobs.
+    dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes + messierConverted);
     weekOvertimeMinutes.set(wk, priorWeekOvertime + overtimeWorkMinutes);
     weekRegularMinutes.set(wk, priorWeekRegular + regularWorkMinutes);
   }
