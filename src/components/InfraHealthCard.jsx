@@ -29,18 +29,28 @@ export default function InfraHealthCard() {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState(null);
+  const [host, setHost] = useState(null); // live CPU/memory/disk/network/IOPS
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    // DB stats (RPC) and host metrics (edge function) load independently — one failing
+    // must not blank the other.
     try {
       const { data, error: rpcError } = await withRetry(() => supabase.rpc("get_infra_stats"), 8000);
       if (rpcError) throw rpcError;
       setStats(data || null);
     } catch (e) {
       setError(e?.message || String(e));
+    }
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("infra_metrics", { body: {} });
+      if (fnError) throw fnError;
+      setHost(data?.metrics || null);
+    } catch {
+      setHost(null); // fall back to the qualitative snapshot below
     } finally {
       setLoading(false);
     }
@@ -48,6 +58,14 @@ export default function InfraHealthCard() {
 
   // Fetch only once the card is opened (and not already loaded).
   useEffect(() => { if (open && !stats && !loading) load(); }, [open, stats, loading, load]);
+
+  const pctTone = (p) => (p == null ? "ok" : p < 60 ? "good" : p < 85 ? "warn" : "bad");
+  const fmtRate = (bps) => {
+    const b = Number(bps) || 0;
+    if (b < 1024) return `${Math.round(b)} o/s`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} Ko/s`;
+    return `${(b / (1024 * 1024)).toFixed(1)} Mo/s`;
+  };
 
   const dbPct = stats ? Math.round((Number(stats.db_size_bytes) / Number(stats.free_quota_bytes)) * 100) : 0;
   const connPct = stats ? Math.round((Number(stats.total_connections) / Number(stats.max_connections)) * 100) : 0;
@@ -58,7 +76,16 @@ export default function InfraHealthCard() {
     { label: t("infra.connections"), value: `${stats.total_connections} / ${stats.max_connections} (${connPct}%)`, tone: connPct < 60 ? "good" : connPct < 85 ? "warn" : "bad" },
   ] : [];
 
-  // Qualitative snapshot (not queryable from Postgres) — from the last infra audit.
+  // Live host metrics (CPU/memory/disk/network/IOPS) from the edge function when available.
+  const hostRows = host ? [
+    { label: t("infra.cpu"), value: host.cpu_pct == null ? "—" : `${host.cpu_pct}%`, tone: pctTone(host.cpu_pct) },
+    { label: t("infra.memory"), value: host.memory_pct == null ? "—" : `${host.memory_pct}%`, tone: pctTone(host.memory_pct) },
+    { label: t("infra.disk"), value: host.disk_pct == null ? "—" : `${host.disk_pct}%`, tone: pctTone(host.disk_pct) },
+    { label: t("infra.network"), value: host.net_bytes_per_sec == null ? "—" : fmtRate(host.net_bytes_per_sec), tone: "ok" },
+    { label: t("infra.iops"), value: host.iops == null ? "—" : `${host.iops}/s`, tone: "ok" },
+  ] : [];
+
+  // Qualitative snapshot (fallback when live host metrics aren't available) — last infra audit.
   const snapshotRows = [
     { label: t("infra.cpu"), value: t("infra.excellent"), tone: "good" },
     { label: t("infra.memory"), value: t("infra.normal"), tone: "ok" },
@@ -110,16 +137,18 @@ export default function InfraHealthCard() {
             <p className="text-[10px] text-muted-foreground">{t("live.updated", { time: dayjs(stats.as_of).format("YYYY-MM-DD HH:mm:ss") })}</p>
           )}
 
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("infra.snapshotTitle")}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {host ? t("infra.hostTitle") : t("infra.snapshotTitle")}
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {snapshotRows.map((r) => (
+            {(host ? hostRows : snapshotRows).map((r) => (
               <div key={r.label} className="rounded-lg border p-3">
                 <div className="text-xs text-muted-foreground">{r.label}</div>
-                <div className={`mt-0.5 text-sm font-semibold ${TONES[r.tone]}`}>{r.value}</div>
+                <div className={`mt-0.5 text-sm font-semibold tabular-nums ${TONES[r.tone]}`}>{r.value}</div>
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground">{t("infra.snapshotNote")}</p>
+          <p className="text-[10px] text-muted-foreground">{host ? t("infra.hostNote") : t("infra.snapshotNote")}</p>
         </CardContent>
       )}
     </Card>
