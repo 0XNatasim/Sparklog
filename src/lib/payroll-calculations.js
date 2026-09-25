@@ -120,16 +120,16 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
     let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     let overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
-    // Façon Messier: top up the week's regular (temps CCQ) toward 40h using the 1.5×
-    // ("hors CCQ") hours only — never past 40h/week — and NEVER touch the double hours.
-    // Reproduces Simon's week 39: 39/1.25/1.75 → 40/0.25/1.75 (1h of 1.5× becomes regular,
-    // the remaining 0.25h stays at 1.5×, double is unchanged). A week already at 40h regular
-    // is identical to the standard method.
+    // Façon Messier: fill the week's regular (temps CCQ) toward a full 40h before any hour
+    // stays overtime — take the 1.5× ("hors CCQ") hours first, then the double hours if the
+    // employee has no 1.5× tier (e.g. "première heure supp. à taux double"). Never past
+    // 40h/week. A week already at 40h regular is identical to the standard method.
     if (messierMethod) {
-      const room = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
+      let room = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
       const from50 = Math.min(overtime50Minutes, room);
-      overtime50Minutes -= from50;
-      regularWorkMinutes += from50;
+      overtime50Minutes -= from50; regularWorkMinutes += from50; room -= from50;
+      const from100 = Math.min(overtime100Minutes, room);
+      overtime100Minutes -= from100; regularWorkMinutes += from100;
     }
     // Legacy field: return travel was never paid as separate minutes on top of the span.
     // It is kept at 0; the carve-out above re-categorises minutes that are already in the
