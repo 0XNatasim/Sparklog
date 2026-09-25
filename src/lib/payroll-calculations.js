@@ -111,7 +111,7 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     // Carve out the return portion only when the policy is on AND the whole day exceeds
     // 8h. Otherwise the return stays inside the paid work span exactly as before.
     const carve = returnOtNoBenefits && (daySpanMinutes.get(job.job_date) || 0) > 480;
-    const returnNoBenefitMinutes = carve ? jobReturnMinutes(job) : 0;
+    let returnNoBenefitMinutes = carve ? jobReturnMinutes(job) : 0;
     const workMinutes = spanMinutes - returnNoBenefitMinutes; // benefits-eligible work
 
     const regularRoom = Math.max(0, 480 - priorDayWork);
@@ -120,16 +120,15 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
     let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     let overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
-    // Façon Messier: fill the week's regular (temps CCQ) toward a full 40h before any hour
-    // stays overtime — take the 1.5× ("hors CCQ") hours first, then the double hours if the
-    // employee has no 1.5× tier (e.g. "première heure supp. à taux double"). Never past
-    // 40h/week. A week already at 40h regular is identical to the standard method.
-    if (messierMethod) {
-      let room = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
-      const from50 = Math.min(overtime50Minutes, room);
-      overtime50Minutes -= from50; regularWorkMinutes += from50; room -= from50;
-      const from100 = Math.min(overtime100Minutes, room);
-      overtime100Minutes -= from100; regularWorkMinutes += from100;
+    // Façon Messier: the "hors CCQ" hours are the paid non-CCQ hours (the return-to-shop time
+    // carved out with no CCQ benefits). Historically Messier counted those toward the 40h of
+    // CCQ regular first — so convert non-CCQ hours into regular (temps CCQ) up to 40h/week.
+    // Overtime (1.5× / double) is not touched. A week already at 40h regular is unchanged.
+    if (messierMethod && returnNoBenefitMinutes > 0) {
+      const room = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
+      const move = Math.min(returnNoBenefitMinutes, room);
+      returnNoBenefitMinutes -= move;
+      regularWorkMinutes += move;
     }
     // Legacy field: return travel was never paid as separate minutes on top of the span.
     // It is kept at 0; the carve-out above re-categorises minutes that are already in the
