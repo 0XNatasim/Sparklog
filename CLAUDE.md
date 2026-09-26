@@ -20,6 +20,41 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 - Submitted intervals are DB-validated: trigger `trg_validate_job_submission` rejects any transition to
   `status='submitted'` (app or forged direct insert) with missing départ/fin or a duration outside (0h, 16h].
 
+## Regression / recurrence assessment (2026-09-26)
+
+**Short answer: yes.** The exact defects above are mostly closed, but several of them came from
+repeating failure patterns rather than isolated mistakes. A nearby feature can therefore recreate the
+same user-visible failure unless the invariant is enforced and tested at the shared boundary (database,
+auth adapter, or payroll engine), not only in one screen.
+
+| Risk | Likelihood | What could recur | Existing protection | Remaining prevention work |
+|------|------------|------------------|---------------------|---------------------------|
+| Network/auth wait never settles | Medium | A new save, login, upload, or manager action can leave its button disabled forever | Employee save and the main auth bootstrap use `withTimeout`; refreshes are coalesced by `refreshSessionOnce` | Route every Supabase/auth/storage call through one bounded API adapter; always restore UI state in `finally`; test a promise that never settles |
+| UI and database rules drift | Medium–high | A control accepts a value that Postgres rejects, as with 5-minute return time | Migration `0059` aligns the deployed constraint to 5-minute increments | Define shared domain constants and add database contract tests for every accepted boundary value (0, 5, 10, …, 240) and rejected neighbors |
+| Payroll logic forks | High impact / medium likelihood | Calcul, Talon, DAS, export, or an Edge Function disagrees on weekly OT, overnight time, return time, or benefits | Browser/Edge payroll parity fixtures cover representative cases | Make one versioned engine authoritative; add fixtures for week boundaries, split return time, holiday weeks, DST, and every employee type before changing a rule |
+| Retry/double-click race | Medium | A side effect other than job insertion or approved-batch claiming is applied twice | Job `submission_key` is unique and approved batches use an atomic claim | Give every mutating workflow an idempotency key and unique constraint; use row locks/expected versions for approval transitions |
+| Multi-step partial save | Medium–high | Upload succeeds but its row/notification fails, leaving an orphan or an incomplete review state | Errors are surfaced and most calls are time-bounded | Move submission to one idempotent server workflow; stage uploads and reconcile abandoned objects (S-3b) |
+| Date/time ambiguity | Medium | Overnight, Sunday/Saturday, device timezone, company timezone, or DST produces a different date/duration in another screen | Overnight arithmetic and CCQ-week helpers have unit coverage | Store normalized instants plus company timezone/offset; resolve C-6/C-6b before adding overlap detection |
+| Authorization policy drift | Medium impact / low–medium likelihood | A new role or policy restores excess access or lets a manager rewrite an approved fact | RLS, privileged-field triggers, and role helpers cover current paths | Add role-by-operation integration tests and replace broad manager update access with transition RPCs (S-4) |
+| Database load regression | Medium | New dashboards repeat unbounded reads/counts and exhaust Disk IO again | FK indexes and optimized auth expressions reduce current load | Add query budgets/observability; paginate notifications/history; replace repeated counts with aggregate RPCs (P-2/P-3/P-4/P-8) |
+| Render failure loses unsaved work | Medium | An unforeseen data shape or component exception blanks the app | None globally | Add route-level error boundaries and durable local drafts (S-7/C-8) |
+
+### Release gates for recurrence-prone changes
+
+Before releasing changes to time entry, auth, payroll, approval, or imports:
+
+1. Exercise timeout, rejected request, lost-response-after-commit, retry, and rapid double-click cases.
+2. Verify the same boundary values against both the UI and a real migrated database.
+3. Run payroll parity fixtures in every runtime that calculates or exports pay.
+4. Test the employee, team-leader, manager, admin, owner, paused, and subcontractor roles explicitly.
+5. Check Sunday/Saturday transitions, midnight crossing, and both DST transitions in the company timezone.
+6. Confirm retries produce one business event, one audit event, and no orphaned storage object.
+7. Compare query counts and rows read with a production-sized dataset before adding dashboard polling or filters.
+
+The highest-value next protections are the atomic `submit_job` workflow (S-3b/C-5*), the manager
+state-transition RPCs (S-4), and shared bounded request handling. They address entire bug families rather
+than another individual symptom.
+
 ---
 
 ## Priority Tier (fix in this order)
@@ -28,26 +63,24 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 |---|----|----------|-------|--------|
 | 1 | S-3 | High | Approval audit actor is null (service-role write vs `auth.uid()` trigger) | `push_approved_batch/index.ts:97,145` + `0015` |
 | 2 | S-4 | Medium | Manager job updates have no state-transition allowlist | `0000:451` |
-| 3 | C-5* | Medium | Remaining: overlap detection + RLS-restrict-to-`saved` + validating `submit_job` RPC | `0018:57-59` |
+| 3 | C-5* | Medium | Remaining: overlap detection | time-only job columns |
 
 ---
 
 ## 1. Critical / Blocking Bugs
 
-### C-5 — Work-interval validity — mostly RESOLVED (overlap + RLS/RPC remain)
+### C-5 — Work-interval validity — mostly RESOLVED (overlap remains)
 - **Done (DB validity):** trigger `trg_validate_job_submission` (migration `validate_job_submission_interval`)
   fires on any write that puts a job into `status='submitted'` — the app AND a forged direct insert — and
   rejects missing départ/fin or a duration outside (0h, 16h] (`check_violation`; client maps it to
   `form.errors.invalidInterval`). Manager approval (submitted→approved), drafts and existing rows are
   untouched. This closes the zero-hour / incomplete / excessive-duration hole for every write path.
-- **Remaining (tracked as C-5\*):**
-  1. **Overlap detection** — intentionally deferred: with time-only columns (no date/offset) a
-     midnight-crossing overlap is ambiguous; it belongs with the timezone/instant work (C-6).
-  2. **Direct-submit hardening** — a forged insert can still create a *valid* `submitted` row for oneself
-     (no escalation, but it bypasses client UX). Durable fix: restrict the employee **insert** policy to
-     `status='saved'` and route submission through a validating `submit_job` RPC (lock row, carry the C-3
-     idempotency key, reject on blocking classification warnings).
-- **Status:** ✅ interval validity done · ☐ overlap + RLS-restrict/RPC (C-5*)
+- **Done (atomic transition):** `save_own_job` owns employee draft/submission transitions, derives
+  ownership/status/lock state server-side, serializes edits, and returns the already-committed row when an
+  idempotency key is retried. Direct employee writes can create/update drafts but cannot submit them.
+- **Remaining (tracked as C-5\*):** **overlap detection** — intentionally deferred: with time-only columns
+  (no date/offset) a midnight-crossing overlap is ambiguous; it belongs with the timezone/instant work (C-6).
+- **Status:** ✅ interval validity and atomic/idempotent transition done · ☐ overlap (C-5*)
 
 ---
 

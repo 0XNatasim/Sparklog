@@ -19,6 +19,7 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
+import { buildJobSaveRpcArgs } from "@/lib/job-submission";
 import {
   Dialog,
   DialogContent,
@@ -276,9 +277,8 @@ export default function EmployeeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, effectiveUserId]);
 
-  // C-3: a fresh idempotency key per new-entry form. Editing an existing job (editId set)
-  // uses UPDATE, not the key. Within one new-entry session the key is stable, so retries
-  // reuse it (idempotent upsert); a brand-new form gets a new key.
+  // A fresh idempotency key per new-entry form. Edits identify and lock the existing row;
+  // within one new-entry flow the key remains stable through retries and attachments.
   useEffect(() => { submissionKeyRef.current = null; }, [editId]);
 
   useEffect(() => {
@@ -397,76 +397,40 @@ export default function EmployeeForm() {
 
       const nextLocked = nextStatus === "submitted";
 
-      const payload = {
-        user_id: user.id,
-        job_date,
-        ot,
-        depart,
-        arrivee: arrivee || null,
-        fin,
-        km_total: kmTotalNum,
-        km_aller: kmClientNum,
-        status: nextStatus,
-        locked: nextLocked,
-        ...(returnValues ? {
-          return_time_minutes: returnValues.minutes,
-          km_retour: kmReturnNum,
-        } : {}),
-        ...(captureEvidence ? { overtime_evidence_captured: true } : {}),
-        parking_receipt_captured: hasParkingReceipt,
-      };
+      // The database owns the state transition and transaction. The idempotency key is
+      // reused across retries, so a response lost after commit resolves to the same row.
+      if (!editId && !submissionKeyRef.current) submissionKeyRef.current = crypto.randomUUID();
+      const { data } = await withRetry(
+        () => supabase.rpc("save_own_job", buildJobSaveRpcArgs({
+          editId,
+          newJobId: forcedId,
+          submissionKey: submissionKeyRef.current,
+          submit: mode === "submit",
+          jobDate: job_date,
+          ot,
+          depart,
+          arrivee,
+          fin,
+          kmTotal: kmTotalNum,
+          kmAller: kmClientNum,
+          returnMinutes: returnValues?.minutes,
+          kmRetour: kmReturnNum,
+          overtimeEvidenceCaptured: captureEvidence || hasOvertimeEvidence,
+          parkingReceiptCaptured: hasParkingReceipt,
+        })).single(),
+        12000
+      );
+      if (!data?.id) throw new Error(t("form.errors.insertNoId"));
 
-      let savedJobId = editId || forcedId;
+      const savedJobId = data.id;
+      setInfo(editId
+        ? (nextStatus === "submitted" ? "form.toasts.submitted" : "form.toasts.updated")
+        : (nextStatus === "submitted" ? "form.toasts.savedAndSubmitted" : "form.toasts.saved"));
+      setStatus(data.status || nextStatus);
+      setLocked(Boolean(data.locked));
+      setDirty(false);
 
-      if (editId) {
-        // withRetry caps each attempt with a timeout AND refreshes the session after the
-        // first failure — this is what un-sticks the "app stalls, refresh fixes it" case,
-        // which is a stale/hung auth token. It never waits forever. The update is idempotent.
-        await withRetry(
-          () => supabase.from("jobs").update(payload).eq("id", editId),
-          12000
-        );
-
-        setInfo(nextStatus === "submitted" ? "form.toasts.submitted" : "form.toasts.updated");
-        setStatus(nextStatus);
-        setLocked(nextLocked);
-        setDirty(false);
-      } else {
-        // C-3: attach a per-new-entry idempotency key and UPSERT on (user_id, submission_key).
-        // A retried timeout that already committed, or a double submit, resolves to the SAME
-        // row instead of inserting a duplicate — so the automatic retry below is safe.
-        if (!submissionKeyRef.current) submissionKeyRef.current = crypto.randomUUID();
-        const submissionKey = submissionKeyRef.current;
-        const insertPayload = { ...payload, submission_key: submissionKey, ...(forcedId ? { id: forcedId } : {}) };
-        let data;
-        try {
-          const result = await withRetry(
-            () => supabase.from("jobs").upsert(insertPayload, { onConflict: "user_id,submission_key" }).select("id").single(),
-            12000
-          );
-          data = result.data;
-        } catch (upsertErr) {
-          // Idempotent recovery: if a row for this key already committed (e.g. a prior
-          // attempt whose response we lost, now locked so the conflicting UPDATE is
-          // refused), adopt it instead of surfacing an error or making a duplicate. Timed
-          // out so it can never hang.
-          const { data: existing } = await withTimeout(
-            supabase.from("jobs").select("id").eq("user_id", user.id).eq("submission_key", submissionKey).maybeSingle(),
-            8000
-          );
-          if (existing?.id) data = existing;
-          else throw upsertErr;
-        }
-        if (!data?.id) throw new Error(t("form.errors.insertNoId"));
-        savedJobId = data.id;
-
-        setInfo(nextStatus === "submitted" ? "form.toasts.savedAndSubmitted" : "form.toasts.saved");
-        setStatus(nextStatus);
-        setLocked(nextLocked);
-        setDirty(false);
-
-        if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
-      }
+      if (!editId && !returnValues) navigate(`/form?edit=${savedJobId}`, { replace: true });
       if (parkingRequested && parkingFile) {
         await uploadParkingReceipt(savedJobId, parkingFile, parkingAmountNumber);
         setHasParkingReceipt(true);
@@ -563,6 +527,7 @@ export default function EmployeeForm() {
     if (await shouldRequestMealClaim(saved)) {
       await createMealClaim(saved);
     }
+    if (!editId) submissionKeyRef.current = null;
     setReturnStep("success");
     if (editId) {
       navigate("/form", { replace: true });
@@ -799,6 +764,7 @@ export default function EmployeeForm() {
       } catch (mealError) {
         console.error("[overtime evidence] Meal claim step failed", mealError);
       }
+      if (!editId) submissionKeyRef.current = null;
       setReturnStep("success");
       navigate("/form", { replace: true });
     } catch (error) {
