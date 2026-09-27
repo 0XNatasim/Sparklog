@@ -18,6 +18,7 @@ import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
 import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
+import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
@@ -60,6 +61,8 @@ function weekKeyFromDate(dateStr) {
   return ccqWeek(dateStr).key;
 }
 
+const ANOMALY_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, started_at, ended_at, km_total, km_aller, km_retour, overtime_evidence_captured";
+
 export default function ManagerDashboard() {
   const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
@@ -71,7 +74,11 @@ export default function ManagerDashboard() {
   // Which dashboard sections this user may open. Managers/owners get all; an admin
   // (office employee) sees only the sections the owner granted (profiles.admin_sections).
   const allSections = ["live", "timesheet", "notifications", "employees", "conges", "forms", "testing"];
-  const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id));
+  // Congés and Formulaires live under Test → Réglage for anyone who can open Test; an
+  // admin granted Formulaires without Test keeps it as a top-level section.
+  const canOpenTesting = canAccessSection(role, adminSections, "testing");
+  const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id)
+    && !(canOpenTesting && (id === "conges" || id === "forms")));
   const fallbackSection = allowedSections[0] || "live";
   const normalizedRequest = ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications" : requestedSection;
   // Clamp to an allowed section so a granted admin can't reach an ungranted one by URL.
@@ -98,6 +105,9 @@ export default function ManagerDashboard() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [counts, setCounts] = useState({ all: 0, saved: 0, submitted: 0, approved: 0 });
+  const [anomalies, setAnomalies] = useState([]);
+  const [anomaliesFailed, setAnomaliesFailed] = useState(false);
+  const [showAllAnomalies, setShowAllAnomalies] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
@@ -148,9 +158,42 @@ export default function ManagerDashboard() {
     });
   }
 
+  // Anomalies across every submitted job (not just the loaded page), compared with the
+  // approved jobs of the same employees and dates.
+  async function loadAnomalies() {
+    try {
+      const { data: submitted } = await withRetry(() => supabase
+        .from("jobs")
+        .select(ANOMALY_COLUMNS)
+        .eq("status", "submitted")
+        .order("job_date", { ascending: false })
+        .limit(QUERY_BUDGETS.anomalySubmittedJobs), 12000);
+      const rows = submitted || [];
+      const userIds = [...new Set(rows.map((row) => row.user_id))];
+      const dates = [...new Set(rows.map((row) => row.job_date))];
+      const { data: approved } = rows.length
+        ? await withRetry(() => supabase
+          .from("jobs")
+          .select(ANOMALY_COLUMNS)
+          .eq("status", "approved")
+          .in("user_id", userIds)
+          .in("job_date", dates)
+          .limit(QUERY_BUDGETS.anomalyApprovedPeers), 12000)
+        : { data: [] };
+      // select("*") so the scan keeps working with default limits if the threshold
+      // columns are not deployed yet.
+      const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).maybeSingle();
+      setAnomalies(detectJobAnomalies([...rows, ...(approved || [])], anomalyLimitsFromSettings(settings)));
+      setAnomaliesFailed(false);
+    } catch {
+      setAnomaliesFailed(true);
+    }
+  }
+
   async function load() {
     setErr(""); setInfo("");
     setLoading(true);
+    loadAnomalies();
     try {
       const { data: jobRows } = await withRetry(
         () => buildJobsQuery().range(0, PAGE_SIZE - 1),
@@ -588,7 +631,42 @@ export default function ManagerDashboard() {
     return split.submitted.filter((j) => weekKeyFromDate(j.job_date) === selectedWeekKey);
   }, [split, selectedEmployee, selectedWeekKey, weekOptions.length]);
 
+  function employeeLabel(userId) {
+    const employee = profiles.get(userId);
+    return employee?.full_name || employee?.email || `User ${String(userId).slice(0, 8)}…`;
+  }
+
+  function describeAnomaly(anomaly) {
+    const duration = formatHM((anomaly.minutes || 0) / 60);
+    return t(`manager.anomalies.${anomaly.type}`, {
+      duration,
+      km: anomaly.km,
+      ot: anomaly.ot,
+      depart: String(anomaly.depart || "").slice(0, 5),
+      fin: String(anomaly.fin || "").slice(0, 5),
+    });
+  }
+
+  // Non-blocking warning: returns "" when the batch is clean, otherwise the text to confirm.
+  function anomalyWarning(jobIds) {
+    const hits = anomaliesForJobs(anomalies, jobIds);
+    if (hits.length === 0) return "";
+    const lines = hits.slice(0, 5).map((anomaly) => `• ${employeeLabel(anomaly.userId)} · ${dayjs(anomaly.jobDate).format("DD MMM")} · ${describeAnomaly(anomaly)}`);
+    if (hits.length > 5) lines.push("…");
+    return t("manager.confirm.anomalies", { count: hits.length, list: lines.join("\n") });
+  }
+
+  function openAnomaly(anomaly) {
+    const next = new URLSearchParams(searchParams);
+    next.set("section", "timesheet");
+    next.set("job", anomaly.jobIds[0]);
+    setSearchParams(next);
+    setEmployeeId(anomaly.userId);
+  }
+
   async function approve(jobId) {
+    const warning = anomalyWarning([jobId]);
+    if (warning && !(await confirm(warning))) return;
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
     try {
@@ -695,7 +773,9 @@ export default function ManagerDashboard() {
         ? t("manager.confirm.selectedPeriod")
         : `${t("manager.weekShort")} ${wk.start.format("DD MMM")} → ${wk.end.format("DD MMM YYYY")}`;
 
-    const ok = await confirm(t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length }));
+    const warning = anomalyWarning(list.map((j) => j.id));
+    const question = t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length });
+    const ok = await confirm(warning ? `${question}\n\n${warning}` : question);
     if (!ok) return;
 
     const actionKey = `week:${selectedWeekKey === "latest" ? "latest" : selectedWeekKey}`;
@@ -1091,6 +1171,48 @@ export default function ManagerDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {(() => {
+          const visible = anomalies.filter((anomaly) => employeeId === "all" || anomaly.userId === employeeId);
+          if (anomaliesFailed) {
+            return (
+              <div className="rounded-md border-2 border-red-500 bg-red-50 px-3 py-2 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-200">
+                {t("manager.anomalies.loadFailed")}
+              </div>
+            );
+          }
+          if (visible.length === 0) return null;
+          const shown = showAllAnomalies ? visible : visible.slice(0, 8);
+          return (
+            <section className="rounded-lg border-2 border-red-500 bg-red-50 p-3 text-red-900 dark:bg-red-950/40 dark:text-red-200" aria-live="polite">
+              <div className="flex items-center gap-2 font-semibold">
+                <TriangleAlert className="h-5 w-5 shrink-0" />
+                {t("manager.anomalies.title", { count: visible.length })}
+              </div>
+              <p className="mt-1 text-xs opacity-80">{t("manager.anomalies.hint")}</p>
+              <ul className="mt-2 divide-y divide-red-200 dark:divide-red-900">
+                {shown.map((anomaly) => (
+                  <li key={anomaly.key}>
+                    <button
+                      type="button"
+                      onClick={() => openAnomaly(anomaly)}
+                      className="flex w-full flex-wrap items-baseline gap-x-2 py-1.5 text-left text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    >
+                      <b>{employeeLabel(anomaly.userId)}</b>
+                      <span className="tabular-nums">{dayjs(anomaly.jobDate).format("DD MMM YYYY")}</span>
+                      <span>{describeAnomaly(anomaly)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {visible.length > 8 && (
+                <Button type="button" size="sm" variant="ghost" className="mt-1 h-7 px-2 text-xs text-red-900 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/40" onClick={() => setShowAllAnomalies((value) => !value)}>
+                  {showAllAnomalies ? t("manager.anomalies.showLess") : t("manager.anomalies.showAll", { count: visible.length })}
+                </Button>
+              )}
+            </section>
+          );
+        })()}
 
         {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (

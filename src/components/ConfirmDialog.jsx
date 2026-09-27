@@ -19,7 +19,7 @@ export function useConfirmDialog() {
     <Dialog open={Boolean(request)} onOpenChange={(open) => { if (!open) answer(false); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-base leading-snug">{request?.message}</DialogTitle>
+          <DialogTitle className="whitespace-pre-line text-base leading-snug">{request?.message}</DialogTitle>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={() => answer(false)}>

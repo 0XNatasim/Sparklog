@@ -4,7 +4,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, DollarSign, Download, ExternalLink, FileText, ShieldCheck, Wallet } from "lucide-react";
+import { Calculator, CalendarDays, DollarSign, Download, ExternalLink, FileText, Settings, ShieldCheck, Wallet } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
@@ -19,6 +19,7 @@ import WeekViewTab from "@/components/WeekViewTab";
 import RecordOfEmploymentTab from "@/components/RecordOfEmploymentTab";
 import AuditLog from "@/components/AuditLog";
 import InfraHealthCard from "@/components/InfraHealthCard";
+import SettingsPanel from "@/components/SettingsPanel";
 
 // ── Coûts section: Coûts (tableau) · Semaine · Mois ──────────────────────────
 function CostingSection() {
@@ -422,6 +423,7 @@ export default function Testing() {
     { id: "roe", icon: FileText, label: t("testing.roe.tab"), description: t("testing.roe.description") },
     { id: "payroll", icon: Wallet, label: t("testing.tabs.payroll"), description: t("testing.sections.payrollDescription") },
     { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
+    { id: "settings", icon: Settings, label: t("settings.tab"), description: t("settings.description") },
   ];
 
   return (
@@ -429,7 +431,7 @@ export default function Testing() {
       <div className="flex justify-end">
         <span className="font-mono text-[10px] text-muted-foreground" title="Version">V{APP_VERSION}</span>
       </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6" aria-label={t("manager.sections.testing")}>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8" aria-label={t("manager.sections.testing")}>
         {sections.map(({ id, icon: Icon, label, description }) => (
           <button
             key={id}
@@ -450,6 +452,7 @@ export default function Testing() {
       {section === "weekview" && <WeekViewTab />}
       {section === "roe" && <RecordOfEmploymentTab />}
       {section === "payroll" && <PayrollSection />}
+      {section === "settings" && <SettingsPanel />}
       {section === "audit" && (
         <div className="space-y-3">
           <InfraHealthCard />
