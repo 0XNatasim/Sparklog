@@ -285,30 +285,44 @@ export default function EmployeeForm() {
     }
   }
 
+  // "New job" defaults, so a previous job's data doesn't bleed into the next entry.
+  function resetNewJobFields() {
+    setJobDate(companyDate());
+    setOt("");
+    setDepart("");
+    setArrivee("");
+    setFin("");
+    setKmAller("");
+    setStatus("");
+    setLocked(false);
+    setErr("");
+    setInfo("");
+    setEditLoadFailed(false);
+    setDirty(false);
+    setHasOvertimeEvidence(false);
+    setParkingRequested(false);
+    setHasParkingReceipt(false);
+    setParkingFile(null);
+    setParkingAmount("");
+  }
+
+  // A closed day also disables the date field, so this is the way back to today's job card.
+  async function returnToTodaysJobCard() {
+    if (editId) {
+      navigate("/form", { replace: true });
+      return;
+    }
+    await deleteDraft({ userId: effectiveUserId }).catch(() => undefined);
+    resetNewJobFields();
+    submissionKeyRef.current = crypto.randomUUID();
+  }
+
   useEffect(() => {
     setDraftReady(false);
     if (editId) {
       loadEdit();
     } else {
-      // "New job" — reset form to empty defaults so previous job's data
-      // doesn't bleed into the next entry.
-      setJobDate(companyDate());
-      setOt("");
-      setDepart("");
-      setArrivee("");
-      setFin("");
-      setKmAller("");
-      setStatus("");
-      setLocked(false);
-      setErr("");
-      setInfo("");
-      setEditLoadFailed(false);
-      setDirty(false);
-      setHasOvertimeEvidence(false);
-      setParkingRequested(false);
-      setHasParkingReceipt(false);
-      setParkingFile(null);
-      setParkingAmount("");
+      resetNewJobFields();
       loadDraft({ userId: effectiveUserId }).then((record) => {
         if (record) restoreLocalDraft(record);
       }).catch(() => undefined).finally(() => setDraftReady(true));
@@ -1021,8 +1035,13 @@ export default function EmployeeForm() {
           </div>
         )}
         {entryBlockedReason && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
-            {entryBlockedReason}
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
+            <span>{entryBlockedReason}</span>
+            {(editId || job_date !== companyDate()) && (
+              <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={saving} onClick={returnToTodaysJobCard}>
+                {t("form.deadline.backToJobCard")}
+              </Button>
+            )}
           </div>
         )}
 
