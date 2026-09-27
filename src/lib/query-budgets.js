@@ -5,5 +5,7 @@ export const QUERY_BUDGETS = Object.freeze({
   reviewQueue: 100,
   employeeHistoryPage: 100,
   employeeWeekLookbackWeeks: 12,
+  anomalySubmittedJobs: 200,
+  anomalyApprovedPeers: 400,
 });
 
