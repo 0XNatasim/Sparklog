@@ -1,7 +1,8 @@
 import { getKilometreBreakdown, minutesBetween } from "./payroll-calculations";
 
-// Thresholds for the manager's "À vérifier" box. These only flag a job for a second
-// look before approval; the database contract still decides what is accepted.
+// Default thresholds for the manager's "À vérifier" box. These only flag a job for a
+// second look before approval; the database contract still decides what is accepted.
+// Managers can change the long-day and kilometre limits in Test → Réglage.
 export const ANOMALY_LIMITS = Object.freeze({
   longDayMinutes: 12 * 60,
   highKm: 300,
@@ -40,9 +41,21 @@ function orderedIds(...jobs) {
     .map((job) => job.id);
 }
 
+// Limits from company_time_settings, falling back to the defaults for missing or
+// out-of-range values (e.g. before the columns exist).
+export function anomalyLimitsFromSettings(settings) {
+  const minutes = Number(settings?.anomaly_long_day_minutes);
+  const km = Number(settings?.anomaly_high_km);
+  return {
+    ...ANOMALY_LIMITS,
+    longDayMinutes: minutes >= 60 && minutes <= 1440 ? minutes : ANOMALY_LIMITS.longDayMinutes,
+    highKm: km >= 1 && km <= 5000 ? km : ANOMALY_LIMITS.highKm,
+  };
+}
+
 // Pure detection over submitted/approved jobs. Only anomalies that touch at least one
 // submitted job are returned: approved days are already settled.
-export function detectJobAnomalies(jobs) {
+export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS) {
   const days = new Map();
   for (const job of jobs || []) {
     if (!REVIEWABLE.has(job.status) || !job.user_id || !job.job_date || !job.depart || !job.fin) continue;
@@ -79,14 +92,14 @@ export function detectJobAnomalies(jobs) {
     }
 
     const worked = dayJobs.reduce((sum, job) => sum + minutesBetween(job.depart, job.fin), 0);
-    if (worked > ANOMALY_LIMITS.longDayMinutes) add("long_day", dayJobs, { minutes: worked });
-    if (worked > ANOMALY_LIMITS.overtimeMinutes && !dayJobs.some((job) => job.overtime_evidence_captured)) {
+    if (worked > limits.longDayMinutes) add("long_day", dayJobs, { minutes: worked });
+    if (worked > limits.overtimeMinutes && !dayJobs.some((job) => job.overtime_evidence_captured)) {
       add("overtime_no_evidence", dayJobs, { minutes: worked });
     }
 
     for (const job of dayJobs) {
       const { totalKm } = getKilometreBreakdown(job);
-      if (totalKm > ANOMALY_LIMITS.highKm) add("high_km", [job], { km: totalKm });
+      if (totalKm > limits.highKm) add("high_km", [job], { km: totalKm });
     }
   }
 

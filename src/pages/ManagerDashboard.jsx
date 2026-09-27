@@ -18,7 +18,7 @@ import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
 import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
-import { anomaliesForJobs, detectJobAnomalies } from "@/lib/job-anomalies";
+import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
@@ -74,7 +74,11 @@ export default function ManagerDashboard() {
   // Which dashboard sections this user may open. Managers/owners get all; an admin
   // (office employee) sees only the sections the owner granted (profiles.admin_sections).
   const allSections = ["live", "timesheet", "notifications", "employees", "conges", "forms", "testing"];
-  const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id));
+  // Congés and Formulaires live under Test → Réglage for anyone who can open Test; an
+  // admin granted Formulaires without Test keeps it as a top-level section.
+  const canOpenTesting = canAccessSection(role, adminSections, "testing");
+  const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id)
+    && !(canOpenTesting && (id === "conges" || id === "forms")));
   const fallbackSection = allowedSections[0] || "live";
   const normalizedRequest = ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications" : requestedSection;
   // Clamp to an allowed section so a granted admin can't reach an ungranted one by URL.
@@ -176,7 +180,10 @@ export default function ManagerDashboard() {
           .in("job_date", dates)
           .limit(QUERY_BUDGETS.anomalyApprovedPeers), 12000)
         : { data: [] };
-      setAnomalies(detectJobAnomalies([...rows, ...(approved || [])]));
+      // select("*") so the scan keeps working with default limits if the threshold
+      // columns are not deployed yet.
+      const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).maybeSingle();
+      setAnomalies(detectJobAnomalies([...rows, ...(approved || [])], anomalyLimitsFromSettings(settings)));
       setAnomaliesFailed(false);
     } catch {
       setAnomaliesFailed(true);

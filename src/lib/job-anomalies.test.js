@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anomaliesForJobs, detectJobAnomalies } from "./job-anomalies";
+import { ANOMALY_LIMITS, anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "./job-anomalies";
 
 const job = (id, depart, fin, extra = {}) => ({
   id, user_id: "u1", job_date: "2026-09-24", status: "submitted", ot: "OT-1", depart, fin, km_total: 20, ...extra,
@@ -59,6 +59,17 @@ describe("detectJobAnomalies", () => {
       job("b", "08:00", "12:00", { user_id: "u2" }),
       job("c", "08:00", "12:00", { job_date: "2026-09-25" }),
     ])).toEqual([]);
+  });
+});
+
+describe("configurable limits", () => {
+  it("uses the manager's thresholds and falls back to the defaults", () => {
+    const jobs = [job("a", "07:00", "17:30", { km_total: 250, overtime_evidence_captured: true })];
+    expect(detectJobAnomalies(jobs)).toEqual([]);
+    const strict = anomalyLimitsFromSettings({ anomaly_long_day_minutes: 600, anomaly_high_km: 200 });
+    expect(types(detectJobAnomalies(jobs, strict)).sort()).toEqual(["high_km", "long_day"]);
+    expect(anomalyLimitsFromSettings({})).toEqual(ANOMALY_LIMITS);
+    expect(anomalyLimitsFromSettings({ anomaly_long_day_minutes: 0, anomaly_high_km: "abc" })).toEqual(ANOMALY_LIMITS);
   });
 });
 
