@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Sparklog — « Feuille 3 » : tableau de bord professionnel des heures approuvées
+// Sparklog — onglet « Stats » : tableau de bord professionnel des heures approuvées
 //
-// Ce script LIT « Feuille 1 » (jamais modifiée) et génère l’onglet « Feuille 3 » :
+// Ce script LIT « Feuille 1 » (jamais modifiée) et génère l’onglet « Stats » :
 //   01 Indicateurs clés     — heures, jobs, KM, ratios route / terrain, alertes
 //   02 Graphiques           — heures par employé, heures par semaine CCQ
 //   03 Classement           — rang des employés + ratios d’efficacité
@@ -20,14 +20,15 @@
 //   3. Choisissez la fonction « F3_installer » dans la liste, puis ▶ Exécuter,
 //      et acceptez les autorisations.
 // Ensuite : le menu « 📊 Sparklog » apparaît à l’ouverture du fichier et la
-// Feuille 3 se met à jour toute seule toutes les 15 minutes (seulement si la
+// l’onglet Stats se met à jour toute seule toutes les 15 minutes (seulement si la
 // Feuille 1 a changé). Les filtres de l’explorateur sont conservés.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const F3 = {
   VERSION: '1.0.0',
   SOURCE: 'Feuille 1',
-  TARGET: 'Feuille 3',
+  TARGET: 'Stats',
+  LEGACY_TARGET: 'Feuille 3',   // ancien nom : renommé automatiquement en « Stats »
   FONT: 'Roboto',
   DATA_COL: 27,        // AA : registre normalisé (masqué) qui alimente l’explorateur
   CHART_COL: 46,       // AT : séries des graphiques (masquées)
@@ -72,18 +73,18 @@ function F3_installer() {
   ScriptApp.newTrigger('F3_actualiserSiChangement').timeBased().everyMinutes(15).create();
   F3_actualiser();
   try { F3_onOpen(); } catch (e) { /* le menu apparaîtra à la prochaine ouverture */ }
-  ss.toast('Feuille 3 installée : menu 📊 Sparklog + mise à jour toutes les 15 min.', 'Sparklog', 8);
+  ss.toast('Stats installé : menu 📊 Sparklog + mise à jour toutes les 15 min.', 'Sparklog', 8);
 }
 
 /** Déclencheur d’ouverture (installable, n’entre pas en conflit avec un onOpen existant). */
 function F3_onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('📊 Sparklog')
-    .addItem('Actualiser la Feuille 3', 'F3_actualiser')
+    .addItem('Actualiser Stats et les semaines', 'F3_actualiser')
     .addItem('Réinitialiser les filtres', 'F3_reinitialiserFiltres')
     .addItem('Recréer tous les onglets de semaine', 'F3_recreerSemaines')
     .addSeparator()
-    .addItem('Aller à la Feuille 3', 'F3_ouvrir')
+    .addItem('Aller à Stats', 'F3_ouvrir')
     .addToUi();
 }
 
@@ -92,7 +93,7 @@ function F3_ouvrir() {
   if (sh) sh.activate();
 }
 
-/** Reconstruit la Feuille 3 à partir de la Feuille 1. */
+/** Reconstruit l’onglet Stats à partir de la Feuille 1. */
 function F3_actualiser() {
   const lock = LockService.getDocumentLock();
   if (!lock.tryLock(30000)) return;
@@ -465,6 +466,8 @@ const F3_FMT = {
 function F3_render_(ss, model) {
   const C = F3.C;
   let sh = ss.getSheetByName(F3.TARGET);
+  const legacy = ss.getSheetByName(F3.LEGACY_TARGET);
+  if (!sh && legacy) sh = legacy.setName(F3.TARGET);
   const saved = F3_readFilters_(sh);
   if (!sh) sh = ss.insertSheet(F3.TARGET, ss.getSheets().length);
   F3_reset_(sh);
@@ -1029,7 +1032,7 @@ function F3_renderExplorer_(sh, row, model, saved) {
 
   const end = r0 + rows;
   sh.getRange(end + 1, 2, 1, 16).merge()
-    .setValue('Sparklog · Feuille 3 générée automatiquement à partir de « ' + F3.SOURCE +
+    .setValue('Sparklog · Onglet Stats généré automatiquement à partir de « ' + F3.SOURCE +
       ' » (lecture seule). Ne modifiez que les champs bleus de l’explorateur.')
     .setFontSize(8).setFontColor(C.faint).setHorizontalAlignment('center');
   return end + 2;
@@ -1097,7 +1100,7 @@ function F3_syncWeekTabs_(ss, model, force) {
     if (sh && ss.getSheets().length > 1) ss.deleteSheet(sh);
   });
 
-  // Ordre chronologique, juste après la Feuille 3.
+  // Ordre chronologique, juste après l’onglet Stats.
   if (moved || force) {
     const anchor = ss.getSheetByName(F3.TARGET);
     let pos = anchor ? anchor.getIndex() + 1 : ss.getSheets().length;
