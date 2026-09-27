@@ -44,4 +44,23 @@ describe("Montréal company time", () => {
     expect(migrationSql).toContain("update public.jobs");
     expect(migrationSql).toContain("where user_id = new.user_id");
   });
+
+  it("isolates the historical instant backfill from unrelated job triggers", () => {
+    for (const trigger of [
+      "jobs_stamp_rate_snapshot",
+      "jobs_set_updated_at",
+      "trg_validate_job_submission",
+    ]) {
+      const disable = `alter table public.jobs disable trigger ${trigger};`;
+      const enable = `alter table public.jobs enable trigger ${trigger};`;
+      expect(migrationSql).toContain(disable);
+      expect(migrationSql).toContain(enable);
+      expect(migrationSql.indexOf(disable)).toBeLessThan(migrationSql.indexOf("update public.jobs"));
+      expect(migrationSql.indexOf(enable)).toBeGreaterThan(migrationSql.indexOf("update public.jobs"));
+    }
+  });
+
+  it("validates only inserts and saved/updated to submitted transitions", () => {
+    expect(migrationSql).toContain("if tg_op = 'UPDATE' and old.status not in ('saved', 'updated') then");
+  });
 });

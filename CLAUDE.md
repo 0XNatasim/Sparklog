@@ -89,9 +89,13 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   ownership/status/lock state server-side, serializes edits, and returns the already-committed row when an
   idempotency key is retried. Direct employee writes can create/update drafts but cannot submit them.
 - **Done (timezone/DST):** Montréal civil times resolve through `America/Toronto` into persisted
-  `started_at`/`ended_at` instants, including a migration backfill for existing jobs. Nonexistent spring
-  times and ambiguous repeated fall times are rejected; elapsed duration therefore reflects the real DST
-  transition rather than wall-clock subtraction.
+  `started_at`/`ended_at` instants, including a migration backfill for existing jobs. The backfill disables
+  and restores the snapshot, `updated_at`, and submission-validation triggers so historical payroll and
+  optimistic-concurrency timestamps remain unchanged. Nonexistent spring times and ambiguous repeated fall
+  times are rejected; elapsed duration therefore reflects the real DST transition rather than wall-clock
+  subtraction.
+- **Done (submission boundary):** interval/overlap validation runs only on inserts and transitions from
+  `saved`/`updated` to `submitted`; export rollbacks and service-role metadata updates are not revalidated.
 - **Done (overlap):** submitted/approved ranges are checked under a per-employee transaction lock, so
   concurrent overlapping submissions cannot both pass.
 - **Remaining:** add a manager-only choice of the first or second occurrence for legitimate work during the

@@ -53,6 +53,12 @@ create trigger trg_00_resolve_montreal_job_instants
 -- Backfill rows created before instant persistence was introduced. PostgreSQL's
 -- timezone conversion deterministically chooses the standard-time occurrence for
 -- a historical fold; new/edited rows still require an unambiguous civil time.
+-- Keep this data migration isolated from unrelated payroll snapshots, optimistic
+-- concurrency timestamps, and submission validation.
+alter table public.jobs disable trigger jobs_stamp_rate_snapshot;
+alter table public.jobs disable trigger jobs_set_updated_at;
+alter table public.jobs disable trigger trg_validate_job_submission;
+
 update public.jobs
 set started_at = (job_date + depart) at time zone 'America/Toronto',
     ended_at = (
@@ -63,12 +69,21 @@ where depart is not null
   and fin is not null
   and (started_at is null or ended_at is null);
 
+alter table public.jobs enable trigger jobs_stamp_rate_snapshot;
+alter table public.jobs enable trigger jobs_set_updated_at;
+alter table public.jobs enable trigger trg_validate_job_submission;
+
 -- Use actual elapsed instants, not wall-clock subtraction, for submitted jobs.
 create or replace function public.validate_job_submission_contract()
 returns trigger language plpgsql set search_path to 'public' as $function$
 declare duration_minutes integer;
 begin
   if new.status <> 'submitted' then return new; end if;
+  -- Validate only a real submission. Rollbacks from approved -> submitted and
+  -- service-role metadata updates must preserve the previous accepted row.
+  if tg_op = 'UPDATE' and old.status not in ('saved', 'updated') then
+    return new;
+  end if;
   if new.started_at is null or new.ended_at is null then
     raise exception using errcode = '23514', message = 'invalid_job_interval';
   end if;
