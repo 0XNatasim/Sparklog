@@ -8,11 +8,13 @@ import { Select } from "@/components/ui/select";
 import Fold from "@/components/ui/fold";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 const montrealDate = companyDate;
 
 export default function TimeRulesManager() {
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const [deadline, setDeadline] = useState("23:59");
   const [holidays, setHolidays] = useState([]);
   const [message, setMessage] = useState("");
@@ -80,10 +82,31 @@ export default function TimeRulesManager() {
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage(t("timeRules.dayUnlocked"));
+      setMessage(await reopenSubmittedJobs(unlockEmployee, unlockDate));
       await load();
     }
     setUnlockBusy(false);
+  }
+
+  // Unlocking a day does not reopen jobs already submitted that day; offer to return them.
+  async function reopenSubmittedJobs(userId, jobDate) {
+    const { data: submitted, error } = await supabase
+      .from("jobs")
+      .select("id, updated_at")
+      .eq("user_id", userId)
+      .eq("job_date", jobDate)
+      .eq("status", "submitted");
+    if (error || !submitted?.length) return t("timeRules.dayUnlocked");
+    const ok = await confirm(t("timeRules.reopenSubmittedConfirm", { name: employeeName(userId), count: submitted.length, date: jobDate }));
+    if (!ok) return t("timeRules.dayUnlocked");
+    const results = await Promise.all(submitted.map((job) => supabase.rpc("return_job_for_correction", {
+      p_job_id: job.id,
+      p_expected_updated_at: job.updated_at,
+    })));
+    const failed = results.filter((result) => result.error).length;
+    return failed
+      ? t("timeRules.reopenSubmittedPartial", { done: submitted.length - failed, failed })
+      : t("timeRules.reopenSubmittedDone", { count: submitted.length });
   }
 
   async function removeUnlock(id) {
@@ -248,6 +271,7 @@ export default function TimeRulesManager() {
           </div>
         </Fold>
       </CardContent>
+      {confirmDialog}
     </Card>
   );
 }
