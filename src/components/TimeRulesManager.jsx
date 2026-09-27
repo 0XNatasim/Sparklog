@@ -7,15 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import Fold from "@/components/ui/fold";
 import { useT } from "@/lib/use-t";
+import { companyDate } from "@/lib/company-time";
 
-function montrealDate() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Toronto",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
+const montrealDate = companyDate;
 
 export default function TimeRulesManager() {
   const t = useT();

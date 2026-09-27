@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, Star, TriangleAlert, Trophy, X } from "lucide-react";
-import dayjs from "dayjs";
 import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
 import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
 import TimeOffControls from "@/components/TimeOffControls";
@@ -21,6 +20,7 @@ import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
+import { companyDate } from "@/lib/company-time";
 
 // Region code → administrative region name, for the label shown next to each employee.
 const REGION_NAME = new Map(QUEBEC_REGIONS.map((r) => [r.code, r.name]));
@@ -58,7 +58,7 @@ export default function EmployeesPanel() {
   const [deleting, setDeleting] = useState(false);
   const [ccqEdit, setCcqEdit] = useState(null); // employee profile whose CCQ card the manager is capturing
   const [timeOff, setTimeOff] = useState(new Map());
-  const today = dayjs().format("YYYY-MM-DD");
+  const today = companyDate();
   const [loading, setLoading]   = useState(true);
   const [err, setErr]           = useState("");
   const [info, setInfo]         = useState("");

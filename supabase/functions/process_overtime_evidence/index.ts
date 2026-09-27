@@ -54,7 +54,9 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     const status = text && validatesOvertimeSms(text) ? "processed" : "needs_review";
     const { error: updateError } = await admin
       .from("overtime_evidence")
-      .update({ ocr_text: text || null, ocr_status: status })
+      // Persist only the classification. Raw message text can contain names, phone
+      // numbers and unrelated conversation metadata and is not needed by the UI.
+      .update({ ocr_text: null, ocr_status: status })
       .eq("id", evidence.id);
     if (updateError) throw updateError;
   } catch (error) {

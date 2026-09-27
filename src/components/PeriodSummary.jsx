@@ -9,6 +9,7 @@ import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import { formatHM } from "@/lib/time";
 import { useT } from "@/lib/use-t";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
+import { companyDate } from "@/lib/company-time";
 
 dayjs.extend(isoWeek);
 
@@ -40,9 +41,7 @@ function periodFor(mode, dateStr) {
   return ccqWeek(dateStr);
 }
 
-function montrealToday() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-}
+const montrealToday = companyDate;
 
 // Summary cards for the Testing "Week" and "Month" tabs. `mode` = "week" | "month".
 export default function PeriodSummary({ mode = "week" }) {

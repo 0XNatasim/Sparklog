@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { calculateDailyTotals, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { EMPLOYER } from "@/lib/paystub";
 import { useT } from "@/lib/use-t";
+import { companyDate } from "@/lib/company-time";
 
 // Weekly payroll → the ROE reports up to the last 53 pay periods (Service Canada rule for
 // a weekly pay period, both for Block 15A hours and Block 15C per-period earnings).
@@ -317,7 +318,7 @@ function Field({ label, value, strong }) {
 
 // Standalone printable preparation sheet (French, A4 portrait) mirroring the talon print flow.
 function buildRoeHtml({ employee, roe, reasonCode, reasonLabel, recall }) {
-  const today = dayjs().format("YYYY-MM-DD");
+  const today = companyDate();
   const rowsHtml = roe.rows.map((p, i) => `
     <tr>
       <td>${i + 1}</td>

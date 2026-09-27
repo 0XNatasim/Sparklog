@@ -10,12 +10,9 @@ import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
 import CongesIndemnityManager from "@/components/CongesIndemnityManager";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
+import { companyDate } from "@/lib/company-time";
 
-function montrealToday() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-}
+const montrealToday = companyDate;
 
 const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 

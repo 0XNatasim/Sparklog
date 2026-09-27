@@ -15,6 +15,8 @@ import { useT } from "@/lib/use-t";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import { buildJobSaveRpcArgs } from "@/lib/job-submission";
+import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
 dayjs.locale("en");
 
@@ -55,32 +57,62 @@ export default function History() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+
+  function historyQuery(cursor = null) {
+    let query = supabase.from("jobs").select("*")
+      .eq("user_id", effectiveUserId)
+      .order("job_date", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(QUERY_BUDGETS.employeeHistoryPage);
+    if (cursor) query = query.or(`job_date.lt.${cursor.job_date},and(job_date.eq.${cursor.job_date},id.lt.${cursor.id})`);
+    return query;
+  }
+
+  async function mealIdsFor(page) {
+    const ids = page.map((job) => job.id);
+    if (!ids.length) return [];
+    const { data, error } = await withTimeout(supabase.from("meal_claims").select("job_id").in("job_id", ids), 12000);
+    if (error) throw error;
+    return (data || []).map((claim) => claim.job_id);
+  }
 
   async function load() {
     setErr("");
     setInfo("");
     setLoading(true);
     try {
-      const [jobsResult, mealsResult] = await withTimeout(
-        Promise.all([
-          supabase
-            .from("jobs")
-            .select("*")
-            .eq("user_id", effectiveUserId)
-            .order("job_date", { ascending: false })
-            .order("updated_at", { ascending: false }),
-          supabase.from("meal_claims").select("job_id").eq("user_id", effectiveUserId),
-        ]),
-        12000
-      );
+      const jobsResult = await withTimeout(historyQuery(), 12000);
       if (jobsResult.error) throw jobsResult.error;
-      if (mealsResult.error) throw mealsResult.error;
-      setJobs(jobsResult.data || []);
-      setMealJobIds(new Set((mealsResult.data || []).map((claim) => claim.job_id)));
+      const page = jobsResult.data || [];
+      setJobs(page);
+      setMealJobIds(new Set(await mealIdsFor(page)));
+      setHasMore(page.length === QUERY_BUDGETS.employeeHistoryPage);
     } catch (e) {
       setErr(e?.message || t("history.errors.failedLoad"));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadMore() {
+    const cursor = jobs[jobs.length - 1];
+    if (!cursor) return;
+    setLoadingMore(true);
+    setErr("");
+    try {
+      const result = await withTimeout(historyQuery(cursor), 12000);
+      if (result.error) throw result.error;
+      const page = result.data || [];
+      const mealIds = await mealIdsFor(page);
+      setJobs((current) => [...current, ...page]);
+      setMealJobIds((current) => new Set([...current, ...mealIds]));
+      setHasMore(page.length === QUERY_BUDGETS.employeeHistoryPage);
+    } catch (error) {
+      setErr(error?.message || t("history.errors.failedLoad"));
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -145,6 +177,28 @@ export default function History() {
     return isOwner(job) && (job.status === "saved" || job.status === "updated") && job.locked === false;
   }
 
+  async function submitExistingJob(job) {
+    const { error } = await withTimeout(
+      supabase.rpc("save_own_job", buildJobSaveRpcArgs({
+        editId: job.id,
+        submit: true,
+        jobDate: job.job_date,
+        ot: job.ot,
+        depart: job.depart,
+        arrivee: job.arrivee,
+        fin: job.fin,
+        kmTotal: job.km_total,
+        kmAller: job.km_aller,
+        returnMinutes: job.return_time_minutes,
+        kmRetour: job.km_retour,
+        overtimeEvidenceCaptured: job.overtime_evidence_captured,
+        parkingReceiptCaptured: job.parking_receipt_captured,
+      })).single(),
+      12000
+    );
+    if (error) throw error;
+  }
+
   async function deleteJob(jobId) {
     const ok = window.confirm(t("history.confirm.delete"));
     if (!ok) return;
@@ -182,8 +236,9 @@ export default function History() {
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
     try {
-      const { error } = await supabase.from("jobs").update({ status: "submitted", locked: true }).eq("id", jobId);
-      if (error) throw error;
+      const job = jobs.find((row) => row.id === jobId);
+      if (!job) throw new Error(t("history.errors.submitFailed"));
+      await submitExistingJob(job);
       setInfo(t("history.toasts.submitted"));
       await load();
     } catch (e) {
@@ -201,8 +256,9 @@ export default function History() {
     setActionLoadingKey(actionKey);
     setErr(""); setInfo("");
     try {
-      const { error } = await supabase.from("jobs").update({ status: "submitted", locked: true }).in("id", ids);
-      if (error) throw error;
+      const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
+      if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
+      await Promise.all(selectedJobs.map(submitExistingJob));
       setInfo(t("history.toasts.daySubmitted", { count: ids.length }));
       await load();
     } catch (e) {
@@ -341,6 +397,13 @@ export default function History() {
             </div>
           );
         })}
+        {!loading && hasMore && (
+          <div className="flex justify-center py-3">
+            <Button type="button" variant="secondary" disabled={loadingMore} onClick={loadMore}>
+              {loadingMore ? t("common.loading") : t("history.loadMore", { loaded: jobs.length })}
+            </Button>
+          </div>
+        )}
       </div>
     </AppShell>
   );

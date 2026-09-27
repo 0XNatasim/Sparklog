@@ -181,10 +181,13 @@ serve(async (req) => {
     const claimedJobs = eligible.filter((j) => claimedSet.has(j.id));
 
     const revertClaim = async () => {
-      await admin
+      const { error: revertError } = await admin
         .from("jobs")
         .update({ status: "submitted", exported_to_sheet: false, exported_at: null, exported_by: null })
         .in("id", claimedIds);
+      if (revertError) {
+        throw new Error(`payroll_claim_revert_failed: ${revertError.message}`);
+      }
     };
 
     // Profiles + auth emails for the claimed jobs only.
