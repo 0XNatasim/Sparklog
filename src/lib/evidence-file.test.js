@@ -36,7 +36,7 @@ describe("evidence file hardening", () => {
   it("locks storage limits, orphan grace, raw-text purge and reconciliation into the backend contract", () => {
     expect(migrationSql).toContain(`file_size_limit = ${MAX_EVIDENCE_BYTES}`);
     expect(migrationSql).toContain("greatest(p_older_than, interval '1 hour')");
-    expect(migrationSql).toContain("update public.overtime_evidence set ocr_text = null");
+    expect(migrationSql).not.toContain("update public.overtime_evidence set ocr_text = null");
     expect(cleanupSource).toContain('rpc("find_orphaned_evidence_objects"');
     expect(cleanupSource).toContain("orphaned_deleted");
   });

@@ -50,6 +50,19 @@ create trigger trg_00_resolve_montreal_job_instants
   before insert or update of job_date, depart, fin on public.jobs
   for each row execute function public.resolve_montreal_job_instants();
 
+-- Backfill rows created before instant persistence was introduced. PostgreSQL's
+-- timezone conversion deterministically chooses the standard-time occurrence for
+-- a historical fold; new/edited rows still require an unambiguous civil time.
+update public.jobs
+set started_at = (job_date + depart) at time zone 'America/Toronto',
+    ended_at = (
+      job_date + fin
+      + case when fin <= depart then interval '1 day' else interval '0' end
+    ) at time zone 'America/Toronto'
+where depart is not null
+  and fin is not null
+  and (started_at is null or ended_at is null);
+
 -- Use actual elapsed instants, not wall-clock subtraction, for submitted jobs.
 create or replace function public.validate_job_submission_contract()
 returns trigger language plpgsql set search_path to 'public' as $function$
@@ -115,7 +128,7 @@ begin
   local_now := timezone(company_tz, now());
   select exists (
     select 1 from public.job_entry_unlocks
-    where user_id = auth.uid() and job_date = new.job_date
+    where user_id = new.user_id and job_date = new.job_date
       and (unlocked_until is null or unlocked_until > now())
   ) into has_unlock;
   if has_unlock then return new; end if;

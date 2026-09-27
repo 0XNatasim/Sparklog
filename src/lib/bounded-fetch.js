@@ -1,4 +1,6 @@
-export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+// Must stay above the longest operation-level timeout. Payroll export allows 60 s;
+// this last-resort bound leaves enough time for that caller to receive its response.
+export const DEFAULT_REQUEST_TIMEOUT_MS = 75_000;
 
 // Supabase uses one fetch implementation for database, auth, storage and functions.
 // Bounding it here is the last-resort safety net for every network request, including

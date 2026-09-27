@@ -34,6 +34,5 @@ $function$;
 revoke all on function public.find_orphaned_evidence_objects(interval, integer) from public, anon, authenticated;
 grant execute on function public.find_orphaned_evidence_objects(interval, integer) to service_role;
 
--- Raw OCR text is unnecessary after classification and may contain message metadata.
-update public.overtime_evidence set ocr_text = null where ocr_text is not null;
-
+-- Existing OCR text is intentionally preserved: deleting historical content in a
+-- schema migration would be irreversible. New processing stores only status metadata.

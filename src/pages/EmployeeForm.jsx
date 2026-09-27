@@ -22,7 +22,7 @@ import { isMealEligible } from "@/lib/payroll-calculations";
 import { buildJobSaveRpcArgs } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
-import { deleteDraft, loadDraft, saveDraft } from "@/lib/draft-store";
+import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
 import { prepareEvidenceImage } from "@/lib/evidence-file";
 import {
   Dialog,
@@ -213,7 +213,7 @@ export default function EmployeeForm() {
     setPendingSaveMode(draft.pendingSaveMode || "draft");
     if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
     setDirty(true);
-    setInfo("form.toasts.draftRestored");
+    setInfo(t("form.toasts.draftRestored"));
   }
 
   async function loadEdit() {
@@ -263,7 +263,14 @@ export default function EmployeeForm() {
       setLocked(shouldLock);
       setDirty(false);
       const localDraft = await loadDraft({ userId: effectiveUserId, editId }).catch(() => null);
-      if (localDraft) restoreLocalDraft(localDraft);
+      if (localDraft) {
+        const draftIsNewer = Date.parse(localDraft.updatedAt) > Date.parse(data.updated_at || 0);
+        if (draftIsNewer && window.confirm(t("form.draft.restoreNewer"))) {
+          restoreLocalDraft(localDraft);
+        } else if (!draftIsNewer) {
+          await deleteDraft({ userId: effectiveUserId, editId }).catch(() => undefined);
+        }
+      }
     } catch (e) {
       setErr(e?.message || t("form.errors.failedLoad"));
       setEditLoadFailed(true);
@@ -318,7 +325,7 @@ export default function EmployeeForm() {
   useEffect(() => {
     if (!draftReady || !dirty || !effectiveUserId || isViewMode || locked) return;
     const timeoutId = window.setTimeout(() => {
-      saveDraft({
+      persistDraft({
         userId: effectiveUserId,
         editId,
         submissionKey: submissionKeyRef.current,
@@ -511,8 +518,17 @@ export default function EmployeeForm() {
       const msg = String(e?.message || "");
       if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
         lastSaveErrorRef.current = t("form.errors.duplicateOt", { ot: ot || "" });
-      } else if (/invalid_job_interval|invalid_job_contract|return_time_exceeds_job_interval|invalid_job_kilometres|montreal_local_time|overlapping_job_interval/i.test(msg)) {
-        // Server-side interval guard (C-5): départ/fin required, duration 0–16h.
+      } else if (/ambiguous_montreal_local_time|invalid_dst_time:ambiguous/i.test(msg)) {
+        lastSaveErrorRef.current = t("form.errors.ambiguousTime");
+      } else if (/nonexistent_montreal_local_time|invalid_dst_time:nonexistent/i.test(msg)) {
+        lastSaveErrorRef.current = t("form.errors.nonexistentTime");
+      } else if (/overlapping_job_interval/i.test(msg)) {
+        lastSaveErrorRef.current = t("form.errors.overlappingInterval");
+      } else if (/return_time_exceeds_job_interval|return_exceeds_interval/i.test(msg)) {
+        lastSaveErrorRef.current = t("form.errors.returnExceedsInterval");
+      } else if (/invalid_job_kilometres|invalid_kilometres/i.test(msg)) {
+        lastSaveErrorRef.current = t("form.errors.invalidKilometres");
+      } else if (/invalid_job_interval|invalid_job_contract|invalid_interval/i.test(msg)) {
         lastSaveErrorRef.current = t("form.errors.invalidInterval");
       } else {
         lastSaveErrorRef.current = e?.message || t("form.errors.saveFailed");

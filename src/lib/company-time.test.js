@@ -41,5 +41,7 @@ describe("Montréal company time", () => {
     expect(migrationSql).toContain("ambiguous_montreal_local_time");
     expect(migrationSql).toContain("tstzrange(new.started_at, new.ended_at, '[)')");
     expect(migrationSql).toContain("pg_advisory_xact_lock");
+    expect(migrationSql).toContain("update public.jobs");
+    expect(migrationSql).toContain("where user_id = new.user_id");
   });
 });

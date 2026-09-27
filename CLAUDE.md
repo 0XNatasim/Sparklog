@@ -51,7 +51,8 @@ Before releasing changes to time entry, auth, payroll, approval, or imports:
 6. Confirm retries produce one business event, one audit event, and no orphaned storage object.
 7. Compare query counts and rows read with a production-sized dataset before adding dashboard polling or filters.
 
-All ten recommended protections are now implemented; remaining lower-tier findings stay tracked below.
+Nine protections are complete. Timezone normalization is deployed, but point 6 remains open until managers
+can explicitly disambiguate the repeated hour during Montréal's autumn DST transition.
 
 ### Ordre recommandé
 
@@ -60,7 +61,7 @@ All ten recommended protections are now implemented; remaining lower-tier findin
 - [x] **3.** Transitions d’approbation sécurisées côté serveur.
 - [x] **4.** Tests de contrat entre l’interface et la base.
 - [x] **5.** Moteur de paie unique avec tests de parité.
-- [x] **6.** Uniformisation du fuseau horaire et gestion du DST.
+- [ ] **6.** Uniformisation du fuseau horaire et gestion du DST (heure répétée : contournement gestionnaire à ajouter).
 - [x] **7.** Matrice automatisée des rôles et autorisations.
 - [x] **8.** Brouillons locaux et reprise hors ligne.
 - [x] **9.** Pagination, agrégations et budgets de requêtes.
@@ -78,7 +79,7 @@ All ten recommended protections are now implemented; remaining lower-tier findin
 
 ## 1. Critical / Blocking Bugs
 
-### C-5 / C-6 — Work intervals, Montréal timezone and DST — RESOLVED
+### C-5 / C-6 — Work intervals, Montréal timezone and DST — PARTIALLY RESOLVED
 - **Done (DB validity):** trigger `trg_validate_job_submission` (migration `validate_job_submission_interval`)
   fires on any write that puts a job into `status='submitted'` — the app AND a forged direct insert — and
   rejects missing départ/fin or a duration outside (0h, 16h] (`check_violation`; client maps it to
@@ -88,11 +89,14 @@ All ten recommended protections are now implemented; remaining lower-tier findin
   ownership/status/lock state server-side, serializes edits, and returns the already-committed row when an
   idempotency key is retried. Direct employee writes can create/update drafts but cannot submit them.
 - **Done (timezone/DST):** Montréal civil times resolve through `America/Toronto` into persisted
-  `started_at`/`ended_at` instants. Nonexistent spring times and ambiguous repeated fall times are rejected;
-  elapsed duration therefore reflects the real DST transition rather than wall-clock subtraction.
+  `started_at`/`ended_at` instants, including a migration backfill for existing jobs. Nonexistent spring
+  times and ambiguous repeated fall times are rejected; elapsed duration therefore reflects the real DST
+  transition rather than wall-clock subtraction.
 - **Done (overlap):** submitted/approved ranges are checked under a per-employee transaction lock, so
   concurrent overlapping submissions cannot both pass.
-- **Status:** ✅ resolved
+- **Remaining:** add a manager-only choice of the first or second occurrence for legitimate work during the
+  repeated autumn hour; rejection without this override is safe but operationally incomplete.
+- **Status:** 🟠 partial
 
 ---
 
@@ -164,7 +168,7 @@ All ten recommended protections are now implemented; remaining lower-tier findin
 | Persona | Scenario | Found Behavior | Expected | Patch |
 |---|---|---|---|---|
 | Employee | Zero/equal times | ✅ Rejected by `trg_validate_job_submission` | Rejected | C-5 (done) |
-| Employee | Offline Save, then reload | Draft lost (memory only) | Durable on-device draft | C-8 |
+| Employee | Offline Save, then reload | Durable IndexedDB draft, with stale-edit conflict prompt | Durable on-device draft | C-8 (done) |
 | Employee | Dropped conn after upload | Orphaned object / flagged job w/o metadata | Atomic or queued | S-3b |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
 | Manager | 100+ employees notifications | Unbounded full-table reads | Paginated review RPC | P-2/P-8 |
@@ -174,8 +178,8 @@ All ten recommended protections are now implemented; remaining lower-tier findin
 | Both | Render exception | Whole app blanks | Recover, keep draft | S-7 |
 
 **Also tracked (lower tier):**
-- **C-8 offline drafts:** form state is memory-only; no IndexedDB persistence (only `autofill_tip_seen` in
-  localStorage). → schema-versioned IndexedDB draft keyed by owner + idempotency key.
+- **C-8 offline drafts (done):** schema-versioned IndexedDB drafts are keyed by owner and job; edit drafts
+  restore only when newer than the server copy and after explicit employee confirmation.
 
 ---
 

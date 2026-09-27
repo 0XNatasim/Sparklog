@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBoundedFetch } from "./bounded-fetch";
+import { createBoundedFetch, DEFAULT_REQUEST_TIMEOUT_MS } from "./bounded-fetch";
 
 function pendingFetch(_input, { signal }) {
   return new Promise((_resolve, reject) => {
@@ -8,6 +8,9 @@ function pendingFetch(_input, { signal }) {
 }
 
 describe("createBoundedFetch", () => {
+  it("does not undercut the 60-second payroll export timeout", () => {
+    expect(DEFAULT_REQUEST_TIMEOUT_MS).toBeGreaterThan(60_000);
+  });
   it("aborts a request that never settles", async () => {
     vi.useFakeTimers();
     const fetch = createBoundedFetch({ timeoutMs: 1000, fetchImpl: pendingFetch });
