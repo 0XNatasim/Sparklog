@@ -29,7 +29,7 @@ auth adapter, or payroll engine), not only in one screen.
 
 | Risk | Likelihood | What could recur | Existing protection | Remaining prevention work |
 |------|------------|------------------|---------------------|---------------------------|
-| Network/auth wait never settles | Medium | A new save, login, upload, or manager action can leave its button disabled forever | Employee save and the main auth bootstrap use `withTimeout`; refreshes are coalesced by `refreshSessionOnce` | Route every Supabase/auth/storage call through one bounded API adapter; always restore UI state in `finally`; test a promise that never settles |
+| Network/auth wait never settles | Low–medium | A new save, login, upload, or manager action could otherwise leave its button disabled forever | Every Supabase database/auth/storage/function HTTP request passes through `createBoundedFetch`; critical auth actions also have shorter operation timeouts; refreshes are coalesced by `refreshSessionOnce` | Keep action-specific timeouts and `finally` cleanup on interactive operations; test a promise that never settles |
 | UI and database rules drift | Medium–high | A control accepts a value that Postgres rejects, as with 5-minute return time | Migration `0059` aligns the deployed constraint to 5-minute increments | Define shared domain constants and add database contract tests for every accepted boundary value (0, 5, 10, …, 240) and rejected neighbors |
 | Payroll logic forks | High impact / medium likelihood | Calcul, Talon, DAS, export, or an Edge Function disagrees on weekly OT, overnight time, return time, or benefits | Browser/Edge payroll parity fixtures cover representative cases | Make one versioned engine authoritative; add fixtures for week boundaries, split return time, holiday weeks, DST, and every employee type before changing a rule |
 | Retry/double-click race | Medium | A side effect other than job insertion or approved-batch claiming is applied twice | Job `submission_key` is unique and approved batches use an atomic claim | Give every mutating workflow an idempotency key and unique constraint; use row locks/expected versions for approval transitions |
@@ -51,9 +51,9 @@ Before releasing changes to time entry, auth, payroll, approval, or imports:
 6. Confirm retries produce one business event, one audit event, and no orphaned storage object.
 7. Compare query counts and rows read with a production-sized dataset before adding dashboard polling or filters.
 
-The highest-value next protections are the atomic `submit_job` workflow (S-3b/C-5*), the manager
-state-transition RPCs (S-4), and shared bounded request handling. They address entire bug families rather
-than another individual symptom.
+The highest-value next protections are completing the attachment transaction/reconciliation work (S-3b)
+and the manager state-transition RPCs (S-4). Job writes are now atomic/idempotent, and a shared bounded
+fetch is installed as a safety net for every Supabase network request.
 
 ---
 
