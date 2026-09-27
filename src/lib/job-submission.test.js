@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildJobSaveRpcArgs } from "./job-submission";
+import { buildJobSaveRpcArgs, kilometreFieldValue } from "./job-submission";
 
 const base = {
   jobDate: "2026-09-26",
@@ -50,3 +50,13 @@ describe("buildJobSaveRpcArgs", () => {
   });
 });
 
+describe("kilometreFieldValue", () => {
+  it("keeps a saved 0 km job complete instead of blanking the field", () => {
+    expect(kilometreFieldValue({ km_total: "0", km_aller: "0", km_retour: "0" })).toBe("0");
+  });
+
+  it("uses the stored total, or aller + retour for legacy rows", () => {
+    expect(kilometreFieldValue({ km_total: "168", km_aller: "94", km_retour: "74" })).toBe("168");
+    expect(kilometreFieldValue({ km_total: null, km_aller: "6", km_retour: "3" })).toBe("9");
+  });
+});

@@ -19,7 +19,7 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
-import { buildJobSaveRpcArgs } from "@/lib/job-submission";
+import { buildJobSaveRpcArgs, kilometreFieldValue } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
@@ -246,9 +246,7 @@ export default function EmployeeForm() {
       setHasParkingReceipt(Boolean(data.parking_receipt_captured));
       setParkingFile(null);
 
-      const aller = data.km_aller ?? "";
-      const totalKm = Number(data.km_total) || (Number(data.km_aller) || 0) + (Number(data.km_retour) || 0);
-      setKmAller(String(totalKm || ""));
+      setKmAller(kilometreFieldValue(data));
       if (data.parking_receipt_captured) {
         const { data: parkingReceipt } = await withTimeout(
           supabase.from("parking_receipts").select("amount").eq("job_id", data.id).maybeSingle(),
