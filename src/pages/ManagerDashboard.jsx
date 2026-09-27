@@ -17,6 +17,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
+import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import FormsManager from "@/components/FormsManager";
 import EmployeesPanel from "@/components/EmployeesPanel";
@@ -27,6 +28,7 @@ import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -61,6 +63,7 @@ function weekKeyFromDate(dateStr) {
 export default function ManagerDashboard() {
   const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const { user, role, adminSections } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
@@ -638,7 +641,7 @@ export default function ManagerDashboard() {
   }
 
   async function unlock(jobId) {
-    const ok = window.confirm(t("manager.confirm.unlock"));
+    const ok = await confirm(t("manager.confirm.unlock"));
     if (!ok) return;
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
@@ -692,7 +695,7 @@ export default function ManagerDashboard() {
         ? t("manager.confirm.selectedPeriod")
         : `${t("manager.weekShort")} ${wk.start.format("DD MMM")} → ${wk.end.format("DD MMM YYYY")}`;
 
-    const ok = window.confirm(t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length }));
+    const ok = await confirm(t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length }));
     if (!ok) return;
 
     const actionKey = `week:${selectedWeekKey === "latest" ? "latest" : selectedWeekKey}`;
@@ -756,6 +759,9 @@ export default function ManagerDashboard() {
     return flagged;
   }, [jobs]);
 
+  const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
+  const dateBands = useMemo(() => dateBandMap(filtered.map((j) => j.job_date)), [filtered]);
+
   function renderJobCard(j) {
     const employee = profiles.get(j.user_id);
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
@@ -772,14 +778,14 @@ export default function ManagerDashboard() {
     const canApprove = j.status === "submitted";
 
     return (
-      <Card key={j.id} id={`job-${j.id}`} className={cn(jobCodeTintClass(j.ot), focusedJobId === j.id && "ring-2 ring-red-500")}>
+      <Card key={j.id} id={`job-${j.id}`} className={cn(dateBands.get(j.job_date) === 1 && "bg-slate-100 dark:bg-slate-800/70", jobCodeTintClass(j.ot), focusedJobId === j.id && "ring-2 ring-red-500")}>
         <CardContent className="p-3">
           {/* Mobile: stacked. Desktop: single-row inline list. */}
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
             {/* OT + date */}
             <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
-              <span>{j.ot} • {dayjs(j.job_date).format("DD MMM")}</span>
-              <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+              <span><span className="text-emerald-700 dark:text-emerald-400">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
+              <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
               {dayOvertimeNoEvidence && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
@@ -1136,7 +1142,16 @@ export default function ManagerDashboard() {
 
         {!loading && employeeId === "all" && (
           <div className="flex flex-col gap-2 self-start">
-            {sortedAll.map(renderJobCard)}
+            {sortedAll.map((j, index) => {
+              const previous = sortedAll[index - 1];
+              const newGroup = previous && (previous.user_id !== j.user_id || previous.job_date !== j.job_date);
+              return (
+                <React.Fragment key={j.id}>
+                  {newGroup && <div role="separator" className="my-1 border-t-2 border-slate-300 dark:border-slate-600" />}
+                  {renderJobCard(j)}
+                </React.Fragment>
+              );
+            })}
             {sortedAll.length === 0 && (
               <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.noResults")}</CardContent></Card>
             )}
@@ -1152,6 +1167,7 @@ export default function ManagerDashboard() {
         )}
         </>}
       </div>
+      {confirmDialog}
     </AppShell>
   );
 }

@@ -15,6 +15,7 @@ import { useT } from "@/lib/use-t";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { buildJobSaveRpcArgs } from "@/lib/job-submission";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
@@ -62,6 +63,7 @@ export default function History() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [confirm, confirmDialog] = useConfirmDialog();
+  const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
 
   function showError(error, fallbackKey) {
     setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, fallbackKey));
@@ -350,7 +352,7 @@ export default function History() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 text-sm font-bold">
                             <span>{j.ot}</span>
-                            <JobCaptureIcons job={{ ...j, meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+                            <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
                           </div>
                           <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
                             {t(`status.${j.status}`)}
