@@ -8,7 +8,10 @@
 //   04 Semaines CCQ         — carte de chaleur dimanche → samedi, seuil 40 h
 //   05 Contrôle qualité     — chevauchements, doublons, vitesses, route sans KM…
 //   06 Explorateur          — recherche par employé, dates, mot-clé, alertes
-// « Feuille 1 » et « Feuille 2 » ne sont jamais modifiées.
+// Il crée aussi un onglet par semaine CCQ (« Sem37 », « Sem38 »…) : résumé par
+// employé et par jour + détail des jobs, prêt à exporter (Fichier → Télécharger).
+// « Feuille 1 » reste le master : « Feuille 1 » et « Feuille 2 » ne sont jamais
+// modifiées. Les onglets SemXX sont régénérés : corrigez les données dans Feuille 1.
 //
 // INSTALLATION (une seule fois) :
 //   1. Dans le Google Sheet : Extensions → Apps Script.
@@ -78,6 +81,7 @@ function F3_onOpen() {
     .createMenu('📊 Sparklog')
     .addItem('Actualiser la Feuille 3', 'F3_actualiser')
     .addItem('Réinitialiser les filtres', 'F3_reinitialiserFiltres')
+    .addItem('Recréer tous les onglets de semaine', 'F3_recreerSemaines')
     .addSeparator()
     .addItem('Aller à la Feuille 3', 'F3_ouvrir')
     .addToUi();
@@ -97,6 +101,7 @@ function F3_actualiser() {
     const source = F3_readSource_(ss);
     const model = F3_buildModel_(source.rows, source.skipped);
     F3_render_(ss, model);
+    F3_syncWeekTabs_(ss, model, false);
     PropertiesService.getDocumentProperties().setProperty('F3_FINGERPRINT', source.fingerprint);
   } finally {
     lock.releaseLock();
@@ -112,6 +117,19 @@ function F3_actualiserSiChangement() {
   const fp = F3_fingerprint_(src.getDataRange().getDisplayValues());
   if (ss.getSheetByName(F3.TARGET) && props.getProperty('F3_FINGERPRINT') === fp) return;
   F3_actualiser();
+}
+
+/** Force la régénération de tous les onglets SemXX. */
+function F3_recreerSemaines() {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30000)) return;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const source = F3_readSource_(ss);
+    F3_syncWeekTabs_(ss, F3_buildModel_(source.rows, source.skipped), true);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function F3_reinitialiserFiltres() {
@@ -159,10 +177,11 @@ function F3_norm_(s) {
 function F3_columns_(header) {
   const want = {
     date: ['date'], employe: ['employe', 'employee'], courriel: ['courriel', 'email'],
+    tel: ['telephone', 'tel', 'phone'],
     ot: ['ot'], depart: ['depart'], arrivee: ['arrivee'], fin: ['fin'], km: ['km'],
     par: ['approuve par'], le: ['approuve le'], id: ['jobid', 'job id'],
   };
-  const fallback = { date: 0, employe: 1, courriel: 2, ot: 4, depart: 5, arrivee: 6, fin: 7,
+  const fallback = { date: 0, employe: 1, courriel: 2, tel: 3, ot: 4, depart: 5, arrivee: 6, fin: 7,
                      km: 9, par: 10, le: 11, id: 12 };
   const normed = header.map(F3_norm_);
   const cols = {};
@@ -265,6 +284,8 @@ function F3_parseRows_(values, display, fmtDate) {
       par: String(t[c.par] || '').trim(),
       le: String(t[c.le] || '').trim(),
       id: String(t[c.id] || '').trim(),
+      email: String(t[c.courriel] || '').trim(),
+      tel: String(t[c.tel] || '').trim(),
       sourceRow: r + 1,
     });
   }
@@ -489,6 +510,7 @@ function F3_reset_(sh) {
   sh.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(p => { try { p.remove(); } catch (e) {} });
   sh.setFrozenRows(0);
   sh.setFrozenColumns(0);
+  if (sh.getFilter()) sh.getFilter().remove();
   sh.showColumns(1, sh.getMaxColumns());
   const all = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns());
   all.breakApart();
@@ -1021,6 +1043,226 @@ function F3_colLetter_(col) {
     col = Math.floor((col - 1) / 26);
   }
   return s;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Onglets hebdomadaires « SemXX » (semaine CCQ dimanche → samedi)
+// ═════════════════════════════════════════════════════════════════════════════
+
+const F3_WEEK_WIDTHS = [90, 50, 190, 85, 62, 62, 62, 68, 62, 62, 60, 115, 100, 210, 110, 110];
+const F3_WEEK_HEADERS = ['Date', 'Jour', 'Employé', 'OT', 'Départ', 'Arrivée', 'Fin', 'Heures',
+  'Route', 'Sur site', 'KM', 'Approuvé par', 'Approuvé le', 'Courriel', 'Téléphone', 'JobID'];
+
+/**
+ * Crée / met à jour un onglet par semaine CCQ présente dans la Feuille 1.
+ * Seuls les onglets dont le contenu a changé sont régénérés (empreinte par semaine).
+ * Onglet nommé « Sem42 » ; une semaine d’une autre année CCQ que la plus ancienne
+ * reçoit un suffixe (« Sem42 (2027) ») pour ne jamais écraser une autre année.
+ */
+function F3_syncWeekTabs_(ss, model, force) {
+  const props = PropertiesService.getDocumentProperties();
+  let tracked = {};
+  try { tracked = JSON.parse(props.getProperty('F3_WEEK_TABS') || '{}'); } catch (e) { tracked = {}; }
+
+  const byWeek = new Map();
+  model.jobs.forEach(j => {
+    if (!byWeek.has(j.week.key)) byWeek.set(j.week.key, { week: j.week, jobs: [] });
+    byWeek.get(j.week.key).jobs.push(j);
+  });
+  const weeks = Array.from(byWeek.values()).sort((a, b) => a.week.startSerial - b.week.startSerial);
+  if (!weeks.length) return;
+  const baseYear = Math.min.apply(null, weeks.map(w => w.week.year));
+  const empName = new Map(model.emps.map(e => [e.key, e.name]));
+  const active = ss.getActiveSheet();
+  const next = {};
+  let moved = false;
+
+  weeks.forEach(w => {
+    const name = 'Sem' + w.week.no + (w.week.year === baseYear ? '' : ' (' + w.week.year + ')');
+    const payload = w.jobs.map(j => [j.id, j.serial, empName.get(j.empKey), j.ot, j.dep, j.arr, j.fin,
+      j.km, j.par, j.le, j.email, j.tel]);
+    payload.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    const hash = F3_fingerprint_(payload);
+    next[name] = hash;
+    let sh = ss.getSheetByName(name);
+    if (sh && !force && tracked[name] === hash) return;
+    if (!sh) { sh = ss.insertSheet(name, ss.getSheets().length); moved = true; }
+    F3_renderWeekTab_(sh, w, empName);
+  });
+
+  // Onglets de semaine devenus vides (jobs retirés de la Feuille 1) : seulement ceux créés ici.
+  Object.keys(tracked).forEach(name => {
+    if (next[name]) return;
+    const sh = ss.getSheetByName(name);
+    if (sh && ss.getSheets().length > 1) ss.deleteSheet(sh);
+  });
+
+  // Ordre chronologique, juste après la Feuille 3.
+  if (moved || force) {
+    const anchor = ss.getSheetByName(F3.TARGET);
+    let pos = anchor ? anchor.getIndex() + 1 : ss.getSheets().length;
+    weeks.forEach(w => {
+      const name = 'Sem' + w.week.no + (w.week.year === baseYear ? '' : ' (' + w.week.year + ')');
+      const sh = ss.getSheetByName(name);
+      if (!sh) return;
+      if (sh.getIndex() !== pos) { ss.setActiveSheet(sh); ss.moveActiveSheet(pos); }
+      pos++;
+    });
+    if (active) ss.setActiveSheet(active);
+  }
+  props.setProperty('F3_WEEK_TABS', JSON.stringify(next));
+}
+
+function F3_renderWeekTab_(sh, w, empName) {
+  const C = F3.C;
+  F3_reset_(sh);
+  const jobs = w.jobs.slice().sort((a, b) =>
+    empName.get(a.empKey).localeCompare(empName.get(b.empKey)) || a.serial - b.serial ||
+    (a.dep === null ? 0 : a.dep) - (b.dep === null ? 0 : b.dep));
+
+  // Agrégats par employé et par jour (dimanche = 0 … samedi = 6)
+  const emps = new Map();
+  jobs.forEach(j => {
+    if (!emps.has(j.empKey)) emps.set(j.empKey, { name: empName.get(j.empKey), days: [0, 0, 0, 0, 0, 0, 0],
+      jobs: 0, km: 0, total: 0, route: 0, routeBase: 0 });
+    const e = emps.get(j.empKey);
+    e.days[j.dow] += j.total; e.jobs++; e.km += j.km; e.total += j.total;
+    if (j.arrOk) { e.route += j.route; e.routeBase += j.total; }
+  });
+  const empList = Array.from(emps.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const totalMin = jobs.reduce((s, j) => s + j.total, 0);
+  const totalKm = jobs.reduce((s, j) => s + j.km, 0);
+
+  const needRows = 30 + empList.length + jobs.length;
+  if (sh.getMaxRows() < needRows) sh.insertRowsAfter(sh.getMaxRows(), needRows - sh.getMaxRows());
+  if (sh.getMaxColumns() < 18) sh.insertColumnsAfter(sh.getMaxColumns(), 18 - sh.getMaxColumns());
+  sh.setHiddenGridlines(true);
+  sh.setTabColor(C.teal);
+  sh.getRange(1, 1, sh.getMaxRows(), 18).setFontFamily(F3.FONT).setFontSize(10)
+    .setFontColor(C.text).setVerticalAlignment('middle').setBackground('#FFFFFF');
+  sh.setColumnWidth(1, 22);
+  F3_WEEK_WIDTHS.forEach((px, i) => sh.setColumnWidth(i + 2, px));
+  sh.setColumnWidth(18, 22);
+  if (sh.getMaxColumns() > 18) sh.hideColumns(19, sh.getMaxColumns() - 18);
+
+  // En-tête
+  const endSerial = w.week.startSerial + 6;
+  let row = 1;
+  sh.setRowHeight(row, 14);
+  row++;
+  F3_band_(sh, row, 4).setBackground(C.navy);
+  sh.setRowHeight(row, 14);
+  sh.getRange(row + 1, 2, 1, 12).merge().setValue('SEMAINE CCQ ' + w.week.no + '  ·  ' + w.week.year)
+    .setFontSize(20).setFontWeight('bold').setFontColor('#FFFFFF');
+  sh.getRange(row + 1, 14, 1, 4).merge().setValue('SPARKLOG').setHorizontalAlignment('right')
+    .setFontSize(10).setFontWeight('bold').setFontColor('#34D399');
+  sh.setRowHeight(row + 1, 40);
+  sh.getRange(row + 2, 2, 1, 16).merge()
+    .setValue('Dimanche ' + F3_fmtSerial_(w.week.startSerial) + '  →  samedi ' + F3_fmtSerial_(endSerial) +
+      '   ·   ' + jobs.length + ' jobs   ·   ' + F3_fmtHM_(totalMin) + '   ·   ' +
+      Math.round(totalKm) + ' km   ·   ' + empList.length + ' employé(s)')
+    .setFontSize(10).setFontColor('#CBD5E1');
+  sh.setRowHeight(row + 2, 24);
+  sh.setRowHeight(row + 3, 12);
+  row += 4;
+
+  // Résumé par employé et par jour
+  row = F3_sectionTitle_(sh, row, '01', 'Résumé par employé',
+    'Heures de Départ à Fin · orange = plus de 8 h dans la journée · rouge = plus de 40 h');
+  const dayLabels = [];
+  for (let d = 0; d < 7; d++) {
+    const dt = new Date(Date.UTC(1899, 11, 30) + (w.week.startSerial + d) * 86400000);
+    dayLabels.push(F3.JOURS[d] + ' ' + dt.getUTCDate());
+  }
+  F3_tableHeader_(sh, row, ['Employé'].concat(dayLabels, ['Total', 'H > 8 h/j', 'KM', 'Jobs', 'Statut']),
+    [3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2]);
+  row++;
+  const n = empList.length;
+  F3_bodyRows_(sh, row, n);
+  sh.getRange(row, 2, n, 16).setValues(empList.map(e => {
+    const over = e.days.reduce((s, m) => s + Math.max(0, m - F3.DAILY_REGULAR_MIN), 0);
+    return [e.name, '', ''].concat(e.days.map(m => m ? m / 1440 : ''),
+      [e.total / 1440, over ? over / 1440 : '', e.km, e.jobs,
+       e.total > F3.WEEKLY_LIMIT_MIN ? '⚠ Plus de 40 h' : '✓ OK', '']);
+  }));
+  sh.getRange(row, 2, n, 3).mergeAcross();
+  sh.getRange(row, 16, n, 2).mergeAcross();
+  sh.getRange(row, 2, n, 1).setHorizontalAlignment('left').setFontWeight('bold').setFontColor(C.ink);
+  sh.getRange(row, 5, n, 9).setNumberFormat(F3_FMT.dur);
+  sh.getRange(row, 12, n, 1).setFontWeight('bold');
+  sh.getRange(row, 14, n, 1).setNumberFormat(F3_FMT.int);
+  const rules = [];
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([sh.getRange(row, 5, n, 7)])
+    .whenNumberGreaterThan(F3.DAILY_REGULAR_MIN / 1440).setBackground(C.amberSoft)
+    .setFontColor(C.amber).setBold(true).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([sh.getRange(row, 12, n, 1)])
+    .whenNumberGreaterThan(F3.WEEKLY_LIMIT_MIN / 1440).setBackground('#FECACA')
+    .setFontColor(C.red).setBold(true).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([sh.getRange(row, 13, n, 1)])
+    .whenNumberGreaterThan(0).setFontColor(C.amber).setBold(true).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([sh.getRange(row, 16, n, 1)])
+    .whenTextContains('⚠').setFontColor(C.red).setBold(true).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([sh.getRange(row, 16, n, 1)])
+    .whenTextContains('✓').setFontColor(C.green).build());
+
+  // Total équipe
+  const t = row + n;
+  const dayTotals = [0, 0, 0, 0, 0, 0, 0];
+  empList.forEach(e => e.days.forEach((m, d) => { dayTotals[d] += m; }));
+  const overAll = empList.reduce((s, e) =>
+    s + e.days.reduce((x, m) => x + Math.max(0, m - F3.DAILY_REGULAR_MIN), 0), 0);
+  sh.getRange(t, 2, 1, 16).setValues([['TOTAL ÉQUIPE', '', ''].concat(
+    dayTotals.map(m => m ? m / 1440 : ''), [totalMin / 1440, overAll ? overAll / 1440 : '', totalKm,
+    jobs.length, '', ''])]);
+  sh.getRange(t, 2, 1, 3).merge();
+  sh.getRange(t, 16, 1, 2).merge();
+  F3_band_(sh, t).setBackground(C.navy2).setFontColor('#FFFFFF').setFontWeight('bold')
+    .setHorizontalAlignment('center');
+  sh.getRange(t, 2).setHorizontalAlignment('left');
+  sh.getRange(t, 5, 1, 9).setNumberFormat(F3_FMT.dur);
+  sh.getRange(t, 14).setNumberFormat(F3_FMT.int);
+  sh.setRowHeight(t, 28);
+  row = t + 1;
+
+  // Détail des jobs (tableau filtrable, prêt à exporter)
+  row = F3_sectionTitle_(sh, row, '02', 'Détail des jobs',
+    'Trié par employé, date et heure de départ · filtres dans l’en-tête');
+  F3_tableHeader_(sh, row, F3_WEEK_HEADERS);
+  const h = row;
+  row++;
+  const m = jobs.length;
+  F3_bodyRows_(sh, row, m);
+  sh.getRange(row, 5, m, 1).setNumberFormat('@');   // OT et téléphone restent du texte
+  sh.getRange(row, 16, m, 1).setNumberFormat('@');
+  sh.getRange(row, 2, m, 16).setValues(jobs.map(j => [
+    j.serial, F3.JOURS[j.dow], empName.get(j.empKey), j.ot,
+    j.dep === null ? '' : j.dep / 1440, j.arr === null ? '' : j.arr / 1440, j.fin === null ? '' : j.fin / 1440,
+    j.total / 1440, j.route / 1440, j.onsite / 1440, j.km, j.par, j.le, j.email, j.tel, j.id]));
+  // Couleur alternée par employé (pas par ligne) pour lire les groupes d’un coup d’œil
+  let shade = false;
+  const bg = jobs.map((j, i) => {
+    if (i > 0 && jobs[i - 1].empKey !== j.empKey) shade = !shade;
+    return new Array(16).fill(shade ? C.panel : '#FFFFFF');
+  });
+  sh.getRange(row, 2, m, 16).setBackgrounds(bg);
+  sh.getRange(row, 2, m, 1).setNumberFormat(F3_FMT.date);
+  sh.getRange(row, 3, m, 1).setFontColor(C.muted);
+  sh.getRange(row, 4, m, 1).setHorizontalAlignment('left').setFontWeight('bold').setFontColor(C.ink);
+  sh.getRange(row, 5, m, 1).setFontWeight('bold').setFontColor(C.blue);
+  sh.getRange(row, 6, m, 3).setNumberFormat(F3_FMT.time);
+  sh.getRange(row, 9, m, 3).setNumberFormat(F3_FMT.dur);
+  sh.getRange(row, 9, m, 1).setFontWeight('bold');
+  sh.getRange(row, 12, m, 1).setNumberFormat(F3_FMT.int);
+  sh.getRange(row, 13, m, 5).setFontColor(C.muted).setFontSize(9);
+  sh.getRange(row, 17, m, 1).setFontColor(C.faint).setFontSize(8)
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  sh.setConditionalFormatRules(rules);
+  sh.getRange(h, 2, m + 1, 16).createFilter();
+
+  sh.getRange(row + m + 1, 2, 1, 16).merge()
+    .setValue('Sparklog · Onglet généré automatiquement à partir de « ' + F3.SOURCE +
+      ' ». Corrigez les données dans ' + F3.SOURCE + ' : cet onglet est recréé à chaque changement.')
+    .setFontSize(8).setFontColor(C.faint).setHorizontalAlignment('center');
 }
 
 // Export pour les tests Node (ignoré par Apps Script).
