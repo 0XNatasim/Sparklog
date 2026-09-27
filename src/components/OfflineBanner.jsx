@@ -22,9 +22,9 @@ export default function OfflineBanner() {
   if (!offline) return null;
 
   return (
-    <div className="sticky top-0 z-50 border-b border-amber-500 bg-amber-100 px-3 py-1.5 text-amber-950 dark:bg-amber-900/40 dark:text-amber-100">
-      <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 text-xs font-semibold">
-        <WifiOff className="h-3.5 w-3.5" />
+    <div className="sticky top-0 z-50 border-b-2 border-amber-500 bg-amber-100 px-4 py-3 text-amber-950 dark:bg-amber-900/60 dark:text-amber-100" role="status">
+      <div className="mx-auto flex max-w-6xl items-center justify-center gap-3 text-sm font-semibold sm:text-base">
+        <WifiOff className="h-5 w-5 shrink-0" />
         {t("offline.banner")}
       </div>
     </div>
