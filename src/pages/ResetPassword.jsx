@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useT } from "@/lib/use-t";
+import { withTimeout } from "@/lib/utils";
 
 export default function ResetPassword() {
   const t = useT();
@@ -26,16 +27,22 @@ export default function ResetPassword() {
 
     setErrorMsg("");
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
+    try {
+      const { error } = await withTimeout(supabase.auth.updateUser({ password }), 12000);
+      if (error) throw error;
 
-    if (error) {
-      setErrorMsg(error.message || t("auth.resetInvalidLink"));
-      return;
+      // Remote sign-out is best effort; clear the local session even when it times out.
+      try {
+        await withTimeout(supabase.auth.signOut(), 8000);
+      } catch {
+        await withTimeout(supabase.auth.signOut({ scope: "local" }), 3000).catch(() => undefined);
+      }
+      window.location.replace(`${window.location.origin}/#/login?passwordReset=success`);
+    } catch (error) {
+      setErrorMsg(error?.message || t("auth.resetInvalidLink"));
+    } finally {
+      setLoading(false);
     }
-
-    await supabase.auth.signOut();
-    window.location.replace(`${window.location.origin}/#/login?passwordReset=success`);
   }
 
   return (

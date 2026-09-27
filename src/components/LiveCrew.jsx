@@ -10,14 +10,11 @@ import { cn, withTimeout } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
 import { isOffOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
+import { companyDate } from "@/lib/company-time";
 
 const REFRESH_MS = 30000;
 
-function montrealDate() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-}
+const montrealDate = companyDate;
 
 const fmtHM = formatHM;
 

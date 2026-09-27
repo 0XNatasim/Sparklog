@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useT } from "@/lib/use-t";
+import { withTimeout } from "@/lib/utils";
 
 // Turn a Supabase auth error into a message an employee can act on. Under load the
 // auth server times out talking to Postgres and returns a 5xx whose body serialises
@@ -84,7 +85,7 @@ export default function Login() {
     // row + its (lowercase) role; `role` is not in the `0018` whitelist, so including it
     // makes the trigger reject the WHOLE upsert (dropping the phone/email/name sync too),
     // e.g. for a returning signup. Sync only the whitelisted contact fields here.
-    const { error } = await supabase.from("profiles").upsert(
+    const { error } = await withTimeout(supabase.from("profiles").upsert(
       {
         id: userId,
         full_name: name || null,
@@ -92,7 +93,7 @@ export default function Login() {
         email: emailValue || null,
       },
       { onConflict: "id" }
-    );
+    ), 12000);
     if (error) console.warn("[Login] ensureProfile error:", error);
   }
 
@@ -105,13 +106,13 @@ export default function Login() {
     setLoading(true);
     try {
       if (isForgotPassword) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        const { error } = await withTimeout(supabase.auth.resetPasswordForEmail(email.trim(), {
           redirectTo: `${window.location.origin}/reset-password`,
-        });
+        }), 12000);
         if (error) throw error;
         setSuccessMsg(t("auth.resetEmailSent"));
       } else if (isSignup) {
-        const { data, error } = await supabase.auth.signUp({
+        const { data, error } = await withTimeout(supabase.auth.signUp({
           email: email.trim(),
           password,
           options: {
@@ -121,7 +122,7 @@ export default function Login() {
               phone: normalizePhone(phone),
             },
           },
-        });
+        }), 12000);
         if (error) throw error;
 
         const createdUser = data?.user;
@@ -142,10 +143,10 @@ export default function Login() {
           return;
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error } = await withTimeout(supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
-        });
+        }), 12000);
         if (error) throw error;
       }
     } catch (err) {

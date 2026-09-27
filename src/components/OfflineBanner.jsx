@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 import { useT } from "@/lib/use-t";
 
-// SparkLog caches the application shell, not unsent form data, so this banner
-// must not promise durable local storage.
+// The application shell and employee form draft are available locally. Final
+// submission still requires the server, so the banner remains explicit about that.
 export default function OfflineBanner() {
   const t = useT();
   const [offline, setOffline] = useState(typeof navigator !== "undefined" && navigator.onLine === false);

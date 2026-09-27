@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { useT } from "@/lib/use-t";
+import { withTimeout } from "@/lib/utils";
 
 // Sensitive NAS/SIN field. The value lives in the restricted `employee_sensitive`
 // vault (RLS: privileged only). Non-privileged managers only ever see a mask.
@@ -30,9 +31,15 @@ export default function NasField({ employeeId, initialHasNas, privileged }) {
   async function confirmPassword() {
     setBusy(true); setErr("");
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: user.email, password });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: user.email, password }),
+        12000
+      );
       if (error) throw new Error(t("employees.nasBadPassword"));
-      const { data, error: rpcErr } = await supabase.rpc("reveal_nas", { target: employeeId });
+      const { data, error: rpcErr } = await withTimeout(
+        supabase.rpc("reveal_nas", { target: employeeId }),
+        12000
+      );
       if (rpcErr) throw rpcErr;
       setValue(data || "");
       setMode("editing");
@@ -48,9 +55,12 @@ export default function NasField({ employeeId, initialHasNas, privileged }) {
     setBusy(true); setErr("");
     try {
       const clean = value.replace(/\D/g, "");
-      const { error } = await supabase
-        .from("employee_sensitive")
-        .upsert({ user_id: employeeId, nas: clean || null, updated_at: new Date().toISOString() });
+      const { error } = await withTimeout(
+        supabase
+          .from("employee_sensitive")
+          .upsert({ user_id: employeeId, nas: clean || null, updated_at: new Date().toISOString() }),
+        12000
+      );
       if (error) throw error;
       setHasNas(Boolean(clean));
       setMode("hidden");

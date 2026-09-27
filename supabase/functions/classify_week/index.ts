@@ -7,7 +7,7 @@
 // snapshot (M5) will record. Manager-only.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { computeWeek, ENGINE_VERSION } from "../_shared/payroll_engine.js";
+import { computeWeek, ENGINE_VERSION, overtimeOptionsFromProfile } from "../_shared/payroll_engine.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,11 +69,8 @@ serve(async (req) => {
     // Per-employee overtime policy: some employers pay the first overtime hour at
     // double time (no 1.5x tier). Read the target employee's flag for the split.
     const { data: targetProfile } = await admin
-      .from("profiles").select("overtime_first_hour_double, return_overtime_no_benefits").eq("id", employeeId).maybeSingle();
-    const result = computeWeek(jobs || [], {
-      firstOtHourDouble: Boolean(targetProfile?.overtime_first_hour_double),
-      returnOtNoBenefits: Boolean(targetProfile?.return_overtime_no_benefits),
-    });
+      .from("profiles").select("role, overtime_first_hour_double, return_overtime_no_benefits").eq("id", employeeId).maybeSingle();
+    const result = computeWeek(jobs || [], overtimeOptionsFromProfile(targetProfile));
     return json({
       ok: true,
       source: "authority",

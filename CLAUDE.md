@@ -20,34 +20,79 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 - Submitted intervals are DB-validated: trigger `trg_validate_job_submission` rejects any transition to
   `status='submitted'` (app or forged direct insert) with missing départ/fin or a duration outside (0h, 16h].
 
+## Regression / recurrence assessment (2026-09-26)
+
+**Short answer: yes.** The exact defects above are mostly closed, but several of them came from
+repeating failure patterns rather than isolated mistakes. A nearby feature can therefore recreate the
+same user-visible failure unless the invariant is enforced and tested at the shared boundary (database,
+auth adapter, or payroll engine), not only in one screen.
+
+| Risk | Likelihood | What could recur | Existing protection | Remaining prevention work |
+|------|------------|------------------|---------------------|---------------------------|
+| Network/auth wait never settles | Low–medium | A new save, login, upload, or manager action could otherwise leave its button disabled forever | Every Supabase database/auth/storage/function HTTP request passes through `createBoundedFetch`; critical auth actions also have shorter operation timeouts; refreshes are coalesced by `refreshSessionOnce` | Keep action-specific timeouts and `finally` cleanup on interactive operations; test a promise that never settles |
+| UI and database rules drift | Low–medium | A control could accept a value that Postgres rejects, as with the former 5-minute return-time bug | Shared `job-contract` constants/validator plus migration-locked contract tests cover every accepted boundary value (0, 5, 10, …, 240), rejected neighbors, intervals and kilometres | Extend the same contract pattern whenever a new job field or boundary is introduced |
+| Payroll logic forks | Low | Calcul, Talon, DAS, export, or an Edge Function could disagree on weekly OT, overnight time, return time, or benefits | Browser code re-exports the Edge Function's single versioned engine module; parity fixtures cover policy combinations, week boundaries, overnight/return time and employee-type mapping | Add a fixture to the authoritative suite before introducing any new compensation rule |
+| Retry/double-click race | Medium | A side effect other than job insertion or approved-batch claiming is applied twice | Job `submission_key` is unique and approved batches use an atomic claim | Give every mutating workflow an idempotency key and unique constraint; use row locks/expected versions for approval transitions |
+| Multi-step partial save | Low–medium | Upload succeeds but its metadata write fails | Client compensation removes a just-uploaded object when its row fails; the cleanup worker reconciles older unreferenced overtime/parking/meal objects with a grace period | Schedule and monitor the cleanup function in each deployment; retain idempotent server submission boundaries |
+| Date/time ambiguity | Low | Overnight, device timezone, or DST could produce a different date/duration in another screen | Montréal dates use shared `companyDate()`; jobs resolve to `started_at`/`ended_at` with `America/Toronto`; DST gaps/folds are rejected and overlap is checked on instants | Keep all new civil-date features on the shared helper and add transition-year fixtures when timezone rules change |
+| Authorization policy drift | Low–medium | A new role or policy could restore excess access or let a manager rewrite an approved fact | An executable role × operation matrix covers every persisted role, every grantable admin section, paused personas, CCQ inclusion and owner-only NAS; database-source assertions lock the matching RLS/RPC invariants | Update the matrix first whenever a role, section or privileged operation is introduced |
+| Database load regression | Low–medium | New dashboards could repeat unbounded reads/counts and exhaust Disk IO again | Named query budgets cap manager/history/review reads; manager/history use stable keyset pagination; four count scans are one aggregate RPC; pending-review/keyset indexes support those paths | Update and test the budget before increasing a page/queue size; retain infrastructure observability |
+| Render failure loses unsaved work | Low–medium | An unforeseen component exception can still blank a route | Employee drafts are schema-versioned, owner-scoped and persisted in IndexedDB with 30-day expiry; reload/offline recovery restores them | Add route-level error boundaries (S-7); keep attachment persistence in point 10 |
+
+### Release gates for recurrence-prone changes
+
+Before releasing changes to time entry, auth, payroll, approval, or imports:
+
+1. Exercise timeout, rejected request, lost-response-after-commit, retry, and rapid double-click cases.
+2. Verify the same boundary values against both the UI and a real migrated database.
+3. Run payroll parity fixtures in every runtime that calculates or exports pay.
+4. Test the employee, team-leader, manager, admin, owner, paused, and subcontractor roles explicitly.
+5. Check Sunday/Saturday transitions, midnight crossing, and both DST transitions in the company timezone.
+6. Confirm retries produce one business event, one audit event, and no orphaned storage object.
+7. Compare query counts and rows read with a production-sized dataset before adding dashboard polling or filters.
+
+All ten recommended protections are now implemented; remaining lower-tier findings stay tracked below.
+
+### Ordre recommandé
+
+- [x] **1.** Soumission atomique et idempotente des jobs.
+- [x] **2.** Timeouts communs et récupération garantie de l’interface.
+- [x] **3.** Transitions d’approbation sécurisées côté serveur.
+- [x] **4.** Tests de contrat entre l’interface et la base.
+- [x] **5.** Moteur de paie unique avec tests de parité.
+- [x] **6.** Uniformisation du fuseau horaire et gestion du DST.
+- [x] **7.** Matrice automatisée des rôles et autorisations.
+- [x] **8.** Brouillons locaux et reprise hors ligne.
+- [x] **9.** Pagination, agrégations et budgets de requêtes.
+- [x] **10.** Nettoyage des fichiers orphelins et durcissement des preuves.
+
 ---
 
 ## Priority Tier (fix in this order)
 
 | # | ID | Severity | Title | Anchor |
 |---|----|----------|-------|--------|
-| 1 | S-3 | High | Approval audit actor is null (service-role write vs `auth.uid()` trigger) | `push_approved_batch/index.ts:97,145` + `0015` |
-| 2 | S-4 | Medium | Manager job updates have no state-transition allowlist | `0000:451` |
-| 3 | C-5* | Medium | Remaining: overlap detection + RLS-restrict-to-`saved` + validating `submit_job` RPC | `0018:57-59` |
+| — | — | — | No open critical/blocking finding | — |
 
 ---
 
 ## 1. Critical / Blocking Bugs
 
-### C-5 — Work-interval validity — mostly RESOLVED (overlap + RLS/RPC remain)
+### C-5 / C-6 — Work intervals, Montréal timezone and DST — RESOLVED
 - **Done (DB validity):** trigger `trg_validate_job_submission` (migration `validate_job_submission_interval`)
   fires on any write that puts a job into `status='submitted'` — the app AND a forged direct insert — and
   rejects missing départ/fin or a duration outside (0h, 16h] (`check_violation`; client maps it to
   `form.errors.invalidInterval`). Manager approval (submitted→approved), drafts and existing rows are
   untouched. This closes the zero-hour / incomplete / excessive-duration hole for every write path.
-- **Remaining (tracked as C-5\*):**
-  1. **Overlap detection** — intentionally deferred: with time-only columns (no date/offset) a
-     midnight-crossing overlap is ambiguous; it belongs with the timezone/instant work (C-6).
-  2. **Direct-submit hardening** — a forged insert can still create a *valid* `submitted` row for oneself
-     (no escalation, but it bypasses client UX). Durable fix: restrict the employee **insert** policy to
-     `status='saved'` and route submission through a validating `submit_job` RPC (lock row, carry the C-3
-     idempotency key, reject on blocking classification warnings).
-- **Status:** ✅ interval validity done · ☐ overlap + RLS-restrict/RPC (C-5*)
+- **Done (atomic transition):** `save_own_job` owns employee draft/submission transitions, derives
+  ownership/status/lock state server-side, serializes edits, and returns the already-committed row when an
+  idempotency key is retried. Direct employee writes can create/update drafts but cannot submit them.
+- **Done (timezone/DST):** Montréal civil times resolve through `America/Toronto` into persisted
+  `started_at`/`ended_at` instants. Nonexistent spring times and ambiguous repeated fall times are rejected;
+  elapsed duration therefore reflects the real DST transition rather than wall-clock subtraction.
+- **Done (overlap):** submitted/approved ranges are checked under a per-employee transaction lock, so
+  concurrent overlapping submissions cannot both pass.
+- **Status:** ✅ resolved
 
 ---
 
@@ -70,21 +115,14 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 
 ## 3. RBAC & Security
 
-### S-3 — Approval audit actor is null — HIGH
-- `push_approved_batch/index.ts:97,145` updates via the **service-role** client; the `audit_job_status`
-  trigger (`0015`) records `auth.uid()`, which is null for service-role → the approving manager is lost.
-- **Fix:** write the audit row inside a `submit`/`approve` RPC that receives and JWT-verifies the actor id.
-  Bundle with the approval-workflow completeness work (persist a snapshot + reviewed-input hash + actor,
-  and durable export-attempt records for reconciliation).
-- **Status:** ☐ open
-
-### S-4 — Manager job updates have no state-transition allowlist — MEDIUM
-- `0000:451` manager update policy is unconditional (not narrowed by later migrations). A forged manager
-  request can rewrite approved facts, revert state, or change ownership/export metadata.
-- **Fix:** replace broad update grant with specific RPCs (`return_job_for_correction`, `approve_jobs`,
-  `void_approval`, `review_meal_claim`, `review_parking_claim`) enforcing legal transitions with row locks
-  + an expected-state/version check (first valid transition wins; later requests get an explicit conflict).
-- **Status:** ☐ open
+### S-3 / S-4 — Approval actor and manager transitions — RESOLVED
+- Approval audit falls back to the JWT-verified `exported_by` actor when the batch Edge Function performs
+  its service-role claim, so the approving manager is no longer recorded as null.
+- Broad manager insert/update policies are removed. Returning a job for correction and reviewing meal or
+  parking claims now use narrow `security definer` RPCs with role checks, row locks, legal-state checks,
+  server-derived reviewer fields, and explicit conflicts. Approval/export remains the typed, atomic batch
+  Edge Function; service-role maintenance continues to bypass RLS.
+- **Status:** ✅ resolved
 
 ### S-2 — Privileged NAS access bypasses the audited reveal — MEDIUM (scoped) — PARTIAL
 - Privilege is now **role-based** (`owner`) and revocable (`is_privileged()`, migrations `0043`+). The
@@ -94,11 +132,12 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
   a distinct permission; require a purpose/reason and audit each bulk access; mask + rate-limit.
 - **Status:** ☐ open (privilege model already role-based/revocable)
 
-### S-6 — OCR sends evidence to a third party with no content controls — MEDIUM
-- `EmployeeForm.jsx:759-792` posts the screenshot to `api.ocr.space`; no magic-byte/size validation,
-  metadata stripping, or crop; full OCR text may be retained.
-- **Fix:** validate/re-encode/crop server-side; document provider residency/retention; avoid storing raw OCR text.
-- **Status:** ☐ open
+### S-6 — Evidence/OCR content controls — RESOLVED
+- Evidence is checked by magic bytes and size, decoded under a pixel budget, resized, and re-encoded as
+  JPEG before Storage/OCR, stripping EXIF/GPS metadata. Storage independently enforces MIME and size.
+- OCR runs server-side with a timeout and stores only `processed` / `needs_review` / `failed`; extracted
+  message text is not retained. Existing raw OCR text is purged by migration `0065`.
+- **Status:** ✅ resolved
 
 ### S-7 — No React error boundaries — MEDIUM
 - No boundary in `App.jsx`/`ProtectedRoute`; one render exception blanks the app and discards in-memory work.
@@ -124,13 +163,9 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 
 | Persona | Scenario | Found Behavior | Expected | Patch |
 |---|---|---|---|---|
-| Employee | Direct API submit (`status=submitted`) | Invalid data now rejected by DB trigger; a *valid* forged submit still allowed | Server-validated transition only | C-5* (RLS/RPC) |
 | Employee | Zero/equal times | ✅ Rejected by `trg_validate_job_submission` | Rejected | C-5 (done) |
-| Employee | Overlapping jobs | Summed, not detected | Rejected/flagged | C-5* (needs tz/instants, C-6) |
 | Employee | Offline Save, then reload | Draft lost (memory only) | Durable on-device draft | C-8 |
 | Employee | Dropped conn after upload | Orphaned object / flagged job w/o metadata | Atomic or queued | S-3b |
-| Employee | Company tz ≠ America/Toronto near midnight | UI (configurable tz) vs DB trigger (hardcoded Toronto) disagree | One company tz everywhere | C-6 |
-| Employee | DST fall-back ambiguous hour | Stored times carry no offset/fold semantics | Reject/flag or normalize to instants | C-6b |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
 | Manager | 100+ employees notifications | Unbounded full-table reads | Paginated review RPC | P-2/P-8 |
 | Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | P-9 + AbortController |
@@ -139,11 +174,6 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 | Both | Render exception | Whole app blanks | Recover, keep draft | S-7 |
 
 **Also tracked (lower tier):**
-- **C-6 timezone:** new-job date uses device-local `dayjs()` (`EmployeeForm.jsx:137,244`) while the
-  entry-window UI uses configurable tz (`:299`) and the DB trigger hardcodes `America/Toronto` (`0000:89`).
-  → shared `companyDate()` helper; trigger reads the configured tz.
-- **C-6b DST ambiguity:** stored date/time facts carry no offset/fold semantics, so a fall-back DST hour is
-  ambiguous. → normalize to instants under the approved company tz, or reject/flag the ambiguous hour.
 - **C-8 offline drafts:** form state is memory-only; no IndexedDB persistence (only `autofill_tip_seen` in
   localStorage). → schema-versioned IndexedDB draft keyed by owner + idempotency key.
 

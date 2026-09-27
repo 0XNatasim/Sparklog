@@ -33,7 +33,9 @@ export const dictionaries = {
 
     // nav
     "nav.form": "Job card",
-    "offline.banner": "You're offline. Do not submit or close this page; unsent changes may be lost.",
+    "offline.banner": "You're offline. Your form draft is saved on this device; reconnect to submit it.",
+    "form.toasts.draftRestored": "Your saved draft was restored on this device.",
+    "history.loadMore": "Load older entries ({loaded} loaded)",
     "install.title": "Install SparkLog",
     "install.subtitle": "Add it to your home screen for quick, full-screen access.",
     "install.button": "Install",
@@ -1135,7 +1137,9 @@ export const dictionaries = {
     "auth.retry": "Réessayer",
 
     "nav.form": "Fiche de travail",
-    "offline.banner": "Vous êtes hors ligne. N’envoyez pas et ne fermez pas cette page; les modifications non envoyées pourraient être perdues.",
+    "offline.banner": "Vous êtes hors ligne. Votre brouillon est sauvegardé sur cet appareil; reconnectez-vous pour l’envoyer.",
+    "form.toasts.draftRestored": "Votre brouillon sauvegardé a été restauré sur cet appareil.",
+    "history.loadMore": "Charger les entrées plus anciennes ({loaded} chargées)",
     "install.title": "Installer SparkLog",
     "install.subtitle": "Ajoutez-la à votre écran d'accueil pour un accès rapide en plein écran.",
     "install.button": "Installer",

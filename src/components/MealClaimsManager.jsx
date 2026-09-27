@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
-import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,10 +11,10 @@ import { formatHours, hoursBetween } from "@/lib/time";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { useSearchParams } from "react-router-dom";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import { withRetry } from "@/lib/utils";
 
 export default function MealClaimsManager() {
   const t = useT();
-  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
   const [claims, setClaims] = useState([]);
@@ -47,16 +46,25 @@ export default function MealClaimsManager() {
   async function review(claim, status) {
     setError("");
     setBusyId(claim.id);
-    const patch = {
-      status,
-      payroll_treatment: status === "approved" ? (treatments[claim.id] || "expense_reimbursement") : null,
-      reviewed_by: user?.id || null,
-      reviewed_at: new Date().toISOString(),
-    };
-    const { error: updateError } = await supabase.from("meal_claims").update(patch).eq("id", claim.id);
-    if (updateError) setError(updateError.message);
-    else await load();
-    setBusyId("");
+    try {
+      const { error: updateError } = await withRetry(
+        () => supabase.rpc("review_meal_claim", {
+          p_claim_id: claim.id,
+          p_decision: status,
+          p_payroll_treatment: status === "approved"
+            ? (treatments[claim.id] || "expense_reimbursement")
+            : null,
+        }),
+        12000
+      );
+      if (updateError) throw updateError;
+      await load();
+    } catch (reviewError) {
+      setError(reviewError?.message || t("manager.errors.failedLoad"));
+      await load();
+    } finally {
+      setBusyId("");
+    }
   }
 
   return <div className="space-y-3">

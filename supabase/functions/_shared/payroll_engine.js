@@ -1,10 +1,10 @@
-// Authoritative payroll classification engine — the SINGLE source of the pay math.
+// Authoritative payroll classification engine — single source for browser and Edge.
 //
-// Pure and dependency-free so the identical code runs in the browser (preview), in this
-// Supabase Edge Function (authority), and under vitest. `src/lib/payroll-calculations.js`
-// mirrors this file and a parity test (payroll-engine-parity.test.js) fails CI if they
-// ever diverge. Bump ENGINE_VERSION on any change that can alter a classified value.
-export const ENGINE_VERSION = "1.2.0";
+// This module is intentionally DEPENDENCY-FREE (no dayjs) so the exact same code runs
+// in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
+// one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
+// alter a classified value; approval snapshots record the version they were computed with.
+export const ENGINE_VERSION = "2.0.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -27,17 +27,22 @@ export function getKilometreBreakdown(job) {
   };
 }
 
+// Parse a YYYY-MM-DD work date at UTC midnight. Using UTC keeps the day-of-week stable
+// regardless of the runtime's timezone (browser vs Deno).
 function parseWorkDate(jobDate) {
   if (!jobDate) return null;
   const d = new Date(`${String(jobDate).slice(0, 10)}T00:00:00Z`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+// Day of week for a work date: 0 = Sunday … 6 = Saturday.
 function dayOfWeek(jobDate) {
   const d = parseWorkDate(jobDate);
   return d ? d.getUTCDay() : null;
 }
 
+// Payroll week runs to the Saturday that ends it (matches the CCQ weekly grouping in
+// ccq-export). Used to scope the 1.5x overtime allowance to the week, not the day.
 export function payrollWeekKey(jobDate) {
   const d = parseWorkDate(jobDate);
   if (!d) return String(jobDate || "");
@@ -45,42 +50,91 @@ export function payrollWeekKey(jobDate) {
   return d.toISOString().slice(0, 10);
 }
 
+// Map an employee profile row to the per-employee overtime options used by the
+// calculation. Keeps every caller in sync as policies are added.
+export function overtimeOptionsFromProfile(profile) {
+  // Subcontractors bill simple up to 8h/day and double beyond (no 1.5x tier), and their
+  // return-to-warehouse time is always at the simple rate when the day exceeds 8h. Enforce
+  // this regardless of the stored toggles so the subcontractor rule always holds.
+  if (profile?.role === "subcontractor_1") {
+    return { firstOtHourDouble: true, returnOtNoBenefits: true };
+  }
+  return {
+    firstOtHourDouble: Boolean(profile?.overtime_first_hour_double),
+    returnOtNoBenefits: Boolean(profile?.return_overtime_no_benefits),
+  };
+}
+
+// Return minutes already logged inside a job's Départ→Fin span, clamped so it can
+// never exceed the span itself.
 function jobReturnMinutes(job) {
   const span = minutesBetween(job.depart, job.fin);
   return Math.min(Math.max(0, Number(job.return_time_minutes) || 0), span);
 }
 
 // Options (per-employee policies):
-//  - firstOtHourDouble: no 1.5x tier — all overtime 2x.
-//  - returnOtNoBenefits: when a day (return included) exceeds 8h, the return portion is
-//    carved out and paid at base rate with NO social benefits; the 8h/overtime split is
-//    computed on the remaining work only. Days of 8h or less are unaffected.
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnOtNoBenefits = false } = {}) {
+//  - firstOtHourDouble: no 1.5x tier — all overtime is 2x.
+//  - returnOtNoBenefits: when a day (Départ→Fin, return included) exceeds 8h, the
+//    return-to-warehouse portion is carved out and paid at the base rate with NO social
+//    benefits (returnNoBenefitMinutes), and the 8h/overtime split is computed on the
+//    remaining work only. A day of 8h or less is unaffected (return stays regular, with
+//    benefits) — matching the current behaviour.
+// `messierMethod` reproduces how Messier Connexion classified hours historically: the weekly
+// first hour of overtime that SparkLog pays at 1.5× (the "hors CCQ" tier) is instead counted
+// as REGULAR straight time. Double time (2×) is left exactly as-is. Used only by the parallel
+// "Façon Messier" comparison views — never by the authoritative export path.
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnOtNoBenefits = false, messierMethod = false } = {}) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
+  // Pre-pass: total worked span per day (return is inside the span). The return
+  // carve-out only applies on days whose total exceeds 8h.
   const daySpanMinutes = new Map();
   for (const job of sorted) {
     daySpanMinutes.set(job.job_date, (daySpanMinutes.get(job.job_date) || 0) + minutesBetween(job.depart, job.fin));
   }
-  const dayWorkMinutes = new Map();
-  const weekOvertimeMinutes = new Map();
+
+  // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
+  // per WEEK at 1.5x, everything beyond that is 2x. Jobs are processed chronologically
+  // so the earliest overtime of the week consumes the 1.5x allowance first. When the
+  // employee's policy is "first hour at double time", the 1.5x allowance is 0.
+  const dayWorkMinutes = new Map();      // job_date -> WORK minutes so far that day (return carved out)
+  const weekOvertimeMinutes = new Map(); // week key -> overtime minutes so far that week
+  const weekRegularMinutes = new Map();  // week key -> regular minutes so far that week (Messier cap)
   const entries = new Map();
 
   for (const job of sorted) {
     const wk = payrollWeekKey(job.job_date);
     const priorDayWork = dayWorkMinutes.get(job.job_date) || 0;
     const priorWeekOvertime = weekOvertimeMinutes.get(wk) || 0;
+    const priorWeekRegular = weekRegularMinutes.get(wk) || 0;
 
     const spanMinutes = minutesBetween(job.depart, job.fin);
+    // Carve out the return portion only when the policy is on AND the whole day exceeds
+    // 8h. Otherwise the return stays inside the paid work span exactly as before.
     const carve = returnOtNoBenefits && (daySpanMinutes.get(job.job_date) || 0) > 480;
-    const returnNoBenefitMinutes = carve ? jobReturnMinutes(job) : 0;
-    const workMinutes = spanMinutes - returnNoBenefitMinutes;
+    let returnNoBenefitMinutes = carve ? jobReturnMinutes(job) : 0;
+    const workMinutes = spanMinutes - returnNoBenefitMinutes; // benefits-eligible work
+
     const regularRoom = Math.max(0, 480 - priorDayWork);
-    const regularWorkMinutes = Math.min(workMinutes, regularRoom);
+    let regularWorkMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - regularWorkMinutes;
     const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
-    const overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
-    const overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
+    let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
+    let overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
+    // Façon Messier: the "hors CCQ" hours are the paid non-CCQ hours (the return-to-shop time
+    // carved out with no CCQ benefits). Historically Messier counted those toward the CCQ
+    // regular — so convert non-CCQ hours into regular (temps CCQ) up to a full 40h/week.
+    // Overtime (1.5× / double) is not touched. Any non-CCQ hours past 40h/week stay non-CCQ.
+    // (Simon's real week 39: 39h reg + 1.25h non-CCQ → 1h converts → 40 / 0.25 / 1.75.)
+    let messierConverted = 0;
+    if (messierMethod && returnNoBenefitMinutes > 0) {
+      const weekRoom = Math.max(0, 2400 - priorWeekRegular - regularWorkMinutes);
+      messierConverted = Math.min(returnNoBenefitMinutes, weekRoom);
+      returnNoBenefitMinutes -= messierConverted;
+      regularWorkMinutes += messierConverted;
+    }
     // Legacy field: return travel was never paid as separate minutes on top of the span.
+    // It is kept at 0; the carve-out above re-categorises minutes that are already in the
+    // span, so no minute is added or lost.
     const returnRegularMinutes = 0;
     const kilometres = getKilometreBreakdown(job);
 
@@ -96,10 +150,40 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
       totalPaidMinutes: spanMinutes + returnRegularMinutes,
       ...kilometres,
     });
-    dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes);
+    // Count Messier-converted non-CCQ minutes as day work so the 8h/day cap holds across jobs.
+    dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes + messierConverted);
     weekOvertimeMinutes.set(wk, priorWeekOvertime + overtimeWorkMinutes);
+    weekRegularMinutes.set(wk, priorWeekRegular + regularWorkMinutes);
   }
   return entries;
+}
+
+export function calculateDailyTotals(jobs, options) {
+  const entries = calculatePayrollEntries(jobs, options);
+  const days = new Map();
+  for (const entry of entries.values()) {
+    const date = entry.job.job_date;
+    const day = days.get(date) || {
+      jobDate: date,
+      regularWorkMinutes: 0,
+      overtime50Minutes: 0,
+      overtime100Minutes: 0,
+      overtimeWorkMinutes: 0,
+      returnRegularMinutes: 0,
+      returnNoBenefitMinutes: 0,
+      totalPaidMinutes: 0,
+      clientKm: 0,
+      returnKm: 0,
+      totalKm: 0,
+      jobCount: 0,
+    };
+    for (const key of ["regularWorkMinutes", "overtime50Minutes", "overtime100Minutes", "overtimeWorkMinutes", "returnRegularMinutes", "returnNoBenefitMinutes", "totalPaidMinutes", "clientKm", "returnKm", "totalKm"]) {
+      day[key] += entry[key];
+    }
+    day.jobCount += 1;
+    days.set(date, day);
+  }
+  return days;
 }
 
 export function isMealEligible({ jobDate, dailyWorkMinutes }) {
@@ -111,16 +195,40 @@ export function roundHours(minutes) {
   return Math.round((minutes / 60) * 100) / 100;
 }
 
+// Indemnité de congés (CCQ): 13% of weekly wages earned — 6% annual vacation,
+// 5.5% paid statutory holidays, 1.5% sick leave. The rate is the same for every level;
+// the dollar amount differs only because wages differ. Base is the gross salary earned
+// in the week. Source: CCQ chèque-vacances page; see docs/rules/compensation-rules.md.
 export const CONGES_INDEMNITY_RATES = { vacation: 0.06, statutoryHolidays: 0.055, sick: 0.015 };
 
-export function calculateCongesIndemnity(weeklyWageDollars) {
+// Map a conges_indemnity_rate DB row to the rates shape, falling back to the code
+// constant for any missing field. Lets the estimate views read the DB value while
+// staying safe if the row is absent. (The authoritative export path does not use
+// this — it keeps the versioned constant.)
+export function congesRatesFromRow(row) {
+  if (!row) return CONGES_INDEMNITY_RATES;
+  const num = (v, d) => (v == null || Number.isNaN(Number(v)) ? d : Number(v));
+  return {
+    vacation: num(row.vacation, CONGES_INDEMNITY_RATES.vacation),
+    statutoryHolidays: num(row.statutory_holidays, CONGES_INDEMNITY_RATES.statutoryHolidays),
+    sick: num(row.sick, CONGES_INDEMNITY_RATES.sick),
+  };
+}
+
+export function calculateCongesIndemnity(weeklyWageDollars, rates = CONGES_INDEMNITY_RATES) {
   const wages = Math.max(0, Number(weeklyWageDollars) || 0);
-  const vacation = wages * CONGES_INDEMNITY_RATES.vacation;
-  const statutoryHolidays = wages * CONGES_INDEMNITY_RATES.statutoryHolidays;
-  const sick = wages * CONGES_INDEMNITY_RATES.sick;
+  const r = rates || CONGES_INDEMNITY_RATES;
+  const vacation = wages * (r.vacation ?? 0);
+  const statutoryHolidays = wages * (r.statutoryHolidays ?? 0);
+  const sick = wages * (r.sick ?? 0);
   return { vacation, statutoryHolidays, sick, total: vacation + statutoryHolidays + sick };
 }
 
+// Authoritative entry point. Given a set of jobs (normally one employee), returns a
+// versioned, self-describing classification: a per-job trace, per-week totals, and
+// warnings for inputs that need review. Every worked minute is accounted for exactly
+// once (regular + ot50 + ot100). This is the contract the Edge Function returns and the
+// approval snapshot records.
 export function computeWeek(jobs, options) {
   const list = Array.isArray(jobs) ? jobs.filter(Boolean) : [];
   const entriesMap = calculatePayrollEntries(list, options);

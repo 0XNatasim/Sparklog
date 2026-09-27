@@ -1,0 +1,92 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
+import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
+
+const migration = (name) => readFileSync(fileURLToPath(new URL(
+  `../../supabase/migrations/${name}`,
+  import.meta.url
+)), "utf8");
+
+const roleMigration = migration("0050_subcontractor_1_role.sql");
+const submissionMigration = migration("0060_atomic_idempotent_job_submission.sql");
+const transitionMigration = migration("0061_manager_state_transition_rpcs.sql");
+const privilegeMigration = migration("0032_owner_role_replaces_hardcoded_privileged.sql");
+
+describe("application authorization matrix", () => {
+  it("covers every persisted application role", () => {
+    expect(APPLICATION_ROLES).toEqual([
+      "employee", "subcontractor_1", "admin", "manager", "owner",
+    ]);
+  });
+
+  it.each(["employee", "subcontractor_1"])("keeps %s on own-time only", (role) => {
+    const permissions = authorizationFor({ role });
+    expect(permissions.canLogOwnTime).toBe(true);
+    expect(permissions.canManageAny).toBe(false);
+    expect(permissions.canAccessSensitiveNas).toBe(false);
+  });
+
+  it("gives an admin exactly the selected management sections", () => {
+    for (const granted of GRANTABLE_ADMIN_SECTIONS) {
+      const permissions = authorizationFor({ role: "admin", adminSections: [granted] });
+      expect(permissions.canManageAny).toBe(true);
+      for (const section of GRANTABLE_ADMIN_SECTIONS) {
+        expect(permissions.managementSections[section], `${granted} -> ${section}`).toBe(section === granted);
+      }
+      expect(permissions.canAccessSensitiveNas).toBe(false);
+      expect(permissions.includedInCcqPayroll).toBe(false);
+    }
+  });
+
+  it.each(["manager", "owner"])("gives %s every management section", (role) => {
+    const permissions = authorizationFor({ role });
+    expect(Object.values(permissions.managementSections).every(Boolean)).toBe(true);
+  });
+
+  it("reserves sensitive NAS access for the owner", () => {
+    for (const role of APPLICATION_ROLES) {
+      expect(authorizationFor({ role }).canAccessSensitiveNas, role).toBe(role === "owner");
+    }
+  });
+
+  it("contains own writes for every paused persona", () => {
+    for (const role of APPLICATION_ROLES) {
+      expect(authorizationFor({ role, paused: true }).canLogOwnTime, role).toBe(false);
+    }
+  });
+
+  it("keeps employee and manager CCQ treatment separate from non-CCQ roles", () => {
+    expect(authorizationFor({ role: "employee" }).includedInCcqPayroll).toBe(true);
+    expect(authorizationFor({ role: "manager" }).includedInCcqPayroll).toBe(true);
+    for (const role of ["admin", "owner", "subcontractor_1"]) {
+      expect(authorizationFor({ role }).includedInCcqPayroll, role).toBe(false);
+    }
+  });
+});
+
+describe("database authorization contract", () => {
+  it("maps owner to manager and subcontractor to employee tier", () => {
+    expect(roleMigration).toMatch(/role = 'owner' then 'manager'/);
+    expect(roleMigration).toMatch(/role in \('admin', 'subcontractor_1'\) then 'employee'/);
+  });
+
+  it("requires active ownership for direct job drafts", () => {
+    expect(submissionMigration).toContain("public.is_not_paused()");
+    expect(submissionMigration).toContain("user_id = auth.uid()");
+    expect(submissionMigration).toContain("status = 'saved'");
+  });
+
+  it("removes broad manager writes and role-checks every transition RPC", () => {
+    expect(transitionMigration).toContain('drop policy if exists "jobs: manager update all"');
+    expect(transitionMigration).toContain('drop policy if exists "jobs: manager insert"');
+    expect(transitionMigration.match(/public\.get_my_role\(\) <> 'manager'/g)).toHaveLength(3);
+  });
+
+  it("keeps database privilege owner-only", () => {
+    expect(privilegeMigration).toMatch(/role = 'owner'/);
+    expect(privilegeMigration).not.toMatch(/role in \('manager', 'owner'\)/);
+  });
+});
+

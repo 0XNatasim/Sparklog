@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import dayjs from "dayjs";
 import { X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
 import { formatTimeOff, categoryLabel, TIME_OFF_CATEGORIES, DEFAULT_CATEGORY, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
+import { companyDate } from "@/lib/company-time";
 
 // One reusable congés editor for a single employee: the list of their entries (with delete)
 // plus an add form supporting the three kinds — full day(s), a specific hours window, or a
@@ -41,7 +41,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
         user_id: employeeId,
         category,
         kind: "recurring_weekly",
-        start_date: draft.from || dayjs().format("YYYY-MM-DD"),
+        start_date: draft.from || companyDate(),
         end_date: draft.until || null,
         weekdays: [...draft.weekdays].sort((a, b) => a - b),
       };

@@ -13,6 +13,8 @@ import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
 import { calculateDailyTotals } from "@/lib/payroll-calculations";
+import { QUERY_BUDGETS } from "@/lib/query-budgets";
+import { companyDate } from "@/lib/company-time";
 import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { useViewMode } from "@/contexts/ViewModeContext";
 
@@ -73,6 +75,7 @@ export default function Week() {
           .from("jobs")
           .select("*")
           .eq("user_id", effectiveUserId)
+          .gte("job_date", dayjs(companyDate()).subtract(QUERY_BUDGETS.employeeWeekLookbackWeeks, "week").format("YYYY-MM-DD"))
           .order("job_date", { ascending: false })
           .order("updated_at", { ascending: false }),
         12000

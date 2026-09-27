@@ -27,6 +27,8 @@ import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import { companyDate } from "@/lib/company-time";
+import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
 dayjs.extend(isoWeek);
 
@@ -57,7 +59,7 @@ function weekKeyFromDate(dateStr) {
 }
 
 export default function ManagerDashboard() {
-  const PAGE_SIZE = 200;
+  const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
   const { user, role, adminSections } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -120,7 +122,7 @@ export default function ManagerDashboard() {
       .from("jobs")
       .select("*")
       .order("job_date", { ascending: false })
-      .order("updated_at", { ascending: false });
+      .order("id", { ascending: false });
     if (employeeId !== "all") q = q.eq("user_id", employeeId);
     // When an employee is selected the UI splits into Saved / Submitted /
     // Approved columns, so ignore the status dropdown there — otherwise
@@ -131,33 +133,15 @@ export default function ManagerDashboard() {
   }
 
   async function loadCounts() {
-    // Rebuilt inside the factory so each retry attempt gets fresh query builders.
-    const scoped = (status) => {
-      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
-      if (employeeId !== "all") q = q.eq("user_id", employeeId);
-      if (status) q = q.eq("status", status);
-      if (dayFilter) q = q.eq("job_date", dayFilter);
-      return q;
-    };
-    const base = () => {
-      let q = supabase.from("jobs").select("id", { head: true, count: "exact" });
-      if (dayFilter) q = q.eq("job_date", dayFilter);
-      return q;
-    };
-    const [all, saved, submitted, approved] = await withRetry(
-      () => Promise.all([
-        employeeId === "all" ? base() : scoped(null),
-        scoped("saved"),
-        scoped("submitted"),
-        scoped("approved"),
-      ]),
-      12000
-    );
+    const { data } = await withRetry(() => supabase.rpc("manager_job_counts", {
+      p_employee_id: employeeId === "all" ? null : employeeId,
+      p_job_date: dayFilter || null,
+    }).single(), 12000);
     setCounts({
-      all: all.count || 0,
-      saved: saved.count || 0,
-      submitted: submitted.count || 0,
-      approved: approved.count || 0,
+      all: Number(data?.all_count) || 0,
+      saved: Number(data?.saved_count) || 0,
+      submitted: Number(data?.submitted_count) || 0,
+      approved: Number(data?.approved_count) || 0,
     });
   }
 
@@ -191,11 +175,18 @@ export default function ManagerDashboard() {
     setLoadingMore(true);
     setErr("");
     try {
-      const from = jobs.length;
-      const to = from + PAGE_SIZE - 1;
-      const { data, error } = await buildJobsQuery().range(from, to);
+      const cursor = jobs[jobs.length - 1];
+      if (!cursor) return;
+      const { data, error } = await buildJobsQuery()
+        .or(`job_date.lt.${cursor.job_date},and(job_date.eq.${cursor.job_date},id.lt.${cursor.id})`)
+        .limit(PAGE_SIZE);
       if (error) throw error;
+      const pageIds = (data || []).map((row) => row.id);
+      const { data: mealRows } = pageIds.length
+        ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", pageIds), 12000)
+        : { data: [] };
       setJobs((prev) => [...prev, ...(data || [])]);
+      setMealJobIds((current) => new Set([...current, ...(mealRows || []).map((claim) => claim.job_id)]));
       setHasMore((data || []).length === PAGE_SIZE);
     } catch (e) {
       setErr(e?.message || t("manager.errors.failedMore"));
@@ -251,7 +242,7 @@ export default function ManagerDashboard() {
       setErr("");
       try {
         const { data: evidenceRows, error: evidenceError } = await withRetry(
-          () => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }),
+          () => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes, created_at").order("created_at", { ascending: false }).limit(QUERY_BUDGETS.reviewQueue),
           12000
         );
         if (evidenceError) throw evidenceError;
@@ -315,7 +306,7 @@ export default function ManagerDashboard() {
       setErr("");
       try {
         const { data: receiptRows, error: receiptError } = await withRetry(
-          () => supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, amount, status, created_at").order("created_at", { ascending: false }),
+          () => supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, amount, status, created_at").order("created_at", { ascending: false }).limit(QUERY_BUDGETS.reviewQueue),
           12000
         );
         if (receiptError) throw receiptError;
@@ -361,7 +352,7 @@ export default function ManagerDashboard() {
       setNotificationMealsLoading(true);
       try {
         const { data: claims } = await withRetry(
-          () => supabase.from("meal_claims").select("job_id, created_at").order("created_at", { ascending: false }), 12000
+          () => supabase.from("meal_claims").select("job_id, created_at").order("created_at", { ascending: false }).limit(QUERY_BUDGETS.reviewQueue), 12000
         );
         const ids = [...new Set((claims || []).map((claim) => claim.job_id))];
         const { data: rows } = ids.length
@@ -408,13 +399,25 @@ export default function ManagerDashboard() {
   }
 
   async function reviewParking(jobId, status) {
-    const { error } = await supabase.from("parking_receipts").update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq("job_id", jobId);
-    if (error) return setErr(error.message);
-    setParkingReceipts((current) => {
-      const next = new Map(current);
-      next.set(jobId, { ...next.get(jobId), status });
-      return next;
-    });
+    setActionLoadingId(`parking:${jobId}`);
+    setErr("");
+    try {
+      const { error } = await withRetry(
+        () => supabase.rpc("review_parking_claim", { p_job_id: jobId, p_decision: status }),
+        12000
+      );
+      if (error) throw error;
+      setParkingReceipts((current) => {
+        const next = new Map(current);
+        next.set(jobId, { ...next.get(jobId), status });
+        return next;
+      });
+    } catch (error) {
+      setErr(error?.message || t("manager.errors.failedLoad"));
+      await load();
+    } finally {
+      setActionLoadingId(null);
+    }
   }
 
   // Opening the SMS proof counts as seeing the overtime notification: mark this job's
@@ -640,10 +643,16 @@ export default function ManagerDashboard() {
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
     try {
-      const { error } = await supabase
-        .from("jobs")
-        .update({ status: "updated", locked: false })
-        .eq("id", jobId);
+      const job = [...jobs, ...overtimeJobs, ...parkingJobs, ...notificationMealJobs]
+        .find((row) => row.id === jobId);
+      if (!job) throw new Error(t("manager.errors.jobNotFound"));
+      const { error } = await withRetry(
+        () => supabase.rpc("return_job_for_correction", {
+          p_job_id: jobId,
+          p_expected_updated_at: job.updated_at || null,
+        }),
+        12000
+      );
       if (error) throw error;
       setInfo(t("manager.toasts.unlocked"));
       await load();
@@ -888,7 +897,7 @@ export default function ManagerDashboard() {
               {evidence && <Button type="button" size="sm" variant="outline" onClick={() => toggleProof(job.id)}>{isProofVisible ? t("manager.notifications.hideOvertimeProof") : t("manager.notifications.showOvertimeProof")}</Button>}
               {receipt && <div className="flex flex-wrap gap-2">
                 <Button type="button" size="sm" variant="outline" disabled={parkingImageLoading === job.id} onClick={() => toggleParkingReceipt(job.id)}>{isParkingVisible ? <ImageOff className="mr-1.5 h-4 w-4" /> : <Image className="mr-1.5 h-4 w-4" />}{parkingImageLoading === job.id ? t("common.loading") : isParkingVisible ? t("manager.notifications.hideParkingProof") : t("manager.notifications.showParkingProof")}</Button>
-                {receipt.status === "pending" && <><Button type="button" size="sm" variant="secondary" onClick={() => reviewParking(job.id, "approved")}>{t("manager.notifications.approveParking")}</Button><Button type="button" size="sm" variant="destructive" onClick={() => reviewParking(job.id, "rejected")}>{t("manager.notifications.rejectParking")}</Button></>}
+                {receipt.status === "pending" && <><Button type="button" size="sm" variant="secondary" disabled={actionLoadingId === `parking:${job.id}`} onClick={() => reviewParking(job.id, "approved")}>{t("manager.notifications.approveParking")}</Button><Button type="button" size="sm" variant="destructive" disabled={actionLoadingId === `parking:${job.id}`} onClick={() => reviewParking(job.id, "rejected")}>{t("manager.notifications.rejectParking")}</Button></>}
               </div>}
             </div>
           </div>
@@ -1010,7 +1019,7 @@ export default function ManagerDashboard() {
                   aria-label={t("manager.filters.day")}
                   title={t("manager.filters.day")}
                 />
-                <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setDayFilter(dayjs().format("YYYY-MM-DD"))}>
+                <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setDayFilter(companyDate())}>
                   {t("manager.filters.today")}
                 </Button>
                 {dayFilter && (

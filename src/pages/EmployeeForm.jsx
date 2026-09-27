@@ -19,6 +19,11 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
+import { buildJobSaveRpcArgs } from "@/lib/job-submission";
+import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
+import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
+import { deleteDraft, loadDraft, saveDraft } from "@/lib/draft-store";
+import { prepareEvidenceImage } from "@/lib/evidence-file";
 import {
   Dialog,
   DialogContent,
@@ -99,10 +104,6 @@ function isEditableStatus(s) {
   return s === "saved" || s === "updated";
 }
 
-// Return-to-warehouse durations offered in the pop-up: short 5/10/20/25-min options plus the
-// 15-min steps up to 3h. (3h15–4h were removed.)
-const RETURN_TIME_OPTIONS = [5, 10, 15, 20, 25, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
-
 function formatReturnMinutes(minutes) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
@@ -137,7 +138,7 @@ export default function EmployeeForm() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
-  const [job_date, setJobDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [job_date, setJobDate] = useState(companyDate());
   const [ot, setOt] = useState("");
   const [depart, setDepart] = useState("");
   const [arrivee, setArrivee] = useState("");
@@ -183,6 +184,7 @@ export default function EmployeeForm() {
   const [officeEmployee, setOfficeEmployee] = useState(false);
   const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
+  const [draftReady, setDraftReady] = useState(false);
 
   const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
@@ -194,6 +196,25 @@ export default function EmployeeForm() {
     () => toHHmmLabelFromFormatHours(formatHours(hoursDecimal)),
     [hoursDecimal]
   );
+
+  function restoreLocalDraft(record) {
+    const draft = record?.data;
+    if (!draft) return;
+    setJobDate(draft.job_date || companyDate());
+    setOt(draft.ot || "");
+    setDepart(draft.depart || "");
+    setArrivee(draft.arrivee || "");
+    setFin(draft.fin || "");
+    setKmAller(draft.km_aller || "");
+    setReturnMinutes(draft.returnMinutes ?? null);
+    setReturnKm(draft.returnKm || "");
+    setParkingRequested(Boolean(draft.parkingRequested));
+    setParkingAmount(draft.parkingAmount || "");
+    setPendingSaveMode(draft.pendingSaveMode || "draft");
+    if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
+    setDirty(true);
+    setInfo("form.toasts.draftRestored");
+  }
 
   async function loadEdit() {
     if (!editId || !effectiveUserId) return;
@@ -212,7 +233,7 @@ export default function EmployeeForm() {
       if (!data) throw new Error(t("form.errors.notFound"));
       if (data.user_id !== effectiveUserId) throw new Error(t("form.errors.notAuthorized"));
 
-      setJobDate(data.job_date || dayjs().format("YYYY-MM-DD"));
+      setJobDate(data.job_date || companyDate());
       setOt(data.ot || "");
       setDepart(fmtTimeHHmm(data.depart) || "");
       setArrivee(fmtTimeHHmm(data.arrivee) || "");
@@ -241,21 +262,30 @@ export default function EmployeeForm() {
       const shouldLock = Boolean(data.locked) || !isEditableStatus(s);
       setLocked(shouldLock);
       setDirty(false);
+      const localDraft = await loadDraft({ userId: effectiveUserId, editId }).catch(() => null);
+      if (localDraft) restoreLocalDraft(localDraft);
     } catch (e) {
       setErr(e?.message || t("form.errors.failedLoad"));
       setEditLoadFailed(true);
+      const localDraft = await loadDraft({ userId: effectiveUserId, editId }).catch(() => null);
+      if (localDraft) {
+        restoreLocalDraft(localDraft);
+        setErr("");
+      }
     } finally {
       setLoadingEdit(false);
+      setDraftReady(true);
     }
   }
 
   useEffect(() => {
+    setDraftReady(false);
     if (editId) {
       loadEdit();
     } else {
       // "New job" — reset form to empty defaults so previous job's data
       // doesn't bleed into the next entry.
-      setJobDate(dayjs().format("YYYY-MM-DD"));
+      setJobDate(companyDate());
       setOt("");
       setDepart("");
       setArrivee("");
@@ -272,14 +302,34 @@ export default function EmployeeForm() {
       setHasParkingReceipt(false);
       setParkingFile(null);
       setParkingAmount("");
+      loadDraft({ userId: effectiveUserId }).then((record) => {
+        if (record) restoreLocalDraft(record);
+      }).catch(() => undefined).finally(() => setDraftReady(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, effectiveUserId]);
 
-  // C-3: a fresh idempotency key per new-entry form. Editing an existing job (editId set)
-  // uses UPDATE, not the key. Within one new-entry session the key is stable, so retries
-  // reuse it (idempotent upsert); a brand-new form gets a new key.
-  useEffect(() => { submissionKeyRef.current = null; }, [editId]);
+  // A fresh idempotency key per new-entry form. Edits identify and lock the existing row;
+  // within one new-entry flow the key remains stable through retries and attachments.
+  useEffect(() => {
+    submissionKeyRef.current = editId ? null : crypto.randomUUID();
+  }, [editId, effectiveUserId]);
+
+  useEffect(() => {
+    if (!draftReady || !dirty || !effectiveUserId || isViewMode || locked) return;
+    const timeoutId = window.setTimeout(() => {
+      saveDraft({
+        userId: effectiveUserId,
+        editId,
+        submissionKey: submissionKeyRef.current,
+        data: {
+          job_date, ot, depart, arrivee, fin, km_aller,
+          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode,
+        },
+      }).catch((error) => console.warn("[draft] local save failed", error));
+    }, 350);
+    return () => window.clearTimeout(timeoutId);
+  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
@@ -316,7 +366,7 @@ export default function EmployeeForm() {
       if (holiday) return setEntryBlockedReason(t("form.deadline.holiday", { name: holiday.label }));
 
       const formatter = new Intl.DateTimeFormat("en-CA", {
-        timeZone: settings?.timezone || "America/Toronto",
+        timeZone: settings?.timezone || COMPANY_TIME_ZONE,
         year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
       });
       const parts = Object.fromEntries(formatter.formatToParts(new Date()).map((part) => [part.type, part.value]));
@@ -397,81 +447,61 @@ export default function EmployeeForm() {
 
       const nextLocked = nextStatus === "submitted";
 
-      const payload = {
-        user_id: user.id,
-        job_date,
-        ot,
-        depart,
-        arrivee: arrivee || null,
-        fin,
-        km_total: kmTotalNum,
-        km_aller: kmClientNum,
-        status: nextStatus,
-        locked: nextLocked,
-        ...(returnValues ? {
-          return_time_minutes: returnValues.minutes,
+      if (mode === "submit") {
+        const contractErrors = validateJobSubmissionContract({
+          depart,
+          fin,
+          job_date,
+          return_time_minutes: returnValues?.minutes ?? 0,
+          km_total: kmTotalNum,
+          km_aller: kmClientNum,
           km_retour: kmReturnNum,
-        } : {}),
-        ...(captureEvidence ? { overtime_evidence_captured: true } : {}),
-        parking_receipt_captured: hasParkingReceipt,
-      };
-
-      let savedJobId = editId || forcedId;
-
-      if (editId) {
-        // withRetry caps each attempt with a timeout AND refreshes the session after the
-        // first failure — this is what un-sticks the "app stalls, refresh fixes it" case,
-        // which is a stale/hung auth token. It never waits forever. The update is idempotent.
-        await withRetry(
-          () => supabase.from("jobs").update(payload).eq("id", editId),
-          12000
-        );
-
-        setInfo(nextStatus === "submitted" ? "form.toasts.submitted" : "form.toasts.updated");
-        setStatus(nextStatus);
-        setLocked(nextLocked);
-        setDirty(false);
-      } else {
-        // C-3: attach a per-new-entry idempotency key and UPSERT on (user_id, submission_key).
-        // A retried timeout that already committed, or a double submit, resolves to the SAME
-        // row instead of inserting a duplicate — so the automatic retry below is safe.
-        if (!submissionKeyRef.current) submissionKeyRef.current = crypto.randomUUID();
-        const submissionKey = submissionKeyRef.current;
-        const insertPayload = { ...payload, submission_key: submissionKey, ...(forcedId ? { id: forcedId } : {}) };
-        let data;
-        try {
-          const result = await withRetry(
-            () => supabase.from("jobs").upsert(insertPayload, { onConflict: "user_id,submission_key" }).select("id").single(),
-            12000
-          );
-          data = result.data;
-        } catch (upsertErr) {
-          // Idempotent recovery: if a row for this key already committed (e.g. a prior
-          // attempt whose response we lost, now locked so the conflicting UPDATE is
-          // refused), adopt it instead of surfacing an error or making a duplicate. Timed
-          // out so it can never hang.
-          const { data: existing } = await withTimeout(
-            supabase.from("jobs").select("id").eq("user_id", user.id).eq("submission_key", submissionKey).maybeSingle(),
-            8000
-          );
-          if (existing?.id) data = existing;
-          else throw upsertErr;
+        });
+        if (contractErrors.length) {
+          throw new Error(`invalid_job_contract:${contractErrors.join(",")}`);
         }
-        if (!data?.id) throw new Error(t("form.errors.insertNoId"));
-        savedJobId = data.id;
-
-        setInfo(nextStatus === "submitted" ? "form.toasts.savedAndSubmitted" : "form.toasts.saved");
-        setStatus(nextStatus);
-        setLocked(nextLocked);
-        setDirty(false);
-
-        if (!returnValues) navigate(`/form?edit=${data.id}`, { replace: true });
       }
+
+      // The database owns the state transition and transaction. The idempotency key is
+      // reused across retries, so a response lost after commit resolves to the same row.
+      if (!editId && !submissionKeyRef.current) submissionKeyRef.current = crypto.randomUUID();
+      const { data } = await withRetry(
+        () => supabase.rpc("save_own_job", buildJobSaveRpcArgs({
+          editId,
+          newJobId: forcedId,
+          submissionKey: submissionKeyRef.current,
+          submit: mode === "submit",
+          jobDate: job_date,
+          ot,
+          depart,
+          arrivee,
+          fin,
+          kmTotal: kmTotalNum,
+          kmAller: kmClientNum,
+          returnMinutes: returnValues?.minutes,
+          kmRetour: kmReturnNum,
+          overtimeEvidenceCaptured: captureEvidence || hasOvertimeEvidence,
+          parkingReceiptCaptured: hasParkingReceipt,
+        })).single(),
+        12000
+      );
+      if (!data?.id) throw new Error(t("form.errors.insertNoId"));
+
+      const savedJobId = data.id;
+      setInfo(editId
+        ? (nextStatus === "submitted" ? "form.toasts.submitted" : "form.toasts.updated")
+        : (nextStatus === "submitted" ? "form.toasts.savedAndSubmitted" : "form.toasts.saved"));
+      setStatus(data.status || nextStatus);
+      setLocked(Boolean(data.locked));
+      setDirty(false);
+
+      if (!editId && !returnValues) navigate(`/form?edit=${savedJobId}`, { replace: true });
       if (parkingRequested && parkingFile) {
         await uploadParkingReceipt(savedJobId, parkingFile, parkingAmountNumber);
         setHasParkingReceipt(true);
         setParkingFile(null);
       }
+      await deleteDraft({ userId: effectiveUserId, editId }).catch(() => undefined);
       return savedJobId;
     } catch (e) {
       // Postgres unique_violation = "23505". Map it to a friendly message
@@ -481,7 +511,7 @@ export default function EmployeeForm() {
       const msg = String(e?.message || "");
       if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
         lastSaveErrorRef.current = t("form.errors.duplicateOt", { ot: ot || "" });
-      } else if (/invalid_job_interval/i.test(msg)) {
+      } else if (/invalid_job_interval|invalid_job_contract|return_time_exceeds_job_interval|invalid_job_kilometres|montreal_local_time|overlapping_job_interval/i.test(msg)) {
         // Server-side interval guard (C-5): départ/fin required, duration 0–16h.
         lastSaveErrorRef.current = t("form.errors.invalidInterval");
       } else {
@@ -498,7 +528,7 @@ export default function EmployeeForm() {
   async function uploadParkingReceipt(jobId, file, amount) {
     const receiptId = crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${receiptId}.jpg`;
-    const image = await compressImage(file);
+    const image = await prepareEvidenceImage(file);
     // Every call is timed out so a bad connection surfaces a retryable error instead of
     // freezing the save button forever.
     const { error: uploadError } = await withTimeout(
@@ -517,7 +547,10 @@ export default function EmployeeForm() {
       }, { onConflict: "job_id" }).select("id").single(),
       12000
     );
-    if (receiptError) throw receiptError;
+    if (receiptError) {
+      await supabase.storage.from("parking-receipts").remove([storagePath]).catch(() => undefined);
+      throw receiptError;
+    }
     const { error: notificationError } = await withTimeout(
       supabase.from("manager_notifications").insert({
         type: "parking_receipt",
@@ -563,11 +596,12 @@ export default function EmployeeForm() {
     if (await shouldRequestMealClaim(saved)) {
       await createMealClaim(saved);
     }
+    if (!editId) submissionKeyRef.current = null;
     setReturnStep("success");
     if (editId) {
       navigate("/form", { replace: true });
     } else {
-      setJobDate(dayjs().format("YYYY-MM-DD"));
+      setJobDate(companyDate());
       setOt("");
       setDepart("");
       setArrivee("");
@@ -705,10 +739,12 @@ export default function EmployeeForm() {
     const jobId = pendingEvidenceJobId || editId || crypto.randomUUID();
     const evidenceId = crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
+    let evidenceUploaded = false;
+    let evidenceRecorded = false;
     try {
       let image;
       try {
-        image = await compressImage(file);
+        image = await prepareEvidenceImage(file);
         const { error: uploadError } = await withTimeout(
           supabase.storage
             .from("overtime-evidence")
@@ -716,6 +752,7 @@ export default function EmployeeForm() {
           20000
         );
         if (uploadError) throw uploadError;
+        evidenceUploaded = true;
       } catch (error) {
         console.error("[overtime evidence] Screenshot upload failed", error);
         throw new Error(t("form.evidence.uploadFailed"));
@@ -768,10 +805,11 @@ export default function EmployeeForm() {
         const { error: evidenceError } = await withTimeout(
           supabase
             .from("overtime_evidence")
-            .insert({ id: evidenceId, job_id: savedJobId, user_id: user.id, job_date, storage_path: storagePath, daily_minutes: dailyMinutes, expires_at: expiresAt }),
+            .insert({ id: evidenceId, job_id: savedJobId, user_id: user.id, job_date, storage_path: storagePath, daily_minutes: dailyMinutes, expires_at: expiresAt, ocr_status: "pending" }),
           12000
         );
         if (evidenceError) throw evidenceError;
+        evidenceRecorded = true;
       } catch (error) {
         console.error("[overtime evidence] Evidence record insert failed", error);
         throw new Error(t("form.evidence.recordFailed"));
@@ -788,6 +826,14 @@ export default function EmployeeForm() {
       );
       if (notificationError) console.error("[overtime evidence] Manager notification insert failed", notificationError);
 
+      // Server-side OCR receives only the normalized JPEG and persists only its
+      // classification, never the extracted conversation text.
+      const { error: processingError } = await withTimeout(
+        supabase.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId } }),
+        12000
+      );
+      if (processingError) console.error("[overtime evidence] OCR queue failed", processingError);
+
       setPendingReturn(null);
       setPendingEvidenceJobId(null);
       setHasOvertimeEvidence(true);
@@ -799,9 +845,13 @@ export default function EmployeeForm() {
       } catch (mealError) {
         console.error("[overtime evidence] Meal claim step failed", mealError);
       }
+      if (!editId) submissionKeyRef.current = null;
       setReturnStep("success");
       navigate("/form", { replace: true });
     } catch (error) {
+      if (evidenceUploaded && !evidenceRecorded) {
+        await supabase.storage.from("overtime-evidence").remove([storagePath]).catch(() => undefined);
+      }
       setErr(error?.message || t("form.evidence.failed"));
       setReturnStep("evidence");
     } finally {

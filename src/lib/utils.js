@@ -11,15 +11,22 @@ export function cn(...inputs) {
 // against the JWT-refresh hang (token refreshes every hour; if the refresh
 // request stalls on a network hiccup, every queued query hangs with it).
 export function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Request timed out after ${Math.round(ms / 1000)}s. Please retry.`)),
-        ms
-      )
-    ),
-  ]);
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(
+      () => reject(new Error(`Request timed out after ${Math.round(ms / 1000)}s. Please retry.`)),
+      ms
+    );
+    Promise.resolve(promise).then(
+      (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
 }
 
 // Single-flight, throttled session refresh. A page runs many queries at once
