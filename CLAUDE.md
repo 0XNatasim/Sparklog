@@ -91,9 +91,10 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   idempotency key is retried (looked up before the INSERT, since BEFORE INSERT triggers run ahead of
   `ON CONFLICT` and the validator would otherwise reject the retry as an overlap). Direct employee writes
   can create/update drafts but cannot submit them.
-- **Migration parity:** four migrations applied to production outside the repo are recorded as
-  `0049a`–`0049d`, so the folder rebuilds the production schema from scratch (0057 depended on
-  `talon_boss_approval`). They are guarded to be no-ops when replayed on production.
+- **Migration parity:** every file in `supabase/migrations` is named `<version>_<name>.sql` with the exact
+  version production recorded in `supabase_migrations.schema_migrations` (4-digit only for legacy
+  0000–0026; new files use a 14-digit timestamp — `migrations.test.js` enforces it). The folder rebuilds the
+  production schema from scratch, and the Supabase GitHub integration sees every file as already applied.
 - **Done (timezone/DST):** Montréal civil times resolve through `America/Toronto` into persisted
   `started_at`/`ended_at` instants, including a migration backfill for existing jobs. The backfill disables
   and restores the snapshot, `updated_at`, and submission-validation triggers so historical payroll and

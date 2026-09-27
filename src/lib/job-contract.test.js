@@ -11,7 +11,7 @@ import {
 } from "./job-contract";
 
 const migrationPath = fileURLToPath(new URL(
-  "../../supabase/migrations/0062_job_write_contract.sql",
+  "../../supabase/migrations/20260927025132_0062_job_write_contract.sql",
   import.meta.url
 ));
 const migrationSql = readFileSync(migrationPath, "utf8");

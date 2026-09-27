@@ -9,7 +9,7 @@ import {
 } from "./company-time";
 
 const migrationSql = readFileSync(fileURLToPath(new URL(
-  "../../supabase/migrations/0063_montreal_timezone_and_dst.sql",
+  "../../supabase/migrations/20260927025233_0063_montreal_timezone_and_dst.sql",
   import.meta.url
 )), "utf8");
 

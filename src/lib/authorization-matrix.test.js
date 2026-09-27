@@ -9,11 +9,11 @@ const migration = (name) => readFileSync(fileURLToPath(new URL(
   import.meta.url
 )), "utf8");
 
-const roleMigration = migration("0050_subcontractor_1_role.sql");
-const submissionMigration = migration("0060_atomic_idempotent_job_submission.sql");
-const transitionMigration = migration("0061_manager_state_transition_rpcs.sql");
-const timezoneMigration = migration("0063_montreal_timezone_and_dst.sql");
-const privilegeMigration = migration("0032_owner_role_replaces_hardcoded_privileged.sql");
+const roleMigration = migration("20260923004309_subcontractor_1_role.sql");
+const submissionMigration = migration("20260927025008_0060_atomic_idempotent_job_submission.sql");
+const transitionMigration = migration("20260927025045_0061_manager_state_transition_rpcs.sql");
+const timezoneMigration = migration("20260927025233_0063_montreal_timezone_and_dst.sql");
+const privilegeMigration = migration("20260910220157_0032_owner_role_replaces_hardcoded_privileged.sql");
 
 describe("application authorization matrix", () => {
   it("covers every persisted application role", () => {

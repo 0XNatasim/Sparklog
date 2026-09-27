@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { MAX_EVIDENCE_BYTES, detectImageMime, validateEvidenceFile } from "./evidence-file";
 
 const migrationSql = readFileSync(fileURLToPath(new URL(
-  "../../supabase/migrations/0065_evidence_hardening_and_orphan_cleanup.sql",
+  "../../supabase/migrations/20260927025342_0065_evidence_hardening_and_orphan_cleanup.sql",
   import.meta.url
 )), "utf8");
 const cleanupSource = readFileSync(fileURLToPath(new URL(

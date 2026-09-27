@@ -140,7 +140,7 @@ The Vite development server normally runs at <http://localhost:5173>.
 
 ## Supabase setup
 
-SparkLog expects Supabase Auth plus the base `profiles` and `jobs` tables. Existing installations should apply every migration in `supabase/migrations` in filename order. The migrations add and configure:
+SparkLog expects Supabase Auth plus the base `profiles` and `jobs` tables. Existing installations should apply every migration in `supabase/migrations` in filename order. Each file is named `<version>_<name>.sql` with the version recorded in the production migration history; name new migrations with a UTC timestamp version (`YYYYMMDDHHMMSS_name.sql`) so they sort after existing ones. The migrations add and configure:
 
 - Manager job-update policies and dashboard indexes
 - CCQ numbers, classifications, snapshots, profile metadata, and scheduled rate synchronization

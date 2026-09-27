@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { QUERY_BUDGETS } from "./query-budgets";
 
 const migrationSql = readFileSync(fileURLToPath(new URL(
-  "../../supabase/migrations/0064_query_budgets_and_aggregates.sql",
+  "../../supabase/migrations/20260927025307_0064_query_budgets_and_aggregates.sql",
   import.meta.url
 )), "utf8");
 
