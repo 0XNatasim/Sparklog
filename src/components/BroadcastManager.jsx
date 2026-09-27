@@ -6,10 +6,12 @@ import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { compressImage } from "@/lib/ocr";
 
 export default function BroadcastManager() {
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const { user } = useAuth();
 
   const [employees, setEmployees] = useState([]);
@@ -143,7 +145,7 @@ export default function BroadcastManager() {
   }
 
   async function remove(b) {
-    if (!window.confirm(t("broadcast.deleteConfirm"))) return;
+    if (!(await confirm(t("broadcast.deleteConfirm")))) return;
     setMessage("");
     setDeletingId(b.id);
     try {
@@ -342,6 +344,7 @@ export default function BroadcastManager() {
           </div>
         </details>
       </Card>
+      {confirmDialog}
     </div>
   );
 }

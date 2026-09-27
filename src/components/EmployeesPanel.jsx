@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import CcqCardCapture from "@/components/CcqCardCapture";
 import { IdCard } from "lucide-react";
 import { useT } from "@/lib/use-t";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { withTimeout } from "@/lib/utils";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
@@ -49,6 +50,7 @@ function roleName(role, t) {
 
 export default function EmployeesPanel() {
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState([]);
@@ -299,7 +301,7 @@ export default function EmployeesPanel() {
   // and it never runs as a side effect of rendering.
   async function applyRateSuggestions() {
     if (rateSuggestions.size === 0 || applyingRates) return;
-    if (!window.confirm(t("employees.rates.applyConfirm", { count: rateSuggestions.size }))) return;
+    if (!(await confirm(t("employees.rates.applyConfirm", { count: rateSuggestions.size })))) return;
     setApplyingRates(true);
     setErr("");
     try {
@@ -914,6 +916,7 @@ export default function EmployeesPanel() {
           )}
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

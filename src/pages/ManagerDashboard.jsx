@@ -28,6 +28,7 @@ import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -62,6 +63,7 @@ function weekKeyFromDate(dateStr) {
 export default function ManagerDashboard() {
   const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const { user, role, adminSections } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
@@ -639,7 +641,7 @@ export default function ManagerDashboard() {
   }
 
   async function unlock(jobId) {
-    const ok = window.confirm(t("manager.confirm.unlock"));
+    const ok = await confirm(t("manager.confirm.unlock"));
     if (!ok) return;
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
@@ -693,7 +695,7 @@ export default function ManagerDashboard() {
         ? t("manager.confirm.selectedPeriod")
         : `${t("manager.weekShort")} ${wk.start.format("DD MMM")} → ${wk.end.format("DD MMM YYYY")}`;
 
-    const ok = window.confirm(t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length }));
+    const ok = await confirm(t("manager.confirm.approveWeek", { name: selectedEmployee.name, label, count: list.length }));
     if (!ok) return;
 
     const actionKey = `week:${selectedWeekKey === "latest" ? "latest" : selectedWeekKey}`;
@@ -1165,6 +1167,7 @@ export default function ManagerDashboard() {
         )}
         </>}
       </div>
+      {confirmDialog}
     </AppShell>
   );
 }
