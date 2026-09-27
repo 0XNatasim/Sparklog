@@ -784,10 +784,10 @@ function F3_renderRanking_(sh, row, model) {
   // Efficacité terrain : dégradé ; H > 8 h : ambre si > 0
   const rules = sh.getConditionalFormatRules();
   rules.push(SpreadsheetApp.newConditionalFormatRule()
-    .setRange(sh.getRange(row, 14, n, 1))
+    .setRanges([sh.getRange(row, 14, n, 1)])
     .setGradientMinpoint('#FEF3C7').setGradientMaxpoint('#A7F3D0').build());
   rules.push(SpreadsheetApp.newConditionalFormatRule()
-    .setRange(sh.getRange(row, 16, n, 1)).whenNumberGreaterThan(0)
+    .setRanges([sh.getRange(row, 16, n, 1)]).whenNumberGreaterThan(0)
     .setFontColor(C.amber).setBold(true).build());
   sh.setConditionalFormatRules(rules);
 
@@ -844,10 +844,10 @@ function F3_renderWeeks_(sh, row, model, weeksShown) {
 
   const heat = sh.getRange(row, 6, n, F3.EMP_COLS);
   const rules = sh.getConditionalFormatRules();
-  rules.push(SpreadsheetApp.newConditionalFormatRule().setRange(heat)
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([heat])
     .whenNumberGreaterThan(F3.WEEKLY_LIMIT_MIN / 1440)
     .setBackground('#FECACA').setFontColor(C.red).setBold(true).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().setRange(heat)
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([heat])
     .setGradientMinpointWithValue('#FFFFFF', SpreadsheetApp.InterpolationType.NUMBER, '0')
     .setGradientMaxpointWithValue('#60A5FA', SpreadsheetApp.InterpolationType.NUMBER,
       String(F3.WEEKLY_LIMIT_MIN / 1440))
@@ -997,11 +997,11 @@ function F3_renderExplorer_(sh, row, model, saved) {
 
   const alertCol = sh.getRange(r0, 15, rows, 1);
   const rules = sh.getConditionalFormatRules();
-  rules.push(SpreadsheetApp.newConditionalFormatRule().setRange(alertCol)
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([alertCol])
     .whenTextContains('🔴').setFontColor(C.red).setBold(true).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().setRange(alertCol)
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([alertCol])
     .whenTextContains('🟠').setFontColor(C.amber).setBold(true).build());
-  rules.push(SpreadsheetApp.newConditionalFormatRule().setRange(alertCol)
+  rules.push(SpreadsheetApp.newConditionalFormatRule().setRanges([alertCol])
     .whenTextContains('🟡').setFontColor('#A16207').build());
   sh.setConditionalFormatRules(rules);
 
