@@ -8,8 +8,14 @@
 alter table public.jobs
   add column if not exists submission_key uuid;
 
-create unique index if not exists jobs_user_submission_key_uidx
-  on public.jobs (user_id, submission_key);
+-- Same name as production's constraint (add_jobs_submission_key) so no duplicate index is created.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'jobs_user_submission_key_uniq') then
+    alter table public.jobs
+      add constraint jobs_user_submission_key_uniq unique (user_id, submission_key);
+  end if;
+end $$;
 
 create or replace function public.save_own_job(
   p_job_id uuid,
@@ -53,27 +59,35 @@ begin
       raise exception using errcode = '23514', message = 'submission_key_required';
     end if;
 
-    insert into public.jobs (
-      id, user_id, submission_key, job_date, ot, depart, arrivee, fin,
-      km_total, km_aller, return_time_minutes, km_retour,
-      overtime_evidence_captured, parking_receipt_captured, status, locked
-    ) values (
-      coalesce(p_new_job_id, gen_random_uuid()), caller_id, p_submission_key,
-      p_job_date, p_ot, p_depart, p_arrivee, p_fin,
-      coalesce(p_km_total, 0), coalesce(p_km_aller, 0),
-      coalesce(p_return_time_minutes, 0), coalesce(p_km_retour, 0),
-      coalesce(p_overtime_evidence_captured, false),
-      coalesce(p_parking_receipt_captured, false),
-      case when p_submit then 'submitted' else 'saved' end,
-      p_submit
-    )
-    on conflict (user_id, submission_key) do nothing
-    returning * into result_job;
+    -- Look up the key first: BEFORE INSERT triggers run before ON CONFLICT and would flag the retry as an overlap.
+    perform pg_advisory_xact_lock(hashtextextended(caller_id::text, 0));
+    select * into result_job
+      from public.jobs j
+     where j.user_id = caller_id and j.submission_key = p_submission_key;
 
     if result_job.id is null then
-      select * into result_job
-        from public.jobs j
-       where j.user_id = caller_id and j.submission_key = p_submission_key;
+      insert into public.jobs (
+        id, user_id, submission_key, job_date, ot, depart, arrivee, fin,
+        km_total, km_aller, return_time_minutes, km_retour,
+        overtime_evidence_captured, parking_receipt_captured, status, locked
+      ) values (
+        coalesce(p_new_job_id, gen_random_uuid()), caller_id, p_submission_key,
+        p_job_date, p_ot, p_depart, p_arrivee, p_fin,
+        coalesce(p_km_total, 0), coalesce(p_km_aller, 0),
+        coalesce(p_return_time_minutes, 0), coalesce(p_km_retour, 0),
+        coalesce(p_overtime_evidence_captured, false),
+        coalesce(p_parking_receipt_captured, false),
+        case when p_submit then 'submitted' else 'saved' end,
+        p_submit
+      )
+      on conflict (user_id, submission_key) do nothing
+      returning * into result_job;
+
+      if result_job.id is null then
+        select * into result_job
+          from public.jobs j
+         where j.user_id = caller_id and j.submission_key = p_submission_key;
+      end if;
     end if;
   else
     select * into current_job

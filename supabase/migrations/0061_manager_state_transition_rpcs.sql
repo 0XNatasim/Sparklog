@@ -166,6 +166,7 @@ drop policy if exists "parking receipts: manager update" on public.parking_recei
 -- Keep employee receipt replacement possible while preventing the owner-role
 -- manager mapping from using this own-row policy to forge a review decision.
 drop policy if exists "parking receipts: owner update" on public.parking_receipts;
+drop policy if exists "parking receipts: owner update pending" on public.parking_receipts;
 create policy "parking receipts: owner update pending"
 on public.parking_receipts for update to authenticated
 using (

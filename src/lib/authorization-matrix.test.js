@@ -12,6 +12,7 @@ const migration = (name) => readFileSync(fileURLToPath(new URL(
 const roleMigration = migration("0050_subcontractor_1_role.sql");
 const submissionMigration = migration("0060_atomic_idempotent_job_submission.sql");
 const transitionMigration = migration("0061_manager_state_transition_rpcs.sql");
+const timezoneMigration = migration("0063_montreal_timezone_and_dst.sql");
 const privilegeMigration = migration("0032_owner_role_replaces_hardcoded_privileged.sql");
 
 describe("application authorization matrix", () => {
@@ -76,6 +77,17 @@ describe("database authorization contract", () => {
     expect(submissionMigration).toContain("public.is_not_paused()");
     expect(submissionMigration).toContain("user_id = auth.uid()");
     expect(submissionMigration).toContain("status = 'saved'");
+  });
+
+  it("resolves a retried submission key before the validator can see it as an overlap", () => {
+    const lookup = submissionMigration.indexOf("where j.user_id = caller_id and j.submission_key = p_submission_key");
+    const insert = submissionMigration.indexOf("insert into public.jobs");
+    expect(lookup).toBeGreaterThan(-1);
+    expect(lookup).toBeLessThan(insert);
+    expect(submissionMigration).toContain("pg_advisory_xact_lock(hashtextextended(caller_id::text, 0))");
+    expect(timezoneMigration).toContain("pg_advisory_xact_lock(hashtextextended(new.user_id::text, 0))");
+    expect(submissionMigration).toContain("jobs_user_submission_key_uniq");
+    expect(submissionMigration).not.toContain("create unique index");
   });
 
   it("removes broad manager writes and role-checks every transition RPC", () => {

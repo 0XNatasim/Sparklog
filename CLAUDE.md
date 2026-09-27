@@ -15,8 +15,9 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 - `push_approved_batch` re-checks manager role server-side, does an **atomic claim** to prevent
   double-export, and returns a **typed per-job result** so the client never force-approves.
 - NAS/SIN live in the RLS-gated `employee_sensitive` vault (`0026`); privilege is role-based (`owner`).
-- Job submission is idempotent: a per-new-entry `submission_key` + a `(user_id, submission_key)` unique
-  constraint (client upserts on it) + a synchronous double-tap guard prevent duplicate timecards.
+- Job submission is idempotent: a per-new-entry `submission_key` + the `jobs_user_submission_key_uniq`
+  constraint; `save_own_job` resolves a reused key to the committed row before inserting, under the same
+  per-employee lock as the submission validator, so a retry or concurrent double-tap returns one job.
 - Submitted intervals are DB-validated: trigger `trg_validate_job_submission` rejects any transition to
   `status='submitted'` (app or forged direct insert) with missing départ/fin or a duration outside (0h, 16h].
 
@@ -87,7 +88,12 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   untouched. This closes the zero-hour / incomplete / excessive-duration hole for every write path.
 - **Done (atomic transition):** `save_own_job` owns employee draft/submission transitions, derives
   ownership/status/lock state server-side, serializes edits, and returns the already-committed row when an
-  idempotency key is retried. Direct employee writes can create/update drafts but cannot submit them.
+  idempotency key is retried (looked up before the INSERT, since BEFORE INSERT triggers run ahead of
+  `ON CONFLICT` and the validator would otherwise reject the retry as an overlap). Direct employee writes
+  can create/update drafts but cannot submit them.
+- **Migration parity:** four migrations applied to production outside the repo are recorded as
+  `0049a`–`0049d`, so the folder rebuilds the production schema from scratch (0057 depended on
+  `talon_boss_approval`). They are guarded to be no-ops when replayed on production.
 - **Done (timezone/DST):** Montréal civil times resolve through `America/Toronto` into persisted
   `started_at`/`ended_at` instants, including a migration backfill for existing jobs. The backfill disables
   and restores the snapshot, `updated_at`, and submission-validation triggers so historical payroll and
@@ -182,6 +188,10 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Both | Render exception | Whole app blanks | Recover, keep draft | S-7 |
 
 **Also tracked (lower tier):**
+- **P-12 export rollback re-rates pending jobs (open, pre-existing):** `revertClaim` in
+  `push_approved_batch` sets `status='submitted'`, which fires `jobs_stamp_rate_snapshot` (`0034`) and
+  overwrites the rate snapshot with the employee's *current* rate. → skip re-stamping on
+  `approved → submitted` (keep the snapshot taken at submission).
 - **C-8 offline drafts (done):** schema-versioned IndexedDB drafts are keyed by owner and job; edit drafts
   restore only when newer than the server copy and after explicit employee confirmation.
 

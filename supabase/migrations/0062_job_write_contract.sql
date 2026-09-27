@@ -49,4 +49,7 @@ create trigger trg_validate_job_submission
   before insert or update on public.jobs
   for each row execute function public.validate_job_submission_contract();
 
+-- Old validator from validate_job_submission_interval; the trigger above no longer uses it.
+drop function if exists public.validate_job_submission();
+
 revoke all on function public.validate_job_submission_contract() from public, anon, authenticated;
