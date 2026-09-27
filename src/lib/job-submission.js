@@ -1,3 +1,9 @@
+// Total-km field value when reopening a saved job; a real 0 km must stay "0", not blank.
+export function kilometreFieldValue(job) {
+  const total = Number(job?.km_total) || (Number(job?.km_aller) || 0) + (Number(job?.km_retour) || 0);
+  return String(total);
+}
+
 // Keep the client-to-RPC contract explicit. Ownership, status and lock state are
 // deliberately absent: save_own_job derives those security-sensitive values server-side.
 export function buildJobSaveRpcArgs({

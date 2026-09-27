@@ -19,11 +19,13 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
-import { buildJobSaveRpcArgs } from "@/lib/job-submission";
+import { buildJobSaveRpcArgs, kilometreFieldValue } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
 import { prepareEvidenceImage } from "@/lib/evidence-file";
+import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import {
   Dialog,
   DialogContent,
@@ -154,6 +156,7 @@ export default function EmployeeForm() {
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
   const lastSaveErrorRef = useRef("");
+  const [confirm, confirmDialog] = useConfirmDialog();
   // C-3: synchronous double-tap guard (React `saving` state updates async, too late for a
   // fast second tap) + a per-new-entry idempotency key reused across retries so a timeout
   // that still commits, or a double submit, upserts one row instead of duplicating it.
@@ -243,9 +246,7 @@ export default function EmployeeForm() {
       setHasParkingReceipt(Boolean(data.parking_receipt_captured));
       setParkingFile(null);
 
-      const aller = data.km_aller ?? "";
-      const totalKm = Number(data.km_total) || (Number(data.km_aller) || 0) + (Number(data.km_retour) || 0);
-      setKmAller(String(totalKm || ""));
+      setKmAller(kilometreFieldValue(data));
       if (data.parking_receipt_captured) {
         const { data: parkingReceipt } = await withTimeout(
           supabase.from("parking_receipts").select("amount").eq("job_id", data.id).maybeSingle(),
@@ -265,14 +266,14 @@ export default function EmployeeForm() {
       const localDraft = await loadDraft({ userId: effectiveUserId, editId }).catch(() => null);
       if (localDraft) {
         const draftIsNewer = Date.parse(localDraft.updatedAt) > Date.parse(data.updated_at || 0);
-        if (draftIsNewer && window.confirm(t("form.draft.restoreNewer"))) {
+        if (draftIsNewer && await confirm(t("form.draft.restoreNewer"))) {
           restoreLocalDraft(localDraft);
         } else if (!draftIsNewer) {
           await deleteDraft({ userId: effectiveUserId, editId }).catch(() => undefined);
         }
       }
     } catch (e) {
-      setErr(e?.message || t("form.errors.failedLoad"));
+      setErr(isOfflineError(e) ? "" : friendlyErrorMessage(e, t, "form.errors.failedLoad"));
       setEditLoadFailed(true);
       const localDraft = await loadDraft({ userId: effectiveUserId, editId }).catch(() => null);
       if (localDraft) {
@@ -285,30 +286,44 @@ export default function EmployeeForm() {
     }
   }
 
+  // "New job" defaults, so a previous job's data doesn't bleed into the next entry.
+  function resetNewJobFields() {
+    setJobDate(companyDate());
+    setOt("");
+    setDepart("");
+    setArrivee("");
+    setFin("");
+    setKmAller("");
+    setStatus("");
+    setLocked(false);
+    setErr("");
+    setInfo("");
+    setEditLoadFailed(false);
+    setDirty(false);
+    setHasOvertimeEvidence(false);
+    setParkingRequested(false);
+    setHasParkingReceipt(false);
+    setParkingFile(null);
+    setParkingAmount("");
+  }
+
+  // A closed day also disables the date field, so this is the way back to today's job card.
+  async function returnToTodaysJobCard() {
+    if (editId) {
+      navigate("/form", { replace: true });
+      return;
+    }
+    await deleteDraft({ userId: effectiveUserId }).catch(() => undefined);
+    resetNewJobFields();
+    submissionKeyRef.current = crypto.randomUUID();
+  }
+
   useEffect(() => {
     setDraftReady(false);
     if (editId) {
       loadEdit();
     } else {
-      // "New job" — reset form to empty defaults so previous job's data
-      // doesn't bleed into the next entry.
-      setJobDate(companyDate());
-      setOt("");
-      setDepart("");
-      setArrivee("");
-      setFin("");
-      setKmAller("");
-      setStatus("");
-      setLocked(false);
-      setErr("");
-      setInfo("");
-      setEditLoadFailed(false);
-      setDirty(false);
-      setHasOvertimeEvidence(false);
-      setParkingRequested(false);
-      setHasParkingReceipt(false);
-      setParkingFile(null);
-      setParkingAmount("");
+      resetNewJobFields();
       loadDraft({ userId: effectiveUserId }).then((record) => {
         if (record) restoreLocalDraft(record);
       }).catch(() => undefined).finally(() => setDraftReady(true));
@@ -342,7 +357,7 @@ export default function EmployeeForm() {
     if (!effectiveUserId) return;
     supabase.from("profiles").select("role, parking_receipts_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
-        setErr(error.message);
+        setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.errors.failedLoad"));
         return;
       }
       setOfficeEmployee(isAdminEmployee(data?.role));
@@ -518,22 +533,10 @@ export default function EmployeeForm() {
       const msg = String(e?.message || "");
       if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
         lastSaveErrorRef.current = t("form.errors.duplicateOt", { ot: ot || "" });
-      } else if (/ambiguous_montreal_local_time|invalid_dst_time:ambiguous/i.test(msg)) {
-        lastSaveErrorRef.current = t("form.errors.ambiguousTime");
-      } else if (/nonexistent_montreal_local_time|invalid_dst_time:nonexistent/i.test(msg)) {
-        lastSaveErrorRef.current = t("form.errors.nonexistentTime");
-      } else if (/overlapping_job_interval/i.test(msg)) {
-        lastSaveErrorRef.current = t("form.errors.overlappingInterval");
-      } else if (/return_time_exceeds_job_interval|return_exceeds_interval/i.test(msg)) {
-        lastSaveErrorRef.current = t("form.errors.returnExceedsInterval");
-      } else if (/invalid_job_kilometres|invalid_kilometres/i.test(msg)) {
-        lastSaveErrorRef.current = t("form.errors.invalidKilometres");
-      } else if (/invalid_job_interval|invalid_job_contract|invalid_interval/i.test(msg)) {
-        lastSaveErrorRef.current = t("form.errors.invalidInterval");
       } else {
-        lastSaveErrorRef.current = e?.message || t("form.errors.saveFailed");
+        lastSaveErrorRef.current = friendlyErrorMessage(e, t, "form.errors.saveFailed");
       }
-      setErr(lastSaveErrorRef.current);
+      setErr(isOfflineError(e) ? "" : lastSaveErrorRef.current);
       return false;
     } finally {
       savingRef.current = false;
@@ -605,7 +608,7 @@ export default function EmployeeForm() {
     }
     const saved = await saveJob(pendingSaveMode, returnValues);
     if (!saved) {
-      setReturnSaveError(t("form.return.saveError"));
+      setReturnSaveError(lastSaveErrorRef.current || t("form.return.saveError"));
       return;
     }
 
@@ -730,7 +733,7 @@ export default function EmployeeForm() {
       if (notificationError) throw notificationError;
       return true;
     } catch (error) {
-      setErr(error?.message || t("form.meal.failed"));
+      setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.meal.failed"));
       return false;
     }
   }
@@ -1021,8 +1024,13 @@ export default function EmployeeForm() {
           </div>
         )}
         {entryBlockedReason && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
-            {entryBlockedReason}
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
+            <span>{entryBlockedReason}</span>
+            {(editId || job_date !== companyDate()) && (
+              <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={saving} onClick={returnToTodaysJobCard}>
+                {t("form.deadline.backToJobCard")}
+              </Button>
+            )}
           </div>
         )}
 
@@ -1481,6 +1489,7 @@ export default function EmployeeForm() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </AppShell>
   );
 }

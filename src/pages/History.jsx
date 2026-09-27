@@ -17,6 +17,8 @@ import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { buildJobSaveRpcArgs } from "@/lib/job-submission";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
+import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 dayjs.locale("en");
 
@@ -59,6 +61,11 @@ export default function History() {
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [confirm, confirmDialog] = useConfirmDialog();
+
+  function showError(error, fallbackKey) {
+    setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, fallbackKey));
+  }
 
   function historyQuery(cursor = null) {
     let query = supabase.from("jobs").select("*")
@@ -90,7 +97,7 @@ export default function History() {
       setMealJobIds(new Set(await mealIdsFor(page)));
       setHasMore(page.length === QUERY_BUDGETS.employeeHistoryPage);
     } catch (e) {
-      setErr(e?.message || t("history.errors.failedLoad"));
+      showError(e, "history.errors.failedLoad");
     } finally {
       setLoading(false);
     }
@@ -110,7 +117,7 @@ export default function History() {
       setMealJobIds((current) => new Set([...current, ...mealIds]));
       setHasMore(page.length === QUERY_BUDGETS.employeeHistoryPage);
     } catch (error) {
-      setErr(error?.message || t("history.errors.failedLoad"));
+      showError(error, "history.errors.failedLoad");
     } finally {
       setLoadingMore(false);
     }
@@ -200,7 +207,7 @@ export default function History() {
   }
 
   async function deleteJob(jobId) {
-    const ok = window.confirm(t("history.confirm.delete"));
+    const ok = await confirm(t("history.confirm.delete"));
     if (!ok) return;
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
@@ -224,14 +231,14 @@ export default function History() {
       setInfo(t("history.toasts.deleted"));
       await load();
     } catch (e) {
-      setErr(e?.message || t("history.errors.deleteFailed"));
+      showError(e, "history.errors.deleteFailed");
     } finally {
       setActionLoadingKey(null);
     }
   }
 
   async function submitJob(jobId) {
-    const ok = window.confirm(t("history.confirm.submit"));
+    const ok = await confirm(t("history.confirm.submit"));
     if (!ok) return;
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
@@ -242,7 +249,7 @@ export default function History() {
       setInfo(t("history.toasts.submitted"));
       await load();
     } catch (e) {
-      setErr(e?.message || t("history.errors.submitFailed"));
+      showError(e, "history.errors.submitFailed");
     } finally {
       setActionLoadingKey(null);
     }
@@ -250,7 +257,7 @@ export default function History() {
 
   async function submitDay(dateKey, ids) {
     if (!ids || ids.length === 0) return;
-    const ok = window.confirm(t("history.confirm.submitDay", { date: dayjs(dateKey).format("DD MMM YYYY") }));
+    const ok = await confirm(t("history.confirm.submitDay", { date: dayjs(dateKey).format("DD MMM YYYY") }));
     if (!ok) return;
     const actionKey = `day:${dateKey}`;
     setActionLoadingKey(actionKey);
@@ -262,7 +269,7 @@ export default function History() {
       setInfo(t("history.toasts.daySubmitted", { count: ids.length }));
       await load();
     } catch (e) {
-      setErr(e?.message || t("history.errors.submitDayFailed"));
+      showError(e, "history.errors.submitDayFailed");
     } finally {
       setActionLoadingKey(null);
     }
@@ -405,6 +412,7 @@ export default function History() {
           </div>
         )}
       </div>
+      {confirmDialog}
     </AppShell>
   );
 }
