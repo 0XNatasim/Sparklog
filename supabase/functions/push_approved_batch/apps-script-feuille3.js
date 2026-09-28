@@ -3,8 +3,9 @@
 //
 // Ce script LIT l’onglet master « Data » (jamais modifié) et génère l’onglet « Stats » :
 //   01 Indicateurs clés     — heures, jobs, KM, ratios route / terrain, alertes
-//   02 Graphiques           — heures par employé, heures par semaine CCQ
-//   03 Classement           — rang des employés + ratios d’efficacité
+//   Vue                     — « Tous les employés » ou un employé (sections 01 et 02)
+//   02 Tendances            — barres : heures par employé / par jour, par semaine CCQ
+//   03 Classement           — rang des employés, triable par n’importe quelle colonne
 //   04 Semaines CCQ         — carte de chaleur dimanche → samedi, seuil 40 h
 //   05 Contrôle qualité     — chevauchements, doublons, vitesses, route sans KM…
 //   06 Explorateur          — recherche par employé, dates, mot-clé, alertes
@@ -25,7 +26,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const F3 = {
-  VERSION: '1.1.0',
+  VERSION: '1.2.0',
   SOURCE: 'Data',
   SOURCE_ALIASES: ['Data', 'Feuille 1'],   // anciens noms acceptés pour l’onglet master
   TARGET: 'Stats',
@@ -66,12 +67,13 @@ const F3 = {
 /** À exécuter une fois : menu, mise à jour automatique, première génération. */
 function F3_installer() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const handlers = ['F3_onOpen', 'F3_actualiserSiChangement'];
+  const handlers = ['F3_onOpen', 'F3_actualiserSiChangement', 'F3_onEdit'];
   ScriptApp.getProjectTriggers()
     .filter(t => handlers.indexOf(t.getHandlerFunction()) !== -1)
     .forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('F3_onOpen').forSpreadsheet(ss).onOpen().create();
   ScriptApp.newTrigger('F3_actualiserSiChangement').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('F3_onEdit').forSpreadsheet(ss).onEdit().create();
   F3_actualiser();
   try { F3_onOpen(); } catch (e) { /* le menu apparaîtra à la prochaine ouverture */ }
   ss.toast('Stats installé : menu 📊 Sparklog + mise à jour toutes les 15 min.', 'Sparklog', 8);
@@ -99,14 +101,72 @@ function F3_actualiser() {
   const lock = LockService.getDocumentLock();
   if (!lock.tryLock(30000)) return;
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const source = F3_readSource_(ss);
-    const model = F3_buildModel_(source.rows, source.skipped);
-    F3_render_(ss, model);
-    F3_syncWeekTabs_(ss, model, false);
-    PropertiesService.getDocumentProperties().setProperty('F3_FINGERPRINT', source.fingerprint);
+    F3_rebuildAll_(SpreadsheetApp.getActiveSpreadsheet());
   } finally {
     lock.releaseLock();
+  }
+}
+
+function F3_rebuildAll_(ss) {
+  const source = F3_readSource_(ss);
+  const model = F3_buildModel_(source.rows, source.skipped);
+  F3_render_(ss, model);
+  F3_syncWeekTabs_(ss, model, false);
+  PropertiesService.getDocumentProperties().setProperty('F3_FINGERPRINT', source.fingerprint);
+}
+
+/**
+ * Déclencheur de modification (installable) : réagit aux sélecteurs de l’onglet Stats.
+ *  - « VUE » → recalcule les sections 01 et 02 pour l’employé choisi ;
+ *  - « TRIER PAR » / « ORDRE » → retrie le classement (section 03).
+ */
+function F3_onEdit(e) {
+  if (!e || !e.range) return;
+  const sh = e.range.getSheet();
+  if (sh.getName() !== F3.TARGET) return;
+  const pos = F3_positions_();
+  if (!pos) return;
+  const r = e.range.getRow(), c = e.range.getColumn();
+  const isView = r === pos.viewRow && c === 3;
+  const isSort = r === pos.sortRow && (c === 3 || c === 8);
+  if (!isView && !isSort) return;
+
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30000)) return;
+  try {
+    const ss = sh.getParent();
+    const source = F3_readSource_(ss);
+    const model = F3_buildModel_(source.rows, source.skipped);
+    // Si les données ont changé de forme depuis la dernière génération, on reconstruit tout.
+    if (pos.rankN !== model.emps.length || pos.trendRows !== F3_trendRows_(model)) {
+      F3_render_(ss, model);
+      F3_syncWeekTabs_(ss, model, false);
+      PropertiesService.getDocumentProperties().setProperty('F3_FINGERPRINT', source.fingerprint);
+      return;
+    }
+    F3_detectFormulaSyntax_(sh);
+    if (isView) {
+      const view = F3_viewFor_(model, sh.getRange(pos.viewRow, 3).getValue());
+      F3_clearBlock_(sh, pos.kpiRow, pos.trendEnd - pos.kpiRow);
+      F3_renderKpis_(sh, pos.kpiRow, view.model, view.label);
+      F3_renderTrends_(sh, pos.trendRow, model, view, pos.trendRows);
+    } else {
+      const sort = { by: sh.getRange(pos.sortRow, 3).getValue(), dir: sh.getRange(pos.sortRow, 8).getValue() };
+      F3_dropRules_(sh, pos.rankRow, pos.rankEnd);
+      F3_clearBlock_(sh, pos.rankRow, pos.rankEnd - pos.rankRow);
+      F3_renderRankingTable_(sh, pos.rankRow, model, sort);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function F3_positions_() {
+  try {
+    const pos = JSON.parse(PropertiesService.getDocumentProperties().getProperty('F3_POS') || 'null');
+    return pos && pos.viewRow ? pos : null;
+  } catch (e) {
+    return null;
   }
 }
 
@@ -346,9 +406,9 @@ function F3_buildModel_(rows, skipped) {
     days.get(dk).jobs.push(job);
 
     const wk = job.week.key;
-    if (!weeks.has(wk)) weeks.set(wk, { week: job.week, total: 0, jobs: 0, byEmp: new Map() });
+    if (!weeks.has(wk)) weeks.set(wk, { week: job.week, total: 0, route: 0, jobs: 0, byEmp: new Map() });
     const w = weeks.get(wk);
-    w.total += total; w.jobs++;
+    w.total += total; w.jobs++; w.route += route;
     w.byEmp.set(r.empKey, (w.byEmp.get(r.empKey) || 0) + total);
 
     const dupKey = [r.empKey, r.dateKey, r.ot, r.dep, r.fin].join('|');
@@ -422,6 +482,7 @@ function F3_buildModel_(rows, skipped) {
     .sort((a, b) => b.sev - a.sev || b.serial - a.serial || (a.dep || 0) - (b.dep || 0));
 
   return {
+    rows: rows,
     jobs: jobs,
     emps: empList,
     weeks: weekList,
@@ -483,6 +544,7 @@ function F3_render_(ss, model) {
   const legacy = ss.getSheetByName(F3.LEGACY_TARGET);
   if (!sh && legacy) sh = legacy.setName(F3.TARGET);
   const saved = F3_readFilters_(sh);
+  const controls = F3_readControls_(sh);
   if (!sh) sh = ss.insertSheet(F3.TARGET, ss.getSheets().length);
   F3_reset_(sh);
 
@@ -510,9 +572,18 @@ function F3_render_(ss, model) {
   let row = 1;
   sh.setRowHeight(row, 14);
   row = F3_renderHeader_(sh, row + 1, model);
-  row = F3_renderKpis_(sh, row + 1, model);
-  row = F3_renderCharts_(sh, row + 1, model);
-  row = F3_renderRanking_(sh, row + 1, model);
+  const pos = {};
+  row = F3_renderViewBar_(sh, row, model, controls.view, pos);
+  const view = F3_viewFor_(model, controls.view);
+  pos.kpiRow = row + 1;
+  row = F3_renderKpis_(sh, pos.kpiRow, view.model, view.label);
+  pos.trendRow = row + 1;
+  pos.trendRows = F3_trendRows_(model);
+  row = F3_renderTrends_(sh, pos.trendRow, model, view, pos.trendRows);
+  pos.trendEnd = row;
+  row = F3_renderRanking_(sh, row + 1, model, controls, pos);
+  pos.rankN = model.emps.length;
+  PropertiesService.getDocumentProperties().setProperty('F3_POS', JSON.stringify(pos));
   row = F3_renderWeeks_(sh, row + 1, model, weeksShown);
   row = F3_renderAlerts_(sh, row + 1, model, alertsN);
   row = F3_renderExplorer_(sh, row + 1, model, saved);
@@ -686,18 +757,18 @@ function F3_bodyRows_(sh, row, n) {
 }
 
 // 01 — Indicateurs clés (2 rangées de 6 cartes)
-function F3_renderKpis_(sh, row, model) {
+function F3_renderKpis_(sh, row, model, viewLabel) {
   const C = F3.C, k = model.kpi;
-  row = F3_sectionTitle_(sh, row, '01', 'Indicateurs clés',
+  row = F3_sectionTitle_(sh, row, '01', 'Indicateurs clés — ' + (viewLabel || F3_VIEW_ALL),
     'Ratios calculés sur Départ → Arrivée (route) et Arrivée → Fin (terrain)');
   const groups = [[2, 3], [5, 2], [7, 4], [11, 4], [15, 1], [16, 2]];
   const cards = [
     [
       ['Heures totales', k.totalMin / 1440, F3_FMT.dur, k.personDays + ' jours-personne', C.blue],
-      ['Jobs approuvés', k.jobs, F3_FMT.int, k.emps + ' employés actifs', C.blue],
+      ['Jobs approuvés', k.jobs, F3_FMT.int, k.emps > 1 ? k.emps + ' employés actifs' : 'vue individuelle', C.blue],
       ['KM parcourus', k.km, F3_FMT.km, Math.round(k.kmPerJob) + ' km / job en moyenne', C.blue],
       ['Moyenne / job', k.avgJob / 1440, F3_FMT.dur, 'de Départ à Fin', C.violet],
-      ['H / jour', k.avgDay / 1440, F3_FMT.dur, 'par employé', C.violet],
+      ['H / jour', k.avgDay / 1440, F3_FMT.dur, k.emps > 1 ? 'par employé' : 'par jour travaillé', C.violet],
       ['Période', k.firstSerial === null ? '—' : F3_fmtSerial_(k.firstSerial), '@',
         k.lastSerial === null ? '' : 'au ' + F3_fmtSerial_(k.lastSerial), C.violet],
     ],
@@ -705,7 +776,7 @@ function F3_renderKpis_(sh, row, model) {
       ['Temps de route', k.routePct, F3_FMT.pct1, 'du temps total', C.amber],
       ['Efficacité terrain', 1 - k.routePct, F3_FMT.pct1, 'du temps passé sur site', C.green],
       ['Heures > 8 h / jour', k.otMin / 1440, F3_FMT.dur, 'estimation — la paie fait foi', C.amber],
-      ['Jobs / jour', k.personDays ? k.jobs / k.personDays : 0, '0.0', 'par employé', C.teal],
+      ['Jobs / jour', k.personDays ? k.jobs / k.personDays : 0, '0.0', k.emps > 1 ? 'par employé' : 'par jour travaillé', C.teal],
       ['Alertes', k.alerts, F3_FMT.int, k.critical + ' critique(s)', k.alerts ? C.red : C.green],
       ['Qualité des données', k.jobs ? 1 - k.alerts / k.jobs : 1, F3_FMT.pct1,
         'jobs sans anomalie' + (model.skipped ? ' · ' + model.skipped + ' ligne(s) ignorée(s)' : ''),
@@ -740,84 +811,243 @@ function F3_renderKpis_(sh, row, model) {
 }
 
 // 02 — Graphiques
-function F3_renderCharts_(sh, row, model) {
-  row = F3_sectionTitle_(sh, row, '02', 'Tendances', 'Heures décimales · semaines CCQ (dim. → sam.)');
-  const height = 300;
-  const rowsNeeded = Math.ceil((height + 10) / 21);
+const F3_VIEW_ALL = 'Tous les employés';
 
-  // Séries des graphiques (heures décimales), écrites SOUS les graphiques : les
-  // graphiques n’affichent pas les données de colonnes masquées.
-  const maxLines = rowsNeeded - 1;
-  const empRows = model.emps.slice(0, maxLines).map(e => [e.name, Math.round(e.total / 6) / 10]);
-  const empData = [['Employé', 'Heures']].concat(empRows.length ? empRows : [['—', 0]]);
-  sh.getRange(row, 2, empData.length, 2).setValues(empData);
-  const shown = model.emps.slice(0, F3.EMP_COLS);
-  const weekRows = model.weeks.slice(-Math.min(F3.MAX_WEEKS, maxLines)).map(w =>
-    ['S' + w.week.no].concat(shown.map(e => Math.round((w.byEmp.get(e.key) || 0) / 6) / 10)));
-  const weekData = [['Semaine'].concat(shown.length ? shown.map(e => F3_shortName_(e.name)) : ['—'])]
-    .concat(weekRows.length ? weekRows : [['—'].concat(shown.length ? shown.map(() => 0) : [0])]);
-  sh.getRange(row, 4, weekData.length, weekData[0].length).setValues(weekData);
-  sh.getRange(row, 2, rowsNeeded, 16).setFontColor('#FFFFFF').setFontSize(6);
-  model.chartRanges = {
-    emp: sh.getRange(row, 2, empData.length, 2),
-    week: sh.getRange(row, 4, weekData.length, weekData[0].length),
-  };
-  const base = {
-    fontName: F3.FONT,
-    titleTextStyle: { color: F3.C.ink, fontSize: 13, bold: true },
-    backgroundColor: '#FFFFFF',
-    chartArea: { left: 150, top: 44, width: '70%', height: '72%' },
-  };
-  const empChart = sh.newChart()
-    .setChartType(Charts.ChartType.BAR)
-    .addRange(model.chartRanges.emp)
-    .setNumHeaders(1)
-    .setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)
-    .setPosition(row, 2, 0, 0)
-    .setOption('title', 'Heures par employé')
-    .setOption('legend', { position: 'none' })
-    .setOption('colors', [F3.C.blue])
-    .setOption('width', 700).setOption('height', height)
-    .setOption('hAxis', { format: '0', gridlines: { color: F3.C.line }, textStyle: { color: F3.C.muted } })
-    .setOption('vAxis', { textStyle: { color: F3.C.text } });
-  Object.keys(base).forEach(key => empChart.setOption(key, base[key]));
-  sh.insertChart(empChart.build());
-
-  const weekChart = sh.newChart()
-    .setChartType(Charts.ChartType.COLUMN)
-    .addRange(model.chartRanges.week)
-    .setNumHeaders(1)
-    .setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)
-    .setPosition(row, 10, 0, 0)
-    .setOption('title', 'Heures par semaine CCQ')
-    .setOption('isStacked', true)
-    .setOption('legend', { position: 'bottom', textStyle: { color: F3.C.muted, fontSize: 10 } })
-    .setOption('colors', F3.PALETTE)
-    .setOption('width', 760).setOption('height', height)
-    .setOption('vAxis', { format: '0', gridlines: { color: F3.C.line }, textStyle: { color: F3.C.muted } });
-  Object.keys(base).forEach(key => weekChart.setOption(key, base[key]));
-  weekChart.setOption('chartArea', { left: 60, top: 44, width: '85%', height: '62%' });
-  sh.insertChart(weekChart.build());
-
-  return row + rowsNeeded;
+/** Barre « VUE » : choix de l’employé pour les sections 01 et 02. */
+function F3_renderViewBar_(sh, row, model, current, pos) {
+  const C = F3.C;
+  const r = row + 1;
+  const names = [F3_VIEW_ALL].concat(model.emps.map(e => e.name).sort((a, b) => a.localeCompare(b)));
+  sh.getRange(r, 2).setValue('VUE').setHorizontalAlignment('right')
+    .setFontSize(9).setFontWeight('bold').setFontColor(C.muted);
+  const input = sh.getRange(r, 3, 1, 3).merge();
+  input.setBackground(C.blueSoft).setFontWeight('bold').setFontColor(C.ink).setFontSize(11)
+    .setHorizontalAlignment('left')
+    .setBorder(true, true, true, true, null, null, C.blueLine, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sh.getRange(r, 3).setDataValidation(SpreadsheetApp.newDataValidation()
+    .requireValueInList(names, true).setAllowInvalid(false).build())
+    .setValue(names.indexOf(current) !== -1 ? current : F3_VIEW_ALL);
+  sh.getRange(r, 6, 1, 12).merge()
+    .setValue('← Choisissez un employé : les sections 01 et 02 affichent ses statistiques.')
+    .setFontSize(9).setFontStyle('italic').setFontColor(C.muted);
+  sh.setRowHeight(row, 10);
+  sh.setRowHeight(r, 34);
+  pos.viewRow = r;
+  return r + 1;
 }
 
-// 03 — Classement des employés
-function F3_renderRanking_(sh, row, model) {
+/** Modèle de la vue : toute l’équipe, ou un sous-modèle limité à un employé. */
+function F3_viewFor_(model, selection) {
+  const emp = model.emps.find(e => e.name === selection);
+  if (!emp) return { key: null, label: F3_VIEW_ALL, model: model };
+  const sub = F3_buildModel_(model.rows.filter(r => r.empKey === emp.key), 0);
+  return { key: emp.key, label: emp.name, model: sub };
+}
+
+function F3_trendRows_(model) {
+  return Math.max(7, Math.min(model.emps.length, 15), Math.min(model.weeks.length, F3.MAX_WEEKS));
+}
+
+/** Efface un bloc de lignes B → Q et remet le style de base. */
+function F3_clearBlock_(sh, row, n) {
+  if (n <= 0) return;
+  const rg = sh.getRange(row, 1, n, 18);
+  rg.breakApart();
+  rg.clearDataValidations();
+  rg.clear();
+  rg.setFontFamily(F3.FONT).setFontSize(10).setFontColor(F3.C.text)
+    .setVerticalAlignment('middle').setBackground('#FFFFFF');
+}
+
+/** Retire les règles de mise en forme conditionnelle qui commencent dans ces lignes. */
+function F3_dropRules_(sh, r0, r1) {
+  const keep = sh.getConditionalFormatRules().filter(rule =>
+    !rule.getRanges().some(rg => rg.getRow() >= r0 && rg.getRow() < r1));
+  sh.setConditionalFormatRules(keep);
+}
+
+/** Barre dessinée en texte : segments colorés + reste en gris clair. */
+function F3_bar_(parts, max, slots) {
+  const total = parts.reduce((s, p) => s + p.value, 0);
+  const filled = max > 0 ? Math.min(slots, Math.round(slots * total / max)) : 0;
+  const b = SpreadsheetApp.newRichTextValue().setText('█'.repeat(slots));
+  let at = 0;
+  parts.forEach((p, i) => {
+    let len = total > 0 ? Math.round(filled * p.value / total) : 0;
+    if (i === parts.length - 1) len = filled - at;
+    if (p.value > 0 && len === 0 && at < filled) len = 1;
+    len = Math.max(0, Math.min(len, filled - at));
+    if (len > 0) {
+      b.setTextStyle(at, at + len, SpreadsheetApp.newTextStyle().setForegroundColor(p.color).build());
+      at += len;
+    }
+  });
+  if (at < slots) {
+    b.setTextStyle(at, slots, SpreadsheetApp.newTextStyle().setForegroundColor(F3.C.line).build());
+  }
+  return b.build();
+}
+
+// 02 — Tendances (barres dans les cellules : s’affichent partout, sans graphique Google)
+function F3_renderTrends_(sh, row, model, view, nRows) {
   const C = F3.C;
-  row = F3_sectionTitle_(sh, row, '03', 'Classement des employés', 'Trié par heures totales');
-  F3_tableHeader_(sh, row,
-    ['Rang', 'Employé', 'Jobs', 'Jours', 'Heures', 'H / jour', 'H / job', 'KM', 'KM / job',
-     '% route', 'Efficacité terrain', 'Part des heures', 'H > 8 h/j (est.)', 'Part %'],
-    [1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+  row = F3_sectionTitle_(sh, row, '02', 'Tendances — ' + view.label,
+    'Barres : bleu = sur site · orange = route');
+  const vm = view.model;
+
+  // Panneau gauche : heures par employé (équipe) ou par jour de semaine (employé)
+  let leftTitle, left;
+  if (!view.key) {
+    leftTitle = 'Heures par employé';
+    left = model.emps.slice(0, nRows).map(e => ({
+      label: e.name, parts: [{ value: e.total - e.route, color: C.blue }, { value: e.route, color: '#F59E0B' }],
+      total: e.total, value: F3_fmtHM_(e.total) + '  ·  ' + e.jobs + ' jobs',
+    }));
+  } else {
+    leftTitle = 'Heures par jour de semaine';
+    const byDay = [0, 1, 2, 3, 4, 5, 6].map(d => ({ total: 0, route: 0, days: new Set() }));
+    vm.jobs.forEach(j => {
+      const b = byDay[j.dow];
+      b.total += j.total; b.route += j.arrOk ? j.route : 0; b.days.add(j.dateKey);
+    });
+    const names = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+    left = byDay.map((b, d) => ({
+      label: names[d], parts: [{ value: b.total - b.route, color: C.blue }, { value: b.route, color: '#F59E0B' }],
+      total: b.total, value: b.total ? F3_fmtHM_(b.total) + '  ·  ' + b.days.size + ' j' : '—',
+    }));
+  }
+
+  // Panneau droit : heures par semaine CCQ (équipe ou employé)
+  const weeks = vm.weeks.slice(-Math.min(F3.MAX_WEEKS, nRows));
+  const right = weeks.map(w => ({
+    label: 'S' + w.week.no + ' · ' + F3_fmtSerial_(w.week.startSerial).replace(/ \d{4}$/, ''),
+    parts: [{ value: w.total - w.route, color: C.blue }, { value: w.route, color: '#F59E0B' }],
+    total: w.total,
+    value: F3_fmtHM_(w.total) + '  ·  ' + (w.total ? Math.round(100 * w.route / w.total) : 0) + ' % route',
+  }));
+
+  // Titres des panneaux
+  const titleRow = row;
+  sh.getRange(titleRow, 2, 1, 8).merge().setValue(leftTitle.toUpperCase());
+  sh.getRange(titleRow, 10, 1, 8).merge().setValue('Heures par semaine CCQ'.toUpperCase());
+  F3_band_(sh, titleRow).setFontSize(8).setFontWeight('bold').setFontColor(C.muted)
+    .setBorder(null, null, true, null, null, null, C.line, SpreadsheetApp.BorderStyle.SOLID);
+  sh.setRowHeight(titleRow, 26);
+  row++;
+
+  const n = nRows;
+  const LEFT_SLOTS = 26, RIGHT_SLOTS = 36;
+  const blank = SpreadsheetApp.newRichTextValue().setText('').build();
+  const leftMax = Math.max.apply(null, left.map(x => x.total).concat([1]));
+  const rightMax = Math.max.apply(null, right.map(x => x.total).concat([1]));
+  const vals = [], lBars = [], rBars = [];
+  for (let i = 0; i < n; i++) {
+    const l = left[i], r = right[i];
+    vals.push([l ? l.label : '', '', '', '', '', '', l ? l.value : '', '',
+               r ? r.label : '', '', '', '', '', '', r ? r.value : '', '']);
+    lBars.push([l ? F3_bar_(l.parts, leftMax, LEFT_SLOTS) : blank]);
+    rBars.push([r ? F3_bar_(r.parts, rightMax, RIGHT_SLOTS) : blank]);
+  }
+  sh.getRange(row, 2, n, 16).setValues(vals);
+  [[2, 3], [5, 3], [8, 2], [10, 2], [12, 4], [16, 2]].forEach(g => sh.getRange(row, g[0], n, g[1]).mergeAcross());
+  sh.getRange(row, 5, n, 1).setRichTextValues(lBars);
+  sh.getRange(row, 12, n, 1).setRichTextValues(rBars);
+  sh.getRange(row, 5, n, 1).setFontSize(9).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  sh.getRange(row, 12, n, 1).setFontSize(9).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  sh.getRange(row, 2, n, 1).setFontWeight('bold').setFontColor(C.ink);
+  sh.getRange(row, 10, n, 1).setFontWeight('bold').setFontColor(C.ink);
+  sh.getRange(row, 8, n, 1).setFontColor(C.muted).setFontSize(9);
+  sh.getRange(row, 16, n, 1).setFontColor(C.muted).setFontSize(9);
+  if (!right.length) {
+    sh.getRange(row, 10).setValue('Aucune semaine').setFontColor(C.muted).setFontStyle('italic');
+  }
+  sh.setRowHeights(row, n, 22);
+  return row + n;
+}
+// 03 — Classement des employés
+const F3_SORTS = [
+  { label: 'Heures', col: 8, f: e => e.total },
+  { label: 'Jobs', col: 6, f: e => e.jobs },
+  { label: 'Jours', col: 7, f: e => e.dayCount },
+  { label: 'H / jour', col: 9, f: e => e.dayCount ? e.total / e.dayCount : 0 },
+  { label: 'H / job', col: 10, f: e => e.jobs ? e.total / e.jobs : 0 },
+  { label: 'KM', col: 11, f: e => e.km },
+  { label: 'KM / job', col: 12, f: e => e.jobs ? e.km / e.jobs : 0 },
+  { label: '% route', col: 13, f: e => e.routePct },
+  { label: 'Efficacité terrain', col: 14, f: e => e.routeBase ? 1 - e.routePct : 0 },
+  { label: 'Part des heures', col: 15, f: e => e.total },
+  { label: 'H > 8 h/j (est.)', col: 16, f: e => e.otMin },
+  { label: 'Part %', col: 17, f: e => e.total },
+  { label: 'Nom', col: 3, f: e => e.name },
+];
+const F3_DIRS = ['Décroissant ▼', 'Croissant ▲'];
+
+function F3_readControls_(sh) {
+  const out = { view: F3_VIEW_ALL, by: 'Heures', dir: F3_DIRS[0] };
+  const pos = F3_positions_();
+  if (!sh || !pos) return out;
+  try {
+    const v = sh.getRange(pos.viewRow, 3).getValue();
+    const by = sh.getRange(pos.sortRow, 3).getValue();
+    const dir = sh.getRange(pos.sortRow, 8).getValue();
+    if (v) out.view = String(v);
+    if (F3_SORTS.some(x => x.label === by)) out.by = by;
+    if (F3_DIRS.indexOf(dir) !== -1) out.dir = dir;
+  } catch (e) { /* valeurs par défaut */ }
+  return out;
+}
+
+// 03 — Classement des employés (triable)
+function F3_renderRanking_(sh, row, model, controls, pos) {
+  const C = F3.C;
+  row = F3_sectionTitle_(sh, row, '03', 'Classement des employés',
+    'Choisissez la colonne et l’ordre : le classement se met à jour');
+  const r = row;
+  const input = (col, span, list, value) => {
+    const rg = sh.getRange(r, col, 1, span);
+    if (span > 1) rg.merge();
+    rg.setBackground(C.blueSoft).setFontWeight('bold').setFontColor(C.ink).setHorizontalAlignment('left')
+      .setBorder(true, true, true, true, null, null, C.blueLine, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+    sh.getRange(r, col).setDataValidation(SpreadsheetApp.newDataValidation()
+      .requireValueInList(list, true).setAllowInvalid(false).build()).setValue(value);
+  };
+  sh.getRange(r, 2).setValue('TRIER PAR').setHorizontalAlignment('right')
+    .setFontSize(9).setFontWeight('bold').setFontColor(C.muted);
+  input(3, 3, F3_SORTS.map(x => x.label), controls.by);
+  sh.getRange(r, 7).setValue('ORDRE').setHorizontalAlignment('right')
+    .setFontSize(9).setFontWeight('bold').setFontColor(C.muted);
+  input(8, 3, F3_DIRS, controls.dir);
+  sh.setRowHeight(r, 32);
+  sh.setRowHeight(r + 1, 8);
+  pos.sortRow = r;
+  pos.rankRow = r + 2;
+  pos.rankEnd = F3_renderRankingTable_(sh, pos.rankRow, model, { by: controls.by, dir: controls.dir });
+  return pos.rankEnd;
+}
+
+function F3_renderRankingTable_(sh, row, model, sort) {
+  const C = F3.C;
+  const spec = F3_SORTS.find(x => x.label === sort.by) || F3_SORTS[0];
+  const asc = sort.dir === F3_DIRS[1];
+  const headers = ['Rang', 'Employé', 'Jobs', 'Jours', 'Heures', 'H / jour', 'H / job', 'KM', 'KM / job',
+    '% route', 'Efficacité terrain', 'Part des heures', 'H > 8 h/j (est.)', 'Part %'];
+  F3_tableHeader_(sh, row, headers, [1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+  const hc = sh.getRange(row, spec.col);
+  hc.setValue(hc.getValue() + (asc ? ' ▲' : ' ▼')).setFontColor(C.blue);
   row++;
   const n = model.emps.length;
   if (!n) return F3_emptyRow_(sh, row, 'Aucun employé dans ' + F3.SOURCE + '.');
+
+  const emps = model.emps.slice().sort((a, b) => {
+    const va = spec.f(a), vb = spec.f(b);
+    const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+    return (asc ? cmp : -cmp) || b.total - a.total || a.name.localeCompare(b.name);
+  });
   F3_bodyRows_(sh, row, n);
   const totalAll = model.kpi.totalMin || 1;
-  const maxTotal = Math.max.apply(null, model.emps.map(e => e.total)) / 1440 || 1;
+  const maxTotal = Math.max.apply(null, emps.map(e => e.total)) || 1;
   const medals = ['🥇', '🥈', '🥉'];
-  const values = model.emps.map((e, i) => [
+  const values = emps.map((e, i) => [
     medals[i] || String(i + 1),
     e.name, '', '',
     e.jobs,
@@ -838,23 +1068,14 @@ function F3_renderRanking_(sh, row, model) {
   sh.getRange(row, 3, n, 1).setHorizontalAlignment('left').setFontWeight('bold').setFontColor(C.ink);
   sh.getRange(row, 2, n, 1).setFontSize(13);
   sh.getRange(row, 8, n, 3).setNumberFormat(F3_FMT.dur);
-  sh.getRange(row, 8, n, 1).setFontWeight('bold');
   sh.getRange(row, 11, n, 1).setNumberFormat(F3_FMT.int);
   sh.getRange(row, 12, n, 1).setNumberFormat('0.0');
   sh.getRange(row, 13, n, 2).setNumberFormat(F3_FMT.pct);
   sh.getRange(row, 16, n, 1).setNumberFormat(F3_FMT.dur);
   sh.getRange(row, 17, n, 1).setNumberFormat(F3_FMT.pct1);
-  const SLOTS = 20;
-  const onStyle = SpreadsheetApp.newTextStyle().setForegroundColor(C.blue).build();
-  const offStyle = SpreadsheetApp.newTextStyle().setForegroundColor(C.line).build();
-  const bars = model.emps.map(e => {
-    const k = Math.max(e.total ? 1 : 0, Math.round(SLOTS * (e.total / 1440) / maxTotal));
-    const b = SpreadsheetApp.newRichTextValue().setText('█'.repeat(SLOTS));
-    if (k > 0) b.setTextStyle(0, k, onStyle);
-    if (k < SLOTS) b.setTextStyle(k, SLOTS, offStyle);
-    return [b.build()];
-  });
-  sh.getRange(row, 15, n, 1).setRichTextValues(bars).setHorizontalAlignment('left').setFontSize(9);
+  sh.getRange(row, spec.col, n, 1).setFontWeight('bold').setFontColor(C.blue);
+  sh.getRange(row, 15, n, 1).setRichTextValues(emps.map(e => [F3_bar_([{ value: e.total, color: C.blue }], maxTotal, 20)]))
+    .setHorizontalAlignment('left').setFontSize(9);
 
   // Efficacité terrain : dégradé ; H > 8 h : ambre si > 0
   const rules = sh.getConditionalFormatRules();
@@ -885,7 +1106,6 @@ function F3_renderRanking_(sh, row, model) {
   sh.setRowHeight(t, 28);
   return t + 1;
 }
-
 // 04 — Semaines CCQ (carte de chaleur)
 function F3_renderWeeks_(sh, row, model, weeksShown) {
   const C = F3.C;
