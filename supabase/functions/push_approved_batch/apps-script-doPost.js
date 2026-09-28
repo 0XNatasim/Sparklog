@@ -7,7 +7,8 @@
 //   - Batch (from push_approved_batch):
 //       { token, rows: [ { job_id, job_date, employee_name, ... }, ... ] }
 //
-// COLUMN LAYOUT written to "Feuille 1":
+// COLUMN LAYOUT written to the master tab "Data" (formerly "Feuille 1"; both
+// names are accepted):
 //   A Date · B Employé · C Courriel · D Téléphone · E OT · F Départ ·
 //   G Arrivée · H Fin · I Heures · J KM · K Approuvé par · L Approuvé le ·
 //   M JobID  (dedup key — you can hide this column)
@@ -40,7 +41,8 @@ function doPost(e) {
       return jsonOut({ success: false, error: "Unauthorized" });
     }
 
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Feuille 1");
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("Data") || ss.getSheetByName("Feuille 1");
     if (!sheet) {
       return jsonOut({ success: false, error: "Sheet not found" });
     }
