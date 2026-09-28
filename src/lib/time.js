@@ -9,8 +9,12 @@ export function hhmmFromDayjs(value) {
 }
 
 /**
- * Returns decimal hours between start and end (e.g. 7.50).
+ * Returns exact decimal hours between start and end (e.g. 203 min -> 3.3833…).
  * Accepts Dayjs objects (or null).
+ *
+ * Not rounded: callers add several jobs together, and rounding each job to the
+ * hundredth of an hour first (36 s) made a 510-minute day display as 8h29.
+ * Round only when displaying the final total (formatHM / formatHours).
  */
 export function hoursBetween(start, end) {
   if (!start || !end) return 0;
@@ -22,7 +26,7 @@ export function hoursBetween(start, end) {
   // interprets an end time before the start as crossing midnight. Delegate to
   // that same calculation to keep employee and manager totals consistent.
   const workedMinutes = minutesBetween(s.format("HH:mm"), e.format("HH:mm"));
-  return Math.round((workedMinutes / 60) * 100) / 100;
+  return workedMinutes / 60;
 }
 
 export function formatHours(hours) {
