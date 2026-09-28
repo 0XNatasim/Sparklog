@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Sparklog — onglet « Stats » : tableau de bord professionnel des heures approuvées
 //
-// Ce script LIT « Feuille 1 » (jamais modifiée) et génère l’onglet « Stats » :
+// Ce script LIT l’onglet master « Data » (jamais modifié) et génère l’onglet « Stats » :
 //   01 Indicateurs clés     — heures, jobs, KM, ratios route / terrain, alertes
 //   02 Graphiques           — heures par employé, heures par semaine CCQ
 //   03 Classement           — rang des employés + ratios d’efficacité
@@ -10,8 +10,8 @@
 //   06 Explorateur          — recherche par employé, dates, mot-clé, alertes
 // Il crée aussi un onglet par semaine CCQ (« Sem37 », « Sem38 »…) : résumé par
 // employé et par jour + détail des jobs, prêt à exporter (Fichier → Télécharger).
-// « Feuille 1 » reste le master : « Feuille 1 » et « Feuille 2 » ne sont jamais
-// modifiées. Les onglets SemXX sont régénérés : corrigez les données dans Feuille 1.
+// « Data » reste le master et n’est jamais modifié. Les onglets SemXX sont
+// régénérés : corrigez les données dans Data.
 //
 // INSTALLATION (une seule fois) :
 //   1. Dans le Google Sheet : Extensions → Apps Script.
@@ -21,12 +21,13 @@
 //      et acceptez les autorisations.
 // Ensuite : le menu « 📊 Sparklog » apparaît à l’ouverture du fichier et la
 // l’onglet Stats se met à jour toute seule toutes les 15 minutes (seulement si la
-// Feuille 1 a changé). Les filtres de l’explorateur sont conservés.
+// Data a changé). Les filtres de l’explorateur sont conservés.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const F3 = {
   VERSION: '1.1.0',
-  SOURCE: 'Feuille 1',
+  SOURCE: 'Data',
+  SOURCE_ALIASES: ['Data', 'Feuille 1'],   // anciens noms acceptés pour l’onglet master
   TARGET: 'Stats',
   LEGACY_TARGET: 'Feuille 3',   // ancien nom : renommé automatiquement en « Stats »
   FONT: 'Roboto',
@@ -93,7 +94,7 @@ function F3_ouvrir() {
   if (sh) sh.activate();
 }
 
-/** Reconstruit l’onglet Stats à partir de la Feuille 1. */
+/** Reconstruit l’onglet Stats à partir de l’onglet Data. */
 function F3_actualiser() {
   const lock = LockService.getDocumentLock();
   if (!lock.tryLock(30000)) return;
@@ -109,11 +110,11 @@ function F3_actualiser() {
   }
 }
 
-/** Déclencheur minuté : ne reconstruit que si la Feuille 1 a changé. */
+/** Déclencheur minuté : ne reconstruit que si l’onglet Data a changé. */
 function F3_actualiserSiChangement() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const props = PropertiesService.getDocumentProperties();
-  const src = ss.getSheetByName(F3.SOURCE);
+  const src = F3_sourceSheet_(ss);
   if (!src) return;
   const fp = F3_fingerprint_(src.getDataRange().getDisplayValues());
   if (ss.getSheetByName(F3.TARGET) && props.getProperty('F3_FINGERPRINT') === fp) return;
@@ -147,7 +148,7 @@ function F3_reinitialiserFiltres() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Lecture et normalisation (Feuille 1 en lecture seule)
+// Lecture et normalisation (onglet Data en lecture seule)
 // ═════════════════════════════════════════════════════════════════════════════
 
 function F3_fingerprint_(display) {
@@ -156,9 +157,22 @@ function F3_fingerprint_(display) {
   return Utilities.base64Encode(bytes);
 }
 
+/** L’onglet master : « Data » (ou « Feuille 1 »), sinon le premier onglet dont l’en-tête contient JobID. */
+function F3_sourceSheet_(ss) {
+  for (const name of F3.SOURCE_ALIASES) {
+    const sh = ss.getSheetByName(name);
+    if (sh) return sh;
+  }
+  return ss.getSheets().find(sh => {
+    if (sh.getLastRow() < 1 || sh.getLastColumn() < 1) return false;
+    return sh.getRange(1, 1, 1, Math.min(sh.getLastColumn(), 20)).getDisplayValues()[0]
+      .some(h => F3_norm_(h) === 'jobid');
+  }) || null;
+}
+
 function F3_readSource_(ss) {
-  const sh = ss.getSheetByName(F3.SOURCE);
-  if (!sh) throw new Error('Onglet « ' + F3.SOURCE + ' » introuvable.');
+  const sh = F3_sourceSheet_(ss);
+  if (!sh) throw new Error('Onglet master introuvable : nommez-le « ' + F3.SOURCE + ' ».');
   const range = sh.getDataRange();
   const values = range.getValues();
   const display = range.getDisplayValues();
@@ -798,7 +812,7 @@ function F3_renderRanking_(sh, row, model) {
     [1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   row++;
   const n = model.emps.length;
-  if (!n) return F3_emptyRow_(sh, row, 'Aucun employé dans la Feuille 1.');
+  if (!n) return F3_emptyRow_(sh, row, 'Aucun employé dans ' + F3.SOURCE + '.');
   F3_bodyRows_(sh, row, n);
   const totalAll = model.kpi.totalMin || 1;
   const maxTotal = Math.max.apply(null, model.emps.map(e => e.total)) / 1440 || 1;
@@ -1093,7 +1107,7 @@ const F3_WEEK_HEADERS = ['Date', 'Jour', 'Employé', 'OT', 'Départ', 'Arrivée'
   'Route', 'Sur site', 'KM', 'Approuvé par', 'Approuvé le', 'Courriel', 'Téléphone', 'JobID'];
 
 /**
- * Crée / met à jour un onglet par semaine CCQ présente dans la Feuille 1.
+ * Crée / met à jour un onglet par semaine CCQ présente dans l’onglet Data.
  * Seuls les onglets dont le contenu a changé sont régénérés (empreinte par semaine).
  * Onglet nommé « Sem42 » ; une semaine d’une autre année CCQ que la plus ancienne
  * reçoit un suffixe (« Sem42 (2027) ») pour ne jamais écraser une autre année.
@@ -1129,7 +1143,7 @@ function F3_syncWeekTabs_(ss, model, force) {
     F3_renderWeekTab_(sh, w, empName);
   });
 
-  // Onglets de semaine devenus vides (jobs retirés de la Feuille 1) : seulement ceux créés ici.
+  // Onglets de semaine devenus vides (jobs retirés de Data) : seulement ceux créés ici.
   Object.keys(tracked).forEach(name => {
     if (next[name]) return;
     const sh = ss.getSheetByName(name);
