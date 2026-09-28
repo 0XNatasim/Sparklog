@@ -12,7 +12,7 @@ import { ANOMALY_LIMITS, anomalyLimitsFromSettings } from "@/lib/job-anomalies";
 import { companyDate } from "@/lib/company-time";
 import { useT } from "@/lib/use-t";
 
-// Test → Réglage: company-wide editable parameters, plus Congés and Formulaires.
+// Réglage: company-wide editable parameters, plus Congés and Formulaires.
 export default function SettingsPanel() {
   const t = useT();
   return (

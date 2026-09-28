@@ -13,6 +13,7 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import { useViewMode } from "@/contexts/ViewModeContext";
+import { APP_VERSION } from "@/lib/version";
 import headerLight from "../../public/header-light.jpg";
 import headerDark from "../../public/header-dark.jpg";
 
@@ -73,8 +74,11 @@ export default function AppShell({ children }) {
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30 dark:bg-[#151515]">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3">
-          <Link to={`/form${viewSuffix}`} className="shrink-0 text-base font-extrabold tracking-tight sm:text-lg">
+          <Link to={`/form${viewSuffix}`} className="flex shrink-0 items-baseline gap-1 text-base font-extrabold tracking-tight sm:text-lg">
             SparkLog
+            <span className="font-mono text-[10px] font-normal tracking-normal text-muted-foreground" title="Version">
+              V{APP_VERSION}
+            </span>
           </Link>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">

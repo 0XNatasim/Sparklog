@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Bell, CalendarDays, ClipboardList, Clock3, Image, ImageOff, Radio, TriangleAlert, Users } from "lucide-react";
+import { Beaker, Bell, CalendarDays, ClipboardList, Clock3, Image, ImageOff, Radio, Settings, TriangleAlert, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -25,6 +25,7 @@ import EmployeesPanel from "@/components/EmployeesPanel";
 import CongesManager from "@/components/CongesManager";
 import TimeRulesManager from "@/components/TimeRulesManager";
 import BroadcastManager from "@/components/BroadcastManager";
+import SettingsPanel from "@/components/SettingsPanel";
 import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
@@ -73,12 +74,12 @@ export default function ManagerDashboard() {
   const requestedSection = searchParams.get("section");
   // Which dashboard sections this user may open. Managers/owners get all; an admin
   // (office employee) sees only the sections the owner granted (profiles.admin_sections).
-  const allSections = ["live", "timesheet", "notifications", "employees", "conges", "forms", "testing"];
-  // Congés and Formulaires live under Test → Réglage for anyone who can open Test; an
-  // admin granted Formulaires without Test keeps it as a top-level section.
-  const canOpenTesting = canAccessSection(role, adminSections, "testing");
+  const allSections = ["live", "timesheet", "notifications", "employees", "settings", "conges", "forms", "testing"];
+  // Congés and Formulaires live under Réglage for anyone who can open it; an admin
+  // granted Formulaires without Réglage keeps it as a top-level section.
+  const canOpenSettings = canAccessSection(role, adminSections, "settings");
   const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id)
-    && !(canOpenTesting && (id === "conges" || id === "forms")));
+    && !(canOpenSettings && (id === "conges" || id === "forms")));
   const fallbackSection = allowedSections[0] || "live";
   const normalizedRequest = ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications" : requestedSection;
   // Clamp to an allowed section so a granted admin can't reach an ungranted one by URL.
@@ -1024,6 +1025,7 @@ export default function ManagerDashboard() {
             { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
             { id: "notifications", icon: Bell, label: t("manager.sections.notifications"), description: t("manager.sections.notificationsDescription") },
             { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
+            { id: "settings", icon: Settings, label: t("settings.tab"), description: t("settings.description") },
             { id: "conges", icon: CalendarDays, label: t("manager.sections.conges"), description: t("manager.sections.congesDescription") },
             { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
             { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
@@ -1044,6 +1046,8 @@ export default function ManagerDashboard() {
         {activeSection === "live" && <LiveCrew />}
 
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
+
+        {activeSection === "settings" && <SettingsPanel />}
 
         {activeSection === "conges" && <CongesManager />}
 

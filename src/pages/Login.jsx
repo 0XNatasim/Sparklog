@@ -6,6 +6,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { isManagerRole } from "@/lib/roles";
+import { logActivity } from "@/lib/activity-log";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,6 +149,7 @@ export default function Login() {
           password,
         }), 12000);
         if (error) throw error;
+        logActivity("login");
       }
     } catch (err) {
       setErrorMsg(authErrorMessage(err, t));

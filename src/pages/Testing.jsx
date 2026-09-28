@@ -4,7 +4,7 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, DollarSign, Download, ExternalLink, FileText, Settings, ShieldCheck, Wallet } from "lucide-react";
+import { Calculator, CalendarDays, DollarSign, Download, ExternalLink, FileText, ShieldCheck, Wallet } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
@@ -18,8 +18,8 @@ import DasTab from "@/components/DasTab";
 import WeekViewTab from "@/components/WeekViewTab";
 import RecordOfEmploymentTab from "@/components/RecordOfEmploymentTab";
 import AuditLog from "@/components/AuditLog";
+import EmployeeActivityLog from "@/components/EmployeeActivityLog";
 import InfraHealthCard from "@/components/InfraHealthCard";
-import SettingsPanel from "@/components/SettingsPanel";
 
 // ── Coûts section: Coûts (tableau) · Semaine · Mois ──────────────────────────
 function CostingSection() {
@@ -38,37 +38,71 @@ function CostingSection() {
   );
 }
 
-// ── Paie section: Calcul (bench) · Talon (aperçu) · DAS (centralisation) ──────
+// ── Paie section ─────────────────────────────────────────────────────────────
+// Façon Messier (the method payroll will be run with) comes first, on the left;
+// the by-the-book CCQ calculation sits on the right for comparison:
+//   Calcul · Talon · DAS  ← Façon Messier | Façon Book →  Calcul · Talon · DAS
 function PayrollSection() {
   const t = useT();
   return (
-    <Tabs defaultValue="calcul" className="w-full">
+    <Tabs defaultValue="calcul-m" className="w-full">
       <TabsList className="flex-wrap">
-        <TabsTrigger value="calcul">{t("payroll.subtabs.calcul")}</TabsTrigger>
-        <TabsTrigger value="talon">{t("payroll.subtabs.talon")}</TabsTrigger>
-        <TabsTrigger value="das">{t("payroll.subtabs.das")}</TabsTrigger>
-        <span className="mx-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">{t("payroll.subtabs.messierLabel")} →</span>
         <TabsTrigger value="calcul-m">{t("payroll.subtabs.calcul")}</TabsTrigger>
         <TabsTrigger value="talon-m">{t("payroll.subtabs.talon")}</TabsTrigger>
         <TabsTrigger value="das-m">{t("payroll.subtabs.das")}</TabsTrigger>
+        <span className="ml-2 flex items-center text-xs font-semibold text-primary">← {t("payroll.subtabs.messierLabel")}</span>
+        <span className="mx-3 h-5 w-px bg-border" aria-hidden="true" />
+        <span className="mr-2 flex items-center text-xs font-semibold text-muted-foreground">{t("payroll.subtabs.bookLabel")} →</span>
+        <TabsTrigger value="calcul">{t("payroll.subtabs.calcul")}</TabsTrigger>
+        <TabsTrigger value="talon">{t("payroll.subtabs.talon")}</TabsTrigger>
+        <TabsTrigger value="das">{t("payroll.subtabs.das")}</TabsTrigger>
       </TabsList>
-      <TabsContent value="calcul" className="mt-3"><PayrollEngineTester /></TabsContent>
-      <TabsContent value="talon" className="mt-3"><TalonTab /></TabsContent>
-      <TabsContent value="das" className="mt-3"><DasTab /></TabsContent>
       <TabsContent value="calcul-m" className="mt-3"><MessierNote /><PayrollEngineTester messier /></TabsContent>
       <TabsContent value="talon-m" className="mt-3"><MessierNote /><TalonTab messier /></TabsContent>
       <TabsContent value="das-m" className="mt-3"><MessierNote /><DasTab messier /></TabsContent>
+      <TabsContent value="calcul" className="mt-3"><BookNote /><PayrollEngineTester /></TabsContent>
+      <TabsContent value="talon" className="mt-3"><BookNote /><TalonTab /></TabsContent>
+      <TabsContent value="das" className="mt-3"><BookNote /><DasTab /></TabsContent>
     </Tabs>
   );
 }
 
-// Explains the Façon Messier calculation difference at the top of each parallel tab.
+// ── Audit section: manager actions · employee activity (sign-ins, job saves) ────
+function AuditSection() {
+  const t = useT();
+  return (
+    <Tabs defaultValue="managers" className="w-full">
+      <TabsList>
+        <TabsTrigger value="managers">{t("audit.tabs.managers")}</TabsTrigger>
+        <TabsTrigger value="employees">{t("audit.tabs.employees")}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="managers" className="mt-3 space-y-3">
+        <InfraHealthCard />
+        <AuditLog />
+      </TabsContent>
+      <TabsContent value="employees" className="mt-3"><EmployeeActivityLog /></TabsContent>
+    </Tabs>
+  );
+}
+
+// Façon Messier: the method payroll will be run with.
 function MessierNote() {
   const t = useT();
   return (
-    <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+    <div className="mb-3 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs">
       <div className="font-semibold">{t("payroll.messierNote.title")}</div>
-      <p className="mt-1">{t("payroll.messierNote.body")}</p>
+      <p className="mt-1 text-muted-foreground">{t("payroll.messierNote.body")}</p>
+    </div>
+  );
+}
+
+// Façon Book: the strict CCQ calculation, kept for comparison.
+function BookNote() {
+  const t = useT();
+  return (
+    <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+      <div className="font-semibold">{t("payroll.bookNote.title")}</div>
+      <p className="mt-1">{t("payroll.bookNote.body")}</p>
     </div>
   );
 }
@@ -423,7 +457,6 @@ export default function Testing() {
     { id: "roe", icon: FileText, label: t("testing.roe.tab"), description: t("testing.roe.description") },
     { id: "payroll", icon: Wallet, label: t("testing.tabs.payroll"), description: t("testing.sections.payrollDescription") },
     { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
-    { id: "settings", icon: Settings, label: t("settings.tab"), description: t("settings.description") },
   ];
 
   return (
@@ -452,13 +485,7 @@ export default function Testing() {
       {section === "weekview" && <WeekViewTab />}
       {section === "roe" && <RecordOfEmploymentTab />}
       {section === "payroll" && <PayrollSection />}
-      {section === "settings" && <SettingsPanel />}
-      {section === "audit" && (
-        <div className="space-y-3">
-          <InfraHealthCard />
-          <AuditLog />
-        </div>
-      )}
+      {section === "audit" && <AuditSection />}
     </div>
   );
 }
