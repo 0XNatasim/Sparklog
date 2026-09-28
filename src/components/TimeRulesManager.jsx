@@ -28,7 +28,7 @@ export default function TimeRulesManager() {
   const [teamLeaderBusy, setTeamLeaderBusy] = useState(false);
 
   async function load() {
-    // Deadline, evidence retention and the CCQ calendar live in Test → Réglage.
+    // Deadline, evidence retention and the CCQ calendar live in Réglage.
     const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, team_leader_premium, is_paused").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
