@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Bell, Check, ChevronDown, Image as ImageIcon, Paperclip, Send, Trash2, X } from "lucide-react";
+import { Bell, BookmarkPlus, Check, ChevronDown, Image as ImageIcon, Paperclip, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +8,60 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { compressImage } from "@/lib/ocr";
+
+// Ready-made messages a manager can click to fill the message box (recipients are
+// still chosen by hand). Managers can add their own; those are kept on this device.
+const BUILT_IN_TEMPLATES = [
+  `📦 Inventaire complet en présentiel à votre entrepôt.
+🗓 Date : ce vendredi
+⏰ Heure : entre 6 h 30 et 7 h 00
+📍 Lieu : votre entrepôt
+
+🔹 Vous devez obligatoirement vous présenter avec :
+• Tout le matériel Hilo en votre possession
+• Les composantes défectueuses
+
+👉 Merci d’essayer de récupérer votre matériel avant la date d’inventaire afin de limiter au maximum les transferts d’inventaire.
+
+❗ Important :
+Si vous n’êtes pas en mesure de vous présenter ou que vous ne travaillez pas vendredi, vous devez :
+📅 Rapporter tout votre matériel à l’entrepôt le jeudi avant, ou à votre dernière journée de travail avant l’inventaire du mois.
+📞 Appeler Marc-Antoine ou Mélanie pour les en informer.`,
+  "🦺 Réunion santé & sécurité ce jeudi. Liens dans votre profil.",
+  "🦺 Réunion santé & sécurité ce mardi. Liens dans votre profil.",
+];
+const CUSTOM_TEMPLATES_KEY = "sparklog.broadcastTemplates.v1";
+
+function loadCustomTemplates() {
+  try {
+    const list = JSON.parse(window.localStorage.getItem(CUSTOM_TEMPLATES_KEY) || "[]");
+    return Array.isArray(list) ? list.filter((item) => typeof item === "string" && item.trim()) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomTemplates(list) {
+  try { window.localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+}
+
+// Signed thumbnail for a sent broadcast's screenshot (private bucket).
+function BroadcastImage({ path }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    let alive = true;
+    supabase.storage.from("broadcast-images").createSignedUrl(path, 3600).then(({ data }) => {
+      if (alive) setUrl(data?.signedUrl || "");
+    });
+    return () => { alive = false; };
+  }, [path]);
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="block w-fit">
+      <img src={url} alt="" className="max-h-48 rounded-md border object-contain" />
+    </a>
+  );
+}
 
 export default function BroadcastManager() {
   const t = useT();
@@ -18,7 +72,8 @@ export default function BroadcastManager() {
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
-  const [audience, setAudience] = useState("all");
+  const [audience, setAudience] = useState("selected");
+  const [customTemplates, setCustomTemplates] = useState(loadCustomTemplates);
   const [selected, setSelected] = useState(new Set());
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
@@ -98,6 +153,27 @@ export default function BroadcastManager() {
     });
   }
 
+  function applyTemplate(text) {
+    setBody(text);
+    setMessage("");
+  }
+
+  function saveTemplate() {
+    const text = body.trim();
+    if (!text) { setMessage(t("broadcast.needMessage")); return; }
+    if (BUILT_IN_TEMPLATES.includes(text) || customTemplates.includes(text)) return;
+    const next = [...customTemplates, text];
+    setCustomTemplates(next);
+    saveCustomTemplates(next);
+    setMessage(t("broadcast.templateSaved"));
+  }
+
+  function deleteTemplate(text) {
+    const next = customTemplates.filter((item) => item !== text);
+    setCustomTemplates(next);
+    saveCustomTemplates(next);
+  }
+
   const employeeName = (id) => {
     const e = employees.find((row) => row.id === id);
     return e?.full_name || e?.email || id;
@@ -134,7 +210,7 @@ export default function BroadcastManager() {
       setBody("");
       clearImage();
       setSelected(new Set());
-      setAudience("all");
+      setAudience("selected");
       setMessage(t("broadcast.sent"));
       await loadLog();
     } catch (e) {
@@ -212,13 +288,14 @@ export default function BroadcastManager() {
               onPaste={handlePaste}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              rows={3}
+              rows={body.split("\n").length > 3 ? 8 : 3}
               placeholder={t("broadcast.messagePlaceholder")}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <p className="text-xs text-muted-foreground">{t("broadcast.pasteHint")}</p>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <span className="text-sm font-medium">{t("broadcast.audience")}</span>
             <div className="flex flex-wrap gap-4 text-sm">
@@ -241,6 +318,34 @@ export default function BroadcastManager() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{t("broadcast.templates")}</span>
+              <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={saveTemplate} title={t("broadcast.saveTemplate")}>
+                <BookmarkPlus className="h-3.5 w-3.5" />{t("broadcast.saveTemplate")}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t("broadcast.templatesHint")}</p>
+            <div className="max-h-56 space-y-1.5 overflow-y-auto">
+              {[...BUILT_IN_TEMPLATES, ...customTemplates].map((text, index) => {
+                const custom = index >= BUILT_IN_TEMPLATES.length;
+                return (
+                  <div key={`${index}-${text.slice(0, 20)}`} className={`flex items-stretch rounded-md border text-sm ${body === text ? "border-primary bg-primary/10" : "hover:border-primary/50"}`}>
+                    <button type="button" onClick={() => applyTemplate(text)} className="min-w-0 flex-1 px-3 py-2 text-left" title={text}>
+                      <span className="line-clamp-2 whitespace-pre-line">{text}</span>
+                    </button>
+                    {custom && (
+                      <button type="button" onClick={() => deleteTemplate(text)} className="shrink-0 border-l px-2 text-muted-foreground hover:text-destructive" aria-label={t("broadcast.deleteTemplate")} title={t("broadcast.deleteTemplate")}>
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           </div>
 
           <div className="space-y-2">
@@ -285,7 +390,7 @@ export default function BroadcastManager() {
                     className="flex min-w-0 flex-1 items-start justify-between gap-3 rounded-l-lg p-3 text-left hover:bg-muted/50"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{b.body}</div>
+                      <div className={`text-sm font-medium ${isOpen ? "whitespace-pre-wrap break-words" : "truncate"}`}>{b.body}</div>
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                         {b.image_path && <ImageIcon className="h-3.5 w-3.5" />}
                         {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
@@ -325,6 +430,7 @@ export default function BroadcastManager() {
                 </div>
                 {isOpen && (
                   <div className="border-t p-3">
+                    {b.image_path && <div className="mb-3"><BroadcastImage path={b.image_path} /></div>}
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("broadcast.recipients")}</div>
                     <div className="max-h-56 space-y-1 overflow-y-auto">
                       {recips.map((r) => (
