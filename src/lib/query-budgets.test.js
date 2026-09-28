@@ -17,6 +17,7 @@ describe("query budgets", () => {
     expect(QUERY_BUDGETS.employeeWeekLookbackWeeks).toBeLessThanOrEqual(12);
     expect(QUERY_BUDGETS.anomalySubmittedJobs).toBeLessThanOrEqual(200);
     expect(QUERY_BUDGETS.anomalyApprovedPeers).toBeLessThanOrEqual(400);
+    expect(QUERY_BUDGETS.employeeActivityPage).toBeLessThanOrEqual(200);
   });
 
   it("locks aggregate counts and keyset/review indexes into the database contract", () => {

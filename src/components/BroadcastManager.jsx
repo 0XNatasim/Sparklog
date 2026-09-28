@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Bell, BookmarkPlus, Check, ChevronDown, Image as ImageIcon, Paperclip, Send, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, BookmarkPlus, Check, ChevronDown, Image as ImageIcon, Paperclip, RotateCcw, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { compressImage } from "@/lib/ocr";
+import { addTemplate, loadTemplates, moveTemplate, removeTemplate, resolveTemplates, saveTemplates } from "@/lib/broadcast-templates";
 
 // Ready-made messages a manager can click to fill the message box (recipients are
-// still chosen by hand). Managers can add their own; those are kept on this device.
+// still chosen by hand). Managers can add, delete and reorder them; the list is
+// kept on this device (see lib/broadcast-templates).
 const BUILT_IN_TEMPLATES = [
   `📦 Inventaire complet en présentiel à votre entrepôt.
 🗓 Date : ce vendredi
@@ -29,22 +31,45 @@ Si vous n’êtes pas en mesure de vous présenter ou que vous ne travaillez pas
 📞 Appeler Marc-Antoine ou Mélanie pour les en informer.`,
   "🦺 Réunion santé & sécurité ce jeudi. Liens dans votre profil.",
   "🦺 Réunion santé & sécurité ce mardi. Liens dans votre profil.",
+  `📱 Sparklog — comment entrer vos heures
+
+✨ Utilisez « Remplir auto » : c'est plus rapide et vos heures concordent avec Field Service.
+
+1️⃣ Dans Field Service, ouvrez l'ordre de travail, onglet « Bilan ».
+2️⃣ Faites défiler jusqu'à « Distance réel parcourue (km) » et prenez une capture d'écran.
+   La capture doit montrer le # OT, les heures de départ, d'arrivée et de fin, et les km.
+3️⃣ Dans Sparklog, appuyez sur « Remplir auto » et choisissez la capture.
+   ➜ L'OT, le Départ, l'Arrivée, la Fin et les KM se remplissent tout seuls.
+4️⃣ Vérifiez que tout est exact, puis :
+   • « Enregistrer » = brouillon, encore modifiable.
+   • « Soumettre » = envoyé au gestionnaire pour approbation. Le job est alors verrouillé.
+
+👉 Astuce : dans l'Historique, « SOUMETTRE LA JOURNÉE » envoie tous vos jobs enregistrés du jour d'un seul coup à la fin de la journée.`,
+  `⏰ Rappel important — Soumission quotidienne
+
+Vos heures doivent être SOUMISES chaque jour, avant la fin de la journée.
+Un job seulement « enregistré » n'est pas envoyé : le gestionnaire ne le voit pas et il ne peut pas être payé.
+
+❗ Une journée non soumise se verrouille. Il faudra alors demander au gestionnaire de la déverrouiller.
+
+Merci de prendre 2 minutes à la fin de chaque journée. 🙏`,
+  `📸 Temps supplémentaire (plus de 8 h dans la journée)
+
+Au-delà de 8 h, Sparklog vous demande la capture d'écran du SMS qui autorise le temps supplémentaire.
+
+La capture doit montrer :
+✅ Le SMS d'approbation avec la date
+✅ Votre réponse avec la durée (ex. : « 30 min »)
+
+Sans cette capture, le temps supplémentaire ne peut pas être approuvé. Appuyez sur « Afficher l'exemple d'image » dans l'app pour voir un modèle.`,
+  `✅ Vos obligations dans Sparklog
+
+• Entrer TOUS vos jobs, avec l'heure de Départ, d'Arrivée et de Fin exactes.
+• Soumettre vos heures CHAQUE JOUR.
+• Plus de 8 h dans la journée ➜ joindre la capture du SMS d'autorisation.
+• Stationnement payé ➜ cocher « Stationnement » et joindre la photo du reçu, avec le montant.
+• Vérifier vos km avant de soumettre.`,
 ];
-const CUSTOM_TEMPLATES_KEY = "sparklog.broadcastTemplates.v1";
-
-function loadCustomTemplates() {
-  try {
-    const list = JSON.parse(window.localStorage.getItem(CUSTOM_TEMPLATES_KEY) || "[]");
-    return Array.isArray(list) ? list.filter((item) => typeof item === "string" && item.trim()) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCustomTemplates(list) {
-  try { window.localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(list)); } catch { /* ignore */ }
-}
-
 // Signed thumbnail for a sent broadcast's screenshot (private bucket).
 function BroadcastImage({ path }) {
   const [url, setUrl] = useState("");
@@ -73,7 +98,7 @@ export default function BroadcastManager() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
   const [audience, setAudience] = useState("selected");
-  const [customTemplates, setCustomTemplates] = useState(loadCustomTemplates);
+  const [templates, setTemplates] = useState(() => loadTemplates(BUILT_IN_TEMPLATES));
   const [selected, setSelected] = useState(new Set());
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
@@ -158,20 +183,32 @@ export default function BroadcastManager() {
     setMessage("");
   }
 
+  function updateTemplates(items) {
+    const next = { ...templates, items };
+    setTemplates(next);
+    saveTemplates(next);
+  }
+
   function saveTemplate() {
     const text = body.trim();
     if (!text) { setMessage(t("broadcast.needMessage")); return; }
-    if (BUILT_IN_TEMPLATES.includes(text) || customTemplates.includes(text)) return;
-    const next = [...customTemplates, text];
-    setCustomTemplates(next);
-    saveCustomTemplates(next);
+    if (templates.items.includes(text)) return;
+    updateTemplates(addTemplate(templates.items, text));
     setMessage(t("broadcast.templateSaved"));
   }
 
-  function deleteTemplate(text) {
-    const next = customTemplates.filter((item) => item !== text);
-    setCustomTemplates(next);
-    saveCustomTemplates(next);
+  async function deleteTemplate(index) {
+    if (!(await confirm(t("broadcast.deleteTemplateConfirm")))) return;
+    updateTemplates(removeTemplate(templates.items, index));
+  }
+
+  async function restoreTemplates() {
+    if (!(await confirm(t("broadcast.restoreTemplatesConfirm")))) return;
+    // Built-ins back in their original order; the manager's own messages stay after them.
+    const own = templates.items.filter((text) => !BUILT_IN_TEMPLATES.includes(text));
+    const next = resolveTemplates(null, own, BUILT_IN_TEMPLATES);
+    setTemplates(next);
+    saveTemplates(next);
   }
 
   const employeeName = (id) => {
@@ -329,22 +366,29 @@ export default function BroadcastManager() {
             </div>
             <p className="text-xs text-muted-foreground">{t("broadcast.templatesHint")}</p>
             <div className="max-h-56 space-y-1.5 overflow-y-auto">
-              {[...BUILT_IN_TEMPLATES, ...customTemplates].map((text, index) => {
-                const custom = index >= BUILT_IN_TEMPLATES.length;
-                return (
-                  <div key={`${index}-${text.slice(0, 20)}`} className={`flex items-stretch rounded-md border text-sm ${body === text ? "border-primary bg-primary/10" : "hover:border-primary/50"}`}>
-                    <button type="button" onClick={() => applyTemplate(text)} className="min-w-0 flex-1 px-3 py-2 text-left" title={text}>
-                      <span className="line-clamp-2 whitespace-pre-line">{text}</span>
-                    </button>
-                    {custom && (
-                      <button type="button" onClick={() => deleteTemplate(text)} className="shrink-0 border-l px-2 text-muted-foreground hover:text-destructive" aria-label={t("broadcast.deleteTemplate")} title={t("broadcast.deleteTemplate")}>
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+              {templates.items.length === 0 && <p className="text-xs text-muted-foreground">{t("broadcast.noTemplates")}</p>}
+              {templates.items.map((text, index) => (
+                <div key={`${index}-${text.slice(0, 20)}`} className={`flex items-stretch rounded-md border text-sm ${body === text ? "border-primary bg-primary/10" : "hover:border-primary/50"}`}>
+                  <button type="button" onClick={() => applyTemplate(text)} className="min-w-0 flex-1 px-3 py-2 text-left" title={text}>
+                    <span className="line-clamp-2 whitespace-pre-line">{text}</span>
+                  </button>
+                  <div className="flex shrink-0 items-center border-l px-0.5">
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={index === 0} onClick={() => updateTemplates(moveTemplate(templates.items, index, -1))} title={t("broadcast.moveTemplateUp")} aria-label={t("broadcast.moveTemplateUp")}>
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={index === templates.items.length - 1} onClick={() => updateTemplates(moveTemplate(templates.items, index, 1))} title={t("broadcast.moveTemplateDown")} aria-label={t("broadcast.moveTemplateDown")}>
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteTemplate(index)} title={t("broadcast.deleteTemplate")} aria-label={t("broadcast.deleteTemplate")}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
+            <button type="button" onClick={restoreTemplates} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline">
+              <RotateCcw className="h-3 w-3" />{t("broadcast.restoreTemplates")}
+            </button>
           </div>
           </div>
 
