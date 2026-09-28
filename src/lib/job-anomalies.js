@@ -2,7 +2,7 @@ import { getKilometreBreakdown, minutesBetween } from "./payroll-calculations";
 
 // Default thresholds for the manager's "À vérifier" box. These only flag a job for a
 // second look before approval; the database contract still decides what is accepted.
-// Managers can change the long-day and kilometre limits in Test → Réglage.
+// Managers can change the long-day and kilometre limits in Réglage.
 export const ANOMALY_LIMITS = Object.freeze({
   longDayMinutes: 12 * 60,
   highKm: 300,
