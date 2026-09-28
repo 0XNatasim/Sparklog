@@ -25,13 +25,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const F3 = {
-  VERSION: '1.0.0',
+  VERSION: '1.1.0',
   SOURCE: 'Feuille 1',
   TARGET: 'Stats',
   LEGACY_TARGET: 'Feuille 3',   // ancien nom : renommé automatiquement en « Stats »
   FONT: 'Roboto',
   DATA_COL: 27,        // AA : registre normalisé (masqué) qui alimente l’explorateur
-  CHART_COL: 46,       // AT : séries des graphiques (masquées)
+  CHART_COL: 46,       // AT : cellule témoin (syntaxe des formules), masquée
   MAX_ALERTS: 150,
   MAX_WEEKS: 12,
   EMP_COLS: 11,        // colonnes employés dans la carte des semaines (F → P)
@@ -491,6 +491,7 @@ function F3_render_(ss, model) {
   sh.setColumnWidth(18, 22);
 
   F3_writeDataBlock_(sh, model);
+  F3_detectFormulaSyntax_(sh);
 
   let row = 1;
   sh.setRowHeight(row, 14);
@@ -568,23 +569,32 @@ function F3_writeDataBlock_(sh, model) {
   sh.getRange(1, col, 1, 16).setValues([F3_DATA_HEADERS]);
   if (rows.length) sh.getRange(2, col, rows.length, 16).setValues(rows);
 
-  // Séries des graphiques (heures décimales)
-  const cc = F3.CHART_COL;
-  const empRows = model.emps.map(e => [e.name, Math.round(e.total / 6) / 10]);
-  sh.getRange(1, cc, 1, 2).setValues([['Employé', 'Heures']]);
-  if (empRows.length) sh.getRange(2, cc, empRows.length, 2).setValues(empRows);
-
-  const shown = model.emps.slice(0, F3.EMP_COLS);
-  const weekRows = model.weeks.slice(-F3.MAX_WEEKS).map(w =>
-    ['S' + w.week.no].concat(shown.map(e => Math.round((w.byEmp.get(e.key) || 0) / 6) / 10)));
-  sh.getRange(1, cc + 3, 1, shown.length + 1).setValues([['Semaine'].concat(shown.map(e => F3_shortName_(e.name)))]);
-  if (weekRows.length) sh.getRange(2, cc + 3, weekRows.length, shown.length + 1).setValues(weekRows);
-
-  model.chartRanges = {
-    emp: sh.getRange(1, cc, Math.max(empRows.length, 1) + 1, 2),
-    week: sh.getRange(1, cc + 3, Math.max(weekRows.length, 1) + 1, shown.length + 1),
-  };
   model.dataRows = rows.length;
+}
+
+// ── Formules : syntaxe selon la langue du fichier ─────────────────────────────
+// En français (virgule décimale), Google Sheets attend « ; » entre les arguments.
+// On teste une formule témoin une fois par génération et on adapte toutes les autres.
+
+let F3_SEMICOLON = false;
+
+function F3_detectFormulaSyntax_(sh) {
+  const probe = sh.getRange(1, F3.CHART_COL);
+  probe.setFormula('=SUM(1,2)');
+  SpreadsheetApp.flush();
+  F3_SEMICOLON = probe.getValue() !== 3;
+  probe.clearContent();
+}
+
+/** Écrit la formule (syntaxe anglaise, virgules) dans la syntaxe attendue par le fichier. */
+function F3_fx_(formula) {
+  if (!F3_SEMICOLON) return formula;
+  let out = '', inQuote = false;
+  for (const ch of formula) {
+    if (ch === '"') inQuote = !inQuote;
+    out += (!inQuote && ch === ',') ? ';' : ch;
+  }
+  return out;
 }
 
 // ── Blocs visuels ─────────────────────────────────────────────────────────────
@@ -720,6 +730,24 @@ function F3_renderCharts_(sh, row, model) {
   row = F3_sectionTitle_(sh, row, '02', 'Tendances', 'Heures décimales · semaines CCQ (dim. → sam.)');
   const height = 300;
   const rowsNeeded = Math.ceil((height + 10) / 21);
+
+  // Séries des graphiques (heures décimales), écrites SOUS les graphiques : les
+  // graphiques n’affichent pas les données de colonnes masquées.
+  const maxLines = rowsNeeded - 1;
+  const empRows = model.emps.slice(0, maxLines).map(e => [e.name, Math.round(e.total / 6) / 10]);
+  const empData = [['Employé', 'Heures']].concat(empRows.length ? empRows : [['—', 0]]);
+  sh.getRange(row, 2, empData.length, 2).setValues(empData);
+  const shown = model.emps.slice(0, F3.EMP_COLS);
+  const weekRows = model.weeks.slice(-Math.min(F3.MAX_WEEKS, maxLines)).map(w =>
+    ['S' + w.week.no].concat(shown.map(e => Math.round((w.byEmp.get(e.key) || 0) / 6) / 10)));
+  const weekData = [['Semaine'].concat(shown.length ? shown.map(e => F3_shortName_(e.name)) : ['—'])]
+    .concat(weekRows.length ? weekRows : [['—'].concat(shown.length ? shown.map(() => 0) : [0])]);
+  sh.getRange(row, 4, weekData.length, weekData[0].length).setValues(weekData);
+  sh.getRange(row, 2, rowsNeeded, 16).setFontColor('#FFFFFF').setFontSize(6);
+  model.chartRanges = {
+    emp: sh.getRange(row, 2, empData.length, 2),
+    week: sh.getRange(row, 4, weekData.length, weekData[0].length),
+  };
   const base = {
     fontName: F3.FONT,
     titleTextStyle: { color: F3.C.ink, fontSize: 13, bold: true },
@@ -802,9 +830,17 @@ function F3_renderRanking_(sh, row, model) {
   sh.getRange(row, 13, n, 2).setNumberFormat(F3_FMT.pct);
   sh.getRange(row, 16, n, 1).setNumberFormat(F3_FMT.dur);
   sh.getRange(row, 17, n, 1).setNumberFormat(F3_FMT.pct1);
-  const bars = model.emps.map((e, i) => ['=SPARKLINE(H' + (row + i) + ',{"charttype","bar";"max",' +
-    maxTotal.toFixed(6) + ';"color1","' + (i === 0 ? C.blue : '#60A5FA') + '"})']);
-  sh.getRange(row, 15, n, 1).setFormulas(bars);
+  const SLOTS = 20;
+  const onStyle = SpreadsheetApp.newTextStyle().setForegroundColor(C.blue).build();
+  const offStyle = SpreadsheetApp.newTextStyle().setForegroundColor(C.line).build();
+  const bars = model.emps.map(e => {
+    const k = Math.max(e.total ? 1 : 0, Math.round(SLOTS * (e.total / 1440) / maxTotal));
+    const b = SpreadsheetApp.newRichTextValue().setText('█'.repeat(SLOTS));
+    if (k > 0) b.setTextStyle(0, k, onStyle);
+    if (k < SLOTS) b.setTextStyle(k, SLOTS, offStyle);
+    return [b.build()];
+  });
+  sh.getRange(row, 15, n, 1).setRichTextValues(bars).setHorizontalAlignment('left').setFontSize(9);
 
   // Efficacité terrain : dégradé ; H > 8 h : ambre si > 0
   const rules = sh.getConditionalFormatRules();
@@ -984,7 +1020,7 @@ function F3_renderExplorer_(sh, row, model, saved) {
     '((' + to + '="")+(' + col(0) + '<=' + to + '))',
     '((' + q + '="")+ISNUMBER(SEARCH(' + q + ',' + col(4) + '&" "&' + col(3) + '&" "&' + col(13) +
       '&" "&' + col(14) + '&" "&' + col(15) + ')))',
-    '((' + only + '<>TRUE)+(' + col(13) + '<>""))',
+    '(NOT(' + only + ')+(' + col(13) + '<>""))',
   ].join(',');
   const block = '$' + F3_colLetter_(F3.DATA_COL) + '$2:$' + F3_colLetter_(F3.DATA_COL + 15) + '$' + (n + 1);
   const sumOf = i => 'SUM(FILTER(' + col(i) + ',' + conds + '))';
@@ -1004,7 +1040,7 @@ function F3_renderExplorer_(sh, row, model, saved) {
   chips.forEach(ch => {
     const rg = sh.getRange(s + 1, ch[0], 1, ch[1]);
     if (ch[1] > 1) rg.merge();
-    rg.setFormula(ch[2]).setNumberFormat(ch[3]).setHorizontalAlignment('center')
+    rg.setFormula(F3_fx_(ch[2])).setNumberFormat(ch[3]).setHorizontalAlignment('center')
       .setFontWeight('bold').setFontSize(11).setFontColor(C.ink).setBackground(C.head)
       .setBorder(true, true, true, true, null, null, '#FFFFFF', SpreadsheetApp.BorderStyle.SOLID_THICK);
   });
@@ -1017,8 +1053,8 @@ function F3_renderExplorer_(sh, row, model, saved) {
   const rows = Math.max(model.dataRows, 1);
   F3_bodyRows_(sh, r0, rows);
   F3_formatJobColumns_(sh, r0, rows);
-  sh.getRange(r0, 2).setFormula('=IFERROR(SORT(FILTER(' + block + ',' + conds + '),1,FALSE,6,TRUE),' +
-    '"Aucun job ne correspond aux filtres.")');
+  sh.getRange(r0, 2).setFormula(F3_fx_('=IFERROR(SORT(FILTER(' + block + ',' + conds + '),1,0,6,1),' +
+    '"Aucun job ne correspond aux filtres.")'));
 
   const alertCol = sh.getRange(r0, 15, rows, 1);
   const rules = sh.getConditionalFormatRules();
