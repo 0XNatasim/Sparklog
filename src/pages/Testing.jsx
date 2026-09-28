@@ -18,6 +18,7 @@ import DasTab from "@/components/DasTab";
 import WeekViewTab from "@/components/WeekViewTab";
 import RecordOfEmploymentTab from "@/components/RecordOfEmploymentTab";
 import AuditLog from "@/components/AuditLog";
+import EmployeeActivityLog from "@/components/EmployeeActivityLog";
 import InfraHealthCard from "@/components/InfraHealthCard";
 import SettingsPanel from "@/components/SettingsPanel";
 
@@ -63,6 +64,24 @@ function PayrollSection() {
       <TabsContent value="calcul" className="mt-3"><BookNote /><PayrollEngineTester /></TabsContent>
       <TabsContent value="talon" className="mt-3"><BookNote /><TalonTab /></TabsContent>
       <TabsContent value="das" className="mt-3"><BookNote /><DasTab /></TabsContent>
+    </Tabs>
+  );
+}
+
+// ── Audit section: manager actions · employee activity (sign-ins, job saves) ────
+function AuditSection() {
+  const t = useT();
+  return (
+    <Tabs defaultValue="managers" className="w-full">
+      <TabsList>
+        <TabsTrigger value="managers">{t("audit.tabs.managers")}</TabsTrigger>
+        <TabsTrigger value="employees">{t("audit.tabs.employees")}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="managers" className="mt-3 space-y-3">
+        <InfraHealthCard />
+        <AuditLog />
+      </TabsContent>
+      <TabsContent value="employees" className="mt-3"><EmployeeActivityLog /></TabsContent>
     </Tabs>
   );
 }
@@ -469,12 +488,7 @@ export default function Testing() {
       {section === "roe" && <RecordOfEmploymentTab />}
       {section === "payroll" && <PayrollSection />}
       {section === "settings" && <SettingsPanel />}
-      {section === "audit" && (
-        <div className="space-y-3">
-          <InfraHealthCard />
-          <AuditLog />
-        </div>
-      )}
+      {section === "audit" && <AuditSection />}
     </div>
   );
 }

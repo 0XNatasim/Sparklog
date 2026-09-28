@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { withTimeout } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-log";
 
 const AuthContext = createContext(null);
 export const SESSION_RESUMED_EVENT = "sparklog:session-resumed";
@@ -202,6 +203,28 @@ export function AuthProvider({ children }) {
       }
     };
   }, [subscribeToProfile]);
+
+  // Record "app opened" presences for the activity log (Gestion → Audit → Employés):
+  // once per page load, and again when the app comes back to the foreground. The
+  // server keeps at most one per 30 minutes; the first one waits a few seconds so a
+  // fresh password sign-in (logged by the Login page) wins the de-duplication.
+  const lastOpenLogRef = useRef(0);
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return undefined;
+    const record = () => {
+      if (Date.now() - lastOpenLogRef.current < 5 * 60 * 1000) return;
+      lastOpenLogRef.current = Date.now();
+      logActivity("app_open");
+    };
+    const timer = setTimeout(record, 5000);
+    const onVisible = () => { if (document.visibilityState === "visible") record(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     let cancelled = false;
