@@ -1252,7 +1252,7 @@ export default function EmployeeForm() {
         setShowAutofillTip(open);
         if (!open) setAutofillTipPage(1);
       }}>
-        <DialogContent className="max-w-sm p-0 overflow-hidden">
+        <DialogContent className="max-w-sm p-0">
           <DialogHeader className="px-5 pt-5 pb-3">
             <DialogTitle>
               {autofillTipPage === 1
