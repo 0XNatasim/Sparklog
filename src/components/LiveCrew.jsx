@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { hoursBetween, formatHM } from "@/lib/time";
 import { cn, withTimeout } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
-import { isOffOn } from "@/lib/timeoff";
+import { isOffOn, isExceptionOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 
@@ -23,6 +23,7 @@ export default function LiveCrew() {
   const [employees, setEmployees] = useState([]);
   const [jobsByUser, setJobsByUser] = useState(new Map());
   const [onLeaveCount, setOnLeaveCount] = useState(0);
+  const [exceptionToday, setExceptionToday] = useState(new Set());
   const [notSubmittedList, setNotSubmittedList] = useState([]); // [{id, name}] not submitted yesterday
   const [yesterdayDate, setYesterdayDate] = useState("");
   const [unlockOpen, setUnlockOpen] = useState(false);
@@ -39,7 +40,7 @@ export default function LiveCrew() {
     const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at").eq("job_date", today),
-      supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
+      supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
       supabase.from("jobs").select("user_id, status").eq("job_date", yesterday).in("status", ["submitted", "approved"]),
     ]);
     // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone off for the
@@ -57,6 +58,9 @@ export default function LiveCrew() {
       (timeOff || []).filter((row) => isOffOn(row, today)).map((row) => row.user_id)
     );
     setOnLeaveCount(onLeaveToday.size);
+    // Present today despite a recurring rule that would otherwise put them off — flag it so a
+    // manager sees at a glance who's an exception to their usual pattern (e.g. in to cover).
+    setExceptionToday(new Set((timeOff || []).filter((row) => isExceptionOn(row, today)).map((row) => row.user_id)));
     const activePeople = (people || []).filter(
       (person) => !person.is_paused && person.show_on_boards !== false && !offToday.has(person.id)
     );
@@ -185,7 +189,14 @@ export default function LiveCrew() {
             <Card key={employee.id}>
               <CardContent className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-semibold">{employee.full_name || employee.email}</span>
+                  <span className="flex items-center gap-1.5 truncate font-semibold">
+                    {employee.full_name || employee.email}
+                    {exceptionToday.has(employee.id) && (
+                      <span title={t("live.exceptionTooltip")} className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400">
+                        {t("live.exceptionBadge")}
+                      </span>
+                    )}
+                  </span>
                   <span className="shrink-0 rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t("live.jobsCount", { count: jobs.length })}</span>
                 </div>
                 {jobs.length === 0 ? (
