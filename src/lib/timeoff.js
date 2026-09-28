@@ -20,7 +20,11 @@ export function formatTimeOff(row, t) {
       .map((d) => t(`timeOff.weekdaysShort.${WEEKDAY_KEYS[d]}`))
       .join(", ");
     const until = row.end_date ? ` (${t("timeOff.untilLabel")} ${dayjs(row.end_date).format("DD MMM YYYY")})` : "";
-    return `${t("timeOff.recurringLabel", { days })}${until}`;
+    const exceptions = (row.exception_dates || []).slice().sort();
+    const exceptionsLabel = exceptions.length
+      ? ` — ${t("timeOff.exceptionsLabel")} ${exceptions.map((e) => dayjs(e).format("DD MMM YYYY")).join(", ")}`
+      : "";
+    return `${t("timeOff.recurringLabel", { days })}${until}${exceptionsLabel}`;
   }
   const sameDay = row.start_date === row.end_date;
   const base = sameDay
@@ -30,14 +34,31 @@ export function formatTimeOff(row, t) {
   return base;
 }
 
+// Would a recurring_weekly row's weekday + date bounds apply to this date, ignoring any
+// exceptions? Shared by isOffOn (to know the rule fires) and by the UI (to validate that a
+// candidate exception date actually falls on one of the recurring days).
+export function matchesRecurrence(row, dateStr) {
+  const d = dayjs(dateStr);
+  if (row.start_date && d.isBefore(dayjs(row.start_date), "day")) return false;
+  if (row.end_date && d.isAfter(dayjs(row.end_date), "day")) return false;
+  return (row.weekdays || []).includes(d.day());
+}
+
+// Is this date carved out as an exception to a recurring rule that would otherwise apply —
+// i.e. the employee is normally off this weekday, but not on this particular occurrence?
+export function isExceptionOn(row, dateStr) {
+  if (row.kind !== "recurring_weekly") return false;
+  if (!(row.exception_dates || []).includes(dateStr)) return false;
+  return matchesRecurrence(row, dateStr);
+}
+
 // Is the employee off on a given YYYY-MM-DD, per this row?
 export function isOffOn(row, dateStr) {
-  const d = dayjs(dateStr);
   if (row.kind === "recurring_weekly") {
-    if (row.start_date && d.isBefore(dayjs(row.start_date), "day")) return false;
-    if (row.end_date && d.isAfter(dayjs(row.end_date), "day")) return false;
-    return (row.weekdays || []).includes(d.day());
+    if (isExceptionOn(row, dateStr)) return false;
+    return matchesRecurrence(row, dateStr);
   }
+  const d = dayjs(dateStr);
   const start = dayjs(row.start_date);
   const end = dayjs(row.end_date || row.start_date);
   return !d.isBefore(start, "day") && !d.isAfter(end, "day");
@@ -53,4 +74,4 @@ export function categoryLabel(category, t) {
 }
 
 // Columns to select wherever a row is read, so the helpers above have what they need.
-export const TIME_OFF_COLUMNS = "id, user_id, category, kind, start_date, end_date, start_time, end_time, weekdays, note";
+export const TIME_OFF_COLUMNS = "id, user_id, category, kind, start_date, end_date, start_time, end_time, weekdays, exception_dates, note";

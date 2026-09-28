@@ -1,10 +1,11 @@
 import React, { useState } from "react";
+import dayjs from "dayjs";
 import { X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
-import { formatTimeOff, categoryLabel, TIME_OFF_CATEGORIES, DEFAULT_CATEGORY, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
+import { formatTimeOff, categoryLabel, matchesRecurrence, TIME_OFF_CATEGORIES, DEFAULT_CATEGORY, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
 import { companyDate } from "@/lib/company-time";
 
 // One reusable congés editor for a single employee: the list of their entries (with delete)
@@ -16,6 +17,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
   const [mode, setMode] = useState("range"); // 'range' | 'hours' | 'recurring'
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [draft, setDraft] = useState({ from: "", to: "", date: "", start: "", end: "", weekdays: [], until: "" });
+  const [exceptionDrafts, setExceptionDrafts] = useState({}); // row id -> candidate date
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -61,6 +63,30 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
     onChanged?.();
   }
 
+  // Except one occurrence out of a recurring rule (e.g. "off every Monday" but worked this one).
+  async function addException(row) {
+    const date = exceptionDrafts[row.id];
+    if (!date) return;
+    if (!matchesRecurrence(row, date)) { setErr(t("timeOff.exceptionInvalid")); return; }
+    const next = Array.from(new Set([...(row.exception_dates || []), date])).sort();
+    setErr("");
+    setBusy(true);
+    const { error } = await supabase.from("employee_time_off").update({ exception_dates: next }).eq("id", row.id);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    setExceptionDrafts((d) => ({ ...d, [row.id]: "" }));
+    onChanged?.();
+  }
+
+  async function removeException(row, date) {
+    const next = (row.exception_dates || []).filter((d) => d !== date);
+    setBusy(true);
+    const { error } = await supabase.from("employee_time_off").update({ exception_dates: next.length ? next : null }).eq("id", row.id);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    onChanged?.();
+  }
+
   const tabBtn = (value, label) => (
     <button
       type="button"
@@ -74,15 +100,36 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
   return (
     <div>
       {rows.length > 0 && (
-        <div className="mb-3 space-y-1">
+        <div className="mb-3 space-y-1.5">
           {rows.map((row) => (
-            <div key={row.id} className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-sm">
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">{categoryLabel(row.category, t)}</span>
-                {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
-                {formatTimeOff(row, t)}
-              </span>
-              <button type="button" onClick={() => remove(row.id)} aria-label={t("common.cancel")} className="rounded p-1 text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
+            <div key={row.id} className="space-y-1.5 rounded-md border bg-muted/30 px-2 py-1.5 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">{categoryLabel(row.category, t)}</span>
+                  {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
+                  {formatTimeOff(row, t)}
+                </span>
+                <button type="button" onClick={() => remove(row.id)} aria-label={t("common.cancel")} className="rounded p-1 text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
+              </div>
+              {row.kind === "recurring_weekly" && (
+                <div className="flex flex-wrap items-center gap-1.5 pl-1">
+                  {(row.exception_dates || []).slice().sort().map((date) => (
+                    <span key={date} className="flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-[11px]">
+                      {dayjs(date).format("DD MMM YYYY")}
+                      <button type="button" onClick={() => removeException(row, date)} aria-label={t("common.cancel")} className="text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>
+                    </span>
+                  ))}
+                  <Input
+                    type="date"
+                    value={exceptionDrafts[row.id] || ""}
+                    onChange={(e) => setExceptionDrafts((d) => ({ ...d, [row.id]: e.target.value }))}
+                    className="h-7 w-auto px-2 text-xs"
+                  />
+                  <Button type="button" size="sm" variant="outline" disabled={busy || !exceptionDrafts[row.id]} onClick={() => addException(row)} className="h-7 px-2 text-xs">
+                    {t("timeOff.addException")}
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
