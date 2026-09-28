@@ -29,6 +29,44 @@ Si vous n’êtes pas en mesure de vous présenter ou que vous ne travaillez pas
 📞 Appeler Marc-Antoine ou Mélanie pour les en informer.`,
   "🦺 Réunion santé & sécurité ce jeudi. Liens dans votre profil.",
   "🦺 Réunion santé & sécurité ce mardi. Liens dans votre profil.",
+  `📱 Sparklog — comment entrer vos heures
+
+✨ Utilisez « Remplir auto » : c'est plus rapide et vos heures concordent avec Field Service.
+
+1️⃣ Dans Field Service, ouvrez l'ordre de travail, onglet « Bilan ».
+2️⃣ Faites défiler jusqu'à « Distance réel parcourue (km) » et prenez une capture d'écran.
+   La capture doit montrer le # OT, les heures de départ, d'arrivée et de fin, et les km.
+3️⃣ Dans Sparklog, appuyez sur « Remplir auto » et choisissez la capture.
+   ➜ L'OT, le Départ, l'Arrivée, la Fin et les KM se remplissent tout seuls.
+4️⃣ Vérifiez que tout est exact, puis :
+   • « Enregistrer » = brouillon, encore modifiable.
+   • « Soumettre » = envoyé au gestionnaire pour approbation. Le job est alors verrouillé.
+
+👉 Astuce : dans l'Historique, « SOUMETTRE LA JOURNÉE » envoie tous vos jobs enregistrés du jour d'un seul coup à la fin de la journée.`,
+  `⏰ Rappel important — Soumission quotidienne
+
+Vos heures doivent être SOUMISES chaque jour, avant la fin de la journée.
+Un job seulement « enregistré » n'est pas envoyé : le gestionnaire ne le voit pas et il ne peut pas être payé.
+
+❗ Une journée non soumise se verrouille. Il faudra alors demander au gestionnaire de la déverrouiller.
+
+Merci de prendre 2 minutes à la fin de chaque journée. 🙏`,
+  `📸 Temps supplémentaire (plus de 8 h dans la journée)
+
+Au-delà de 8 h, Sparklog vous demande la capture d'écran du SMS qui autorise le temps supplémentaire.
+
+La capture doit montrer :
+✅ Le SMS d'approbation avec la date
+✅ Votre réponse avec la durée (ex. : « 30 min »)
+
+Sans cette capture, le temps supplémentaire ne peut pas être approuvé. Appuyez sur « Afficher l'exemple d'image » dans l'app pour voir un modèle.`,
+  `✅ Vos obligations dans Sparklog
+
+• Entrer TOUS vos jobs, avec l'heure de Départ, d'Arrivée et de Fin exactes.
+• Soumettre vos heures CHAQUE JOUR.
+• Plus de 8 h dans la journée ➜ joindre la capture du SMS d'autorisation.
+• Stationnement payé ➜ cocher « Stationnement » et joindre la photo du reçu, avec le montant.
+• Vérifier vos km avant de soumettre.`,
 ];
 const CUSTOM_TEMPLATES_KEY = "sparklog.broadcastTemplates.v1";
 
