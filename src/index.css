@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Every dialog stays inside the visible screen and scrolls when its content is
+     taller (large text, zoom, small phones, mobile browser toolbars). dvh follows
+     the visible viewport; the vh line is the fallback for older browsers. */
+  .dialog-fit {
+    max-height: calc(100vh - 1rem);
+    max-height: calc(100dvh - 1rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 @layer base {
   :root {
     color-scheme: light;

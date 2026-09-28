@@ -63,15 +63,19 @@ export default function BroadcastPopup() {
 
   return (
     <Dialog open={!dismissed} onOpenChange={(o) => { if (!o) setDismissed(true); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      {/* Only the message scrolls: the OK button stays pinned at the bottom even with
+          a long message, large text or browser zoom. */}
+      <DialogContent className="flex flex-col gap-3 overflow-hidden sm:max-w-md">
+        <DialogHeader className="shrink-0 pr-6">
           <DialogTitle>{t("broadcast.popupTitle")}</DialogTitle>
         </DialogHeader>
-        {current.manager_broadcasts.body && <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>}
-        {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer"><img src={imageUrl} alt="" className="max-h-72 w-full rounded-md border object-contain" /></a>}
-        <p className="text-xs text-muted-foreground">{dayjs(current.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</p>
-        <DialogFooter>
-          <Button type="button" disabled={busy} onClick={acknowledge}>{busy ? t("common.working") : t("broadcast.acknowledge")}</Button>
+        <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
+          {current.manager_broadcasts.body && <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>}
+          {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer"><img src={imageUrl} alt="" className="max-h-72 w-full rounded-md border object-contain" /></a>}
+          <p className="text-xs text-muted-foreground">{dayjs(current.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</p>
+        </div>
+        <DialogFooter className="shrink-0 border-t pt-3">
+          <Button type="button" className="h-11 w-full text-base sm:w-auto" disabled={busy} onClick={acknowledge}>{busy ? t("common.working") : t("broadcast.acknowledge")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
