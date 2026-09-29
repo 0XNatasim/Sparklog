@@ -191,16 +191,20 @@ export default function LiveCrew() {
             return (
             <Card
               key={employee.id}
-              className={cn(
-                status === "submitted" && "border-2 border-emerald-500",
-                status === "saved" && "border-2 border-red-500",
-              )}
               title={status === "submitted" ? t("live.daySubmitted") : status === "saved" ? t("live.dayNotSubmitted") : undefined}
             >
               <CardContent className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 truncate font-semibold">
-                    <span className="truncate">{employee.full_name || employee.email}</span>
+                    <span
+                      className={cn(
+                        "truncate",
+                        status === "submitted" && "text-emerald-600 dark:text-emerald-400",
+                        status === "saved" && "text-red-600 dark:text-red-400",
+                      )}
+                    >
+                      {employee.full_name || employee.email}
+                    </span>
                     {overtime && (
                       <span
                         className={cn(
