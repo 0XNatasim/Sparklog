@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { RefreshCw, Unlock } from "lucide-react";
+import { RefreshCw, TimerReset, Unlock } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { jobCodeTintClass } from "@/lib/job-code";
 import { isOffOn, isExceptionOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
-import { liveRoster, notSubmittedYesterday } from "@/lib/live-crew";
+import { dayStatus, liveRoster, notSubmittedYesterday } from "@/lib/live-crew";
 
 const REFRESH_MS = 30000;
 
@@ -40,7 +40,7 @@ export default function LiveCrew() {
     setYesterdayDate(yesterday);
     const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards").order("full_name"),
-      supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at").eq("job_date", today),
+      supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at, overtime_evidence_captured").eq("job_date", today),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
       supabase.from("jobs").select("user_id, status").eq("job_date", yesterday),
     ]);
@@ -184,12 +184,35 @@ export default function LiveCrew() {
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows
-          .map(({ employee, jobs, dayTotal }) => (
-            <Card key={employee.id}>
+          .map(({ employee, jobs, dayTotal }) => {
+            const overtime = dayTotal > 8;
+            const overtimeCaptured = jobs.some((job) => job.overtime_evidence_captured);
+            const status = dayStatus(jobs);
+            return (
+            <Card
+              key={employee.id}
+              className={cn(
+                status === "submitted" && "border-2 border-emerald-500",
+                status === "saved" && "border-2 border-red-500",
+              )}
+              title={status === "submitted" ? t("live.daySubmitted") : status === "saved" ? t("live.dayNotSubmitted") : undefined}
+            >
               <CardContent className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 truncate font-semibold">
-                    {employee.full_name || employee.email}
+                    <span className="truncate">{employee.full_name || employee.email}</span>
+                    {overtime && (
+                      <span
+                        className={cn(
+                          "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+                          overtimeCaptured ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-red-500/15 text-red-600 dark:text-red-400",
+                        )}
+                        title={overtimeCaptured ? t("live.overtimeTooltip") : t("live.overtimeMissingTooltip")}
+                        aria-label={overtimeCaptured ? t("live.overtimeTooltip") : t("live.overtimeMissingTooltip")}
+                      >
+                        <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                    )}
                     {exceptionToday.has(employee.id) && (
                       <span title={t("live.exceptionTooltip")} className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400">
                         {t("live.exceptionBadge")}
@@ -216,13 +239,14 @@ export default function LiveCrew() {
                     ))}
                     <div className="flex items-center justify-between px-1 pt-0.5 text-xs">
                       <span className="text-muted-foreground">{t("live.dayTotal")}</span>
-                      <span className="font-mono font-bold">{fmtHM(dayTotal)}</span>
+                      <span className={cn("font-mono font-bold", overtime && "text-amber-600 dark:text-amber-400")}>{fmtHM(dayTotal)}</span>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
       </div>
 
       <Dialog open={unlockOpen} onOpenChange={setUnlockOpen}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { liveRoster, notSubmittedYesterday } from "./live-crew";
+import { dayStatus, liveRoster, notSubmittedYesterday } from "./live-crew";
 
 const person = (id, extra = {}) => ({ id, role: "employee", is_paused: false, show_on_boards: true, ...extra });
 const people = [
@@ -41,5 +41,14 @@ describe("notSubmittedYesterday", () => {
       { user_id: "admin", status: "approved" },
     ];
     expect(ids(notSubmittedYesterday(people, { yesterdayJobs, offUserIds: new Set(["off"]) }))).toEqual(["owner", "off"]);
+  });
+});
+
+describe("dayStatus", () => {
+  it("is submitted only when every job of the day is submitted or approved", () => {
+    expect(dayStatus([])).toBe("none");
+    expect(dayStatus([{ status: "submitted" }, { status: "approved" }])).toBe("submitted");
+    expect(dayStatus([{ status: "submitted" }, { status: "saved" }])).toBe("saved");
+    expect(dayStatus([{ status: "updated" }])).toBe("saved");
   });
 });
