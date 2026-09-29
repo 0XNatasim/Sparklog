@@ -650,10 +650,20 @@ export default function EmployeeForm() {
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
-    const needsEvidence = requiresEvidenceBeforeSave(requestedMode)
-      ? await requiresOvertimeEvidence(minutes)
-      : false;
-    setReturnCheckBusy(false);
+    let needsEvidence = false;
+    try {
+      needsEvidence = requiresEvidenceBeforeSave(requestedMode)
+        ? await requiresOvertimeEvidence(minutes)
+        : false;
+    } catch (error) {
+      const message = friendlyErrorMessage(error, t, "form.errors.saveFailed");
+      lastSaveErrorRef.current = message;
+      setErr(isOfflineError(error) ? "" : message);
+      setReturnSaveError(message);
+      return;
+    } finally {
+      setReturnCheckBusy(false);
+    }
     if (needsEvidence) {
       setPendingReturn(returnValues);
       setReturnStep("evidence");
@@ -727,15 +737,10 @@ export default function EmployeeForm() {
       // as a backstop for jobs that were entered out of order).
       return fullDayMinutes > 480;
     } catch (error) {
-      // The day-jobs lookup failed (e.g. a cold-start timeout even after retries).
-      // Fall back to a LOCAL-only decision using just this job's own duration, so a
-      // slow network can never demand an overtime screenshot for a job that on its
-      // own is under 8h — such as a first, 3h job of the day. Only this job alone
-      // exceeding 8h forces evidence here; the manager still reviews at approval and
-      // the authoritative engine recomputes the day.
-      console.error("[overtime evidence] day-jobs check failed; using local fallback", error);
-      setOvertimeDailyMinutes(thisMinutes);
-      return thisMinutes > 480;
+      // Submission must fail closed: without the other jobs we cannot prove that
+      // the complete day is at or below 8 h.
+      console.error("[overtime evidence] day-jobs check failed; submission blocked", error);
+      throw error;
     }
   }
 

@@ -14,6 +14,8 @@ describe("friendlyErrorMessage", () => {
     setOnline(true);
     expect(friendlyErrorMessage({ message: "overlapping_job_interval" }, t, "fallback"))
       .toBe("t:form.errors.overlappingInterval");
+    expect(friendlyErrorMessage({ message: "overtime_evidence_required" }, t, "fallback"))
+      .toBe("t:form.errors.overtimeEvidenceRequired");
     expect(friendlyErrorMessage({ message: "invalid_job_kilometres" }, t, "fallback"))
       .toBe("t:form.errors.invalidKilometres");
     expect(friendlyErrorMessage({ message: "The entry deadline for this work date has passed" }, t, "fallback"))

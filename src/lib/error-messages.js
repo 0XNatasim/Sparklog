@@ -3,6 +3,7 @@ const CODE_MESSAGES = [
   [/ambiguous_montreal_local_time|invalid_dst_time:ambiguous/i, "form.errors.ambiguousTime"],
   [/nonexistent_montreal_local_time|invalid_dst_time:nonexistent/i, "form.errors.nonexistentTime"],
   [/overlapping_job_interval/i, "form.errors.overlappingInterval"],
+  [/overtime_evidence_required/i, "form.errors.overtimeEvidenceRequired"],
   [/return_time_exceeds_job_interval|return_exceeds_interval/i, "form.errors.returnExceedsInterval"],
   [/invalid_job_kilometres|invalid_kilometres/i, "form.errors.invalidKilometres"],
   [/invalid_job_interval|invalid_job_contract|invalid_interval/i, "form.errors.invalidInterval"],

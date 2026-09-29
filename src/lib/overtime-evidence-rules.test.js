@@ -12,6 +12,11 @@ const lastJobSql = readFileSync(fileURLToPath(new URL(
   import.meta.url
 )), "utf8");
 
+const requiredOnSubmitSql = readFileSync(fileURLToPath(new URL(
+  "../../supabase/migrations/20260929200000_0069_require_daily_overtime_evidence.sql",
+  import.meta.url
+)), "utf8");
+
 const mealFunction = migrationSql.slice(
   migrationSql.indexOf("create or replace function public.reconcile_overtime_meal"),
   migrationSql.indexOf("create or replace function public.rehome_overtime_evidence_before_job_delete"),
@@ -48,5 +53,13 @@ describe("the screenshot sits on the day's last job", () => {
 
   it("points the manager notification at the job holding the screenshot", () => {
     expect(lastJobSql).toContain("before insert on public.manager_notifications");
+  });
+});
+
+describe("overtime evidence is mandatory at every submission boundary", () => {
+  it("counts saved through approved jobs and rejects a day over 8 h without proof", () => {
+    expect(requiredOnSubmitSql).toContain("j.status in ('saved', 'updated', 'submitted', 'approved')");
+    expect(requiredOnSubmitSql).toContain("duration_minutes + other_minutes > 480");
+    expect(requiredOnSubmitSql).toContain("message = 'overtime_evidence_required'");
   });
 });

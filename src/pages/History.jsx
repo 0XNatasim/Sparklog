@@ -11,12 +11,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
+import { isAdminEmployee } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
-import { buildJobSaveRpcArgs } from "@/lib/job-submission";
+import { buildJobSaveRpcArgs, dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
@@ -49,7 +50,7 @@ function kmTotal(job) {
 }
 
 export default function History() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { isViewMode, viewedEmployee } = useViewMode();
   const effectiveUserId = isViewMode ? (viewedEmployee?.id || user?.id) : user?.id;
   const navigate = useNavigate();
@@ -249,6 +250,10 @@ export default function History() {
     const job = jobs.find((row) => row.id === jobId);
     try {
       if (!job) throw new Error(t("history.errors.submitFailed"));
+      if (!isAdminEmployee(role) && dailyOvertimeEvidenceRequirement(job, jobs).required) {
+        setErr(t("form.errors.overtimeEvidenceRequired"));
+        return;
+      }
       const overlapWarning = jobOverlapDetails(job, jobs, t);
       if (overlapWarning) {
         setErr(overlapWarning);
@@ -275,6 +280,10 @@ export default function History() {
     try {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
+      if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs).required)) {
+        setErr(t("form.errors.overtimeEvidenceRequired"));
+        return;
+      }
       const overlapWarning = selectedJobs.map((job) => jobOverlapDetails(job, jobs, t)).find(Boolean);
       if (overlapWarning) {
         setErr(overlapWarning);
