@@ -19,12 +19,13 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
-import { buildJobSaveRpcArgs, kilometreFieldValue } from "@/lib/job-submission";
+import { buildJobSaveRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
 import { prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
+import { isJobOverlapError, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import {
   Dialog,
@@ -408,7 +409,7 @@ export default function EmployeeForm() {
     setReturnKm("");
     // Office employees don't travel to sites, so skip the warehouse-return
     // (time + km) question entirely and save straight away.
-    if (officeEmployee) { await saveWithReturn(0, 0); return; }
+    if (officeEmployee) { await saveWithReturn(0, 0, "draft"); return; }
     setReturnStep("ask");
   }
 
@@ -416,7 +417,7 @@ export default function EmployeeForm() {
     setPendingSaveMode("submit");
     setReturnMinutes(null);
     setReturnKm("");
-    if (officeEmployee) { await saveWithReturn(0, 0); return; }
+    if (officeEmployee) { await saveWithReturn(0, 0, "submit"); return; }
     setReturnStep("ask");
   }
 
@@ -531,7 +532,26 @@ export default function EmployeeForm() {
       // useless to an employee.
       const code = e?.code || e?.cause?.code;
       const msg = String(e?.message || "");
-      if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
+      if (isJobOverlapError(e)) {
+        let overlapMessage = null;
+        try {
+          const fromDate = dayjs(job_date).subtract(1, "day").format("YYYY-MM-DD");
+          const toDate = dayjs(job_date).add(1, "day").format("YYYY-MM-DD");
+          const { data: possibleConflicts } = await withTimeout(
+            supabase.from("jobs")
+              .select("id, ot, job_date, depart, fin, status")
+              .eq("user_id", user.id)
+              .in("status", ["submitted", "approved"])
+              .gte("job_date", fromDate)
+              .lte("job_date", toDate),
+            8000
+          );
+          overlapMessage = jobOverlapMessage(e, { id: editId, ot, job_date, depart, fin }, possibleConflicts, t);
+        } catch {
+          // Keep the existing translated generic overlap error if details cannot load.
+        }
+        lastSaveErrorRef.current = overlapMessage || friendlyErrorMessage(e, t, "form.errors.saveFailed");
+      } else if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
         lastSaveErrorRef.current = t("form.errors.duplicateOt", { ot: ot || "" });
       } else {
         lastSaveErrorRef.current = friendlyErrorMessage(e, t, "form.errors.saveFailed");
@@ -595,18 +615,20 @@ export default function EmployeeForm() {
     setDirty(true);
   }
 
-  async function saveWithReturn(minutes, km) {
+  async function saveWithReturn(minutes, km, requestedMode = pendingSaveMode) {
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
-    const needsEvidence = await requiresOvertimeEvidence(minutes);
+    const needsEvidence = requiresEvidenceBeforeSave(requestedMode)
+      ? await requiresOvertimeEvidence(minutes)
+      : false;
     setReturnCheckBusy(false);
     if (needsEvidence) {
       setPendingReturn(returnValues);
       setReturnStep("evidence");
       return;
     }
-    const saved = await saveJob(pendingSaveMode, returnValues);
+    const saved = await saveJob(requestedMode, returnValues);
     if (!saved) {
       setReturnSaveError(lastSaveErrorRef.current || t("form.return.saveError"));
       return;
