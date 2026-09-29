@@ -28,3 +28,10 @@ export function notSubmittedYesterday(people, { yesterdayJobs = [], offUserIds =
     && !submitted.has(person.id)
     && (worked.has(person.id) || (isRegularCrew(person) && !offUserIds.has(person.id))));
 }
+
+// A day's submission state for the Live Crew card edge: "submitted" once every job of
+// the day is submitted (or approved), "saved" while any job is still only saved.
+export function dayStatus(jobs) {
+  if (!jobs?.length) return "none";
+  return jobs.every((job) => job.status === "submitted" || job.status === "approved") ? "submitted" : "saved";
+}
