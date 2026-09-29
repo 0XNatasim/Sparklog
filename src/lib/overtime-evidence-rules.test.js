@@ -7,6 +7,11 @@ const migrationSql = readFileSync(fileURLToPath(new URL(
   import.meta.url
 )), "utf8");
 
+const lastJobSql = readFileSync(fileURLToPath(new URL(
+  "../../supabase/migrations/20260929003000_0068_attach_overtime_evidence_to_last_job.sql",
+  import.meta.url
+)), "utf8");
+
 const mealFunction = migrationSql.slice(
   migrationSql.indexOf("create or replace function public.reconcile_overtime_meal"),
   migrationSql.indexOf("create or replace function public.rehome_overtime_evidence_before_job_delete"),
@@ -26,5 +31,22 @@ describe("overtime evidence is kept at the day level", () => {
     expect(migrationSql).toContain("update public.overtime_evidence set job_id = target");
     expect(migrationSql).toContain("after delete on public.jobs");
     expect(migrationSql).toContain("set overtime_evidence_captured = true");
+  });
+});
+
+describe("the screenshot sits on the day's last job", () => {
+  it("re-attaches on capture and on every job insert, re-time, re-flag or delete", () => {
+    expect(lastJobSql).toContain("after insert on public.overtime_evidence");
+    expect(lastJobSql).toContain("after insert or update of job_date, depart, fin, overtime_evidence_captured on public.jobs");
+    expect(lastJobSql).toContain("perform public.attach_overtime_evidence_to_last_job(old.user_id, old.job_date)");
+  });
+
+  it("picks the job with the latest end, like the timesheet clock marker", () => {
+    expect(lastJobSql).toContain("order by j.ended_at desc nulls last, j.fin desc nulls last, j.id desc");
+    expect(lastJobSql).toContain("set overtime_evidence_captured = (j.id = last_job)");
+  });
+
+  it("points the manager notification at the job holding the screenshot", () => {
+    expect(lastJobSql).toContain("before insert on public.manager_notifications");
   });
 });
