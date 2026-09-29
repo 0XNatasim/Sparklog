@@ -19,7 +19,7 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
-import { buildJobSaveRpcArgs, kilometreFieldValue } from "@/lib/job-submission";
+import { buildJobSaveRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
@@ -408,7 +408,7 @@ export default function EmployeeForm() {
     setReturnKm("");
     // Office employees don't travel to sites, so skip the warehouse-return
     // (time + km) question entirely and save straight away.
-    if (officeEmployee) { await saveWithReturn(0, 0); return; }
+    if (officeEmployee) { await saveWithReturn(0, 0, "draft"); return; }
     setReturnStep("ask");
   }
 
@@ -416,7 +416,7 @@ export default function EmployeeForm() {
     setPendingSaveMode("submit");
     setReturnMinutes(null);
     setReturnKm("");
-    if (officeEmployee) { await saveWithReturn(0, 0); return; }
+    if (officeEmployee) { await saveWithReturn(0, 0, "submit"); return; }
     setReturnStep("ask");
   }
 
@@ -595,18 +595,20 @@ export default function EmployeeForm() {
     setDirty(true);
   }
 
-  async function saveWithReturn(minutes, km) {
+  async function saveWithReturn(minutes, km, requestedMode = pendingSaveMode) {
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
-    const needsEvidence = await requiresOvertimeEvidence(minutes);
+    const needsEvidence = requiresEvidenceBeforeSave(requestedMode)
+      ? await requiresOvertimeEvidence(minutes)
+      : false;
     setReturnCheckBusy(false);
     if (needsEvidence) {
       setPendingReturn(returnValues);
       setReturnStep("evidence");
       return;
     }
-    const saved = await saveJob(pendingSaveMode, returnValues);
+    const saved = await saveJob(requestedMode, returnValues);
     if (!saved) {
       setReturnSaveError(lastSaveErrorRef.current || t("form.return.saveError"));
       return;

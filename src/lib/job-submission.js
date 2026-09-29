@@ -4,6 +4,13 @@ export function kilometreFieldValue(job) {
   return String(total);
 }
 
+// Saving a draft must never be blocked by the overtime-proof workflow. The proof
+// is a submission requirement; employees still need to be able to preserve a
+// manually entered day (including one over 8 h) before they have the screenshot.
+export function requiresEvidenceBeforeSave(mode) {
+  return mode === "submit";
+}
+
 // Keep the client-to-RPC contract explicit. Ownership, status and lock state are
 // deliberately absent: save_own_job derives those security-sensitive values server-side.
 export function buildJobSaveRpcArgs({

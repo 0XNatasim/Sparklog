@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildJobSaveRpcArgs, kilometreFieldValue } from "./job-submission";
+import { buildJobSaveRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "./job-submission";
 
 const base = {
   jobDate: "2026-09-26",
@@ -47,6 +47,16 @@ describe("buildJobSaveRpcArgs", () => {
     expect(args.p_new_job_id).toBeNull();
     expect(args.p_submission_key).toBeNull();
     expect(args.p_submit).toBe(false);
+  });
+});
+
+describe("requiresEvidenceBeforeSave", () => {
+  it("does not block a manual draft while overtime proof is unavailable", () => {
+    expect(requiresEvidenceBeforeSave("draft")).toBe(false);
+  });
+
+  it("keeps the overtime-proof check on submission", () => {
+    expect(requiresEvidenceBeforeSave("submit")).toBe(true);
   });
 });
 
