@@ -25,7 +25,7 @@ import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
 import { prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
-import { isJobOverlapError, jobOverlapMessage } from "@/lib/job-overlap";
+import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import {
   Dialog,
@@ -140,6 +140,7 @@ export default function EmployeeForm() {
 
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+  const [warning, setWarning] = useState("");
 
   const [job_date, setJobDate] = useState(companyDate());
   const [ot, setOt] = useState("");
@@ -225,6 +226,7 @@ export default function EmployeeForm() {
 
     setErr("");
     setInfo("");
+    setWarning("");
     setLoadingEdit(true);
     setEditLoadFailed(false);
 
@@ -299,6 +301,7 @@ export default function EmployeeForm() {
     setLocked(false);
     setErr("");
     setInfo("");
+    setWarning("");
     setEditLoadFailed(false);
     setDirty(false);
     setHasOvertimeEvidence(false);
@@ -444,8 +447,35 @@ export default function EmployeeForm() {
       return false;
     }
 
+    let overlapWarning = null;
+    try {
+      const fromDate = dayjs(job_date).subtract(1, "day").format("YYYY-MM-DD");
+      const toDate = dayjs(job_date).add(1, "day").format("YYYY-MM-DD");
+      const { data: possibleConflicts, error: overlapLoadError } = await withTimeout(
+        supabase.from("jobs")
+          .select("id, ot, job_date, depart, fin, status")
+          .eq("user_id", user.id)
+          .in("status", ["saved", "updated", "submitted", "approved"])
+          .gte("job_date", fromDate)
+          .lte("job_date", toDate),
+        8000
+      );
+      if (overlapLoadError) throw overlapLoadError;
+      overlapWarning = jobOverlapDetails({ id: editId, ot, job_date, depart, fin }, possibleConflicts, t);
+    } catch {
+      // Saving remains available if this advisory check cannot load. The database
+      // still enforces submitted/approved overlaps during submission.
+    }
+    if (mode === "submit" && overlapWarning) {
+      lastSaveErrorRef.current = overlapWarning;
+      setErr(overlapWarning);
+      setWarning("");
+      return false;
+    }
+
     setErr("");
     setInfo("");
+    setWarning("");
     savingRef.current = true; // set synchronously (before the first await) — see the guard above
     setSaving(true);
 
@@ -517,6 +547,7 @@ export default function EmployeeForm() {
       setStatus(data.status || nextStatus);
       setLocked(Boolean(data.locked));
       setDirty(false);
+      setWarning(overlapWarning || "");
 
       if (!editId && !returnValues) navigate(`/form?edit=${savedJobId}`, { replace: true });
       if (parkingRequested && parkingFile) {
@@ -619,10 +650,20 @@ export default function EmployeeForm() {
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
-    const needsEvidence = requiresEvidenceBeforeSave(requestedMode)
-      ? await requiresOvertimeEvidence(minutes)
-      : false;
-    setReturnCheckBusy(false);
+    let needsEvidence = false;
+    try {
+      needsEvidence = requiresEvidenceBeforeSave(requestedMode)
+        ? await requiresOvertimeEvidence(minutes)
+        : false;
+    } catch (error) {
+      const message = friendlyErrorMessage(error, t, "form.errors.saveFailed");
+      lastSaveErrorRef.current = message;
+      setErr(isOfflineError(error) ? "" : message);
+      setReturnSaveError(message);
+      return;
+    } finally {
+      setReturnCheckBusy(false);
+    }
     if (needsEvidence) {
       setPendingReturn(returnValues);
       setReturnStep("evidence");
@@ -696,15 +737,10 @@ export default function EmployeeForm() {
       // as a backstop for jobs that were entered out of order).
       return fullDayMinutes > 480;
     } catch (error) {
-      // The day-jobs lookup failed (e.g. a cold-start timeout even after retries).
-      // Fall back to a LOCAL-only decision using just this job's own duration, so a
-      // slow network can never demand an overtime screenshot for a job that on its
-      // own is under 8h — such as a first, 3h job of the day. Only this job alone
-      // exceeding 8h forces evidence here; the manager still reviews at approval and
-      // the authoritative engine recomputes the day.
-      console.error("[overtime evidence] day-jobs check failed; using local fallback", error);
-      setOvertimeDailyMinutes(thisMinutes);
-      return thisMinutes > 480;
+      // Submission must fail closed: without the other jobs we cannot prove that
+      // the complete day is at or below 8 h.
+      console.error("[overtime evidence] day-jobs check failed; submission blocked", error);
+      throw error;
     }
   }
 
@@ -1043,6 +1079,11 @@ export default function EmployeeForm() {
         {info && (
           <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {t(info)}
+          </div>
+        )}
+        {warning && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-200" role="alert">
+            {warning}
           </div>
         )}
         {entryBlockedReason && (

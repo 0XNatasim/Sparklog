@@ -18,14 +18,15 @@ export function isJobOverlapError(error) {
   return OVERLAP_ERROR.test(String(error?.message || error || ""));
 }
 
-// Return the submitted/approved job that intersects the job being submitted,
-// along with the exact common time range. Adjacent intervals are not overlaps.
+// Return any existing employee job that intersects the job being edited. Catching
+// saved/updated drafts here warns the employee before the database's stricter
+// submitted/approved constraint has to reject the submission.
 export function findJobOverlap(candidate, jobs) {
   const candidateInterval = interval(candidate);
   if (!candidateInterval) return null;
 
   for (const other of jobs || []) {
-    if (!other || other.id === candidate.id || !["submitted", "approved"].includes(other.status)) continue;
+    if (!other || other.id === candidate.id || !["saved", "updated", "submitted", "approved"].includes(other.status)) continue;
     const otherInterval = interval(other);
     if (!otherInterval) continue;
     const overlapStart = Math.max(candidateInterval.start, otherInterval.start);
@@ -42,8 +43,7 @@ export function findJobOverlap(candidate, jobs) {
   return null;
 }
 
-export function jobOverlapMessage(error, candidate, jobs, t) {
-  if (!isJobOverlapError(error)) return null;
+export function jobOverlapDetails(candidate, jobs, t) {
   const overlap = findJobOverlap(candidate, jobs);
   if (!overlap) return null;
   return t("form.errors.overlappingIntervalDetails", {
@@ -56,4 +56,8 @@ export function jobOverlapMessage(error, candidate, jobs, t) {
     overlapStart: overlap.overlapStart,
     overlapEnd: overlap.overlapEnd,
   });
+}
+
+export function jobOverlapMessage(error, candidate, jobs, t) {
+  return isJobOverlapError(error) ? jobOverlapDetails(candidate, jobs, t) : null;
 }
