@@ -11,6 +11,7 @@ import { jobCodeTintClass } from "@/lib/job-code";
 import { isOffOn, isExceptionOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
+import { liveRoster, notSubmittedYesterday } from "@/lib/live-crew";
 
 const REFRESH_MS = 30000;
 
@@ -38,14 +39,15 @@ export default function LiveCrew() {
     const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
     setYesterdayDate(yesterday);
     const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, is_paused, show_on_boards").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at").eq("job_date", today),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
-      supabase.from("jobs").select("user_id, status").eq("job_date", yesterday).in("status", ["submitted", "approved"]),
+      supabase.from("jobs").select("user_id, status").eq("job_date", yesterday),
     ]);
-    // Hidden today: paused users, board opt-outs (e.g. the boss), and anyone off for the
-    // FULL day — a full-day range or a weekly recurrence (e.g. never Fridays). A partial
-    // hours congé (start_time set) still leaves them on the board for the rest of the day.
+    // Off for the FULL day — a full-day range or a weekly recurrence (e.g. never Fridays).
+    // A partial-hours congé (start_time set) still leaves them on the board. Owners, admins,
+    // board opt-outs and full-day-off people are hidden unless they enter a job today
+    // (see liveRoster).
     const offToday = new Set(
       (timeOff || []).filter((row) => isOffOn(row, today) && !row.start_time).map((row) => row.user_id)
     );
@@ -61,15 +63,12 @@ export default function LiveCrew() {
     // Present today despite a recurring rule that would otherwise put them off — flag it so a
     // manager sees at a glance who's an exception to their usual pattern (e.g. in to cover).
     setExceptionToday(new Set((timeOff || []).filter((row) => isExceptionOn(row, today)).map((row) => row.user_id)));
-    const activePeople = (people || []).filter(
-      (person) => !person.is_paused && person.show_on_boards !== false && !offToday.has(person.id)
-    );
-    // "Pas soumis hier": active roster minus anyone who submitted yesterday and minus anyone
-    // who was on FULL-day leave yesterday.
-    const submittedYesterday = new Set((yJobs || []).map((j) => j.user_id));
+    const activePeople = liveRoster(people, {
+      jobUserIds: new Set((jobs || []).map((job) => job.user_id)),
+      offUserIds: offToday,
+    });
     setNotSubmittedList(
-      activePeople
-        .filter((p) => !submittedYesterday.has(p.id) && !offYesterday.has(p.id))
+      notSubmittedYesterday(people, { yesterdayJobs: yJobs || [], offUserIds: offYesterday })
         .map((p) => ({ id: p.id, name: p.full_name || p.email || p.id }))
     );
     const map = new Map();
