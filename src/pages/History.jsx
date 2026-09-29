@@ -19,6 +19,7 @@ import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { buildJobSaveRpcArgs } from "@/lib/job-submission";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
+import { jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 dayjs.locale("en");
@@ -65,8 +66,9 @@ export default function History() {
   const [confirm, confirmDialog] = useConfirmDialog();
   const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
 
-  function showError(error, fallbackKey) {
-    setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, fallbackKey));
+  function showError(error, fallbackKey, candidate = null) {
+    const overlapMessage = candidate ? jobOverlapMessage(error, candidate, jobs, t) : null;
+    setErr(isOfflineError(error) ? "" : overlapMessage || friendlyErrorMessage(error, t, fallbackKey));
   }
 
   function historyQuery(cursor = null) {
@@ -244,14 +246,19 @@ export default function History() {
     if (!ok) return;
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
+    const job = jobs.find((row) => row.id === jobId);
     try {
-      const job = jobs.find((row) => row.id === jobId);
       if (!job) throw new Error(t("history.errors.submitFailed"));
+      const overlapWarning = jobOverlapDetails(job, jobs, t);
+      if (overlapWarning) {
+        setErr(overlapWarning);
+        return;
+      }
       await submitExistingJob(job);
       setInfo(t("history.toasts.submitted"));
       await load();
     } catch (e) {
-      showError(e, "history.errors.submitFailed");
+      showError(e, "history.errors.submitFailed", job);
     } finally {
       setActionLoadingKey(null);
     }
@@ -264,14 +271,27 @@ export default function History() {
     const actionKey = `day:${dateKey}`;
     setActionLoadingKey(actionKey);
     setErr(""); setInfo("");
+    let failedCandidate = null;
     try {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
-      await Promise.all(selectedJobs.map(submitExistingJob));
+      const overlapWarning = selectedJobs.map((job) => jobOverlapDetails(job, jobs, t)).find(Boolean);
+      if (overlapWarning) {
+        setErr(overlapWarning);
+        return;
+      }
+      for (const job of selectedJobs) {
+        try {
+          await submitExistingJob(job);
+        } catch (error) {
+          failedCandidate = job;
+          throw error;
+        }
+      }
       setInfo(t("history.toasts.daySubmitted", { count: ids.length }));
       await load();
     } catch (e) {
-      showError(e, "history.errors.submitDayFailed");
+      showError(e, "history.errors.submitDayFailed", failedCandidate);
     } finally {
       setActionLoadingKey(null);
     }
