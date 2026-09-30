@@ -32,7 +32,7 @@ import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculation
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { companyDate } from "@/lib/company-time";
-import { QUERY_BUDGETS } from "@/lib/query-budgets";
+import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
 
 dayjs.extend(isoWeek);
 
@@ -196,20 +196,29 @@ export default function ManagerDashboard() {
     setLoading(true);
     loadAnomalies();
     try {
-      const { data: jobRows } = await withRetry(
-        () => buildJobsQuery().range(0, PAGE_SIZE - 1),
-        12000
-      );
+      const loadEveryMatch = shouldLoadAllMatchingManagerJobs(employeeId, dayFilter);
+      const jobRows = [];
+      let pageStart = 0;
+      let page = [];
+      do {
+        const result = await withRetry(
+          () => buildJobsQuery().range(pageStart, pageStart + PAGE_SIZE - 1),
+          12000
+        );
+        page = result.data || [];
+        jobRows.push(...page);
+        pageStart += PAGE_SIZE;
+      } while (loadEveryMatch && page.length === PAGE_SIZE);
 
       // Only the meal indicators for the jobs actually on screen — no full-table scan.
-      const jobIds = (jobRows || []).map((j) => j.id);
+      const jobIds = jobRows.map((j) => j.id);
       const { data: mealRows } = jobIds.length
         ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", jobIds), 12000)
         : { data: [] };
 
-      setJobs(jobRows || []);
+      setJobs(jobRows);
       setMealJobIds(new Set((mealRows || []).map((claim) => claim.job_id)));
-      setHasMore((jobRows || []).length === PAGE_SIZE);
+      setHasMore(!loadEveryMatch && page.length === PAGE_SIZE);
       await loadCounts();
     } catch (e) {
       setErr(e?.message || t("manager.errors.failedLoad"));

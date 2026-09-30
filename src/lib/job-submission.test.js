@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildJobSaveRpcArgs, kilometreFieldValue } from "./job-submission";
+import { buildJobSaveRpcArgs, dailyOvertimeEvidenceRequirement, kilometreFieldValue, requiresEvidenceBeforeSave } from "./job-submission";
 
 const base = {
   jobDate: "2026-09-26",
@@ -47,6 +47,33 @@ describe("buildJobSaveRpcArgs", () => {
     expect(args.p_new_job_id).toBeNull();
     expect(args.p_submission_key).toBeNull();
     expect(args.p_submit).toBe(false);
+  });
+});
+
+describe("requiresEvidenceBeforeSave", () => {
+  it("does not block a manual draft while overtime proof is unavailable", () => {
+    expect(requiresEvidenceBeforeSave("draft")).toBe(false);
+  });
+
+  it("keeps the overtime-proof check on submission", () => {
+    expect(requiresEvidenceBeforeSave("submit")).toBe(true);
+  });
+});
+
+describe("dailyOvertimeEvidenceRequirement", () => {
+  const candidate = { id: "b", job_date: "2026-09-29", depart: "13:00", fin: "17:36", status: "saved" };
+
+  it("requires evidence when saved jobs bring the day over 8 hours", () => {
+    expect(dailyOvertimeEvidenceRequirement(candidate, [
+      { id: "a", job_date: "2026-09-29", depart: "08:00", fin: "13:00", status: "saved", overtime_evidence_captured: false },
+    ])).toEqual({ totalMinutes: 576, required: true });
+  });
+
+  it("accepts one proof anywhere on the day and ignores unrelated jobs", () => {
+    expect(dailyOvertimeEvidenceRequirement(candidate, [
+      { id: "a", job_date: "2026-09-29", depart: "08:00", fin: "13:00", status: "submitted", overtime_evidence_captured: true },
+      { id: "other-day", job_date: "2026-09-28", depart: "00:00", fin: "12:00", status: "submitted" },
+    ])).toEqual({ totalMinutes: 576, required: false });
   });
 });
 

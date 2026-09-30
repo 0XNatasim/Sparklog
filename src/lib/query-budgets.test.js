@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { QUERY_BUDGETS } from "./query-budgets";
+import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "./query-budgets";
 
 const migrationSql = readFileSync(fileURLToPath(new URL(
   "../../supabase/migrations/20260927025307_0064_query_budgets_and_aggregates.sql",
@@ -18,6 +18,13 @@ describe("query budgets", () => {
     expect(QUERY_BUDGETS.anomalySubmittedJobs).toBeLessThanOrEqual(200);
     expect(QUERY_BUDGETS.anomalyApprovedPeers).toBeLessThanOrEqual(400);
     expect(QUERY_BUDGETS.employeeActivityPage).toBeLessThanOrEqual(200);
+  });
+
+  it("loads every page when the manager narrows by employee or day", () => {
+    expect(shouldLoadAllMatchingManagerJobs("employee-id", "")).toBe(true);
+    expect(shouldLoadAllMatchingManagerJobs("all", "2026-09-29")).toBe(true);
+    expect(shouldLoadAllMatchingManagerJobs("employee-id", "2026-09-29")).toBe(true);
+    expect(shouldLoadAllMatchingManagerJobs("all", "")).toBe(false);
   });
 
   it("locks aggregate counts and keyset/review indexes into the database contract", () => {

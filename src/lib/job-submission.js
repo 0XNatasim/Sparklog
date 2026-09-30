@@ -4,6 +4,38 @@ export function kilometreFieldValue(job) {
   return String(total);
 }
 
+// Saving a draft must never be blocked by the overtime-proof workflow. The proof
+// is a submission requirement; employees still need to be able to preserve a
+// manually entered day (including one over 8 h) before they have the screenshot.
+export function requiresEvidenceBeforeSave(mode) {
+  return mode === "submit";
+}
+
+function workedMinutes(job) {
+  if (!job?.depart || !job?.fin) return 0;
+  const [startHour, startMinute] = String(job.depart).slice(0, 5).split(":").map(Number);
+  const [endHour, endMinute] = String(job.fin).slice(0, 5).split(":").map(Number);
+  if (![startHour, startMinute, endHour, endMinute].every(Number.isFinite)) return 0;
+  const start = startHour * 60 + startMinute;
+  let end = endHour * 60 + endMinute;
+  if (end <= start) end += 24 * 60;
+  return end - start;
+}
+
+// Evidence is one-per-day. Include saved/updated jobs in the total so submitting
+// from History cannot bypass the same >8 h rule enforced by the main form.
+export function dailyOvertimeEvidenceRequirement(candidate, jobs) {
+  const dayJobs = (jobs || []).filter((job) =>
+    job?.job_date === candidate?.job_date
+    && job.id !== candidate?.id
+    && ["saved", "updated", "submitted", "approved"].includes(job.status)
+  );
+  const totalMinutes = workedMinutes(candidate) + dayJobs.reduce((sum, job) => sum + workedMinutes(job), 0);
+  const hasEvidence = Boolean(candidate?.overtime_evidence_captured)
+    || dayJobs.some((job) => job.overtime_evidence_captured);
+  return { totalMinutes, required: totalMinutes > 8 * 60 && !hasEvidence };
+}
+
 // Keep the client-to-RPC contract explicit. Ownership, status and lock state are
 // deliberately absent: save_own_job derives those security-sensitive values server-side.
 export function buildJobSaveRpcArgs({
@@ -41,4 +73,3 @@ export function buildJobSaveRpcArgs({
     p_parking_receipt_captured: Boolean(parkingReceiptCaptured),
   };
 }
-
