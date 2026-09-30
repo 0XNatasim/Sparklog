@@ -57,7 +57,7 @@ serve(async (req) => {
 
     let q = admin
       .from("jobs")
-      .select("id, user_id, job_date, depart, fin, return_time_minutes, km_total, km_aller, km_retour, status")
+      .select("id, user_id, job_date, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour, status")
       .eq("user_id", employeeId)
       .order("job_date", { ascending: true });
     if (from) q = q.gte("job_date", from);
@@ -69,7 +69,7 @@ serve(async (req) => {
     // Per-employee overtime policy: some employers pay the first overtime hour at
     // double time (no 1.5x tier). Read the target employee's flag for the split.
     const { data: targetProfile } = await admin
-      .from("profiles").select("role, overtime_first_hour_double, return_overtime_no_benefits").eq("id", employeeId).maybeSingle();
+      .from("profiles").select("role, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid").eq("id", employeeId).maybeSingle();
     const result = computeWeek(jobs || [], overtimeOptionsFromProfile(targetProfile));
     return json({
       ok: true,

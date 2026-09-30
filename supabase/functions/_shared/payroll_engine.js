@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.0.0";
+export const ENGINE_VERSION = "2.1.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -57,22 +57,39 @@ export function overtimeOptionsFromProfile(profile) {
   // return-to-warehouse time is always at the simple rate when the day exceeds 8h. Enforce
   // this regardless of the stored toggles so the subcontractor rule always holds.
   if (profile?.role === "subcontractor_1") {
-    return { firstOtHourDouble: true, returnOtNoBenefits: true };
+    return { firstOtHourDouble: true, returnOtNoBenefits: true, firstTripUnpaid: Boolean(profile?.first_trip_unpaid) };
   }
   return {
     firstOtHourDouble: Boolean(profile?.overtime_first_hour_double),
     returnOtNoBenefits: Boolean(profile?.return_overtime_no_benefits),
+    firstTripUnpaid: Boolean(profile?.first_trip_unpaid),
   };
 }
 
-// Return minutes already logged inside a job's Départ→Fin span, clamped so it can
-// never exceed the span itself.
-function jobReturnMinutes(job) {
-  const span = minutesBetween(job.depart, job.fin);
+// Unpaid first trip: for employees flagged `firstTripUnpaid`, the time between Départ and
+// Arrivée of the FIRST job of each day (chronologically) is travel to the first client and
+// is not paid. Returns a Map job.id -> unpaid minutes (clamped to the Départ→Fin span).
+function firstTripUnpaidMinutes(sortedJobs) {
+  const unpaid = new Map();
+  const seenDays = new Set();
+  for (const job of sortedJobs) {
+    if (seenDays.has(job.job_date)) continue;
+    seenDays.add(job.job_date);
+    if (!job.arrivee) continue;
+    unpaid.set(job.id, Math.min(minutesBetween(job.depart, job.arrivee), minutesBetween(job.depart, job.fin)));
+  }
+  return unpaid;
+}
+
+// Return minutes already logged inside a job's paid span, clamped so it can never
+// exceed that span.
+function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
   return Math.min(Math.max(0, Number(job.return_time_minutes) || 0), span);
 }
 
 // Options (per-employee policies):
+//  - firstTripUnpaid: Départ→Arrivée of the first job of each day is not paid (removed from
+//    the paid span before the 8h/overtime split).
 //  - firstOtHourDouble: no 1.5x tier — all overtime is 2x.
 //  - returnOtNoBenefits: when a day (Départ→Fin, return included) exceeds 8h, the
 //    return-to-warehouse portion is carved out and paid at the base rate with NO social
@@ -83,13 +100,15 @@ function jobReturnMinutes(job) {
 // first hour of overtime that SparkLog pays at 1.5× (the "hors CCQ" tier) is instead counted
 // as REGULAR straight time. Double time (2×) is left exactly as-is. Used only by the parallel
 // "Façon Messier" comparison views — never by the authoritative export path.
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnOtNoBenefits = false, messierMethod = false } = {}) {
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnOtNoBenefits = false, messierMethod = false, firstTripUnpaid = false } = {}) {
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
   // Pre-pass: total worked span per day (return is inside the span). The return
   // carve-out only applies on days whose total exceeds 8h.
+  const unpaidTrip = firstTripUnpaid ? firstTripUnpaidMinutes(sorted) : new Map();
+  const paidSpan = (job) => minutesBetween(job.depart, job.fin) - (unpaidTrip.get(job.id) || 0);
   const daySpanMinutes = new Map();
   for (const job of sorted) {
-    daySpanMinutes.set(job.job_date, (daySpanMinutes.get(job.job_date) || 0) + minutesBetween(job.depart, job.fin));
+    daySpanMinutes.set(job.job_date, (daySpanMinutes.get(job.job_date) || 0) + paidSpan(job));
   }
 
   // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
@@ -107,11 +126,11 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const priorWeekOvertime = weekOvertimeMinutes.get(wk) || 0;
     const priorWeekRegular = weekRegularMinutes.get(wk) || 0;
 
-    const spanMinutes = minutesBetween(job.depart, job.fin);
+    const spanMinutes = paidSpan(job);
     // Carve out the return portion only when the policy is on AND the whole day exceeds
     // 8h. Otherwise the return stays inside the paid work span exactly as before.
     const carve = returnOtNoBenefits && (daySpanMinutes.get(job.job_date) || 0) > 480;
-    let returnNoBenefitMinutes = carve ? jobReturnMinutes(job) : 0;
+    let returnNoBenefitMinutes = carve ? jobReturnMinutes(job, spanMinutes) : 0;
     const workMinutes = spanMinutes - returnNoBenefitMinutes; // benefits-eligible work
 
     const regularRoom = Math.max(0, 480 - priorDayWork);

@@ -38,8 +38,8 @@ export default function WeekViewTab() {
       try {
         const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
         const [{ data: profs, error: pErr }, { data: jobs, error: jErr }] = await Promise.all([
-          supabase.from("profiles").select("id, full_name, overtime_first_hour_double, return_overtime_no_benefits").order("full_name", { ascending: true }),
-          supabase.from("jobs").select("id, user_id, job_date, depart, fin, ot, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", since),
+          supabase.from("profiles").select("id, full_name, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid").order("full_name", { ascending: true }),
+          supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", since),
         ]);
         if (pErr) throw pErr;
         if (jErr) throw jErr;
