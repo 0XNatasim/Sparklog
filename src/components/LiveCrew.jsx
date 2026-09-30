@@ -104,6 +104,13 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
     })
     .sort((a, b) => b.dayTotal - a.dayTotal);
 
+  // OT number colour: green = submitted (or approved), orange = saved but not yet submitted.
+  const jobOtColorClass = (jobStatus) => (
+    jobStatus === "submitted" || jobStatus === "approved"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-amber-600 dark:text-amber-400"
+  );
+
   // Recap: an OT counts once it is saved or submitted (drafts excluded).
   const COUNTED_STATUS = new Set(["saved", "updated", "submitted", "approved"]);
   const countedJobs = (jobs) => jobs.filter((j) => COUNTED_STATUS.has(j.status));
@@ -211,8 +218,6 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                       onClick={() => onSelectEmployee?.(employee.id, todayDate)}
                       className={cn(
                         "truncate rounded-sm text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        status === "submitted" && "text-emerald-600 dark:text-emerald-400",
-                        status === "saved" && "text-amber-600 dark:text-amber-400",
                         status === "none" && "text-red-600 dark:text-red-400",
                       )}
                     >
@@ -246,7 +251,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                       <div key={job.id} className={cn("flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-sm", jobCodeTintClass(job.ot))}>
                         <span className="flex items-center gap-2 truncate">
                           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">{index + 1}</span>
-                          <span className="truncate">{job.ot || "—"}</span>
+                          <span className={cn("truncate font-semibold", jobOtColorClass(job.status))}>{job.ot || "—"}</span>
                         </span>
                         <span className="shrink-0 font-mono font-semibold">{fmtHM(hoursBetween(
                           job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,
