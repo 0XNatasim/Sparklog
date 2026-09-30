@@ -8,6 +8,8 @@ import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
 import { hasManagementAccess } from "@/lib/roles";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
+import { companyDate } from "@/lib/company-time";
+import { missingEntryDays } from "@/lib/live-crew";
 
 // Gestion → Audit → Employés: when each employee signs in / opens the app and when
 // they save, submit or delete a job (table employee_activity_log, migration 0067).
@@ -45,10 +47,12 @@ export default function EmployeeActivityLog() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [missingDays, setMissingDays] = useState([]);
+  const [missingLoading, setMissingLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    supabase.from("profiles").select("id, full_name, email, role, admin_sections").order("full_name").then(({ data }) => {
+    supabase.from("profiles").select("id, full_name, email, role, admin_sections, is_paused, show_on_boards").order("full_name").then(({ data }) => {
       if (!alive) return;
       // Employees only: anyone who can open Gestion is left out.
       setEmployees((data || []).filter((p) => !hasManagementAccess(p.role, p.admin_sections)));
@@ -85,6 +89,42 @@ export default function EmployeeActivityLog() {
   }, [employeeIds.length, fetchPage]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (employeeIds.length === 0) return;
+    let cancelled = false;
+    const startDate = periodStart(period).format("YYYY-MM-DD");
+    const endDate = companyDate();
+
+    (async () => {
+      setMissingLoading(true);
+      const fetchAll = async (makeQuery) => {
+        const all = [];
+        const pageSize = 500;
+        for (let from = 0; ; from += pageSize) {
+          const result = await makeQuery().range(from, from + pageSize - 1);
+          if (result.error) return result;
+          all.push(...(result.data || []));
+          if ((result.data || []).length < pageSize) return { data: all, error: null };
+        }
+      };
+      const [jobsResult, timeOffResult] = await Promise.all([
+        fetchAll(() => supabase.from("jobs").select("user_id, job_date").in("user_id", employeeIds).gte("job_date", startDate).lte("job_date", endDate).order("job_date")),
+        fetchAll(() => supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").in("user_id", employeeIds).lte("start_date", endDate).or(`end_date.gte.${startDate},end_date.is.null`).order("start_date")),
+      ]);
+      if (!cancelled) {
+        if (jobsResult.error || timeOffResult.error) {
+          setError(jobsResult.error?.message || timeOffResult.error?.message || "");
+          setMissingDays([]);
+        } else {
+          setMissingDays(missingEntryDays(employees, jobsResult.data, timeOffResult.data, startDate, endDate));
+        }
+        setMissingLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [employeeIds, employees, period]);
 
   async function loadMore() {
     const last = rows[rows.length - 1];
@@ -187,6 +227,29 @@ export default function EmployeeActivityLog() {
             <span className="rounded-full border px-2.5 py-1">{t("activity.count.jobSaved", { n: counts.job_saved })}</span>
             <span className="rounded-full border px-2.5 py-1">{t("activity.count.jobSubmitted", { n: counts.job_submitted })}</span>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-sm font-semibold">{t("activity.missing.title")}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{t("activity.missing.description")}</p>
+          {missingLoading ? (
+            <p className="mt-3 text-sm text-muted-foreground">{t("common.loading")}</p>
+          ) : (
+            <div className="mt-3 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+              {missingDays
+                .filter((item) => employee === "all" || item.id === employee)
+                .map((item) => (
+                  <button key={item.id} type="button" onClick={() => setEmployee(item.id)} className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className="truncate font-medium">{item.name}</span>
+                    <span className={item.count > 0 ? "shrink-0 font-semibold text-red-600 dark:text-red-400" : "shrink-0 text-muted-foreground"}>
+                      {t("activity.missing.days", { n: item.count })}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayStatus, liveRoster, notSubmittedYesterday } from "./live-crew";
+import { activePeopleOnLeave, dayStatus, liveRoster, missingEntryDays, notSubmittedYesterday } from "./live-crew";
 
 const person = (id, extra = {}) => ({ id, role: "employee", is_paused: false, show_on_boards: true, ...extra });
 const people = [
@@ -50,5 +50,36 @@ describe("dayStatus", () => {
     expect(dayStatus([{ status: "submitted" }, { status: "approved" }])).toBe("submitted");
     expect(dayStatus([{ status: "submitted" }, { status: "saved" }])).toBe("saved");
     expect(dayStatus([{ status: "updated" }])).toBe("saved");
+  });
+});
+
+describe("activePeopleOnLeave", () => {
+  it("includes full and partial leave, excludes paused accounts, and sorts by name", () => {
+    const leave = [
+      { user_id: "crew", kind: "date_range", start_date: "2026-09-30", end_date: "2026-09-30" },
+      { user_id: "off", kind: "date_range", start_date: "2026-09-30", end_date: "2026-09-30", start_time: "13:00", end_time: "16:00" },
+      { user_id: "paused", kind: "date_range", start_date: "2026-09-30", end_date: "2026-09-30" },
+    ];
+    const namedPeople = people.map((p) => ({ ...p, full_name: { crew: "Zoé", off: "Alice", paused: "Bob" }[p.id] }));
+
+    expect(activePeopleOnLeave(namedPeople, leave, "2026-09-30")).toEqual([
+      { id: "off", name: "Alice" },
+      { id: "crew", name: "Zoé" },
+    ]);
+  });
+});
+
+describe("missingEntryDays", () => {
+  it("counts jobless board days while excluding full-day leave and inactive people", () => {
+    const leave = [
+      { user_id: "crew", kind: "date_range", start_date: "2026-09-29", end_date: "2026-09-29" },
+      { user_id: "off", kind: "date_range", start_date: "2026-09-29", end_date: "2026-09-29", start_time: "13:00" },
+    ];
+    const jobs = [{ user_id: "crew", job_date: "2026-09-30" }];
+
+    expect(missingEntryDays(people, jobs, leave, "2026-09-28", "2026-09-30")).toEqual([
+      { id: "off", name: "off", count: 3 },
+      { id: "crew", name: "crew", count: 1 },
+    ]);
   });
 });
