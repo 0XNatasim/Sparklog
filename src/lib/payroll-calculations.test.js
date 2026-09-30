@@ -197,3 +197,21 @@ describe("roundHours", () => {
     expect(roundHours(485)).toBe(8.08);
   });
 });
+
+describe("firstTripUnpaid", () => {
+  const jobs = [
+    { id: "a", job_date: "2026-09-29", depart: "07:00", arrivee: "08:00", fin: "12:00", km_total: 0 },
+    { id: "b", job_date: "2026-09-29", depart: "13:00", arrivee: "13:30", fin: "16:00", km_total: 0 },
+  ];
+  it("removes Départ→Arrivée of the first job of the day only for flagged employees", () => {
+    const on = calculatePayrollEntries(jobs, { firstTripUnpaid: true });
+    const off = calculatePayrollEntries(jobs);
+    expect(off.get("a").totalPaidMinutes).toBe(300);
+    expect(on.get("a").totalPaidMinutes).toBe(240);
+    expect(on.get("b").totalPaidMinutes).toBe(180);
+  });
+  it("leaves jobs without Arrivée untouched", () => {
+    const on = calculatePayrollEntries([{ id: "c", job_date: "2026-09-29", depart: "07:00", fin: "12:00" }], { firstTripUnpaid: true });
+    expect(on.get("c").totalPaidMinutes).toBe(300);
+  });
+});

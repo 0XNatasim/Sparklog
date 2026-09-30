@@ -194,7 +194,7 @@ serve(async (req) => {
     const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double, return_overtime_no_benefits")
+      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -239,6 +239,8 @@ serve(async (req) => {
         // When true and the day exceeds 8h, the return-to-warehouse time is paid at the
         // base rate without social benefits (the sheet applies this).
         employee_return_ot_no_benefits: Boolean(prof?.return_overtime_no_benefits),
+        // When true, Départ→Arrivée of the employee's first job of the day is unpaid travel.
+        employee_first_trip_unpaid: Boolean(prof?.first_trip_unpaid),
         approved_at: approved_at_label,
         approved_by: approved_by_value,
       };

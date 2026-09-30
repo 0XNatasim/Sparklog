@@ -75,11 +75,11 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits"),
+        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid"),
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
         // 'saved' drafts and 'updated' un-reviewed edits). Claims: pending + approved
         // (exclude rejected — a rejected expense must not inflate the estimate).
-        supabase.from("jobs").select("id, user_id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").in("status", ["submitted", "approved"]).gte("job_date", start).lte("job_date", end),
+        supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").in("status", ["submitted", "approved"]).gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end),
         supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }),

@@ -20,7 +20,7 @@ const fixtures = [
 describe("engine parity: app copy === Edge Function copy", () => {
   it("ENGINE_VERSION matches", () => {
     expect(app.ENGINE_VERSION).toBe(shared.ENGINE_VERSION);
-    expect(app.ENGINE_VERSION).toBe("2.0.0");
+    expect(app.ENGINE_VERSION).toBe("2.1.0");
     expect(app.computeWeek).toBe(shared.computeWeek);
     expect(app.calculatePayrollEntries).toBe(shared.calculatePayrollEntries);
   });
@@ -36,6 +36,7 @@ describe("engine parity: app copy === Edge Function copy", () => {
     { firstOtHourDouble: true, returnOtNoBenefits: false, messierMethod: false },
     { firstOtHourDouble: false, returnOtNoBenefits: true, messierMethod: false },
     { firstOtHourDouble: false, returnOtNoBenefits: true, messierMethod: true },
+    { firstOtHourDouble: false, returnOtNoBenefits: true, messierMethod: false, firstTripUnpaid: true },
   ])("produces the same versioned result for policy options %o", (options) => {
     for (const jobs of fixtures) {
       expect(strip(app.computeWeek(jobs, options))).toEqual(strip(shared.computeWeek(jobs, options)));
@@ -46,11 +47,12 @@ describe("engine parity: app copy === Edge Function copy", () => {
     expect(app.overtimeOptionsFromProfile({ role: "subcontractor_1" })).toEqual({
       firstOtHourDouble: true,
       returnOtNoBenefits: true,
+      firstTripUnpaid: false,
     });
     expect(app.overtimeOptionsFromProfile({
       role: "employee",
       overtime_first_hour_double: false,
       return_overtime_no_benefits: true,
-    })).toEqual({ firstOtHourDouble: false, returnOtNoBenefits: true });
+    })).toEqual({ firstOtHourDouble: false, returnOtNoBenefits: true, firstTripUnpaid: false });
   });
 });

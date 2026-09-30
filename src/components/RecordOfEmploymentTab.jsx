@@ -72,7 +72,7 @@ export default function RecordOfEmploymentTab() {
       try {
         const { data, error: e } = await supabase
           .from("profiles")
-          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_overtime_no_benefits")
+          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid")
           .eq("role", "employee")
           .order("full_name", { ascending: true });
         if (e) throw e;
@@ -115,7 +115,7 @@ export default function RecordOfEmploymentTab() {
             .order("period_end", { ascending: true }),
           supabase
             .from("jobs")
-            .select("job_date, depart, fin, ot, km_total, km_aller, km_retour, return_time_minutes")
+            .select("job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes")
             .eq("user_id", selectedId)
             .order("job_date", { ascending: true }),
         ]);

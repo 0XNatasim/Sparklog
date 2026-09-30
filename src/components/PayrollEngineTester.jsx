@@ -257,7 +257,7 @@ export default function PayrollEngineTester({ messier = false }) {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid")
         .order("full_name", { ascending: true });
       // Subcontractors record time but are never part of the company's DAS payroll run.
       if (!cancelled) setEmployees((data || []).filter((employee) => !isSubcontractorRole(employee.role)));
@@ -296,7 +296,7 @@ export default function PayrollEngineTester({ messier = false }) {
     const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
     const { data: jobRows } = await supabase
       .from("jobs")
-      .select("id, job_date, depart, fin, km_total, km_aller, km_retour, return_time_minutes")
+      .select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes")
       .eq("user_id", id).gte("job_date", since).order("job_date", { ascending: false });
     const byWeek = new Map();
     (jobRows || []).forEach((j) => {
