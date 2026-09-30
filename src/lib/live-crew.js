@@ -1,5 +1,9 @@
 import { isOffOn } from "./timeoff";
 
+// Missing-entry auditing began after the previous five-day work week. Keep those
+// untracked days out of every employee's displayed baseline and never show negatives.
+export const MISSING_ENTRY_BASELINE_DAYS = 5;
+
 // Who appears on Live Crew for a given day.
 //
 // The regular crew shows every day (a card with "no jobs yet" until they enter one).
@@ -43,7 +47,11 @@ export function missingEntryDays(people, jobs, timeOffRows, startDate, endDate) 
       const fullyOff = (timeOffRows || []).some((row) => row.user_id === person.id && !row.start_time && isOffOn(row, date));
       if (!fullyOff && !jobKeys.has(`${person.id}:${date}`)) count++;
     }
-    result.push({ id: person.id, name: person.full_name || person.email || person.id, count });
+    result.push({
+      id: person.id,
+      name: person.full_name || person.email || person.id,
+      count: Math.max(0, count - MISSING_ENTRY_BASELINE_DAYS),
+    });
   }
 
   return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
