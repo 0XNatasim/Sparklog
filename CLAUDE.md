@@ -7,6 +7,8 @@
 **Stack:** React 18 + Vite PWA, Supabase (Postgres + RLS + Edge Functions), payroll
 export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` (lowercase).
 
+**Release rule:** always bump the patch of `APP_VERSION` in `src/lib/version.js` in every PR (shown in the header as `V…`), and mention it in the commit/PR title.
+
 **What is already solid (do not "fix"):**
 - RLS is comprehensive; `get_my_role()` / `is_active_employee()` are `security definer`.
 - Employees read only their own `profiles` row and own `jobs` (no peer PII/pay leakage).
