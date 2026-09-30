@@ -4,11 +4,10 @@ export function kilometreFieldValue(job) {
   return String(total);
 }
 
-// Saving a draft must never be blocked by the overtime-proof workflow. The proof
-// is a submission requirement; employees still need to be able to preserve a
-// manually entered day (including one over 8 h) before they have the screenshot.
+// Overtime proof (screenshot) is requested whenever the day exceeds 8 h, both
+// when saving and when submitting, from the work form or from History.
 export function requiresEvidenceBeforeSave(mode) {
-  return mode === "submit";
+  return mode === "submit" || mode === "draft";
 }
 
 function workedMinutes(job) {

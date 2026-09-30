@@ -251,7 +251,8 @@ export default function History() {
     try {
       if (!job) throw new Error(t("history.errors.submitFailed"));
       if (!isAdminEmployee(role) && dailyOvertimeEvidenceRequirement(job, jobs).required) {
-        setErr(t("form.errors.overtimeEvidenceRequired"));
+        // Over 8 h without proof: open the work form, which shows the screenshot pop-up.
+        navigate(`/form?edit=${job.id}&submit=1`);
         return;
       }
       const overlapWarning = jobOverlapDetails(job, jobs, t);
@@ -281,7 +282,9 @@ export default function History() {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
       if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs).required)) {
-        setErr(t("form.errors.overtimeEvidenceRequired"));
+        // Proof is one per day: open the day's last job so the form asks for the screenshot.
+        const lastJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
+        navigate(`/form?edit=${lastJob.id}&submit=1`);
         return;
       }
       const overlapWarning = selectedJobs.map((job) => jobOverlapDetails(job, jobs, t)).find(Boolean);

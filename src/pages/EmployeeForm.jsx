@@ -158,6 +158,8 @@ export default function EmployeeForm() {
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
   const lastSaveErrorRef = useRef("");
+  const loadedReturnRef = useRef({ minutes: 0, km: 0 });
+  const autoSubmitDoneRef = useRef(false);
   const [confirm, confirmDialog] = useConfirmDialog();
   // C-3: synchronous double-tap guard (React `saving` state updates async, too late for a
   // fast second tap) + a per-new-entry idempotency key reused across retries so a timeout
@@ -245,6 +247,10 @@ export default function EmployeeForm() {
       setArrivee(fmtTimeHHmm(data.arrivee) || "");
       setFin(fmtTimeHHmm(data.fin) || "");
       setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
+      loadedReturnRef.current = {
+        minutes: Number(data.return_time_minutes) || 0,
+        km: Number(data.km_retour) || 0,
+      };
       setParkingRequested(Boolean(data.parking_receipt_captured));
       setHasParkingReceipt(Boolean(data.parking_receipt_captured));
       setParkingFile(null);
@@ -645,6 +651,18 @@ export default function EmployeeForm() {
     setParkingRequested(true);
     setDirty(true);
   }
+
+  // Arriving from History with ?submit=1 (day over 8 h, no proof yet): once the job
+  // is loaded, run the normal submit flow so the screenshot pop-up opens by itself.
+  useEffect(() => {
+    if (searchParams.get("submit") !== "1") return;
+    if (!editId || autoSubmitDoneRef.current) return;
+    if (loadingEdit || !draftReady || editLoadFailed || locked || isViewMode) return;
+    autoSubmitDoneRef.current = true;
+    setPendingSaveMode("submit");
+    saveWithReturn(loadedReturnRef.current.minutes, loadedReturnRef.current.km, "submit");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, loadingEdit, draftReady, editLoadFailed, locked, isViewMode]);
 
   async function saveWithReturn(minutes, km, requestedMode = pendingSaveMode) {
     setReturnSaveError("");
