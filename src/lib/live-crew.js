@@ -31,6 +31,30 @@ export function activePeopleOnLeave(people, timeOffRows, date) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Count the dates on which a regular crew member would have appeared red on Live Crew:
+// the account was expected on the board, had no job at all, and was not away all day.
+export function missingEntryDays(people, jobs, timeOffRows, startDate, endDate) {
+  const jobKeys = new Set((jobs || []).map((job) => `${job.user_id}:${job.job_date}`));
+  const result = [];
+
+  for (const person of (people || []).filter(isRegularCrew)) {
+    let count = 0;
+    for (let date = startDate; date && date <= endDate; date = dayAfter(date)) {
+      const fullyOff = (timeOffRows || []).some((row) => row.user_id === person.id && !row.start_time && isOffOn(row, date));
+      if (!fullyOff && !jobKeys.has(`${person.id}:${date}`)) count++;
+    }
+    result.push({ id: person.id, name: person.full_name || person.email || person.id, count });
+  }
+
+  return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function dayAfter(date) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + 1);
+  return value.toISOString().slice(0, 10);
+}
+
 // "Not submitted yesterday": the regular crew who were not off yesterday, plus anyone
 // else who logged a job yesterday, minus everyone who submitted (or had approved) a job.
 export function notSubmittedYesterday(people, { yesterdayJobs = [], offUserIds = new Set() } = {}) {

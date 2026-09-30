@@ -209,7 +209,8 @@ export default function LiveCrew({ onSelectEmployee }) {
                       className={cn(
                         "truncate rounded-sm text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         status === "submitted" && "text-emerald-600 dark:text-emerald-400",
-                        status === "saved" && "text-red-600 dark:text-red-400",
+                        status === "saved" && "text-amber-600 dark:text-amber-400",
+                        status === "none" && "text-red-600 dark:text-red-400",
                       )}
                     >
                       {employee.full_name || employee.email}
