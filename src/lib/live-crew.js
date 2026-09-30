@@ -1,3 +1,5 @@
+import { isOffOn } from "./timeoff";
+
 // Who appears on Live Crew for a given day.
 //
 // The regular crew shows every day (a card with "no jobs yet" until they enter one).
@@ -17,6 +19,16 @@ export function isRegularCrew(person) {
 export function liveRoster(people, { jobUserIds = new Set(), offUserIds = new Set() } = {}) {
   return (people || []).filter((person) => !person.is_paused
     && (jobUserIds.has(person.id) || (isRegularCrew(person) && !offUserIds.has(person.id))));
+}
+
+// The recap and its dialog deliberately share this list so their totals cannot drift.
+// Partial-day entries count as leave, while paused accounts never do.
+export function activePeopleOnLeave(people, timeOffRows, date) {
+  const offUserIds = new Set((timeOffRows || []).filter((row) => isOffOn(row, date)).map((row) => row.user_id));
+  return (people || [])
+    .filter((person) => !person.is_paused && offUserIds.has(person.id))
+    .map((person) => ({ id: person.id, name: person.full_name || person.email || person.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // "Not submitted yesterday": the regular crew who were not off yesterday, plus anyone
