@@ -10,3 +10,8 @@ export const QUERY_BUDGETS = Object.freeze({
   employeeActivityPage: 200,
 });
 
+// A narrowed timesheet search must be complete, not merely filtered from the
+// first global page. Requests still use managerJobsPage-sized batches.
+export function shouldLoadAllMatchingManagerJobs(employeeId, dayFilter) {
+  return employeeId !== "all" || Boolean(dayFilter);
+}
