@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
@@ -31,7 +32,7 @@ import LiveCrew from "@/components/LiveCrew";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { companyDate } from "@/lib/company-time";
+import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
 
 dayjs.extend(isoWeek);
@@ -119,6 +120,7 @@ export default function ManagerDashboard() {
   const [dayFilter, setDayFilter] = useState("");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
+  const [yesterdaySnapshotOpen, setYesterdaySnapshotOpen] = useState(false);
 
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
@@ -674,9 +676,9 @@ export default function ManagerDashboard() {
     setEmployeeId(anomaly.userId);
   }
 
-  function openEmployeeTimesheet(userId) {
+  function openEmployeeTimesheet(userId, date = companyDate()) {
     setEmployeeId(userId);
-    setDayFilter(companyDate());
+    setDayFilter(date);
     setStatusFilter("all");
     setSearchLive("");
     setSearch("");
@@ -1101,6 +1103,9 @@ export default function ManagerDashboard() {
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
                 {t("manager.counts.approved")}: <b>{counts.approved}</b>
               </span>
+              <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => setYesterdaySnapshotOpen(true)}>
+                <Radio className="mr-1.5 h-4 w-4" />{t("live.snapshot.open")}
+              </Button>
             </div>
 
             {/* One line: employee · status · date · OT search. */}
@@ -1194,6 +1199,22 @@ export default function ManagerDashboard() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={yesterdaySnapshotOpen} onOpenChange={setYesterdaySnapshotOpen}>
+          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{t("live.snapshot.dialogTitle")}</DialogTitle>
+            </DialogHeader>
+            <LiveCrew
+              targetDate={addCalendarDays(companyDate(), -1)}
+              snapshot
+              onSelectEmployee={(userId, date) => {
+                setYesterdaySnapshotOpen(false);
+                openEmployeeTimesheet(userId, date);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
 
         {(() => {
           const visible = anomalies.filter((anomaly) => employeeId === "all" || anomaly.userId === employeeId);

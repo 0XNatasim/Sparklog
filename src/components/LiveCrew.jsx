@@ -19,7 +19,7 @@ const montrealDate = companyDate;
 
 const fmtHM = formatHM;
 
-export default function LiveCrew({ onSelectEmployee }) {
+export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot = false }) {
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByUser, setJobsByUser] = useState(new Map());
@@ -37,7 +37,7 @@ export default function LiveCrew({ onSelectEmployee }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const today = montrealDate();
+    const today = targetDate || montrealDate();
     setTodayDate(today);
     const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
     setYesterdayDate(yesterday);
@@ -84,13 +84,14 @@ export default function LiveCrew({ onSelectEmployee }) {
     setJobsByUser(map);
     setUpdatedAt(new Date());
     setLoading(false);
-  }, []);
+  }, [targetDate]);
 
   useEffect(() => {
     load();
+    if (snapshot) return undefined;
     const id = setInterval(load, REFRESH_MS);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, snapshot]);
 
   const rows = employees
     .map((employee) => {
@@ -123,13 +124,13 @@ export default function LiveCrew({ onSelectEmployee }) {
       onClick: onLeaveCount > 0 ? () => setLeaveOpen(true) : null,
       title: t("live.leave.open"),
     },
-    {
+    !snapshot && {
       label: t("live.recap.notSubmittedYesterday"),
       value: notSubmittedCount,
       cls: notSubmittedCount > 0 ? "text-destructive dark:text-red-300" : "text-foreground",
       onClick: notSubmittedCount > 0 ? () => { setUnlockMsg(""); setUnlockOpen(true); } : null,
     },
-  ];
+  ].filter(Boolean);
 
   async function unlockAllYesterday() {
     if (!notSubmittedList.length || !yesterdayDate) return;
@@ -160,9 +161,9 @@ export default function LiveCrew({ onSelectEmployee }) {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
               </span>
-              {t("live.title")} · {dayjs(montrealDate()).format("DD MMM YYYY")}
+              {snapshot ? t("live.snapshot.title") : t("live.title")} · {dayjs(todayDate || montrealDate()).format("DD MMM YYYY")}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">{t("live.description")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t(snapshot ? "live.snapshot.description" : "live.description")}</p>
           </div>
           {/* Day recap — centered, compact */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
@@ -182,9 +183,11 @@ export default function LiveCrew({ onSelectEmployee }) {
           </div>
           <div className="flex items-center gap-3">
             {updatedAt && <span className="text-xs text-muted-foreground">{t("live.updated", { time: dayjs(updatedAt).format("HH:mm:ss") })}</span>}
-            <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
-              <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
-            </Button>
+            {!snapshot && (
+              <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
+                <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -205,7 +208,7 @@ export default function LiveCrew({ onSelectEmployee }) {
                   <span className="flex items-center gap-1.5 truncate font-semibold">
                     <button
                       type="button"
-                      onClick={() => onSelectEmployee?.(employee.id)}
+                      onClick={() => onSelectEmployee?.(employee.id, todayDate)}
                       className={cn(
                         "truncate rounded-sm text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         status === "submitted" && "text-emerald-600 dark:text-emerald-400",
