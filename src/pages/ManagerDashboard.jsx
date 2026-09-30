@@ -674,6 +674,16 @@ export default function ManagerDashboard() {
     setEmployeeId(anomaly.userId);
   }
 
+  function openEmployeeTimesheet(userId) {
+    setEmployeeId(userId);
+    setDayFilter(companyDate());
+    setStatusFilter("all");
+    setSearchLive("");
+    setSearch("");
+    setSelectedWeekKey("latest");
+    setSearchParams({ section: "timesheet" });
+  }
+
   async function approve(jobId) {
     const warning = anomalyWarning([jobId]);
     if (warning && !(await confirm(warning))) return;
@@ -1052,7 +1062,7 @@ export default function ManagerDashboard() {
           ))}
         </div>
 
-        {activeSection === "live" && <LiveCrew />}
+        {activeSection === "live" && <LiveCrew onSelectEmployee={openEmployeeTimesheet} />}
 
         {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
 

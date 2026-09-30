@@ -11,7 +11,7 @@ import { jobCodeTintClass } from "@/lib/job-code";
 import { isOffOn, isExceptionOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
-import { dayStatus, liveRoster, notSubmittedYesterday } from "@/lib/live-crew";
+import { activePeopleOnLeave, dayStatus, liveRoster, notSubmittedYesterday } from "@/lib/live-crew";
 
 const REFRESH_MS = 30000;
 
@@ -19,11 +19,13 @@ const montrealDate = companyDate;
 
 const fmtHM = formatHM;
 
-export default function LiveCrew() {
+export default function LiveCrew({ onSelectEmployee }) {
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByUser, setJobsByUser] = useState(new Map());
-  const [onLeaveCount, setOnLeaveCount] = useState(0);
+  const [onLeaveList, setOnLeaveList] = useState([]);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [todayDate, setTodayDate] = useState("");
   const [exceptionToday, setExceptionToday] = useState(new Set());
   const [notSubmittedList, setNotSubmittedList] = useState([]); // [{id, name}] not submitted yesterday
   const [yesterdayDate, setYesterdayDate] = useState("");
@@ -36,6 +38,7 @@ export default function LiveCrew() {
   const load = useCallback(async () => {
     setLoading(true);
     const today = montrealDate();
+    setTodayDate(today);
     const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
     setYesterdayDate(yesterday);
     const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }] = await Promise.all([
@@ -56,10 +59,7 @@ export default function LiveCrew() {
       (timeOff || []).filter((row) => isOffOn(row, yesterday) && !row.start_time).map((row) => row.user_id)
     );
     // Recap "en congé": everyone with time off applicable today (full day OR partial hours).
-    const onLeaveToday = new Set(
-      (timeOff || []).filter((row) => isOffOn(row, today)).map((row) => row.user_id)
-    );
-    setOnLeaveCount(onLeaveToday.size);
+    setOnLeaveList(activePeopleOnLeave(people, timeOff, today));
     // Present today despite a recurring rule that would otherwise put them off — flag it so a
     // manager sees at a glance who's an exception to their usual pattern (e.g. in to cover).
     setExceptionToday(new Set((timeOff || []).filter((row) => isExceptionOn(row, today)).map((row) => row.user_id)));
@@ -111,11 +111,18 @@ export default function LiveCrew() {
   const over8Count = rows.filter((r) => r.dayTotal > 8).length;
 
   const notSubmittedCount = notSubmittedList.length;
+  const onLeaveCount = onLeaveList.length;
   const recapTiles = [
     { label: t("live.recap.withOt"), value: `${withOtCount}/${employees.length}`, cls: "text-emerald-600 dark:text-emerald-400" },
     { label: t("live.recap.totalOt"), value: totalOtCount, cls: "text-foreground" },
     { label: t("live.recap.over8"), value: over8Count, cls: "text-amber-600 dark:text-amber-400" },
-    { label: t("live.recap.onLeave"), value: onLeaveCount, cls: "text-sky-600 dark:text-sky-400" },
+    {
+      label: t("live.recap.onLeave"),
+      value: onLeaveCount,
+      cls: "text-sky-600 dark:text-sky-400",
+      onClick: onLeaveCount > 0 ? () => setLeaveOpen(true) : null,
+      title: t("live.leave.open"),
+    },
     {
       label: t("live.recap.notSubmittedYesterday"),
       value: notSubmittedCount,
@@ -161,7 +168,7 @@ export default function LiveCrew() {
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
             {recapTiles.map((tile) => (
               tile.onClick ? (
-                <button key={tile.label} type="button" onClick={tile.onClick} title={t("live.unlock.open")} className="rounded px-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <button key={tile.label} type="button" onClick={tile.onClick} title={tile.title || t("live.unlock.open")} className="rounded px-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <div className={`text-base font-bold leading-tight tabular-nums underline decoration-dotted underline-offset-2 ${tile.cls}`}>{tile.value}</div>
                   <div className="text-[10px] leading-tight text-muted-foreground">{tile.label}</div>
                 </button>
@@ -196,15 +203,18 @@ export default function LiveCrew() {
               <CardContent className="space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 truncate font-semibold">
-                    <span
+                    <button
+                      type="button"
+                      onClick={() => onSelectEmployee?.(employee.id)}
                       className={cn(
-                        "truncate",
+                        "truncate rounded-sm text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                         status === "submitted" && "text-emerald-600 dark:text-emerald-400",
-                        status === "saved" && "text-red-600 dark:text-red-400",
+                        status === "saved" && "text-amber-600 dark:text-amber-400",
+                        status === "none" && "text-red-600 dark:text-red-400",
                       )}
                     >
                       {employee.full_name || employee.email}
-                    </span>
+                    </button>
                     {overtime && (
                       <span
                         className={cn(
@@ -252,6 +262,20 @@ export default function LiveCrew() {
             );
           })}
       </div>
+
+      <Dialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("live.leave.title", { date: todayDate ? dayjs(todayDate).format("DD MMM YYYY") : "" })}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">{t("live.leave.hint")}</p>
+          <div className="max-h-64 divide-y overflow-y-auto rounded-lg border">
+            {onLeaveList.map((employee) => (
+              <div key={employee.id} className="px-3 py-2 text-sm">{employee.name}</div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={unlockOpen} onOpenChange={setUnlockOpen}>
         <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
