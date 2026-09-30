@@ -51,8 +51,8 @@ describe("buildJobSaveRpcArgs", () => {
 });
 
 describe("requiresEvidenceBeforeSave", () => {
-  it("does not block a manual draft while overtime proof is unavailable", () => {
-    expect(requiresEvidenceBeforeSave("draft")).toBe(false);
+  it("asks for the overtime proof when saving a draft too", () => {
+    expect(requiresEvidenceBeforeSave("draft")).toBe(true);
   });
 
   it("keeps the overtime-proof check on submission", () => {
