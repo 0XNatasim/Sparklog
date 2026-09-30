@@ -8,8 +8,8 @@ import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
 import { hasManagementAccess } from "@/lib/roles";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
-import { companyDate } from "@/lib/company-time";
-import { missingEntryDays } from "@/lib/live-crew";
+import { addCalendarDays, companyDate } from "@/lib/company-time";
+import { MISSING_ENTRY_TRACKING_START, missingEntryDays } from "@/lib/live-crew";
 
 // Gestion → Audit → Employés: when each employee signs in / opens the app and when
 // they save, submit or delete a job (table employee_activity_log, migration 0067).
@@ -93,8 +93,11 @@ export default function EmployeeActivityLog() {
   useEffect(() => {
     if (employeeIds.length === 0) return;
     let cancelled = false;
-    const startDate = periodStart(period).format("YYYY-MM-DD");
-    const endDate = companyDate();
+    const requestedStart = periodStart(period).format("YYYY-MM-DD");
+    const startDate = requestedStart < MISSING_ENTRY_TRACKING_START ? MISSING_ENTRY_TRACKING_START : requestedStart;
+    // Today is still in progress and may legitimately be red in Live Crew. Audit only
+    // completed days so nobody receives a missing day before they can finish entering it.
+    const endDate = addCalendarDays(companyDate(), -1);
 
     (async () => {
       setMissingLoading(true);

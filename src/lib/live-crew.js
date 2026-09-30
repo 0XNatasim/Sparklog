@@ -1,8 +1,8 @@
 import { isOffOn } from "./timeoff";
 
-// Missing-entry auditing began after the previous five-day work week. Keep those
-// untracked days out of every employee's displayed baseline and never show negatives.
-export const MISSING_ENTRY_BASELINE_DAYS = 5;
+// Historical missing-entry auditing starts on the first day for which the board data
+// is considered complete. Earlier dates must never contribute to an employee total.
+export const MISSING_ENTRY_TRACKING_START = "2026-09-28";
 
 // Who appears on Live Crew for a given day.
 //
@@ -40,18 +40,15 @@ export function activePeopleOnLeave(people, timeOffRows, date) {
 export function missingEntryDays(people, jobs, timeOffRows, startDate, endDate) {
   const jobKeys = new Set((jobs || []).map((job) => `${job.user_id}:${job.job_date}`));
   const result = [];
+  const effectiveStart = startDate < MISSING_ENTRY_TRACKING_START ? MISSING_ENTRY_TRACKING_START : startDate;
 
   for (const person of (people || []).filter(isRegularCrew)) {
     let count = 0;
-    for (let date = startDate; date && date <= endDate; date = dayAfter(date)) {
+    for (let date = effectiveStart; date && date <= endDate; date = dayAfter(date)) {
       const fullyOff = (timeOffRows || []).some((row) => row.user_id === person.id && !row.start_time && isOffOn(row, date));
       if (!fullyOff && !jobKeys.has(`${person.id}:${date}`)) count++;
     }
-    result.push({
-      id: person.id,
-      name: person.full_name || person.email || person.id,
-      count: Math.max(0, count - MISSING_ENTRY_BASELINE_DAYS),
-    });
+    result.push({ id: person.id, name: person.full_name || person.email || person.id, count });
   }
 
   return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));

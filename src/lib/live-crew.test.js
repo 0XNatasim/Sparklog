@@ -70,7 +70,7 @@ describe("activePeopleOnLeave", () => {
 });
 
 describe("missingEntryDays", () => {
-  it("counts jobless board days after the five-day baseline while excluding leave and inactive people", () => {
+  it("counts jobless board days from September 28 while excluding leave and inactive people", () => {
     const leave = [
       { user_id: "crew", kind: "date_range", start_date: "2026-09-29", end_date: "2026-09-29" },
       { user_id: "off", kind: "date_range", start_date: "2026-09-29", end_date: "2026-09-29", start_time: "13:00" },
@@ -78,13 +78,13 @@ describe("missingEntryDays", () => {
     const jobs = [{ user_id: "crew", job_date: "2026-09-30" }];
 
     expect(missingEntryDays(people, jobs, leave, "2026-09-22", "2026-09-30")).toEqual([
-      { id: "off", name: "off", count: 4 },
-      { id: "crew", name: "crew", count: 2 },
+      { id: "off", name: "off", count: 3 },
+      { id: "crew", name: "crew", count: 1 },
     ]);
   });
 
-  it("never reports a negative total when the period has five days or fewer", () => {
-    expect(missingEntryDays([person("crew")], [], [], "2026-09-28", "2026-09-30"))
+  it("reports zero when the requested period ends before tracking started", () => {
+    expect(missingEntryDays([person("crew")], [], [], "2026-09-20", "2026-09-27"))
       .toEqual([{ id: "crew", name: "crew", count: 0 }]);
   });
 });
