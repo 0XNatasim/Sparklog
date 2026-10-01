@@ -29,6 +29,7 @@ import BroadcastManager from "@/components/BroadcastManager";
 import SettingsPanel from "@/components/SettingsPanel";
 import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
+import WeekSnapshot from "@/components/WeekSnapshot";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -121,6 +122,7 @@ export default function ManagerDashboard() {
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
   const [yesterdaySnapshotOpen, setYesterdaySnapshotOpen] = useState(false);
+  const [weekSnapshotOpen, setWeekSnapshotOpen] = useState(false);
 
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
@@ -1103,9 +1105,14 @@ export default function ManagerDashboard() {
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
                 {t("manager.counts.approved")}: <b>{counts.approved}</b>
               </span>
-              <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => setYesterdaySnapshotOpen(true)}>
-                <Radio className="mr-1.5 h-4 w-4" />{t("live.snapshot.open")}
-              </Button>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setWeekSnapshotOpen(true)}>
+                  <Radio className="mr-1.5 h-4 w-4" />{t("live.week.open")}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setYesterdaySnapshotOpen(true)}>
+                  <Radio className="mr-1.5 h-4 w-4" />{t("live.snapshot.open")}
+                </Button>
+              </div>
             </div>
 
             {/* One line: employee · status · date · OT search. */}
@@ -1199,6 +1206,20 @@ export default function ManagerDashboard() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={weekSnapshotOpen} onOpenChange={setWeekSnapshotOpen}>
+          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{t("live.week.dialogTitle")}</DialogTitle>
+            </DialogHeader>
+            <WeekSnapshot
+              onSelectEmployee={(userId, date) => {
+                setWeekSnapshotOpen(false);
+                openEmployeeTimesheet(userId, date);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={yesterdaySnapshotOpen} onOpenChange={setYesterdaySnapshotOpen}>
           <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">

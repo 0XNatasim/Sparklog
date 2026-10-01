@@ -88,3 +88,13 @@ describe("missingEntryDays", () => {
       .toEqual([{ id: "crew", name: "crew", count: 0 }]);
   });
 });
+
+describe("weekCellSummary", () => {
+  it("ignores drafts and reports the day status", async () => {
+    const { weekCellSummary } = await import("./live-crew");
+    expect(weekCellSummary([])).toEqual({ count: 0, status: "none" });
+    expect(weekCellSummary([{ status: "draft" }])).toEqual({ count: 0, status: "none" });
+    expect(weekCellSummary([{ status: "saved" }, { status: "submitted" }])).toEqual({ count: 2, status: "saved" });
+    expect(weekCellSummary([{ status: "submitted" }, { status: "approved" }])).toEqual({ count: 2, status: "submitted" });
+  });
+});

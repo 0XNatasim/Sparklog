@@ -76,3 +76,13 @@ export function dayStatus(jobs) {
   if (!jobs?.length) return "none";
   return jobs.every((job) => job.status === "submitted" || job.status === "approved") ? "submitted" : "saved";
 }
+
+// Jobs counted on the weekly snapshot: drafts are excluded, like the Live Crew recap.
+const COUNTED_JOB_STATUS = new Set(["saved", "updated", "submitted", "approved"]);
+
+// One employee × one day on the weekly snapshot: how many ORs were logged and whether the
+// whole day is submitted ("submitted"), still only saved ("saved") or empty ("none").
+export function weekCellSummary(jobs) {
+  const counted = (jobs || []).filter((job) => COUNTED_JOB_STATUS.has(job.status));
+  return { count: counted.length, status: dayStatus(counted) };
+}
