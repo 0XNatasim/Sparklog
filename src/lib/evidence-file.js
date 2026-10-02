@@ -46,3 +46,25 @@ export async function prepareEvidenceImage(file, { maxEdge = 1600, quality = 0.7
   }
 }
 
+
+// Why an overtime-screenshot upload failed, as an i18n key (`form.evidence.reason.*`) plus
+// the raw technical detail, so the employee can read it out and support can act on it.
+export function evidenceUploadFailure(error) {
+  const raw = String(error?.message || error || "").trim();
+  const status = Number(error?.statusCode ?? error?.status ?? 0) || null;
+  const detail = [error?.name && error.name !== "Error" ? error.name : "", status, raw].filter(Boolean).join(" · ").slice(0, 200);
+  const has = (re) => re.test(`${error?.name || ""} ${raw}`);
+  let key = "unknown";
+  if (has(/evidence_file_empty/)) key = "empty";
+  else if (has(/evidence_file_too_large/)) key = "tooLarge";
+  else if (has(/evidence_file_type_invalid/)) key = "badType";
+  else if (has(/evidence_image_decode_failed/)) key = "decode";
+  else if (has(/evidence_image_dimensions_too_large/)) key = "dimensions";
+  else if (has(/evidence_image_encode_failed/)) key = "encode";
+  else if (has(/TimeoutError|timed out/i)) key = "timeout";
+  else if (status === 401 || status === 403 || has(/jwt|token|expired|not authorized|unauthorized|row-level security|violates/i)) key = "auth";
+  else if (status === 413 || has(/exceeded the maximum allowed size|payload too large/i)) key = "tooLarge";
+  else if (status === 415 || has(/mime type|not supported/i)) key = "badType";
+  else if (has(/failed to fetch|networkerror|network request failed|load failed/i)) key = "network";
+  return { key, detail };
+}

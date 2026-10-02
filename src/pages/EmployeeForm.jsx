@@ -23,7 +23,7 @@ import { buildJobSaveRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } 
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
-import { prepareEvidenceImage } from "@/lib/evidence-file";
+import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -850,7 +850,8 @@ export default function EmployeeForm() {
         evidenceUploaded = true;
       } catch (error) {
         console.error("[overtime evidence] Screenshot upload failed", error);
-        throw new Error(t("form.evidence.uploadFailed"));
+        const failure = evidenceUploadFailure(error);
+        throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`);
       }
 
       let savedJobId = pendingEvidenceJobId;
