@@ -159,7 +159,12 @@ export default function History() {
       map.get(key).push(j);
     }
 
-    return Array.from(map.entries()).map(([date, list]) => {
+    return Array.from(map.entries()).map(([date, sorted]) => {
+      // Within a day: start of the day first, jobs without a départ last.
+      const list = [...sorted].sort((a, b) =>
+        String(a.depart || "99").localeCompare(String(b.depart || "99"))
+        || String(a.fin || "99").localeCompare(String(b.fin || "99"))
+        || String(a.id).localeCompare(String(b.id)));
       const totalHours = sumHoursForJobs(list);
       const totalHHmm = toHHmmLabelFromFormatHours(formatHours(totalHours));
       const totalKm = sumKmForJobs(list);

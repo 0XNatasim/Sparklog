@@ -41,3 +41,16 @@ describe("evidence file hardening", () => {
     expect(cleanupSource).toContain("orphaned_deleted");
   });
 });
+
+describe("evidenceUploadFailure", () => {
+  it("maps known causes and keeps the technical detail", async () => {
+    const { evidenceUploadFailure } = await import("./evidence-file");
+    expect(evidenceUploadFailure(new Error("evidence_image_decode_failed")).key).toBe("decode");
+    expect(evidenceUploadFailure(new Error("evidence_file_too_large")).key).toBe("tooLarge");
+    expect(evidenceUploadFailure({ name: "TimeoutError", message: "Request timed out after 20s" }).key).toBe("timeout");
+    expect(evidenceUploadFailure({ statusCode: "403", message: "new row violates row-level security policy" }).key).toBe("auth");
+    expect(evidenceUploadFailure(new TypeError("Failed to fetch")).key).toBe("network");
+    const unknown = evidenceUploadFailure(new Error("boom"));
+    expect(unknown).toEqual({ key: "unknown", detail: "boom" });
+  });
+});
