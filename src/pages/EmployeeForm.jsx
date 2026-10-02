@@ -17,7 +17,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { isAdminEmployee, isManagerRole } from "@/lib/roles";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
-import { withRetry, withTimeout } from "@/lib/utils";
+import { refreshSessionOnce, withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
 import { buildJobSaveRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
@@ -175,6 +175,7 @@ export default function EmployeeForm() {
   const [pendingReturn, setPendingReturn] = useState(null);
   const [pendingEvidenceJobId, setPendingEvidenceJobId] = useState(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
+  const [failedEvidenceFile, setFailedEvidenceFile] = useState(null); // kept so "Réessayer" needs no re-pick
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
   const [showOvertimeExample, setShowOvertimeExample] = useState(false);
   const [returnSaveError, setReturnSaveError] = useState("");
@@ -814,9 +815,32 @@ export default function EmployeeForm() {
     }
   }
 
-  async function handleOvertimeEvidence(event) {
+  // Uploads the screenshot; on an expired session, timeout or network drop it refreshes the
+  // session and retries once. A duplicate on the retry means the first attempt did commit.
+  async function uploadEvidenceWithRefresh(path, image) {
+    const attempt = () => withTimeout(
+      supabase.storage.from("overtime-evidence").upload(path, image, { contentType: "image/jpeg", upsert: false }),
+      20000
+    );
+    try {
+      const { error } = await attempt();
+      if (error) throw error;
+    } catch (firstError) {
+      if (!["auth", "timeout", "network"].includes(evidenceUploadFailure(firstError).key)) throw firstError;
+      await refreshSessionOnce();
+      const { error } = await attempt();
+      const duplicate = Number(error?.statusCode ?? error?.status) === 409 || /already exists|duplicate/i.test(error?.message || "");
+      if (error && !duplicate) throw error;
+    }
+  }
+
+  function handleOvertimeEvidence(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
+    return processEvidenceFile(file);
+  }
+
+  async function processEvidenceFile(file) {
     if (!file) {
       setErr(t("form.evidence.fileMissing"));
       return;
@@ -830,6 +854,7 @@ export default function EmployeeForm() {
     setEvidenceBusy(true);
     setErr("");
     setEvidenceValidationError("");
+    setFailedEvidenceFile(null);
 
     const jobId = pendingEvidenceJobId || editId || crypto.randomUUID();
     const evidenceId = crypto.randomUUID();
@@ -840,13 +865,7 @@ export default function EmployeeForm() {
       let image;
       try {
         image = await prepareEvidenceImage(file);
-        const { error: uploadError } = await withTimeout(
-          supabase.storage
-            .from("overtime-evidence")
-            .upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
-          20000
-        );
-        if (uploadError) throw uploadError;
+        await uploadEvidenceWithRefresh(storagePath, image);
         evidenceUploaded = true;
       } catch (error) {
         console.error("[overtime evidence] Screenshot upload failed", error);
@@ -949,6 +968,7 @@ export default function EmployeeForm() {
         await supabase.storage.from("overtime-evidence").remove([storagePath]).catch(() => undefined);
       }
       setErr(error?.message || t("form.evidence.failed"));
+      setFailedEvidenceFile(file);
       setReturnStep("evidence");
     } finally {
       setEvidenceBusy(false);
@@ -1539,6 +1559,11 @@ export default function EmployeeForm() {
                 />
               </div>
               <DialogFooter>
+                {failedEvidenceFile && !evidenceBusy && (
+                  <Button type="button" variant="outline" onClick={() => processEvidenceFile(failedEvidenceFile)}>
+                    {t("form.evidence.retry")}
+                  </Button>
+                )}
                 <Button type="button" disabled={evidenceBusy} onClick={() => overtimeInputRef.current?.click()}>
                   {evidenceBusy ? t("form.evidence.processing") : t("form.evidence.choose")}
                 </Button>
