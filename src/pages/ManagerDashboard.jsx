@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Bell, CalendarDays, ClipboardList, Clock3, Image, ImageOff, Radio, Settings, TriangleAlert, Users } from "lucide-react";
+import { Beaker, Bell, CalendarDays, ChevronDown, ClipboardList, Clock3, Image, ImageOff, Radio, Settings, TriangleAlert, Users } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -86,6 +86,7 @@ export default function ManagerDashboard() {
   const normalizedRequest = ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications" : requestedSection;
   // Clamp to an allowed section so a granted admin can't reach an ungranted one by URL.
   const activeSection = allowedSections.includes(normalizedRequest) ? normalizedRequest : fallbackSection;
+  const [notificationsCardOpen, setNotificationsCardOpen] = useState(false); // folded by default
   const [notificationFilter, setNotificationFilter] = useState(["overtime", "meals", "parking"].includes(requestedSection) ? requestedSection : "all");
   const [focusedEvidence, setFocusedEvidence] = useState(null);
   const [overtimeJobs, setOvertimeJobs] = useState([]);
@@ -1081,7 +1082,27 @@ export default function ManagerDashboard() {
         {activeSection === "notifications" && (
           <div className="space-y-3">
             <BroadcastManager />
-            <Card><CardContent className="space-y-3 p-4"><h2 className="font-semibold">{t("manager.notifications.heading")}</h2><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select></CardContent></Card>
+            <Card>
+              <CardContent className="space-y-3 p-4">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 text-left"
+                  aria-expanded={notificationsCardOpen}
+                  onClick={() => setNotificationsCardOpen((open) => !open)}
+                >
+                  <h2 className="font-semibold">{t("manager.notifications.heading")}</h2>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${notificationsCardOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                </button>
+                {notificationsCardOpen && (
+                  <Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}>
+                    <option value="all">{t("manager.notifications.all")}</option>
+                    <option value="overtime">{t("manager.sections.overtime")}</option>
+                    <option value="meals">{t("manager.sections.meals")}</option>
+                    <option value="parking">{t("manager.sections.parking")}</option>
+                  </Select>
+                )}
+              </CardContent>
+            </Card>
             {(overtimeLoading || parkingLoading || notificationMealsLoading) && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
             {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
             {!overtimeLoading && !parkingLoading && !notificationMealsLoading && notificationJobs.map(renderNotificationCard)}
