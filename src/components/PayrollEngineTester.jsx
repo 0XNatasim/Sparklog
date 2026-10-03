@@ -224,6 +224,7 @@ export default function PayrollEngineTester({ messier = false }) {
   const [selectedId, setSelectedId] = useState("");
   const [weekOptions, setWeekOptions] = useState([]); // [{key, label, start, end, weekNo, regularHours, ot150Hours, ot200Hours, km}]
   const [selectedWeek, setSelectedWeek] = useState(""); // "" = manual
+  const [startFromEnd, setStartFromEnd] = useState(""); // manual mode: period_end of the ledger week whose closing cumulatives are the opening ("" = initial opening)
   const [saveState, setSaveState] = useState({ status: "idle", message: "" }); // idle|loading|saving|saved|error
   const [seqByEnd, setSeqByEnd] = useState({}); // period_end → talon_seq (from the ledger)
   const [talonRef, setTalonRef] = useState(""); // cumulative talon reference for the selected week
@@ -269,7 +270,7 @@ export default function PayrollEngineTester({ messier = false }) {
   async function handleSelectEmployee(id) {
     setSelectedId(id);
     setSaveState({ status: "idle", message: "" });
-    setWeekOptions([]); setSelectedWeek("");
+    setWeekOptions([]); setSelectedWeek(""); setStartFromEnd("");
     if (!id) return;
     const profile = employees.find((e) => e.id === id);
     if (profile?.hourly_rate != null) {
@@ -484,6 +485,7 @@ export default function PayrollEngineTester({ messier = false }) {
   function handleSelectWeek(key) {
     setSelectedWeek(key);
     setResult(null); setCalcCtx(null); setPayEditable(false); // re-lock Paie on the new week
+    setStartFromEnd("");
     setTalonRef(formatTalonRef(seqByEnd[key])); // existing ref if this week is comptabilisé
     if (!key) { setYtd(seed); setAsOfDate(seedDate); return; }
     const w = weekOptions.find((o) => o.key === key);
@@ -494,6 +496,20 @@ export default function PayrollEngineTester({ messier = false }) {
     const opening = openingForWeekStart(w.start);
     setYtd(opening.snapshot);
     setAsOfDate(opening.date);
+  }
+
+  // Manual mode only: begin from the closing cumulatives of a specific ledger week (e.g. an
+  // imported talon) so hours typed by hand can be checked against the NEXT real talon.
+  // Nothing is written: Comptabiliser stays tied to a real week.
+  function handleStartFrom(periodEnd) {
+    setStartFromEnd(periodEnd);
+    setResult(null); setCalcCtx(null);
+    if (!periodEnd) { setYtd(seed); setAsOfDate(seedDate); return; }
+    const row = ledger.find((r) => r.periodEnd === periodEnd);
+    if (!row) return;
+    setYtd(row.snapshot);
+    setAsOfDate(row.periodEnd);
+    setFrequency("weekly");
   }
 
   const setP = (k) => (v) => setPay((s) => ({ ...s, [k]: v }));
@@ -646,7 +662,7 @@ export default function PayrollEngineTester({ messier = false }) {
 
   // Opening balances are read-only once entered (seedLocked) or when a week is
   // selected (the opening is then derived from the ledger, not typed).
-  const openingLocked = seedLocked || !!selectedWeek;
+  const openingLocked = seedLocked || !!selectedWeek || !!startFromEnd;
 
   // Paie fields are read-only when a week is selected (they mirror the week's real
   // jobs) until the user clicks "Éditer"; always editable in manual mode.
@@ -701,6 +717,21 @@ export default function PayrollEngineTester({ messier = false }) {
                 </select>
               </label>
             )}
+            {selectedId && !selectedWeek && ledger.length > 0 && (
+              <label className="block text-xs sm:col-span-2">
+                <span className="text-muted-foreground">{t("payroll.startFrom")}</span>
+                <select value={startFromEnd} onChange={(e) => handleStartFrom(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                  <option value="">{t("payroll.startFromSeed")}</option>
+                  {[...ledger].sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1)).map((r) => (
+                    <option key={r.periodEnd} value={r.periodEnd}>
+                      {r.periodStart ? `${dayjs(r.periodStart).format("DD MMM")} – ` : ""}{dayjs(r.periodEnd).format("DD MMM YYYY")}
+                      {seqByEnd[r.periodEnd] ? ` · ${formatTalonRef(seqByEnd[r.periodEnd])}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {startFromEnd && <span className="mt-1 block text-muted-foreground">{t("payroll.startFromHint", { date: dayjs(startFromEnd).add(7, "day").format("DD MMM YYYY") })}</span>}
+              </label>
+            )}
           </div>
           {saveState.message && (
             <div className={`mt-3 text-xs ${saveState.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
@@ -740,7 +771,7 @@ export default function PayrollEngineTester({ messier = false }) {
           <Field label={t("payroll.insurableRqapYtd")} value={ytd.insurableIncomeRQAP} onChange={setY("insurableIncomeRQAP")} disabled={openingLocked} />
         </div>
 
-        {selectedId && !selectedWeek && !seedLocked && (
+        {selectedId && !selectedWeek && !seedLocked && !startFromEnd && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input ref={stubInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleStubUpload} />
             <Button size="sm" variant="outline" onClick={() => stubInputRef.current?.click()} disabled={stubParse.status === "loading"} className="text-xs">
