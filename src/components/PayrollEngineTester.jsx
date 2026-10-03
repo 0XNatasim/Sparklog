@@ -209,6 +209,9 @@ export default function PayrollEngineTester({ messier = false }) {
     prelevementCcq: 0,        // CCQ remittance withholding (federal U1 deduction)
     caisseEducation: 0,       // union education fund (federal U1 deduction)
   });
+  // Test mode only (a start week is chosen): hand-typed rates to reproduce a stub issued under
+  // another agreement. Blank pension/union = keep the sourced formula.
+  const [testRates, setTestRates] = useState({ enabled: false, safety: "", social: "", pensionPerHour: "", unionDues: "" });
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
@@ -484,12 +487,25 @@ export default function PayrollEngineTester({ messier = false }) {
   const setY = (k) => (v) => setYtd((s) => ({ ...s, [k]: v }));
   const setEr = (k) => (v) => setEmployer((s) => ({ ...s, [k]: v }));
   const setC = (k) => (v) => setCcq((s) => ({ ...s, [k]: v }));
+  const testRatesOn = !!startFromEnd && testRates.enabled;
+  const setTR = (k) => (v) => setTestRates((s) => ({ ...s, [k]: v }));
+  function toggleTestRates(on) {
+    setResult(null); setCalcCtx(null);
+    setTestRates((s) => ({
+      ...s,
+      enabled: on,
+      // Start from the current sourced values so only the differing ones need typing.
+      safety: on && s.safety === "" ? String(CCQ_ELECTRICIAN_IC_C3.safetyEquipmentPerHour) : s.safety,
+      social: on && s.social === "" ? String(CCQ_ELECTRICIAN_IC_C3.employerSocialBenefitPerHour) : s.social,
+    }));
+  }
+  useEffect(() => { if (!startFromEnd) setTestRates((s) => (s.enabled ? { ...s, enabled: false } : s)); }, [startFromEnd]);
 
   // Auto-fill the CCQ levies (prélèvement + caisse d'éducation) from hours/wage/union,
   // the same way the union dues are auto-computed. They stay editable (a manual entry
   // is overwritten only when hours/wage/union/vacation change).
   useEffect(() => {
-    if (!ccq.enabled) return;
+    if (!ccq.enabled || testRatesOn) return;
     const hours = (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0);
     const levies = computeCcqLevies({
       hours,
@@ -501,7 +517,7 @@ export default function PayrollEngineTester({ messier = false }) {
     });
     setCcq((s) => ({ ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled]);
+  }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
 
   // Run the calculation. `includePhone` decides whether the profile's phone-data
   // reimbursement is added (asked via a styled modal, never auto-added).
@@ -559,6 +575,12 @@ export default function PayrollEngineTester({ messier = false }) {
         level: ccq.status,
         prelevementCcq: Number(ccq.prelevementCcq) || 0,
         caisseEducationSyndicale: Number(ccq.caisseEducation) || 0,
+        ...(testRatesOn ? {
+          ...(testRates.safety !== "" && { safetyEquipmentPerHour: Number(testRates.safety) || 0 }),
+          ...(testRates.social !== "" && { employerSocialBenefitPerHour: Number(testRates.social) || 0 }),
+          ...(testRates.pensionPerHour !== "" && { pensionDeductionPerHour: Number(testRates.pensionPerHour) || 0 }),
+          ...(testRates.unionDues !== "" && { unionDuesOverride: Number(testRates.unionDues) || 0 }),
+        } : {}),
       });
       baseAdjustments = benefits.baseAdjustments;
       // Union dues + prélèvement + caisse are federal-only deductions (U1), computed
@@ -817,6 +839,23 @@ export default function PayrollEngineTester({ messier = false }) {
 
       {/* ── Avantages CCQ — foldable; level/union from profile, rates auto-filled + locked ── */}
       <Collapsible title={ccqTitle}>
+            {startFromEnd && (
+              <div className="mb-3 space-y-2 rounded-md border border-dashed border-amber-500/60 bg-amber-500/5 p-3">
+                <label className="flex items-center gap-2 text-xs font-semibold">
+                  <input type="checkbox" checked={testRates.enabled} onChange={(e) => toggleTestRates(e.target.checked)} />
+                  {t("payroll.testRates.toggle")}
+                </label>
+                <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.hint")}</p>
+                {testRates.enabled && (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <Field label={t("payroll.testRates.safety")} value={testRates.safety} onChange={setTR("safety")} step="0.01" />
+                    <Field label={t("payroll.testRates.social")} value={testRates.social} onChange={setTR("social")} step="0.001" />
+                    <Field label={t("payroll.testRates.pension")} value={testRates.pensionPerHour} onChange={setTR("pensionPerHour")} step="0.001" />
+                    <Field label={t("payroll.testRates.union")} value={testRates.unionDues} onChange={setTR("unionDues")} step="0.01" />
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
@@ -836,12 +875,12 @@ export default function PayrollEngineTester({ messier = false }) {
                   ))}
                 </select>
               </label>
-              <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" disabled />
-              <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" disabled />
-              <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" disabled />
-              <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" disabled />
-              <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" disabled />
-              <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" disabled />
+              <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" disabled={!testRatesOn} />
+              <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" disabled={!testRatesOn} />
+              <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" disabled={!testRatesOn} />
+              <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" disabled={!testRatesOn} />
+              <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" disabled={!testRatesOn} />
+              <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" disabled={!testRatesOn} />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqAutoNote")}</p>
       </Collapsible>
