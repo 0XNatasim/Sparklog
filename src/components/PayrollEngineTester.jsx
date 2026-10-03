@@ -5,6 +5,8 @@ import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { buildClosing, payTotals } from "@/lib/payroll-closing";
+import TalonCompare from "@/components/TalonCompare";
 import { calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
@@ -426,42 +428,7 @@ export default function PayrollEngineTester({ messier = false }) {
     const periodEnd = w.end.format("YYYY-MM-DD");
     const periodStart = w.start.format("YYYY-MM-DD");
     setSaveState({ status: "saving", message: "" });
-    const a = result.ytdAfter;
-    const snap = calcCtx.ytdSnapshot; // the week's opening balance
-    const fromCents = (v) => (Number(v) || 0) / 100;
-    const add = (k, v) => (Number(snap[k]) || 0) + (Number(v) || 0);
-    const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
-    const c = ccqAmounts;
-    const medicPrem = c ? c.medicWithholding / 1.09 : 0;
-    const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
-    const closing = {
-      ...snap, // untouched lines keep the opening baseline
-      grossIncome: fromCents(a.grossIncome),
-      rrqEmployee: fromCents(a.rrqEmployee),
-      rrq2Employee: fromCents(a.rrq2Employee),
-      eiEmployee: fromCents(a.eiEmployee),
-      rqapEmployee: fromCents(a.rqapEmployee),
-      federalTax: fromCents(a.federalTax),
-      quebecTax: fromCents(a.quebecTax),
-      pensionableIncomeRRQ: fromCents(a.pensionableIncomeRRQ),
-      insurableIncomeEI: fromCents(a.insurableIncomeEI),
-      insurableIncomeRQAP: fromCents(a.insurableIncomeRQAP),
-      labourStandardsIncome: fromCents(a.labourStandardsIncome),
-      regularEarnings: add("regularEarnings", result.gross?.cashTotal),
-      vacancesCcq: add("vacancesCcq", c?.vacation),
-      ccqTaxableBenefit: add("ccqTaxableBenefit", c?.taxableBenefit),
-      ccqBenefitsDeduction: add("ccqBenefitsDeduction", c?.pensionDeduction),
-      ccqBenefitsAdvantage: add("ccqBenefitsAdvantage", c?.employerSocialBenefit),
-      medicInsurance: add("medicInsurance", medicPrem),
-      insuranceSalesTax: add("insuranceSalesTax", c ? c.medicWithholding - medicPrem : 0),
-      unionDues: add("unionDues", c?.unionDues),
-      ccqLevy: add("ccqLevy", c?.prelevementCcq),
-      unionEducationFund: add("unionEducationFund", c?.caisseEducationSyndicale),
-      safetyEquipment: add("safetyEquipment", c?.safetyEquipment),
-      kmIndemnity: add("kmIndemnity", reimb?.km),
-      hoursYtd: add("hoursYtd", hours),
-    };
-    Object.keys(closing).forEach((k) => { if (typeof closing[k] === "number") closing[k] = round2(closing[k]); });
+    const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
     const talonSeq = await nextTalonSeq(periodEnd);
     const error = await saveLedgerRow(closing, periodEnd, periodStart, talonSeq);
     if (error) { setSaveState({ status: "error", message: error.message }); return false; }
@@ -928,6 +895,14 @@ export default function PayrollEngineTester({ messier = false }) {
 
       {result && <Results result={result} reimb={reimb} ccq={ccqAmounts} pay={pay} open={openExplain} setOpen={setOpenExplain} t={t} />}
 
+      {result && result.employee && calcCtx && (
+        <TalonCompare
+          opening={calcCtx.ytdSnapshot}
+          closing={buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay })}
+          totals={payTotals(result, ccqAmounts, reimb)}
+        />
+      )}
+
       <PayStubPrint
         open={showStub}
         onOpenChange={setShowStub}
@@ -1029,16 +1004,8 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
         <Card><CardContent className="space-y-1.5 p-4 text-sm">
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.employee")}</div>
           {(() => {
-            const statutory = employee.federalTax + employee.quebecTax + employee.rrq.total + employee.ei + employee.rqap;
-            // Gross-up presentation (matches the CCQ stub): non-cash benefits are shown
-            // as gains, then reversed in the deductions; safety equipment is a paid,
-            // non-taxable allowance. Net = grossUp − (reversals + all withholdings).
-            const reversals = ccq ? ccq.vacation + ccq.taxableBenefit + ccq.employerSocialBenefit : 0;
-            const grossUp = gross.total + (ccq ? reversals + ccq.safetyEquipment : 0);
-            const withheld = statutory + (ccq ? ccq.netWithholdings : 0);
-            const totalRetenues = reversals + withheld;
-            const net = grossUp - totalRetenues; // includes the paid safety allowance
-            const extraReimb = reimb ? (reimb.km || 0) + (reimb.phone || 0) : 0;
+            // Gross-up presentation (matches the CCQ stub): see payTotals.
+            const { grossUp, totalRetenues, net, extraReimb } = payTotals(result, ccq, reimb);
             return (
               <>
                 <Row label={t("payroll.grossTotal")} value={money(grossUp)} strong />
