@@ -71,7 +71,9 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
       setPeriodEnd(result.periodEnd || result.header?.periodEnd || "");
       setFileName(file.name);
       const n = (result.transactions?.length || 0) + (result.sommaire?.length || 0);
-      setMsg(t("payroll.legacy.detected", { count: n }));
+      const fix = result.hoursCorrection;
+      setMsg(t("payroll.legacy.detected", { count: n })
+        + (fix ? ` ${t("payroll.legacy.hoursCorrected", { legacy: fix.legacyHours, paid: fix.paidHours })}` : ""));
     } catch (e2) {
       setErr(e2?.code === "no_text_layer" ? t("payroll.legacy.noText") : (e2?.message || t("payroll.legacy.failed")));
     } finally {

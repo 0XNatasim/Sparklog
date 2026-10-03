@@ -113,6 +113,39 @@ function headerValue(rows, labelRe) {
   return null;
 }
 
+// Paid hours of a talon = the units on the hour-based earnings lines only (régulier, temps et
+// demi, temps double). "Régulier à taux horaire" is a premium computed ON the regular hours and
+// the allowance/reimbursement lines are not hours, so none of them may add to the total.
+const isPaidHoursLine = (description) => {
+  const n = norm(description);
+  if (/taux horaire/.test(n)) return false;
+  return /^(salaire )?regulier/.test(n) || /^temps (et demi|double|simple)/.test(n);
+};
+
+// The legacy software also counted the premium line's units, inflating "Heures" / "Heures AE"
+// (e.g. 29.5 + 2 + 29.5 = 61 instead of 31.5). Rebuild the real hours from the Transactions block
+// and take the excess off both the period and the cumulative columns. No-op when the legacy
+// figure is already right, or when no hour line can be identified.
+export function correctLegacyHours(transactions, sommaire, ytd) {
+  const lines = transactions.filter((r) => r.unite != null && isPaidHoursLine(r.description));
+  if (!lines.length) return null;
+  const paidHours = Math.round(lines.reduce((sum, r) => sum + r.unite, 0) * 100) / 100;
+  const legacy = sommaire.find((r) => r.key === "hoursYtd");
+  if (!legacy || legacy.periode == null) return null;
+  const legacyHours = legacy.periode;
+  const excess = Math.round((legacyHours - paidHours) * 100) / 100;
+  if (excess <= 0.005) return null;
+  const fix = (v) => (v == null ? v : Math.round((v - excess) * 100) / 100);
+  for (const row of sommaire) {
+    if (row.key === "hoursYtd" || /^heures ae$/.test(norm(row.description))) {
+      row.periode = fix(row.periode);
+      row.cumulatif = fix(row.cumulatif);
+    }
+  }
+  if (ytd.hoursYtd != null) ytd.hoursYtd = fix(ytd.hoursYtd);
+  return { legacyHours, paidHours, excess };
+}
+
 // Pure: rebuild the full talon from positioned items.
 export function buildTalonFromItems(items) {
   // The talon lives on the page carrying the "Transactions"/"Sommaire" table.
@@ -147,6 +180,8 @@ export function buildTalonFromItems(items) {
   const ytd = {};
   for (const s of sommaire) if (s.key && s.cumulatif != null) ytd[s.key] = s.cumulatif;
 
+  const hoursCorrection = correctLegacyHours(tx, sommaire, ytd);
+
   // Accent/case-insensitive text for label-anchored header captures.
   const nText = norm(allText);
   const grab = (re) => (nText.match(re) || [])[1] || "";
@@ -167,5 +202,5 @@ export function buildTalonFromItems(items) {
     rbq: grab(/rbq\s*#?\s*([\d-]+)/),
   };
 
-  return { header, transactions: tx, sommaire, ytd, periodEnd: header.periodEnd };
+  return { header, transactions: tx, sommaire, ytd, periodEnd: header.periodEnd, hoursCorrection };
 }
