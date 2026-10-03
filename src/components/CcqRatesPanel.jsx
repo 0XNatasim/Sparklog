@@ -1,111 +1,13 @@
 import React, { useState, useEffect } from "react";
 import dayjs from "dayjs";
+import { ExternalLink } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Calculator, CalendarDays, DollarSign, Download, ExternalLink, FileText, ShieldCheck, Wallet } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
-import { APP_VERSION } from "@/lib/version";
-import ManagerDownloads from "@/components/ManagerDownloads";
-import CostingDashboard from "@/components/CostingDashboard";
-import PeriodSummary from "@/components/PeriodSummary";
 import ElectricianCostSheet from "@/components/ElectricianCostSheet";
-import PayrollEngineTester from "@/components/PayrollEngineTester";
-import TalonTab from "@/components/TalonTab";
-import DasTab from "@/components/DasTab";
-import WeekViewTab from "@/components/WeekViewTab";
-import RecordOfEmploymentTab from "@/components/RecordOfEmploymentTab";
-import AuditLog from "@/components/AuditLog";
-import EmployeeActivityLog from "@/components/EmployeeActivityLog";
-import InfraHealthCard from "@/components/InfraHealthCard";
-
-// ── Coûts section: Coûts (tableau) · Semaine · Mois ──────────────────────────
-function CostingSection() {
-  const t = useT();
-  return (
-    <Tabs defaultValue="costs" className="w-full">
-      <TabsList>
-        <TabsTrigger value="costs">{t("testing.sections.costing")}</TabsTrigger>
-        <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
-        <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="costs" className="mt-3"><CostingDashboard /></TabsContent>
-      <TabsContent value="week" className="mt-3"><PeriodSummary mode="week" /></TabsContent>
-      <TabsContent value="month" className="mt-3"><PeriodSummary mode="month" /></TabsContent>
-    </Tabs>
-  );
-}
-
-// ── Paie section ─────────────────────────────────────────────────────────────
-// Façon Messier (the method payroll will be run with) comes first, on the left;
-// the by-the-book CCQ calculation sits on the right for comparison:
-//   Calcul · Talon · DAS  ← Façon Messier | Façon Book →  Calcul · Talon · DAS
-function PayrollSection() {
-  const t = useT();
-  return (
-    <Tabs defaultValue="calcul-m" className="w-full">
-      <TabsList className="flex-wrap">
-        <TabsTrigger value="calcul-m">{t("payroll.subtabs.calcul")}</TabsTrigger>
-        <TabsTrigger value="talon-m">{t("payroll.subtabs.talon")}</TabsTrigger>
-        <TabsTrigger value="das-m">{t("payroll.subtabs.das")}</TabsTrigger>
-        <span className="ml-2 flex items-center text-xs font-semibold text-primary">← {t("payroll.subtabs.messierLabel")}</span>
-        <span className="mx-3 h-5 w-px bg-border" aria-hidden="true" />
-        <span className="mr-2 flex items-center text-xs font-semibold text-muted-foreground">{t("payroll.subtabs.bookLabel")} →</span>
-        <TabsTrigger value="calcul">{t("payroll.subtabs.calcul")}</TabsTrigger>
-        <TabsTrigger value="talon">{t("payroll.subtabs.talon")}</TabsTrigger>
-        <TabsTrigger value="das">{t("payroll.subtabs.das")}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="calcul-m" className="mt-3"><MessierNote /><PayrollEngineTester messier /></TabsContent>
-      <TabsContent value="talon-m" className="mt-3"><MessierNote /><TalonTab messier /></TabsContent>
-      <TabsContent value="das-m" className="mt-3"><MessierNote /><DasTab messier /></TabsContent>
-      <TabsContent value="calcul" className="mt-3"><BookNote /><PayrollEngineTester /></TabsContent>
-      <TabsContent value="talon" className="mt-3"><BookNote /><TalonTab /></TabsContent>
-      <TabsContent value="das" className="mt-3"><BookNote /><DasTab /></TabsContent>
-    </Tabs>
-  );
-}
-
-// ── Audit section: manager actions · employee activity (sign-ins, job saves) ────
-function AuditSection() {
-  const t = useT();
-  return (
-    <Tabs defaultValue="managers" className="w-full">
-      <TabsList>
-        <TabsTrigger value="managers">{t("audit.tabs.managers")}</TabsTrigger>
-        <TabsTrigger value="employees">{t("audit.tabs.employees")}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="managers" className="mt-3 space-y-3">
-        <InfraHealthCard />
-        <AuditLog />
-      </TabsContent>
-      <TabsContent value="employees" className="mt-3"><EmployeeActivityLog /></TabsContent>
-    </Tabs>
-  );
-}
-
-// Façon Messier: the method payroll will be run with.
-function MessierNote() {
-  const t = useT();
-  return (
-    <div className="mb-3 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs">
-      <div className="font-semibold">{t("payroll.messierNote.title")}</div>
-      <p className="mt-1 text-muted-foreground">{t("payroll.messierNote.body")}</p>
-    </div>
-  );
-}
-
-// Façon Book: the strict CCQ calculation, kept for comparison.
-function BookNote() {
-  const t = useT();
-  return (
-    <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
-      <div className="font-semibold">{t("payroll.bookNote.title")}</div>
-      <p className="mt-1">{t("payroll.bookNote.body")}</p>
-    </div>
-  );
-}
 
 // ─── CCQ configuration ───────────────────────────────────────────────────────
 const OCCUPATION = { id: "220", name: "Électricien" };
@@ -233,7 +135,7 @@ function fmt(value) {
 }
 
 // ─── CCQ rates panel ──────────────────────────────────────────────────────────
-function CcqRatesPanel() {
+export default function CcqRatesPanel() {
   const t = useT();
   const [loading, setLoading]   = useState(false);
   const [err, setErr]           = useState("");
@@ -440,52 +342,6 @@ function CcqRatesPanel() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-// ─── Page with card sub-navigation ────────────────────────────────────────────
-export default function Testing() {
-  const t = useT();
-  const [section, setSection] = useState("costing");
-
-  const sections = [
-    { id: "costing", icon: Calculator, label: t("testing.sections.costing"), description: t("testing.sections.costingDescription") },
-    { id: "downloads", icon: Download, label: t("testing.sections.downloads"), description: t("testing.sections.downloadsDescription") },
-    { id: "ccq", icon: DollarSign, label: t("testing.tabs.ccq"), description: t("testing.sections.ccqDescription") },
-    { id: "weekview", icon: CalendarDays, label: t("testing.weekView.tab"), description: t("testing.weekView.description") },
-    { id: "roe", icon: FileText, label: t("testing.roe.tab"), description: t("testing.roe.description") },
-    { id: "payroll", icon: Wallet, label: t("testing.tabs.payroll"), description: t("testing.sections.payrollDescription") },
-    { id: "audit", icon: ShieldCheck, label: t("manager.sections.audit"), description: t("manager.sections.auditDescription") },
-  ];
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <span className="font-mono text-[10px] text-muted-foreground" title="Version">V{APP_VERSION}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8" aria-label={t("manager.sections.testing")}>
-        {sections.map(({ id, icon: Icon, label, description }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSection(id)}
-            aria-current={section === id ? "page" : undefined}
-            className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${section === id ? "border-primary bg-primary/10 text-primary" : "bg-card hover:border-primary/50 hover:bg-accent"}`}
-          >
-            <div className="flex items-center gap-2 font-semibold"><Icon className="h-4 w-4" />{label}</div>
-            <div className={`mt-1 text-xs ${section === id ? "text-primary/80" : "text-muted-foreground"}`}>{description}</div>
-          </button>
-        ))}
-      </div>
-
-      {section === "costing" && <CostingSection />}
-      {section === "downloads" && <ManagerDownloads />}
-      {section === "ccq" && <CcqRatesPanel />}
-      {section === "weekview" && <WeekViewTab />}
-      {section === "roe" && <RecordOfEmploymentTab />}
-      {section === "payroll" && <PayrollSection />}
-      {section === "audit" && <AuditSection />}
     </div>
   );
 }

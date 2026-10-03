@@ -746,7 +746,7 @@ export default function PayrollEngineTester({ messier = false }) {
             <Button size="sm" variant="outline" onClick={() => stubInputRef.current?.click()} disabled={stubParse.status === "loading"} className="text-xs">
               <Upload className="mr-1.5 h-3.5 w-3.5" /> {stubParse.status === "loading" ? t("payroll.stub.reading") : t("payroll.stub.upload")}
             </Button>
-            <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs">
+            <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs border-amber-600 bg-amber-500/10 font-semibold text-amber-900 hover:bg-amber-500/20 dark:text-amber-200">
               <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
             </Button>
             {stubParse.message && (
@@ -880,7 +880,7 @@ export default function PayrollEngineTester({ messier = false }) {
               <Printer className="mr-2 h-4 w-4" /> {t("payroll.printStub")}
             </Button>
             {selectedId && (
-              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full sm:w-auto">
+              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full border-amber-600 bg-amber-500/10 font-semibold text-amber-900 hover:bg-amber-500/20 dark:text-amber-200 sm:w-auto">
                 <Save className="mr-2 h-4 w-4" /> {t("payroll.post")}
               </Button>
             )}

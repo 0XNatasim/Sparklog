@@ -1,13 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Beaker, Bell, CalendarDays, ClipboardList, Clock3, Image, ImageOff, Radio, Settings, TriangleAlert, Users } from "lucide-react";
+import { Image, ImageOff, Radio, TriangleAlert } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { canAccessSection } from "@/lib/roles";
 import { formatHM } from "../lib/time";
-import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,13 +19,6 @@ import { jobCodeTintClass } from "@/lib/job-code";
 import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
-import FormsManager from "@/components/FormsManager";
-import EmployeesPanel from "@/components/EmployeesPanel";
-import CongesManager from "@/components/CongesManager";
-import TimeRulesManager from "@/components/TimeRulesManager";
-import BroadcastManager from "@/components/BroadcastManager";
-import SettingsPanel from "@/components/SettingsPanel";
-import Testing from "@/pages/Testing";
 import LiveCrew from "@/components/LiveCrew";
 import WeekSnapshot from "@/components/WeekSnapshot";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
@@ -66,27 +57,22 @@ function weekKeyFromDate(dateStr) {
 
 const ANOMALY_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, started_at, ended_at, km_total, km_aller, km_retour, overtime_evidence_captured";
 
-export default function ManagerDashboard() {
+const NOTIFICATION_FILTERS = ["overtime", "meals", "parking"];
+
+// Two Gestion pages share this component's state (jobs, claims, evidence):
+//   view="timesheet" → Feuilles  (#/manager/timesheets)
+//   view="receipts"  → Justificatifs (#/manager/receipts)
+// Employee, status and day live in the URL so a timesheet view can be bookmarked or shared.
+export default function ManagerDashboard({ view = "timesheet" }) {
   const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
-  const { user, role, adminSections } = useAuth();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = searchParams.get("job");
-  const requestedSection = searchParams.get("section");
-  // Which dashboard sections this user may open. Managers/owners get all; an admin
-  // (office employee) sees only the sections the owner granted (profiles.admin_sections).
-  const allSections = ["live", "timesheet", "notifications", "employees", "settings", "conges", "forms", "testing"];
-  // Congés and Formulaires live under Réglage for anyone who can open it; an admin
-  // granted Formulaires without Réglage keeps it as a top-level section.
-  const canOpenSettings = canAccessSection(role, adminSections, "settings");
-  const allowedSections = allSections.filter((id) => canAccessSection(role, adminSections, id)
-    && !(canOpenSettings && (id === "conges" || id === "forms")));
-  const fallbackSection = allowedSections[0] || "live";
-  const normalizedRequest = ["overtime", "meals", "parking"].includes(requestedSection) ? "notifications" : requestedSection;
-  // Clamp to an allowed section so a granted admin can't reach an ungranted one by URL.
-  const activeSection = allowedSections.includes(normalizedRequest) ? normalizedRequest : fallbackSection;
-  const [notificationFilter, setNotificationFilter] = useState(["overtime", "meals", "parking"].includes(requestedSection) ? requestedSection : "all");
+  const activeSection = view === "receipts" ? "notifications" : "timesheet";
+  const requestedFilter = searchParams.get("filter");
+  const [notificationFilter, setNotificationFilter] = useState(NOTIFICATION_FILTERS.includes(requestedFilter) ? requestedFilter : "all");
   const [focusedEvidence, setFocusedEvidence] = useState(null);
   const [overtimeJobs, setOvertimeJobs] = useState([]);
   const [overtimeEvidence, setOvertimeEvidence] = useState(new Map());
@@ -116,9 +102,11 @@ export default function ManagerDashboard() {
 
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  const [employeeId, setEmployeeId] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [dayFilter, setDayFilter] = useState("");
+  const [employeeId, setEmployeeId] = useState(searchParams.get("emp") || "all");
+  const [statusFilter, setStatusFilter] = useState(["saved", "submitted", "approved"].includes(searchParams.get("status")) ? searchParams.get("status") : "all");
+  const [dayFilter, setDayFilter] = useState(/^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") || "") ? searchParams.get("date") : "");
+  // Phone only: which of the three status piles is shown when one employee is selected.
+  const [mobileStatus, setMobileStatus] = useState("submitted");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
   const [yesterdaySnapshotOpen, setYesterdaySnapshotOpen] = useState(false);
@@ -134,6 +122,26 @@ export default function ManagerDashboard() {
   useEffect(() => {
     setSearchDebounced(searchLive);
   }, [searchLive, setSearchDebounced]);
+
+  // Mirror the filters into the URL (replace, so Back does not step through every keystroke).
+  useEffect(() => {
+    if (view !== "timesheet") return;
+    const next = new URLSearchParams(searchParams);
+    const put = (key, value, empty) => (value && value !== empty ? next.set(key, value) : next.delete(key));
+    put("emp", employeeId, "all");
+    put("status", statusFilter, "all");
+    put("date", dayFilter, "");
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, employeeId, statusFilter, dayFilter]);
+
+  useEffect(() => {
+    if (view !== "receipts") return;
+    const next = new URLSearchParams(searchParams);
+    if (notificationFilter === "all") next.delete("filter"); else next.set("filter", notificationFilter);
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, notificationFilter]);
 
   function buildJobsQuery() {
     let q = supabase
@@ -672,7 +680,6 @@ export default function ManagerDashboard() {
 
   function openAnomaly(anomaly) {
     const next = new URLSearchParams(searchParams);
-    next.set("section", "timesheet");
     next.set("job", anomaly.jobIds[0]);
     setSearchParams(next);
     setEmployeeId(anomaly.userId);
@@ -685,7 +692,11 @@ export default function ManagerDashboard() {
     setSearchLive("");
     setSearch("");
     setSelectedWeekKey("latest");
-    setSearchParams({ section: "timesheet" });
+    if (searchParams.has("job")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("job");
+      setSearchParams(next, { replace: true });
+    }
   }
 
   async function approve(jobId) {
@@ -1040,47 +1051,10 @@ export default function ManagerDashboard() {
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
   return (
-    <AppShell>
+    <>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8" aria-label={t("manager.sections.label")}>
-          {[
-            { id: "live", icon: Radio, label: t("manager.sections.live"), description: t("manager.sections.liveDescription") },
-            { id: "timesheet", icon: Clock3, label: t("manager.sections.timesheet"), description: t("manager.sections.timesheetDescription") },
-            { id: "notifications", icon: Bell, label: t("manager.sections.notifications"), description: t("manager.sections.notificationsDescription") },
-            { id: "employees", icon: Users, label: t("manager.sections.employees"), description: t("manager.sections.employeesDescription") },
-            { id: "settings", icon: Settings, label: t("settings.tab"), description: t("settings.description") },
-            { id: "conges", icon: CalendarDays, label: t("manager.sections.conges"), description: t("manager.sections.congesDescription") },
-            { id: "forms", icon: ClipboardList, label: t("manager.sections.forms"), description: t("manager.sections.formsDescription") },
-            { id: "testing", icon: Beaker, label: t("manager.sections.testing"), description: t("manager.sections.testingDescription") },
-          ].filter(({ id }) => allowedSections.includes(id)).map(({ id, icon: Icon, label, description }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setSearchParams({ section: id })}
-              aria-current={activeSection === id ? "page" : undefined}
-              className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === id ? "border-primary bg-primary/10 text-primary" : "bg-card hover:border-primary/50 hover:bg-accent"}`}
-            >
-              <div className="flex items-center gap-2 font-semibold"><Icon className="h-4 w-4" />{label}</div>
-              <div className={`mt-1 text-xs ${activeSection === id ? "text-primary/80" : "text-muted-foreground"}`}>{description}</div>
-            </button>
-          ))}
-        </div>
-
-        {activeSection === "live" && <LiveCrew onSelectEmployee={openEmployeeTimesheet} />}
-
-        {activeSection === "employees" && <div className="space-y-3"><TimeRulesManager /><EmployeesPanel /></div>}
-
-        {activeSection === "settings" && <SettingsPanel />}
-
-        {activeSection === "conges" && <CongesManager />}
-
-        {activeSection === "forms" && <FormsManager collapsible={false} />}
-
-        {activeSection === "testing" && <Testing />}
-
         {activeSection === "notifications" && (
           <div className="space-y-3">
-            <BroadcastManager />
             <Card><CardContent className="space-y-3 p-4"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select></CardContent></Card>
             {(overtimeLoading || parkingLoading || notificationMealsLoading) && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
             {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
@@ -1296,33 +1270,37 @@ export default function ManagerDashboard() {
 
         {!loading && employeeId !== "all" && split && (
           <>
-            {/* Three small standalone header cards, above the columns */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                {t("manager.savedSection")}
-                <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.saved.length}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                {t("manager.submittedSection")}
-                <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.submitted.length}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                {t("status.approved")}
-                <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split.approved.length}</span>
-              </div>
+            {/* Phone: one status selector above a single list. Desktop keeps the three piles. */}
+            <Select
+              value={mobileStatus}
+              onChange={(e) => setMobileStatus(e.target.value)}
+              className="lg:hidden"
+              aria-label={t("manager.filters.allStatuses")}
+            >
+              <option value="saved">{t("manager.savedSection")} ({split.saved.length})</option>
+              <option value="submitted">{t("manager.submittedSection")} ({split.submitted.length})</option>
+              <option value="approved">{t("status.approved")} ({split.approved.length})</option>
+            </Select>
+
+            <div className="hidden grid-cols-3 gap-3 lg:grid">
+              {[
+                ["saved", t("manager.savedSection")],
+                ["submitted", t("manager.submittedSection")],
+                ["approved", t("status.approved")],
+              ].map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
+                  {label}
+                  <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split[key].length}</span>
+                </div>
+              ))}
             </div>
 
-            {/* Three columns of job cards (no inner headers) */}
             <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-              <div className="flex flex-col gap-2 self-start">
-                {split.saved.map(renderJobCard)}
-              </div>
-              <div className="flex flex-col gap-2 self-start">
-                {split.submitted.map(renderJobCard)}
-              </div>
-              <div className="flex flex-col gap-2 self-start">
-                {split.approved.map(renderJobCard)}
-              </div>
+              {["saved", "submitted", "approved"].map((key) => (
+                <div key={key} className={cn("flex-col gap-2 self-start", mobileStatus === key ? "flex" : "hidden", "lg:flex")}>
+                  {split[key].map(renderJobCard)}
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -1355,6 +1333,6 @@ export default function ManagerDashboard() {
         </>}
       </div>
       {confirmDialog}
-    </AppShell>
+    </>
   );
 }

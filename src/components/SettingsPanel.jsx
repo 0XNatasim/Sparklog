@@ -4,30 +4,15 @@ import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Fold from "@/components/ui/fold";
-import CongesManager from "@/components/CongesManager";
-import FormsManager from "@/components/FormsManager";
 import { ANOMALY_LIMITS, anomalyLimitsFromSettings } from "@/lib/job-anomalies";
 import { companyDate } from "@/lib/company-time";
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 
-// Réglage: company-wide editable parameters, plus Congés and Formulaires.
+// Paramètres: company-wide editable parameters. Congés and Formulaires are their own pages.
 export default function SettingsPanel() {
-  const t = useT();
-  return (
-    <Tabs defaultValue="general" className="w-full">
-      <TabsList className="flex-wrap">
-        <TabsTrigger value="general">{t("settings.tabs.general")}</TabsTrigger>
-        <TabsTrigger value="conges">{t("manager.sections.conges")}</TabsTrigger>
-        <TabsTrigger value="forms">{t("manager.sections.forms")}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="general" className="mt-3"><GeneralSettings /></TabsContent>
-      <TabsContent value="conges" className="mt-3"><CongesManager /></TabsContent>
-      <TabsContent value="forms" className="mt-3"><FormsManager collapsible={false} /></TabsContent>
-    </Tabs>
-  );
+  return <GeneralSettings />;
 }
 
 function GeneralSettings() {

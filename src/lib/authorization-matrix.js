@@ -5,6 +5,7 @@ import {
   isNonCcqRole,
   isPrivileged,
 } from "./roles";
+import { MANAGER_NAV_ITEMS, canOpenNavItem } from "./manager-nav";
 
 export const APPLICATION_ROLES = Object.freeze([
   "employee",
@@ -26,8 +27,15 @@ export function authorizationFor({ role, adminSections = [], paused = false }) {
     ])
   );
 
+  // Every Gestion page (sidebar entry), by id — payroll, reports, settings and audit are
+  // manager/owner only because no grantable section maps to them.
+  const pages = Object.fromEntries(
+    MANAGER_NAV_ITEMS.map((item) => [item.id, knownRole && canOpenNavItem(role, adminSections, item)])
+  );
+
   return Object.freeze({
     role,
+    pages: Object.freeze(pages),
     paused: Boolean(paused),
     canLogOwnTime: knownRole && !paused,
     canManageAny: Object.values(sections).some(Boolean),
