@@ -24,8 +24,14 @@ Roles are stored lowercase in `profiles.role`:
 - Record work-order number, date, departure, arrival, end time, mileage, and return-to-storage details.
 - Auto-fill a job card from a work-order photo.
 - Attach an overtime authorization screenshot when the daily total exceeds eight hours.
+  If the upload fails, the message states the real cause (empty/too-large/unsupported or
+  unreadable image, timeout, expired session, no network) with the technical detail. An
+  expired session, timeout or network drop is retried once automatically after refreshing
+  the session, and a **Réessayer avec la même capture** button re-runs the upload with the
+  same file without losing the job details.
 - Attach a parking receipt when the manager enables Parking for that employee.
-- Review job history and weekly totals.
+- Review job history and weekly totals. Within each day, jobs are listed in chronological
+  order (by departure time, then end time; jobs without a departure last).
 - Complete first-login work-region and union-association onboarding.
 - View manager-enabled company forms from the Profile page.
 - New profiles default to `compagnon`, CCQ schedule `C3` (general daytime work), a
@@ -39,7 +45,7 @@ The Manager workspace has six sections:
 | Section | Purpose |
 |---|---|
 | **Live crew** | See who is working today. |
-| **Time-sheet** | Review submitted jobs, filter by employee / status / day, unlock entries, and approve jobs individually or a full week before Google Sheets export. Weeks run Sunday→Saturday (matching the payroll engine) and are grouped under their CCQ monthly report period (which ends on the last Saturday of the month). Job cards are tinted by code prefix (AD… = administration, JOB… = project) and flagged when a day exceeds 8 h with no overtime screenshot. |
+| **Time-sheet** | Review submitted jobs, filter by employee / status / day, unlock entries, and approve jobs individually or a full week before Google Sheets export. Weeks run Sunday→Saturday (matching the payroll engine) and are grouped under their CCQ monthly report period (which ends on the last Saturday of the month). Job cards are tinted by code prefix (AD… = administration, JOB… = project) and flagged when a day exceeds 8 h with no overtime screenshot. Two read-only snapshot buttons open overviews: **Hier à 23 h 58** (yesterday's Live-crew board) and **Cette semaine** (current Sunday→Saturday week: one row per employee, one cell per day with total time and number of ORs, coloured orange = saved, green = submitted/approved, red = nothing entered on a past weekday, blue = leave; click a cell to open that day's time-sheet). |
 | **Notifications** | Review overtime authorizations, supper claims, and parking receipts in one place. |
 | **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, set day/week time off, manage company holidays, and pause accounts (or delete already-inactive ones) without losing history. The list is grouped by role (owner → admin → manager → employee, alphabetical within each). Owners can assign roles here; `admin` staff show a flat-hourly pay field instead of CCQ metadata. |
 | **Forms** | Open company forms and control which forms employees can see. |
@@ -82,7 +88,7 @@ Parking receipt pictures and overtime proof screenshots are stored as images wit
 
 ```text
 src/
-  components/       Shared UI and manager panels
+  components/       Shared UI and manager panels (LiveCrew, WeekSnapshot, UpdateBanner, …)
   contexts/         Authentication/profile state
   lib/              CCQ export/rate helpers, i18n, and static lists
   pages/            Employee, manager, history, profile, week, and testing pages
@@ -321,6 +327,16 @@ Rules are recorded as data in the `public.payroll_rules` table and documented in
 5. Configure the global overtime evidence-retention period.
 6. Synchronize commercial CCQ rates and select the correct appendix.
 7. Configure Google Sheets and an email provider if those integrations are required.
+
+## App updates (PWA)
+
+Every build emits `/version.json` (generated from `APP_VERSION` in `src/lib/version.js`,
+never precached by the service worker). `UpdateBanner` checks it on load, on focus and
+every 5 minutes; when a newer version is deployed than the one running on the device it
+shows a banner asking the user to refresh or sign back in, with a **Rafraîchir
+maintenant** button that unregisters the service worker, clears caches and reloads. It
+never reloads on its own, so a form in progress is not lost. Always bump the patch of
+`APP_VERSION` in every PR (it is shown in the header as `V…`).
 
 ## Reliability (free-tier keep-warm)
 
