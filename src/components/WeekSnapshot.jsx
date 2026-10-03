@@ -119,10 +119,7 @@ export default function WeekSnapshot({ onSelectEmployee }) {
                         className={cn("flex w-full flex-col items-center rounded-md border px-1 py-1 leading-tight hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", cellClass(cell))}
                       >
                         {cell.count > 0 ? (
-                          <>
-                            <span className="font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
-                            <span className="text-[10px]">{t("live.week.otCount", { count: cell.count })}</span>
-                          </>
+                          <span className="py-1 font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
                         ) : (
                           <span className="py-1 text-sm">{cell.off ? t("live.week.off") : "—"}</span>
                         )}
