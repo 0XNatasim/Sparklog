@@ -32,6 +32,7 @@ Roles are stored lowercase in `profiles.role`:
 - Attach a parking receipt when the manager enables Parking for that employee.
 - Review job history and weekly totals. Within each day, jobs are listed in chronological
   order (by departure time, then end time; jobs without a departure last).
+- See manager announcements from a **bell icon** in the header: the dropdown lists the latest announcements (unread highlighted, with a count badge); tapping one simply re-opens that notification (no notifications page) and marks it as read.
 - Complete first-login work-region and union-association onboarding.
 - View manager-enabled company forms from the Profile page.
 - New profiles default to `compagnon`, CCQ schedule `C3` (general daytime work), a

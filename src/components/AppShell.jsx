@@ -13,6 +13,7 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { APP_VERSION } from "@/lib/version";
 import headerLight from "../../public/header-light.jpg";
@@ -90,6 +91,7 @@ export default function AppShell({ children }) {
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
             <NotificationsBell />
+            <EmployeeNotificationsBell />
             <Button
               variant="ghost"
               size="icon"

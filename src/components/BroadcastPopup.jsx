@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useT } from "@/lib/use-t";
+import { BROADCASTS_REFRESH_EVENT } from "@/components/EmployeeNotificationsBell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
@@ -16,9 +17,9 @@ export default function BroadcastPopup() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) { setQueue([]); return; }
+    if (!user?.id) { setQueue([]); return undefined; }
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       const { data } = await supabase
         .from("broadcast_recipients")
         .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path)")
@@ -29,8 +30,14 @@ export default function BroadcastPopup() {
         .filter((r) => r.manager_broadcasts)
         .sort((a, b) => new Date(a.manager_broadcasts.created_at) - new Date(b.manager_broadcasts.created_at));
       setQueue(rows);
-    })();
-    return () => { cancelled = true; };
+    };
+    load();
+    // The notification bell acknowledges items too; reload so they leave this queue.
+    window.addEventListener(BROADCASTS_REFRESH_EVENT, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(BROADCASTS_REFRESH_EVENT, load);
+    };
   }, [user?.id]);
 
   const [dismissed, setDismissed] = useState(false);

@@ -89,7 +89,33 @@ export default function CongesManager() {
 
   return (
     <div className="space-y-3">
-      {/* History of everyone — first. */}
+      {/* Add / manage for one employee — first. */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-primary" />{t("conges.addTitle")}</div>
+          <label className="block text-xs sm:max-w-sm">
+            <span className="text-muted-foreground">{t("conges.employee")}</span>
+            <select
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="">{t("conges.employeePlaceholder")}</option>
+              {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.is_paused ? ` — ${t("employees.paused")}` : ""}</option>)}
+            </select>
+          </label>
+          {selectedId ? (
+            <div className="rounded-lg border p-3">
+              <TimeOffControls employeeId={selectedId} rows={selectedRows} onChanged={loadRows} />
+            </div>
+          ) : (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="h-4 w-4" />{t("conges.selectPrompt")}</p>
+          )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </CardContent>
+      </Card>
+
+      {/* History of everyone — below the add card. */}
       <Card>
         <CardContent className="p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
@@ -124,32 +150,6 @@ export default function CongesManager() {
             ))}
           </div>
           {loading && <div className="p-4 text-sm text-muted-foreground">{t("common.working")}</div>}
-        </CardContent>
-      </Card>
-
-      {/* Add / manage for one employee. */}
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-primary" />{t("conges.addTitle")}</div>
-          <label className="block text-xs sm:max-w-sm">
-            <span className="text-muted-foreground">{t("conges.employee")}</span>
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            >
-              <option value="">{t("conges.employeePlaceholder")}</option>
-              {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.is_paused ? ` — ${t("employees.paused")}` : ""}</option>)}
-            </select>
-          </label>
-          {selectedId ? (
-            <div className="rounded-lg border p-3">
-              <TimeOffControls employeeId={selectedId} rows={selectedRows} onChanged={loadRows} />
-            </div>
-          ) : (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="h-4 w-4" />{t("conges.selectPrompt")}</p>
-          )}
-          {error && <p className="text-xs text-destructive">{error}</p>}
         </CardContent>
       </Card>
     </div>
