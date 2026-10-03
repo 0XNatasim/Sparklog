@@ -46,6 +46,17 @@ describe("application authorization matrix", () => {
     expect(Object.values(permissions.managementSections).every(Boolean)).toBe(true);
   });
 
+  it("keeps payroll, reports, settings and audit pages manager-only", () => {
+    const managerOnly = ["payroll-calcul", "payroll-stubs", "payroll-das", "payroll-roe", "reports-costs",
+      "reports-period", "reports-ccq", "reports-downloads", "config-settings", "advanced-audit", "advanced-health", "absences"];
+    for (const role of APPLICATION_ROLES) {
+      const pages = authorizationFor({ role, adminSections: [...GRANTABLE_ADMIN_SECTIONS] }).pages;
+      for (const id of managerOnly) {
+        expect(pages[id], `${role}:${id}`).toBe(role === "manager" || role === "owner");
+      }
+    }
+  });
+
   it("reserves sensitive NAS access for the owner", () => {
     for (const role of APPLICATION_ROLES) {
       expect(authorizationFor({ role }).canAccessSensitiveNas, role).toBe(role === "owner");

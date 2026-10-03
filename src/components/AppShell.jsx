@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { LogOut, RefreshCw } from "lucide-react";
+import { CalendarDays, ClipboardList, History, LayoutDashboard, LogOut, RefreshCw, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -38,11 +38,31 @@ function NavItem({ to, children }) {
   );
 }
 
+// Phone only: four fixed destinations in thumb reach (field use, installed PWA).
+function BottomNavItem({ to, icon: Icon, children }) {
+  return (
+    <NavLink
+      to={to}
+      end={to.startsWith("/form")}
+      className={({ isActive }) =>
+        cn(
+          "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          isActive ? "text-primary" : "text-muted-foreground"
+        )
+      }
+    >
+      <Icon className="h-5 w-5" aria-hidden="true" />
+      <span className="max-w-full truncate">{children}</span>
+    </NavLink>
+  );
+}
+
 export default function AppShell({ children }) {
   const { role, adminSections, signOut } = useAuth();
   const navigate = useNavigate();
   const t = useT();
   const { isViewMode, viewedEmployee } = useViewMode();
+  const canManage = hasManagementAccess(role, adminSections);
 
   async function handleLogout() {
     try {
@@ -68,7 +88,7 @@ export default function AppShell({ children }) {
         <div className="sticky top-0 z-50 border-b border-amber-500 bg-amber-300 px-3 py-2 text-amber-950 shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div className="text-sm font-bold">{t("viewMode.banner", { name: viewedEmployee.name })}</div>
-            <Button size="sm" variant="outline" className="h-8 border-amber-700 bg-amber-50 text-amber-950 hover:bg-white" onClick={() => navigate("/manager?section=employees")}>
+            <Button size="sm" variant="outline" className="h-8 border-amber-700 bg-amber-50 text-amber-950 hover:bg-white" onClick={() => navigate("/manager/employees")}>
               {t("viewMode.return")}
             </Button>
           </div>
@@ -90,6 +110,11 @@ export default function AppShell({ children }) {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
+            {canManage && !isViewMode && (
+              <Link to="/manager" className="mr-1 inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold text-primary hover:bg-accent sm:hidden" aria-label={t("nav.manager")}>
+                <LayoutDashboard className="h-4 w-4" />{t("nav.manager")}
+              </Link>
+            )}
             <NotificationsBell />
             <EmployeeNotificationsBell />
             <Button
@@ -118,16 +143,26 @@ export default function AppShell({ children }) {
         </div>
 
         {/* Second row: nav tabs */}
-        <nav className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:px-4 sm:pb-3">
+        <nav className="mx-auto hidden max-w-6xl items-center gap-1 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex sm:flex-wrap sm:px-4 sm:pb-3">
           <NavItem to={`/form${viewSuffix}`}>{t("nav.form")}</NavItem>
           <NavItem to={`/history${viewSuffix}`}>{t("nav.history")}</NavItem>
           <NavItem to={`/week${viewSuffix}`}>{t("nav.week")}</NavItem>
           <NavItem to={`/profile${viewSuffix}`}>{t("nav.profile")}</NavItem>
-          {hasManagementAccess(role, adminSections) && !isViewMode && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
+          {canManage && !isViewMode && <NavItem to="/manager">{t("nav.manager")}</NavItem>}
         </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl px-2 py-2 sm:px-4 sm:py-4">{children}</main>
+      <main className="mx-auto max-w-6xl px-2 py-2 pb-20 sm:px-4 sm:py-4 sm:pb-4">{children}</main>
+
+      <nav
+        aria-label={t("mgr.bottomNav.label")}
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden dark:bg-[#151515]"
+      >
+        <BottomNavItem to={`/form${viewSuffix}`} icon={ClipboardList}>{t("nav.form")}</BottomNavItem>
+        <BottomNavItem to={`/history${viewSuffix}`} icon={History}>{t("nav.history")}</BottomNavItem>
+        <BottomNavItem to={`/week${viewSuffix}`} icon={CalendarDays}>{t("nav.week")}</BottomNavItem>
+        <BottomNavItem to={`/profile${viewSuffix}`} icon={UserCircle}>{t("nav.profile")}</BottomNavItem>
+      </nav>
     </div>
   );
 }
