@@ -34,6 +34,8 @@ export const dictionaries = {
 
     // nav
     "nav.form": "Job card",
+    "update.banner": "New version available (V{version}, you are on V{current}). Please refresh the page or sign out and back in to get V{version}.",
+    "update.refresh": "Refresh now",
     "offline.banner": "You're offline. Your form draft is saved on this device; reconnect to submit it.",
     "form.toasts.draftRestored": "Your saved draft was restored on this device.",
     "form.draft.restoreNewer": "A newer local draft exists on this device. Restore it instead of the latest server version?",
@@ -1264,6 +1266,8 @@ export const dictionaries = {
     "auth.retry": "Réessayer",
 
     "nav.form": "Fiche de travail",
+    "update.banner": "Nouvelle version disponible (V{version}, vous êtes sur V{current}). Veuillez rafraîchir la page ou vous reconnecter pour passer à la V{version}.",
+    "update.refresh": "Rafraîchir maintenant",
     "offline.banner": "Vous êtes hors ligne. Votre brouillon est sauvegardé sur cet appareil; reconnectez-vous pour l’envoyer.",
     "form.toasts.draftRestored": "Votre brouillon sauvegardé a été restauré sur cet appareil.",
     "form.draft.restoreNewer": "Un brouillon local plus récent existe sur cet appareil. Le restaurer à la place de la dernière version du serveur?",

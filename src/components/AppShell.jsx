@@ -12,6 +12,7 @@ import NotificationsBell from "@/components/NotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
+import UpdateBanner from "@/components/UpdateBanner";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { APP_VERSION } from "@/lib/version";
 import headerLight from "../../public/header-light.jpg";
@@ -59,6 +60,7 @@ export default function AppShell({ children }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <OfflineBanner />
+      <UpdateBanner />
       {!isViewMode && <RegionOnboarding />}
       {!isViewMode && <BroadcastPopup />}
       {isViewMode && (

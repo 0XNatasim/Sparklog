@@ -1,14 +1,28 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Emits /version.json (never precached) so open apps can detect a newer deploy even when
+// their service worker / cache is stale. Single source of truth: src/lib/version.js.
+function versionManifest() {
+  const read = () => /APP_VERSION\s*=\s*"([^"]+)"/.exec(fs.readFileSync(path.resolve(__dirname, "src/lib/version.js"), "utf8"))?.[1] || "";
+  return {
+    name: "sparklog-version-manifest",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ version: read() }) });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
+    versionManifest(),
     VitePWA({
       // autoUpdate: a new deploy replaces the cached app on next load — no
       // stale-version lock-in for the crew already using it.
