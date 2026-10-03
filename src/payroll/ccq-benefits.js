@@ -305,6 +305,11 @@ export function computeCcqBenefits({
   // deduction). See docs/rules/2026-das-payroll.md.
   prelevementCcq = 0,
   caisseEducationSyndicale = 0,
+  // Test-only overrides (reproducing a stub issued under another collective agreement):
+  // a stated pension deduction per hour, and a stated union-dues amount for the period.
+  // null = use the sourced formula.
+  pensionDeductionPerHour = null,
+  unionDuesOverride = null,
 } = {}) {
   const round2 = (x) => Math.round(x * 100) / 100; // to the cent
   const h = Math.max(0, Number(hours) || 0);
@@ -324,12 +329,16 @@ export function computeCcqBenefits({
   // (and thus federal tax) by 1-2¢. Matching the per-component rounding reproduces the
   // stub's printed "gains imposables" (2 386,59 $) and federal tax (259,95 $) exactly.
   const pensionableHourlyBase = round2(wage * (1 + vacationHolidaySickRate));
-  const pensionDeduction = round2(pensionableHourlyBase * employeePensionRate * h);
+  const pensionDeduction = pensionDeductionPerHour == null
+    ? round2(pensionableHourlyBase * employeePensionRate * h)
+    : round2(Number(pensionDeductionPerHour) * h);
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax
   // deduction (U1); a Québec credit (not a base deduction).
-  const unionDues = computeUnionDues({ union, level, hourlyWage: wage, hours: h, date });
+  const unionDues = unionDuesOverride == null
+    ? computeUnionDues({ union, level, hourlyWage: wage, hours: h, date })
+    : Number(unionDuesOverride);
   // Safety-equipment allowance — a NON-taxable amount paid on top of net (like KM).
   // Paid on `safetyEquipmentHours` when given (includes return time), else on `hours`.
   const safetyHours = safetyEquipmentHours == null ? h : Math.max(0, Number(safetyEquipmentHours) || 0);

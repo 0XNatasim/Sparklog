@@ -285,3 +285,30 @@ describe("13% indemnity base includes overtime at its multiplier (talon method)"
     expect(b.vacation).toBe(217.89);
   });
 });
+
+describe("test-only stub overrides (talon D0009-0009, week of 2026-04-05, 29 h)", () => {
+  // Rates of the previous agreement, read off the real stub: the sourced lines still reproduce it.
+  const stubWeek = {
+    hours: 29, hourlyWage: 45.36, date: "2026-04-05", union: "ftq_fipoe", level: "journeyman",
+    taxableBenefitPerHour: 3.111, medicEmployeePerHour: 0.68, medicProvincialTaxRate: 0.09,
+    safetyEquipmentPerHour: 0.65, employerSocialBenefitPerHour: 8.32, vacationHolidaySickRate: 0.13,
+  };
+
+  it("matches the stub's vacation, taxable benefit, safety, social benefit and MÉDIC lines", () => {
+    const b = computeCcqBenefits(stubWeek);
+    expect(b.vacation).toBe(171.01);
+    expect(b.taxableBenefit).toBe(90.22);
+    expect(b.safetyEquipment).toBeCloseTo(18.85, 2);
+    expect(b.employerSocialBenefit).toBeCloseTo(241.28, 2);
+    expect(b.medicWithholding).toBeCloseTo(21.49, 2);
+  });
+
+  it("applies a stated pension deduction per hour and union dues, otherwise keeps the formula", () => {
+    const sourced = computeCcqBenefits(stubWeek);
+    const stated = computeCcqBenefits({ ...stubWeek, pensionDeductionPerHour: 4.338, unionDuesOverride: 28.05 });
+    expect(stated.pensionDeduction).toBe(125.8);
+    expect(stated.unionDues).toBe(28.05);
+    expect(stated.federalDeduction).toBeCloseTo(28.05, 2);
+    expect(sourced.pensionDeduction).not.toBe(125.8);
+  });
+});
