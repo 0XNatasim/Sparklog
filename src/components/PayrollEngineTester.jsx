@@ -214,6 +214,7 @@ export default function PayrollEngineTester({ messier = false }) {
   // another agreement. Blank pension/union = keep the sourced formula.
   const [testRates, setTestRates] = useState({ enabled: false, safety: "", social: "", pensionPerHour: "", unionDues: "" });
   const [presetKind, setPresetKind] = useState(""); // "before" | "after" the 2026-04-26 agreement (test mode)
+  const [weekEndOverride, setWeekEndOverride] = useState(""); // test mode: Saturday of the week to calculate when weeks without pay (vacation) are skipped
   const [cmp, setCmp] = useState(null); // { talon, exact, fileName } from the talon comparison card
   const [keeping, setKeeping] = useState(false);
   const [ccqAmounts, setCcqAmounts] = useState(null);
@@ -279,7 +280,7 @@ export default function PayrollEngineTester({ messier = false }) {
   async function handleSelectEmployee(id) {
     setSelectedId(id);
     setSaveState({ status: "idle", message: "" });
-    setWeekOptions([]); setSelectedWeek(""); setStartFromEnd("");
+    setWeekOptions([]); setSelectedWeek(""); setStartFromEnd(""); setWeekEndOverride("");
     if (!id) return;
     const profile = employees.find((e) => e.id === id);
     if (profile?.hourly_rate != null) {
@@ -389,6 +390,7 @@ export default function PayrollEngineTester({ messier = false }) {
   function currentPeriodEnd() {
     const w = weekOptions.find((o) => o.key === selectedWeek);
     if (w?.end) return w.end.format("YYYY-MM-DD");
+    if (startFromEnd && weekEndOverride) return weekEndOverride;
     const days = { weekly: 7, biweekly: 14, semimonthly: 15, monthly: 30 }[frequency] || 7;
     if (asOfDate) return dayjs(asOfDate).add(days, "day").format("YYYY-MM-DD");
     return dayjs().add((6 - dayjs().day() + 7) % 7, "day").format("YYYY-MM-DD");
@@ -460,7 +462,7 @@ export default function PayrollEngineTester({ messier = false }) {
   function handleSelectWeek(key) {
     setSelectedWeek(key);
     setResult(null); setCalcCtx(null); setPayEditable(false); // re-lock Paie on the new week
-    setStartFromEnd("");
+    setStartFromEnd(""); setWeekEndOverride("");
     setTalonRef(formatTalonRef(seqByEnd[key])); // existing ref if this week is comptabilisé
     if (!key) { setYtd(seed); setAsOfDate(seedDate); return; }
     const w = weekOptions.find((o) => o.key === key);
@@ -478,6 +480,7 @@ export default function PayrollEngineTester({ messier = false }) {
   // Nothing is written: Comptabiliser stays tied to a real week.
   function handleStartFrom(periodEnd) {
     setStartFromEnd(periodEnd);
+    setWeekEndOverride("");
     setResult(null); setCalcCtx(null);
     if (!periodEnd) { setYtd(seed); setAsOfDate(seedDate); return; }
     const row = ledger.find((r) => r.periodEnd === periodEnd);
@@ -495,10 +498,11 @@ export default function PayrollEngineTester({ messier = false }) {
     if (!result || !result.employee || !calcCtx) return;
     const periodEnd = calcCtx.periodEnd;
     const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
-    const periodStart = dayjs(asOfDate || periodEnd).add(1, "day").format("YYYY-MM-DD");
+    const periodStart = dayjs(periodEnd).subtract(6, "day").format("YYYY-MM-DD");
     setLedger((rows) => [...rows.filter((r) => r.periodEnd !== periodEnd), { periodEnd, periodStart, snapshot: closing, virtual: true }]
       .sort((x, y) => (x.periodEnd < y.periodEnd ? -1 : 1)));
     setStartFromEnd(periodEnd);
+    setWeekEndOverride("");
     setYtd(closing);
     setAsOfDate(periodEnd);
     setResult(null); setCalcCtx(null);
@@ -510,10 +514,12 @@ export default function PayrollEngineTester({ messier = false }) {
   // the next week. Same upsert key as an import, so keeping a week twice replaces it.
   async function keepValidatedWeek() {
     if (!cmp?.acceptable || !result?.employee || !calcCtx || !selectedId) return;
+    // Never file a stub under another week: the stub's own period must be the one calculated.
+    if (stubWeekMismatch) return;
     setKeeping(true);
     try {
       const periodEnd = calcCtx.periodEnd;
-      const periodStart = dayjs(asOfDate || periodEnd).add(1, "day").format("YYYY-MM-DD");
+      const periodStart = dayjs(periodEnd).subtract(6, "day").format("YYYY-MM-DD");
       const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
       // One-cent tolerance on the Québec tax: the register follows the employer's printed amount.
       if (cmp.qcAdjustment) closing.quebecTax = Math.round((closing.quebecTax + cmp.qcAdjustment) * 100) / 100;
@@ -527,6 +533,7 @@ export default function PayrollEngineTester({ messier = false }) {
       setLedger((rows) => [...rows.filter((r) => r.periodEnd !== periodEnd), { periodEnd, periodStart, snapshot: closing }]
         .sort((x, y) => (x.periodEnd < y.periodEnd ? -1 : 1)));
       setStartFromEnd(periodEnd);
+      setWeekEndOverride("");
       setYtd(closing);
       setAsOfDate(periodEnd);
       setResult(null); setCalcCtx(null); setCmp(null);
@@ -566,6 +573,18 @@ export default function PayrollEngineTester({ messier = false }) {
   const setEr = (k) => (v) => setEmployer((s) => ({ ...s, [k]: v }));
   const setC = (k) => (v) => setCcq((s) => ({ ...s, [k]: v }));
   const testRatesOn = !!startFromEnd && testRates.enabled;
+  // Week being calculated in test mode (default: the week after the start week; vacation weeks can be skipped).
+  const defaultWeekEnd = startFromEnd ? dayjs(startFromEnd).add(7, "day").format("YYYY-MM-DD") : "";
+  const calcWeekEnd = weekEndOverride || defaultWeekEnd;
+  const calcWeekStart = calcWeekEnd ? dayjs(calcWeekEnd).subtract(6, "day").format("YYYY-MM-DD") : "";
+  // The comparison card read a stub for another week than the one calculated.
+  const stubEnd = cmp?.talon?.header?.periodEnd || "";
+  const stubWeekMismatch = !!(startFromEnd && calcCtx && stubEnd && stubEnd !== calcCtx.periodEnd);
+  function setCalcWeekEnd(value) {
+    setWeekEndOverride(value && value !== defaultWeekEnd ? value : "");
+    setResult(null); setCalcCtx(null);
+    if (value) applyPresetKind(presetKindForWeekStart(dayjs(value).subtract(6, "day")));
+  }
   // Union dues as the previous stubs print them: the rule applied to the DECLARED hourly rate
   // (base + team-leader premium), not the base alone. Shown as a suggestion only.
   const unionSuggestion = testRatesOn && ccq.enabled
@@ -573,7 +592,7 @@ export default function PayrollEngineTester({ messier = false }) {
       union: ccq.union, level: ccq.status,
       declaredHourlyWage: (Number(pay.baseRate) || 0) + (Number(pay.premium) || 0),
       hours: (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0),
-      date: asOfDate ? dayjs(asOfDate).add(1, "day").format("YYYY-MM-DD") : undefined,
+      date: calcWeekStart || undefined,
     })
     : null;
   const setTR = (k) => (v) => setTestRates((s) => ({ ...s, [k]: v }));
@@ -814,7 +833,21 @@ export default function PayrollEngineTester({ messier = false }) {
                     </option>
                   ))}
                 </select>
-                {startFromEnd && <span className="mt-1 block text-muted-foreground">{t("payroll.startFromHint", { date: dayjs(startFromEnd).add(7, "day").format("DD MMM YYYY") })}</span>}
+                {startFromEnd && <span className="mt-1 block text-muted-foreground">{t("payroll.startFromHint", { date: dayjs(calcWeekEnd).format("DD MMM YYYY") })}</span>}
+              </label>
+            )}
+            {selectedId && !selectedWeek && startFromEnd && (
+              <label className="block text-xs sm:col-span-2">
+                <span className="text-muted-foreground">{t("payroll.weekEnd.label")}</span>
+                <input
+                  type="date"
+                  value={calcWeekEnd}
+                  onChange={(e) => setCalcWeekEnd(e.target.value)}
+                  className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm sm:max-w-xs"
+                />
+                <span className="mt-1 block text-muted-foreground">
+                  {dayjs(calcWeekEnd).day() !== 6 ? t("payroll.weekEnd.notSaturday") : t("payroll.weekEnd.hint")}
+                </span>
               </label>
             )}
           </div>
@@ -1049,7 +1082,13 @@ export default function PayrollEngineTester({ messier = false }) {
 
       {result && result.employee && calcCtx && startFromEnd && !selectedWeek && (
         <div className="space-y-2 rounded-lg border border-dashed p-3">
-          {cmp?.acceptable && (
+          {cmp?.acceptable && stubWeekMismatch && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200">
+              <span>{t("payroll.keep.weekMismatch", { stub: dayjs(stubEnd).format("DD MMM YYYY"), calc: dayjs(calcCtx.periodEnd).format("DD MMM YYYY") })}</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => setCalcWeekEnd(stubEnd)}>{t("payroll.keep.useStubWeek")}</Button>
+            </div>
+          )}
+          {cmp?.acceptable && !stubWeekMismatch && (
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="success" disabled={keeping} onClick={keepValidatedWeek}>
                 {keeping ? t("common.saving") : t("payroll.keep.button", { week: ccqWeekNumber(dayjs(calcCtx.periodEnd)) })}
