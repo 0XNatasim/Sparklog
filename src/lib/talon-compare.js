@@ -1,10 +1,10 @@
 // Compare what SparkLog calculated for a week with the real talon of that week.
-// Only lines the calculator actually maintains are compared (the legacy "Temps double",
-// "Vacances" and "Autre revenu" lines are not tracked as cumulatives).
+// Only lines the calculator actually maintains are compared (the stubs' "Vacances" and
+// "Autre revenu" lines are not tracked as cumulatives).
 
 // Ledger stateKey → comparable on the talon's Sommaire (período column).
 export const COMPARABLE_KEYS = [
-  "regularEarnings", "vacancesCcq", "ccqLevy", "unionDues", "unionEducationFund",
+  "regularEarnings", "doubleTime", "vacancesCcq", "ccqLevy", "unionDues", "unionEducationFund",
   "ccqBenefitsAdvantage", "ccqBenefitsDeduction", "ccqTaxableBenefit", "safetyEquipment",
   "medicInsurance", "insuranceSalesTax", "quebecTax", "federalTax", "eiEmployee", "rrqEmployee",
   "rqapEmployee", "insurableIncomeEI", "pensionableIncomeRRQ", "insurableIncomeRQAP",

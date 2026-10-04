@@ -7,11 +7,11 @@ const talon = {
     { description: "Impôt Québec", key: "quebecTax", periode: 223.66, cumulatif: 223.66 },
     { description: "Impôt Fédéral", key: "federalTax", periode: 162.68, cumulatif: 162.68 },
     { description: "Heures", key: "hoursYtd", periode: 31.5, cumulatif: 31.5 },
-    { description: "Temps double", key: "doubleTime", periode: 181.44, cumulatif: 181.44 }, // not tracked
+    { description: "Temps double", key: "doubleTime", periode: 181.44, cumulatif: 181.44 },
     { description: "Autre Revenu 1", key: null, periode: 7, cumulatif: 7 },
   ],
 };
-const opening = { quebecTax: 0, federalTax: 0, hoursYtd: 0 };
+const opening = { quebecTax: 0, federalTax: 0, hoursYtd: 0, doubleTime: 0 };
 const totals = { gains: 2555.21, totalRetenues: 1291.94, netPlusReimb: 1263.27 };
 
 describe("compareWithTalon", () => {
@@ -21,17 +21,17 @@ describe("compareWithTalon", () => {
   });
 
   it("is exact when every compared line matches to the cent", () => {
-    const r = compareWithTalon({ opening, closing: { quebecTax: 223.66, federalTax: 162.68, hoursYtd: 31.5 }, totals, talon });
+    const r = compareWithTalon({ opening, closing: { quebecTax: 223.66, federalTax: 162.68, hoursYtd: 31.5, doubleTime: 181.44 }, totals, talon });
     expect(r.exact).toBe(true);
     expect(r.mismatches).toBe(0);
-    expect(r.lines.map((l) => l.key)).toEqual(["quebecTax", "federalTax", "hoursYtd"]);
+    expect(r.lines.map((l) => l.key)).toEqual(["quebecTax", "federalTax", "hoursYtd", "doubleTime"]);
   });
 
   it("flags a one-cent difference with its sign and compares periods, not cumulatives", () => {
-    const o = { quebecTax: 100, federalTax: 50, hoursYtd: 10 };
+    const o = { quebecTax: 100, federalTax: 50, hoursYtd: 10, doubleTime: 20 };
     const r = compareWithTalon({
       opening: o,
-      closing: { quebecTax: 323.67, federalTax: 212.68, hoursYtd: 41.5 },
+      closing: { quebecTax: 323.67, federalTax: 212.68, hoursYtd: 41.5, doubleTime: 201.44 },
       totals, talon,
     });
     expect(r.exact).toBe(false);
@@ -40,7 +40,7 @@ describe("compareWithTalon", () => {
   });
 
   it("flags header totals that differ", () => {
-    const r = compareWithTalon({ opening, closing: { quebecTax: 223.66, federalTax: 162.68, hoursYtd: 31.5 }, totals: { ...totals, netPlusReimb: 1263.0 }, talon });
+    const r = compareWithTalon({ opening, closing: { quebecTax: 223.66, federalTax: 162.68, hoursYtd: 31.5, doubleTime: 181.44 }, totals: { ...totals, netPlusReimb: 1263.0 }, talon });
     expect(r.totals.find((l) => l.label === "Paie nette")).toMatchObject({ diff: -0.27, ok: false });
   });
 });

@@ -347,3 +347,14 @@ wage only; the test-mode "before 2026-04-26" preset enters 45,36 + 3,00.
 | taxable benefit | 3,111 $/h | 3,377 $/h |
 | pension deduction | 4,338 $/h (stated) | 9 % × (rate × 1,13) = 5,165 $/h |
 | MÉDIC / tax | 0,68 $/h / 9 % | 0,68 $/h / 9 % |
+
+### Printed rounding policy (stubs S15–S25, 2026-10)
+
+- **Pension (journeyman 9 %):** the hourly amount is rounded to the mill, then multiplied by the hours and
+  rounded to the cent: `round2(round3(round2(rate × 1,13) × 9 %) × hours)` — 5,1651 → 5,165 $/h; 38,25 h →
+  197,56 $ (stub S21), not 197,57. Reproduces S19–S25 and D0033-0007 (40 h → 206,60). Other pension rates are
+  unverified and keep the plain rounding of the total.
+- **MÉDIC, safety equipment, employer social benefits:** each printed line is rounded to the cent (MÉDIC
+  25,50 + tax 2,30 = 27,80).
+- **Sommaire lines:** « Temps double » is its own line (period and cumulative); « Salaire régulier » is the
+  rest of the cash pay (S21: 1 904,63 + 76,19).
