@@ -132,7 +132,9 @@ export const CCQ_UNIONS = {
         // Électricien : 55 % du taux horaire (apprenti selon sa période, basé sur ICI-I)
         // + 0,05 $/h travaillée. Formule du syndicat/métier, pas un taux unique. Confirmé
         // vs le talon de Simon B. (0,55 × 50,79 + 0,05 × 40 = 29,93 $).
-        dues: { rateOfHourlyWage: 0.55, perHour: 0.05 },
+        // Imprimé au cent : la partie taux est arrondie AVANT d'ajouter 0,05 $/h
+        // (0,55 × 50,79 = 27,93 ; + 0,05 × 34,25 = 29,64). 23 talons sur 23 (S3–S25 2026).
+        dues: { rateOfHourlyWage: 0.55, perHour: 0.05, roundRatePart: true },
       },
     ],
   },
@@ -268,18 +270,22 @@ export function computeUnionDues({ union = "ftq_fipoe", level = "journeyman", ho
   const rate = level !== "journeyman" && d.apprenticeRateOfHourlyWage != null
     ? d.apprenticeRateOfHourlyWage
     : (d.rateOfHourlyWage || 0);
+  if (d.roundRatePart) {
+    // Printed like the employer's stub: the rate part is rounded to the cent BEFORE the per-hour
+    // part is added (0,55 × 50,79 = 27,93 ; + 0,05 × 34,25 h = 29,64 — not 29,65). Verified on
+    // 23 of 23 real FTQ-FIPOE stubs (S3–S25 2026, two employers); other unions are unverified.
+    const r2 = (x) => Math.round(x * 100) / 100;
+    return r2(r2(rate * wage) + (d.perHour || 0) * h);
+  }
   return rate * wage + (d.perHour || 0) * h;
 }
 
-// Union dues as the employer's stubs print them: the rule is applied to the DECLARED hourly rate
-// (base + team-leader premium), and the rate part is rounded to the cent BEFORE the per-hour part
-// is added (0,55 × 48,36 = 26,598 → 26,60; + 0,05 × 31,5 h = 28,18). Used by the test mode that
-// reproduces past stubs; the sourced default (computeUnionDues on the base wage) is unchanged.
+// Union dues on a DECLARED hourly rate (the CCQ scale rate). Before 2026-04-26 the stubs split the
+// scale into a fixed 45,36 $/h + 3,00 $/h, so the declared rate there is base + 3 (48,36); the
+// default calculation keeps using the base wage only (a premium above the scale is not declared:
+// D0033-0007, 4,06 $ premium, dues on 50,79). Used by the test mode that reproduces past stubs.
 export function computeUnionDuesAsPrinted({ union = "ftq_fipoe", level = "journeyman", declaredHourlyWage = 0, hours = 0, date } = {}) {
-  const r2 = (x) => Math.round(x * 100) / 100;
-  const fixed = computeUnionDues({ union, level, hourlyWage: declaredHourlyWage, hours: 0, date });
-  const full = computeUnionDues({ union, level, hourlyWage: declaredHourlyWage, hours, date });
-  return r2(r2(fixed) + (full - fixed));
+  return computeUnionDues({ union, level, hourlyWage: declaredHourlyWage, hours, date });
 }
 
 // Compute the CCQ benefit amounts, engine base adjustments and net withholdings

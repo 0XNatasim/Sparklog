@@ -320,3 +320,30 @@ The Testing → Payroll tab contains no tax logic; it only calls
 `calculatePayroll(input)` and renders the result. The same engine is intended to
 back real pay runs, pay stubs, batch and DAS reports **only after** validation and
 sign-off, as a separate approved program (see `GPT.md` Milestone 12).
+
+## FTQ-FIPOE union dues — verified on 23 real stubs (2026-10)
+
+**Source (primary):** the employee's own stubs S3–S25 of 2026 (TMC Électrique S3–S14, rate 48,37 $/h;
+Messier Connexion S15–S18, scale 48,36 $/h = 45,36 fixed + 3,00 hourly; S19–S25, scale 50,79 $/h),
+compiled by the owner in the "Talon Test" sheet. No specialist sign-off yet — output stays
+*Not finalized payroll · Requires payroll review*.
+
+**Rule:** `dues = round2( round2(0,55 × scale hourly rate) + 0,05 × hours )` — the rate part is rounded
+to the cent **before** adding the per-hour part (S20: 27,93 + 0,05 × 34,25 = 29,64; without the early
+rounding the code printed 29,65). 23/23 stubs reproduced (`ccq-benefits.test.js`).
+
+**Base = the CCQ scale rate, not "base + any premium".** Before 2026-04-26 the stubs split the
+48,36 $/h scale into a fixed 45,36 + a 3,00 $/h line, so the declared rate there is 48,36; the 13 %
+indemnity is on the 45,36 part only. A premium paid *above* the scale (D0033-0007: 4,06 $) is not in
+the dues base (29,93 = 0,55 × 50,79 + 0,05 × 40). The default calculation therefore keeps the base
+wage only; the test-mode "before 2026-04-26" preset enters 45,36 + 3,00.
+
+**Agreement change 2026-04-26 (test-mode presets, `src/lib/rate-presets.js`):**
+
+| | before | after |
+|---|---|---|
+| safety equipment | 0,65 $/h | 0,80 $/h |
+| employer social benefits | 8,32 $/h | 8,875 $/h |
+| taxable benefit | 3,111 $/h | 3,377 $/h |
+| pension deduction | 4,338 $/h (stated) | 9 % × (rate × 1,13) = 5,165 $/h |
+| MÉDIC / tax | 0,68 $/h / 9 % | 0,68 $/h / 9 % |
