@@ -11,9 +11,11 @@ function toNumber(tok) {
 
 // Column x-bands for the legacy layout (points). [labelMin,labelMax, n1Min,n1Max, n2Min,n2Max].
 const BLOCKS = {
-  transactions: { label: [30, 115], nums: [[115, 150], [150, 195], [195, 235]] }, // Unité, Taux, Montant
-  sommaireMid: { label: [235, 312], nums: [[312, 362], [362, 405]] }, // Période, Cumulatif
-  sommaireRight: { label: [405, 483], nums: [[483, 530], [530, 620]] }, // Période, Cumulatif
+  // Generous bands: stubs re-printed through « Microsoft Print To PDF » (D0035-0001) sit ~5 pt further left than
+  // the originals, and right-aligned numbers start further left the wider they are.
+  transactions: { label: [20, 105], nums: [[105, 148], [148, 190], [190, 235]] }, // Unité, Taux, Montant
+  sommaireMid: { label: [220, 300], nums: [[300, 345], [345, 395]] }, // Période, Cumulatif
+  sommaireRight: { label: [395, 483], nums: [[483, 530], [530, 620]] }, // Période, Cumulatif
 };
 
 const inBand = (x, [a, b]) => x >= a && x < b;
