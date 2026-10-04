@@ -346,9 +346,17 @@ export function computeCcqBenefits({
   // (and thus federal tax) by 1-2¢. Matching the per-component rounding reproduces the
   // stub's printed "gains imposables" (2 386,59 $) and federal tax (259,95 $) exactly.
   const pensionableHourlyBase = round2(wage * (1 + vacationHolidaySickRate));
-  const pensionDeduction = pensionDeductionPerHour == null
-    ? round2(pensionableHourlyBase * employeePensionRate * h)
-    : round2(Number(pensionDeductionPerHour) * h);
+  // The employer rounds the HOURLY pension to the mill (0,001 $/h) and multiplies by the hours:
+  // 57,39 × 9 % = 5,1651 → 5,165 $/h ; 38,25 h × 5,165 = 197,56 (not 197,57 — stub S21). Matches
+  // S19–S25 and D0033-0007 (40 h → 206,60). Computed in integer mills so half-cents stay exact.
+  // Verified for the journeyman rate (9 %) and for stated per-hour amounts; other rates keep the plain
+  // rounding of the total (no stub to verify them).
+  const roundHourlyPension = pensionDeductionPerHour != null || Math.abs(employeePensionRate - 0.09) < 1e-9;
+  const pensionDeduction = roundHourlyPension
+    ? Math.round((Math.round((pensionDeductionPerHour == null
+      ? pensionableHourlyBase * employeePensionRate
+      : Number(pensionDeductionPerHour)) * 1000) * h) / 10) / 100
+    : round2(pensionableHourlyBase * employeePensionRate * h);
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   // Printed per component, each rounded to the cent: premium 37,5 h × 0,68 = 25,50 and tax
   // 25,50 × 9 % = 2,295 → 2,30 (stub S17: 25,50 + 2,30 = 27,80, not 27,795).

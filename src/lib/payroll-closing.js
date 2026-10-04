@@ -26,6 +26,9 @@ export function buildClosing({ opening, result, ccq, reimb, pay }) {
   const c = ccq;
   const medicPrem = c ? c.medicWithholding / 1.09 : 0;
   const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
+  // The stubs list « Temps double » on its own line; « Salaire régulier » is the rest of the cash pay
+  // (temps et demi included).
+  const doubleTime = round2((Number(pay.ot200Hours) || 0) * (Number(pay.baseRate) || 0) * 2);
   const closing = {
     ...opening, // untouched lines keep the opening baseline
     grossIncome: fromCents(a.grossIncome),
@@ -39,7 +42,8 @@ export function buildClosing({ opening, result, ccq, reimb, pay }) {
     insurableIncomeEI: fromCents(a.insurableIncomeEI),
     insurableIncomeRQAP: fromCents(a.insurableIncomeRQAP),
     labourStandardsIncome: fromCents(a.labourStandardsIncome),
-    regularEarnings: add("regularEarnings", result.gross?.cashTotal),
+    regularEarnings: add("regularEarnings", round2(Number(result.gross?.cashTotal) || 0) - doubleTime),
+    doubleTime: add("doubleTime", doubleTime),
     vacancesCcq: add("vacancesCcq", c?.vacation),
     ccqTaxableBenefit: add("ccqTaxableBenefit", c?.taxableBenefit),
     ccqBenefitsDeduction: add("ccqBenefitsDeduction", c?.pensionDeduction),

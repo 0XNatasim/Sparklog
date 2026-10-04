@@ -354,3 +354,14 @@ describe("per-line cent rounding (stub D0010-0006, 37,5 h, week of 2026-04-12)",
     expect(med(31.5)).toBe(23.35);
   });
 });
+
+describe("pension printed per hour to the mill (stubs S19–S25 + D0033-0007)", () => {
+  // scale 50,79 $/h: 57,39 × 9 % = 5,1651 → 5,165 $/h, times the hours, to the cent.
+  const stubs = [[38, 196.27], [34.25, 176.9], [38.25, 197.56], [31, 160.12], [36, 185.94], [29.5, 152.37], [35.75, 184.65], [40, 206.6]];
+  it.each(stubs)("%s h → %s $", (hours, printed) => {
+    expect(computeCcqBenefits({ hours, hourlyWage: 50.79, employeePensionRate: 0.09 }).pensionDeduction).toBe(printed);
+  });
+  it("a stated per-hour pension is rounded to the mill too (4,338 × 31,5 h = 136,65)", () => {
+    expect(computeCcqBenefits({ hours: 31.5, hourlyWage: 45.36, pensionDeductionPerHour: 4.338 }).pensionDeduction).toBe(136.65);
+  });
+});
