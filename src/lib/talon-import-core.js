@@ -11,9 +11,11 @@ function toNumber(tok) {
 
 // Column x-bands for the legacy layout (points). [labelMin,labelMax, n1Min,n1Max, n2Min,n2Max].
 const BLOCKS = {
-  transactions: { label: [30, 115], nums: [[115, 150], [150, 195], [195, 235]] }, // Unité, Taux, Montant
-  sommaireMid: { label: [235, 312], nums: [[312, 362], [362, 405]] }, // Période, Cumulatif
-  sommaireRight: { label: [405, 483], nums: [[483, 530], [530, 620]] }, // Période, Cumulatif
+  // Generous bands: stubs re-printed through « Microsoft Print To PDF » (D0035-0001) sit ~5 pt further left than
+  // the originals, and right-aligned numbers start further left the wider they are.
+  transactions: { label: [20, 105], nums: [[105, 148], [148, 190], [190, 235]] }, // Unité, Taux, Montant
+  sommaireMid: { label: [220, 300], nums: [[300, 345], [345, 395]] }, // Période, Cumulatif
+  sommaireRight: { label: [395, 483], nums: [[483, 530], [530, 620]] }, // Période, Cumulatif
 };
 
 const inBand = (x, [a, b]) => x >= a && x < b;
@@ -123,9 +125,13 @@ function headerValue(rows, labelRe) {
 // Paid hours of a talon = the units on the hour-based earnings lines only (régulier, temps et
 // demi, temps double). "Régulier à taux horaire" is a premium computed ON the regular hours and
 // the allowance/reimbursement lines are not hours, so none of them may add to the total.
-const isPaidHoursLine = (description) => {
+const isPaidHoursLine = (description, taux, regularRate) => {
   const n = norm(description);
-  if (/taux horaire/.test(n)) return false;
+  if (/taux horaire/.test(n)) {
+    // « Régulier à taux horaire » is the premium line (units = the regular hours, rate = the premium) EXCEPT when
+    // it is paid at the regular rate itself (stub S39: 0,25 h × 50,79) — those are real hours.
+    return regularRate != null && taux != null && Math.abs(taux - regularRate) < 0.005;
+  }
   return /^(salaire )?regulier/.test(n) || /^temps (et demi|double|simple)/.test(n);
 };
 
@@ -134,7 +140,8 @@ const isPaidHoursLine = (description) => {
 // and take the excess off both the period and the cumulative columns. No-op when the legacy
 // figure is already right, or when no hour line can be identified.
 export function correctLegacyHours(transactions, sommaire, ytd) {
-  const lines = transactions.filter((r) => r.unite != null && isPaidHoursLine(r.description));
+  const regularRate = (transactions.find((r) => /^(salaire )?regulier/.test(norm(r.description)) && !/taux horaire/.test(norm(r.description)) && r.taux != null) || {}).taux ?? null;
+  const lines = transactions.filter((r) => r.unite != null && isPaidHoursLine(r.description, r.taux, regularRate));
   if (!lines.length) return null;
   const paidHours = Math.round(lines.reduce((sum, r) => sum + r.unite, 0) * 100) / 100;
   const legacy = sommaire.find((r) => r.key === "hoursYtd");

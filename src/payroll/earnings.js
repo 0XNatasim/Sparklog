@@ -72,7 +72,7 @@ export function printedLineAmount(units, rate) {
   return Math.round((hundredths * Math.round(r * 100)) / 100) / 100;
 }
 
-export function printedPayLines({ regularHours = 0, ot150Hours = 0, ot200Hours = 0, returnNbHours = 0, baseRate = 0, premium = 0 } = {}) {
+export function printedPayLines({ regularHours = 0, ot150Hours = 0, ot200Hours = 0, returnNbHours = 0, baseOnlyHours = 0, baseRate = 0, premium = 0 } = {}) {
   const r2 = (x) => Math.round(x * 100) / 100;
   const base = Number(baseRate) || 0;
   const regularBase = printedLineAmount(regularHours, base);
@@ -80,8 +80,11 @@ export function printedPayLines({ regularHours = 0, ot150Hours = 0, ot200Hours =
   const ot150 = printedLineAmount(ot150Hours, r2(base * 1.5));
   const ot200 = printedLineAmount(ot200Hours, r2(base * 2));
   const returnNoBenefit = printedLineAmount(returnNbHours, base);
+  // Hours paid at the base rate only (no premium, no CCQ benefits, no safety equipment): stub S39 prints a
+  // « Régulier à taux horaire » line of 0,25 h × 50,79 = 12,70 next to the usual premium line.
+  const baseOnly = printedLineAmount(baseOnlyHours, base);
   return {
-    regularBase, regularPremium, ot150, ot200, returnNoBenefit,
+    regularBase, regularPremium, ot150, ot200, returnNoBenefit, baseOnly,
     regular: r2(regularBase + regularPremium), // « Salaire régulier fixe » + « Régulier à taux horaire »
     overtime: r2(ot150 + ot200),
   };

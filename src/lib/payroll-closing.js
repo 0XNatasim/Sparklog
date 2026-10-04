@@ -25,7 +25,8 @@ export function buildClosing({ opening, result, ccq, reimb, pay }) {
   const add = (k, v) => (Number(opening[k]) || 0) + (Number(v) || 0);
   const c = ccq;
   const medicPrem = c ? c.medicWithholding / 1.09 : 0;
-  const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours);
+  // Worked hours for the cumulative « Heures »: the base-rate-only hours count too (S39: 40 + 0,25 + 1,75 = 42).
+  const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours) + (Number(pay.baseOnlyHours) || 0);
   // The stubs list « Temps double » on its own line; « Salaire régulier » is the rest of the cash pay
   // (temps et demi included).
   const doubleTime = round2((Number(pay.ot200Hours) || 0) * (Number(pay.baseRate) || 0) * 2);

@@ -5,6 +5,7 @@ import { calculateEi } from "./statutory/ei.js";
 import { calculateRqap } from "./statutory/rqap.js";
 import { QUEBEC_2026 } from "./rules/index.js";
 import { toCents } from "./money.js";
+import { computeCcqBenefits, computeCcqLevies } from "./ccq-benefits.js";
 
 // NOTE: these assertions exercise the ENGINE's arithmetic against the current
 // PLACEHOLDER rule constants (src/payroll/rules/2026.js). They verify the math and
@@ -197,5 +198,42 @@ describe("pay lines printed to the cent (stubs S35, S36)", () => {
   });
   it("hours that are not whole hundredths (from job minutes) keep plain rounding", () => {
     expect(printedLineAmount(7.8333333, 50.79)).toBe(Math.round(7.8333333 * 50.79 * 100) / 100);
+  });
+});
+
+describe("S39 (D0035-0001): 0,25 h at the base rate only, outside every CCQ base", () => {
+  it("printedPayLines prices the line at 12,70 $", () => {
+    expect(printedPayLines({ baseOnlyHours: 0.25, baseRate: 50.79 }).baseOnly).toBe(12.7);
+  });
+
+  it("reproduces Gains and the statutory deductions of the stub (Québec within the known cent)", () => {
+    const ytdD = { rrqEmployee: 2870.88, eiEmployee: 578.31, rqapEmployee: 191.27, federalTax: 4215.72, quebecTax: 5754.2, pensionableIncomeRRQ: 47050.22, insurableIncomeEI: 44484, insurableIncomeRQAP: 44484 };
+    const ytd = { grossIncome: 0, rrq2Employee: 0, rrq2Employer: 0, labourStandardsIncome: 0 };
+    for (const [k, v] of Object.entries(ytdD)) ytd[k] = Math.round(v * 100);
+    ytd.rrqEmployer = ytd.rrqEmployee; ytd.eiEmployer = ytd.eiEmployee; ytd.rqapEmployer = ytd.rqapEmployee;
+    const hours = 41.75; // 40 régulier + 1,75 temps double; the 0,25 h is NOT a benefit hour
+    const lev = computeCcqLevies({ hours, hourlyWage: 50.79, overtime200Hours: 1.75, vacationHolidaySickRate: 0.13, union: "ftq_fipoe" });
+    const b = computeCcqBenefits({
+      hours, safetyEquipmentHours: hours, hourlyWage: 50.79, overtime200Hours: 1.75, employeePensionRate: 0.09,
+      vacationHolidaySickRate: 0.13, medicEmployeePerHour: 0.68, medicProvincialTaxRate: 0.09, union: "ftq_fipoe", level: "journeyman",
+      prelevementCcq: lev.prelevementCcq, caisseEducationSyndicale: lev.caisseEducationSyndicale,
+    });
+    const pl = printedPayLines({ regularHours: 40, ot200Hours: 1.75, baseOnlyHours: 0.25, baseRate: 50.79, premium: 4.06 });
+    const r = calculatePayroll({
+      taxYear: 2026, provinceOfEmployment: "QC", payPeriod: { frequency: "weekly" },
+      employee: { federalTaxProfile: { annualDeductions: b.federalDeduction * 52 }, quebecTaxProfile: {} },
+      employer: { annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 0.02, workforceSkillsFundApplicable: false },
+      earnings: [{ type: "regular", amount: pl.regular }, { type: "overtime", amount: pl.overtime }, { type: "regular", amount: pl.baseOnly }],
+      baseAdjustments: b.baseAdjustments, ytd,
+    });
+    const e = r.employee;
+    const gains = r.gross.total + b.vacation + b.taxableBenefit + b.employerSocialBenefit + b.safetyEquipment + 765 * 0.65 + 7;
+    expect(Math.round(gains * 100) / 100).toBe(3720.86);
+    expect(e.federalTax).toBe(300.2);
+    expect(e.rrq.total).toBe(172.96);
+    expect(e.ei).toBe(34.73);
+    expect(e.rqap).toBe(11.49);
+    expect(b.safetyEquipment).toBe(33.4);
+    expect(Math.abs(e.quebecTax - 402.24)).toBeLessThanOrEqual(0.0100001);
   });
 });

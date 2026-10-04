@@ -184,7 +184,7 @@ function Row({ label, value, strong, tone }) {
 export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
@@ -469,7 +469,7 @@ export default function PayrollEngineTester({ messier = false }) {
     if (!w) return;
     const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
     setFrequency("weekly");
-    setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), returnNbHours: r2(w.returnNbHours), km: r2(w.km) }));
+    setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), returnNbHours: r2(w.returnNbHours), baseOnlyHours: 0, km: r2(w.km) }));
     const opening = openingForWeekStart(w.start);
     setYtd(opening.snapshot);
     setAsOfDate(opening.date);
@@ -646,9 +646,12 @@ export default function PayrollEngineTester({ messier = false }) {
     // income (so it stays a DAS-subject earning) but is EXCLUDED from the CCQ social
     // benefits below (not added to `totalHours`), i.e. paid without social benefits.
     const returnNoBenefit = printed.returnNoBenefit;
+    // Hours at the base rate only: taxable/insurable/pensionable pay, outside every CCQ benefit base.
+    const baseOnlyPay = printed.baseOnly;
     if (regular) earnings.push({ type: "regular", amount: regular });
     if (overtime) earnings.push({ type: "overtime", amount: overtime });
     if (returnNoBenefit) earnings.push({ type: "regular", amount: returnNoBenefit });
+    if (baseOnlyPay) earnings.push({ type: "regular", amount: baseOnlyPay });
     if (Number(pay.taxableBenefit)) earnings.push({ type: "taxableBenefit", amount: Number(pay.taxableBenefit) });
 
     // Non-taxable reimbursements/allowances (outside the DAS calc): KM + weekly
@@ -962,6 +965,7 @@ export default function PayrollEngineTester({ messier = false }) {
           <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.returnNbHours")} value={pay.returnNbHours} onChange={setP("returnNbHours")} step="0.25" disabled={payLocked} />
+          <Field label={t("payroll.baseOnlyHours")} value={pay.baseOnlyHours} onChange={setP("baseOnlyHours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" disabled={payLocked} />
           <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" disabled={payLocked} />
           <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} disabled={payLocked} />
@@ -1287,6 +1291,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
             const ot15 = Number(pay?.ot150Hours) || 0;
             const ot20 = Number(pay?.ot200Hours) || 0;
             const retNb = Number(pay?.returnNbHours) || 0;
+            const baseOnlyH = Number(pay?.baseOnlyHours) || 0;
             const tb = Number(pay?.taxableBenefit) || 0;
             const rrqTotal = e.rrq ? (e.rrq.tier1?.contribution || 0) + (e.rrq.tier2?.contribution || 0) : 0;
             return (
@@ -1298,6 +1303,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
                   {ot15 > 0 && <DetailRow label={t("payroll.ot150Hours")} formula={`${ot15} h × ${money(base * 1.5)}`} value={money(ot15 * base * 1.5)} tone="add" />}
                   {ot20 > 0 && <DetailRow label={t("payroll.ot200Hours")} formula={`${ot20} h × ${money(base * 2)}`} value={money(ot20 * base * 2)} tone="add" />}
                   {retNb > 0 && <DetailRow label={t("payroll.returnNbHours")} formula={`${retNb} h × ${money(base)}`} value={money(retNb * base)} tone="add" />}
+                  {baseOnlyH > 0 && <DetailRow label={t("payroll.baseOnlyHours")} formula={`${baseOnlyH} h × ${money(base)}`} value={money(printedPayLines({ baseOnlyHours: baseOnlyH, baseRate: base }).baseOnly)} tone="add" />}
                   {tb > 0 && <DetailRow label={t("payroll.taxableBenefits")} value={money(tb)} tone="add" />}
                   {ccq && <>
                     <DetailRow label={t("payroll.ccqVacation")} formula="13 %" value={money(ccq.vacation)} tone="add" />

@@ -97,3 +97,19 @@ describe("buildTalonFromItems — wide rate in the Unité band (stub D0031-0008,
     expect(talon.sommaire.find((r) => r.key === "hoursYtd")).toMatchObject({ periode: 36.5, cumulatif: 36.5 });
   });
 });
+
+describe("correctLegacyHours — « Régulier à taux horaire » paid at the regular rate counts as hours (S39)", () => {
+  const tx = [
+    { description: "indeminité utilisation véhicule", unite: 765, taux: 0.65, montant: 497.25 },
+    { description: "Régulier à taux horaire", unite: 0.25, taux: 50.79, montant: 12.7 },
+    { description: "Régulier à taux horaire", unite: 40, taux: 4.06, montant: 162.4 },
+    { description: "Salaire régulier fixe", unite: 40, taux: 50.79, montant: 2031.6 },
+    { description: "Temps double", unite: 1.75, taux: 101.58, montant: 177.77 },
+  ];
+  it("paid hours = 40 + 0,25 + 1,75 = 42; the premium line (40 h at 4,06) is the excess (82 → 42)", () => {
+    const rows = [{ description: "Heures AE", key: null, periode: 82, cumulatif: 989.25 }, { description: "Heures", key: "hoursYtd", periode: 82, cumulatif: 989.25 }];
+    const ytd = { hoursYtd: 989.25 };
+    expect(correctLegacyHours(tx, rows, ytd)).toEqual({ legacyHours: 82, paidHours: 42, excess: 40 });
+    expect(rows[1]).toMatchObject({ periode: 42, cumulatif: 949.25 });
+  });
+});
