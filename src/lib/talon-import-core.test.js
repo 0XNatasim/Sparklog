@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainHoursFromPrevious, correctLegacyHours } from "./talon-import-core";
+import { buildTalonFromItems, chainHoursFromPrevious, correctLegacyHours } from "./talon-import-core";
 
 // Talon D0008-0009 (week of 2026-03-29): the legacy software reported 61 h because it also
 // counted the 29.5 units of the "Régulier à taux horaire" premium line.
@@ -78,3 +78,22 @@ function transactionsS16() {
     { description: "indeminité utilisation véhicule", unite: 753, taux: 0.65, montant: 489.45 },
   ];
 }
+
+describe("buildTalonFromItems — wide rate in the Unité band (stub D0031-0008, S35)", () => {
+  const at = (s, x, y) => ({ s, x, y, page: 1 });
+  const items = [
+    at("Transactions", 40, 520), at("Sommaire", 300, 520),
+    at("Description", 30, 500), at("Unité", 120, 500), at("Taux", 165, 500), at("Montant", 205, 500),
+    at("Salaire régulier fixe", 30, 480), at("36.50", 125, 480), at("50.7900", 160, 480), at("$1,853.84", 200, 480),
+    at("Temps double", 30, 470), at("101.5800", 140, 470), at("$0.00", 205, 470), // no units; the rate starts in the Unité band
+    at("Régulier à taux horaire", 30, 460), at("36.50", 125, 460), at("4.0600", 165, 460), at("$148.19", 205, 460),
+    at("Heures", 240, 480), at("73.00", 330, 480), at("73.00", 380, 480),
+  ];
+  it("reads the wide rate as a rate and still corrects the doubled hours (73 → 36,5)", () => {
+    const talon = buildTalonFromItems(items);
+    const double = talon.transactions.find((r) => r.description === "Temps double");
+    expect(double).toMatchObject({ unite: null, taux: 101.58, montant: 0 });
+    expect(talon.hoursCorrection).toEqual({ legacyHours: 73, paidHours: 36.5, excess: 36.5 });
+    expect(talon.sommaire.find((r) => r.key === "hoursYtd")).toMatchObject({ periode: 36.5, cumulatif: 36.5 });
+  });
+});
