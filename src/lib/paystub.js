@@ -53,6 +53,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const caisse = n(ccqPeriod?.caisseEducationSyndicale);
   const kmReimb = n(reimb?.km);
   const phoneReimb = n(reimb?.phone);
+  const otherReimb = n(reimb?.other);
 
   // ── Gross-up presentation (matches the CCQ stub) ──
   const statutory = n(emp.federalTax) + n(emp.quebecTax) + n(emp.rrq.total) + n(emp.ei) + n(emp.rqap);
@@ -61,7 +62,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const withheld = statutory + pension + medicTotal + union + prel + caisse;
   const totalRetenues = reversals + withheld;
   const net = grossUp - totalRetenues;
-  const netPlusReimb = net + kmReimb + phoneReimb;
+  const netPlusReimb = net + kmReimb + phoneReimb + otherReimb;
 
   const gainsRRQ = cash + vac + imposable;
   const gainsAE = cash + vac;
@@ -75,6 +76,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
     safety ? { label: "Équipement de sécurité", unit: hours, taux: safety / (hours || 1), montant: safety } : null,
     kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, taux: pay.kmRate, montant: kmReimb } : null,
     phoneReimb ? { label: "Remboursement données cellulaire", unit: "", taux: "", montant: phoneReimb } : null,
+    otherReimb ? { label: "Autre revenu non imposable", unit: "", taux: "", montant: otherReimb } : null,
     n(pay.taxableBenefit) ? { label: "Autre avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
   ].filter((r) => r && (r.montant || r.label));
 
@@ -106,7 +108,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
 
   return {
     gains, sommaire, groupLabel, rulesTag,
-    grossUp, totalRetenues, net, netPlusReimb, kmReimb, phoneReimb,
+    grossUp, totalRetenues, net, netPlusReimb, kmReimb, phoneReimb, otherReimb,
   };
 }
 
@@ -196,7 +198,7 @@ export function stubSheetHtml({ model, hdr, employee, frequency, official = fals
       <div><div class="lbl">Paie nette</div><div class="val">${money(model.net)}</div></div>
     </div>
     <div class="paid">
-      <span class="paid-detail">Paie nette ${money(model.net)}${model.kmReimb > 0 ? ` + Indemnité KM ${money(model.kmReimb)}` : ""}${model.phoneReimb > 0 ? ` + Données cellulaire ${money(model.phoneReimb)}` : ""}</span>
+      <span class="paid-detail">Paie nette ${money(model.net)}${model.kmReimb > 0 ? ` + Indemnité KM ${money(model.kmReimb)}` : ""}${model.phoneReimb > 0 ? ` + Données cellulaire ${money(model.phoneReimb)}` : ""}${model.otherReimb > 0 ? ` + Autre revenu ${money(model.otherReimb)}` : ""}</span>
       <span class="paid-total">Paie nette + remboursements <b>${money(model.netPlusReimb)}</b></span>
     </div>
     <div class="cols">

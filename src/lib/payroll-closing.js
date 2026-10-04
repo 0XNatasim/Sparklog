@@ -1,6 +1,6 @@
 // Pure helpers shared by the payroll tester (Comptabiliser, results card, talon comparison).
 // `result` = calculatePayroll output, `ccq` = computeCcqBenefits output (or null), `reimb` =
-// { km, phone } non-taxable reimbursements. All amounts are dollars.
+// { km, phone, other } non-taxable reimbursements. All amounts are dollars.
 
 const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
 
@@ -14,7 +14,7 @@ export function payTotals(result, ccq, reimb) {
   const withheld = statutory + (ccq ? ccq.netWithholdings : 0);
   const totalRetenues = reversals + withheld;
   const net = grossUp - totalRetenues; // includes the paid safety allowance
-  const extraReimb = reimb ? (reimb.km || 0) + (reimb.phone || 0) : 0;
+  const extraReimb = reimb ? (reimb.km || 0) + (reimb.phone || 0) + (reimb.other || 0) : 0;
   return { grossUp, totalRetenues, net, extraReimb, gains: grossUp + extraReimb, netPlusReimb: net + extraReimb };
 }
 
