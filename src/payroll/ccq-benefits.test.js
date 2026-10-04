@@ -26,7 +26,7 @@ describe("computeCcqBenefits", () => {
 
   it("computes MÉDIC + provincial tax as a net withholding, separate from the pension", () => {
     const b = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
-    expect(b.medicWithholding).toBeCloseTo(40 * 0.68 * 1.09, 6); // 0,7412 $/h → 29,648
+    expect(b.medicWithholding).toBe(29.65); // premium 27,20 + tax 2,45 (2,448 → 2,45), each printed to the cent
     // Take-home withholding = pension + MÉDIC + union dues; none of MÉDIC is a tax deduction.
     expect(b.netWithholdings).toBeCloseTo(b.pensionDeduction + b.medicWithholding + b.unionDues, 6);
   });
@@ -36,7 +36,7 @@ describe("computeCcqBenefits", () => {
     // équipement de sécurité (indemnity, not a social benefit).
     const withReturn = computeCcqBenefits({ hours: 35.18, hourlyWage: 50.79, employeePensionRate: 0.09, safetyEquipmentHours: 35.18 + 2.75 });
     const baseOnly = computeCcqBenefits({ hours: 35.18, hourlyWage: 50.79, employeePensionRate: 0.09 });
-    expect(withReturn.safetyEquipment).toBeCloseTo((35.18 + 2.75) * 0.80, 6);
+    expect(withReturn.safetyEquipment).toBe(30.34); // (35,18 + 2,75) × 0,80 = 30,344 → 30,34
     // Pension/MÉDIC still key off the base hours only (avantages sociaux excluded on return).
     expect(withReturn.pensionDeduction).toBe(baseOnly.pensionDeduction);
     expect(withReturn.medicWithholding).toBe(baseOnly.medicWithholding);
@@ -331,5 +331,26 @@ describe("FTQ-FIPOE union dues vs 23 real stubs (S3–S25 2026)", () => {
   ];
   it.each(stubs)("%s h at %s $/h → %s $", (hours, rate, printed) => {
     expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: rate, hours })).toBe(printed);
+  });
+});
+
+describe("per-line cent rounding (stub D0010-0006, 37,5 h, week of 2026-04-12)", () => {
+  const b = computeCcqBenefits({
+    hours: 37.5, hourlyWage: 45.36, date: "2026-04-12", union: "ftq_fipoe", level: "journeyman",
+    taxableBenefitPerHour: 3.111, medicEmployeePerHour: 0.68, medicProvincialTaxRate: 0.09,
+    safetyEquipmentPerHour: 0.65, employerSocialBenefitPerHour: 8.32, vacationHolidaySickRate: 0.13,
+    pensionDeductionPerHour: 4.338,
+  });
+  it("prints MÉDIC 25,50 + taxe 2,30 = 27,80 and safety 24,38", () => {
+    expect(b.medicWithholding).toBe(27.8);
+    expect(b.safetyEquipment).toBe(24.38);
+    expect(b.employerSocialBenefit).toBe(312);
+    expect(b.vacation).toBe(221.13);
+    expect(b.taxableBenefit).toBe(116.66);
+  });
+  it("keeps the earlier stubs unchanged (S16 29 h: 19,72 + 1,77; S15 31,5 h: 21,42 + 1,93)", () => {
+    const med = (hours) => computeCcqBenefits({ hours, hourlyWage: 45.36, medicEmployeePerHour: 0.68, medicProvincialTaxRate: 0.09 }).medicWithholding;
+    expect(med(29)).toBe(21.49);
+    expect(med(31.5)).toBe(23.35);
   });
 });
