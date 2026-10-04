@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useT } from "@/lib/use-t";
 import { withRetry } from "@/lib/utils";
 import { EMPTY_YTD, YTD_STATUTORY, CCQ_CUMUL, snapshotToLedgerColumns, ledgerRowToSnapshot } from "@/lib/payroll-ledger-fields";
+import { chainHoursFromPrevious } from "@/lib/talon-import-core";
 import { legacyTalonSheet, legacyTalonDocument, printLegacyTalon } from "@/lib/legacy-talon-render";
 
 const money = (v) => `$${(Number(v) || 0).toFixed(2)}`;
@@ -66,6 +67,13 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
     try {
       const { parseFullTalon } = await import("@/lib/talon-import-parse");
       const result = await parseFullTalon(file);
+      // Hours: start from the previous week already in the register, not from the legacy
+      // cumulative (which still carries every earlier week's premium-line excess).
+      const endDate = result.periodEnd || result.header?.periodEnd || "";
+      const previous = existing
+        .filter((r) => r.period_end && endDate && r.period_end < endDate && r.hours_ytd != null)
+        .sort((a, b) => (a.period_end < b.period_end ? 1 : -1))[0];
+      const chained = previous ? chainHoursFromPrevious(result, previous.hours_ytd) : null;
       setTalon(result);
       setSnapshot({ ...EMPTY_YTD, ...(result.ytd || {}) });
       setPeriodEnd(result.periodEnd || result.header?.periodEnd || "");
@@ -73,7 +81,8 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
       const n = (result.transactions?.length || 0) + (result.sommaire?.length || 0);
       const fix = result.hoursCorrection;
       setMsg(t("payroll.legacy.detected", { count: n })
-        + (fix ? ` ${t("payroll.legacy.hoursCorrected", { legacy: fix.legacyHours, paid: fix.paidHours })}` : ""));
+        + (fix ? ` ${t("payroll.legacy.hoursCorrected", { legacy: fix.legacyHours, paid: fix.paidHours })}` : "")
+        + (chained ? ` ${t("payroll.legacy.hoursChained", { previous: chained.previousHours, hours: chained.periodHours, total: chained.total, week: dayjs(previous.period_end).format("DD MMM") })}` : ""));
     } catch (e2) {
       setErr(e2?.code === "no_text_layer" ? t("payroll.legacy.noText") : (e2?.message || t("payroll.legacy.failed")));
     } finally {

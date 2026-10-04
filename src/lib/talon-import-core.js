@@ -146,6 +146,23 @@ export function correctLegacyHours(transactions, sommaire, ytd) {
   return { legacyHours, paidHours, excess };
 }
 
+// Cumulative hours of an imported week = the previous registry week's hours + this week's real
+// hours (the legacy cumulative also carries every earlier week's premium-line excess, which only
+// the current week's correction removes). Rewrites "Heures" and "Heures AE" (cumulatif) and the
+// ledger snapshot; returns { previousHours, periodHours, total } or null when nothing applies.
+export function chainHoursFromPrevious(talon, previousHoursYtd) {
+  const prev = Number(previousHoursYtd);
+  if (!Number.isFinite(prev)) return null;
+  const hoursRow = (talon.sommaire || []).find((r) => r.key === "hoursYtd");
+  if (!hoursRow || hoursRow.periode == null) return null;
+  const total = Math.round((prev + hoursRow.periode) * 100) / 100;
+  for (const row of talon.sommaire) {
+    if (row.key === "hoursYtd" || /^heures ae$/.test(norm(row.description))) row.cumulatif = total;
+  }
+  talon.ytd = { ...(talon.ytd || {}), hoursYtd: total };
+  return { previousHours: prev, periodHours: hoursRow.periode, total };
+}
+
 // Pure: rebuild the full talon from positioned items.
 export function buildTalonFromItems(items) {
   // The talon lives on the page carrying the "Transactions"/"Sommaire" table.
