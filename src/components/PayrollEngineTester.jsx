@@ -184,7 +184,7 @@ function Row({ label, value, strong, tone }) {
 export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, otherReimb: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
@@ -194,7 +194,7 @@ export default function PayrollEngineTester({ messier = false }) {
   const [asOfDate, setAsOfDate] = useState("");
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
   const [result, setResult] = useState(null);
-  const [reimb, setReimb] = useState({ km: 0, phone: 0, total: 0 });
+  const [reimb, setReimb] = useState({ km: 0, phone: 0, other: 0, total: 0 });
   // CCQ benefit modelling (folded into the DAS bases via baseAdjustments). Rates
   // seed from the sourced électricien-C3 config but stay editable per métier. The
   // pension rate follows the level (compagnon 9 % / apprenti 4,5 %); the deductible
@@ -221,7 +221,6 @@ export default function PayrollEngineTester({ messier = false }) {
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
   const [advanceOnPrint, setAdvanceOnPrint] = useState(false); // advance cumulatives when printing/saving the stub
-  const [phonePromptOpen, setPhonePromptOpen] = useState(false); // styled confirm for the phone-data reimbursement
   const [sourcesOpen, setSourcesOpen] = useState(false); // "Sources" modal
   const [payEditable, setPayEditable] = useState(false); // unlock the auto-filled Paie fields of a selected week
   // Snapshot captured at "Calculer" time: the YTD baseline + period-ending date the
@@ -631,9 +630,8 @@ export default function PayrollEngineTester({ messier = false }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
 
-  // Run the calculation. `includePhone` decides whether the profile's phone-data
-  // reimbursement is added (asked via a styled modal, never auto-added).
-  function runCalculate(includePhone) {
+  // Run the calculation (phone-data / other reimbursements come from typed fields).
+  function runCalculate() {
     const earnings = [];
     const base = Number(pay.baseRate);
     const prem = Number(pay.premium);
@@ -658,8 +656,9 @@ export default function PayrollEngineTester({ messier = false }) {
     // phone/data + CCQ safety-equipment allowance (added once CCQ is computed).
     const profile = employees.find((e) => e.id === selectedId);
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
-    // Phone-data reimbursement is never added automatically (see handleCalculate's modal).
-    const phoneReimb = includePhone ? (Number(profile?.phone_data_reimbursement) || 0) : 0;
+    // Phone-data and other non-taxable reimbursements are typed amounts (never added automatically).
+    const phoneReimb = Number(pay.phone) || 0;
+    const otherReimb = Number(pay.otherReimb) || 0;
 
     // CCQ benefits (upstream of the tax engine): fold the collective-agreement
     // indemnity / taxable benefit / social-benefits deduction into the DAS bases.
@@ -710,7 +709,7 @@ export default function PayrollEngineTester({ messier = false }) {
     } else {
       setCcqAmounts(null);
     }
-    setReimb({ km: kmReimb, phone: phoneReimb, safety: safetyEquip, total: kmReimb + phoneReimb + safetyEquip });
+    setReimb({ km: kmReimb, phone: phoneReimb, other: otherReimb, safety: safetyEquip, total: kmReimb + phoneReimb + otherReimb + safetyEquip });
 
     setResult(calculatePayroll({
       taxYear: 2026,
@@ -760,12 +759,8 @@ export default function PayrollEngineTester({ messier = false }) {
     setOpenExplain(false);
   }
 
-  // "Calculer": if the employee has a phone-data reimbursement, ask (styled modal)
-  // whether to include it; otherwise calculate straight away.
   function handleCalculate() {
-    const phoneAmt = Number(employees.find((e) => e.id === selectedId)?.phone_data_reimbursement) || 0;
-    if (phoneAmt > 0) { setPhonePromptOpen(true); return; }
-    runCalculate(false);
+    runCalculate();
   }
 
   // Opening balances are read-only once entered (seedLocked) or when a week is
@@ -969,6 +964,8 @@ export default function PayrollEngineTester({ messier = false }) {
           <Field label={t("payroll.km")} value={pay.km} onChange={setP("km")} step="1" disabled={payLocked} />
           <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" disabled={payLocked} />
           <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} disabled={payLocked} />
+          <Field label={t("payroll.reimbPhone")} value={pay.phone} onChange={setP("phone")} step="0.01" disabled={payLocked} />
+          <Field label={t("payroll.otherReimb")} value={pay.otherReimb} onChange={setP("otherReimb")} step="0.01" disabled={payLocked} />
         </div>
       </Collapsible>
 
@@ -1124,23 +1121,6 @@ export default function PayrollEngineTester({ messier = false }) {
         onOutput={advanceOnPrint && selectedId ? () => postPayroll({ silent: true }) : undefined}
       />
 
-      {/* Styled confirm for the phone-data reimbursement (replaces window.confirm) */}
-      <Dialog open={phonePromptOpen} onOpenChange={setPhonePromptOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{t("payroll.confirmPhoneReimb", { amount: money(Number(employees.find((e) => e.id === selectedId)?.phone_data_reimbursement) || 0) })}</DialogTitle>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => { setPhonePromptOpen(false); runCalculate(false); }}>
-              {t("common.no")}
-            </Button>
-            <Button type="button" onClick={() => { setPhonePromptOpen(false); runCalculate(true); }}>
-              {t("common.yes")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Sources modal — every primary reference behind the rule set */}
       <Dialog open={sourcesOpen} onOpenChange={setSourcesOpen}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
@@ -1243,6 +1223,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
                   <>
                     {reimb.km > 0 && <Row label={t("payroll.reimbKm")} value={money(reimb.km)} tone="add" />}
                     {reimb.phone > 0 && <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} tone="add" />}
+                    {reimb.other > 0 && <Row label={t("payroll.otherReimb")} value={money(reimb.other)} tone="add" />}
                     <Row label={t("payroll.netPlusReimb")} value={money(net + extraReimb)} strong />
                   </>
                 )}
