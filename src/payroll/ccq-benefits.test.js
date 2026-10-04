@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCcqBenefits, computeUnionDues, unionDuesRuleFor, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeUnionDuesAsPrinted, computeUnionDues, unionDuesRuleFor, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 
 const c = (d) => Math.round(d * 100);
@@ -310,5 +310,13 @@ describe("test-only stub overrides (talon D0009-0009, week of 2026-04-05, 29 h)"
     expect(stated.unionDues).toBe(28.05);
     expect(stated.federalDeduction).toBeCloseTo(28.05, 2);
     expect(sourced.pensionDeduction).not.toBe(125.8);
+  });
+});
+
+describe("computeUnionDuesAsPrinted (previous-agreement stubs)", () => {
+  const stub = { union: "ftq_fipoe", level: "journeyman", declaredHourlyWage: 45.36 + 3, date: "2026-04-05" };
+  it("reproduces both real stubs to the cent (rate part rounded first)", () => {
+    expect(computeUnionDuesAsPrinted({ ...stub, hours: 29 })).toBe(28.05); // D0009-0009
+    expect(computeUnionDuesAsPrinted({ ...stub, hours: 31.5 })).toBe(28.18); // D0008-0009
   });
 });

@@ -11,6 +11,7 @@ import { isOwnerRole, isNonCcqRole } from "@/lib/roles";
 import { useAuth } from "@/contexts/AuthContext";
 import PayStubPrint from "@/components/PayStubPrint";
 import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
+import { printLegacyTalon } from "@/lib/legacy-talon-render";
 import { useT } from "@/lib/use-t";
 
 const isPending = (s) => s === "submitted" || s === "updated";
@@ -79,7 +80,15 @@ export default function TalonTab({ messier = false }) {
         (ledgers || []).forEach((r) => { if (!lByE.has(r.user_id)) lByE.set(r.user_id, []); lByE.get(r.user_id).push(r); });
         setLedgerByEmp(lByE);
 
-        const wk = [...weekMap.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, NB_WEEKS);
+        // Weeks in the register (imported or validated stubs) always show, even without jobs.
+        const recent = [...weekMap.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, NB_WEEKS);
+        const all = new Map(recent.map((w) => [w.key, w]));
+        (ledgers || []).forEach((r) => {
+          if (!r.imported_talon || !r.period_end || all.has(r.period_end)) return;
+          const end = dayjs(r.period_end);
+          all.set(r.period_end, { key: r.period_end, start: weekStartSundayD(r.period_end), end, weekNo: ccqWeekNumber(end) });
+        });
+        const wk = [...all.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
         setWeeks(wk);
         setBatchWeek(wk[0]?.key || "");
       } catch (e) {
@@ -92,7 +101,8 @@ export default function TalonTab({ messier = false }) {
   }, [reloadKey]);
 
   // Employees that have at least one job in the window, in roster order.
-  const rows = useMemo(() => employees.filter((e) => (jobsByEmp.get(e.id) || []).length > 0), [employees, jobsByEmp]);
+  const rows = useMemo(() => employees.filter((e) => (jobsByEmp.get(e.id) || []).length > 0
+    || (ledgerByEmp.get(e.id) || []).some((r) => r.imported_talon)), [employees, jobsByEmp, ledgerByEmp]);
 
   // Opening balance for an employee at a week start (latest ledger ending before, else seed).
   function openingFor(userId, weekStart) {
@@ -105,6 +115,9 @@ export default function TalonTab({ messier = false }) {
   // The per-cell state for (employee, week).
   function cellState(profile, week) {
     const jobs = (jobsByEmp.get(profile.id) || []).filter((j) => ccqWeekOf(j.job_date).key === week.key);
+    // A stub kept in the register (imported or validated against the real one) is shown as is.
+    const kept = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key && r.imported_talon);
+    if (kept) return { kind: "imported", talon: kept.imported_talon };
     if (!jobs.length) return { kind: "none" };
     const pending = jobs.filter((j) => isPending(j.status)).length;
     const approved = jobs.filter((j) => j.status === "approved");
@@ -182,6 +195,18 @@ export default function TalonTab({ messier = false }) {
     if (st.kind === "none") return <span className="text-muted-foreground/40">·</span>;
     if (st.kind === "draft") return <span className="text-muted-foreground/60" title={t("payroll.talon.cell.draft")}>—</span>;
     if (st.kind === "pending") return <Clock className="mx-auto h-4 w-4 text-amber-500" title={t("payroll.talon.cell.pending")} />;
+    if (st.kind === "imported") {
+      return (
+        <button
+          type="button"
+          onClick={() => printLegacyTalon(st.talon, `${t("payroll.subtabs.talon")} — S${week.weekNo} — ${profile.full_name || ""}`)}
+          title={t("payroll.talon.cell.imported")}
+          className="mx-auto flex h-7 w-7 items-center justify-center rounded-md text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+        >
+          <FileText className="h-4 w-4" strokeWidth={2.2} />
+        </button>
+      );
+    }
     const official = st.kind === "official";
     const comptabilise = st.kind === "comptabilise";
     const cls = official
@@ -218,6 +243,7 @@ export default function TalonTab({ messier = false }) {
         <span className="flex items-center gap-1.5"><BadgeCheck className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={2.2} /> {t("payroll.talon.cell.official")}</span>
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={2.2} /> {t("payroll.talon.cell.comptabilise")}</span>
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 opacity-70" strokeWidth={1.6} /> {t("payroll.talon.cell.apercu")}</span>
+        <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-300" strokeWidth={2.2} /> {t("payroll.talon.cell.imported")}</span>
         <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-amber-500" /> {t("payroll.talon.cell.pending")}</span>
         <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" onClick={() => setImportOpen(true)}>
           <Upload className="mr-1.5 h-3.5 w-3.5" /> {t("payroll.legacy.title")}

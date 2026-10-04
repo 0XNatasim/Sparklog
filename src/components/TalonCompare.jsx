@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileSearch, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +10,7 @@ const fmtDiff = (value, unit) => (value == null ? "—" : `${value > 0 ? "+" : "
 
 // Upload the real talon of the calculated week and see, line by line, where SparkLog agrees
 // to the cent and where it does not. Client-side only; nothing is saved.
-export default function TalonCompare({ opening, closing, totals }) {
+export default function TalonCompare({ opening, closing, totals, onComparison }) {
   const t = useT();
   const inputRef = useRef(null);
   const [talon, setTalon] = useState(null);
@@ -36,6 +36,10 @@ export default function TalonCompare({ opening, closing, totals }) {
   }
 
   const comparison = talon ? compareWithTalon({ opening, closing, totals, talon }) : null;
+
+  // Let the page offer "keep this week" once the comparison is exact.
+  const exact = !!comparison?.exact;
+  useEffect(() => { onComparison?.(talon ? { talon, exact, fileName } : null); }, [talon, exact, fileName]); // eslint-disable-line react-hooks/exhaustive-deps
   const header = talon?.header || {};
 
   const renderRows = (rows) => rows.map((row) => (
