@@ -87,7 +87,14 @@ function blockLines(rows, block, def) {
     for (const it of cells) {
       const v = toNumber(it.s);
       if (v !== null) {
-        const idx = def.nums.findIndex((band) => inBand(it.x, band));
+        let idx = def.nums.findIndex((band) => inBand(it.x, band));
+        // Transactions: a printed rate always has four decimals (« 101.5800 ») and an amount a « $ »,
+        // units two. A wide rate starts further left and lands in the Unité band (stub D0031-0008:
+        // « Temps double » without units) — classify by format, not only by position.
+        if (block === "transactions" && idx >= 0) {
+          if (/\.\d{4}$/.test(it.s.trim())) idx = 1;
+          else if (it.s.includes("$")) idx = 2;
+        }
         if (idx >= 0) nums[idx] = v; else labelFrags.push(it.s);
       } else if (inBand(it.x, def.label)) {
         labelFrags.push(it.s);
