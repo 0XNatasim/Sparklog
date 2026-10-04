@@ -5,8 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useT } from "@/lib/use-t";
 import { compareWithTalon } from "@/lib/talon-compare";
 
-const fmt = (value, unit) => (value == null ? "—" : unit === "h" ? `${value.toFixed(2)} h` : `$${value.toFixed(2)}`);
-const fmtDiff = (value, unit) => (value == null ? "—" : `${value > 0 ? "+" : ""}${unit === "h" ? `${value.toFixed(2)} h` : `$${value.toFixed(2)}`}`);
+// Same cent rounding as the comparison, so a displayed pair can never look different yet pass.
+const cent = (value) => (Math.round(value * 100) / 100).toFixed(2);
+const fmt = (value, unit) => (value == null ? "—" : unit === "h" ? `${cent(value)} h` : `$${cent(value)}`);
+const fmtDiff = (value, unit) => (value == null ? "—" : `${value > 0 ? "+" : ""}${unit === "h" ? `${cent(value)} h` : `$${cent(value)}`}`);
 
 // Upload the real talon of the calculated week and see, line by line, where SparkLog agrees
 // to the cent and where it does not. Client-side only; nothing is saved.

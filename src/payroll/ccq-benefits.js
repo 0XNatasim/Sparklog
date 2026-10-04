@@ -350,7 +350,11 @@ export function computeCcqBenefits({
     ? round2(pensionableHourlyBase * employeePensionRate * h)
     : round2(Number(pensionDeductionPerHour) * h);
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
-  const medicWithholding = h * medicEmployeePerHour * (1 + medicProvincialTaxRate);
+  // Printed per component, each rounded to the cent: premium 37,5 h × 0,68 = 25,50 and tax
+  // 25,50 × 9 % = 2,295 → 2,30 (stub S17: 25,50 + 2,30 = 27,80, not 27,795).
+  const medicPremiumCents = Math.round(h * medicEmployeePerHour * 100);
+  const medicTaxCents = Math.round((medicPremiumCents * Math.round(medicProvincialTaxRate * 1e4)) / 1e4);
+  const medicWithholding = (medicPremiumCents + medicTaxCents) / 100;
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax
   // deduction (U1); a Québec credit (not a base deduction).
   const unionDues = unionDuesOverride == null
@@ -359,10 +363,11 @@ export function computeCcqBenefits({
   // Safety-equipment allowance — a NON-taxable amount paid on top of net (like KM).
   // Paid on `safetyEquipmentHours` when given (includes return time), else on `hours`.
   const safetyHours = safetyEquipmentHours == null ? h : Math.max(0, Number(safetyEquipmentHours) || 0);
-  const safetyEquipment = safetyHours * safetyEquipmentPerHour;
+  // Printed to the cent: 37,5 h × 0,65 = 24,375 → 24,38 (stub S17).
+  const safetyEquipment = round2(safetyHours * safetyEquipmentPerHour);
   // Employer avantages-sociaux contribution — imputed gain shown then reversed (a
   // display wash: not cash, not taxed). Used only for the gross-up presentation.
-  const employerSocialBenefit = h * employerSocialBenefitPerHour;
+  const employerSocialBenefit = round2(h * employerSocialBenefitPerHour);
   const prelevement = Number(prelevementCcq) || 0;
   const caisse = Number(caisseEducationSyndicale) || 0;
 
