@@ -14,3 +14,11 @@ describe("buildClosing — « Temps double » on its own line (stub D0014-0008)"
     expect(c.doubleTime).toBe(269.67);
   });
 });
+
+describe("buildClosing — base-rate-only hours count in the cumulative « Heures » (S39: 42 h)", () => {
+  it("40 + 1,75 + 0,25 = 42", () => {
+    const pay = { regularHours: 40, ot150Hours: 0, ot200Hours: 1.75, baseOnlyHours: 0.25, baseRate: 50.79 };
+    const c = buildClosing({ opening: { hoursYtd: 947.25 }, result: { gross: { cashTotal: 2384.1 }, ytdAfter: {} }, ccq: null, reimb: null, pay });
+    expect(c.hoursYtd).toBe(989.25);
+  });
+});

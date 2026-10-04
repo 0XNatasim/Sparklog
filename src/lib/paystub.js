@@ -71,6 +71,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
     { label: "Temps et demi", unit: n(pay.ot150Hours), taux: base * 1.5, montant: n(pay.ot150Hours) * base * 1.5 },
     { label: "Temps double", unit: n(pay.ot200Hours), taux: base * 2, montant: n(pay.ot200Hours) * base * 2 },
     prem ? { label: "Prime chef d'équipe", unit: regHrs, taux: prem, montant: regHrs * prem } : null,
+    n(pay.baseOnlyHours) ? { label: "Régulier à taux horaire (taux de base)", unit: n(pay.baseOnlyHours), taux: base, montant: n(pay.baseOnlyHours) * base } : null,
     safety ? { label: "Équipement de sécurité", unit: hours, taux: safety / (hours || 1), montant: safety } : null,
     kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, taux: pay.kmRate, montant: kmReimb } : null,
     phoneReimb ? { label: "Remboursement données cellulaire", unit: "", taux: "", montant: phoneReimb } : null,

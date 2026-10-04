@@ -123,9 +123,13 @@ function headerValue(rows, labelRe) {
 // Paid hours of a talon = the units on the hour-based earnings lines only (régulier, temps et
 // demi, temps double). "Régulier à taux horaire" is a premium computed ON the regular hours and
 // the allowance/reimbursement lines are not hours, so none of them may add to the total.
-const isPaidHoursLine = (description) => {
+const isPaidHoursLine = (description, taux, regularRate) => {
   const n = norm(description);
-  if (/taux horaire/.test(n)) return false;
+  if (/taux horaire/.test(n)) {
+    // « Régulier à taux horaire » is the premium line (units = the regular hours, rate = the premium) EXCEPT when
+    // it is paid at the regular rate itself (stub S39: 0,25 h × 50,79) — those are real hours.
+    return regularRate != null && taux != null && Math.abs(taux - regularRate) < 0.005;
+  }
   return /^(salaire )?regulier/.test(n) || /^temps (et demi|double|simple)/.test(n);
 };
 
@@ -134,7 +138,8 @@ const isPaidHoursLine = (description) => {
 // and take the excess off both the period and the cumulative columns. No-op when the legacy
 // figure is already right, or when no hour line can be identified.
 export function correctLegacyHours(transactions, sommaire, ytd) {
-  const lines = transactions.filter((r) => r.unite != null && isPaidHoursLine(r.description));
+  const regularRate = (transactions.find((r) => /^(salaire )?regulier/.test(norm(r.description)) && !/taux horaire/.test(norm(r.description)) && r.taux != null) || {}).taux ?? null;
+  const lines = transactions.filter((r) => r.unite != null && isPaidHoursLine(r.description, r.taux, regularRate));
   if (!lines.length) return null;
   const paidHours = Math.round(lines.reduce((sum, r) => sum + r.unite, 0) * 100) / 100;
   const legacy = sommaire.find((r) => r.key === "hoursYtd");
