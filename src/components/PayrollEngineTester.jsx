@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import TalonCompare from "@/components/TalonCompare";
-import { calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
+import { computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
@@ -212,6 +212,8 @@ export default function PayrollEngineTester({ messier = false }) {
   // Test mode only (a start week is chosen): hand-typed rates to reproduce a stub issued under
   // another agreement. Blank pension/union = keep the sourced formula.
   const [testRates, setTestRates] = useState({ enabled: false, safety: "", social: "", pensionPerHour: "", unionDues: "" });
+  const [cmp, setCmp] = useState(null); // { talon, exact, fileName } from the talon comparison card
+  const [keeping, setKeeping] = useState(false);
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
   const [showStub, setShowStub] = useState(false);
@@ -349,7 +351,7 @@ export default function PayrollEngineTester({ messier = false }) {
   // starts, else the seed. Returns { snapshot, date }.
   function openingForWeekStart(weekStart) {
     const before = ledger
-      .filter((r) => r.periodEnd && dayjs(r.periodEnd).isBefore(weekStart))
+      .filter((r) => !r.virtual && r.periodEnd && dayjs(r.periodEnd).isBefore(weekStart))
       .sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1));
     if (before.length) return { snapshot: before[0].snapshot, date: before[0].periodEnd };
     return { snapshot: seed, date: seedDate };
@@ -391,11 +393,12 @@ export default function PayrollEngineTester({ messier = false }) {
   }
 
   // Persist one week's CLOSING snapshot to the ledger (upsert by period_end → idempotent).
-  async function saveLedgerRow(closing, periodEnd, periodStart, talonSeq) {
+  async function saveLedgerRow(closing, periodEnd, periodStart, talonSeq, importedTalon) {
     const num = (v) => Number(v) || 0;
     const { error } = await supabase.from("payroll_period_ledger").upsert({
       user_id: selectedId, tax_year: TAX_YEAR, period_end: periodEnd, period_start: periodStart || null,
       talon_seq: talonSeq ?? null,
+      ...(importedTalon ? { imported_talon: importedTalon } : {}),
       ...Object.fromEntries(YTD_ALL.map(([k, col]) => [col, num(closing[k])])),
     }, { onConflict: "user_id,period_end" });
     return error;
@@ -482,15 +485,80 @@ export default function PayrollEngineTester({ messier = false }) {
     setFrequency("weekly");
   }
 
+  // Enchaîner (test): keep this calculation's closing cumulatives in memory as a virtual ledger
+  // week and start the next one from it. Nothing is written to the database; virtual weeks are
+  // ignored when a real week is selected.
+  function chainNextWeek() {
+    if (!result || !result.employee || !calcCtx) return;
+    const periodEnd = calcCtx.periodEnd;
+    const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
+    const periodStart = dayjs(asOfDate || periodEnd).add(1, "day").format("YYYY-MM-DD");
+    setLedger((rows) => [...rows.filter((r) => r.periodEnd !== periodEnd), { periodEnd, periodStart, snapshot: closing, virtual: true }]
+      .sort((x, y) => (x.periodEnd < y.periodEnd ? -1 : 1)));
+    setStartFromEnd(periodEnd);
+    setYtd(closing);
+    setAsOfDate(periodEnd);
+    setResult(null); setCalcCtx(null);
+  }
+
+  // Valider et garder: the hand-typed week reproduced the real stub to the cent, so write its
+  // closing cumulatives to the ledger (with the real stub as the printable talon) and move on to
+  // the next week. Same upsert key as an import, so keeping a week twice replaces it.
+  async function keepValidatedWeek() {
+    if (!cmp?.exact || !result?.employee || !calcCtx || !selectedId) return;
+    setKeeping(true);
+    try {
+      const periodEnd = calcCtx.periodEnd;
+      const periodStart = dayjs(asOfDate || periodEnd).add(1, "day").format("YYYY-MM-DD");
+      const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
+      const importedTalon = {
+        header: { ...cmp.talon.header, periodStart, periodEnd },
+        transactions: cmp.talon.transactions || [],
+        sommaire: cmp.talon.sommaire || [],
+      };
+      const error = await saveLedgerRow(closing, periodEnd, periodStart, null, importedTalon);
+      if (error) { setSaveState({ status: "error", message: error.message }); return; }
+      setLedger((rows) => [...rows.filter((r) => r.periodEnd !== periodEnd), { periodEnd, periodStart, snapshot: closing }]
+        .sort((x, y) => (x.periodEnd < y.periodEnd ? -1 : 1)));
+      setStartFromEnd(periodEnd);
+      setYtd(closing);
+      setAsOfDate(periodEnd);
+      setResult(null); setCalcCtx(null); setCmp(null);
+      setSaveState({ status: "saved", message: t("payroll.keep.done", { week: ccqWeekNumber(dayjs(periodEnd)), date: periodEnd }) });
+    } finally {
+      setKeeping(false);
+    }
+  }
+
+  // One click: the rates of the stubs issued before the 2026-04-26 agreement (read off talons
+  // D0008-0009 and D0009-0009). Test mode only; nothing here is a default rule.
+  function applyOldAgreementPreset() {
+    setResult(null); setCalcCtx(null);
+    setPay((s) => ({ ...s, baseRate: 45.36 }));
+    setCcq((s) => ({ ...s, vacationRatePct: 13, imposablePerHour: 3.111, medicPerHour: 0.68, medicTaxPct: 9, caisseEducation: 0 }));
+    setTestRates((s) => ({ ...s, enabled: true, safety: "0.65", social: "8.32", pensionPerHour: "4.338", unionDues: "" }));
+  }
+
   const setP = (k) => (v) => setPay((s) => ({ ...s, [k]: v }));
   const setE = (k) => (v) => setEmp((s) => ({ ...s, [k]: v }));
   const setY = (k) => (v) => setYtd((s) => ({ ...s, [k]: v }));
   const setEr = (k) => (v) => setEmployer((s) => ({ ...s, [k]: v }));
   const setC = (k) => (v) => setCcq((s) => ({ ...s, [k]: v }));
   const testRatesOn = !!startFromEnd && testRates.enabled;
+  // Union dues as the previous stubs print them: the rule applied to the DECLARED hourly rate
+  // (base + team-leader premium), not the base alone. Shown as a suggestion only.
+  const unionSuggestion = testRatesOn && ccq.enabled
+    ? computeUnionDuesAsPrinted({
+      union: ccq.union, level: ccq.status,
+      declaredHourlyWage: (Number(pay.baseRate) || 0) + (Number(pay.premium) || 0),
+      hours: (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0),
+      date: asOfDate ? dayjs(asOfDate).add(1, "day").format("YYYY-MM-DD") : undefined,
+    })
+    : null;
   const setTR = (k) => (v) => setTestRates((s) => ({ ...s, [k]: v }));
   function toggleTestRates(on) {
     setResult(null); setCalcCtx(null);
+    if (on) setCcq((s) => ({ ...s, caisseEducation: 0 })); // no caisse line on the previous agreement's stubs
     setTestRates((s) => ({
       ...s,
       enabled: on,
@@ -499,13 +567,14 @@ export default function PayrollEngineTester({ messier = false }) {
       social: on && s.social === "" ? String(CCQ_ELECTRICIAN_IC_C3.employerSocialBenefitPerHour) : s.social,
     }));
   }
+  useEffect(() => { setCmp(null); }, [calcCtx]);
   useEffect(() => { if (!startFromEnd) setTestRates((s) => (s.enabled ? { ...s, enabled: false } : s)); }, [startFromEnd]);
 
   // Auto-fill the CCQ levies (prélèvement + caisse d'éducation) from hours/wage/union,
   // the same way the union dues are auto-computed. They stay editable (a manual entry
   // is overwritten only when hours/wage/union/vacation change).
   useEffect(() => {
-    if (!ccq.enabled || testRatesOn) return;
+    if (!ccq.enabled) return;
     const hours = (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0);
     const levies = computeCcqLevies({
       hours,
@@ -515,7 +584,10 @@ export default function PayrollEngineTester({ messier = false }) {
       vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
       union: ccq.union,
     });
-    setCcq((s) => ({ ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
+    // Test rates: the prélèvement formula (0,75 % of wage + indemnity) still holds; the caisse is typed by hand.
+    setCcq((s) => (testRatesOn
+      ? { ...s, prelevementCcq: levies.prelevementCcq }
+      : { ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
 
@@ -579,7 +651,9 @@ export default function PayrollEngineTester({ messier = false }) {
           ...(testRates.safety !== "" && { safetyEquipmentPerHour: Number(testRates.safety) || 0 }),
           ...(testRates.social !== "" && { employerSocialBenefitPerHour: Number(testRates.social) || 0 }),
           ...(testRates.pensionPerHour !== "" && { pensionDeductionPerHour: Number(testRates.pensionPerHour) || 0 }),
-          ...(testRates.unionDues !== "" && { unionDuesOverride: Number(testRates.unionDues) || 0 }),
+          ...(testRates.unionDues !== ""
+            ? { unionDuesOverride: Number(testRates.unionDues) || 0 }
+            : (unionSuggestion != null && { unionDuesOverride: unionSuggestion })),
         } : {}),
       });
       baseAdjustments = benefits.baseAdjustments;
@@ -715,6 +789,7 @@ export default function PayrollEngineTester({ messier = false }) {
                     <option key={r.periodEnd} value={r.periodEnd}>
                       {r.periodStart ? `${dayjs(r.periodStart).format("DD MMM")} – ` : ""}{dayjs(r.periodEnd).format("DD MMM YYYY")}
                       {seqByEnd[r.periodEnd] ? ` · ${formatTalonRef(seqByEnd[r.periodEnd])}` : ""}
+                      {r.virtual ? ` · ${t("payroll.chain.virtual")}` : ""}
                     </option>
                   ))}
                 </select>
@@ -846,6 +921,7 @@ export default function PayrollEngineTester({ messier = false }) {
                   {t("payroll.testRates.toggle")}
                 </label>
                 <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.hint")}</p>
+                <Button type="button" size="sm" variant="outline" onClick={applyOldAgreementPreset}>{t("payroll.testRates.preset")}</Button>
                 {testRates.enabled && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Field label={t("payroll.testRates.safety")} value={testRates.safety} onChange={setTR("safety")} step="0.01" />
@@ -853,6 +929,9 @@ export default function PayrollEngineTester({ messier = false }) {
                     <Field label={t("payroll.testRates.pension")} value={testRates.pensionPerHour} onChange={setTR("pensionPerHour")} step="0.001" />
                     <Field label={t("payroll.testRates.union")} value={testRates.unionDues} onChange={setTR("unionDues")} step="0.01" />
                   </div>
+                )}
+                {testRates.enabled && unionSuggestion != null && (
+                  <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.unionSuggest", { amount: unionSuggestion.toFixed(2) })}</p>
                 )}
               </div>
             )}
@@ -939,7 +1018,25 @@ export default function PayrollEngineTester({ messier = false }) {
           opening={calcCtx.ytdSnapshot}
           closing={buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay })}
           totals={payTotals(result, ccqAmounts, reimb)}
+          onComparison={setCmp}
         />
+      )}
+
+      {result && result.employee && calcCtx && startFromEnd && !selectedWeek && (
+        <div className="space-y-2 rounded-lg border border-dashed p-3">
+          {cmp?.exact && (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="success" disabled={keeping} onClick={keepValidatedWeek}>
+                {keeping ? t("common.saving") : t("payroll.keep.button", { week: ccqWeekNumber(dayjs(calcCtx.periodEnd)) })}
+              </Button>
+              <span className="text-xs text-muted-foreground">{t("payroll.keep.hint")}</span>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={chainNextWeek}>{t("payroll.chain.button")}</Button>
+            <span className="text-xs text-muted-foreground">{t("payroll.chain.hint", { date: dayjs(calcCtx.periodEnd).add(7, "day").format("DD MMM YYYY") })}</span>
+          </div>
+        </div>
       )}
 
       <PayStubPrint

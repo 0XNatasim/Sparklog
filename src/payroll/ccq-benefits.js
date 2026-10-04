@@ -271,6 +271,17 @@ export function computeUnionDues({ union = "ftq_fipoe", level = "journeyman", ho
   return rate * wage + (d.perHour || 0) * h;
 }
 
+// Union dues as the employer's stubs print them: the rule is applied to the DECLARED hourly rate
+// (base + team-leader premium), and the rate part is rounded to the cent BEFORE the per-hour part
+// is added (0,55 × 48,36 = 26,598 → 26,60; + 0,05 × 31,5 h = 28,18). Used by the test mode that
+// reproduces past stubs; the sourced default (computeUnionDues on the base wage) is unchanged.
+export function computeUnionDuesAsPrinted({ union = "ftq_fipoe", level = "journeyman", declaredHourlyWage = 0, hours = 0, date } = {}) {
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const fixed = computeUnionDues({ union, level, hourlyWage: declaredHourlyWage, hours: 0, date });
+  const full = computeUnionDues({ union, level, hourlyWage: declaredHourlyWage, hours, date });
+  return r2(r2(fixed) + (full - fixed));
+}
+
 // Compute the CCQ benefit amounts, engine base adjustments and net withholdings
 // for one period. Dollar amounts (the engine converts to cents).
 //   hours              — total worked hours (regular + overtime hours)
