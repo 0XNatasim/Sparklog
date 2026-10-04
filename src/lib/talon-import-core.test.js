@@ -113,3 +113,21 @@ describe("correctLegacyHours — « Régulier à taux horaire » paid at the reg
     expect(rows[1]).toMatchObject({ periode: 42, cumulatif: 949.25 });
   });
 });
+
+describe("buildTalonFromItems — Sommaire de droite, PDF réimprimé (S39)", () => {
+  it("lit Période (x≈481) et Cumulatif (x≈528) de « Gains RRQ » sans prendre le cumulatif pour la période", () => {
+    const row = (y, label, p, c) => [
+      { s: label, x: 400, y, page: 1 }, { s: p, x: 481, y, page: 1 }, { s: c, x: 528, y, page: 1 },
+    ];
+    const items = [
+      { s: "Sommaire", x: 231, y: 300, page: 1 },
+      ...row(280, "Gains RRQ", "2,812.68", "49,862.90"),
+      ...row(268, "Gains RQAP", "2,671.69", "47,155.69"),
+    ];
+    const talon = buildTalonFromItems(items);
+    const rrq = talon.sommaire.find((r) => r.key === "pensionableIncomeRRQ");
+    expect(rrq).toMatchObject({ periode: 2812.68, cumulatif: 49862.9 });
+    const rqap = talon.sommaire.find((r) => r.key === "insurableIncomeRQAP");
+    expect(rqap).toMatchObject({ periode: 2671.69, cumulatif: 47155.69 });
+  });
+});

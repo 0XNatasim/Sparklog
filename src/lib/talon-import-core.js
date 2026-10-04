@@ -15,7 +15,7 @@ const BLOCKS = {
   // the originals, and right-aligned numbers start further left the wider they are.
   transactions: { label: [20, 105], nums: [[105, 148], [148, 190], [190, 235]] }, // Unité, Taux, Montant
   sommaireMid: { label: [220, 300], nums: [[300, 345], [345, 395]] }, // Période, Cumulatif
-  sommaireRight: { label: [395, 483], nums: [[483, 530], [530, 620]] }, // Période, Cumulatif
+  sommaireRight: { label: [395, 470], nums: [[470, 522], [522, 620]] }, // Période, Cumulatif
 };
 
 const inBand = (x, [a, b]) => x >= a && x < b;
