@@ -41,7 +41,11 @@ export default function TalonCompare({ opening, closing, totals, onComparison })
 
   // Let the page offer "keep this week" once the comparison is exact.
   const exact = !!comparison?.exact;
-  useEffect(() => { onComparison?.(talon ? { talon, exact, fileName } : null); }, [talon, exact, fileName]); // eslint-disable-line react-hooks/exhaustive-deps
+  const acceptable = !!comparison?.acceptable;
+  const qcAdjustment = comparison?.qcAdjustment ?? 0;
+  useEffect(() => {
+    onComparison?.(talon ? { talon, exact, acceptable, qcAdjustment: comparison?.qcTolerated ? qcAdjustment : 0, fileName } : null);
+  }, [talon, exact, acceptable, qcAdjustment, fileName]); // eslint-disable-line react-hooks/exhaustive-deps
   const header = talon?.header || {};
 
   const renderRows = (rows) => rows.map((row) => (
@@ -78,9 +82,9 @@ export default function TalonCompare({ opening, closing, totals, onComparison })
             <div className="text-xs text-muted-foreground">
               {fileName} · {header.ref || "—"} · {header.periodStart || "?"} → {header.periodEnd || "?"}
             </div>
-            <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${comparison.exact ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200"}`}>
+            <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${comparison.exact ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : comparison.qcTolerated ? "border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200" : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200"}`}>
               {comparison.exact ? <CheckCircle2 className="h-4 w-4" /> : <TriangleAlert className="h-4 w-4" />}
-              {comparison.exact ? t("payroll.compare.exact") : t("payroll.compare.mismatches", { count: comparison.mismatches })}
+              {comparison.exact ? t("payroll.compare.exact") : comparison.qcTolerated ? t("payroll.compare.qcTolerated") : t("payroll.compare.mismatches", { count: comparison.mismatches })}
             </div>
             <div className="overflow-x-auto rounded-md border">
               <table className="w-full text-sm">

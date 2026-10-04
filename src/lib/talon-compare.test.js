@@ -44,3 +44,43 @@ describe("compareWithTalon", () => {
     expect(r.totals.find((l) => l.label === "Paie nette")).toMatchObject({ diff: -0.27, ok: false });
   });
 });
+
+describe("one-cent Québec tax tolerance (stub D0011-0007, S18)", () => {
+  const talonS18 = {
+    header: { gains: "2,887.86", retenues: "1,442.96", paieNette: "1,444.90", ref: "D0011-0007" },
+    sommaire: [
+      { description: "Impôt Québec", key: "quebecTax", periode: 250.36, cumulatif: 919.91 },
+      { description: "Impôt Fédéral", key: "federalTax", periode: 184.05, cumulatif: 669.0 },
+    ],
+  };
+  const opening = { quebecTax: 669.55, federalTax: 484.92 };
+  const closing = { quebecTax: 669.55 + 250.35, federalTax: 484.92 + 184.05 };
+  const totals = { gains: 2887.86, totalRetenues: 1442.95, netPlusReimb: 1444.91 };
+
+  it("accepts a lone one-cent Québec difference and reports the adjustment", () => {
+    const r = compareWithTalon({ opening, closing, totals, talon: talonS18 });
+    expect(r.exact).toBe(false);
+    expect(r.qcTolerated).toBe(true);
+    expect(r.acceptable).toBe(true);
+    expect(r.qcAdjustment).toBe(0.01);
+  });
+
+  it("refuses when anything else differs, or the Québec gap is not one cent", () => {
+    const federalOff = compareWithTalon({ opening, closing: { ...closing, federalTax: closing.federalTax + 0.01 }, totals, talon: talonS18 });
+    expect(federalOff.acceptable).toBe(false);
+    const twoCents = compareWithTalon({ opening, closing: { ...closing, quebecTax: closing.quebecTax - 0.01 }, totals: { ...totals, totalRetenues: 1442.94, netPlusReimb: 1444.92 }, talon: talonS18 });
+    expect(twoCents.acceptable).toBe(false);
+    const gainsOff = compareWithTalon({ opening, closing, totals: { ...totals, gains: 2887.85 }, talon: talonS18 });
+    expect(gainsOff.acceptable).toBe(false);
+  });
+
+  it("an exact comparison needs no adjustment", () => {
+    const r = compareWithTalon({
+      opening, closing: { quebecTax: 669.55 + 250.36, federalTax: 484.92 + 184.05 },
+      totals: { gains: 2887.86, totalRetenues: 1442.96, netPlusReimb: 1444.9 }, talon: talonS18,
+    });
+    expect(r.exact).toBe(true);
+    expect(r.qcTolerated).toBe(false);
+    expect(r.acceptable).toBe(true);
+  });
+});

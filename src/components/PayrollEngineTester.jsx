@@ -509,12 +509,14 @@ export default function PayrollEngineTester({ messier = false }) {
   // closing cumulatives to the ledger (with the real stub as the printable talon) and move on to
   // the next week. Same upsert key as an import, so keeping a week twice replaces it.
   async function keepValidatedWeek() {
-    if (!cmp?.exact || !result?.employee || !calcCtx || !selectedId) return;
+    if (!cmp?.acceptable || !result?.employee || !calcCtx || !selectedId) return;
     setKeeping(true);
     try {
       const periodEnd = calcCtx.periodEnd;
       const periodStart = dayjs(asOfDate || periodEnd).add(1, "day").format("YYYY-MM-DD");
       const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
+      // One-cent tolerance on the Québec tax: the register follows the employer's printed amount.
+      if (cmp.qcAdjustment) closing.quebecTax = Math.round((closing.quebecTax + cmp.qcAdjustment) * 100) / 100;
       const importedTalon = {
         header: { ...cmp.talon.header, periodStart, periodEnd },
         transactions: cmp.talon.transactions || [],
@@ -1047,7 +1049,7 @@ export default function PayrollEngineTester({ messier = false }) {
 
       {result && result.employee && calcCtx && startFromEnd && !selectedWeek && (
         <div className="space-y-2 rounded-lg border border-dashed p-3">
-          {cmp?.exact && (
+          {cmp?.acceptable && (
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="success" disabled={keeping} onClick={keepValidatedWeek}>
                 {keeping ? t("common.saving") : t("payroll.keep.button", { week: ccqWeekNumber(dayjs(calcCtx.periodEnd)) })}

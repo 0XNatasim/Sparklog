@@ -43,10 +43,34 @@ export function compareWithTalon({ opening, closing, totals, talon }) {
     lines.push({ key: row.key, ...line(row.description, Math.round(appPeriod * 100) / 100, row.periode, row.key === "hoursYtd" ? "h" : "$") });
   }
   const all = [...totalsRows, ...lines];
+  const exact = all.length > 0 && all.every((r) => r.ok);
+  const tolerance = qcTolerance(totalsRows, lines);
   return {
     totals: totalsRows,
     lines,
     mismatches: all.filter((r) => !r.ok).length,
-    exact: all.length > 0 && all.every((r) => r.ok),
+    exact,
+    // Only the Québec tax is off by one cent (the employer's software rounds the annualised tax
+    // differently on some weeks); Retenues / Paie nette differ by that same cent and nothing else.
+    qcTolerated: !exact && tolerance != null,
+    qcAdjustment: tolerance, // talon − SparkLog for the Québec tax, in dollars (±0,01)
+    acceptable: exact || tolerance != null,
   };
+}
+
+// One-cent tolerance on the Québec income tax ONLY. Returns the adjustment (talon − app, dollars) when
+// every mismatch is that cent on "Impôt Québec" and its two consequences, else null.
+function qcTolerance(totalsRows, lines) {
+  const bad = [...totalsRows, ...lines].filter((r) => !r.ok);
+  const qc = lines.find((r) => r.key === "quebecTax");
+  if (!qc || qc.ok || qc.diff == null || Math.abs(Math.round(qc.diff * 100)) !== 1) return null;
+  const allowed = new Set([qc, ...totalsRows.filter((r) => r.label === "Retenues" || r.label === "Paie nette")]);
+  if (bad.some((r) => !allowed.has(r))) return null;
+  const retenues = totalsRows.find((r) => r.label === "Retenues");
+  const net = totalsRows.find((r) => r.label === "Paie nette");
+  const d = Math.round(qc.diff * 100);
+  // Retenues move with the tax, Paie nette the other way; Gains must be exact (it is in `bad` otherwise).
+  if (retenues && !retenues.ok && Math.round(retenues.diff * 100) !== d) return null;
+  if (net && !net.ok && Math.round(net.diff * 100) !== -d) return null;
+  return -d / 100;
 }
