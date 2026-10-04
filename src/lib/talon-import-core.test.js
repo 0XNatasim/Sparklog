@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { correctLegacyHours } from "./talon-import-core";
+import { chainHoursFromPrevious, correctLegacyHours } from "./talon-import-core";
 
 // Talon D0008-0009 (week of 2026-03-29): the legacy software reported 61 h because it also
 // counted the 29.5 units of the "Régulier à taux horaire" premium line.
@@ -50,3 +50,31 @@ describe("correctLegacyHours", () => {
     expect(rows[1].periode).toBe(61);
   });
 });
+
+describe("chainHoursFromPrevious", () => {
+  // S16 (D0009-0009): legacy cumulative 119 h (58 = 29 + 29 premium); S15 is in the register at 31,5 h.
+  it("takes the previous registry hours + this week's real hours (31,5 + 29 = 60,5)", () => {
+    const talon = { sommaire: sommaire(58, 119), ytd: { hoursYtd: 119 } };
+    correctLegacyHours(transactionsS16(), talon.sommaire, talon.ytd); // period 58 → 29, cumulative 119 → 90
+    expect(talon.ytd.hoursYtd).toBe(90);
+    const chained = chainHoursFromPrevious(talon, 31.5);
+    expect(chained).toEqual({ previousHours: 31.5, periodHours: 29, total: 60.5 });
+    expect(talon.ytd.hoursYtd).toBe(60.5);
+    expect(talon.sommaire[0]).toMatchObject({ periode: 29, cumulatif: 60.5 }); // Heures AE
+    expect(talon.sommaire[1]).toMatchObject({ periode: 29, cumulatif: 60.5 }); // Heures
+  });
+
+  it("does nothing without a previous week or an hours row", () => {
+    expect(chainHoursFromPrevious({ sommaire: sommaire(31.5, 31.5), ytd: {} }, undefined)).toBeNull();
+    expect(chainHoursFromPrevious({ sommaire: [], ytd: {} }, 10)).toBeNull();
+  });
+});
+
+function transactionsS16() {
+  return [
+    { description: "Salaire régulier fixe", unite: 29, taux: 45.36, montant: 1315.44 },
+    { description: "Temps double", unite: null, taux: 90.72, montant: 0 },
+    { description: "Régulier à taux horaire", unite: 29, taux: 3, montant: 87 },
+    { description: "indeminité utilisation véhicule", unite: 753, taux: 0.65, montant: 489.45 },
+  ];
+}
