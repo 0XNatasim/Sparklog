@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
+import { BEFORE_PRESET, afterPreset, presetKindForWeekStart } from "@/lib/rate-presets";
 import TalonCompare from "@/components/TalonCompare";
 import { computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
@@ -212,6 +213,7 @@ export default function PayrollEngineTester({ messier = false }) {
   // Test mode only (a start week is chosen): hand-typed rates to reproduce a stub issued under
   // another agreement. Blank pension/union = keep the sourced formula.
   const [testRates, setTestRates] = useState({ enabled: false, safety: "", social: "", pensionPerHour: "", unionDues: "" });
+  const [presetKind, setPresetKind] = useState(""); // "before" | "after" the 2026-04-26 agreement (test mode)
   const [cmp, setCmp] = useState(null); // { talon, exact, fileName } from the talon comparison card
   const [keeping, setKeeping] = useState(false);
   const [ccqAmounts, setCcqAmounts] = useState(null);
@@ -483,6 +485,7 @@ export default function PayrollEngineTester({ messier = false }) {
     setYtd(row.snapshot);
     setAsOfDate(row.periodEnd);
     setFrequency("weekly");
+    presetForNextWeek(row.periodEnd);
   }
 
   // Enchaîner (test): keep this calculation's closing cumulatives in memory as a virtual ledger
@@ -499,6 +502,7 @@ export default function PayrollEngineTester({ messier = false }) {
     setYtd(closing);
     setAsOfDate(periodEnd);
     setResult(null); setCalcCtx(null);
+    presetForNextWeek(periodEnd);
   }
 
   // Valider et garder: the hand-typed week reproduced the real stub to the cent, so write its
@@ -524,20 +528,35 @@ export default function PayrollEngineTester({ messier = false }) {
       setYtd(closing);
       setAsOfDate(periodEnd);
       setResult(null); setCalcCtx(null); setCmp(null);
+      presetForNextWeek(periodEnd);
       setSaveState({ status: "saved", message: t("payroll.keep.done", { week: ccqWeekNumber(dayjs(periodEnd)), date: periodEnd }) });
     } finally {
       setKeeping(false);
     }
   }
 
-  // One click: the rates of the stubs issued before the 2026-04-26 agreement (read off talons
-  // D0008-0009 and D0009-0009). Test mode only; nothing here is a default rule.
-  function applyOldAgreementPreset() {
+  // Test-mode rate sets for the weeks before / after the 2026-04-26 agreement (see rate-presets.js).
+  // Picked automatically from the week being calculated; the buttons force one.
+  function applyPresetKind(kind) {
     setResult(null); setCalcCtx(null);
-    setPay((s) => ({ ...s, baseRate: 45.36 }));
-    setCcq((s) => ({ ...s, vacationRatePct: 13, imposablePerHour: 3.111, medicPerHour: 0.68, medicTaxPct: 9, caisseEducation: 0 }));
-    setTestRates((s) => ({ ...s, enabled: true, safety: "0.65", social: "8.32", pensionPerHour: "4.338", unionDues: "" }));
+    setPresetKind(kind);
+    if (kind === "before") {
+      const p = BEFORE_PRESET;
+      setPay((s) => ({ ...s, baseRate: p.baseRate, premium: p.premium }));
+      setCcq((s) => ({ ...s, vacationRatePct: p.vacationPct, imposablePerHour: p.imposablePerHour, medicPerHour: p.medicPerHour, medicTaxPct: p.medicTaxPct, caisseEducation: 0 }));
+      setTestRates((s) => ({ ...s, enabled: true, safety: String(p.safety), social: String(p.social), pensionPerHour: String(p.pensionPerHour), unionDues: "" }));
+    } else {
+      const profile = employees.find((e) => e.id === selectedId);
+      const p = afterPreset({ baseRate: Number(profile?.hourly_rate) || 50.79 });
+      setPay((s) => ({ ...s, baseRate: p.baseRate, premium: p.premium }));
+      setCcq((s) => ({
+        ...s, vacationRatePct: p.vacationPct, medicTaxPct: p.medicTaxPct,
+        imposablePerHour: CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour, medicPerHour: CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
+      }));
+      setTestRates({ enabled: false, safety: "", social: "", pensionPerHour: "", unionDues: "" });
+    }
   }
+  const presetForNextWeek = (openingPeriodEnd) => applyPresetKind(presetKindForWeekStart(dayjs(openingPeriodEnd).add(1, "day")));
 
   const setP = (k) => (v) => setPay((s) => ({ ...s, [k]: v }));
   const setE = (k) => (v) => setEmp((s) => ({ ...s, [k]: v }));
@@ -921,7 +940,11 @@ export default function PayrollEngineTester({ messier = false }) {
                   {t("payroll.testRates.toggle")}
                 </label>
                 <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.hint")}</p>
-                <Button type="button" size="sm" variant="outline" onClick={applyOldAgreementPreset}>{t("payroll.testRates.preset")}</Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" variant={presetKind === "before" ? "default" : "outline"} onClick={() => applyPresetKind("before")}>{t("payroll.testRates.preset")}</Button>
+                  <Button type="button" size="sm" variant={presetKind === "after" ? "default" : "outline"} onClick={() => applyPresetKind("after")}>{t("payroll.testRates.presetAfter")}</Button>
+                  {presetKind && <span className="text-[11px] text-muted-foreground">{t("payroll.testRates.presetAuto")}</span>}
+                </div>
                 {testRates.enabled && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Field label={t("payroll.testRates.safety")} value={testRates.safety} onChange={setTR("safety")} step="0.01" />

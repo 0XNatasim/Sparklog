@@ -45,7 +45,6 @@ describe("computeCcqBenefits", () => {
   it("auto-computes the FTQ-FIPOE union dues (federal U1 deduction) by default", () => {
     // 55 % of one hour's wage per week + 0,05 $/h → 0,55 × 50,79 + 0,05 × 40 = 29,93.
     const b = computeCcqBenefits({ hours: 40, hourlyWage: 50.79, employeePensionRate: 0.09 });
-    expect(b.unionDues).toBeCloseTo(0.55 * 50.79 + 0.05 * 40, 6);
     expect(b.unionDues).toBeCloseTo(29.93, 2);
     expect(b.federalDeduction).toBe(b.unionDues); // U1: federal only, Québec is a credit
   });
@@ -189,7 +188,7 @@ describe("engine baseAdjustments", () => {
 describe("computeUnionDues (per union)", () => {
   const wage = 50.79, hours = 40;
   it("FTQ-FIPOE: 55 % + 0,05 $/h", () => {
-    expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.55 * wage + 0.05 * hours, 6);
+    expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.55 * wage + 0.05 * hours, 2);
   });
   it("International (FIPOE 568): 65 % compagnon, 50 % apprenti, + 0,05 $/h", () => {
     expect(computeUnionDues({ union: "international_568", level: "journeyman", hourlyWage: wage, hours })).toBeCloseTo(0.65 * wage + 0.05 * hours, 6);
@@ -234,7 +233,7 @@ describe("computeUnionDues — dated rule selection (28 June 2026 change)", () =
   it("date-agnostic unions (CSD/FTQ) are unaffected by the 28 June boundary", () => {
     expect(computeUnionDues({ union: "csd", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-27" })).toBeCloseTo(0.50 * wage + 0.035 * hours, 6);
     expect(computeUnionDues({ union: "csd", level: "journeyman", hourlyWage: wage, hours, date: "2026-07-01" })).toBeCloseTo(0.50 * wage + 0.035 * hours, 6);
-    expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-27" })).toBeCloseTo(0.55 * wage + 0.05 * hours, 6);
+    expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: wage, hours, date: "2026-06-27" })).toBeCloseTo(0.55 * wage + 0.05 * hours, 2);
   });
   it("unionDuesRuleFor selects the window; unknown union → null", () => {
     expect(unionDuesRuleFor("csn", "2026-06-27").effectiveFrom).toBe("2025-12-28");
@@ -318,5 +317,19 @@ describe("computeUnionDuesAsPrinted (previous-agreement stubs)", () => {
   it("reproduces both real stubs to the cent (rate part rounded first)", () => {
     expect(computeUnionDuesAsPrinted({ ...stub, hours: 29 })).toBe(28.05); // D0009-0009
     expect(computeUnionDuesAsPrinted({ ...stub, hours: 31.5 })).toBe(28.18); // D0008-0009
+  });
+});
+
+describe("FTQ-FIPOE union dues vs 23 real stubs (S3–S25 2026)", () => {
+  // [hours, scale rate, printed dues]; S3–S14 TMC 48,37; S15–S18 Messier 48,36; S19–S25 50,79.
+  const stubs = [
+    [37.75, 48.37, 28.49], [38.5, 48.37, 28.53], [39.5, 48.37, 28.58], [42.5, 48.37, 28.73], [38.75, 48.37, 28.54],
+    [39, 48.37, 28.55], [41, 48.37, 28.65], [37.5, 48.37, 28.48], [37.25, 48.37, 28.46], [39.25, 48.37, 28.56],
+    [38.75, 48.37, 28.54], [36.5, 48.37, 28.43], [31.5, 48.36, 28.18], [29, 48.36, 28.05], [37.5, 48.36, 28.48],
+    [36, 48.36, 28.4], [38, 50.79, 29.83], [34.25, 50.79, 29.64], [38.25, 50.79, 29.84], [31, 50.79, 29.48],
+    [36, 50.79, 29.73], [29.5, 50.79, 29.41], [35.75, 50.79, 29.72],
+  ];
+  it.each(stubs)("%s h at %s $/h → %s $", (hours, rate, printed) => {
+    expect(computeUnionDues({ union: "ftq_fipoe", level: "journeyman", hourlyWage: rate, hours })).toBe(printed);
   });
 });
