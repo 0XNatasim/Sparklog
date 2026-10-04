@@ -201,7 +201,7 @@ export default function TalonTab({ messier = false }) {
           type="button"
           onClick={() => printLegacyTalon(st.talon, `${t("payroll.subtabs.talon")} — S${week.weekNo} — ${profile.full_name || ""}`)}
           title={t("payroll.talon.cell.imported")}
-          className="mx-auto flex h-7 w-7 items-center justify-center rounded-md text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+          className="mx-auto flex h-9 w-9 items-center sm:h-7 sm:w-7 justify-center rounded-md text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-indigo-300 dark:hover:bg-indigo-950/40"
         >
           <FileText className="h-4 w-4" strokeWidth={2.2} />
         </button>
@@ -220,7 +220,7 @@ export default function TalonTab({ messier = false }) {
         type="button"
         onClick={() => openTalon(profile, week, st.jobs)}
         title={title}
-        className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cls}`}
+        className={`mx-auto flex h-9 w-9 items-center sm:h-7 sm:w-7 justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cls}`}
       >
         {official
           ? <BadgeCheck className="h-4 w-4" strokeWidth={2.2} />
@@ -284,8 +284,31 @@ export default function TalonTab({ messier = false }) {
         <CardContent className="p-0">
           {error && <div className="px-4 py-3 text-xs text-destructive">{error}</div>}
           {loading && <div className="px-4 py-6 text-center text-xs text-muted-foreground">{t("common.working")}</div>}
+          {/* Phone: one card per employee, the weeks that have a stub wrap onto several lines (no sideways scrolling). */}
           {!loading && (
-            <div className="overflow-x-auto">
+            <div className="divide-y sm:hidden">
+              {rows.map((profile) => {
+                const shown = weeks.filter((w) => cellState(profile, w).kind !== "none");
+                return (
+                  <div key={profile.id} className="px-3 py-3">
+                    <div className="mb-2 text-sm font-semibold">{profile.full_name || profile.id}</div>
+                    <div className="grid grid-cols-5 gap-x-1 gap-y-2">
+                      {shown.map((w) => (
+                        <div key={w.key} className="flex flex-col items-center gap-0.5" title={`${w.start.format("DD MMM")}–${w.end.format("DD MMM YYYY")}`}>
+                          <Cell profile={profile} week={w} />
+                          <span className="text-[11px] font-medium text-muted-foreground">S{w.weekNo}</span>
+                        </div>
+                      ))}
+                      {shown.length === 0 && <span className="col-span-5 text-xs text-muted-foreground">—</span>}
+                    </div>
+                  </div>
+                );
+              })}
+              {rows.length === 0 && <div className="px-3 py-6 text-center text-xs text-muted-foreground">{t("payroll.talon.noneApproved")}</div>}
+            </div>
+          )}
+          {!loading && (
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
