@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import { BEFORE_PRESET, afterPreset, presetKindForWeekStart } from "@/lib/rate-presets";
 import TalonCompare from "@/components/TalonCompare";
-import { computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
+import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import PayStubPrint from "@/components/PayStubPrint";
@@ -638,12 +638,14 @@ export default function PayrollEngineTester({ messier = false }) {
     const base = Number(pay.baseRate);
     const prem = Number(pay.premium);
     // Regular is paid at base + premium; overtime is on the base rate only (CCQ).
-    const regular = Number(pay.regularHours) * (base + prem);
-    const overtime = Number(pay.ot150Hours) * base * 1.5 + Number(pay.ot200Hours) * base * 2;
+    // Each stub line (units × rate) is rounded to the cent before adding — see printedPayLines.
+    const printed = printedPayLines({ ...pay, baseRate: base, premium: prem });
+    const regular = printed.regular;
+    const overtime = printed.overtime;
     // Return time carved out beyond 8h: paid at base rate (no premium). It is taxable
     // income (so it stays a DAS-subject earning) but is EXCLUDED from the CCQ social
     // benefits below (not added to `totalHours`), i.e. paid without social benefits.
-    const returnNoBenefit = Number(pay.returnNbHours) * base;
+    const returnNoBenefit = printed.returnNoBenefit;
     if (regular) earnings.push({ type: "regular", amount: regular });
     if (overtime) earnings.push({ type: "overtime", amount: overtime });
     if (returnNoBenefit) earnings.push({ type: "regular", amount: returnNoBenefit });

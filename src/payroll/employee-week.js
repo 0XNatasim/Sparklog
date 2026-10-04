@@ -12,6 +12,7 @@ import {
   CCQ_ELECTRICIAN_IC_C3,
   PAY_PERIODS_PER_YEAR,
 } from "./index.js";
+import { printedPayLines } from "./earnings.js";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
@@ -100,9 +101,10 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   };
 
   const earnings = [];
-  const regular = regularHours * (base + prem);
-  const overtime = ot150Hours * base * 1.5 + ot200Hours * base * 2;
-  const returnNoBenefit = returnNbHours * base; // base rate, no premium, no social benefits
+  const printed = printedPayLines({ regularHours, ot150Hours, ot200Hours, returnNbHours, baseRate: base, premium: prem });
+  const regular = printed.regular;
+  const overtime = printed.overtime;
+  const returnNoBenefit = printed.returnNoBenefit; // base rate, no premium, no social benefits
   if (regular) earnings.push({ type: "regular", amount: regular });
   if (overtime) earnings.push({ type: "overtime", amount: overtime });
   if (returnNoBenefit) earnings.push({ type: "regular", amount: returnNoBenefit });

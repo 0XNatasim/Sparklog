@@ -173,3 +173,29 @@ describe("YTD chaining", () => {
     expect(p2.ytdAfter.pensionableIncomeRRQ).toBeGreaterThan(p1.ytdAfter.pensionableIncomeRRQ);
   });
 });
+
+import { printedLineAmount, printedPayLines } from "./earnings.js";
+
+describe("pay lines printed to the cent (stubs S35, S36)", () => {
+  it("S36: 38,25 h × 50,79 = 1 942,72 + 38,25 h × 4,06 = 155,30 → 2 098,02 (not 2 098,01)", () => {
+    const l = printedPayLines({ regularHours: 38.25, ot200Hours: 1.5, baseRate: 50.79, premium: 4.06 });
+    expect(l.regularBase).toBe(1942.72);
+    expect(l.regularPremium).toBe(155.3);
+    expect(l.regular).toBe(2098.02);
+    expect(l.ot200).toBe(152.37);
+    expect(l.overtime).toBe(152.37);
+  });
+  it("S35 and earlier weeks keep their printed amounts", () => {
+    expect(printedPayLines({ regularHours: 36.5, baseRate: 50.79, premium: 4.06 }).regular).toBe(2002.03);
+    const s15 = printedPayLines({ regularHours: 29.5, ot200Hours: 2, baseRate: 45.36, premium: 3 });
+    expect(s15.regular).toBe(1426.62);
+    expect(s15.ot200).toBe(181.44);
+    expect(printedPayLines({ regularHours: 37.5, baseRate: 45.36, premium: 3 }).regular).toBe(1813.5);
+  });
+  it("temps et demi uses the rate printed to the cent (76,185 → 76,19)", () => {
+    expect(printedPayLines({ ot150Hours: 2, baseRate: 50.79 }).ot150).toBe(152.38);
+  });
+  it("hours that are not whole hundredths (from job minutes) keep plain rounding", () => {
+    expect(printedLineAmount(7.8333333, 50.79)).toBe(Math.round(7.8333333 * 50.79 * 100) / 100);
+  });
+});
