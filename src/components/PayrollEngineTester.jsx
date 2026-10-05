@@ -12,6 +12,8 @@ import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERS
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import { withHoursCumulative } from "@/lib/talon-import-core";
+import { buildCalculTalon } from "@/lib/calcul-talon";
+import { payDateFor } from "@/lib/paystub";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 import { isSubcontractorRole } from "@/lib/roles";
@@ -440,7 +442,18 @@ export default function PayrollEngineTester({ messier = false }) {
     setSaveState({ status: "saving", message: "" });
     const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
     const talonSeq = await nextTalonSeq(periodEnd);
-    const error = await saveLedgerRow(closing, periodEnd, periodStart, talonSeq);
+    // Keep what Calcul computed as the week's talon (the Talons tab otherwise recomputes from the approved
+    // jobs only). A real stub already kept for this week (« Valider et garder » / import) is never replaced.
+    const { data: existing } = await supabase.from("payroll_period_ledger")
+      .select("imported_talon").eq("user_id", selectedId).eq("period_end", periodEnd).maybeSingle();
+    const keepsRealStub = !!existing?.imported_talon && existing.imported_talon.header?.source !== "calcul";
+    const importedTalon = keepsRealStub ? undefined : buildCalculTalon({
+      opening: calcCtx.ytdSnapshot, closing, result, ccq: ccqAmounts, reimb, pay,
+      employee: employees.find((e) => e.id === selectedId) || {},
+      week: { periodStart, periodEnd, weekNo: ccqWeekNumber(w.end) },
+      reference: formatTalonRef(talonSeq), payDate: payDateFor(w.end),
+    });
+    const error = await saveLedgerRow(closing, periodEnd, periodStart, talonSeq, importedTalon);
     if (error) { setSaveState({ status: "error", message: error.message }); return false; }
     // Replace/insert the row in local ledger state, keep sorted by period end.
     setLedger((rows) => {

@@ -29,6 +29,7 @@ export const LEGACY_TALON_STYLES = `
   .wm { position: relative; }
   .foot { margin-top: 10px; font-size: 9px; color: #555; border-top: 1px solid #ddd; padding-top: 6px; }
   .sheet + .sheet { page-break-before: always; }
+  @media (max-width: 640px) { .hd, .cols { grid-template-columns: 1fr; } .sheet { overflow-x: auto; } }
   @page { size: letter; margin: 12mm; }
 `;
 
@@ -82,7 +83,9 @@ export function legacyTalonSheet(data) {
         <tbody>${somRows}</tbody></table>
       </div>
     </div>
-    <div class="foot">Talon importé (ancien système) — reproduit tel qu'importé pour les archives et le relevé d'emploi. Ne remplace pas le talon d'origine.</div>
+    <div class="foot">${h.source === "calcul"
+      ? "Talon calculé par SparkLog (Calcul) — reproduction des montants comptabilisés. Ne remplace pas le talon de l'employeur."
+      : "Talon importé (ancien système) — reproduit tel qu'importé pour les archives et le relevé d'emploi. Ne remplace pas le talon d'origine."}</div>
   </div>`;
 }
 
