@@ -40,6 +40,20 @@ describe("buildClosing — « Autre revenu » cumulatif = cellulaire + autre rev
   });
 });
 
+describe("buildClosing — cumulatif « Vacances » = 4 % des lignes « Régulier à taux horaire » (S35 à S40)", () => {
+  const result = { gross: { cashTotal: 0 }, ytdAfter: {} };
+  const week = (hours, extra = {}) => ({ regularHours: hours, ot150Hours: 0, ot200Hours: 0, baseRate: 50.79, premium: 4.06, ...extra });
+  const close = (opening, pay) => buildClosing({ opening: { vacationPay: opening }, result, ccq: null, reimb: null, pay }).vacationPay;
+  it("S35: 36,5 h × 4,06 = 148,19 → 5,93", () => { expect(close(0, week(36.5))).toBe(5.93); });
+  it("S36: 38,25 h → 155,30 → 6,21 (cumul 12,14)", () => { expect(close(5.93, week(38.25))).toBe(12.14); });
+  it("S38: 31 h → 125,86 → 5,03 (cumul 23,67)", () => { expect(close(18.64, week(31))).toBe(23.67); });
+  it("S39: prime 162,40 + 0,25 h au taux de base 12,70 → 6,50 + 0,51 = 7,01 (cumul 30,68)", () => {
+    expect(close(23.67, week(40, { ot200Hours: 1.75, baseOnlyHours: 0.25 }))).toBe(30.68);
+  });
+  it("S40: 6,50 → cumul 37,18", () => { expect(close(30.68, week(40))).toBe(37.18); });
+  it("sans prime ni heures au taux de base, le cumul ne bouge pas", () => { expect(close(7.02, week(35, { premium: 0 }))).toBe(7.02); });
+});
+
 describe("payTotals — remboursements non imposables saisis (S40)", () => {
   it("km + cellulaire + autre revenu entrent dans Gains et Net + remboursements, pas dans les retenues", () => {
     const result = { gross: { total: 1000 }, employee: { federalTax: 0, quebecTax: 0, rrq: { total: 0 }, ei: 0, rqap: 0 } };

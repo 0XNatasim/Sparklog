@@ -2,7 +2,20 @@
 // `result` = calculatePayroll output, `ccq` = computeCcqBenefits output (or null), `reimb` =
 // { km, phone, other } non-taxable reimbursements. All amounts are dollars.
 
+import { printedPayLines } from "../payroll/earnings";
+
 const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+
+// The stub's « Vacances » line (record-only, not part of Gains): 4 % of each « Régulier à taux horaire » line,
+// rounded per line — premium line + base-rate-only line (S39: 6,50 + 0,51 = 7,01; S40: 6,50).
+const VACATION_RATE_ON_HOURLY_LINES = 0.04;
+function hourlyLinesVacation(pay) {
+  const lines = printedPayLines({
+    regularHours: Number(pay.regularHours) || 0, baseRate: Number(pay.baseRate) || 0,
+    premium: Number(pay.premium) || 0, baseOnlyHours: Number(pay.baseOnlyHours) || 0,
+  });
+  return round2(lines.regularPremium * VACATION_RATE_ON_HOURLY_LINES) + round2(lines.baseOnly * VACATION_RATE_ON_HOURLY_LINES);
+}
 
 // Gross-up presentation matching the CCQ stub: non-cash benefits appear as gains and are
 // reversed in the deductions; safety equipment is a paid, non-taxable allowance.
@@ -55,6 +68,7 @@ export function buildClosing({ opening, result, ccq, reimb, pay }) {
     ccqLevy: add("ccqLevy", c?.prelevementCcq),
     unionEducationFund: add("unionEducationFund", c?.caisseEducationSyndicale),
     safetyEquipment: add("safetyEquipment", c?.safetyEquipment),
+    vacationPay: add("vacationPay", hourlyLinesVacation(pay)),
     kmIndemnity: add("kmIndemnity", reimb?.km),
     // The stub's « Autre Revenu 1 » line is the cellular reimbursement plus any other non-taxable income
     // (S40: 14,00 + 7,11 = 21,11).
