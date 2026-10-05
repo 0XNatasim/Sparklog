@@ -111,6 +111,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
   const [search, setSearch] = useState("");
   const [yesterdaySnapshotOpen, setYesterdaySnapshotOpen] = useState(false);
   const [weekSnapshotOpen, setWeekSnapshotOpen] = useState(false);
+  const [lastWeekSnapshotOpen, setLastWeekSnapshotOpen] = useState(false);
 
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
@@ -1083,6 +1084,9 @@ export default function ManagerDashboard({ view = "timesheet" }) {
                 <Button type="button" size="sm" variant="outline" onClick={() => setWeekSnapshotOpen(true)}>
                   <Radio className="mr-1.5 h-4 w-4" />{t("live.week.open")}
                 </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setLastWeekSnapshotOpen(true)}>
+                  <Radio className="mr-1.5 h-4 w-4" />{t("live.week.openLast")}
+                </Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => setYesterdaySnapshotOpen(true)}>
                   <Radio className="mr-1.5 h-4 w-4" />{t("live.snapshot.open")}
                 </Button>
@@ -1189,6 +1193,21 @@ export default function ManagerDashboard({ view = "timesheet" }) {
             <WeekSnapshot
               onSelectEmployee={(userId, date) => {
                 setWeekSnapshotOpen(false);
+                openEmployeeTimesheet(userId, date);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={lastWeekSnapshotOpen} onOpenChange={setLastWeekSnapshotOpen}>
+          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{t("live.week.dialogTitleLast")}</DialogTitle>
+            </DialogHeader>
+            <WeekSnapshot
+              weekOffset={-1}
+              onSelectEmployee={(userId, date) => {
+                setLastWeekSnapshotOpen(false);
                 openEmployeeTimesheet(userId, date);
               }}
             />

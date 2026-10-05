@@ -105,7 +105,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
         <div className="payslip-print relative overflow-hidden rounded border border-neutral-900 bg-white text-[11px] leading-tight text-black">
           {!official && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="rotate-[-24deg] text-5xl font-black tracking-widest text-red-500/10">BROUILLON · DRAFT</span>
+              <span className="rotate-[-24deg] text-3xl font-black tracking-widest text-red-500/10 sm:text-5xl">BROUILLON · DRAFT</span>
             </div>
           )}
 
@@ -162,8 +162,8 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
           </div>
 
           {/* Body: Transactions + Sommaire */}
-          <div className="grid grid-cols-2">
-            <div className="border-r border-neutral-900 px-3 py-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2">
+            <div className="overflow-x-auto border-b border-neutral-900 px-3 py-2 sm:border-b-0 sm:border-r">
               <div className="mb-1 bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Transactions</div>
               <table className="w-full">
                 <thead><tr className="border-b border-neutral-900 text-left text-[9px] uppercase text-slate-500"><th className="py-0.5">Description</th><th className="text-right">Unité</th><th className="text-right">Taux</th><th className="text-right">Montant</th></tr></thead>
@@ -180,7 +180,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
               </table>
             </div>
 
-            <div className="px-3 py-2">
+            <div className="overflow-x-auto px-3 py-2">
               <div className="mb-1 bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Sommaire — Période / Cumulatif</div>
               <table className="w-full">
                 <thead><tr className="border-b border-neutral-900 text-left text-[9px] uppercase text-slate-500"><th className="py-0.5">Description</th><th className="text-right">Période</th><th className="text-right">Cumulatif</th></tr></thead>
