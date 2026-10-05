@@ -852,28 +852,11 @@ export default function EmployeesPanel() {
                     <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
                     <input type="checkbox" checked={Boolean(p.parking_receipts_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "parking_receipts_enabled", checked); saveField(p.id, "parking_receipts_enabled", checked); }} className="h-5 w-5 rounded border-input accent-amber-600" />
                   </label>
-                  {isSubcontractorRole(p.role) ? (
+                  {isSubcontractorRole(p.role) && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs md:col-span-2">
                     <div className="font-semibold text-primary">{t("employees.subcontractorRuleTitle")}</div>
                     <p className="mt-1 text-muted-foreground">{t("employees.subcontractorRuleHint")}</p>
                   </div>
-                  ) : (
-                  <>
-                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
-                    <span className="text-sm font-medium">
-                      {t("employees.otFirstHourDouble")}
-                      <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{t("employees.otFirstHourDoubleHint")}</span>
-                    </span>
-                    <input type="checkbox" checked={Boolean(p.overtime_first_hour_double)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "overtime_first_hour_double", checked); saveField(p.id, "overtime_first_hour_double", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
-                  </label>
-                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
-                    <span className="text-sm font-medium">
-                      {t("employees.returnNoBenefits")}
-                      <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">{t("employees.returnNoBenefitsHint")}</span>
-                    </span>
-                    <input type="checkbox" checked={Boolean(p.return_overtime_no_benefits)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "return_overtime_no_benefits", checked); saveField(p.id, "return_overtime_no_benefits", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
-                  </label>
-                  </>
                   )}
                 </div>
               </div>

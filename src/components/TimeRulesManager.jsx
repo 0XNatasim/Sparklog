@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Unlock, Users } from "lucide-react";
+import { Scale, Unlock, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import Fold from "@/components/ui/fold";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import { isManagerRole, isSubcontractorRole } from "@/lib/roles";
 
 const montrealDate = companyDate;
 
@@ -23,6 +24,8 @@ export default function TimeRulesManager() {
   const [unlocks, setUnlocks] = useState([]);
   const [unlockBusy, setUnlockBusy] = useState(false);
 
+  const [payRuleRows, setPayRuleRows] = useState([]);
+
   const [teamLeaderEmployee, setTeamLeaderEmployee] = useState("");
   const [teamLeaderPremium, setTeamLeaderPremium] = useState("");
   const [teamLeaderBusy, setTeamLeaderBusy] = useState(false);
@@ -30,10 +33,11 @@ export default function TimeRulesManager() {
   async function load() {
     // Deadline, evidence retention and the CCQ calendar live in Réglage.
     const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, team_leader_premium, is_paused").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_overtime_no_benefits").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
     ]);
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
+    setPayRuleRows((employeeRows || []).filter((employee) => !isManagerRole(employee.role)));
     setUnlocks(unlockRows || []);
   }
 
@@ -121,6 +125,19 @@ export default function TimeRulesManager() {
     setTeamLeaderBusy(false);
   }
 
+  // Per-employee pay rules (optimistic, reverted if the update fails).
+  async function setPayRule(id, field, checked) {
+    const patch = (value) => setPayRuleRows((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
+    patch(checked);
+    const { error } = await supabase.from("profiles").update({ [field]: checked }).eq("id", id);
+    if (error) {
+      patch(!checked);
+      setMessage(error.message);
+    } else {
+      setMessage(t("timeRules.payRules.saved"));
+    }
+  }
+
   async function removeTeamLeader(id) {
     setTeamLeaderBusy(true);
     const { error } = await supabase.from("profiles").update({ team_leader_premium: 0 }).eq("id", id);
@@ -173,6 +190,41 @@ export default function TimeRulesManager() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </Fold>
+
+        <Fold icon={Scale} title={t("timeRules.payRules.title")}>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">{t("timeRules.payRules.help")}</p>
+            <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+              {payRuleRows.map((row) => {
+                const fixed = isSubcontractorRole(row.role);
+                const rules = [
+                  { field: "first_trip_unpaid", label: t("settings.firstTrip.title"), hint: t("settings.firstTrip.help"), locked: false },
+                  { field: "return_overtime_no_benefits", label: t("employees.returnNoBenefits"), hint: t("employees.returnNoBenefitsHint"), locked: fixed },
+                  { field: "overtime_first_hour_double", label: t("employees.otFirstHourDouble"), hint: t("employees.otFirstHourDoubleHint"), locked: fixed },
+                ];
+                return (
+                  <div key={row.id} className="rounded border bg-muted/30 px-3 py-2">
+                    <div className="mb-1 text-sm font-semibold">{row.full_name || row.email || row.id}{fixed ? <span className="ml-2 text-[11px] font-normal text-muted-foreground">{t("timeRules.payRules.subcontractor")}</span> : null}</div>
+                    <div className="grid gap-1 md:grid-cols-3">
+                      {rules.map((rule) => (
+                        <label key={rule.field} title={rule.hint} className={`flex items-center justify-between gap-3 rounded border bg-background px-2 py-2 text-xs ${rule.locked ? "opacity-70" : "cursor-pointer"}`}>
+                          <span>{rule.label}</span>
+                          <input
+                            type="checkbox"
+                            checked={rule.locked ? true : Boolean(row[rule.field])}
+                            disabled={rule.locked}
+                            onChange={(e) => setPayRule(row.id, rule.field, e.target.checked)}
+                            className="h-5 w-5 shrink-0 rounded border-input accent-primary"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </Fold>
