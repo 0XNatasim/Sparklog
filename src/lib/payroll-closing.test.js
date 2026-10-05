@@ -23,6 +23,23 @@ describe("buildClosing — base-rate-only hours count in the cumulative « Heure
   });
 });
 
+describe("buildClosing — « Autre revenu » cumulatif = cellulaire + autre revenu non imposable", () => {
+  const result = { gross: { cashTotal: 0 }, ytdAfter: {} };
+  const pay = { regularHours: 0, ot150Hours: 0, ot200Hours: 0, baseRate: 50.79 };
+  it("adds the 7 $ cellular reimbursement each week (S29 → S30: 105 $)", () => {
+    const c = buildClosing({ opening: { otherIncome: 98 }, result, ccq: null, reimb: { km: 0, phone: 7, other: 0 }, pay });
+    expect(c.otherIncome).toBe(105);
+  });
+  it("adds cellular + other (S40: 14 + 7,11 = 21,11)", () => {
+    const c = buildClosing({ opening: { otherIncome: 147 }, result, ccq: null, reimb: { km: 0, phone: 14, other: 7.11 }, pay });
+    expect(c.otherIncome).toBe(168.11);
+  });
+  it("keeps the cumulative unchanged when nothing is entered (S37)", () => {
+    const c = buildClosing({ opening: { otherIncome: 140 }, result, ccq: null, reimb: { km: 0, phone: 0, other: 0 }, pay });
+    expect(c.otherIncome).toBe(140);
+  });
+});
+
 describe("payTotals — remboursements non imposables saisis (S40)", () => {
   it("km + cellulaire + autre revenu entrent dans Gains et Net + remboursements, pas dans les retenues", () => {
     const result = { gross: { total: 1000 }, employee: { federalTax: 0, quebecTax: 0, rrq: { total: 0 }, ei: 0, rqap: 0 } };
