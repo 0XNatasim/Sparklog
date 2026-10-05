@@ -31,7 +31,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     const weekEnd = days[6];
     const [p, j, o] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards").order("full_name"),
-      supabase.from("jobs").select("id, user_id, status, depart, fin, job_date, return_time_minutes").gte("job_date", weekStart).lte("job_date", weekEnd),
+      supabase.from("jobs").select("id, user_id, status, depart, fin, job_date").gte("job_date", weekStart).lte("job_date", weekEnd),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
     ]);
     if (p.error || j.error) setError((p.error || j.error).message);
@@ -54,11 +54,10 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     return roster.map((employee) => {
       const cells = days.map((date) => {
         const dayJobs = byKey.get(`${employee.id}:${date}`) || [];
-        // Worked time only: the return-to-storage time sits inside the job interval but is not counted.
-        const hours = dayJobs.reduce((sum, job) => sum + Math.max(0, (hoursBetween(
+        const hours = dayJobs.reduce((sum, job) => sum + (hoursBetween(
           job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,
           job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
-        ) || 0) - (Number(job.return_time_minutes) || 0) / 60), 0);
+        ) || 0), 0);
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
         return { date, hours, off, ...weekCellSummary(dayJobs) };
       });
