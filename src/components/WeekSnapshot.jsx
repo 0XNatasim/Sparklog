@@ -12,7 +12,7 @@ import { liveRoster, weekCellSummary } from "@/lib/live-crew";
 
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
 // time, the number of ORs and a colour for saved (orange) / submitted (green) / missing (red).
-export default function WeekSnapshot({ onSelectEmployee }) {
+export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   const t = useT();
   const [people, setPeople] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -21,7 +21,8 @@ export default function WeekSnapshot({ onSelectEmployee }) {
   const [error, setError] = useState("");
 
   const today = companyDate();
-  const weekStart = weekStartSundayD(today).format("YYYY-MM-DD");
+  // weekOffset: 0 = current week, -1 = last week (Sunday → Saturday).
+  const weekStart = addCalendarDays(weekStartSundayD(today).format("YYYY-MM-DD"), weekOffset * 7);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addCalendarDays(weekStart, i)), [weekStart]);
 
   const load = useCallback(async () => {
