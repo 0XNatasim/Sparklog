@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTalonFromItems, chainHoursFromPrevious, correctLegacyHours } from "./talon-import-core";
+import { buildTalonFromItems, chainHoursFromPrevious, correctLegacyHours, withHoursCumulative } from "./talon-import-core";
 
 // Talon D0008-0009 (week of 2026-03-29): the legacy software reported 61 h because it also
 // counted the 29.5 units of the "Régulier à taux horaire" premium line.
@@ -129,5 +129,26 @@ describe("buildTalonFromItems — Sommaire de droite, PDF réimprimé (S39)", ()
     expect(rrq).toMatchObject({ periode: 2812.68, cumulatif: 49862.9 });
     const rqap = talon.sommaire.find((r) => r.key === "insurableIncomeRQAP");
     expect(rqap).toMatchObject({ periode: 2671.69, cumulatif: 47155.69 });
+  });
+});
+
+describe("withHoursCumulative — talon gardé depuis Calcul (S40)", () => {
+  const sommaire = () => [
+    { key: "hoursYtd", description: "Heures", periode: 40, cumulatif: 1029.25 },
+    { key: null, description: "Heures AE", periode: 40, cumulatif: 1029.25 },
+    { key: "quebecTax", description: "Impôt Québec", periode: 352.25, cumulatif: 6508.69 },
+  ];
+  it("remplace le cumul « Heures » et « Heures AE » par celui du registre, sans toucher au reste ni à l'original", () => {
+    const orig = sommaire();
+    const out = withHoursCumulative(orig, 843.5);
+    expect(out[0].cumulatif).toBe(843.5);
+    expect(out[1].cumulatif).toBe(843.5);
+    expect(out[2]).toEqual(orig[2]);
+    expect(out[0].periode).toBe(40);
+    expect(orig[0].cumulatif).toBe(1029.25);
+  });
+  it("laisse le Sommaire intact quand le total n'est pas un nombre", () => {
+    const orig = sommaire();
+    expect(withHoursCumulative(orig, undefined)).toBe(orig);
   });
 });

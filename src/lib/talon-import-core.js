@@ -177,6 +177,15 @@ export function chainHoursFromPrevious(talon, previousHoursYtd) {
   return { previousHours: prev, periodHours: hoursRow.periode, total };
 }
 
+// Non-mutating twin for a talon kept from Calcul: its « Heures » / « Heures AE » cumulative is replaced by
+// the register's (real) hours, because the printed one still carries every earlier week's premium-line excess.
+export function withHoursCumulative(sommaire, total) {
+  const t = Number(total);
+  if (!Number.isFinite(t)) return sommaire;
+  return (sommaire || []).map((row) =>
+    row.key === "hoursYtd" || /^heures ae$/.test(norm(row.description)) ? { ...row, cumulatif: Math.round(t * 100) / 100 } : row);
+}
+
 // Pure: rebuild the full talon from positioned items.
 export function buildTalonFromItems(items) {
   // The talon lives on the page carrying the "Transactions"/"Sommaire" table.
