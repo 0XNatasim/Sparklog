@@ -56,6 +56,9 @@ export function buildClosing({ opening, result, ccq, reimb, pay }) {
     unionEducationFund: add("unionEducationFund", c?.caisseEducationSyndicale),
     safetyEquipment: add("safetyEquipment", c?.safetyEquipment),
     kmIndemnity: add("kmIndemnity", reimb?.km),
+    // The stub's « Autre Revenu 1 » line is the cellular reimbursement plus any other non-taxable income
+    // (S40: 14,00 + 7,11 = 21,11).
+    otherIncome: add("otherIncome", (Number(reimb?.phone) || 0) + (Number(reimb?.other) || 0)),
     hoursYtd: add("hoursYtd", hours),
   };
   Object.keys(closing).forEach((k) => { if (typeof closing[k] === "number") closing[k] = round2(closing[k]); });
