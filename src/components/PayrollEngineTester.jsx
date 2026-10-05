@@ -11,6 +11,7 @@ import TalonCompare from "@/components/TalonCompare";
 import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
+import { withHoursCumulative } from "@/lib/talon-import-core";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 import { isSubcontractorRole } from "@/lib/roles";
@@ -525,7 +526,8 @@ export default function PayrollEngineTester({ messier = false }) {
       const importedTalon = {
         header: { ...cmp.talon.header, periodStart, periodEnd },
         transactions: cmp.talon.transactions || [],
-        sommaire: cmp.talon.sommaire || [],
+        // « Heures » / « Heures AE » cumulative = the register's real hours, not the employer's inflated one.
+        sommaire: withHoursCumulative(cmp.talon.sommaire, closing.hoursYtd),
       };
       const error = await saveLedgerRow(closing, periodEnd, periodStart, null, importedTalon);
       if (error) { setSaveState({ status: "error", message: error.message }); return; }
