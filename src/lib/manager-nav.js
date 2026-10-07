@@ -11,6 +11,7 @@ export const MANAGER_NAV = Object.freeze([
   { id: "time", labelKey: "mgr.group.time", items: [
     { id: "timesheets", path: "timesheets", grant: "timesheet", labelKey: "mgr.nav.timesheets" },
     { id: "receipts", path: "receipts", grant: "notifications", labelKey: "mgr.nav.receipts" },
+    { id: "inventory", path: "inventory", grant: null, labelKey: "mgr.nav.inventory" },
   ] },
   { id: "team", labelKey: "mgr.group.team", items: [
     { id: "employees", path: "employees", grant: "employees", labelKey: "mgr.nav.employees" },

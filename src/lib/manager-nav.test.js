@@ -32,6 +32,11 @@ describe("manager navigation", () => {
     expect(menu).not.toContain("absences");
   });
 
+  it("keeps the inventory screenshots page manager-only", () => {
+    expect(ids("manager", [])).toContain("inventory");
+    expect(ids("admin", [...GRANTABLE_ADMIN_SECTIONS])).not.toContain("inventory");
+  });
+
   it("opens exactly the pages tied to one granted section", () => {
     expect(ids("admin", ["forms"])).toEqual(["forms"]);
     expect(ids("admin", ["notifications"])).toEqual(["receipts", "messages"]);
