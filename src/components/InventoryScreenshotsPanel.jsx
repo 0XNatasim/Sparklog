@@ -1,71 +1,70 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { withTimeout } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn, withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { INVENTORY_BUCKET, INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
+import { INVENTORY_BUCKET, INVENTORY_SLOTS } from "@/lib/inventory-screenshots";
+import { INVENTORY_STATE_ORDER, summarizeInventoryDay } from "@/lib/inventory-items";
+import { requestInventoryReading } from "@/lib/inventory-upload";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
-// Manager view of the end-of-shift inventory screenshots: one card per employee for a day,
-// plus the employees who have the option ticked but sent nothing yet.
+const CHIP_CLASS = {
+  missing: "border-destructive/40 bg-destructive/10 text-destructive dark:text-red-300",
+  partial: "border-destructive/40 bg-destructive/10 text-destructive dark:text-red-300",
+  photos: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+  review: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+  reading: "text-muted-foreground",
+  ok: "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-300",
+};
+
+// Manager view of the end-of-shift inventory. One row per employee for the chosen day; a tap
+// opens that employee's card: the written equipment list first, the photos second.
 export default function InventoryScreenshotsPanel() {
   const t = useT();
   const [date, setDate] = useState(companyDate());
-  const [employeeId, setEmployeeId] = useState("all");
   const [people, setPeople] = useState([]);
-  const [cards, setCards] = useState([]);
-  const [missing, setMissing] = useState([]);
+  const [shots, setShots] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [viewer, setViewer] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const [photos, setPhotos] = useState({});
+  const [hideZero, setHideZero] = useState(false);
+  const [rereadBusy, setRereadBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true);
     setErr("");
     try {
-      const [peopleResult, rowsResult] = await Promise.all([
+      const [peopleResult, shotsResult, itemsResult] = await Promise.all([
         withTimeout(
           supabase.from("profiles").select("id, full_name, email, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
           12000
         ),
         withTimeout(
-          supabase.from("inventory_screenshots").select("user_id, slot, storage_path, created_at")
+          supabase.from("inventory_screenshots").select("user_id, slot, storage_path, ocr_status, list_total")
             .eq("job_date", date).order("slot").limit(QUERY_BUDGETS.inventoryRows),
           12000
         ),
+        withTimeout(
+          supabase.from("inventory_items").select("user_id, slot, code, name, quantity")
+            .eq("job_date", date).limit(QUERY_BUDGETS.inventoryItems),
+          12000
+        ),
       ]);
-      if (peopleResult.error) throw peopleResult.error;
-      if (rowsResult.error) throw rowsResult.error;
-      const profiles = peopleResult.data || [];
-      setPeople(profiles);
-      const nameOf = new Map(profiles.map((p) => [p.id, p.full_name || p.email || p.id]));
-
-      const rows = rowsResult.data || [];
-      const paths = rows.map((row) => row.storage_path);
-      const urls = new Map();
-      if (paths.length) {
-        const { data: signed } = await withTimeout(supabase.storage.from(INVENTORY_BUCKET).createSignedUrls(paths, 600), 12000);
-        for (const item of signed || []) if (item.signedUrl) urls.set(item.path, item.signedUrl);
-      }
-      const byUser = new Map();
-      for (const row of rows) {
-        const list = byUser.get(row.user_id) || [];
-        list.push({ ...row, url: urls.get(row.storage_path) || "" });
-        byUser.set(row.user_id, list);
-      }
-      setCards([...byUser.entries()]
-        .map(([id, shots]) => ({ id, name: nameOf.get(id) || id, shots, missing: missingInventorySlots(shots) }))
-        .sort((a, b) => a.name.localeCompare(b.name)));
-      setMissing(profiles.filter((p) => p.inventory_screenshots_enabled && !byUser.has(p.id)));
+      for (const result of [peopleResult, shotsResult, itemsResult]) if (result.error) throw result.error;
+      setPeople(peopleResult.data || []);
+      setShots(shotsResult.data || []);
+      setItems(itemsResult.data || []);
     } catch (error) {
       setErr(friendlyErrorMessage(error, t, "mgr.inventory.failedLoad"));
     } finally {
@@ -73,87 +72,183 @@ export default function InventoryScreenshotsPanel() {
     }
   }, [date, t]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setOpenId(null); setPhotos({}); load(); }, [load]);
 
-  const visibleCards = employeeId === "all" ? cards : cards.filter((card) => card.id === employeeId);
-  const visibleMissing = employeeId === "all" ? missing : missing.filter((p) => p.id === employeeId);
+  const entries = useMemo(() => {
+    const shotsBy = new Map();
+    for (const shot of shots) shotsBy.set(shot.user_id, [...(shotsBy.get(shot.user_id) || []), shot]);
+    const itemsBy = new Map();
+    for (const item of items) itemsBy.set(item.user_id, [...(itemsBy.get(item.user_id) || []), item]);
+    return people
+      .filter((p) => p.inventory_screenshots_enabled || shotsBy.has(p.id))
+      .map((p) => ({ person: p, name: p.full_name || p.email || p.id, ...summarizeInventoryDay(shotsBy.get(p.id) || [], itemsBy.get(p.id) || []), shots: shotsBy.get(p.id) || [] }))
+      .sort((a, b) => INVENTORY_STATE_ORDER.indexOf(a.state) - INVENTORY_STATE_ORDER.indexOf(b.state) || a.name.localeCompare(b.name, "fr-CA"));
+  }, [people, shots, items]);
+
+  // The OCR runs in the background: keep refreshing quietly while some reading is pending.
+  const pending = entries.some((entry) => entry.state === "reading");
+  useEffect(() => {
+    if (!pending) return undefined;
+    const timer = window.setTimeout(() => load({ quiet: true }), 6000);
+    return () => window.clearTimeout(timer);
+  }, [pending, load, shots]);
+
+  const open = entries.find((entry) => entry.person.id === openId) || null;
+
+  // Photos are signed only for the card being opened.
+  useEffect(() => {
+    if (!open || photos[open.person.id]) return;
+    const paths = open.shots.map((shot) => shot.storage_path);
+    if (!paths.length) return;
+    supabase.storage.from(INVENTORY_BUCKET).createSignedUrls(paths, 600).then(({ data }) => {
+      const urls = new Map((data || []).map((row) => [row.path, row.signedUrl]));
+      setPhotos((current) => ({ ...current, [open.person.id]: Object.fromEntries(open.shots.map((shot) => [shot.slot, urls.get(shot.storage_path) || ""])) }));
+    }).catch(() => undefined);
+  }, [open, photos]);
+
+  async function rereadAll() {
+    if (!open || rereadBusy) return;
+    setRereadBusy(true);
+    await Promise.all(open.shots.map((shot) => requestInventoryReading(supabase, { jobDate: date, slot: shot.slot, userId: open.person.id })));
+    await load({ quiet: true });
+    setRereadBusy(false);
+  }
+
+  const received = entries.filter((entry) => entry.state !== "missing").length;
+  const shiftDay = (days) => setDate((current) => dayjs(current).add(days, "day").format("YYYY-MM-DD"));
+
+  function chipLabel(entry) {
+    if (entry.state === "missing") return t("mgr.inventory.state.missing");
+    if (entry.state === "partial") return t("mgr.inventory.state.partial", { count: entry.captures });
+    if (entry.state === "photos") return t("mgr.inventory.state.photos");
+    if (entry.state === "reading") return t("mgr.inventory.state.reading");
+    if (entry.state === "review") return t("mgr.inventory.state.review", { count: entry.count });
+    return t("mgr.inventory.state.ok", { count: entry.count });
+  }
+
+  const shownItems = open ? open.items.filter((item) => !(hideZero && Number(item.quantity) === 0)) : [];
 
   return (
     <div className="space-y-3">
       <Card>
-        <CardContent className="flex flex-wrap items-end gap-3 p-3">
-          <div className="grid gap-1">
-            <Label htmlFor="inventory-date" className="text-xs">{t("mgr.inventory.date")}</Label>
-            <Input id="inventory-date" type="date" value={date} onChange={(event) => event.target.value && setDate(event.target.value)} className="h-9 w-44" />
+        <CardContent className="flex flex-wrap items-center gap-2 p-3">
+          <Button type="button" variant="outline" size="icon" aria-label={t("mgr.inventory.previousDay")} onClick={() => shiftDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <Input type="date" aria-label={t("mgr.inventory.date")} value={date} onChange={(event) => event.target.value && setDate(event.target.value)} className="h-9 w-44" />
+          <Button type="button" variant="outline" size="icon" aria-label={t("mgr.inventory.nextDay")} onClick={() => shiftDay(1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="sm" disabled={date === companyDate()} onClick={() => setDate(companyDate())}>{t("mgr.inventory.today")}</Button>
+          <div className="ml-auto flex items-center gap-3">
+            {entries.length > 0 && <span className="text-sm text-muted-foreground">{t("mgr.inventory.received", { received, total: entries.length })}</span>}
+            <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </Button>
           </div>
-          <div className="grid gap-1">
-            <Label htmlFor="inventory-employee" className="text-xs">{t("mgr.inventory.employee")}</Label>
-            <Select id="inventory-employee" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} className="h-9 w-56">
-              <option value="all">{t("mgr.inventory.allEmployees")}</option>
-              {people.filter((p) => p.inventory_screenshots_enabled || cards.some((card) => card.id === p.id)).map((p) => (
-                <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
-              ))}
-            </Select>
-          </div>
-          <Button type="button" variant="outline" size="sm" disabled={loading} onClick={load}>
-            <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            {t("common.retry")}
-          </Button>
         </CardContent>
       </Card>
 
       {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300" role="alert">{err}</div>}
 
-      {visibleMissing.length > 0 && (
+      {!loading && !err && entries.length === 0 && (
+        <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("mgr.inventory.empty")}</CardContent></Card>
+      )}
+
+      {entries.length > 0 && (
         <Card>
-          <CardContent className="space-y-2 p-3">
-            <div className="text-sm font-semibold">{t("mgr.inventory.missingTitle")}</div>
-            <div className="flex flex-wrap gap-2">
-              {visibleMissing.map((p) => <Badge key={p.id} variant="outline">{p.full_name || p.email}</Badge>)}
-            </div>
+          <CardContent className="divide-y p-0">
+            {entries.map((entry) => (
+              <button
+                key={entry.person.id}
+                type="button"
+                onClick={() => setOpenId(entry.person.id)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+              >
+                <span className="font-medium">{entry.name}</span>
+                <span className="flex items-center gap-2">
+                  <Badge variant="outline" className={CHIP_CLASS[entry.state]}>{chipLabel(entry)}</Badge>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                </span>
+              </button>
+            ))}
           </CardContent>
         </Card>
       )}
 
-      {!loading && !err && visibleCards.length === 0 && (
-        <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("mgr.inventory.empty")}</CardContent></Card>
-      )}
+      <Dialog open={Boolean(open)} onOpenChange={(next) => !next && setOpenId(null)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          {open && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{open.name} · {dayjs(date).format("YYYY-MM-DD")}</DialogTitle>
+              </DialogHeader>
+              <Tabs defaultValue={open.state === "photos" || open.state === "partial" ? "photos" : "list"} key={`${open.person.id}-${date}`}>
+                <TabsList>
+                  <TabsTrigger value="list">{t("mgr.inventory.tabList")}</TabsTrigger>
+                  <TabsTrigger value="photos">{t("mgr.inventory.tabPhotos", { count: open.captures })}</TabsTrigger>
+                </TabsList>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {visibleCards.map((card) => (
-          <Card key={card.id}>
-            <CardContent className="space-y-2 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-semibold">{card.name}</div>
-                {card.missing.length > 0 && (
-                  <Badge variant="destructive">{t("mgr.inventory.incomplete", { count: card.shots.length })}</Badge>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {INVENTORY_SLOTS.map((slot) => {
-                  const shot = card.shots.find((row) => row.slot === slot);
-                  return shot?.url ? (
-                    <button key={slot} type="button" className="overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setViewer({ name: card.name, slot, url: shot.url })}>
-                      <img src={shot.url} alt={t("mgr.inventory.shotAlt", { name: card.name, n: slot })} loading="lazy" className="h-40 w-full object-cover object-top" />
-                    </button>
-                  ) : (
-                    <div key={slot} className="flex h-40 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
-                      {shot ? t("mgr.inventory.unavailable") : t("form.inventory.slot", { n: slot })}
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <TabsContent value="list" className="space-y-3">
+                  {open.state === "missing" && <p className="text-sm text-muted-foreground">{t("mgr.inventory.noCapture")}</p>}
+                  {open.state === "reading" && <p className="text-sm text-muted-foreground">{t("mgr.inventory.readingNow")}</p>}
+                  {open.state === "photos" && <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">{t("mgr.inventory.unreadable")}</p>}
+                  {open.state === "review" && (
+                    <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                      {open.expected ? t("mgr.inventory.mismatch", { count: open.count, expected: open.expected }) : t("mgr.inventory.unverified")}
+                    </p>
+                  )}
+                  {open.state === "partial" && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{t("mgr.inventory.partialNote", { count: open.captures })}</p>}
+                  {open.items.length > 0 && (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-medium">{t("mgr.inventory.itemCount", { count: open.count })}</span>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input type="checkbox" checked={hideZero} onChange={(event) => setHideZero(event.target.checked)} className="h-4 w-4 accent-primary" />
+                          {t("mgr.inventory.hideZero")}
+                        </label>
+                      </div>
+                      <div className="overflow-hidden rounded-md border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                            <tr><th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th><th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colQty")}</th></tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {shownItems.map((item) => (
+                              <tr key={item.code}>
+                                <td className="px-3 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.code}</div></td>
+                                <td className={cn("px-3 py-2 text-right tabular-nums", Number(item.quantity) === 0 && "text-muted-foreground")}>{Number(item.quantity).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                  {open.captures > 0 && open.state !== "reading" && (
+                    <Button type="button" variant="outline" size="sm" disabled={rereadBusy} onClick={rereadAll}>
+                      <RefreshCw className={cn("mr-1 h-4 w-4", rereadBusy && "animate-spin")} />
+                      {t("mgr.inventory.reread")}
+                    </Button>
+                  )}
+                </TabsContent>
 
-      <Dialog open={Boolean(viewer)} onOpenChange={(open) => !open && setViewer(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{viewer ? `${viewer.name} · ${t("form.inventory.slot", { n: viewer.slot })}` : ""}</DialogTitle>
-          </DialogHeader>
-          {viewer && <img src={viewer.url} alt="" className="max-h-[75vh] w-full rounded object-contain" />}
+                <TabsContent value="photos">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {INVENTORY_SLOTS.map((slot) => {
+                      const url = photos[open.person.id]?.[slot];
+                      const sent = open.shots.some((shot) => shot.slot === slot);
+                      return url ? (
+                        <a key={slot} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <img src={url} alt={t("mgr.inventory.shotAlt", { n: slot, name: open.name })} loading="lazy" className="max-h-96 w-full object-contain" />
+                        </a>
+                      ) : (
+                        <div key={slot} className="flex h-32 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+                          {sent ? t("mgr.inventory.unavailable") : t("form.inventory.slot", { n: slot })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

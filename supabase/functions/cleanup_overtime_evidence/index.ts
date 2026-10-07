@@ -63,6 +63,13 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Written inventory rows expire with their screenshots (same expires_at).
+  const { error: expiredItemsError } = await admin
+    .from("inventory_items")
+    .delete()
+    .lte("expires_at", new Date().toISOString());
+  if (expiredItemsError) failures.push({ phase: "delete_expired_inventory_items", detail: expiredItemsError.message });
+
   // Reconcile objects whose DB write never committed. The SQL function applies a
   // minimum one-hour grace period so active uploads are never collected.
   const { data: orphans, error: orphanError } = await admin.rpc("find_orphaned_evidence_objects", {
