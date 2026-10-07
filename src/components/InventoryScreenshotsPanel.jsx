@@ -13,7 +13,7 @@ import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { INVENTORY_BUCKET, INVENTORY_SLOTS } from "@/lib/inventory-screenshots";
-import { INVENTORY_STATE_ORDER, summarizeInventoryDay } from "@/lib/inventory-items";
+import { INVENTORY_STATE_ORDER, effectiveOcrStatus, summarizeInventoryDay } from "@/lib/inventory-items";
 import { requestInventoryReading } from "@/lib/inventory-upload";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -40,6 +40,7 @@ export default function InventoryScreenshotsPanel() {
   const [photos, setPhotos] = useState({});
   const [hideZero, setHideZero] = useState(false);
   const [rereadBusy, setRereadBusy] = useState(false);
+  const [requestedAt, setRequestedAt] = useState({});
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
@@ -51,7 +52,7 @@ export default function InventoryScreenshotsPanel() {
           12000
         ),
         withTimeout(
-          supabase.from("inventory_screenshots").select("user_id, slot, storage_path, ocr_status, list_total")
+          supabase.from("inventory_screenshots").select("user_id, slot, storage_path, ocr_status, list_total, created_at")
             .eq("job_date", date).order("slot").limit(QUERY_BUDGETS.inventoryRows),
           12000
         ),
@@ -76,14 +77,18 @@ export default function InventoryScreenshotsPanel() {
 
   const entries = useMemo(() => {
     const shotsBy = new Map();
-    for (const shot of shots) shotsBy.set(shot.user_id, [...(shotsBy.get(shot.user_id) || []), shot]);
+    const now = Date.now();
+    for (const raw of shots) {
+      const shot = { ...raw, ocr_status: effectiveOcrStatus(raw, now, requestedAt[`${raw.user_id}:${raw.slot}`]) };
+      shotsBy.set(shot.user_id, [...(shotsBy.get(shot.user_id) || []), shot]);
+    }
     const itemsBy = new Map();
     for (const item of items) itemsBy.set(item.user_id, [...(itemsBy.get(item.user_id) || []), item]);
     return people
       .filter((p) => p.inventory_screenshots_enabled || shotsBy.has(p.id))
       .map((p) => ({ person: p, name: p.full_name || p.email || p.id, ...summarizeInventoryDay(shotsBy.get(p.id) || [], itemsBy.get(p.id) || []), shots: shotsBy.get(p.id) || [] }))
       .sort((a, b) => INVENTORY_STATE_ORDER.indexOf(a.state) - INVENTORY_STATE_ORDER.indexOf(b.state) || a.name.localeCompare(b.name, "fr-CA"));
-  }, [people, shots, items]);
+  }, [people, shots, items, requestedAt]);
 
   // The OCR runs in the background: keep refreshing quietly while some reading is pending.
   const pending = entries.some((entry) => entry.state === "reading");
@@ -109,6 +114,8 @@ export default function InventoryScreenshotsPanel() {
   async function rereadAll() {
     if (!open || rereadBusy) return;
     setRereadBusy(true);
+    const stamp = Date.now();
+    setRequestedAt((current) => ({ ...current, ...Object.fromEntries(open.shots.map((shot) => [`${open.person.id}:${shot.slot}`, stamp])) }));
     await Promise.all(open.shots.map((shot) => requestInventoryReading(supabase, { jobDate: date, slot: shot.slot, userId: open.person.id })));
     await load({ quiet: true });
     setRereadBusy(false);

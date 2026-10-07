@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
@@ -102,6 +102,19 @@ describe("summarizeInventoryDay", () => {
 
   it("never calls a list verified when a screenshot needed review", () => {
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "needs_review" })], rows(17)).state).toBe("review");
+  });
+});
+
+describe("effectiveOcrStatus", () => {
+  const sent = "2026-10-07T17:48:00.000Z";
+  const at = (minutes) => Date.parse(sent) + minutes * 60000;
+  it("keeps a recent pending reading as pending and gives up on a stale one", () => {
+    expect(effectiveOcrStatus({ ocr_status: "pending", created_at: sent }, at(1))).toBe("pending");
+    expect(effectiveOcrStatus({ ocr_status: "pending", created_at: sent }, at(10))).toBe("failed");
+  });
+  it("restarts the clock when a manager asks for a new reading, and leaves final statuses alone", () => {
+    expect(effectiveOcrStatus({ ocr_status: "pending", created_at: sent }, at(11), at(10))).toBe("pending");
+    expect(effectiveOcrStatus({ ocr_status: "processed", created_at: sent }, at(99))).toBe("processed");
   });
 });
 
