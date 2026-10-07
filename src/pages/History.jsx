@@ -17,7 +17,10 @@ import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
-import { buildJobSaveRpcArgs, dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
+import { dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
+import { submitSavedJob } from "@/lib/submit-job";
+import { inventoryRequiredFor, missingInventorySlots } from "@/lib/inventory-screenshots";
+import { fetchInventorySlots } from "@/lib/inventory-upload";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
@@ -194,26 +197,13 @@ export default function History() {
     return isOwner(job) && (job.status === "saved" || job.status === "updated") && job.locked === false;
   }
 
-  async function submitExistingJob(job) {
-    const { error } = await withTimeout(
-      supabase.rpc("save_own_job", buildJobSaveRpcArgs({
-        editId: job.id,
-        submit: true,
-        jobDate: job.job_date,
-        ot: job.ot,
-        depart: job.depart,
-        arrivee: job.arrivee,
-        fin: job.fin,
-        kmTotal: job.km_total,
-        kmAller: job.km_aller,
-        returnMinutes: job.return_time_minutes,
-        kmRetour: job.km_retour,
-        overtimeEvidenceCaptured: job.overtime_evidence_captured,
-        parkingReceiptCaptured: job.parking_receipt_captured,
-      })).single(),
-      12000
-    );
-    if (error) throw error;
+  const submitExistingJob = (job) => submitSavedJob(supabase, job);
+
+  // The day must carry its three end-of-shift inventory screenshots before any job is submitted
+  // (the database enforces the same rule). Missing ones are collected from the work form.
+  async function inventoryMissingForDay(jobDate) {
+    if (isAdminEmployee(role) || !inventoryRequiredFor(jobDate)) return false;
+    return missingInventorySlots(await fetchInventorySlots(supabase, user.id, jobDate)).length > 0;
   }
 
   async function deleteJob(jobId) {
@@ -260,6 +250,10 @@ export default function History() {
         navigate(`/form?edit=${job.id}&submit=1`);
         return;
       }
+      if (await inventoryMissingForDay(job.job_date)) {
+        navigate(`/form?edit=${job.id}&submit=1`);
+        return;
+      }
       const overlapWarning = jobOverlapDetails(job, jobs, t);
       if (overlapWarning) {
         setErr(overlapWarning);
@@ -290,6 +284,11 @@ export default function History() {
         // Proof is one per day: open the day's last job so the form asks for the screenshot.
         const lastJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
         navigate(`/form?edit=${lastJob.id}&submit=1`);
+        return;
+      }
+      const lastDayJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
+      if (await inventoryMissingForDay(lastDayJob.job_date)) {
+        navigate(`/form?edit=${lastDayJob.id}&submit=1`);
         return;
       }
       const overlapWarning = selectedJobs.map((job) => jobOverlapDetails(job, jobs, t)).find(Boolean);
