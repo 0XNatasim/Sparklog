@@ -26,7 +26,7 @@ import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-s
 import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { submitSavedJob } from "@/lib/submit-job";
-import { INVENTORY_SLOTS, inventoryRequiredFor, missingInventorySlots } from "@/lib/inventory-screenshots";
+import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
 import { fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -751,7 +751,7 @@ export default function EmployeeForm() {
     }
     setInventoryError("");
     setDaySubmitError("");
-    if (officeEmployee || !inventoryEnabled || !inventoryRequiredFor(endShiftDateRef.current)) {
+    if (officeEmployee || !inventoryEnabled) {
       setReturnStep("dayDone");
       return;
     }
@@ -1775,7 +1775,7 @@ export default function EmployeeForm() {
           {returnStep === "dayDone" && (
             <>
               <DialogHeader><DialogTitle>{t("form.day.readyTitle")}</DialogTitle></DialogHeader>
-              <p className="text-sm text-muted-foreground">{t("form.day.readyDescription")}</p>
+              <p className="text-sm text-muted-foreground">{t(!officeEmployee && inventoryEnabled ? "form.day.readyDescription" : "form.day.readyDescriptionPlain")}</p>
               {daySubmitError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">{daySubmitError}</div>}
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" disabled={daySubmitBusy} onClick={() => { closeReturnDialog(); navigate("/history"); }}>
