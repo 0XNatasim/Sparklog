@@ -118,6 +118,16 @@ describe("effectiveOcrStatus", () => {
   });
 });
 
+describe("InventoryScreenshotsPanel", () => {
+  const panel = read("../components/InventoryScreenshotsPanel.jsx");
+  it("never reloads on every render: the translate function stays out of dependency lists", () => {
+    // useT() returns a new function each render; depending on it re-ran the load, closed the
+    // open card and cleared the photos continuously.
+    expect(panel).not.toMatch(/\[[^\]]*\bt\b[^\]]*\]\s*\)/);
+    expect(panel).toContain("tRef.current");
+  });
+});
+
 describe("0073 migration and deployment", () => {
   const sql = read("../../supabase/migrations/20261008120000_0073_inventory_items_ocr.sql");
   it("stores only parsed rows, readable by the owner and managers, written by the service role", () => {
