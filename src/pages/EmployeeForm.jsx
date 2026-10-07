@@ -1226,6 +1226,17 @@ export default function EmployeeForm() {
   const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(fin)
     && (officeEmployee || (Boolean(arrivee) && String(km_aller).trim() !== "")) && parkingComplete;
 
+  // Names of the required fields still empty, shown next to the disabled Save button.
+  const missingFields = [
+    !job_date && t("form.date"),
+    !ot && t("form.ot"),
+    !depart && (officeEmployee ? t("form.debut") : t("form.depart")),
+    !officeEmployee && !arrivee && t("form.arrival"),
+    !fin && t("form.end"),
+    !officeEmployee && String(km_aller).trim() === "" && t("form.kmTotal"),
+    !parkingComplete && t("form.parking.title"),
+  ].filter(Boolean);
+
   return (
     <AppShell>
       <div className="space-y-2 sm:space-y-3">
@@ -1436,10 +1447,17 @@ export default function EmployeeForm() {
             )}
 
             <div className="space-y-2 pt-3">
-              {(dirty || editId) && formComplete && (
-                <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs} onClick={saveDraft}>
-                  {saving ? t("common.saving") : t("form.buttons.save")}
-                </Button>
+              {(dirty || editId) && !locked && (
+                <>
+                  <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs || !formComplete} onClick={saveDraft}>
+                    {saving ? t("common.saving") : t("form.buttons.save")}
+                  </Button>
+                  {!formComplete && (
+                    <p className="text-center text-xs font-medium text-amber-700 dark:text-amber-300" role="status">
+                      {t("form.missing.hint", { fields: missingFields.join(", ") })}
+                    </p>
+                  )}
+                </>
               )}
 
               {editId && (
