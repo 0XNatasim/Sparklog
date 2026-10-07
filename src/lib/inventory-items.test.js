@@ -129,6 +129,12 @@ describe("0073 migration and deployment", () => {
   it("is expired by the cleanup worker", () => {
     expect(read("../../supabase/functions/cleanup_overtime_evidence/index.ts")).toContain('from("inventory_items")');
   });
+  it("lets only a manager delete screenshots, files first, with an audit entry", () => {
+    const fn = read("../../supabase/functions/delete_inventory_screenshots/index.ts");
+    expect(fn).toContain('role !== "manager"');
+    expect(fn.indexOf("storage.from(\"inventory-screenshots\").remove")).toBeLessThan(fn.indexOf('from("inventory_screenshots").delete()'));
+    expect(fn).toContain('action: "inventory_deleted"');
+  });
   it("only lets a manager read another employee's screenshots", () => {
     const fn = read("../../supabase/functions/process_inventory_screenshot/index.ts");
     expect(fn).toContain('role !== "manager"');

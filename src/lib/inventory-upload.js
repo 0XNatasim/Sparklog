@@ -62,3 +62,15 @@ export function requestInventoryReading(client, { jobDate, slot, userId = null }
     if (error) console.warn("[inventory] reading request failed", error);
   }).catch((error) => console.warn("[inventory] reading request failed", error));
 }
+
+// Manager action: removes the files, the written list and the rows of one screenshot (slot) or
+// of the whole day for an employee. Done server-side so Storage and the database stay in step.
+export async function deleteInventoryScreenshots(client, { userId, jobDate, slot = null }) {
+  const { data, error } = await withTimeout(
+    client.functions.invoke("delete_inventory_screenshots", { body: { user_id: userId, job_date: jobDate, slot } }),
+    20000
+  );
+  if (error) throw error;
+  if (data && data.ok === false) throw new Error(data.error || "inventory_delete_failed");
+  return data;
+}

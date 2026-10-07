@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,8 @@ import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { INVENTORY_BUCKET, INVENTORY_SLOTS } from "@/lib/inventory-screenshots";
 import { INVENTORY_STATE_ORDER, effectiveOcrStatus, summarizeInventoryDay } from "@/lib/inventory-items";
-import { requestInventoryReading } from "@/lib/inventory-upload";
+import { deleteInventoryScreenshots, requestInventoryReading } from "@/lib/inventory-upload";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
 const CHIP_CLASS = {
@@ -41,6 +42,8 @@ export default function InventoryScreenshotsPanel() {
   const [hideZero, setHideZero] = useState(false);
   const [rereadBusy, setRereadBusy] = useState(false);
   const [requestedAt, setRequestedAt] = useState({});
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [confirm, confirmDialog] = useConfirmDialog();
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
@@ -119,6 +122,27 @@ export default function InventoryScreenshotsPanel() {
     await Promise.all(open.shots.map((shot) => requestInventoryReading(supabase, { jobDate: date, slot: shot.slot, userId: open.person.id })));
     await load({ quiet: true });
     setRereadBusy(false);
+  }
+
+  // Deletes one screenshot (slot) or all of the open employee's screenshots for the day.
+  async function removeShots(slot = null) {
+    if (!open || deleteBusy) return;
+    const message = slot
+      ? t("mgr.inventory.confirmDeleteOne", { n: slot, name: open.name })
+      : t("mgr.inventory.confirmDeleteAll", { name: open.name });
+    if (!(await confirm(message))) return;
+    setDeleteBusy(true);
+    setErr("");
+    try {
+      await deleteInventoryScreenshots(supabase, { userId: open.person.id, jobDate: date, slot });
+      setPhotos((current) => ({ ...current, [open.person.id]: undefined }));
+      if (!slot || open.shots.length <= 1) setOpenId(null);
+      await load({ quiet: true });
+    } catch (error) {
+      setErr(friendlyErrorMessage(error, t, "mgr.inventory.deleteFailed"));
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   const received = entries.filter((entry) => entry.state !== "missing").length;
@@ -241,23 +265,38 @@ export default function InventoryScreenshotsPanel() {
                     {INVENTORY_SLOTS.map((slot) => {
                       const url = photos[open.person.id]?.[slot];
                       const sent = open.shots.some((shot) => shot.slot === slot);
-                      return url ? (
-                        <a key={slot} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          <img src={url} alt={t("mgr.inventory.shotAlt", { n: slot, name: open.name })} loading="lazy" className="max-h-96 w-full object-contain" />
-                        </a>
-                      ) : (
-                        <div key={slot} className="flex h-32 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
-                          {sent ? t("mgr.inventory.unavailable") : t("form.inventory.slot", { n: slot })}
+                      return (
+                        <div key={slot} className="space-y-2">
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                              <img src={url} alt={t("mgr.inventory.shotAlt", { n: slot, name: open.name })} loading="lazy" className="max-h-96 w-full object-contain" />
+                            </a>
+                          ) : (
+                            <div className="flex h-32 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+                              {sent ? t("mgr.inventory.unavailable") : t("form.inventory.slot", { n: slot })}
+                            </div>
+                          )}
+                          {sent && (
+                            <Button type="button" variant="outline" size="sm" className="w-full text-destructive hover:text-destructive" disabled={deleteBusy} onClick={() => removeShots(slot)}>
+                              <Trash2 className="mr-1 h-4 w-4" />{t("mgr.inventory.delete")}
+                            </Button>
+                          )}
                         </div>
                       );
                     })}
                   </div>
+                  {open.captures > 1 && (
+                    <Button type="button" variant="outline" size="sm" className="mt-3 text-destructive hover:text-destructive" disabled={deleteBusy} onClick={() => removeShots(null)}>
+                      <Trash2 className="mr-1 h-4 w-4" />{t("mgr.inventory.deleteAll")}
+                    </Button>
+                  )}
                 </TabsContent>
               </Tabs>
             </>
           )}
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }
