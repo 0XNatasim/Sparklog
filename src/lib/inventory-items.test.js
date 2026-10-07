@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
@@ -105,6 +105,19 @@ describe("summarizeInventoryDay", () => {
   });
 });
 
+describe("effectiveOcrStatus", () => {
+  const sent = "2026-10-07T17:48:00.000Z";
+  const at = (minutes) => Date.parse(sent) + minutes * 60000;
+  it("keeps a recent pending reading as pending and gives up on a stale one", () => {
+    expect(effectiveOcrStatus({ ocr_status: "pending", created_at: sent }, at(1))).toBe("pending");
+    expect(effectiveOcrStatus({ ocr_status: "pending", created_at: sent }, at(10))).toBe("failed");
+  });
+  it("restarts the clock when a manager asks for a new reading, and leaves final statuses alone", () => {
+    expect(effectiveOcrStatus({ ocr_status: "pending", created_at: sent }, at(11), at(10))).toBe("pending");
+    expect(effectiveOcrStatus({ ocr_status: "processed", created_at: sent }, at(99))).toBe("processed");
+  });
+});
+
 describe("0073 migration and deployment", () => {
   const sql = read("../../supabase/migrations/20261008120000_0073_inventory_items_ocr.sql");
   it("stores only parsed rows, readable by the owner and managers, written by the service role", () => {
@@ -115,6 +128,12 @@ describe("0073 migration and deployment", () => {
   });
   it("is expired by the cleanup worker", () => {
     expect(read("../../supabase/functions/cleanup_overtime_evidence/index.ts")).toContain('from("inventory_items")');
+  });
+  it("lets only a manager delete screenshots, files first, with an audit entry", () => {
+    const fn = read("../../supabase/functions/delete_inventory_screenshots/index.ts");
+    expect(fn).toContain('role !== "manager"');
+    expect(fn.indexOf("storage.from(\"inventory-screenshots\").remove")).toBeLessThan(fn.indexOf('from("inventory_screenshots").delete()'));
+    expect(fn).toContain('action: "inventory_deleted"');
   });
   it("only lets a manager read another employee's screenshots", () => {
     const fn = read("../../supabase/functions/process_inventory_screenshot/index.ts");

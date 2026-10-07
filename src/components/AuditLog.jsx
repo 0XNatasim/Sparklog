@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { RefreshCw, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking } from "lucide-react";
+import { Images, RefreshCw, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ const PAGE_SIZE = 100;
 
 const ACTION_META = {
   user_deleted: { icon: Trash2, tone: "text-destructive dark:text-red-300" },
+  inventory_deleted: { icon: Images, tone: "text-destructive dark:text-red-300" },
   role_change: { icon: UserCog, tone: "text-primary" },
   pause_change: { icon: PauseCircle, tone: "text-amber-600 dark:text-amber-300" },
   job_unlock: { icon: Unlock, tone: "text-amber-600 dark:text-amber-300" },
@@ -44,6 +45,7 @@ export default function AuditLog() {
     const d = row.details || {};
     switch (row.action) {
       case "user_deleted": return t("audit.desc.userDeleted", { name: target, email: d.email || "—" });
+      case "inventory_deleted": return t("audit.desc.inventoryDeleted", { name: target, date: d.job_date || "—", count: d.count || 0 });
       case "role_change": return t("audit.desc.roleChange", { name: target, from: d.from || "—", to: d.to || "—" });
       case "pause_change": return t(d.is_paused ? "audit.desc.paused" : "audit.desc.unpaused", { name: target });
       case "job_unlock": return t("audit.desc.jobUnlock", { name: target, date: d.job_date || "—" });
@@ -66,6 +68,7 @@ export default function AuditLog() {
             <Select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label={t("audit.filterLabel")} className="h-9">
               <option value="all">{t("audit.filter.all")}</option>
               <option value="user_deleted">{t("audit.filter.userDeleted")}</option>
+              <option value="inventory_deleted">{t("audit.filter.inventoryDeleted")}</option>
               <option value="role_change">{t("audit.filter.roleChange")}</option>
               <option value="pause_change">{t("audit.filter.pauseChange")}</option>
               <option value="job_unlock">{t("audit.filter.jobUnlock")}</option>
