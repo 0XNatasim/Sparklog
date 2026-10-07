@@ -38,7 +38,7 @@ export async function saveInventoryScreenshot(client, { userId, jobDate, slot, f
   const expiresAt = new Date(Date.now() + Math.min(365, Math.max(1, retentionDays)) * 86400000).toISOString();
   const { error } = await withTimeout(
     client.from("inventory_screenshots")
-      .upsert({ user_id: userId, job_date: jobDate, slot, storage_path: path, expires_at: expiresAt }, { onConflict: "user_id,job_date,slot" }),
+      .upsert({ user_id: userId, job_date: jobDate, slot, storage_path: path, expires_at: expiresAt, ocr_status: "pending", list_total: null }, { onConflict: "user_id,job_date,slot" }),
     12000
   );
   if (error) {
@@ -48,5 +48,17 @@ export async function saveInventoryScreenshot(client, { userId, jobDate, slot, f
   if (previousPath && previousPath !== path) {
     await client.storage.from(INVENTORY_BUCKET).remove([previousPath]).catch(() => undefined);
   }
+  requestInventoryReading(client, { jobDate, slot });
   return path;
+}
+
+// Asks the server to read a screenshot (OCR) into a written equipment list. Best-effort: the
+// photo is already saved, and a manager can re-run the reading from the Inventory page.
+export function requestInventoryReading(client, { jobDate, slot, userId = null }) {
+  return withTimeout(
+    client.functions.invoke("process_inventory_screenshot", { body: { job_date: jobDate, slot, user_id: userId } }),
+    15000
+  ).then(({ error }) => {
+    if (error) console.warn("[inventory] reading request failed", error);
+  }).catch((error) => console.warn("[inventory] reading request failed", error));
 }
