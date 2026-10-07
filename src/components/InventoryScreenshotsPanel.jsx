@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { ChevronLeft, ChevronRight, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -44,6 +44,10 @@ export default function InventoryScreenshotsPanel() {
   const [requestedAt, setRequestedAt] = useState({});
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [confirm, confirmDialog] = useConfirmDialog();
+  // useT() returns a new function on every render: keep it out of effect/callback dependencies,
+  // or the data reloads (and the open card closes) on every render.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
@@ -70,13 +74,14 @@ export default function InventoryScreenshotsPanel() {
       setShots(shotsResult.data || []);
       setItems(itemsResult.data || []);
     } catch (error) {
-      setErr(friendlyErrorMessage(error, t, "mgr.inventory.failedLoad"));
+      setErr(friendlyErrorMessage(error, tRef.current, "mgr.inventory.failedLoad"));
     } finally {
       setLoading(false);
     }
-  }, [date, t]);
+  }, [date]);
 
-  useEffect(() => { setOpenId(null); setPhotos({}); load(); }, [load]);
+  useEffect(() => { setOpenId(null); setPhotos({}); }, [date]);
+  useEffect(() => { load(); }, [load]);
 
   const entries = useMemo(() => {
     const shotsBy = new Map();
