@@ -203,6 +203,12 @@ export default function History() {
   // (the database enforces the same rule). Missing ones are collected from the work form.
   async function inventoryMissingForDay(jobDate) {
     if (isAdminEmployee(role) || !inventoryRequiredFor(jobDate)) return false;
+    const { data: profile, error: profileError } = await withTimeout(
+      supabase.from("profiles").select("inventory_screenshots_enabled").eq("id", user.id).single(),
+      10000
+    );
+    if (profileError) throw profileError;
+    if (!profile?.inventory_screenshots_enabled) return false;
     return missingInventorySlots(await fetchInventorySlots(supabase, user.id, jobDate)).length > 0;
   }
 

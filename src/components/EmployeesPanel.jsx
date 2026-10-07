@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, Star, TriangleAlert, Trophy, X } from "lucide-react";
-import { GRANTABLE_ADMIN_SECTIONS, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
+import { GRANTABLE_ADMIN_SECTIONS, isAdminEmployee, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
 import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
 import TimeOffControls from "@/components/TimeOffControls";
 import NasField from "./NasField";
@@ -96,7 +96,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, overtime_first_hour_double, return_overtime_no_benefits, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_overtime_no_benefits, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -852,6 +852,12 @@ export default function EmployeesPanel() {
                     <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
                     <input type="checkbox" checked={Boolean(p.parking_receipts_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "parking_receipts_enabled", checked); saveField(p.id, "parking_receipts_enabled", checked); }} className="h-5 w-5 rounded border-input accent-amber-600" />
                   </label>
+                  {!isAdminEmployee(p.role) && (
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
+                    <span className="text-sm font-medium">{t("employees.inventoryScreenshots")}</span>
+                    <input type="checkbox" checked={Boolean(p.inventory_screenshots_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "inventory_screenshots_enabled", checked); saveField(p.id, "inventory_screenshots_enabled", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
+                  </label>
+                  )}
                   {isSubcontractorRole(p.role) && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs md:col-span-2">
                     <div className="font-semibold text-primary">{t("employees.subcontractorRuleTitle")}</div>

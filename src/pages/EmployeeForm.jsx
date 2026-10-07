@@ -190,6 +190,7 @@ export default function EmployeeForm() {
   const [parkingAmount, setParkingAmount] = useState("");
   const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
+  const [inventoryEnabled, setInventoryEnabled] = useState(false);
   // Administration (office, non-CCQ) employees log a simplified timesheet: no
   // auto-fill, no Arrivée, "Départ" is labelled "Début", and no kilometres.
   const [officeEmployee, setOfficeEmployee] = useState(false);
@@ -383,12 +384,13 @@ export default function EmployeeForm() {
 
   useEffect(() => {
     if (!effectiveUserId) return;
-    supabase.from("profiles").select("role, parking_receipts_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
+    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
         setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.errors.failedLoad"));
         return;
       }
       setOfficeEmployee(isAdminEmployee(data?.role));
+      setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled));
       const enabled = Boolean(data?.parking_receipts_enabled);
       setParkingReceiptsEnabled(enabled);
       if (!enabled) {
@@ -749,7 +751,7 @@ export default function EmployeeForm() {
     }
     setInventoryError("");
     setDaySubmitError("");
-    if (officeEmployee || !inventoryRequiredFor(endShiftDateRef.current)) {
+    if (officeEmployee || !inventoryEnabled || !inventoryRequiredFor(endShiftDateRef.current)) {
       setReturnStep("dayDone");
       return;
     }

@@ -41,6 +41,20 @@ describe("inventory screenshot rules", () => {
   });
 });
 
+const optIn = readFileSync(fileURLToPath(new URL(
+  "../../supabase/migrations/20261007130000_0072_inventory_screenshots_opt_in.sql",
+  import.meta.url
+)), "utf8");
+
+describe("0072 per-employee opt-in", () => {
+  it("adds an off-by-default profile flag and gates submission on it", () => {
+    expect(optIn).toContain("inventory_screenshots_enabled boolean not null default false");
+    expect(optIn).toContain("coalesce(inventory_enabled, false)");
+    expect(optIn).toContain("message = 'inventory_screenshots_required'");
+    expect(optIn).toContain(`new.job_date >= date '${INVENTORY_REQUIRED_FROM}'`);
+  });
+});
+
 describe("0071 migration", () => {
   it("keeps the database rollout date equal to the client constant", () => {
     expect(sql).toContain(`new.job_date >= date '${INVENTORY_REQUIRED_FROM}'`);
