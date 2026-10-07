@@ -12,7 +12,7 @@ import ManagerLayout from "./components/manager/ManagerLayout";
 import {
   AbsencesPage, AuditPage, CcqPage, CostsPage, DownloadsPage, EmployeesPage, FormsPage, HealthPage, LivePage,
   ManagerIndex, MessagesPage, PayrollCalculPage, PayrollDasPage, PayrollRoePage, PayrollStubsPage, PeriodPage,
-  ReceiptsPage, RulesPage, SettingsPage, TimesheetsPage,
+  InventoryPage, ReceiptsPage, RulesPage, SettingsPage, TimesheetsPage,
 } from "./pages/manager/ManagerPages";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
@@ -115,6 +115,7 @@ export default function App() {
           <Route path="live" element={<LivePage />} />
           <Route path="timesheets" element={<TimesheetsPage />} />
           <Route path="receipts" element={<ReceiptsPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="absences" element={<AbsencesPage />} />
           <Route path="forms" element={<FormsPage />} />

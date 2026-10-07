@@ -36,7 +36,7 @@ function json(data: unknown, status = 200) {
 // Best-effort per-user storage cleanup. Returns a list of non-fatal warnings instead of
 // throwing, so a storage hiccup can never block removing the account itself.
 async function removeUserStorage(admin: ReturnType<typeof createClient>, userId: string): Promise<string[]> {
-  const buckets = ["ccq-cards", "meal-receipts", "overtime-evidence", "parking-receipts"];
+  const buckets = ["ccq-cards", "meal-receipts", "overtime-evidence", "parking-receipts", "inventory-screenshots"];
   const warnings: string[] = [];
   for (const bucket of buckets) {
     try {

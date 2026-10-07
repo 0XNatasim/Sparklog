@@ -40,6 +40,29 @@ Deno.serve(async (req) => {
     }
   }
 
+  // End-of-shift inventory screenshots follow the same retention window.
+  const { data: expiredInventory, error: expiredInventoryError } = await admin
+    .from("inventory_screenshots")
+    .select("id, storage_path")
+    .lte("expires_at", new Date().toISOString())
+    .limit(500);
+  if (expiredInventoryError) failures.push({ phase: "load_expired_inventory", detail: expiredInventoryError.message });
+  if (expiredInventory?.length) {
+    const { error: storageError } = await admin.storage
+      .from("inventory-screenshots")
+      .remove(expiredInventory.map((row) => row.storage_path));
+    if (storageError) {
+      failures.push({ phase: "delete_expired_inventory_objects", detail: storageError.message });
+    } else {
+      const { error: deleteError } = await admin
+        .from("inventory_screenshots")
+        .delete()
+        .in("id", expiredInventory.map((row) => row.id));
+      if (deleteError) failures.push({ phase: "delete_expired_inventory_rows", detail: deleteError.message });
+      else expiredDeleted += expiredInventory.length;
+    }
+  }
+
   // Reconcile objects whose DB write never committed. The SQL function applies a
   // minimum one-hour grace period so active uploads are never collected.
   const { data: orphans, error: orphanError } = await admin.rpc("find_orphaned_evidence_objects", {

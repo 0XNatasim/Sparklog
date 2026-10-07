@@ -25,6 +25,7 @@ import ManagerDownloads from "@/components/ManagerDownloads";
 import AuditLog from "@/components/AuditLog";
 import EmployeeActivityLog from "@/components/EmployeeActivityLog";
 import InfraHealthCard from "@/components/InfraHealthCard";
+import InventoryScreenshotsPanel from "@/components/InventoryScreenshotsPanel";
 import ManagerDashboard from "@/pages/ManagerDashboard";
 
 // #/manager → first page the user may open; old `?section=` links keep working.
@@ -58,6 +59,7 @@ export function LivePage() {
 
 export const TimesheetsPage = () => <ManagerDashboard view="timesheet" />;
 export const ReceiptsPage = () => <ManagerDashboard view="receipts" />;
+export const InventoryPage = () => <InventoryScreenshotsPanel />;
 export const EmployeesPage = () => <EmployeesPanel />;
 export const AbsencesPage = () => <CongesManager />;
 export const FormsPage = () => <FormsManager collapsible={false} />;

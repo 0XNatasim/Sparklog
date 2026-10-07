@@ -8,6 +8,8 @@ export const QUERY_BUDGETS = Object.freeze({
   anomalySubmittedJobs: 200,
   anomalyApprovedPeers: 400,
   employeeActivityPage: 200,
+  inventoryPeople: 500,
+  inventoryRows: 600,
 });
 
 // A narrowed timesheet search must be complete, not merely filtered from the

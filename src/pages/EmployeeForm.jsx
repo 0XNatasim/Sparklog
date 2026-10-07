@@ -25,6 +25,9 @@ import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
 import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
+import { submitSavedJob } from "@/lib/submit-job";
+import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
+import { fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import {
@@ -187,12 +190,27 @@ export default function EmployeeForm() {
   const [parkingAmount, setParkingAmount] = useState("");
   const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
+  const [inventoryEnabled, setInventoryEnabled] = useState(false);
   // Administration (office, non-CCQ) employees log a simplified timesheet: no
   // auto-fill, no Arrivée, "Départ" is labelled "Début", and no kilometres.
   const [officeEmployee, setOfficeEmployee] = useState(false);
   const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
   const [draftReady, setDraftReady] = useState(false);
+  // End-of-shift flow: "last work order of the day" -> return to the shop -> overtime proof
+  // (if >8 h) -> three inventory screenshots -> submit the day. The date is kept in a ref
+  // because the form fields are reset as soon as the job is saved.
+  const endShiftRef = useRef(false);
+  const endShiftDateRef = useRef(null);
+  const inventoryInputRef = useRef(null);
+  const inventorySlotRef = useRef(null);
+  const daySubmitRef = useRef(false);
+  const [inventoryRows, setInventoryRows] = useState([]);
+  const [inventoryBusySlot, setInventoryBusySlot] = useState(null);
+  const [inventoryError, setInventoryError] = useState("");
+  const [showInventoryExamples, setShowInventoryExamples] = useState(false);
+  const [daySubmitBusy, setDaySubmitBusy] = useState(false);
+  const [daySubmitError, setDaySubmitError] = useState("");
 
   const [status, setStatus] = useState("");
   const statusLabel = editId ? (status || "saved") : "new";
@@ -366,12 +384,13 @@ export default function EmployeeForm() {
 
   useEffect(() => {
     if (!effectiveUserId) return;
-    supabase.from("profiles").select("role, parking_receipts_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
+    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
         setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.errors.failedLoad"));
         return;
       }
       setOfficeEmployee(isAdminEmployee(data?.role));
+      setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled));
       const enabled = Boolean(data?.parking_receipts_enabled);
       setParkingReceiptsEnabled(enabled);
       if (!enabled) {
@@ -413,22 +432,24 @@ export default function EmployeeForm() {
     return () => { cancelled = true; };
   }, [job_date, t, effectiveUserId, isManager]);
 
-  async function saveDraft() {
+  // Saving is the only action on this form: it first asks whether this is the last work
+  // order of the day. Submitting the day happens at the end of that flow (or from History).
+  function saveDraft() {
     setPendingSaveMode("draft");
     setReturnMinutes(null);
     setReturnKm("");
-    // Office employees don't travel to sites, so skip the warehouse-return
-    // (time + km) question entirely and save straight away.
-    if (officeEmployee) { await saveWithReturn(0, 0, "draft"); return; }
-    setReturnStep("ask");
+    endShiftRef.current = false;
+    endShiftDateRef.current = null;
+    setReturnStep("last");
   }
 
-  async function submitJob() {
-    setPendingSaveMode("submit");
-    setReturnMinutes(null);
-    setReturnKm("");
-    if (officeEmployee) { await saveWithReturn(0, 0, "submit"); return; }
-    setReturnStep("ask");
+  function answerLastJob(isLast) {
+    endShiftRef.current = isLast;
+    endShiftDateRef.current = isLast ? job_date : null;
+    // Office employees don't travel to sites, so skip the warehouse-return (time + km)
+    // question; field employees continue to it only on their last job of the day.
+    if (isLast && !officeEmployee) { setReturnStep("ask"); return; }
+    return saveWithReturn(0, 0, "draft");
   }
 
   async function saveJob(mode, returnValues = null, forcedId = null, captureEvidence = false) {
@@ -660,8 +681,11 @@ export default function EmployeeForm() {
     if (!editId || autoSubmitDoneRef.current) return;
     if (loadingEdit || !draftReady || editLoadFailed || locked || isViewMode) return;
     autoSubmitDoneRef.current = true;
-    setPendingSaveMode("submit");
-    saveWithReturn(loadedReturnRef.current.minutes, loadedReturnRef.current.km, "submit");
+    // Coming from History to submit a day: run the end-of-shift flow for this job's day.
+    endShiftRef.current = true;
+    endShiftDateRef.current = job_date;
+    setPendingSaveMode("draft");
+    saveWithReturn(loadedReturnRef.current.minutes, loadedReturnRef.current.km, "draft");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, loadingEdit, draftReady, editLoadFailed, locked, isViewMode]);
 
@@ -698,7 +722,7 @@ export default function EmployeeForm() {
       await createMealClaim(saved);
     }
     if (!editId) submissionKeyRef.current = null;
-    setReturnStep("success");
+    await finishAfterSave();
     if (editId) {
       navigate("/form", { replace: true });
     } else {
@@ -715,6 +739,106 @@ export default function EmployeeForm() {
       setParkingRequested(false);
       setParkingFile(null);
       setHasParkingReceipt(false);
+    }
+  }
+
+  // Last step after a job (and its proof) is stored: either the plain "saved" message, or
+  // the end-of-shift inventory capture / day submission.
+  async function finishAfterSave() {
+    if (!endShiftRef.current) {
+      setReturnStep("success");
+      return;
+    }
+    setInventoryError("");
+    setDaySubmitError("");
+    if (officeEmployee || !inventoryEnabled) {
+      setReturnStep("dayDone");
+      return;
+    }
+    try {
+      const rows = await fetchInventorySlots(supabase, user.id, endShiftDateRef.current);
+      setInventoryRows(rows);
+      setReturnStep(missingInventorySlots(rows).length ? "inventory" : "dayDone");
+    } catch (error) {
+      setInventoryRows([]);
+      setInventoryError(friendlyErrorMessage(error, t, "form.errors.failedLoad"));
+      setReturnStep("inventory");
+    }
+  }
+
+  function closeReturnDialog() {
+    endShiftRef.current = false;
+    endShiftDateRef.current = null;
+    setReturnStep("closed");
+    setShowOvertimeExample(false);
+    setShowInventoryExamples(false);
+  }
+
+  function pickInventorySlot(slot) {
+    inventorySlotRef.current = slot;
+    inventoryInputRef.current?.click();
+  }
+
+  async function handleInventoryFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    const slot = inventorySlotRef.current;
+    if (!file || !slot || inventoryBusySlot) return;
+    setInventoryBusySlot(slot);
+    setInventoryError("");
+    try {
+      let retentionDays = 30;
+      try {
+        const { data } = await withTimeout(
+          supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).maybeSingle(),
+          8000
+        );
+        retentionDays = Number(data?.evidence_retention_days) || 30;
+      } catch { /* default retention applies */ }
+      const previousPath = inventoryRows.find((row) => row.slot === slot)?.storage_path || null;
+      const path = await saveInventoryScreenshot(supabase, {
+        userId: user.id,
+        jobDate: endShiftDateRef.current,
+        slot,
+        file,
+        retentionDays,
+        previousPath,
+      });
+      setInventoryRows((rows) => [...rows.filter((row) => row.slot !== slot), { slot, storage_path: path }]);
+    } catch (error) {
+      console.error("[inventory] screenshot failed", error);
+      const failure = evidenceUploadFailure(error);
+      setInventoryError(`${t("form.inventory.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}`);
+    } finally {
+      setInventoryBusySlot(null);
+    }
+  }
+
+  // Submits every editable job of the end-of-shift day. Retrying is safe: only jobs still
+  // saved/updated are sent, and each goes through the idempotent save_own_job RPC.
+  async function submitEndOfDay() {
+    if (daySubmitRef.current) return;
+    daySubmitRef.current = true;
+    setDaySubmitBusy(true);
+    setDaySubmitError("");
+    try {
+      const { data, error } = await withTimeout(
+        supabase.from("jobs").select("*")
+          .eq("user_id", user.id)
+          .eq("job_date", endShiftDateRef.current)
+          .in("status", ["saved", "updated"])
+          .eq("locked", false)
+          .order("depart", { ascending: true }),
+        12000
+      );
+      if (error) throw error;
+      for (const job of data || []) await submitSavedJob(supabase, job);
+      setReturnStep("daySubmitted");
+    } catch (error) {
+      setDaySubmitError(isOfflineError(error) ? t("offline.banner") : friendlyErrorMessage(error, t, "history.errors.submitDayFailed"));
+    } finally {
+      daySubmitRef.current = false;
+      setDaySubmitBusy(false);
     }
   }
 
@@ -961,7 +1085,7 @@ export default function EmployeeForm() {
         console.error("[overtime evidence] Meal claim step failed", mealError);
       }
       if (!editId) submissionKeyRef.current = null;
-      setReturnStep("success");
+      await finishAfterSave();
       navigate("/form", { replace: true });
     } catch (error) {
       if (evidenceUploaded && !evidenceRecorded) {
@@ -1101,6 +1225,17 @@ export default function EmployeeForm() {
   // two fields are not required to complete the form for them.
   const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(fin)
     && (officeEmployee || (Boolean(arrivee) && String(km_aller).trim() !== "")) && parkingComplete;
+
+  // Names of the required fields still empty, shown next to the disabled Save button.
+  const missingFields = [
+    !job_date && t("form.date"),
+    !ot && t("form.ot"),
+    !depart && (officeEmployee ? t("form.debut") : t("form.depart")),
+    !officeEmployee && !arrivee && t("form.arrival"),
+    !fin && t("form.end"),
+    !officeEmployee && String(km_aller).trim() === "" && t("form.kmTotal"),
+    !parkingComplete && t("form.parking.title"),
+  ].filter(Boolean);
 
   return (
     <AppShell>
@@ -1312,16 +1447,17 @@ export default function EmployeeForm() {
             )}
 
             <div className="space-y-2 pt-3">
-              {dirty && formComplete && (
-                <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs} onClick={saveDraft}>
-                  {saving ? t("common.saving") : t("form.buttons.save")}
-                </Button>
-              )}
-
-              {(dirty || editId) && formComplete && (
-                <Button type="button" className="h-12 w-full text-base font-semibold bg-emerald-600 text-white hover:bg-emerald-700" disabled={disableInputs} onClick={submitJob}>
-                  {saving ? t("common.submitting") : t("form.buttons.submit")}
-                </Button>
+              {(dirty || editId) && !locked && (
+                <>
+                  <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs || !formComplete} onClick={saveDraft}>
+                    {saving ? t("common.saving") : t("form.buttons.save")}
+                  </Button>
+                  {!formComplete && (
+                    <p className="text-center text-xs font-medium text-amber-700 dark:text-amber-300" role="status">
+                      {t("form.missing.hint", { fields: missingFields.join(", ") })}
+                    </p>
+                  )}
+                </>
               )}
 
               {editId && (
@@ -1427,10 +1563,7 @@ export default function EmployeeForm() {
         </DialogContent>
       </Dialog>
       <Dialog open={returnStep !== "closed"} onOpenChange={(open) => {
-        if (!open && !saving) {
-          setReturnStep("closed");
-          setShowOvertimeExample(false);
-        }
+        if (!open && !saving && !daySubmitBusy && !inventoryBusySlot) closeReturnDialog();
       }}>
         <DialogContent className="max-w-md">
           {returnSaveError && (
@@ -1438,6 +1571,23 @@ export default function EmployeeForm() {
               {returnSaveError}
             </div>
           )}
+          {returnStep === "last" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("form.last.title")}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">{t("form.last.description")}</p>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" disabled={saving || returnCheckBusy} onClick={() => answerLastJob(false)}>
+                  {returnCheckBusy ? t("common.pleaseWait") : t("common.no")}
+                </Button>
+                <Button type="button" disabled={saving || returnCheckBusy} onClick={() => answerLastJob(true)}>
+                  {t("common.yes")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
           {returnStep === "ask" && (
             <>
               <DialogHeader>
@@ -1445,7 +1595,7 @@ export default function EmployeeForm() {
               </DialogHeader>
               <p className="text-sm text-muted-foreground">{t("form.return.askDescription")}</p>
               <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" disabled={saving || returnCheckBusy} onClick={() => saveWithReturn(0, 0)}>
+                <Button type="button" variant="outline" disabled={saving || returnCheckBusy} onClick={() => saveWithReturn(0, 0, "draft")}>
                   {returnCheckBusy ? t("common.pleaseWait") : t("common.no")}
                 </Button>
                 <Button type="button" disabled={saving || returnCheckBusy} onClick={() => setReturnStep("time")}>
@@ -1571,12 +1721,89 @@ export default function EmployeeForm() {
             </>
           )}
 
+          {returnStep === "inventory" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("form.inventory.title")}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">{t("form.inventory.description")}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  aria-expanded={showInventoryExamples}
+                  onClick={() => setShowInventoryExamples((visible) => !visible)}
+                >
+                  {showInventoryExamples ? t("form.inventory.hideExample") : t("form.inventory.showExample")}
+                </Button>
+                {showInventoryExamples && (
+                  <div className="grid grid-cols-3 gap-2 rounded-md border bg-background p-2">
+                    {INVENTORY_SLOTS.map((slot) => (
+                      <img key={slot} src={`/inventory-examples/${slot}.jpg`} alt={t("form.inventory.exampleAlt", { n: slot })} className="max-h-72 w-full rounded object-contain" />
+                    ))}
+                  </div>
+                )}
+                <ul className="space-y-2">
+                  {INVENTORY_SLOTS.map((slot) => {
+                    const done = inventoryRows.some((row) => row.slot === slot);
+                    const busy = inventoryBusySlot === slot;
+                    return (
+                      <li key={slot} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                        <span className="flex items-center gap-2 font-medium">
+                          {done && <CircleCheck className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden="true" />}
+                          {t("form.inventory.slot", { n: slot })}
+                        </span>
+                        <Button type="button" size="sm" variant={done ? "outline" : "default"} disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(slot)}>
+                          {busy ? t("form.inventory.uploading") : done ? t("form.inventory.replace") : t("form.inventory.capture")}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300" role="alert">{inventoryError}</div>}
+                <input ref={inventoryInputRef} type="file" accept="image/*" className="hidden" onChange={handleInventoryFile} />
+              </div>
+              <DialogFooter>
+                <Button type="button" disabled={Boolean(inventoryBusySlot) || missingInventorySlots(inventoryRows).length > 0} onClick={() => setReturnStep("dayDone")}>
+                  {t("form.inventory.continue")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {returnStep === "dayDone" && (
+            <>
+              <DialogHeader><DialogTitle>{t("form.day.readyTitle")}</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">{t(!officeEmployee && inventoryEnabled ? "form.day.readyDescription" : "form.day.readyDescriptionPlain")}</p>
+              {daySubmitError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">{daySubmitError}</div>}
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" disabled={daySubmitBusy} onClick={() => { closeReturnDialog(); navigate("/history"); }}>
+                  {t("form.day.review")}
+                </Button>
+                <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={daySubmitBusy} onClick={submitEndOfDay}>
+                  {daySubmitBusy ? t("common.submitting") : t("form.day.submit")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {returnStep === "daySubmitted" && (
+            <>
+              <DialogHeader><DialogTitle>{t("form.day.submittedTitle")}</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">{t("form.day.submittedDescription")}</p>
+              <DialogFooter>
+                <Button type="button" onClick={closeReturnDialog}>{t("common.ok")}</Button>
+              </DialogFooter>
+            </>
+          )}
+
           {returnStep === "success" && (
             <>
               <DialogHeader><DialogTitle>{t("form.return.savedTitle")}</DialogTitle></DialogHeader>
               <p className="text-sm text-muted-foreground">{t("form.return.savedDescription")}</p>
               <DialogFooter>
-                <Button type="button" onClick={() => setReturnStep("closed")}>{t("common.ok")}</Button>
+                <Button type="button" onClick={closeReturnDialog}>{t("common.ok")}</Button>
               </DialogFooter>
             </>
           )}
