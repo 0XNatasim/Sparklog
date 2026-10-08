@@ -143,6 +143,7 @@ export default function EmployeeForm() {
 
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+  const [draftRestored, setDraftRestored] = useState(false);
   const [warning, setWarning] = useState("");
 
   const [job_date, setJobDate] = useState(companyDate());
@@ -239,7 +240,22 @@ export default function EmployeeForm() {
     setPendingSaveMode(draft.pendingSaveMode || "draft");
     if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
     setDirty(true);
+    setDraftRestored(true);
     setInfo(t("form.toasts.draftRestored"));
+  }
+
+  // Lets the employee throw away a restored local draft and start from a clean form
+  // (new entry) or from the server copy (existing entry).
+  async function discardLocalDraft() {
+    if (!(await confirm(t("form.draft.discardConfirm")))) return;
+    await deleteDraft({ userId: effectiveUserId, ...(editId ? { editId } : {}) }).catch(() => undefined);
+    setDraftRestored(false);
+    if (editId) {
+      await loadEdit();
+      return;
+    }
+    resetNewJobFields();
+    submissionKeyRef.current = crypto.randomUUID();
   }
 
   async function loadEdit() {
@@ -247,6 +263,7 @@ export default function EmployeeForm() {
 
     setErr("");
     setInfo("");
+    setDraftRestored(false);
     setWarning("");
     setLoadingEdit(true);
     setEditLoadFailed(false);
@@ -326,6 +343,7 @@ export default function EmployeeForm() {
     setLocked(false);
     setErr("");
     setInfo("");
+    setDraftRestored(false);
     setWarning("");
     setEditLoadFailed(false);
     setDirty(false);
@@ -1251,8 +1269,13 @@ export default function EmployeeForm() {
           </div>
         )}
         {info && (
-          <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            {t(info)}
+          <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+            <span>{t(info)}</span>
+            {draftRestored && (
+              <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={discardLocalDraft}>
+                {t("form.draft.discard")}
+              </Button>
+            )}
           </div>
         )}
         {warning && (
