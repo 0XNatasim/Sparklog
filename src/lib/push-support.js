@@ -15,3 +15,12 @@ export function isStandalone(win = globalThis.window) {
     return false;
   }
 }
+
+// Number on the installed app's icon. No-op where the Badging API is missing.
+export function setAppBadgeCount(count, nav = globalThis.navigator) {
+  try {
+    if (count > 0 && nav?.setAppBadge) return Promise.resolve(nav.setAppBadge(Math.min(count, 999))).catch(() => {});
+    if (nav?.clearAppBadge) return Promise.resolve(nav.clearAppBadge()).catch(() => {});
+  } catch { /* unsupported */ }
+  return Promise.resolve();
+}

@@ -5,15 +5,21 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data ? event.data.text() : "" }; }
   const title = data.title || "SparkLog";
-  event.waitUntil(
+  const tasks = [
     self.registration.showNotification(title, {
       body: data.body || "",
       icon: "/pwa-192.png",
       badge: "/pwa-192.png",
       tag: data.tag,
       data: { url: data.url || "/" },
-    })
-  );
+    }),
+  ];
+  // Number on the app icon (Android/desktop PWA, iOS 16.4+ installed app). The open app
+  // keeps it in sync with the real unread count afterwards.
+  if (typeof data.badge === "number" && self.navigator && "setAppBadge" in self.navigator) {
+    tasks.push(self.navigator.setAppBadge(data.badge).catch(() => {}));
+  }
+  event.waitUntil(Promise.all(tasks));
 });
 
 self.addEventListener("notificationclick", (event) => {

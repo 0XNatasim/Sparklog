@@ -9,12 +9,14 @@ export function truncate(text, max = MAX_BODY_CHARS) {
 }
 
 // Payload read by public/push-sw.js. `tag` collapses repeats of the same broadcast.
-export function buildPushPayload({ title, body, url = "/", tag }) {
+// `badge` is the recipient's unread count, shown on the app icon (Badging API).
+export function buildPushPayload({ title, body, url = "/", tag, badge }) {
   return JSON.stringify({
     title: truncate(title || "SparkLog", 60),
     body: truncate(body),
     url: typeof url === "string" && url.startsWith("/") ? url : "/",
     tag: tag || undefined,
+    badge: Number.isInteger(badge) && badge >= 0 ? Math.min(badge, 999) : undefined,
   });
 }
 

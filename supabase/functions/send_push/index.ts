@@ -70,14 +70,17 @@ serve(async (req) => {
     if (employeeIds.length === 0) return json({ ok: true, sent: 0, failed: 0, removed: 0 });
 
     const { data: subs, error: subsErr } = await admin
-      .from("push_subscriptions").select("id, endpoint, p256dh, auth")
+      .from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth")
       .in("user_id", employeeIds).limit(MAX_SUBSCRIPTIONS);
     if (subsErr) return json({ ok: false, error: subsErr.message }, 500);
 
     webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
-    const message = buildPushPayload({
-      title: "SparkLog", body: broadcast.body, url: "/", tag: `broadcast-${broadcastId}`,
-    });
+    // Unread announcements per employee (this one included) → number on the app icon.
+    const { data: unreadRows } = await admin
+      .from("broadcast_recipients").select("employee_id")
+      .in("employee_id", employeeIds).is("acknowledged_at", null);
+    const unread = new Map<string, number>();
+    for (const row of unreadRows ?? []) unread.set(row.employee_id, (unread.get(row.employee_id) ?? 0) + 1);
 
     let sent = 0, failed = 0;
     const gone: string[] = [];
@@ -85,6 +88,10 @@ serve(async (req) => {
     // call is bounded by an AbortSignal and does not depend on Node's https module.
     await Promise.all((subs ?? []).map(async (sub) => {
       try {
+        const message = buildPushPayload({
+          title: "SparkLog", body: broadcast.body, url: "/", tag: `broadcast-${broadcastId}`,
+          badge: Math.max(1, unread.get(sub.user_id) ?? 1),
+        });
         const d = await webpush.generateRequestDetails(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           message,

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildPushPayload, isGonePushStatus, truncate } from "../../supabase/functions/send_push/push_payload.js";
-import { urlBase64ToUint8Array } from "./push-support";
+import { setAppBadgeCount, urlBase64ToUint8Array } from "./push-support";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
@@ -23,6 +23,26 @@ describe("push payload (shared with the send_push Edge Function)", () => {
   it("treats only 404/410 as a dead subscription", () => {
     expect([404, 410].every(isGonePushStatus)).toBe(true);
     expect([200, 201, 400, 401, 403, 413, 429, 500, 503].some(isGonePushStatus)).toBe(false);
+  });
+});
+
+describe("app icon badge", () => {
+  it("puts the unread count in the payload, clamped and validated", () => {
+    expect(JSON.parse(buildPushPayload({ body: "x", badge: 3 })).badge).toBe(3);
+    expect(JSON.parse(buildPushPayload({ body: "x", badge: 5000 })).badge).toBe(999);
+    expect(JSON.parse(buildPushPayload({ body: "x", badge: -1 })).badge).toBeUndefined();
+    expect(JSON.parse(buildPushPayload({ body: "x", badge: "2" })).badge).toBeUndefined();
+  });
+
+  it("sets or clears the badge, and is a no-op without the Badging API", async () => {
+    const calls = [];
+    const nav = { setAppBadge: (n) => { calls.push(["set", n]); return Promise.resolve(); }, clearAppBadge: () => { calls.push(["clear"]); return Promise.resolve(); } };
+    await setAppBadgeCount(4, nav);
+    await setAppBadgeCount(0, nav);
+    await setAppBadgeCount(2000, nav);
+    expect(calls).toEqual([["set", 4], ["clear"], ["set", 999]]);
+    await expect(setAppBadgeCount(1, {})).resolves.toBeUndefined();
+    await expect(setAppBadgeCount(1, { setAppBadge: () => Promise.reject(new Error("no")) })).resolves.toBeUndefined();
   });
 });
 
