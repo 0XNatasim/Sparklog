@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildPushPayload, isGonePushStatus, truncate } from "../../supabase/functions/_shared/push_payload.js";
+import { buildPushPayload, isGonePushStatus, truncate } from "../../supabase/functions/send_push/push_payload.js";
 import { urlBase64ToUint8Array } from "./push-support";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");

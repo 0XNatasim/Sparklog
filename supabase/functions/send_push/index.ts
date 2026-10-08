@@ -12,7 +12,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { buildPushPayload, isGonePushStatus } from "../_shared/push_payload.js";
+import { buildPushPayload, isGonePushStatus } from "./push_payload.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
