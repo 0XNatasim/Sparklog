@@ -4,16 +4,17 @@ import "dayjs/locale/en";
 import "dayjs/locale/fr";
 import { SUPPORTED_LANGUAGES } from "@/lib/i18n";
 
-const LanguageContext = createContext({ language: "en", setLanguage: () => {} });
+const LanguageContext = createContext({ language: "fr", setLanguage: () => {} });
 
 const STORAGE_KEY = "language";
 
+// French is the default (most employees use it); the phone's language is ignored so an
+// English-configured phone doesn't flip the app to English. An explicit choice wins.
 function detectInitial() {
-  if (typeof window === "undefined") return "en";
+  if (typeof window === "undefined") return "fr";
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored && SUPPORTED_LANGUAGES.includes(stored)) return stored;
-  const nav = typeof navigator !== "undefined" ? navigator.language : "";
-  return nav && nav.toLowerCase().startsWith("fr") ? "fr" : "en";
+  return "fr";
 }
 
 export function LanguageProvider({ children }) {
@@ -21,6 +22,9 @@ export function LanguageProvider({ children }) {
 
   useEffect(() => {
     dayjs.locale(language);
+    // Keep <html lang> in sync so the browser never mistakes the page for another
+    // language and offers to auto-translate it.
+    document.documentElement.lang = language;
   }, [language]);
 
   const setLanguage = (lang) => {
