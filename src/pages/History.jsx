@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { CircleCheck, CircleX, Images } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
@@ -19,7 +20,8 @@ import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
 import { submitSavedJob } from "@/lib/submit-job";
-import { inventoryRequiredFor, missingInventorySlots } from "@/lib/inventory-screenshots";
+import { inventoryDayBadge, inventoryRequiredFor, missingInventorySlots } from "@/lib/inventory-screenshots";
+import InventoryPhotosDialog from "@/components/InventoryPhotosDialog";
 import { fetchInventorySlots } from "@/lib/inventory-upload";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
@@ -65,6 +67,11 @@ export default function History() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
+  // End-of-shift inventory: per-day capture counts (null until loaded, so a failed read never
+  // shows a false "missing"), whether the employee has the option, and the open photo viewer.
+  const [inventoryEnabled, setInventoryEnabled] = useState(false);
+  const [inventoryCounts, setInventoryCounts] = useState(null);
+  const [inventoryViewDate, setInventoryViewDate] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -136,6 +143,33 @@ export default function History() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveUserId]);
+
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    let cancelled = false;
+    supabase.from("profiles").select("role, inventory_screenshots_enabled").eq("id", effectiveUserId).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled) && !isAdminEmployee(data?.role)); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [effectiveUserId]);
+
+  useEffect(() => {
+    if (!effectiveUserId || jobs.length === 0) return;
+    let cancelled = false;
+    const dates = jobs.map((job) => job.job_date).sort();
+    withTimeout(
+      supabase.from("inventory_screenshots").select("job_date, slot")
+        .eq("user_id", effectiveUserId).gte("job_date", dates[0]).lte("job_date", dates[dates.length - 1])
+        .limit(QUERY_BUDGETS.inventoryRows),
+      12000
+    ).then(({ data, error }) => {
+      if (cancelled || error) return;
+      const slotsByDate = new Map();
+      for (const row of data || []) slotsByDate.set(row.job_date, new Set([...(slotsByDate.get(row.job_date) || []), row.slot]));
+      setInventoryCounts(new Map([...slotsByDate].map(([date, slots]) => [date, slots.size])));
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [effectiveUserId, jobs]);
 
   function sumHoursForJobs(list) {
     let total = 0;
@@ -351,8 +385,31 @@ export default function History() {
           return (
             <div key={g.date} className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-block rounded-full border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
-                  {dayjs(g.date).format("DD MMM YYYY")} • <b className="text-foreground">{g.totalHHmm}</b> • <b className="text-foreground">{g.totalKm}</b> km
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-block rounded-full border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
+                    {dayjs(g.date).format("DD MMM YYYY")} • <b className="text-foreground">{g.totalHHmm}</b> • <b className="text-foreground">{g.totalKm}</b> km
+                  </div>
+                  {inventoryCounts && (() => {
+                    const count = inventoryCounts.get(g.date) || 0;
+                    const badge = inventoryDayBadge(g.date, count, inventoryEnabled);
+                    if (!badge) return null;
+                    return (
+                      <>
+                        <div
+                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${badge === "done" ? "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-300" : "border-destructive/40 bg-destructive/10 text-destructive dark:text-red-300"}`}
+                          title={t(badge === "done" ? "history.inventory.doneTitle" : "history.inventory.missingTitle", { count })}
+                        >
+                          {t("history.inventory.label")}
+                          {badge === "done" ? <CircleCheck className="h-4 w-4" aria-label={t("history.inventory.done")} /> : <CircleX className="h-4 w-4" aria-label={t("history.inventory.missing")} />}
+                        </div>
+                        {count > 0 && (
+                          <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-full" aria-label={t("history.inventory.view")} title={t("history.inventory.view")} onClick={() => setInventoryViewDate(g.date)}>
+                            <Images className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 {dayCanSubmit && (
                   <Button
@@ -456,6 +513,7 @@ export default function History() {
           </div>
         )}
       </div>
+      <InventoryPhotosDialog date={inventoryViewDate} userId={effectiveUserId} onClose={() => setInventoryViewDate(null)} />
       {confirmDialog}
     </AppShell>
   );

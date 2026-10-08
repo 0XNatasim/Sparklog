@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   INVENTORY_REQUIRED_FROM,
+  inventoryDayBadge,
   inventoryRequiredFor,
   inventoryStoragePath,
   missingInventorySlots,
@@ -23,6 +24,18 @@ describe("inventory screenshot rules", () => {
     expect(inventoryRequiredFor("2026-10-07")).toBe(false);
     expect(inventoryRequiredFor(INVENTORY_REQUIRED_FROM)).toBe(true);
     expect(inventoryRequiredFor("2026-10-09", { officeEmployee: true })).toBe(false);
+  });
+
+  it("shows a green check once the 3 captures are sent, a red X when a required day lacks them", () => {
+    expect(inventoryDayBadge("2026-10-08", 3, true)).toBe("done");
+    expect(inventoryDayBadge("2026-10-08", 2, true)).toBe("missing");
+    expect(inventoryDayBadge("2026-10-08", 0, true)).toBe("missing");
+  });
+
+  it("stays silent for employees without the option and for pre-rollout days", () => {
+    expect(inventoryDayBadge("2026-10-08", 0, false)).toBeNull();
+    expect(inventoryDayBadge("2026-10-07", 0, true)).toBeNull();
+    expect(inventoryDayBadge("2026-10-07", 3, true)).toBe("done");
   });
 
   it("lists the slots still missing", () => {

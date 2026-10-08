@@ -16,3 +16,13 @@ export function missingInventorySlots(rows) {
   const present = new Set((rows || []).map((row) => Number(row.slot)));
   return INVENTORY_SLOTS.filter((slot) => !present.has(slot));
 }
+
+// Badge shown beside each day of the employee's History: "done" (all three captures sent),
+// "missing" (a required day without all of them), or null (nothing to show: option off, or a
+// day from before the rollout with no captures).
+export function inventoryDayBadge(jobDate, captureCount, enabled) {
+  if (captureCount >= INVENTORY_SLOTS.length) return "done";
+  if (!enabled) return null;
+  if (captureCount > 0) return "missing";
+  return inventoryRequiredFor(jobDate) ? "missing" : null;
+}
