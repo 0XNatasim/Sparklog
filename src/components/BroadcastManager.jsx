@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
+import { notifyBroadcastPush } from "@/lib/push";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { compressImage } from "@/lib/ocr";
 import { addTemplate, loadTemplates, moveTemplate, removeTemplate, resolveTemplates, saveTemplates } from "@/lib/broadcast-templates";
@@ -243,6 +244,7 @@ export default function BroadcastManager() {
       const rows = targetIds.map((employee_id) => ({ broadcast_id: created.id, employee_id }));
       const { error: recipError } = await supabase.from("broadcast_recipients").insert(rows);
       if (recipError) throw recipError;
+      notifyBroadcastPush(created.id); // phone push, best-effort (not awaited)
 
       setBody("");
       clearImage();
@@ -295,6 +297,7 @@ export default function BroadcastManager() {
       const rows = targetIds.map((employee_id) => ({ broadcast_id: created.id, employee_id }));
       const { error: recipError } = await supabase.from("broadcast_recipients").insert(rows);
       if (recipError) throw recipError;
+      notifyBroadcastPush(created.id); // phone push, best-effort (not awaited)
 
       setMessage(t("broadcast.resent"));
       await loadLog();
