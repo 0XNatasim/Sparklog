@@ -143,6 +143,7 @@ export default function EmployeeForm() {
 
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+  const [draftRestored, setDraftRestored] = useState(false);
   const [warning, setWarning] = useState("");
 
   const [job_date, setJobDate] = useState(companyDate());
@@ -240,6 +241,20 @@ export default function EmployeeForm() {
     if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
     setDirty(true);
     setInfo(t("form.toasts.draftRestored"));
+    setDraftRestored(true);
+  }
+
+  // Drops the restored local draft and goes back to a clean form (new job) or to the
+  // server copy of the job being edited.
+  async function discardLocalDraft() {
+    setDraftRestored(false);
+    await deleteDraft({ userId: effectiveUserId, editId }).catch(() => undefined);
+    if (editId) {
+      await loadEdit();
+      return;
+    }
+    resetNewJobFields();
+    submissionKeyRef.current = crypto.randomUUID();
   }
 
   async function loadEdit() {
@@ -1251,8 +1266,13 @@ export default function EmployeeForm() {
           </div>
         )}
         {info && (
-          <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            {t(info)}
+          <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+            <span>{t(info)}</span>
+            {draftRestored && info === t("form.toasts.draftRestored") && !saving && (
+              <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={discardLocalDraft}>
+                {t("form.draft.discard")}
+              </Button>
+            )}
           </div>
         )}
         {warning && (
