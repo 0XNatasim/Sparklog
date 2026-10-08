@@ -647,12 +647,19 @@ export default function ManagerDashboard({ view = "timesheet" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmployee?.id]);
 
+  // The stored key can go stale (employee switched while jobs were still loading, or
+  // the week was fully approved). A <select> then *displays* the first option while the
+  // state points elsewhere, so the button read "(0)". Fall back to the newest week.
+  const effectiveWeekKey = useMemo(() => {
+    if (weekOptions.length === 0) return "latest";
+    return weekOptions.some((w) => w.key === selectedWeekKey) ? selectedWeekKey : weekOptions[0].key;
+  }, [weekOptions, selectedWeekKey]);
+
   const submittedForSelectedWeek = useMemo(() => {
     if (!split || !selectedEmployee) return [];
     if (weekOptions.length === 0) return [];
-    if (!selectedWeekKey || selectedWeekKey === "latest") return split.submitted;
-    return split.submitted.filter((j) => weekKeyFromDate(j.job_date) === selectedWeekKey);
-  }, [split, selectedEmployee, selectedWeekKey, weekOptions.length]);
+    return split.submitted.filter((j) => weekKeyFromDate(j.job_date) === effectiveWeekKey);
+  }, [split, selectedEmployee, effectiveWeekKey, weekOptions.length]);
 
   function employeeLabel(userId) {
     const employee = profiles.get(userId);
@@ -805,7 +812,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
 
     const wk = ccqWeek(list[0].job_date);
     const label =
-      selectedWeekKey === "latest"
+      effectiveWeekKey === "latest"
         ? t("manager.confirm.selectedPeriod")
         : `${t("manager.weekShort")} ${wk.start.format("DD MMM")} → ${wk.end.format("DD MMM YYYY")}`;
 
@@ -814,7 +821,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
     const ok = await confirm(warning ? `${question}\n\n${warning}` : question);
     if (!ok) return;
 
-    const actionKey = `week:${selectedWeekKey === "latest" ? "latest" : selectedWeekKey}`;
+    const actionKey = `week:${effectiveWeekKey}`;
     setActionLoadingId(actionKey);
     setErr(""); setInfo("");
 
@@ -1149,7 +1156,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
                   </Button>
 
                   <Select
-                    value={weekOptions.length === 0 ? "latest" : selectedWeekKey}
+                    value={effectiveWeekKey}
                     onChange={(e) => setSelectedWeekKey(e.target.value)}
                     disabled={weekOptions.length === 0}
                     className="max-w-xs"
