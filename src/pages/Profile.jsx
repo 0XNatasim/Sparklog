@@ -11,6 +11,7 @@ import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import CcqCardCapture from "@/components/CcqCardCapture";
+import PushNotificationsToggle from "@/components/PushNotificationsToggle";
 import { isOwnerRole } from "@/lib/roles";
 import { Radio } from "lucide-react";
 
@@ -84,6 +85,7 @@ export default function Profile() {
                   <p className="mt-1 text-xs text-muted-foreground">{t("profile.showOnBoardsHint")}</p>
                 </div>
               )}
+              {!isViewMode && <PushNotificationsToggle />}
               {!isViewMode && (
                 <div className="mt-4 border-t pt-4">
                   <CcqCardCapture userId={effectiveUserId} profile={profile} onSaved={load} />

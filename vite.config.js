@@ -51,6 +51,8 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/functions\//, /supabase/i],
         globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,woff2}"],
         cleanupOutdatedCaches: true,
+        // Push + notification-click handlers live in public/push-sw.js.
+        importScripts: ["push-sw.js"],
         clientsClaim: true,
         skipWaiting: true,
       },
