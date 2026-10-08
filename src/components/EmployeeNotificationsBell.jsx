@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
+import { setAppBadgeCount } from "@/lib/push-support";
 
 export const BROADCASTS_REFRESH_EVENT = "sparklog:broadcasts-refresh";
 const LIST_LIMIT = 30;
@@ -70,8 +71,15 @@ export default function EmployeeNotificationsBell() {
     return () => { cancelled = true; };
   }, [path]);
 
-  if (!enabled) return null;
   const unread = items.filter((item) => !item.acknowledged_at).length;
+
+  // Keep the app-icon badge equal to the unread count; clear it on logout/unmount.
+  useEffect(() => {
+    if (enabled) setAppBadgeCount(unread);
+  }, [enabled, unread]);
+  useEffect(() => () => { setAppBadgeCount(0); }, []);
+
+  if (!enabled) return null;
 
   async function openItem(item) {
     setOpened(item);
