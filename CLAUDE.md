@@ -117,16 +117,11 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 
 | ID | Finding | Anchor | Fix |
 |----|---------|--------|-----|
-| P-1 | No route-splitting; employees download manager code; ~784 kB bundle | `App.jsx:7-13` | `React.lazy` + `Suspense`; vendor chunks |
-| P-2 | Notifications panel does unbounded full-table reads | `ManagerDashboard.jsx:237-239,301-304,347-349` | date/status window + `.limit()` + indexes |
-| P-3 | 4 exact-count queries per filter change | `ManagerDashboard.jsx:117-146` | single RPC with `count(*) filter (where …)` |
-| P-4 | Employee History/Week fetch all-time jobs | `History.jsx`, `Week.jsx` | default 8–12 weeks + cursor paging |
+| P-1 | No route-splitting; employees download manager code (incl. `PayrollEngineTester`); single 1.27 MB chunk (360 kB gzip), measured 2026-10-09 | `App.jsx:7-18` | `React.lazy` + `Suspense`; vendor chunks — see §5 Lot 3 |
 | P-5 | Costing does full client-side joins/aggregation (now status-scoped, still client-side) | `CostingDashboard.jsx` | server aggregation endpoint |
-| P-7 | LiveCrew polls roster every 30s | `LiveCrew.jsx` | cache roster; realtime; pause when hidden; abort in-flight |
-| P-8 | Missing review indexes on `created_at`/status | `overtime_evidence`, `parking_receipts`, `meal_claims` | partial indexes |
-| P-9 | Offset pagination over mutable `updated_at` sort skips/dupes | `ManagerDashboard.jsx:178-180` | keyset pagination on `(job_date, id)` |
-| P-10 | Card renderers recreated each render; lists unmemoized | `ManagerDashboard.jsx:685,793` | `React.memo` card + `useCallback` handlers |
-| P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts` | one bulk lookup, or avoid exporting contact data |
+| P-7 | LiveCrew polls roster every 30s, even when the tab is hidden | `LiveCrew.jsx:92` | cache roster; realtime; pause when hidden; abort in-flight |
+| P-10 | Card renderers recreated each render; lists unmemoized | `ManagerDashboard.jsx` | `React.memo` card + `useCallback` handlers |
+| P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts:202-207` | one bulk lookup, or avoid exporting contact data |
 
 ---
 
@@ -184,8 +179,7 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Employee | Offline Save, then reload | Durable IndexedDB draft, with stale-edit conflict prompt | Durable on-device draft | C-8 (done) |
 | Employee | Dropped conn after upload | Orphaned object / flagged job w/o metadata | Atomic or queued | S-3b |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
-| Manager | 100+ employees notifications | Unbounded full-table reads | Paginated review RPC | P-2/P-8 |
-| Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | P-9 + AbortController |
+| Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | AbortController / request id |
 | Manager | Sensitive export | Owner can bulk-read NAS un-audited from the browser | Audited server-side export | S-2 |
 | Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
 | Both | Render exception | Whole app blanks | Recover, keep draft | S-7 |
@@ -197,6 +191,60 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   `approved → submitted` (keep the snapshot taken at submission).
 - **C-8 offline drafts (done):** schema-versioned IndexedDB drafts are keyed by owner and job; edit drafts
   restore only when newer than the server copy and after explicit employee confirmation.
+
+---
+
+## 5. Optimisation — bundle, couleurs, interface (audit 2026-10-09)
+
+Mesures : `vite build` → un seul chunk `index-*.js` de 1,27 Mo (360 Ko gzip) ; precache PWA 3,5 Mo.
+Contrastes calculés selon WCAG 2.x (texte ≥ 4,5:1, bordures de champs ≥ 3:1). Une PR par lot, chacune
+avec le bump de `APP_VERSION`.
+
+### Lot 1 — Nettoyage (risque faible)
+- [ ] Retirer les dépendances jamais importées : `@mui/material`, `@mui/x-date-pickers`, `@emotion/react`,
+  `@emotion/styled`, `next-themes`, `@radix-ui/react-select`, `jimp` (dev).
+- [ ] Supprimer les fichiers morts : `src/App.css` (boilerplate Vite, non importé), `src/assets/react.svg`,
+  `public/vite.svg`, `public/logo.jpg` (189 Ko, non référencé) — re-vérifier les références avant.
+- [ ] `public/header-light.jpg` (1712×608, 176 Ko) et `header-dark.jpg` (126 Ko) affichés à 64 px de haut →
+  WebP ~360 px de large.
+- [ ] `AppShell.jsx:19-20` importe les en-têtes depuis `../../public/` → copie hachée en double dans le
+  precache ; référencer `/header-*.…` (ou déplacer dans `src/assets`).
+- [ ] `public/inventory-examples` (748 Ko) est précaché pour tous → exclure du `globPatterns`, charger à la demande.
+
+### Lot 2 — Contrastes et thème (`src/index.css`, `AppShell.jsx`, `index.html`)
+- [ ] Sombre : `--destructive` `0 62.8% 30.6%` utilisé comme texte (`text-destructive`, 85 usages) = **1,99:1**
+  → ~`0 84% 65%` (ou jeton texte séparé).
+- [ ] Clair : `--destructive` `0 84.2% 60.2%` + texte blanc = 3,59:1 → ~`0 72% 45%`.
+- [ ] Clair : `--input`/`--border` = 1,23:1 → assombrir `--input` jusqu'à ~3:1 (champs lisibles au soleil).
+- [ ] Deux noirs en sombre : `dark:bg-[#151515]` en dur (`AppShell.jsx:97,159`) vs `--background` `#09090b`
+  → une seule valeur via le jeton.
+- [ ] `theme-color` fixé à `#151515` même en clair → une balise `<meta name="theme-color" media=…>` par mode.
+
+### Lot 3 — Chargement (P-1, P-7)
+- [ ] `React.lazy` + `Suspense` pour toutes les pages `/manager/*` et `PayrollEngineTester`.
+- [ ] `manualChunks` (React / Supabase / Radix) dans `vite.config.js`.
+- [ ] Noter les tailles avant/après (bundle principal, precache) dans ce fichier.
+- [ ] `LiveCrew.jsx:92` : suspendre le polling quand `document.hidden`.
+- [ ] Optionnel : charger seulement la langue active de `src/lib/i18n.js` (2 906 lignes, FR+EN).
+
+### Lot 4 — Couleurs sémantiques
+- [ ] Jetons `--success`, `--warning`, `--info` (+ variantes sombres) et entrées `tailwind.config.js`.
+- [ ] Migrer les couleurs en dur (≈179 amber, 112 red, 65 emerald, 53 green, 37 sky) et réduire les 215 `dark:`.
+- [ ] Une seule couleur « succès » (aujourd'hui emerald dans 18 fichiers, green dans 11).
+- [ ] Clair : `text-amber-600` (3,19:1), `text-green-600` (3,30:1), `text-emerald-600` (3,77:1) → nuances `-700`.
+- [ ] Variante `success` de `ui/button.jsx` sur le nouveau jeton.
+
+### Lot 5 — Ergonomie terrain
+- [ ] Boutons d'en-tête 32×32 px (`AppShell.jsx:123-135`) → cible tactile ≥ 44 px.
+- [ ] 85 textes en `text-[9px]`/`[10px]`/`[11px]` → 12 px minimum pour l'information utile.
+- [ ] Splash PWA maintenu ≥ 1 s (`main.jsx`) → retirer au premier rendu (≤ 300 ms).
+- [ ] Manifeste `orientation: "portrait"` (`vite.config.js`) → `"any"` (tablettes gestionnaires).
+- [ ] Error boundaries global + par route, brouillon préservé (S-7).
+
+### Lot 6 — Qualité du code
+- [ ] `eslint.config.js` existe mais ESLint n'est pas en devDependencies ni en script → ajouter `npm run lint`.
+- [ ] Découper `EmployeeForm.jsx` (1 755 l.), `ManagerDashboard.jsx` (1 364 l.), `EmployeesPanel.jsx` (920 l.).
+- [ ] Mémoïser les cartes du tableau de bord (P-10).
 
 ---
 
