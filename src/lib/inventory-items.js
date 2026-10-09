@@ -44,3 +44,29 @@ export function summarizeInventoryDay(shots, rows, slotCount = 3) {
   else state = "review";
   return { state, items, count: items.length, expected, captures: shots?.length || 0 };
 }
+
+const round2 = (value) => Math.round(value * 100) / 100;
+
+// Today's list next to an earlier day's. A code missing from a list counts as 0 only when that
+// list is known to be complete (it matched the app's own total); otherwise its quantity, and the
+// difference, stay unknown (null) rather than inventing a change. diff = today - previous.
+export function compareInventory(todayItems, previousItems, { todayComplete = false, previousComplete = false } = {}) {
+  const today = new Map((todayItems || []).map((item) => [item.code, item]));
+  const previous = new Map((previousItems || []).map((item) => [item.code, item]));
+  return [...new Set([...today.keys(), ...previous.keys()])]
+    .map((code) => {
+      const now = today.get(code);
+      const before = previous.get(code);
+      const todayQty = now ? Number(now.quantity) : (todayComplete ? 0 : null);
+      const previousQty = before ? Number(before.quantity) : (previousComplete ? 0 : null);
+      const name = String(now?.name || "").length >= String(before?.name || "").length ? now?.name : before?.name;
+      return {
+        code,
+        name: name || code,
+        today: todayQty,
+        previous: previousQty,
+        diff: todayQty !== null && previousQty !== null ? round2(todayQty - previousQty) : null,
+      };
+    })
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
+}

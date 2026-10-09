@@ -13,8 +13,8 @@ import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { INVENTORY_BUCKET, INVENTORY_SLOTS } from "@/lib/inventory-screenshots";
-import { INVENTORY_STATE_ORDER, effectiveOcrStatus, summarizeInventoryDay } from "@/lib/inventory-items";
-import { deleteInventoryScreenshots, requestInventoryReading } from "@/lib/inventory-upload";
+import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "@/lib/inventory-items";
+import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -39,7 +39,9 @@ export default function InventoryScreenshotsPanel() {
   const [err, setErr] = useState("");
   const [openId, setOpenId] = useState(null);
   const [photos, setPhotos] = useState({});
-  const [hideZero, setHideZero] = useState(false);
+  const [hideZero, setHideZero] = useState(true);
+  // Comparison with the employee's previous inventory day: { personId, date, status, data }.
+  const [compare, setCompare] = useState(null);
   const [rereadBusy, setRereadBusy] = useState(false);
   const [requestedAt, setRequestedAt] = useState({});
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -80,7 +82,8 @@ export default function InventoryScreenshotsPanel() {
     }
   }, [date]);
 
-  useEffect(() => { setOpenId(null); setPhotos({}); }, [date]);
+  useEffect(() => { setOpenId(null); setPhotos({}); setCompare(null); }, [date]);
+  useEffect(() => { setCompare(null); }, [openId]);
   useEffect(() => { load(); }, [load]);
 
   const entries = useMemo(() => {
@@ -162,7 +165,35 @@ export default function InventoryScreenshotsPanel() {
     return t("mgr.inventory.state.ok", { count: entry.count });
   }
 
-  const shownItems = open ? open.items.filter((item) => !(hideZero && Number(item.quantity) === 0)) : [];
+  async function toggleCompare() {
+    if (!open) return;
+    if (compare) { setCompare(null); return; }
+    const personId = open.person.id;
+    setCompare({ personId, status: "loading" });
+    try {
+      const previous = await fetchPreviousInventory(supabase, { userId: personId, beforeDate: date });
+      setCompare(previous ? { personId, status: "ready", previous } : { personId, status: "none" });
+    } catch (error) {
+      console.error("[inventory] comparison failed", error);
+      setCompare({ personId, status: "failed" });
+    }
+  }
+
+  const comparison = useMemo(() => {
+    if (!open || compare?.status !== "ready" || compare.personId !== open.person.id) return null;
+    const previousSummary = summarizeInventoryDay(compare.previous.shots, compare.previous.items);
+    const rows = compareInventory(open.items, mergeInventoryItems(compare.previous.items), {
+      todayComplete: open.state === "ok",
+      previousComplete: previousSummary.state === "ok",
+    });
+    return { date: compare.previous.date, rows };
+  }, [open, compare]);
+
+  const shownItems = !open ? [] : comparison
+    ? comparison.rows.filter((row) => !(hideZero && !Number(row.today) && !Number(row.previous)))
+    : open.items.filter((item) => !(hideZero && Number(item.quantity) === 0));
+  const fmtQty = (value) => (value === null || value === undefined ? "—" : Number(value).toLocaleString("fr-CA", { minimumFractionDigits: 2 }));
+  const fmtDiff = (value) => (value === null ? "—" : `${value > 0 ? "+" : ""}${Number(value).toLocaleString("fr-CA", { maximumFractionDigits: 2 })}`);
 
   return (
     <div className="space-y-3">
@@ -235,23 +266,45 @@ export default function InventoryScreenshotsPanel() {
                     <>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm font-medium">{t("mgr.inventory.itemCount", { count: open.count })}</span>
-                        <label className="flex cursor-pointer items-center gap-2 text-sm">
-                          <input type="checkbox" checked={hideZero} onChange={(event) => setHideZero(event.target.checked)} className="h-4 w-4 accent-primary" />
-                          {t("mgr.inventory.hideZero")}
-                        </label>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Button type="button" variant={compare ? "default" : "outline"} size="sm" aria-pressed={Boolean(compare)} disabled={compare?.status === "loading"} onClick={toggleCompare}>
+                            {compare?.status === "loading" ? t("common.loading") : t("mgr.inventory.compare")}
+                          </Button>
+                          <label className="flex cursor-pointer items-center gap-2 text-sm">
+                            <input type="checkbox" checked={hideZero} onChange={(event) => setHideZero(event.target.checked)} className="h-4 w-4 accent-primary" />
+                            {t("mgr.inventory.hideZero")}
+                          </label>
+                        </div>
                       </div>
+                      {compare?.status === "none" && <p className="text-sm text-muted-foreground">{t("mgr.inventory.compareNone")}</p>}
+                      {compare?.status === "failed" && <p className="text-sm text-destructive dark:text-red-300" role="alert">{t("mgr.inventory.compareFailed")}</p>}
                       <div className="overflow-hidden rounded-md border">
                         <table className="w-full text-sm">
                           <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                            <tr><th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th><th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colQty")}</th></tr>
+                            <tr>
+                              <th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th>
+                              {comparison && <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colPrevious", { date: dayjs(comparison.date).format("DD MMM") })}</th>}
+                              <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colQty")}</th>
+                              {comparison && <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colDiff")}</th>}
+                            </tr>
                           </thead>
                           <tbody className="divide-y">
-                            {shownItems.map((item) => (
-                              <tr key={item.code}>
-                                <td className="px-3 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.code}</div></td>
-                                <td className={cn("px-3 py-2 text-right tabular-nums", Number(item.quantity) === 0 && "text-muted-foreground")}>{Number(item.quantity).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}</td>
-                              </tr>
-                            ))}
+                            {shownItems.map((row) => {
+                              const code = row.code;
+                              const quantity = comparison ? row.today : Number(row.quantity);
+                              return (
+                                <tr key={code}>
+                                  <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{code}</div></td>
+                                  {comparison && <td className={cn("px-3 py-2 text-right tabular-nums", !Number(row.previous) && "text-muted-foreground")}>{fmtQty(row.previous)}</td>}
+                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground")}>{fmtQty(quantity)}</td>
+                                  {comparison && (
+                                    <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.diff === null || row.diff === 0 ? "text-muted-foreground" : row.diff < 0 ? "text-destructive dark:text-red-300" : "text-green-700 dark:text-green-300")}>
+                                      {fmtDiff(row.diff)}
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

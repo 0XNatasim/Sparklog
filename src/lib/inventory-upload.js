@@ -74,3 +74,23 @@ export async function deleteInventoryScreenshots(client, { userId, jobDate, slot
   if (data && data.ok === false) throw new Error(data.error || "inventory_delete_failed");
   return data;
 }
+
+// The employee's most recent earlier day that has a written inventory list, with its screenshots'
+// reading status (needed to know whether that list is complete). null when there is none.
+export async function fetchPreviousInventory(client, { userId, beforeDate }) {
+  const { data: latest, error: latestError } = await withTimeout(
+    client.from("inventory_items").select("job_date").eq("user_id", userId).lt("job_date", beforeDate)
+      .order("job_date", { ascending: false }).limit(1),
+    12000
+  );
+  if (latestError) throw latestError;
+  const date = latest?.[0]?.job_date;
+  if (!date) return null;
+  const [itemsResult, shotsResult] = await Promise.all([
+    withTimeout(client.from("inventory_items").select("slot, code, name, quantity").eq("user_id", userId).eq("job_date", date).limit(1000), 12000),
+    withTimeout(client.from("inventory_screenshots").select("slot, ocr_status, list_total, created_at").eq("user_id", userId).eq("job_date", date), 12000),
+  ]);
+  if (itemsResult.error) throw itemsResult.error;
+  if (shotsResult.error) throw shotsResult.error;
+  return { date, items: itemsResult.data || [], shots: shotsResult.data || [] };
+}
