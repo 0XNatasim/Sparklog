@@ -100,8 +100,14 @@ describe("summarizeInventoryDay", () => {
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3)], rows(17))).toMatchObject({ state: "ok", count: 17, expected: 17 });
   });
 
-  it("never calls a list verified when a screenshot needed review", () => {
-    expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "needs_review" })], rows(17)).state).toBe("review");
+  it("calls a list complete when it matches the app's total, even if a screenshot had an unreadable fragment", () => {
+    expect(summarizeInventoryDay([shot(1), shot(2, { ocr_status: "needs_review" }), shot(3, { ocr_status: "needs_review" })], rows(17)).state).toBe("ok");
+  });
+
+  it("never calls a list complete when it does not match the app's total", () => {
+    expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "needs_review" })], rows(16)).state).toBe("review");
+    expect(summarizeInventoryDay([shot(1), shot(2), shot(3)], rows(18)).state).toBe("review");
+    expect(summarizeInventoryDay([shot(1, { list_total: null }), shot(2, { list_total: null }), shot(3, { list_total: null })], rows(17)).state).toBe("review");
   });
 });
 
