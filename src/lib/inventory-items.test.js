@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { sumCrewInventory, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
@@ -102,6 +102,59 @@ describe("summarizeInventoryDay", () => {
 
   it("never calls a list verified when a screenshot needed review", () => {
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "needs_review" })], rows(17)).state).toBe("review");
+  });
+});
+
+describe("sumCrewInventory", () => {
+  const item = (code, quantity, name = `Item ${code}`) => ({ code, name, quantity });
+  const ok = (name, items) => ({ name, state: "ok", items });
+
+  it("sums each equipment code over all employees and counts who holds it", () => {
+    const { rows, counted, unverified } = sumCrewInventory([
+      ok("A", [item("EQ000001", 5), item("EQ000002", 0)]),
+      ok("B", [item("EQ000001", 12.5), item("EQ000003", 2)]),
+    ]);
+    expect(counted).toBe(2);
+    expect(unverified).toEqual([]);
+    expect(rows.find((row) => row.code === "EQ000001")).toMatchObject({ total: 17.5, holders: 2 });
+    expect(rows.find((row) => row.code === "EQ000002")).toMatchObject({ total: 0, holders: 0 });
+  });
+
+  it("flags employees whose list is not verified, so totals are not read as complete", () => {
+    const { counted, unverified } = sumCrewInventory([
+      ok("A", [item("EQ000001", 1)]),
+      { name: "B", state: "review", items: [item("EQ000001", 2)] },
+      { name: "C", state: "missing", items: [] },
+    ]);
+    expect(counted).toBe(2);
+    expect(unverified).toEqual(["B", "C"]);
+  });
+});
+
+describe("compareInventory", () => {
+  const item = (code, quantity, name = `Item ${code}`) => ({ code, name, quantity });
+  const today = [item("EQ000001", 5), item("EQ000002", 10), item("EQ000004", 0)];
+  const before = [item("EQ000001", 17), item("EQ000002", 10), item("EQ000003", 3)];
+
+  it("shows today minus the previous day, signed", () => {
+    const rows = compareInventory(today, before, { todayComplete: true, previousComplete: true });
+    const byCode = Object.fromEntries(rows.map((row) => [row.code, row]));
+    expect(byCode.EQ000001).toMatchObject({ today: 5, previous: 17, diff: -12 });
+    expect(byCode.EQ000002.diff).toBe(0);
+  });
+
+  it("counts a missing code as 0 only when that day's list is verified complete", () => {
+    const complete = Object.fromEntries(compareInventory(today, before, { todayComplete: true, previousComplete: true }).map((row) => [row.code, row]));
+    expect(complete.EQ000003).toMatchObject({ today: 0, previous: 3, diff: -3 });
+    expect(complete.EQ000004).toMatchObject({ today: 0, previous: 0, diff: 0 });
+    const unverified = Object.fromEntries(compareInventory(today, before).map((row) => [row.code, row]));
+    expect(unverified.EQ000003).toMatchObject({ today: null, previous: 3, diff: null });
+    expect(unverified.EQ000004.diff).toBeNull();
+  });
+
+  it("rounds decimal differences", () => {
+    const [row] = compareInventory([item("EQ000001", 0.3)], [item("EQ000001", 0.1)], { todayComplete: true, previousComplete: true });
+    expect(row.diff).toBe(0.2);
   });
 });
 
