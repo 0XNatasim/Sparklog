@@ -1,3 +1,5 @@
+import { dayFirstTripUnpaidMinutes } from "./payroll-calculations";
+
 // Total-km field value when reopening a saved job; a real 0 km must stay "0", not blank.
 export function kilometreFieldValue(job) {
   const total = Number(job?.km_total) || (Number(job?.km_aller) || 0) + (Number(job?.km_retour) || 0);
@@ -22,17 +24,21 @@ function workedMinutes(job) {
 }
 
 // Evidence is one-per-day. Include saved/updated jobs in the total so submitting
-// from History cannot bypass the same >8 h rule enforced by the main form.
-export function dailyOvertimeEvidenceRequirement(candidate, jobs) {
+// from History cannot bypass the same >8 h rule enforced by the main form. For an employee
+// with the "first trip unpaid" option the threshold counts PAID time (the unpaid first trip
+// is removed), exactly like the database gate; `grossMinutes` keeps the full span.
+export function dailyOvertimeEvidenceRequirement(candidate, jobs, { firstTripUnpaid = false } = {}) {
   const dayJobs = (jobs || []).filter((job) =>
     job?.job_date === candidate?.job_date
     && job.id !== candidate?.id
     && ["saved", "updated", "submitted", "approved"].includes(job.status)
   );
-  const totalMinutes = workedMinutes(candidate) + dayJobs.reduce((sum, job) => sum + workedMinutes(job), 0);
+  const grossMinutes = workedMinutes(candidate) + dayJobs.reduce((sum, job) => sum + workedMinutes(job), 0);
+  const unpaidTrip = firstTripUnpaid ? dayFirstTripUnpaidMinutes([candidate, ...dayJobs]) : 0;
+  const totalMinutes = grossMinutes - unpaidTrip;
   const hasEvidence = Boolean(candidate?.overtime_evidence_captured)
     || dayJobs.some((job) => job.overtime_evidence_captured);
-  return { totalMinutes, required: totalMinutes > 8 * 60 && !hasEvidence };
+  return { totalMinutes, grossMinutes, required: totalMinutes > 8 * 60 && !hasEvidence };
 }
 
 // Keep the client-to-RPC contract explicit. Ownership, status and lock state are

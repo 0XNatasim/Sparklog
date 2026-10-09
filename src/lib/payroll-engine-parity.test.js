@@ -56,3 +56,30 @@ describe("engine parity: app copy === Edge Function copy", () => {
     })).toEqual({ firstOtHourDouble: false, returnOtNoBenefits: true, firstTripUnpaid: false });
   });
 });
+
+describe("dayFirstTripUnpaidMinutes (overtime-proof threshold helper)", () => {
+  const day = [
+    { id: "b", depart: "08:45", arrivee: "08:55", fin: "11:34" },
+    { id: "a", depart: "06:30", arrivee: "07:00", fin: "08:45" },
+  ];
+
+  it("takes the Départ→Arrivée of the earliest job", () => {
+    expect(shared.dayFirstTripUnpaidMinutes(day)).toBe(30);
+  });
+
+  it("is 0 when the first job has no Arrivée, and for an empty day", () => {
+    expect(shared.dayFirstTripUnpaidMinutes([{ id: "a", depart: "06:30", arrivee: null, fin: "08:45" }, day[0]])).toBe(0);
+    expect(shared.dayFirstTripUnpaidMinutes([])).toBe(0);
+  });
+
+  it("clamps to the job's own Départ→Fin span and accepts HH:MM:SS", () => {
+    expect(shared.dayFirstTripUnpaidMinutes([{ id: "a", depart: "06:30:00", arrivee: "09:00:00", fin: "07:00:00" }])).toBe(30);
+  });
+
+  it("agrees with the payroll engine's own unpaid first trip", () => {
+    const jobs = day.map((job) => ({ ...job, job_date: "2026-10-09", return_time_minutes: 0 }));
+    const paid = (options) => [...shared.calculatePayrollEntries(jobs, options).values()]
+      .reduce((sum, entry) => sum + entry.totalPaidMinutes, 0);
+    expect(paid({}) - paid({ firstTripUnpaid: true })).toBe(shared.dayFirstTripUnpaidMinutes(day));
+  });
+});

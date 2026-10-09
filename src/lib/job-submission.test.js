@@ -78,14 +78,50 @@ describe("dailyOvertimeEvidenceRequirement", () => {
   it("requires evidence when saved jobs bring the day over 8 hours", () => {
     expect(dailyOvertimeEvidenceRequirement(candidate, [
       { id: "a", job_date: "2026-09-29", depart: "08:00", fin: "13:00", status: "saved", overtime_evidence_captured: false },
-    ])).toEqual({ totalMinutes: 576, required: true });
+    ])).toEqual({ totalMinutes: 576, grossMinutes: 576, required: true });
   });
 
   it("accepts one proof anywhere on the day and ignores unrelated jobs", () => {
     expect(dailyOvertimeEvidenceRequirement(candidate, [
       { id: "a", job_date: "2026-09-29", depart: "08:00", fin: "13:00", status: "submitted", overtime_evidence_captured: true },
       { id: "other-day", job_date: "2026-09-28", depart: "00:00", fin: "12:00", status: "submitted" },
-    ])).toEqual({ totalMinutes: 576, required: false });
+    ])).toEqual({ totalMinutes: 576, grossMinutes: 576, required: false });
+  });
+});
+
+// Jean-Marc, 2026-10-09: 2 h 15 + 2 h 49 + 3 h 25 = 8 h 29 gross. With "first trip unpaid"
+// the 06:30 → 07:00 trip is not paid, so the paid day is 7 h 59 and no overtime proof is due.
+describe("overtime proof threshold with the first-trip-unpaid option", () => {
+  const day = [
+    { id: "a", job_date: "2026-10-09", depart: "06:30:00", arrivee: "07:00:00", fin: "08:45:00", status: "saved" },
+    { id: "b", job_date: "2026-10-09", depart: "08:45:00", arrivee: "08:55:00", fin: "11:34:00", status: "saved" },
+  ];
+  const third = { id: "c", job_date: "2026-10-09", depart: "11:35", arrivee: "12:04", fin: "15:00", status: "saved" };
+
+  it("still asks for the proof on gross time without the option", () => {
+    expect(dailyOvertimeEvidenceRequirement(third, day)).toEqual({ totalMinutes: 509, grossMinutes: 509, required: true });
+  });
+
+  it("counts paid time with the option: 7 h 59, no proof", () => {
+    expect(dailyOvertimeEvidenceRequirement(third, day, { firstTripUnpaid: true }))
+      .toEqual({ totalMinutes: 479, grossMinutes: 509, required: false });
+  });
+
+  it("still asks for the proof once the PAID day passes 8 h", () => {
+    const later = { ...third, fin: "15:05" };
+    expect(dailyOvertimeEvidenceRequirement(later, day, { firstTripUnpaid: true }).required).toBe(true);
+  });
+
+  it("removes the trip of the earliest job, whatever the order of entry", () => {
+    const entered = { id: "z", job_date: "2026-10-09", depart: "05:30", arrivee: "06:00", fin: "06:30", status: "saved" };
+    // The new earliest job owns the unpaid trip (30 min) instead of the 06:30 job.
+    expect(dailyOvertimeEvidenceRequirement(entered, day, { firstTripUnpaid: true }).totalMinutes)
+      .toBe(60 + 135 + 169 - 30);
+  });
+
+  it("removes nothing when the first job has no arrival time", () => {
+    const noArrival = day.map((job, index) => (index === 0 ? { ...job, arrivee: null } : job));
+    expect(dailyOvertimeEvidenceRequirement(third, noArrival, { firstTripUnpaid: true }).totalMinutes).toBe(509);
   });
 });
 

@@ -1,4 +1,4 @@
-import { getKilometreBreakdown, minutesBetween } from "./payroll-calculations";
+import { dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "./payroll-calculations";
 
 // Default thresholds for the manager's "À vérifier" box. These only flag a job for a
 // second look before approval; the database contract still decides what is accepted.
@@ -55,7 +55,9 @@ export function anomalyLimitsFromSettings(settings) {
 
 // Pure detection over submitted/approved jobs. Only anomalies that touch at least one
 // submitted job are returned: approved days are already settled.
-export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS) {
+// `firstTripUnpaidUsers` (Set of user ids with the "first trip unpaid" option) makes the
+// overtime-proof threshold count paid time, like the employee screens and the database.
+export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS, { firstTripUnpaidUsers = new Set() } = {}) {
   const days = new Map();
   for (const job of jobs || []) {
     if (!REVIEWABLE.has(job.status) || !job.user_id || !job.job_date || !job.depart || !job.fin) continue;
@@ -93,8 +95,9 @@ export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS) {
 
     const worked = dayJobs.reduce((sum, job) => sum + minutesBetween(job.depart, job.fin), 0);
     if (worked > limits.longDayMinutes) add("long_day", dayJobs, { minutes: worked });
-    if (worked > limits.overtimeMinutes && !dayJobs.some((job) => job.overtime_evidence_captured)) {
-      add("overtime_no_evidence", dayJobs, { minutes: worked });
+    const paidWorked = worked - (firstTripUnpaidUsers.has(dayJobs[0].user_id) ? dayFirstTripUnpaidMinutes(dayJobs) : 0);
+    if (paidWorked > limits.overtimeMinutes && !dayJobs.some((job) => job.overtime_evidence_captured)) {
+      add("overtime_no_evidence", dayJobs, { minutes: paidWorked });
     }
 
     for (const job of dayJobs) {

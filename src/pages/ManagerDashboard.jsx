@@ -21,7 +21,7 @@ import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from 
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import LiveCrew from "@/components/LiveCrew";
 import WeekSnapshot from "@/components/WeekSnapshot";
-import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
+import { dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
@@ -55,7 +55,7 @@ function weekKeyFromDate(dateStr) {
   return ccqWeek(dateStr).key;
 }
 
-const ANOMALY_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, started_at, ended_at, km_total, km_aller, km_retour, overtime_evidence_captured";
+const ANOMALY_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, overtime_evidence_captured";
 
 const NOTIFICATION_FILTERS = ["overtime", "meals", "parking"];
 
@@ -197,7 +197,15 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       // select("*") so the scan keeps working with default limits if the threshold
       // columns are not deployed yet.
       const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).maybeSingle();
-      setAnomalies(detectJobAnomalies([...rows, ...(approved || [])], anomalyLimitsFromSettings(settings)));
+      // Employees with "first trip unpaid" reach the 8 h overtime-proof threshold on paid time.
+      const { data: tripUnpaid } = userIds.length
+        ? await supabase.from("profiles").select("id").eq("first_trip_unpaid", true).in("id", userIds)
+        : { data: [] };
+      setAnomalies(detectJobAnomalies(
+        [...rows, ...(approved || [])],
+        anomalyLimitsFromSettings(settings),
+        { firstTripUnpaidUsers: new Set((tripUnpaid || []).map((row) => row.id)) },
+      ));
       setAnomaliesFailed(false);
     } catch {
       setAnomaliesFailed(true);
@@ -276,7 +284,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
     (async () => {
       try {
         const { data } = await withRetry(
-          () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, is_paused, show_on_boards"),
+          () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, is_paused, show_on_boards, first_trip_unpaid"),
           12000
         );
         if (!cancelled) setProfiles((current) => {
@@ -325,7 +333,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
         const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
         if (missingProfileIds.length) {
           const { data: profileRows, error: profileError } = await withRetry(
-            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
+            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds),
             12000
           );
           if (profileError) throw profileError;
@@ -389,7 +397,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
         const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
         if (missingProfileIds.length) {
           const { data: profileRows, error: profileError } = await withRetry(
-            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds),
+            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds),
             12000
           );
           if (profileError) throw profileError;
@@ -431,7 +439,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
         const orderedRows = (rows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
         const missingProfileIds = [...new Set(orderedRows.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
         const { data: people } = missingProfileIds.length
-          ? await withRetry(() => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number").in("id", missingProfileIds), 12000)
+          ? await withRetry(() => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds), 12000)
           : { data: [] };
         if (!cancelled) {
           setNotificationMealJobs(orderedRows);
@@ -865,22 +873,26 @@ export default function ManagerDashboard({ view = "timesheet" }) {
   // Days (per employee) that total more than 8h of worked time but have NO overtime
   // authorization screenshot on any of that day's jobs. Backstop for jobs entered out
   // of order, where the employee-side prompt can miss the crossing. Return time is not
-  // counted (it never creates overtime), matching the payroll engine.
+  // counted (it never creates overtime), matching the payroll engine. For an employee
+  // with "first trip unpaid" the day's first Départ→Arrivée trip is not counted either.
   const overtimeDaysMissingEvidence = useMemo(() => {
-    const totals = new Map(); // `${user_id}|${job_date}` -> { minutes, hasEvidence }
+    const totals = new Map(); // `${user_id}|${job_date}` -> { minutes, hasEvidence, dayJobs }
     for (const j of jobs) {
       const key = `${j.user_id}|${j.job_date}`;
-      const acc = totals.get(key) || { minutes: 0, hasEvidence: false };
+      const acc = totals.get(key) || { minutes: 0, hasEvidence: false, dayJobs: [] };
       acc.minutes += minutesBetween(j.depart, j.fin);
+      acc.dayJobs.push(j);
       if (j.overtime_evidence_captured) acc.hasEvidence = true;
       totals.set(key, acc);
     }
     const flagged = new Set();
     for (const [key, v] of totals) {
-      if (v.minutes > 480 && !v.hasEvidence) flagged.add(key);
+      const userId = key.slice(0, key.indexOf("|"));
+      const unpaidTrip = profiles.get(userId)?.first_trip_unpaid ? dayFirstTripUnpaidMinutes(v.dayJobs) : 0;
+      if (v.minutes - unpaidTrip > 480 && !v.hasEvidence) flagged.add(key);
     }
     return flagged;
-  }, [jobs]);
+  }, [jobs, profiles]);
 
   const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
   const dateBands = useMemo(() => dateBandMap(filtered.map((j) => j.job_date)), [filtered]);
