@@ -867,7 +867,14 @@ export default function EmployeeForm() {
       // deliberately excluded: it is always paid at the regular rate and never
       // creates overtime or supper eligibility.
       const fullDayMinutes = others.reduce((total, job) => total + workedMinutes(job), 0) + thisMinutes;
-      setOvertimeDailyMinutes(fullDayMinutes);
+      // With the "first trip unpaid" option the day's first Départ→Arrivée trip is not paid:
+      // supper eligibility, the overtime threshold and the stored daily total all use PAID
+      // time (same rule as the payroll and the database).
+      const unpaidTrip = firstTripUnpaid
+        ? dayFirstTripUnpaidMinutes([...others, { id: editId || "current", depart, arrivee, fin }])
+        : 0;
+      const paidDayMinutes = fullDayMinutes - unpaidTrip;
+      setOvertimeDailyMinutes(paidDayMinutes);
       // The overtime authorization is one screenshot per day. If another job
       // today already has it, don't ask again for this one.
       if (others.some((job) => job.overtime_evidence_captured)) return false;
@@ -878,12 +885,7 @@ export default function EmployeeForm() {
       // crosses 8h asks for it (the once-per-day guard above prevents a second
       // prompt, and the manager also sees an "8h+, no evidence" flag at approval
       // as a backstop for jobs that were entered out of order).
-      // With the "first trip unpaid" option the threshold counts paid time: the day's
-      // first Départ→Arrivée trip is removed (same rule as the payroll and the database).
-      const unpaidTrip = firstTripUnpaid
-        ? dayFirstTripUnpaidMinutes([...others, { id: editId || "current", depart, arrivee, fin }])
-        : 0;
-      return fullDayMinutes - unpaidTrip > 480;
+      return paidDayMinutes > 480;
     } catch (error) {
       // Submission must fail closed: without the other jobs we cannot prove that
       // the complete day is at or below 8 h.
