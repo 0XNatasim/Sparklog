@@ -50,6 +50,18 @@ describe("buildJobSaveRpcArgs", () => {
   });
 });
 
+describe("manager-entry confirmation", () => {
+  it("keeps the exact historical call shape unless the employee confirms", () => {
+    const args = buildJobSaveRpcArgs({ ...base, editId: "existing-id", submit: true });
+    expect(args).not.toHaveProperty("p_confirm_manager_entry");
+  });
+
+  it("sends the confirmation flag only when explicitly requested", () => {
+    const args = buildJobSaveRpcArgs({ ...base, editId: "existing-id", submit: true, confirmManagerEntry: true });
+    expect(args.p_confirm_manager_entry).toBe(true);
+  });
+});
+
 describe("requiresEvidenceBeforeSave", () => {
   it("asks for the overtime proof when saving a draft too", () => {
     expect(requiresEvidenceBeforeSave("draft")).toBe(true);

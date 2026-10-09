@@ -53,8 +53,9 @@ export function buildJobSaveRpcArgs({
   kmRetour,
   overtimeEvidenceCaptured,
   parkingReceiptCaptured,
+  confirmManagerEntry = false,
 }) {
-  return {
+  const args = {
     p_job_id: editId || null,
     p_new_job_id: editId ? null : (newJobId || null),
     p_submission_key: editId ? null : submissionKey,
@@ -71,4 +72,8 @@ export function buildJobSaveRpcArgs({
     p_overtime_evidence_captured: Boolean(overtimeEvidenceCaptured),
     p_parking_receipt_captured: Boolean(parkingReceiptCaptured),
   };
+  // Only sent when the employee explicitly confirms an owner-created job, so every other
+  // submission keeps the exact pre-0075 call shape.
+  if (confirmManagerEntry) args.p_confirm_manager_entry = true;
+  return args;
 }

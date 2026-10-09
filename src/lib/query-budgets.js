@@ -11,6 +11,8 @@ export const QUERY_BUDGETS = Object.freeze({
   inventoryPeople: 500,
   inventoryRows: 600,
   inventoryItems: 3000,
+  emergencyEmployees: 200,
+  emergencyEntries: 50,
 });
 
 // A narrowed timesheet search must be complete, not merely filtered from the

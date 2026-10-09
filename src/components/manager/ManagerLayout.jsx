@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign, Banknote, BarChart3, CalendarClock, CalendarDays, CalendarOff, ChevronDown, ClipboardList,
-  Clock3, FileText, Files, HeartPulse, History, LogOut, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen,
+  Clock3, FilePlus2, FileText, Files, HeartPulse, History, LogOut, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen,
   Percent, Radio, Receipt, ReceiptText, RefreshCw, ScrollText, Settings, ShieldCheck, SlidersHorizontal, Sun,
   UserCircle, Users, Wallet, X,
 } from "lucide-react";
@@ -45,6 +45,7 @@ const ICONS = {
   "config-settings": Settings,
   "advanced-audit": ScrollText,
   "advanced-health": HeartPulse,
+  "advanced-emergency": FilePlus2,
 };
 
 const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };

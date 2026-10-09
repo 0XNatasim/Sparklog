@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { Images, RefreshCw, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking } from "lucide-react";
+import { BellRing, FilePlus2, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,9 @@ const ACTION_META = {
   pause_change: { icon: PauseCircle, tone: "text-amber-600 dark:text-amber-300" },
   job_unlock: { icon: Unlock, tone: "text-amber-600 dark:text-amber-300" },
   job_approved: { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-300" },
+  job_created_by_owner: { icon: FilePlus2, tone: "text-primary" },
+  manager_entry_confirmed: { icon: UserCheck, tone: "text-emerald-600 dark:text-emerald-300" },
+  manager_entry_reminded: { icon: BellRing, tone: "text-amber-600 dark:text-amber-300" },
   meal_reviewed: { icon: Utensils, tone: "text-primary" },
   parking_reviewed: { icon: SquareParking, tone: "text-primary" },
 };
@@ -50,6 +53,9 @@ export default function AuditLog() {
       case "pause_change": return t(d.is_paused ? "audit.desc.paused" : "audit.desc.unpaused", { name: target });
       case "job_unlock": return t("audit.desc.jobUnlock", { name: target, date: d.job_date || "—" });
       case "job_approved": return t("audit.desc.jobApproved", { name: target, date: d.job_date || "—" });
+      case "job_created_by_owner": return t("audit.desc.jobCreatedByOwner", { name: target, date: d.job_date || "—" });
+      case "manager_entry_confirmed": return t("audit.desc.managerEntryConfirmed", { name: target, date: d.job_date || "—" });
+      case "manager_entry_reminded": return t("audit.desc.managerEntryReminded", { name: target, date: d.job_date || "—" });
       case "meal_reviewed": return t("audit.desc.mealReviewed", { name: target, status: d.status || "—" });
       case "parking_reviewed": return t("audit.desc.parkingReviewed", { name: target, status: d.status || "—" });
       default: return row.action;
@@ -73,6 +79,7 @@ export default function AuditLog() {
               <option value="pause_change">{t("audit.filter.pauseChange")}</option>
               <option value="job_unlock">{t("audit.filter.jobUnlock")}</option>
               <option value="job_approved">{t("audit.filter.jobApproved")}</option>
+              <option value="job_created_by_owner">{t("audit.filter.jobCreatedByOwner")}</option>
               <option value="meal_reviewed">{t("audit.filter.mealReviewed")}</option>
               <option value="parking_reviewed">{t("audit.filter.parkingReviewed")}</option>
             </Select>

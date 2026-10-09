@@ -20,6 +20,7 @@ import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
 import { submitSavedJob } from "@/lib/submit-job";
+import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { inventoryDayBadge, inventoryRequiredFor, missingInventorySlots } from "@/lib/inventory-screenshots";
 import InventoryPhotosDialog from "@/components/InventoryPhotosDialog";
 import { fetchInventorySlots } from "@/lib/inventory-upload";
@@ -231,7 +232,10 @@ export default function History() {
     return isOwner(job) && (job.status === "saved" || job.status === "updated") && job.locked === false;
   }
 
-  const submitExistingJob = (job) => submitSavedJob(supabase, job);
+  // A job created by management is confirmed explicitly by the employee (the dialog shows
+  // its values); the database refuses to submit it otherwise.
+  const submitExistingJob = (job, confirmManagerEntry = false) =>
+    submitSavedJob(supabase, job, { confirmManagerEntry: confirmManagerEntry && isPendingManagerEntry(job) });
 
   // The day must carry its three end-of-shift inventory screenshots before any job is submitted
   // (the database enforces the same rule). Missing ones are collected from the work form.
@@ -278,20 +282,30 @@ export default function History() {
   }
 
   async function submitJob(jobId) {
-    const ok = await confirm(t("history.confirm.submit"));
+    const job = jobs.find((row) => row.id === jobId);
+    const managerEntry = isPendingManagerEntry(job);
+    const ok = await confirm(managerEntry
+      ? t("history.confirm.managerEntry", {
+        name: job.manager_entry_by_name || t("audit.someone"),
+        date: dayjs(job.job_date).format("DD MMM YYYY"),
+        ot: job.ot,
+        from: fmtTimeHHmm(job.depart),
+        to: fmtTimeHHmm(job.fin),
+        km: getKilometreBreakdown(job).totalKm,
+      })
+      : t("history.confirm.submit"));
     if (!ok) return;
     setActionLoadingKey(jobId);
     setErr(""); setInfo("");
-    const job = jobs.find((row) => row.id === jobId);
     try {
       if (!job) throw new Error(t("history.errors.submitFailed"));
       if (!isAdminEmployee(role) && dailyOvertimeEvidenceRequirement(job, jobs).required) {
         // Over 8 h without proof: open the work form, which shows the screenshot pop-up.
-        navigate(`/form?edit=${job.id}&submit=1`);
+        navigate(`/form?edit=${job.id}&submit=1${managerEntry ? `&confirmed=${job.id}` : ""}`);
         return;
       }
       if (await inventoryMissingForDay(job.job_date)) {
-        navigate(`/form?edit=${job.id}&submit=1`);
+        navigate(`/form?edit=${job.id}&submit=1${managerEntry ? `&confirmed=${job.id}` : ""}`);
         return;
       }
       const overlapWarning = jobOverlapDetails(job, jobs, t);
@@ -299,7 +313,7 @@ export default function History() {
         setErr(overlapWarning);
         return;
       }
-      await submitExistingJob(job);
+      await submitExistingJob(job, managerEntry);
       setInfo(t("history.toasts.submitted"));
       await load();
     } catch (e) {
@@ -311,7 +325,9 @@ export default function History() {
 
   async function submitDay(dateKey, ids) {
     if (!ids || ids.length === 0) return;
-    const ok = await confirm(t("history.confirm.submitDay", { date: dayjs(dateKey).format("DD MMM YYYY") }));
+    const hasManagerEntry = ids.some((id) => isPendingManagerEntry(jobs.find((job) => job.id === id)));
+    const ok = await confirm(t(hasManagerEntry ? "history.confirm.managerEntryDay" : "history.confirm.submitDay",
+      { date: dayjs(dateKey).format("DD MMM YYYY") }));
     if (!ok) return;
     const actionKey = `day:${dateKey}`;
     setActionLoadingKey(actionKey);
@@ -323,12 +339,12 @@ export default function History() {
       if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs).required)) {
         // Proof is one per day: open the day's last job so the form asks for the screenshot.
         const lastJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
-        navigate(`/form?edit=${lastJob.id}&submit=1`);
+        navigate(`/form?edit=${lastJob.id}&submit=1${hasManagerEntry ? `&confirmed=${ids.join(",")}` : ""}`);
         return;
       }
       const lastDayJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
       if (await inventoryMissingForDay(lastDayJob.job_date)) {
-        navigate(`/form?edit=${lastDayJob.id}&submit=1`);
+        navigate(`/form?edit=${lastDayJob.id}&submit=1${hasManagerEntry ? `&confirmed=${ids.join(",")}` : ""}`);
         return;
       }
       const overlapWarning = selectedJobs.map((job) => jobOverlapDetails(job, jobs, t)).find(Boolean);
@@ -338,7 +354,7 @@ export default function History() {
       }
       for (const job of selectedJobs) {
         try {
-          await submitExistingJob(job);
+          await submitExistingJob(job, hasManagerEntry);
         } catch (error) {
           failedCandidate = job;
           throw error;
@@ -453,10 +469,20 @@ export default function History() {
                             <span>{j.ot}</span>
                             <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
                           </div>
-                          <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
-                            {t(`status.${j.status}`)}
-                          </Badge>
+                          <div className="flex items-center gap-1.5">
+                            {isPendingManagerEntry(j) && (
+                              <Badge variant="warning" className="uppercase tracking-wide">{t("history.badge.managerEntry")}</Badge>
+                            )}
+                            <Badge variant={statusBadgeVariant(j.status)} className="uppercase tracking-wide">
+                              {t(`status.${j.status}`)}
+                            </Badge>
+                          </div>
                         </div>
+                        {isPendingManagerEntry(j) && (
+                          <div className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                            {t("history.managerEntry.from", { name: j.manager_entry_by_name || t("audit.someone") })}
+                          </div>
+                        )}
 
                         {/* Metric pills + updated time on the same row */}
                         <div className="flex flex-wrap items-center gap-1.5">

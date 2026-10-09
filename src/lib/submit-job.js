@@ -3,7 +3,7 @@ import { withTimeout } from "./utils";
 
 // Submits one already-saved job through the atomic save_own_job RPC (shared by History and
 // the end-of-day dialog of the work form).
-export async function submitSavedJob(client, job) {
+export async function submitSavedJob(client, job, { confirmManagerEntry = false } = {}) {
   const { error } = await withTimeout(
     client.rpc("save_own_job", buildJobSaveRpcArgs({
       editId: job.id,
@@ -19,6 +19,7 @@ export async function submitSavedJob(client, job) {
       kmRetour: job.km_retour,
       overtimeEvidenceCaptured: job.overtime_evidence_captured,
       parkingReceiptCaptured: job.parking_receipt_captured,
+      confirmManagerEntry,
     })).single(),
     12000
   );

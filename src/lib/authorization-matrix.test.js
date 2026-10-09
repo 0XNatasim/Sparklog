@@ -57,6 +57,13 @@ describe("application authorization matrix", () => {
     }
   });
 
+  it("reserves the emergency timesheet for the owner role only", () => {
+    for (const role of APPLICATION_ROLES) {
+      const pages = authorizationFor({ role, adminSections: [...GRANTABLE_ADMIN_SECTIONS] }).pages;
+      expect(pages["advanced-emergency"], role).toBe(role === "owner");
+    }
+  });
+
   it("reserves sensitive NAS access for the owner", () => {
     for (const role of APPLICATION_ROLES) {
       expect(authorizationFor({ role }).canAccessSensitiveNas, role).toBe(role === "owner");
