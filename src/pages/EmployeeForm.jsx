@@ -26,6 +26,7 @@ import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-s
 import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { submitSavedJob } from "@/lib/submit-job";
+import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
 import { fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
@@ -144,6 +145,8 @@ export default function EmployeeForm() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [draftRestored, setDraftRestored] = useState(false);
+  // Set when the opened job was created by management and still needs the employee's confirmation.
+  const [managerEntryBy, setManagerEntryBy] = useState(null);
   const [warning, setWarning] = useState("");
 
   const [job_date, setJobDate] = useState(companyDate());
@@ -277,6 +280,7 @@ export default function EmployeeForm() {
       if (!data) throw new Error(t("form.errors.notFound"));
       if (data.user_id !== effectiveUserId) throw new Error(t("form.errors.notAuthorized"));
 
+      setManagerEntryBy(isPendingManagerEntry(data) ? (data.manager_entry_by_name || t("audit.someone")) : null);
       setJobDate(data.job_date || companyDate());
       setOt(data.ot || "");
       setDepart(fmtTimeHHmm(data.depart) || "");
@@ -347,6 +351,7 @@ export default function EmployeeForm() {
     setWarning("");
     setEditLoadFailed(false);
     setDirty(false);
+    setManagerEntryBy(null);
     setHasOvertimeEvidence(false);
     setParkingRequested(false);
     setHasParkingReceipt(false);
@@ -850,7 +855,18 @@ export default function EmployeeForm() {
         12000
       );
       if (error) throw error;
-      for (const job of data || []) await submitSavedJob(supabase, job);
+      // Jobs created by management are only submitted when the employee confirmed them in
+      // History (carried in ?confirmed=); otherwise they stay there awaiting validation.
+      const confirmedIds = new Set((searchParams.get("confirmed") || "").split(",").filter(Boolean));
+      let awaitingConfirmation = 0;
+      for (const job of data || []) {
+        if (isPendingManagerEntry(job) && !confirmedIds.has(job.id)) {
+          awaitingConfirmation += 1;
+          continue;
+        }
+        await submitSavedJob(supabase, job, { confirmManagerEntry: isPendingManagerEntry(job) });
+      }
+      if (awaitingConfirmation > 0) setWarning(t("form.managerEntry.skipped", { count: awaitingConfirmation }));
       setReturnStep("daySubmitted");
     } catch (error) {
       setDaySubmitError(isOfflineError(error) ? t("offline.banner") : friendlyErrorMessage(error, t, "history.errors.submitDayFailed"));
@@ -1266,6 +1282,11 @@ export default function EmployeeForm() {
                 {t("common.retry")}
               </Button>
             )}
+          </div>
+        )}
+        {managerEntryBy && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-200" role="status">
+            {t("form.managerEntry.banner", { name: managerEntryBy })}
           </div>
         )}
         {info && (

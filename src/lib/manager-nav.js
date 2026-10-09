@@ -1,8 +1,9 @@
-import { canAccessSection, isManagerRole } from "./roles";
+import { canAccessSection, isManagerRole, isOwnerRole } from "./roles";
 
 // Gestion navigation: one entry per destination, grouped for the sidebar.
 //   grant — the GRANTABLE_ADMIN_SECTIONS id that also opens the page for an office admin;
 //           null means manager/owner only (payroll, reports, settings, audit are never grantable).
+//   ownerOnly — the page is reserved to the owner role (emergency timesheet).
 // `path` is relative to #/manager. Keep ids in step with authorization-matrix.js.
 export const MANAGER_NAV = Object.freeze([
   { id: "today", labelKey: "mgr.group.today", items: [
@@ -40,6 +41,7 @@ export const MANAGER_NAV = Object.freeze([
   { id: "advanced", labelKey: "mgr.group.advanced", items: [
     { id: "advanced-audit", path: "advanced/audit", grant: null, labelKey: "mgr.nav.audit" },
     { id: "advanced-health", path: "advanced/health", grant: null, labelKey: "mgr.nav.health" },
+    { id: "advanced-emergency", path: "advanced/emergency", grant: null, ownerOnly: true, labelKey: "mgr.nav.emergency" },
   ] },
 ]);
 
@@ -47,6 +49,7 @@ export const MANAGER_NAV_ITEMS = Object.freeze(MANAGER_NAV.flatMap((group) => gr
 
 // Same rule as canAccessSection: the menu and the route guard cannot disagree.
 export function canOpenNavItem(role, adminSections, item) {
+  if (item.ownerOnly) return isOwnerRole(role);
   return item.grant ? canAccessSection(role, adminSections, item.grant) : isManagerRole(role);
 }
 

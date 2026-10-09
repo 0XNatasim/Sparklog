@@ -13,9 +13,24 @@ describe("manager navigation", () => {
     expect(new Set(MANAGER_NAV_ITEMS.map((i) => i.path)).size).toBe(MANAGER_NAV_ITEMS.length);
   });
 
-  it.each(["manager", "owner"])("shows every page to %s, starting on the live crew", (role) => {
-    expect(ids(role, [])).toHaveLength(MANAGER_NAV_ITEMS.length);
-    expect(firstAllowedPath(role, [])).toBe("live");
+  it("shows every page to the owner, starting on the live crew", () => {
+    expect(ids("owner", [])).toHaveLength(MANAGER_NAV_ITEMS.length);
+    expect(firstAllowedPath("owner", [])).toBe("live");
+  });
+
+  it("shows every page except the owner-only ones to a manager", () => {
+    const ownerOnly = MANAGER_NAV_ITEMS.filter((item) => item.ownerOnly).map((item) => item.id);
+    expect(ownerOnly).toEqual(["advanced-emergency"]);
+    expect(ids("manager", [])).toHaveLength(MANAGER_NAV_ITEMS.length - ownerOnly.length);
+    for (const id of ownerOnly) expect(ids("manager", [])).not.toContain(id);
+    expect(firstAllowedPath("manager", [])).toBe("live");
+  });
+
+  it("keeps the emergency timesheet owner-only, whatever an admin was granted", () => {
+    for (const role of ["employee", "subcontractor_1", "admin", "manager"]) {
+      expect(ids(role, [...GRANTABLE_ADMIN_SECTIONS]), role).not.toContain("advanced-emergency");
+    }
+    expect(ids("owner", [])).toContain("advanced-emergency");
   });
 
   it.each(["employee", "subcontractor_1", "admin"])("shows nothing to %s without a grant", (role) => {

@@ -26,6 +26,7 @@ import AuditLog from "@/components/AuditLog";
 import EmployeeActivityLog from "@/components/EmployeeActivityLog";
 import InfraHealthCard from "@/components/InfraHealthCard";
 import InventoryScreenshotsPanel from "@/components/InventoryScreenshotsPanel";
+import EmergencyTimesheet from "@/components/EmergencyTimesheet";
 import ManagerDashboard from "@/pages/ManagerDashboard";
 
 // #/manager → first page the user may open; old `?section=` links keep working.
@@ -70,6 +71,7 @@ export const CostsPage = () => <CostingDashboard />;
 export const CcqPage = () => <CcqRatesPanel />;
 export const DownloadsPage = () => <ManagerDownloads />;
 export const HealthPage = () => <InfraHealthCard />;
+export const EmergencyPage = () => <EmergencyTimesheet />;
 
 // ── Paie: Méthode (Messier / Référence) is a page-level choice kept in the URL ──
 const METHODS = ["messier", "book"];
