@@ -26,6 +26,7 @@ import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-s
 import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { submitSavedJob } from "@/lib/submit-job";
+import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
 import { fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
@@ -40,46 +41,6 @@ import {
 } from "@/components/ui/dialog";
 
 dayjs.locale("en");
-
-function parseExtractedText(text) {
-  const out = {};
-
-  const ot = text.match(/OT[\s\-_:]*(\d{4,8})/i);
-  if (ot) out.ot = ot[1];
-
-  const dates = [...text.matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)];
-  if (dates.length) {
-    const [, dd, mm, yyyy] = dates[0];
-    out.job_date = `${yyyy}-${mm}-${dd}`;
-  }
-
-  const labelTime = (labelRegex) => {
-    const m = text.match(labelRegex);
-    if (!m) return null;
-    const tail = text.slice(m.index, m.index + 200);
-    const t = tail.match(/\b([01]?\d|2[0-3])[:hH]([0-5]\d)\b/);
-    return t ? `${String(t[1]).padStart(2, "0")}:${t[2]}` : null;
-  };
-
-  // Labels are matched in both the French and the English variants of the
-  // source work-order app (it can be displayed in either language).
-  const depart = labelTime(/(?:Heure\s+de\s+d[eé]but|Start\s*Time)/i);
-  if (depart) out.depart = depart;
-
-  const fin = labelTime(/(?:Heure\s+de\s+fin|End\s*Time)/i);
-  if (fin) out.fin = fin;
-
-  const arrivee = labelTime(/(?:Heure\s+d['’]?\s*arriv[eé]e|(?:Actual\s+)?Arrival\s*Time)/i);
-  if (arrivee) out.arrivee = arrivee;
-
-  // Handles "Distance parcourue", "Distance réelle parcourue (km)" and the
-  // English "Distance travelled". The optional words between "Distance" and
-  // the keyword are skipped, then the first number after it is the value.
-  const km = text.match(/Distance[^\n\d]*?(?:parcourue|travell?ed)[^\d]*?(\d+(?:[.,]\d+)?)/i);
-  if (km) out.km_aller = Math.round(parseFloat(km[1].replace(",", ".")));
-
-  return out;
-}
 
 function fmtTimeHHmm(t) {
   if (!t) return "";
@@ -1133,77 +1094,6 @@ export default function EmployeeForm() {
     }
   }
 
-  async function compressImage(file, maxEdge = 1600, quality = 0.7) {
-    const url = URL.createObjectURL(file);
-    try {
-      // A very large image, an odd format, or memory pressure on a phone can make
-      // decoding stall forever (onload/onerror never fire). Bound it so the whole
-      // evidence flow can't freeze on image prep — fall back to the original file.
-      const img = await withTimeout(
-        new Promise((resolve, reject) => {
-          const i = new Image();
-          i.onload = () => resolve(i);
-          i.onerror = () => reject(new Error("image_decode_failed"));
-          i.src = url;
-        }),
-        15000
-      );
-      const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      const blob = await withTimeout(
-        new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality)),
-        15000
-      );
-      // toBlob can hand back null (unsupported/again memory pressure); never upload null.
-      return blob || file;
-    } catch (error) {
-      console.warn("[compressImage] falling back to original file:", error?.message || error);
-      return file; // upload the original rather than dead-ending the evidence flow
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  async function ocrSpaceExtract(file) {
-    const apiKey = import.meta.env.VITE_OCR_SPACE_API_KEY || "helloworld";
-    const blob = await compressImage(file);
-    const fd = new FormData();
-    fd.append("file", blob, "job.jpg");
-    fd.append("language", "fre");
-    fd.append("OCREngine", "2");
-    fd.append("scale", "true");
-    fd.append("isTable", "true");
-
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
-    let res;
-    try {
-      res = await fetch("https://api.ocr.space/parse/image", {
-        method: "POST",
-        headers: { apikey: apiKey },
-        body: fd,
-        signal: controller.signal,
-      });
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-    if (!res.ok) throw new Error(`ocr.space HTTP ${res.status}`);
-    const json = await res.json();
-    if (json?.IsErroredOnProcessing) {
-      throw new Error(
-        Array.isArray(json.ErrorMessage) ? json.ErrorMessage.join("; ") : String(json.ErrorMessage || "ocr.space error")
-      );
-    }
-    const text = (json?.ParsedResults || []).map((r) => r?.ParsedText || "").join("\n");
-    if (!text.trim()) throw new Error("ocr.space returned no text");
-    return text;
-  }
-
   async function handleExtractFromImage(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -1214,15 +1104,7 @@ export default function EmployeeForm() {
     setExtracting(true);
 
     try {
-      let text = "";
-      try {
-        text = await ocrSpaceExtract(file);
-      } catch (apiErr) {
-        console.warn("ocr.space failed, falling back to Tesseract:", apiErr);
-        const { default: Tesseract } = await import("tesseract.js");
-        const { data: ocr } = await Tesseract.recognize(file, "fra+eng");
-        text = ocr?.text || "";
-      }
+      const text = await extractWorkOrderText(file);
 
       const d = parseExtractedText(text);
 

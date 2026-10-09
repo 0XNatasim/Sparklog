@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { BellRing, FilePlus2 } from "lucide-react";
+import { BellRing, Camera, FilePlus2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { notifyBroadcastPush } from "@/lib/push";
 import { formatHM, hoursBetween } from "@/lib/time";
 import { useT } from "@/lib/use-t";
+import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
 import { withRetry, withTimeout } from "@/lib/utils";
 
 const ELIGIBLE_ROLES = ["employee", "admin", "subcontractor_1"];
@@ -41,6 +42,8 @@ export default function EmergencyTimesheet() {
   const [pendingOnly, setPendingOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [remindingId, setRemindingId] = useState(null);
+  const [extracting, setExtracting] = useState(false);
+  const imageInputRef = useRef(null);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [showErrors, setShowErrors] = useState(false);
@@ -136,6 +139,42 @@ export default function EmergencyTimesheet() {
     }
   }
 
+  // Same screenshot reader as the employee form ("Remplir auto"): date, OT, times and km.
+  async function handleAutofill(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || extracting) return;
+    setError("");
+    setInfo("");
+    setExtracting(true);
+    try {
+      const parsed = parseExtractedText(await extractWorkOrderText(file));
+      const hasKm = parsed.km_aller !== null && parsed.km_aller !== undefined;
+      if (!parsed.job_date && !parsed.ot && !parsed.depart && !parsed.arrivee && !parsed.fin && !hasKm) {
+        setError(t("emergency.autofill.nothingFound"));
+        return;
+      }
+      setForm((current) => ({
+        ...current,
+        ...(parsed.job_date ? { jobDate: parsed.job_date } : {}),
+        ...(parsed.ot ? { ot: String(parsed.ot) } : {}),
+        ...(parsed.depart ? { depart: parsed.depart } : {}),
+        ...(parsed.arrivee ? { arrivee: parsed.arrivee } : {}),
+        ...(parsed.fin ? { fin: parsed.fin } : {}),
+        ...(hasKm ? { km: String(parsed.km_aller) } : {}),
+      }));
+      if (parsed.job_date && (parsed.job_date < range.min || parsed.job_date > range.max)) {
+        setError(t("emergency.errors.dateWindow"));
+      } else {
+        setInfo(t(hasKm ? "emergency.autofill.done" : "emergency.autofill.doneNoKm"));
+      }
+    } catch (extractError) {
+      setError(friendlyErrorMessage(extractError, t, "form.errors.extractFailed"));
+    } finally {
+      setExtracting(false);
+    }
+  }
+
   async function remind(entry) {
     if (remindingId) return;
     setRemindingId(entry.id);
@@ -178,6 +217,15 @@ export default function EmergencyTimesheet() {
           )}
 
           <form onSubmit={createEntry} className="grid gap-3 sm:grid-cols-2" noValidate>
+            <div className="sm:col-span-2">
+              <Button type="button" variant="secondary" className="h-12 w-full text-base font-semibold"
+                disabled={busy || extracting} onClick={() => imageInputRef.current?.click()}>
+                <Camera className="mr-2 h-5 w-5" aria-hidden="true" />
+                {extracting ? t("common.extracting") : t("form.buttons.autofill")}
+              </Button>
+              <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleAutofill} />
+              <p className="mt-1 text-center text-xs text-muted-foreground">{t("emergency.autofill.hint")}</p>
+            </div>
             <div className="grid gap-1.5 sm:col-span-2">
               <Label htmlFor="em-employee">{t("emergency.employee")}</Label>
               <Select id="em-employee" value={form.employeeId} onChange={setField("employeeId")} disabled={busy} aria-invalid={invalid("employee")}
