@@ -11,12 +11,11 @@ export const MANAGER_NAV = Object.freeze([
   { id: "time", labelKey: "mgr.group.time", items: [
     { id: "timesheets", path: "timesheets", grant: "timesheet", labelKey: "mgr.nav.timesheets" },
     { id: "receipts", path: "receipts", grant: "notifications", labelKey: "mgr.nav.receipts" },
-    { id: "inventory", path: "inventory", grant: null, labelKey: "mgr.nav.inventory" },
   ] },
   { id: "team", labelKey: "mgr.group.team", items: [
     { id: "employees", path: "employees", grant: "employees", labelKey: "mgr.nav.employees" },
     { id: "absences", path: "absences", grant: null, labelKey: "mgr.nav.absences" },
-    { id: "forms", path: "forms", grant: "forms", labelKey: "mgr.nav.forms" },
+    { id: "inventory", path: "inventory", grant: null, labelKey: "mgr.nav.inventory" },
   ] },
   { id: "payroll", labelKey: "mgr.group.payroll", items: [
     { id: "payroll-calcul", path: "payroll/calcul", grant: null, labelKey: "mgr.nav.calcul" },
@@ -36,6 +35,7 @@ export const MANAGER_NAV = Object.freeze([
   { id: "config", labelKey: "mgr.group.config", items: [
     { id: "config-rules", path: "config/rules", grant: "employees", labelKey: "mgr.nav.rules" },
     { id: "config-settings", path: "config/settings", grant: null, labelKey: "mgr.nav.settings" },
+    { id: "forms", path: "forms", grant: "forms", labelKey: "mgr.nav.forms" },
   ] },
   { id: "advanced", labelKey: "mgr.group.advanced", items: [
     { id: "advanced-audit", path: "advanced/audit", grant: null, labelKey: "mgr.nav.audit" },

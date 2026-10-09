@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
 import {
-  MANAGER_NAV_ITEMS, canOpenNavItem, findNavItem, firstAllowedPath, legacySectionTarget, visibleManagerNav,
+  MANAGER_NAV, MANAGER_NAV_ITEMS, canOpenNavItem, findNavItem, firstAllowedPath, legacySectionTarget, visibleManagerNav,
 } from "./manager-nav";
 import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
 
@@ -30,6 +30,14 @@ describe("manager navigation", () => {
     }
     expect(menu).toEqual(expect.arrayContaining(["live", "timesheets", "receipts", "employees", "forms", "messages", "config-rules"]));
     expect(menu).not.toContain("absences");
+  });
+
+  it("groups Inventory under Team and Forms under Configuration, next to Settings", () => {
+    const groupOf = (id) => MANAGER_NAV.find((group) => group.items.some((item) => item.id === id))?.id;
+    expect(groupOf("inventory")).toBe("team");
+    expect(groupOf("forms")).toBe("config");
+    const config = MANAGER_NAV.find((group) => group.id === "config").items.map((item) => item.id);
+    expect(config.indexOf("forms")).toBe(config.indexOf("config-settings") + 1);
   });
 
   it("keeps the inventory screenshots page manager-only", () => {
