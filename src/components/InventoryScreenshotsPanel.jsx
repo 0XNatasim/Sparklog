@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { ChevronLeft, ChevronRight, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { INVENTORY_BUCKET, INVENTORY_SLOTS } from "@/lib/inventory-screenshots";
-import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "@/lib/inventory-items";
+import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay, sumCrewInventory } from "@/lib/inventory-items";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -42,6 +42,7 @@ export default function InventoryScreenshotsPanel() {
   const [hideZero, setHideZero] = useState(true);
   // Comparison with the employee's previous inventory day: { personId, date, status, data }.
   const [compare, setCompare] = useState(null);
+  const [crewOpen, setCrewOpen] = useState(false);
   const [rereadBusy, setRereadBusy] = useState(false);
   const [requestedAt, setRequestedAt] = useState({});
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -153,6 +154,9 @@ export default function InventoryScreenshotsPanel() {
     }
   }
 
+  const crew = useMemo(() => sumCrewInventory(entries), [entries]);
+  const crewRows = crew.rows.filter((row) => !(hideZero && row.total === 0));
+
   const received = entries.filter((entry) => entry.state !== "missing").length;
   const shiftDay = (days) => setDate((current) => dayjs(current).add(days, "day").format("YYYY-MM-DD"));
 
@@ -205,6 +209,9 @@ export default function InventoryScreenshotsPanel() {
           <Button type="button" variant="ghost" size="sm" disabled={date === companyDate()} onClick={() => setDate(companyDate())}>{t("mgr.inventory.today")}</Button>
           <div className="ml-auto flex items-center gap-3">
             {entries.length > 0 && <span className="text-sm text-muted-foreground">{t("mgr.inventory.received", { received, total: entries.length })}</span>}
+            <Button type="button" variant="outline" size="sm" disabled={crew.counted === 0} onClick={() => setCrewOpen(true)}>
+              <Users className="mr-1 h-4 w-4" />{t("mgr.inventory.crew")}
+            </Button>
             <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>
@@ -352,6 +359,47 @@ export default function InventoryScreenshotsPanel() {
               </Tabs>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={crewOpen} onOpenChange={setCrewOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("mgr.inventory.crewTitle", { date: dayjs(date).format("YYYY-MM-DD") })}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">{t("mgr.inventory.crewCounted", { count: crew.counted, items: crew.rows.length })}</span>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={hideZero} onChange={(event) => setHideZero(event.target.checked)} className="h-4 w-4 accent-primary" />
+                {t("mgr.inventory.hideZero")}
+              </label>
+            </div>
+            {crew.unverified.length > 0 && (
+              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                {t("mgr.inventory.crewUnverified", { names: crew.unverified.join(", ") })}
+              </p>
+            )}
+            <div className="overflow-hidden rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colTotal")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colHolders")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {crewRows.map((row) => (
+                    <tr key={row.code}>
+                      <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{row.code}</div></td>
+                      <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.total === 0 && "text-muted-foreground")}>{Number(row.total).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{row.holders}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
       {confirmDialog}

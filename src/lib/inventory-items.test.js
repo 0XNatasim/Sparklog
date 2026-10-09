@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { sumCrewInventory, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
@@ -102,6 +102,32 @@ describe("summarizeInventoryDay", () => {
 
   it("never calls a list verified when a screenshot needed review", () => {
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "needs_review" })], rows(17)).state).toBe("review");
+  });
+});
+
+describe("sumCrewInventory", () => {
+  const item = (code, quantity, name = `Item ${code}`) => ({ code, name, quantity });
+  const ok = (name, items) => ({ name, state: "ok", items });
+
+  it("sums each equipment code over all employees and counts who holds it", () => {
+    const { rows, counted, unverified } = sumCrewInventory([
+      ok("A", [item("EQ000001", 5), item("EQ000002", 0)]),
+      ok("B", [item("EQ000001", 12.5), item("EQ000003", 2)]),
+    ]);
+    expect(counted).toBe(2);
+    expect(unverified).toEqual([]);
+    expect(rows.find((row) => row.code === "EQ000001")).toMatchObject({ total: 17.5, holders: 2 });
+    expect(rows.find((row) => row.code === "EQ000002")).toMatchObject({ total: 0, holders: 0 });
+  });
+
+  it("flags employees whose list is not verified, so totals are not read as complete", () => {
+    const { counted, unverified } = sumCrewInventory([
+      ok("A", [item("EQ000001", 1)]),
+      { name: "B", state: "review", items: [item("EQ000001", 2)] },
+      { name: "C", state: "missing", items: [] },
+    ]);
+    expect(counted).toBe(2);
+    expect(unverified).toEqual(["B", "C"]);
   });
 });
 
