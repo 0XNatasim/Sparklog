@@ -14,6 +14,7 @@ const CODE_MESSAGES = [
   [/manager_entry_note_required/i, "emergency.errors.note"],
   [/manager_entry_ot_required/i, "emergency.errors.ot"],
   [/reminder_too_soon/i, "emergency.errors.reminderTooSoon"],
+  [/job_state_changed/i, "emergency.errors.deleteStateChanged"],
   [/owner_role_required/i, "emergency.errors.ownerOnly"],
   [/job_not_editable/i, "form.errors.notEditable"],
   [/entry deadline for this work date has passed/i, "form.errors.dayClosed"],
