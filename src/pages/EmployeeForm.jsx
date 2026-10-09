@@ -28,6 +28,7 @@ import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { submitSavedJob } from "@/lib/submit-job";
 import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
+import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
 import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
 import { fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
@@ -159,6 +160,9 @@ export default function EmployeeForm() {
   // Administration (office, non-CCQ) employees log a simplified timesheet: no
   // auto-fill, no Arrivée, "Départ" is labelled "Début", and no kilometres.
   const [officeEmployee, setOfficeEmployee] = useState(false);
+  // "First trip unpaid" employees reach the 8 h overtime-screenshot threshold on PAID time.
+  // Until the profile loads this stays false, i.e. the stricter gross-time rule applies.
+  const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
   const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
   const [draftReady, setDraftReady] = useState(false);
@@ -368,12 +372,13 @@ export default function EmployeeForm() {
 
   useEffect(() => {
     if (!effectiveUserId) return;
-    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled").eq("id", effectiveUserId).single().then(({ data, error }) => {
+    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled, first_trip_unpaid").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
         setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.errors.failedLoad"));
         return;
       }
       setOfficeEmployee(isAdminEmployee(data?.role));
+      setFirstTripUnpaid(Boolean(data?.first_trip_unpaid));
       setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled));
       const enabled = Boolean(data?.parking_receipts_enabled);
       setParkingReceiptsEnabled(enabled);
@@ -847,7 +852,7 @@ export default function EmployeeForm() {
       // Retry (with a session refresh + backoff) so a Supabase free-tier cold
       // start doesn't fail the check on the first slow attempt.
       const { data: dayJobs } = await withRetry(
-        () => supabase.from("jobs").select("id, depart, fin, overtime_evidence_captured").eq("user_id", user.id).eq("job_date", job_date),
+        () => supabase.from("jobs").select("id, depart, arrivee, fin, overtime_evidence_captured").eq("user_id", user.id).eq("job_date", job_date),
         8000,
         { retries: 2 }
       );
@@ -873,7 +878,12 @@ export default function EmployeeForm() {
       // crosses 8h asks for it (the once-per-day guard above prevents a second
       // prompt, and the manager also sees an "8h+, no evidence" flag at approval
       // as a backstop for jobs that were entered out of order).
-      return fullDayMinutes > 480;
+      // With the "first trip unpaid" option the threshold counts paid time: the day's
+      // first Départ→Arrivée trip is removed (same rule as the payroll and the database).
+      const unpaidTrip = firstTripUnpaid
+        ? dayFirstTripUnpaidMinutes([...others, { id: editId || "current", depart, arrivee, fin }])
+        : 0;
+      return fullDayMinutes - unpaidTrip > 480;
     } catch (error) {
       // Submission must fail closed: without the other jobs we cannot prove that
       // the complete day is at or below 8 h.
