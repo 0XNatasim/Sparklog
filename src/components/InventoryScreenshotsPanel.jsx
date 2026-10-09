@@ -171,7 +171,7 @@ export default function InventoryScreenshotsPanel() {
 
   async function toggleCompare() {
     if (!open) return;
-    if (compare) { setCompare(null); return; }
+    if (compare?.status === "ready" || compare?.status === "loading") { setCompare(null); return; }
     const personId = open.person.id;
     setCompare({ personId, status: "loading" });
     try {
@@ -274,7 +274,7 @@ export default function InventoryScreenshotsPanel() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm font-medium">{t("mgr.inventory.itemCount", { count: open.count })}</span>
                         <div className="flex flex-wrap items-center gap-3">
-                          <Button type="button" variant={compare ? "default" : "outline"} size="sm" aria-pressed={Boolean(compare)} disabled={compare?.status === "loading"} onClick={toggleCompare}>
+                          <Button type="button" variant={compare?.status === "ready" ? "default" : "outline"} size="sm" aria-pressed={compare?.status === "ready"} disabled={compare?.status === "loading"} onClick={toggleCompare}>
                             {compare?.status === "loading" ? t("common.loading") : t("mgr.inventory.compare")}
                           </Button>
                           <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -283,7 +283,7 @@ export default function InventoryScreenshotsPanel() {
                           </label>
                         </div>
                       </div>
-                      {compare?.status === "none" && <p className="text-sm text-muted-foreground">{t("mgr.inventory.compareNone")}</p>}
+                      {compare?.status === "none" && <p className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">{t("mgr.inventory.compareNone")}</p>}
                       {compare?.status === "failed" && <p className="text-sm text-destructive dark:text-red-300" role="alert">{t("mgr.inventory.compareFailed")}</p>}
                       <div className="overflow-hidden rounded-md border">
                         <table className="w-full text-sm">

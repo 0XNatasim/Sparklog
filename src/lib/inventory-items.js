@@ -40,7 +40,9 @@ export function summarizeInventoryDay(shots, rows, slotCount = 3) {
   else if (shots.length < slotCount) state = "partial";
   else if (shots.some((shot) => shot.ocr_status === "pending")) state = "reading";
   else if (!items.length) state = "photos";
-  else if (expected !== null && items.length === expected && shots.every((shot) => shot.ocr_status === "processed")) state = "ok";
+  // The list is complete when the merged readings match the total the app itself shows ("N de N"),
+  // even if a screenshot also held a fragment that could not be parsed.
+  else if (expected !== null && items.length === expected) state = "ok";
   else state = "review";
   return { state, items, count: items.length, expected, captures: shots?.length || 0 };
 }
