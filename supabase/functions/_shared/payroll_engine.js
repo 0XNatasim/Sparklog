@@ -221,6 +221,9 @@ export function calculateDailyTotals(jobs, options) {
   return days;
 }
 
+// `dailyWorkMinutes` is the day's PAID work: for an employee with the "first trip unpaid"
+// option, pass the span minus dayFirstTripUnpaidMinutes (the database twin is
+// reconcile_overtime_meal, migration 0077).
 export function isMealEligible({ jobDate, dailyWorkMinutes }) {
   const weekday = dayOfWeek(jobDate);
   return weekday !== null && weekday !== 0 && weekday !== 6 && Math.max(0, dailyWorkMinutes - 480) >= 135;
