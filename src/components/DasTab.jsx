@@ -130,7 +130,7 @@ export default function DasTab({ messier = false }) {
         if (!approved.length) continue;
         let talon = null;
         try {
-          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", weekDate: w.start.format("YYYY-MM-DD"), messierMethod: messier });
+          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", includePhone: true, weekDate: w.start.format("YYYY-MM-DD"), messierMethod: messier });
         } catch { /* skip */ }
         if (!talon) continue;
         const emp = talon.result.employee, empr = talon.result.employer, das = talon.result.das;

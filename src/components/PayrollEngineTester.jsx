@@ -293,6 +293,7 @@ export default function PayrollEngineTester({ messier = false }) {
         baseRate: Number(profile.hourly_rate) || 0,
         premium: Number(profile.team_leader_premium) || 0,
         kmRate: Number(profile.km_rate) || 0,
+        phone: Number(profile.phone_data_reimbursement) || 0,
       }));
     }
     // CCQ level + union come from the employee's profile (no manual selection):

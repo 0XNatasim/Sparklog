@@ -131,7 +131,7 @@ export default function TalonTab({ messier = false }) {
   function openTalon(profile, week, jobs) {
     try {
       const opening = openingFor(profile.id, week.start);
-      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
+      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", includePhone: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
       // Reference is assigned at comptabilisation only; blank for an aperçu.
       const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
       const reference = formatTalonRef(ledgerRow?.talon_seq);
@@ -177,7 +177,7 @@ export default function TalonTab({ messier = false }) {
       if (st.kind !== "comptabilise" && st.kind !== "apercu") continue;
       try {
         const opening = openingFor(profile.id, week.start);
-        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
+        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", includePhone: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
         const model = buildStubModel({ result: talon.result, ytd: opening, pay: talon.pay, reimb: talon.reimb, ccq: talon.ccqAmounts });
         if (!model) continue;
         const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);

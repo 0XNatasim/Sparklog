@@ -9,7 +9,7 @@ import Fold from "@/components/ui/fold";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { isManagerRole, isSubcontractorRole } from "@/lib/roles";
+import { isAdminEmployee, isManagerRole, isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 
 const montrealDate = companyDate;
 
@@ -33,7 +33,7 @@ export default function TimeRulesManager() {
   async function load() {
     // Deadline, evidence retention and the CCQ calendar live in Réglage.
     const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_overtime_no_benefits").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_overtime_no_benefits, km_rate, phone_data_reimbursement, storage_compensation").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
     ]);
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
@@ -138,6 +138,28 @@ export default function TimeRulesManager() {
     }
   }
 
+  // Per-employee reimbursements (km rate, weekly phone data). Edited locally, saved on blur;
+  // an empty field saves the column default meaning (no km rate / no phone reimbursement).
+  function setPayRuleLocal(id, field, value) {
+    setPayRuleRows((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
+  }
+
+  async function savePayAmount(id, field, rawValue) {
+    const text = String(rawValue ?? "").trim().replace(",", ".");
+    const value = text === "" ? (field === "km_rate" ? null : 0) : Number(text);
+    if (value != null && (Number.isNaN(value) || value < 0)) {
+      setMessage(t("timeRules.payRules.invalidAmount"));
+      return;
+    }
+    const { error } = await supabase.from("profiles").update({ [field]: value }).eq("id", id);
+    if (error) {
+      setMessage(error.message);
+      await load();
+    } else {
+      setMessage(t("timeRules.payRules.saved"));
+    }
+  }
+
   async function removeTeamLeader(id) {
     setTeamLeaderBusy(true);
     const { error } = await supabase.from("profiles").update({ team_leader_premium: 0 }).eq("id", id);
@@ -200,6 +222,9 @@ export default function TimeRulesManager() {
             <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
               {payRuleRows.map((row) => {
                 const fixed = isSubcontractorRole(row.role);
+                // Office (admin) employees have no km/phone reimbursement; storage is CCQ-only.
+                const reimbursable = !isAdminEmployee(row.role);
+                const storageEligible = !isNonCcqRole(row.role);
                 const rules = [
                   { field: "first_trip_unpaid", label: t("settings.firstTrip.title"), hint: t("settings.firstTrip.help"), locked: false },
                   { field: "return_overtime_no_benefits", label: t("employees.returnNoBenefits"), hint: t("employees.returnNoBenefitsHint"), locked: fixed },
@@ -222,6 +247,37 @@ export default function TimeRulesManager() {
                         </label>
                       ))}
                     </div>
+                    {reimbursable && (
+                      <div className="mt-1 grid gap-1 md:grid-cols-3">
+                        <label className="flex items-center justify-between gap-3 rounded border bg-background px-2 py-1.5 text-xs">
+                          <span>{t("employees.kmRate")}</span>
+                          <span className="flex items-center gap-1">
+                            <span className="text-muted-foreground">$</span>
+                            <Input type="number" step="0.01" min="0" max="9.99" inputMode="decimal" value={row.km_rate ?? ""} onChange={(e) => setPayRuleLocal(row.id, "km_rate", e.target.value)} onBlur={(e) => savePayAmount(row.id, "km_rate", e.target.value)} placeholder="0.65" className="h-8 w-20 text-right font-mono" />
+                            <span className="text-muted-foreground">/km</span>
+                          </span>
+                        </label>
+                        <label title={t("employees.phoneDataHint")} className="flex items-center justify-between gap-3 rounded border bg-background px-2 py-1.5 text-xs">
+                          <span>{t("employees.phoneData")}</span>
+                          <span className="flex items-center gap-1">
+                            <span className="text-muted-foreground">$</span>
+                            <Input type="number" step="0.01" min="0" inputMode="decimal" value={row.phone_data_reimbursement ?? ""} onChange={(e) => setPayRuleLocal(row.id, "phone_data_reimbursement", e.target.value)} onBlur={(e) => savePayAmount(row.id, "phone_data_reimbursement", e.target.value)} placeholder="7.00" className="h-8 w-20 text-right font-mono" />
+                            <span className="text-muted-foreground">/{t("employees.perWeek")}</span>
+                          </span>
+                        </label>
+                        {storageEligible && (
+                          <label className="flex cursor-pointer items-center justify-between gap-3 rounded border bg-background px-2 py-2 text-xs">
+                            <span>{t("employees.storage")} <b className="text-primary">$50</b></span>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(row.storage_compensation)}
+                              onChange={(e) => setPayRule(row.id, "storage_compensation", e.target.checked)}
+                              className="h-5 w-5 shrink-0 rounded border-input accent-primary"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

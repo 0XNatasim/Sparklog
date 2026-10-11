@@ -129,6 +129,8 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const unionDuesFederalAnnual = (ccqAmounts.federalDeduction || 0) * (PAY_PERIODS_PER_YEAR[frequency] || 52);
 
   const kmReimb = pay.km * pay.kmRate;
+  // Weekly cell-phone data reimbursement (profiles.phone_data_reimbursement, set per employee in
+  // Règles de temps). Paid once per worked week; non-taxable, so it only adds to the paid amount.
   const phoneReimb = includePhone ? (Number(profile?.phone_data_reimbursement) || 0) : 0;
   const safety = ccqAmounts.safetyEquipment || 0;
   const reimb = { km: kmReimb, phone: phoneReimb, safety, total: kmReimb + phoneReimb + safety };
