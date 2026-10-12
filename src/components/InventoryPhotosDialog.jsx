@@ -43,7 +43,7 @@ export default function InventoryPhotosDialog({ date, userId, onClose }) {
         <DialogHeader>
           <DialogTitle>{t("history.inventory.dialogTitle", { date: date || "" })}</DialogTitle>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive dark:text-red-300" role="alert">{error}</p>}
+        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         {!error && photos === null && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
         {photos && (
           <div className="grid gap-3 sm:grid-cols-3">

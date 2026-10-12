@@ -19,9 +19,9 @@ export function jobCodeKind(ot) {
 export function jobCodeTintClass(ot) {
   switch (jobCodeKind(ot)) {
     case "admin":
-      return "bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-900";
+      return "bg-info/10 border-info/30";
     case "project":
-      return "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900";
+      return "bg-success/10 border-success/30";
     default:
       return "";
   }

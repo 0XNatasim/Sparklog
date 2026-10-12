@@ -913,17 +913,17 @@ export default function ManagerDashboard({ view = "timesheet" }) {
     const canApprove = j.status === "submitted";
 
     return (
-      <Card key={j.id} id={`job-${j.id}`} className={cn(dateBands.get(j.job_date) === 1 && "bg-slate-100 dark:bg-slate-800/70", jobCodeTintClass(j.ot), focusedJobId === j.id && "ring-2 ring-red-500")}>
+      <Card key={j.id} id={`job-${j.id}`} className={cn(dateBands.get(j.job_date) === 1 && "bg-slate-100 dark:bg-slate-800/70", jobCodeTintClass(j.ot), focusedJobId === j.id && "ring-2 ring-destructive")}>
         <CardContent className="p-3">
           {/* Mobile: stacked. Desktop: single-row inline list. */}
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
             {/* OT + date */}
             <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
-              <span><span className="text-emerald-700 dark:text-emerald-400">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
+              <span><span className="text-success">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
               <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
               {dayOvertimeNoEvidence && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
+                  className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-semibold text-warning"
                   title={t("manager.overtimeNoEvidenceHint")}
                 >
                   <TriangleAlert className="h-3 w-3" />{t("manager.overtimeNoEvidence")}
@@ -1004,7 +1004,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
             {t("history.depart")}: {fmtTimeHHmm(j.depart)} • {t("history.arrival")}: {fmtTimeHHmm(j.arrivee)} • {t("history.end")}: {fmtTimeHHmm(j.fin)}
           </div>
           {focusedJobId === j.id && focusedEvidence && (
-            <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+            <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
               <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
               {focusedEvidence.imageUrl && <img src={focusedEvidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-80 w-full rounded-md border object-contain" />}
             </div>
@@ -1049,9 +1049,9 @@ export default function ManagerDashboard({ view = "timesheet" }) {
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
-          {evidence?.daily_minutes ? <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHM(evidence.daily_minutes / 60)}</b></span> : null}
-          {receipt ? <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt.amount || 0).toFixed(2)}</b></span> : null}
-          {hasMeal ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">{t("manager.notifications.supper")}: <b>$30.00</b></span> : null}
+          {evidence?.daily_minutes ? <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHM(evidence.daily_minutes / 60)}</b></span> : null}
+          {receipt ? <span className="rounded-full border border-info/30 bg-info/10 px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt.amount || 0).toFixed(2)}</b></span> : null}
+          {hasMeal ? <span className="rounded-full border border-success/30 bg-success/10 px-2 py-1">{t("manager.notifications.supper")}: <b>$30.00</b></span> : null}
           {job.status === "submitted" && <Button type="button" size="sm" className="ml-auto" disabled={actionLoadingId === job.id} onClick={() => approve(job.id)}>{actionLoadingId === job.id ? t("common.working") : t("manager.notifications.approveJob")}</Button>}
         </div>
         {isParkingVisible && <div className="rounded-lg border p-3">{receipt?.imageUrl ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /> : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
@@ -1077,7 +1077,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
           <div className="space-y-3">
             <Card><CardContent className="space-y-3 p-4"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select></CardContent></Card>
             {(overtimeLoading || parkingLoading || notificationMealsLoading) && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
-            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{err}</div>}
+            {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{err}</div>}
             {!overtimeLoading && !parkingLoading && !notificationMealsLoading && notificationJobs.map(renderNotificationCard)}
             {!overtimeLoading && !parkingLoading && !notificationMealsLoading && notificationJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.notifications.empty")}</CardContent></Card>}
           </div>
@@ -1253,7 +1253,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
           const visible = anomalies.filter((anomaly) => employeeId === "all" || anomaly.userId === employeeId);
           if (anomaliesFailed) {
             return (
-              <div className="rounded-md border-2 border-red-500 bg-red-50 px-3 py-2 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-200">
+              <div className="rounded-md border-2 border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {t("manager.anomalies.loadFailed")}
               </div>
             );
@@ -1261,19 +1261,19 @@ export default function ManagerDashboard({ view = "timesheet" }) {
           if (visible.length === 0) return null;
           const shown = showAllAnomalies ? visible : visible.slice(0, 8);
           return (
-            <section className="rounded-lg border-2 border-red-500 bg-red-50 p-3 text-red-900 dark:bg-red-950/40 dark:text-red-200" aria-live="polite">
+            <section className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-destructive" aria-live="polite">
               <div className="flex items-center gap-2 font-semibold">
                 <TriangleAlert className="h-5 w-5 shrink-0" />
                 {t("manager.anomalies.title", { count: visible.length })}
               </div>
               <p className="mt-1 text-xs opacity-80">{t("manager.anomalies.hint")}</p>
-              <ul className="mt-2 divide-y divide-red-200 dark:divide-red-900">
+              <ul className="mt-2 divide-y divide-destructive/30">
                 {shown.map((anomaly) => (
                   <li key={anomaly.key}>
                     <button
                       type="button"
                       onClick={() => openAnomaly(anomaly)}
-                      className="flex w-full flex-wrap items-baseline gap-x-2 py-1.5 text-left text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                      className="flex w-full flex-wrap items-baseline gap-x-2 py-1.5 text-left text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
                     >
                       <b>{employeeLabel(anomaly.userId)}</b>
                       <span className="tabular-nums">{dayjs(anomaly.jobDate).format("DD MMM YYYY")}</span>
@@ -1283,7 +1283,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
                 ))}
               </ul>
               {visible.length > 8 && (
-                <Button type="button" size="sm" variant="ghost" className="mt-1 h-7 px-2 text-xs text-red-900 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900/40" onClick={() => setShowAllAnomalies((value) => !value)}>
+                <Button type="button" size="sm" variant="ghost" className="mt-1 h-7 px-2 text-xs text-destructive hover:bg-destructive/10" onClick={() => setShowAllAnomalies((value) => !value)}>
                   {showAllAnomalies ? t("manager.anomalies.showLess") : t("manager.anomalies.showAll", { count: visible.length })}
                 </Button>
               )}
@@ -1293,7 +1293,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
 
         {loading && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
             <span>{err}</span>
             <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
               {t("common.retry")}

@@ -382,7 +382,7 @@ export default function History() {
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
         )}
         {err && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
             <span>{err}</span>
             <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
               {t("common.retry")}
@@ -418,7 +418,7 @@ export default function History() {
                     return (
                       <>
                         <div
-                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${badge === "done" ? "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-300" : "border-destructive/40 bg-destructive/10 text-destructive dark:text-red-300"}`}
+                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${badge === "done" ? "border-success/40 bg-success/10 text-success " : "border-destructive/40 bg-destructive/10 text-destructive "}`}
                           title={t(badge === "done" ? "history.inventory.doneTitle" : "history.inventory.missingTitle", { count })}
                         >
                           {t("history.inventory.label")}
@@ -485,7 +485,7 @@ export default function History() {
                           </div>
                         </div>
                         {isPendingManagerEntry(j) && (
-                          <div className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                          <div className="text-xs font-medium text-warning">
                             {t("history.managerEntry.from", { name: j.manager_entry_by_name || t("audit.someone") })}
                           </div>
                         )}

@@ -66,11 +66,11 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   }, [people, jobs, timeOff, days]);
 
   function cellClass(cell) {
-    if (cell.status === "submitted") return "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
-    if (cell.status === "saved") return "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300";
-    if (cell.off) return "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+    if (cell.status === "submitted") return "border-success/40 bg-success/15 text-success";
+    if (cell.status === "saved") return "border-warning/40 bg-warning/15 text-warning";
+    if (cell.off) return "border-info/30 bg-info/10 text-info";
     const weekday = dayjs(cell.date).day();
-    if (cell.date < today && weekday >= 1 && weekday <= 5) return "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400";
+    if (cell.date < today && weekday >= 1 && weekday <= 5) return "border-destructive/40 bg-destructive/10 text-destructive";
     return "border-transparent bg-muted/30 text-muted-foreground";
   }
 
@@ -85,10 +85,10 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
             <p className="mt-1 text-xs text-muted-foreground">{t("live.week.description")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-700 dark:text-amber-300">{t("live.week.legendSaved")}</span>
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">{t("live.week.legendSubmitted")}</span>
-            <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-red-600 dark:text-red-400">{t("live.week.legendMissing")}</span>
-            <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-sky-700 dark:text-sky-300">{t("live.week.legendOff")}</span>
+            <span className="rounded-full bg-warning/15 px-2 py-0.5 text-warning">{t("live.week.legendSaved")}</span>
+            <span className="rounded-full bg-success/15 px-2 py-0.5 text-success">{t("live.week.legendSubmitted")}</span>
+            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-destructive">{t("live.week.legendMissing")}</span>
+            <span className="rounded-full bg-info/10 px-2 py-0.5 text-info">{t("live.week.legendOff")}</span>
           </div>
         </div>
 

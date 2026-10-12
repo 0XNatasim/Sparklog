@@ -116,7 +116,7 @@ function MethodNote({ method }) {
       <p className="mt-1 text-muted-foreground">{t("payroll.messierNote.body")}</p>
     </div>
   ) : (
-    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+    <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
       <div className="font-semibold">{t("payroll.bookNote.title")}</div>
       <p className="mt-1">{t("payroll.bookNote.body")}</p>
     </div>
@@ -138,7 +138,7 @@ function PayrollPage({ Component, writes = false }) {
       <MethodSwitch method={method} onChange={setMethod} />
       <MethodNote method={method} />
       {writes && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-600/50 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+        <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning">
           <Save className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{t("mgr.payroll.writesNote")}</span>
         </div>

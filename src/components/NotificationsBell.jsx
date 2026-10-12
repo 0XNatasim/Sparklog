@@ -92,16 +92,16 @@ export default function NotificationsBell() {
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-300" aria-label={t("notifications.title")}>
+        <Button variant="ghost" size="icon" className="relative h-8 w-8 text-destructive hover:text-destructive" aria-label={t("notifications.title")}>
           <Bell className="h-5 w-5" />
-          {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-red-600 px-1 text-[10px] font-bold leading-4 text-white">{unread > 99 ? "99+" : unread}</span>}
+          {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-destructive px-1 text-[10px] font-bold leading-4 text-destructive-foreground">{unread > 99 ? "99+" : unread}</span>}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-96 w-[calc(100vw-1rem)] overflow-y-auto sm:w-80">
         <div className="px-2 py-2 text-sm font-semibold">{t("notifications.title")}</div>
         {visible.length === 0 && <div className="px-2 py-4 text-center text-xs text-muted-foreground">{t("notifications.empty")}</div>}
         {visible.map((notification) => (
-          <DropdownMenuItem key={notification.id} onSelect={() => openNotification(notification)} className="block border-t px-3 py-3 bg-red-500/10">
+          <DropdownMenuItem key={notification.id} onSelect={() => openNotification(notification)} className="block border-t px-3 py-3 bg-destructive/10">
             <div className="font-semibold">{notification.employeeName}</div>
             <div className="text-xs text-muted-foreground">
               {notification.type === "meal_claim"

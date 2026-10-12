@@ -247,7 +247,7 @@ export default function FormsManager({ collapsible = true }) {
       </CardHeader>
       {isOpen && (
         <CardContent id="manager-forms-list" className="space-y-3">
-          {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">{error}</div>}
+          {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</div>}
           <div className="flex justify-end">
             <Button type="button" size="sm" onClick={startCreate} disabled={anyBusy || editingId === "new"}>
               <Plus className="mr-1 h-4 w-4" aria-hidden="true" />{t("manager.forms.add")}

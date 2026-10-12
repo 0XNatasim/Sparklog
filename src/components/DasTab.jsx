@@ -178,7 +178,7 @@ export default function DasTab({ messier = false }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-xs text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+      <div className="rounded-lg border border-info/30 bg-info/10 p-3 text-xs text-info">
         <div className="flex items-start gap-2">
           <Landmark className="mt-0.5 h-4 w-4 shrink-0" />
           <div><b>{t("payroll.das.title")}</b> {t("payroll.das.intro")} {t("payroll.das.freqNote")}</div>
@@ -241,7 +241,7 @@ export default function DasTab({ messier = false }) {
           {blocked.length > 0 && (
             <Card>
               <CardContent className="flex items-start gap-2 p-4 text-xs text-muted-foreground">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div>{t("payroll.das.pending", { names: blocked.map((r) => r.profile.full_name).join(", ") })}</div>
               </CardContent>
             </Card>

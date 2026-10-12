@@ -8,10 +8,10 @@ import { withRetry } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 
 const TONES = {
-  good: "text-emerald-600 dark:text-emerald-400",
-  ok: "text-sky-600 dark:text-sky-400",
-  warn: "text-amber-600 dark:text-amber-400",
-  bad: "text-destructive dark:text-red-300",
+  good: "text-success",
+  ok: "text-info",
+  warn: "text-warning",
+  bad: "text-destructive",
 };
 
 function fmtBytes(n) {
@@ -102,7 +102,7 @@ export default function InfraHealthCard() {
         aria-expanded={open}
         className="flex w-full items-center gap-3 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <Activity className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <Activity className="h-5 w-5 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
           <div className="font-semibold">{t("infra.title")}</div>
           <div className="truncate text-xs text-muted-foreground">{t("infra.subtitle")}</div>

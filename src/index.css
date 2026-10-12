@@ -23,7 +23,8 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 217 91% 42%;
+    /* Messier green (logo). White text on it 6.2:1. */
+    --primary: 132 55% 28%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -36,33 +37,49 @@
     --destructive-foreground: 0 0% 100%;
     --border: 214.3 31.8% 91.4%;
     --input: 215 16% 58%;
-    --ring: 217 91% 42%;
+    --ring: 132 55% 28%;
+    /* Status colours. Each passes 4.5:1 as text on the background, on a /15 tint of
+       itself, and under its -foreground. Success is teal so it never reads as the
+       green primary action. */
+    --success: 178 80% 24%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 30%;
+    --warning-foreground: 0 0% 100%;
+    --info: 200 98% 30%;
+    --info-foreground: 0 0% 100%;
     --radius: 0.5rem;
   }
 
   .dark {
     color-scheme: dark;
     /* #151515 — the logo, splash, header and PWA theme colour share this one value.
-       Contrast (WCAG): --destructive as text on background 5.4:1, --input 3.4:1. */
+       Contrast (WCAG): --destructive as text on background 6.4:1 (4.9:1 on its own tint),
+       --input 3.4:1. */
     --background: 0 0% 8.2%;
     --foreground: 0 0% 98%;
     --card: 0 0% 10.6%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 10.6%;
     --popover-foreground: 0 0% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 120 40% 55%;
+    --primary-foreground: 0 0% 8.2%;
     --secondary: 0 0% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 15.9%;
     --muted-foreground: 0 0% 65%;
     --accent: 0 0% 15.9%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 84% 64%;
+    --destructive: 0 92% 70%;
     --destructive-foreground: 0 0% 8.2%;
     --border: 0 0% 20%;
     --input: 0 0% 42%;
-    --ring: 217 91% 60%;
+    --ring: 120 40% 55%;
+    --success: 172 60% 48%;
+    --success-foreground: 0 0% 8.2%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 8.2%;
+    --info: 199 89% 62%;
+    --info-foreground: 0 0% 8.2%;
   }
 
   * {

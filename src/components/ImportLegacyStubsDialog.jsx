@@ -163,7 +163,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
           </div>
         )}
 
-        {msg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{msg}</p>}
+        {msg && <p className="text-xs text-success">{msg}</p>}
         {err && <p className="text-xs text-destructive">{err}</p>}
 
         {talon && (

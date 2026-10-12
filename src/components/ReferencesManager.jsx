@@ -255,7 +255,7 @@ export default function ReferencesManager() {
             <CardDescription>{t("ref.editorHint")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">{error}</div>}
+            {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</div>}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5 sm:col-span-2">
                 <Label htmlFor="ref-title">{t("ref.title")}</Label>
@@ -392,7 +392,7 @@ export default function ReferencesManager() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">{error}</div>}
+          {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</div>}
           {info && <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary" role="status">{info}</div>}
           {REFERENCE_SECTIONS.map((section) => {
             const items = references.filter((item) => item.section === section);

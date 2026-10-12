@@ -173,7 +173,7 @@ function Collapsible({ title, children }) {
 
 // tone: "add" = a gain/addition (green), "ded" = a deduction (red), undefined = neutral.
 function Row({ label, value, strong, tone }) {
-  const toneClass = tone === "add" ? "text-green-600 dark:text-green-400" : tone === "ded" ? "text-red-600 dark:text-red-400" : "";
+  const toneClass = tone === "add" ? "text-success" : tone === "ded" ? "text-destructive" : "";
   return (
     <div className={`flex items-baseline justify-between gap-2 ${strong ? "border-t pt-2 font-semibold" : ""}`}>
       <span className={strong ? "" : "text-muted-foreground"}>{label}</span>
@@ -801,7 +801,7 @@ export default function PayrollEngineTester({ messier = false }) {
   return (
     <div className="space-y-3">
       {/* ── Boundary banner (ADR 0001 / payroll-rule gate) ── */}
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
@@ -915,7 +915,7 @@ export default function PayrollEngineTester({ messier = false }) {
             <Button size="sm" variant="outline" onClick={() => stubInputRef.current?.click()} disabled={stubParse.status === "loading"} className="text-xs">
               <Upload className="mr-1.5 h-3.5 w-3.5" /> {stubParse.status === "loading" ? t("payroll.stub.reading") : t("payroll.stub.upload")}
             </Button>
-            <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs border-amber-600 bg-amber-500/10 font-semibold text-amber-900 hover:bg-amber-500/20 dark:text-amber-200">
+            <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs border-warning bg-warning/10 font-semibold text-warning hover:bg-warning/20">
               <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
             </Button>
             {stubParse.message && (
@@ -993,7 +993,7 @@ export default function PayrollEngineTester({ messier = false }) {
       {/* ── Avantages CCQ — foldable; level/union from profile, rates auto-filled + locked ── */}
       <Collapsible title={ccqTitle}>
             {startFromEnd && (
-              <div className="mb-3 space-y-2 rounded-md border border-dashed border-amber-500/60 bg-amber-500/5 p-3">
+              <div className="mb-3 space-y-2 rounded-md border border-dashed border-warning/60 bg-warning/5 p-3">
                 <label className="flex items-center gap-2 text-xs font-semibold">
                   <input type="checkbox" checked={testRates.enabled} onChange={(e) => toggleTestRates(e.target.checked)} />
                   {t("payroll.testRates.toggle")}
@@ -1078,7 +1078,7 @@ export default function PayrollEngineTester({ messier = false }) {
               <Printer className="mr-2 h-4 w-4" /> {t("payroll.printStub")}
             </Button>
             {selectedId && (
-              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full border-amber-600 bg-amber-500/10 font-semibold text-amber-900 hover:bg-amber-500/20 dark:text-amber-200 sm:w-auto">
+              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full border-warning bg-warning/10 font-semibold text-warning hover:bg-warning/20 sm:w-auto">
                 <Save className="mr-2 h-4 w-4" /> {t("payroll.post")}
               </Button>
             )}
@@ -1107,7 +1107,7 @@ export default function PayrollEngineTester({ messier = false }) {
       {result && result.employee && calcCtx && startFromEnd && !selectedWeek && (
         <div className="space-y-2 rounded-lg border border-dashed p-3">
           {cmp?.acceptable && stubWeekMismatch && (
-            <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200">
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning/50 bg-warning/10 p-2 text-xs text-warning">
               <span>{t("payroll.keep.weekMismatch", { stub: dayjs(stubEnd).format("DD MMM YYYY"), calc: dayjs(calcCtx.periodEnd).format("DD MMM YYYY") })}</span>
               <Button type="button" size="sm" variant="outline" onClick={() => setCalcWeekEnd(stubEnd)}>{t("payroll.keep.useStubWeek")}</Button>
             </div>
@@ -1158,7 +1158,7 @@ export default function PayrollEngineTester({ messier = false }) {
                     <li key={i} className="rounded-md border bg-muted/20 p-2 text-xs">
                       <div className="font-medium">
                         {it.name}
-                        {it.draft && <span className="ml-2 rounded bg-amber-200 px-1 py-0.5 text-[10px] font-semibold uppercase text-amber-900 dark:bg-amber-900/50 dark:text-amber-200">draft</span>}
+                        {it.draft && <span className="ml-2 rounded bg-warning/20 px-1 py-0.5 text-[10px] font-semibold uppercase text-warning">draft</span>}
                       </div>
                       {it.note && <div className="mt-0.5 text-muted-foreground">{it.note}</div>}
                     </li>
@@ -1175,7 +1175,7 @@ export default function PayrollEngineTester({ messier = false }) {
 
 // One readable line: bold label, muted formula, right-aligned amount.
 function DetailRow({ label, formula, value, tone }) {
-  const toneClass = tone === "add" ? "text-green-600 dark:text-green-400" : tone === "ded" ? "text-red-600 dark:text-red-400" : "";
+  const toneClass = tone === "add" ? "text-success" : tone === "ded" ? "text-destructive" : "";
   return (
     <div className="flex items-baseline justify-between gap-3 py-0.5">
       <span className="text-muted-foreground">
@@ -1192,7 +1192,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
     return (
       <Card>
         <CardContent className="p-4 text-sm">
-          <div className="font-semibold text-amber-700 dark:text-amber-300">{t("payroll.requiresReview")}</div>
+          <div className="font-semibold text-warning">{t("payroll.requiresReview")}</div>
           <ul className="mt-2 list-disc pl-5 text-muted-foreground">{result.reviewReasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
         </CardContent>
       </Card>
@@ -1202,7 +1202,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
   return (
     <div className="space-y-3">
       {result.requiresReview && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           <b>{result.label}.</b> {result.reviewReasons.join(" ")}
         </div>
       )}

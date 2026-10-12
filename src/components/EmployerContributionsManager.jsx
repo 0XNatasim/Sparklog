@@ -67,7 +67,7 @@ export default function EmployerContributionsManager() {
                 {t("costing.contrib.sourceLink")}<ExternalLink className="h-3 w-3" />
               </a>
             </p>
-            {err && <div className="mb-2 text-xs text-destructive dark:text-red-300">{err}</div>}
+            {err && <div className="mb-2 text-xs text-destructive">{err}</div>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
@@ -81,7 +81,7 @@ export default function EmployerContributionsManager() {
                     <tr key={r.code} className="border-b last:border-0">
                       <td className="px-3 py-1.5">
                         {r.label}
-                        {savedCode === r.code && <span className="ml-2 text-[11px] text-emerald-600 dark:text-emerald-400">✓</span>}
+                        {savedCode === r.code && <span className="ml-2 text-[11px] text-success">✓</span>}
                       </td>
                       {LEVEL_COLUMNS.map((c) => (
                         <td key={c.key} className="px-2 py-1.5 text-right">

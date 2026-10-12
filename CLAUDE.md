@@ -196,7 +196,7 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 
 Mesures initiales : `vite build` → un seul chunk `index-*.js` de 1,27 Mo (360 Ko gzip) ; precache PWA 3,5 Mo.
 Contrastes calculés selon WCAG 2.x (texte ≥ 4,5:1, bordures de champs ≥ 3:1). Une PR par lot, chacune
-avec le bump de `APP_VERSION`. Note : le logo Messier est vert alors que `--primary` est bleu — à trancher au Lot 4.
+avec le bump de `APP_VERSION`.
 
 ### Lot 1 — Nettoyage (risque faible) — ✅ fait (V2.4.94)
 Precache PWA : 3 562 Ko → 2 027 Ko (28 → 23 entrées). Bundle JS inchangé (le gain JS est au Lot 3).
@@ -243,12 +243,23 @@ Le precache PWA reste ≈ 2 050 Ko (tous les chunks y sont, téléchargés en ar
   `dictionaries.en` pour toute clé française manquante, donc les deux restent nécessaires tant que ce
   repli existe.
 
-### Lot 4 — Couleurs sémantiques
-- [ ] Jetons `--success`, `--warning`, `--info` (+ variantes sombres) et entrées `tailwind.config.js`.
-- [ ] Migrer les couleurs en dur (≈179 amber, 112 red, 65 emerald, 53 green, 37 sky) et réduire les 215 `dark:`.
-- [ ] Une seule couleur « succès » (aujourd'hui emerald dans 18 fichiers, green dans 11).
-- [ ] Clair : `text-amber-600` (3,19:1), `text-green-600` (3,30:1), `text-emerald-600` (3,77:1) → nuances `-700`.
-- [ ] Variante `success` de `ui/button.jsx` sur le nouveau jeton.
+### Lot 4 — Couleurs sémantiques — ✅ fait (V2.4.97)
+Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f30, sombre `120 40% 55%`).
+- [x] Jetons `--success` (teal, pour ne pas se confondre avec le vert d'action), `--warning`, `--info`
+  + `-foreground`, clair et sombre ; entrées `tailwind.config.js`.
+- [x] Couleurs en dur migrées vers les jetons (≈ 450 classes dans 47 fichiers) : amber/yellow/orange → warning,
+  red/rose → destructive, emerald/green/lime/teal → success, sky/blue/cyan/indigo → info. Les variantes
+  `dark:` correspondantes sont supprimées (215 → 16 `dark:` restants). CSS 52,7 → 44,4 Ko.
+- [x] Une seule couleur « succès » ; les nuances `-600` trop pâles en clair disparaissent avec les jetons.
+- [x] `button` / `badge` : variantes `success`, `warning`, `info` sur les jetons. Statut `saved` → badge `info`
+  (bleu, comme avant) pour qu'un brouillon ne ressemble pas à l'action principale verte.
+- [x] Corrections manuelles : bouton Enregistrer de la fiche = bouton principal (n'est plus bleu forcé) ;
+  « Soumettre la journée » = `variant="success"` ; bouton du bandeau « vue employé » lisible sur l'ambre.
+- [x] `src/lib/theme-contrast.test.js` verrouille les contrastes WCAG de tous les jetons (texte sur fond, carte
+  et teinte /15 ; `-foreground` sur fond plein ; `--input` ≥ 3:1). Il a imposé `--destructive` sombre
+  `0 92% 70%` (le `0 84% 64%` du Lot 2 tombait à 4,2:1 sur sa propre teinte).
+- Reste : `bg-violet`/`slate` ponctuels et le gris de `badge neutral` (non sémantiques) ; couleurs hex du
+  talon imprimé (`lib/paystub.js`), volontairement neutres.
 
 ### Lot 5 — Ergonomie terrain
 - [ ] Boutons d'en-tête 32×32 px (`AppShell.jsx:123-135`) → cible tactile ≥ 44 px.

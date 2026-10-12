@@ -484,7 +484,7 @@ export default function BroadcastManager() {
                         <div key={r.employee_id} className="flex items-center justify-between gap-2 rounded border bg-muted/20 px-2 py-1.5 text-xs">
                           <span>{employeeName(r.employee_id)}</span>
                           {r.acknowledged_at
-                            ? <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><Check className="h-3.5 w-3.5" />{t("broadcast.viewed")} · {dayjs(r.acknowledged_at).format("DD MMM HH:mm")}</span>
+                            ? <span className="flex items-center gap-1 text-success"><Check className="h-3.5 w-3.5" />{t("broadcast.viewed")} · {dayjs(r.acknowledged_at).format("DD MMM HH:mm")}</span>
                             : <span className="text-muted-foreground">{t("broadcast.notViewed")}</span>}
                         </div>
                       ))}

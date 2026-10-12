@@ -19,12 +19,12 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
 const CHIP_CLASS = {
-  missing: "border-destructive/40 bg-destructive/10 text-destructive dark:text-red-300",
-  partial: "border-destructive/40 bg-destructive/10 text-destructive dark:text-red-300",
-  photos: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200",
-  review: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+  missing: "border-destructive/40 bg-destructive/10 text-destructive",
+  partial: "border-destructive/40 bg-destructive/10 text-destructive",
+  photos: "border-warning/40 bg-warning/10 text-warning",
+  review: "border-warning/40 bg-warning/10 text-warning",
   reading: "text-muted-foreground",
-  ok: "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-300",
+  ok: "border-success/40 bg-success/10 text-success",
 };
 
 // Manager view of the end-of-shift inventory. One row per employee for the chosen day; a tap
@@ -219,7 +219,7 @@ export default function InventoryScreenshotsPanel() {
         </CardContent>
       </Card>
 
-      {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300" role="alert">{err}</div>}
+      {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{err}</div>}
 
       {!loading && !err && entries.length === 0 && (
         <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("mgr.inventory.empty")}</CardContent></Card>
@@ -262,13 +262,13 @@ export default function InventoryScreenshotsPanel() {
                 <TabsContent value="list" className="space-y-3">
                   {open.state === "missing" && <p className="text-sm text-muted-foreground">{t("mgr.inventory.noCapture")}</p>}
                   {open.state === "reading" && <p className="text-sm text-muted-foreground">{t("mgr.inventory.readingNow")}</p>}
-                  {open.state === "photos" && <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">{t("mgr.inventory.unreadable")}</p>}
+                  {open.state === "photos" && <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{t("mgr.inventory.unreadable")}</p>}
                   {open.state === "review" && (
-                    <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                    <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                       {open.expected ? t("mgr.inventory.mismatch", { count: open.count, expected: open.expected }) : t("mgr.inventory.unverified")}
                     </p>
                   )}
-                  {open.state === "partial" && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{t("mgr.inventory.partialNote", { count: open.captures })}</p>}
+                  {open.state === "partial" && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{t("mgr.inventory.partialNote", { count: open.captures })}</p>}
                   {open.items.length > 0 && (
                     <>
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -284,7 +284,7 @@ export default function InventoryScreenshotsPanel() {
                         </div>
                       </div>
                       {compare?.status === "none" && <p className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">{t("mgr.inventory.compareNone")}</p>}
-                      {compare?.status === "failed" && <p className="text-sm text-destructive dark:text-red-300" role="alert">{t("mgr.inventory.compareFailed")}</p>}
+                      {compare?.status === "failed" && <p className="text-sm text-destructive" role="alert">{t("mgr.inventory.compareFailed")}</p>}
                       <div className="overflow-hidden rounded-md border">
                         <table className="w-full text-sm">
                           <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
@@ -305,7 +305,7 @@ export default function InventoryScreenshotsPanel() {
                                   {comparison && <td className={cn("px-3 py-2 text-right tabular-nums", !Number(row.previous) && "text-muted-foreground")}>{fmtQty(row.previous)}</td>}
                                   <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground")}>{fmtQty(quantity)}</td>
                                   {comparison && (
-                                    <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.diff === null || row.diff === 0 ? "text-muted-foreground" : row.diff < 0 ? "text-destructive dark:text-red-300" : "text-green-700 dark:text-green-300")}>
+                                    <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.diff === null || row.diff === 0 ? "text-muted-foreground" : row.diff < 0 ? "text-destructive" : "text-success")}>
                                       {fmtDiff(row.diff)}
                                     </td>
                                   )}
@@ -375,7 +375,7 @@ export default function InventoryScreenshotsPanel() {
               </label>
             </div>
             {crew.unverified.length > 0 && (
-              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+              <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                 {t("mgr.inventory.crewUnverified", { names: crew.unverified.join(", ") })}
               </p>
             )}

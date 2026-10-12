@@ -203,7 +203,7 @@ export default function CostingDashboard() {
               <div className="font-semibold">{t("costing.estimateLabel")} · {dayjs(range.start).format("DD MMM")} – {dayjs(range.end).format("DD MMM YYYY")}</div>
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.description")}</p>
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.scopeNote")}</p>
-              <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{t("costing.reviewNotice")}</p>
+              <p className="mt-1 text-xs font-semibold text-warning">{t("costing.reviewNotice")}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {period === "week" && (
@@ -264,9 +264,9 @@ export default function CostingDashboard() {
                           </button>
                           {r.name}
                           {r.premium > 0 && <span className="ml-2 text-[11px] font-normal text-primary">({t("costing.teamLeader")} +{money(r.premium)}/h)</span>}
-                          {!r.hasRate && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noRate")})</span>}
+                          {!r.hasRate && <span className="ml-2 text-[11px] font-normal text-warning">({t("costing.noRate")})</span>}
                           {r.isNonCcq && <span className="ml-2 text-[11px] font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
-                          {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noLevel")})</span>}
+                          {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-[11px] font-normal text-warning">({t("costing.noLevel")})</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono">{r.regHours.toFixed(2)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{r.otHours.toFixed(2)}</td>

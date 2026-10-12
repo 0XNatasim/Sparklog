@@ -113,8 +113,8 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
   // OT number colour: green = submitted (or approved), orange = saved but not yet submitted.
   const jobOtColorClass = (jobStatus) => (
     jobStatus === "submitted" || jobStatus === "approved"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : "text-amber-600 dark:text-amber-400"
+      ? "text-success"
+      : "text-warning"
   );
 
   // Recap: an OT counts once it is saved or submitted (drafts excluded).
@@ -127,20 +127,20 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
   const notSubmittedCount = notSubmittedList.length;
   const onLeaveCount = onLeaveList.length;
   const recapTiles = [
-    { label: t("live.recap.withOt"), value: `${withOtCount}/${employees.length}`, cls: "text-emerald-600 dark:text-emerald-400" },
+    { label: t("live.recap.withOt"), value: `${withOtCount}/${employees.length}`, cls: "text-success" },
     { label: t("live.recap.totalOt"), value: totalOtCount, cls: "text-foreground" },
-    { label: t("live.recap.over8"), value: over8Count, cls: "text-amber-600 dark:text-amber-400" },
+    { label: t("live.recap.over8"), value: over8Count, cls: "text-warning" },
     {
       label: t("live.recap.onLeave"),
       value: onLeaveCount,
-      cls: "text-sky-600 dark:text-sky-400",
+      cls: "text-info",
       onClick: onLeaveCount > 0 ? () => setLeaveOpen(true) : null,
       title: t("live.leave.open"),
     },
     !snapshot && {
       label: t("live.recap.notSubmittedYesterday"),
       value: notSubmittedCount,
-      cls: notSubmittedCount > 0 ? "text-destructive dark:text-red-300" : "text-foreground",
+      cls: notSubmittedCount > 0 ? "text-destructive" : "text-foreground",
       onClick: notSubmittedCount > 0 ? () => { setUnlockMsg(""); setUnlockOpen(true); } : null,
     },
   ].filter(Boolean);
@@ -171,8 +171,8 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
           <div>
             <div className="flex items-center gap-2 font-semibold">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
               </span>
               {snapshot ? t("live.snapshot.title") : t("live.title")} · {dayjs(todayDate || montrealDate()).format("DD MMM YYYY")}
             </div>
@@ -224,7 +224,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                       onClick={() => onSelectEmployee?.(employee.id, todayDate)}
                       className={cn(
                         "truncate rounded-sm text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        status === "none" && "text-red-600 dark:text-red-400",
+                        status === "none" && "text-destructive",
                       )}
                     >
                       {employee.full_name || employee.email}
@@ -233,7 +233,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                       <span
                         className={cn(
                           "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
-                          overtimeCaptured ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-red-500/15 text-red-600 dark:text-red-400",
+                          overtimeCaptured ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive",
                         )}
                         title={overtimeCaptured ? t("live.overtimeTooltip") : t("live.overtimeMissingTooltip")}
                         aria-label={overtimeCaptured ? t("live.overtimeTooltip") : t("live.overtimeMissingTooltip")}
@@ -242,7 +242,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                       </span>
                     )}
                     {exceptionToday.has(employee.id) && (
-                      <span title={t("live.exceptionTooltip")} className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400">
+                      <span title={t("live.exceptionTooltip")} className="shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warning">
                         {t("live.exceptionBadge")}
                       </span>
                     )}
@@ -267,7 +267,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                     ))}
                     <div className="flex items-center justify-between px-1 pt-0.5 text-xs">
                       <span className="text-muted-foreground">{t("live.dayTotal")}</span>
-                      <span className={cn("font-mono font-bold", overtime && "text-amber-600 dark:text-amber-400")}>{fmtHM(dayTotal)}</span>
+                      <span className={cn("font-mono font-bold", overtime && "text-warning")}>{fmtHM(dayTotal)}</span>
                     </div>
                   </div>
                 )}
@@ -308,7 +308,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
             </div>
           )}
 
-          {unlockMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{unlockMsg}</p>}
+          {unlockMsg && <p className="text-xs text-success">{unlockMsg}</p>}
 
           <DialogFooter>
             <Button type="button" disabled={unlockBusy || notSubmittedList.length === 0} onClick={unlockAllYesterday}>

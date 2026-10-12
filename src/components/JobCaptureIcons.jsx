@@ -3,9 +3,9 @@ import { Car, TimerReset, Utensils } from "lucide-react";
 import { useT } from "@/lib/use-t";
 
 const CAPTURES = [
-  { field: "parking_receipt_captured", icon: Car, label: "manager.timesheet.parkingIndicator", className: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
-  { field: "overtime_evidence_captured", icon: TimerReset, label: "manager.timesheet.overtimeIndicator", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  { field: "meal_claim_captured", icon: Utensils, label: "manager.timesheet.mealIndicator", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+  { field: "parking_receipt_captured", icon: Car, label: "manager.timesheet.parkingIndicator", className: "bg-info/15 text-info" },
+  { field: "overtime_evidence_captured", icon: TimerReset, label: "manager.timesheet.overtimeIndicator", className: "bg-warning/15 text-warning" },
+  { field: "meal_claim_captured", icon: Utensils, label: "manager.timesheet.mealIndicator", className: "bg-success/15 text-success" },
 ];
 
 export default function JobCaptureIcons({ job, className = "" }) {

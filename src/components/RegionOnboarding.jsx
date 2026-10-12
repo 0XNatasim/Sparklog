@@ -83,7 +83,7 @@ export default function RegionOnboarding() {
             {UNION_ASSOCIATIONS.map((item) => <option key={item.code} value={item.code}>{item.employeeLabel}</option>)}
           </Select>
         )}
-        {error && <p className="text-sm text-destructive dark:text-red-300">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
           <Button type="button" disabled={(step === "region" ? !region : !association) || saving} onClick={step === "region" ? saveRegion : saveAssociation}>
             {saving ? t("common.saving") : step === "region" ? t("common.next") : t("common.save")}

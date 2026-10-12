@@ -1168,7 +1168,7 @@ export default function EmployeeForm() {
     <AppShell>
       <div className="space-y-2 sm:space-y-3">
         {err && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <span>{err}</span>
             {editId && editLoadFailed && (
               <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={loadingEdit} onClick={loadEdit}>
@@ -1178,7 +1178,7 @@ export default function EmployeeForm() {
           </div>
         )}
         {managerEntryBy && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-200" role="status">
+          <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning" role="status">
             {t("form.managerEntry.banner", { name: managerEntryBy })}
           </div>
         )}
@@ -1193,12 +1193,12 @@ export default function EmployeeForm() {
           </div>
         )}
         {warning && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-200" role="alert">
+          <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning" role="alert">
             {warning}
           </div>
         )}
         {entryBlockedReason && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive" role="alert">
             <span>{entryBlockedReason}</span>
             {(editId || job_date !== companyDate()) && (
               <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={saving} onClick={returnToTodaysJobCard}>
@@ -1372,7 +1372,7 @@ export default function EmployeeForm() {
                       {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
                     </Button>
                     {hasParkingReceipt && (
-                      <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400" title={t("form.parking.receiptSaved")}>
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-success" title={t("form.parking.receiptSaved")}>
                         <CircleCheck className="h-5 w-5" aria-hidden="true" />
                         <span className="sr-only">{t("form.parking.receiptSaved")}</span>
                       </span>
@@ -1386,11 +1386,11 @@ export default function EmployeeForm() {
             <div className="space-y-2 pt-3">
               {(dirty || editId) && !locked && (
                 <>
-                  <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs || !formComplete} onClick={saveDraft}>
+                  <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs || !formComplete} onClick={saveDraft}>
                     {saving ? t("common.saving") : t("form.buttons.save")}
                   </Button>
                   {!formComplete && (
-                    <p className="text-center text-xs font-medium text-amber-700 dark:text-amber-300" role="status">
+                    <p className="text-center text-xs font-medium text-warning" role="status">
                       {t("form.missing.hint", { fields: missingFields.join(", ") })}
                     </p>
                   )}
@@ -1504,7 +1504,7 @@ export default function EmployeeForm() {
       }}>
         <DialogContent className="max-w-md">
           {returnSaveError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
               {returnSaveError}
             </div>
           )}
@@ -1604,7 +1604,7 @@ export default function EmployeeForm() {
                 <DialogTitle>{t("form.evidence.title")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
                   {t("form.evidence.description")}
                 </div>
                 <div className="rounded-md border bg-muted/40 p-3">
@@ -1635,8 +1635,8 @@ export default function EmployeeForm() {
                     </div>
                   )}
                 </div>
-                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{evidenceValidationError}</div>}
-                {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{err}</div>}
+                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{evidenceValidationError}</div>}
+                {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{err}</div>}
                 <input
                   ref={overtimeInputRef}
                   type="file"
@@ -1688,7 +1688,7 @@ export default function EmployeeForm() {
                     return (
                       <li key={slot} className="flex items-center justify-between gap-2 rounded-md border p-2">
                         <span className="flex items-center gap-2 font-medium">
-                          {done && <CircleCheck className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden="true" />}
+                          {done && <CircleCheck className="h-5 w-5 text-success" aria-hidden="true" />}
                           {t("form.inventory.slot", { n: slot })}
                         </span>
                         <Button type="button" size="sm" variant={done ? "outline" : "default"} disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(slot)}>
@@ -1698,7 +1698,7 @@ export default function EmployeeForm() {
                     );
                   })}
                 </ul>
-                {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300" role="alert">{inventoryError}</div>}
+                {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive" role="alert">{inventoryError}</div>}
                 <input ref={inventoryInputRef} type="file" accept="image/*" className="hidden" onChange={handleInventoryFile} />
               </div>
               <DialogFooter>
@@ -1713,12 +1713,12 @@ export default function EmployeeForm() {
             <>
               <DialogHeader><DialogTitle>{t("form.day.readyTitle")}</DialogTitle></DialogHeader>
               <p className="text-sm text-muted-foreground">{t(!officeEmployee && inventoryEnabled ? "form.day.readyDescription" : "form.day.readyDescriptionPlain")}</p>
-              {daySubmitError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">{daySubmitError}</div>}
+              {daySubmitError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{daySubmitError}</div>}
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" disabled={daySubmitBusy} onClick={() => { closeReturnDialog(); navigate("/history"); }}>
                   {t("form.day.review")}
                 </Button>
-                <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={daySubmitBusy} onClick={submitEndOfDay}>
+                <Button type="button" variant="success" disabled={daySubmitBusy} onClick={submitEndOfDay}>
                   {daySubmitBusy ? t("common.submitting") : t("form.day.submit")}
                 </Button>
               </DialogFooter>
@@ -1750,7 +1750,7 @@ export default function EmployeeForm() {
       <Dialog open={kmMissingAlert} onOpenChange={setKmMissingAlert}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+            <DialogTitle className="flex items-center gap-2 text-warning">
               <TriangleAlert className="h-5 w-5" />{t("form.kmMissing.title")}
             </DialogTitle>
           </DialogHeader>
