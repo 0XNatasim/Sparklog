@@ -1,21 +1,44 @@
 // src/App.jsx
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 
 import Login from "./pages/Login";
 import EmployeeForm from "./pages/EmployeeForm";
-import History from "./pages/History";
-import Week from "./pages/Week";
-import ManagerLayout from "./components/manager/ManagerLayout";
-import {
-  AbsencesPage, AuditPage, CcqPage, CostsPage, DownloadsPage, EmployeesPage, EmergencyPage, FormsPage, HealthPage, LivePage, ReferencesPage,
-  ManagerIndex, MessagesPage, PayrollCalculPage, PayrollDasPage, PayrollRoePage, PayrollStubsPage, PeriodPage,
-  InventoryPage, ReceiptsPage, RulesPage, SettingsPage, TimesheetsPage,
-} from "./pages/manager/ManagerPages";
-import ResetPassword from "./pages/ResetPassword";
-import Profile from "./pages/Profile";
+import { PageLoading } from "@/components/LazyLoading";
+
+// The time-entry form (employees' landing page) and login stay in the main bundle;
+// everything else loads on first visit. Manager code is never sent to employees.
+const History = lazy(() => import("./pages/History"));
+const Week = lazy(() => import("./pages/Week"));
+const Profile = lazy(() => import("./pages/Profile"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const ManagerLayout = lazy(() => import("./components/manager/ManagerLayout"));
+const managerPage = (name) => lazy(() => import("./pages/manager/ManagerPages").then((m) => ({ default: m[name] })));
+const AbsencesPage = managerPage("AbsencesPage");
+const AuditPage = managerPage("AuditPage");
+const CcqPage = managerPage("CcqPage");
+const CostsPage = managerPage("CostsPage");
+const DownloadsPage = managerPage("DownloadsPage");
+const EmployeesPage = managerPage("EmployeesPage");
+const EmergencyPage = managerPage("EmergencyPage");
+const FormsPage = managerPage("FormsPage");
+const HealthPage = managerPage("HealthPage");
+const LivePage = managerPage("LivePage");
+const ReferencesPage = managerPage("ReferencesPage");
+const ManagerIndex = managerPage("ManagerIndex");
+const MessagesPage = managerPage("MessagesPage");
+const PayrollCalculPage = managerPage("PayrollCalculPage");
+const PayrollDasPage = managerPage("PayrollDasPage");
+const PayrollRoePage = managerPage("PayrollRoePage");
+const PayrollStubsPage = managerPage("PayrollStubsPage");
+const PeriodPage = managerPage("PeriodPage");
+const InventoryPage = managerPage("InventoryPage");
+const ReceiptsPage = managerPage("ReceiptsPage");
+const RulesPage = managerPage("RulesPage");
+const SettingsPage = managerPage("SettingsPage");
+const TimesheetsPage = managerPage("TimesheetsPage");
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { isManagerRole } from "@/lib/roles";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -44,12 +67,13 @@ export default function App() {
 
   // Supabase appends its recovery credentials to the URL hash. Keep this
   // pathname outside HashRouter so the credentials are not mistaken for a route.
-  if (isPasswordRecovery) return <ResetPassword />;
+  if (isPasswordRecovery) return <Suspense fallback={<PageLoading />}><ResetPassword /></Suspense>;
 
   return (
     <HashRouter>
       <ViewModeProvider>
       <InstallPrompt />
+      <Suspense fallback={<PageLoading />}>
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
@@ -154,6 +178,7 @@ export default function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
       </ViewModeProvider>
     </HashRouter>
   );

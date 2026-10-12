@@ -86,11 +86,17 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
     setLoading(false);
   }, [targetDate]);
 
+  // Poll only while the tab is visible; refresh as soon as it is shown again.
   useEffect(() => {
     load();
     if (snapshot) return undefined;
-    const id = setInterval(load, REFRESH_MS);
-    return () => clearInterval(id);
+    const refreshIfVisible = () => { if (!document.hidden) load(); };
+    const id = setInterval(refreshIfVisible, REFRESH_MS);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
   }, [load, snapshot]);
 
   const rows = employees

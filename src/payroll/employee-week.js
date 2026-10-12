@@ -5,13 +5,11 @@
 // ⚠️ DRAFT / preview: uses the BASIC personal tax credits (no per-employee TD1) and
 // default employer settings. The DAS figures come from the unvalidated rule set — never
 // a substitute for the official pay stub. Freezing happens at "Comptabiliser".
-import {
-  calculatePayroll,
-  computeCcqBenefits,
-  computeCcqLevies,
-  CCQ_ELECTRICIAN_IC_C3,
-  PAY_PERIODS_PER_YEAR,
-} from "./index.js";
+// Import the engine modules directly, not through ./index.js: index.js re-exports this
+// file, and the cycle breaks chunk ordering once pages are code-split.
+import { calculatePayroll } from "./engine/calculatePayroll.js";
+import { computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { PAY_PERIODS_PER_YEAR } from "./rules/2026.js";
 import { printedPayLines } from "./earnings.js";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";

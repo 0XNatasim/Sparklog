@@ -30,6 +30,20 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   setTimeout(remove, 1000);
 })();
 
+// Pages load on demand. If a deploy removed the files this tab started with, the next
+// page change fails to fetch its code: reload once to pick up the current version
+// (drafts live in IndexedDB). The one-minute guard stops a reload loop when offline.
+window.addEventListener("vite:preloadError", () => {
+  const KEY = "sparklog.chunkReloadAt";
+  try {
+    if (Date.now() - Number(sessionStorage.getItem(KEY) || 0) < 60 * 1000) return;
+    sessionStorage.setItem(KEY, String(Date.now()));
+  } catch {
+    return;
+  }
+  window.location.reload();
+});
+
 // Auto-apply a new deploy — but never while the tab is in active use (that
 // would reload mid-entry and lose a timesheet). Check for updates on focus and
 // every few minutes; when a new version takes control, reload only once the

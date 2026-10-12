@@ -117,9 +117,7 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 
 | ID | Finding | Anchor | Fix |
 |----|---------|--------|-----|
-| P-1 | No route-splitting; employees download manager code (incl. `PayrollEngineTester`); single 1.27 MB chunk (360 kB gzip), measured 2026-10-09 | `App.jsx:7-18` | `React.lazy` + `Suspense`; vendor chunks — see §5 Lot 3 |
 | P-5 | Costing does full client-side joins/aggregation (now status-scoped, still client-side) | `CostingDashboard.jsx` | server aggregation endpoint |
-| P-7 | LiveCrew polls roster every 30s, even when the tab is hidden | `LiveCrew.jsx:92` | cache roster; realtime; pause when hidden; abort in-flight |
 | P-10 | Card renderers recreated each render; lists unmemoized | `ManagerDashboard.jsx` | `React.memo` card + `useCallback` handlers |
 | P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts:202-207` | one bulk lookup, or avoid exporting contact data |
 
@@ -224,12 +222,26 @@ Precache PWA : 3 562 Ko → 2 027 Ko (28 → 23 entrées). Bundle JS inchangé (
 - [x] `theme-color` : une balise par mode dans `index.html`, puis `theme-provider.jsx` aligne la couleur sur
   le thème choisi dans l'app (`#ffffff` / `#151515`), y compris quand il diffère du système.
 
-### Lot 3 — Chargement (P-1, P-7)
-- [ ] `React.lazy` + `Suspense` pour toutes les pages `/manager/*` et `PayrollEngineTester`.
-- [ ] `manualChunks` (React / Supabase / Radix) dans `vite.config.js`.
-- [ ] Noter les tailles avant/après (bundle principal, precache) dans ce fichier.
-- [ ] `LiveCrew.jsx:92` : suspendre le polling quand `document.hidden`.
-- [ ] Optionnel : charger seulement la langue active de `src/lib/i18n.js` (2 906 lignes, FR+EN).
+### Lot 3 — Chargement (P-1, P-7) — ✅ fait (V2.4.96)
+JS téléchargé à l'ouverture par un employé : 1 292 Ko (364 Ko gzip) → 792 Ko (233 Ko gzip), −36 %.
+Le precache PWA reste ≈ 2 050 Ko (tous les chunks y sont, téléchargés en arrière-plan une fois).
+- [x] `App.jsx` : `EmployeeForm` et `Login` restent dans le bundle principal ; `History`, `Week`, `Profile`,
+  `ResetPassword`, `ManagerLayout` et `ManagerPages` sont en `React.lazy` sous un `Suspense` (`PageLoading`).
+- [x] `ManagerPages.jsx` : chaque panneau (dont `PayrollEngineTester`, 63 Ko) est un chunk séparé via
+  `lazyPanel()` (`components/LazyLoading.jsx`), avec son propre `Suspense` : la barre latérale et les onglets
+  restent affichés pendant le chargement. `ManagerLayout` entoure aussi `<Outlet/>` d'un `Suspense`.
+- [x] `manualChunks` : `vendor-react`, `vendor-supabase`, `vendor-radix`, `vendor-icons` (un déploiement ne
+  re-télécharge que le code de l'app ; 76 entrées de precache au lieu de 101 sans le chunk d'icônes).
+- [x] Cycle `payroll/index.js` ⇄ `employee-week.js` cassé (imports directs) — Rollup signalait un ordre
+  d'exécution cassé une fois le code découpé.
+- [x] Après un déploiement, un chunk disparu déclenche `vite:preloadError` → un seul rechargement
+  (`main.jsx`, garde d'une minute en `sessionStorage` contre les boucles hors ligne).
+- [x] `LiveCrew.jsx` : pas de requête quand l'onglet est caché ; rafraîchit dès qu'il redevient visible.
+- Vérifié dans Chromium avec Supabase simulé : un employé ne charge aucun chunk gestionnaire ; un
+  propriétaire ouvre Direct, Calcul, Semaine/mois, Journal et Employés sans erreur.
+- [ ] Non fait (volontairement) : charger une seule langue de `i18n.js` (206 Ko source). `use-t.js` retombe sur
+  `dictionaries.en` pour toute clé française manquante, donc les deux restent nécessaires tant que ce
+  repli existe.
 
 ### Lot 4 — Couleurs sémantiques
 - [ ] Jetons `--success`, `--warning`, `--info` (+ variantes sombres) et entrées `tailwind.config.js`.

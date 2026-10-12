@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign, Banknote, BarChart3, CalendarClock, CalendarDays, CalendarOff, ChevronDown, ClipboardList,
@@ -21,6 +21,7 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import { PanelLoading } from "@/components/LazyLoading";
 
 const COMPANY_NAME = "Messier Connexion";
 const COLLAPSE_KEY = "sparklog.managerNavCollapsed";
@@ -275,7 +276,9 @@ export default function ManagerLayout() {
             <AccountMenu />
           </header>
           <main className="min-w-0 flex-1 px-2 py-3 sm:px-4 sm:py-4">
-            <Outlet />
+            <Suspense fallback={<PanelLoading />}>
+              <Outlet />
+            </Suspense>
           </main>
         </div>
       </div>
