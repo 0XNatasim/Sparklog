@@ -18,6 +18,7 @@ const ACTION_META = {
   job_approved: { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-300" },
   job_created_by_owner: { icon: FilePlus2, tone: "text-primary" },
   manager_entry_confirmed: { icon: UserCheck, tone: "text-emerald-600 dark:text-emerald-300" },
+  manager_entry_deleted: { icon: Trash2, tone: "text-destructive" },
   manager_entry_reminded: { icon: BellRing, tone: "text-amber-600 dark:text-amber-300" },
   meal_reviewed: { icon: Utensils, tone: "text-primary" },
   parking_reviewed: { icon: SquareParking, tone: "text-primary" },
@@ -55,6 +56,7 @@ export default function AuditLog() {
       case "job_approved": return t("audit.desc.jobApproved", { name: target, date: d.job_date || "—" });
       case "job_created_by_owner": return t("audit.desc.jobCreatedByOwner", { name: target, date: d.job_date || "—" });
       case "manager_entry_confirmed": return t("audit.desc.managerEntryConfirmed", { name: target, date: d.job_date || "—" });
+      case "manager_entry_deleted": return t("audit.desc.managerEntryDeleted", { name: target, date: d.job_date || "—" });
       case "manager_entry_reminded": return t("audit.desc.managerEntryReminded", { name: target, date: d.job_date || "—" });
       case "meal_reviewed": return t("audit.desc.mealReviewed", { name: target, status: d.status || "—" });
       case "parking_reviewed": return t("audit.desc.parkingReviewed", { name: target, status: d.status || "—" });

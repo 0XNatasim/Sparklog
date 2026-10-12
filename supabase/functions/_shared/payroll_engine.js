@@ -81,6 +81,22 @@ function firstTripUnpaidMinutes(sortedJobs) {
   return unpaid;
 }
 
+// Unpaid first-trip minutes of ONE day's jobs (0 when the first job has no Arrivée). Same
+// ordering (earliest Départ, then id) and Départ→Fin clamp as the payroll above. Used by the
+// "more than 8 h needs the overtime screenshot" rule so it counts PAID time for employees
+// who have the option (a day of 8 h 29 with a 30-minute unpaid trip pays 7 h 59: no overtime).
+// Keep the SQL twin in validate_job_submission_contract (migration 0076) in step.
+export function dayFirstTripUnpaidMinutes(dayJobs) {
+  const jobs = (dayJobs || []).map((job, index) => ({
+    ...job,
+    id: job.id ?? `#${index}`,
+    depart: job.depart ? String(job.depart).slice(0, 5) : job.depart,
+    job_date: "day",
+  }));
+  jobs.sort((a, b) => `${a.depart || ""}${a.id}`.localeCompare(`${b.depart || ""}${b.id}`));
+  return [...firstTripUnpaidMinutes(jobs).values()][0] || 0;
+}
+
 // Return minutes already logged inside a job's paid span, clamped so it can never
 // exceed that span.
 function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
@@ -205,6 +221,9 @@ export function calculateDailyTotals(jobs, options) {
   return days;
 }
 
+// `dailyWorkMinutes` is the day's PAID work: for an employee with the "first trip unpaid"
+// option, pass the span minus dayFirstTripUnpaidMinutes (the database twin is
+// reconcile_overtime_meal, migration 0077).
 export function isMealEligible({ jobDate, dailyWorkMinutes }) {
   const weekday = dayOfWeek(jobDate);
   return weekday !== null && weekday !== 0 && weekday !== 6 && Math.max(0, dailyWorkMinutes - 480) >= 135;

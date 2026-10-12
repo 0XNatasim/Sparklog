@@ -71,6 +71,8 @@ export default function History() {
   // End-of-shift inventory: per-day capture counts (null until loaded, so a failed read never
   // shows a false "missing"), whether the employee has the option, and the open photo viewer.
   const [inventoryEnabled, setInventoryEnabled] = useState(false);
+  // Paid-time threshold for the overtime screenshot (stricter gross rule until loaded).
+  const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
   const [inventoryCounts, setInventoryCounts] = useState(null);
   const [inventoryViewDate, setInventoryViewDate] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -148,8 +150,12 @@ export default function History() {
   useEffect(() => {
     if (!effectiveUserId) return;
     let cancelled = false;
-    supabase.from("profiles").select("role, inventory_screenshots_enabled").eq("id", effectiveUserId).maybeSingle()
-      .then(({ data }) => { if (!cancelled) setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled) && !isAdminEmployee(data?.role)); })
+    supabase.from("profiles").select("role, inventory_screenshots_enabled, first_trip_unpaid").eq("id", effectiveUserId).maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled) && !isAdminEmployee(data?.role));
+        setFirstTripUnpaid(Boolean(data?.first_trip_unpaid));
+      })
       .catch(() => undefined);
     return () => { cancelled = true; };
   }, [effectiveUserId]);
@@ -299,7 +305,7 @@ export default function History() {
     setErr(""); setInfo("");
     try {
       if (!job) throw new Error(t("history.errors.submitFailed"));
-      if (!isAdminEmployee(role) && dailyOvertimeEvidenceRequirement(job, jobs).required) {
+      if (!isAdminEmployee(role) && dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid }).required) {
         // Over 8 h without proof: open the work form, which shows the screenshot pop-up.
         navigate(`/form?edit=${job.id}&submit=1${managerEntry ? `&confirmed=${job.id}` : ""}`);
         return;
@@ -336,7 +342,7 @@ export default function History() {
     try {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
-      if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs).required)) {
+      if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid }).required)) {
         // Proof is one per day: open the day's last job so the form asks for the screenshot.
         const lastJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
         navigate(`/form?edit=${lastJob.id}&submit=1${hasManagerEntry ? `&confirmed=${ids.join(",")}` : ""}`);

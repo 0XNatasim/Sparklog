@@ -27,7 +27,7 @@ export function payTotals(result, ccq, reimb) {
   const withheld = statutory + (ccq ? ccq.netWithholdings : 0);
   const totalRetenues = reversals + withheld;
   const net = grossUp - totalRetenues; // includes the paid safety allowance
-  const extraReimb = reimb ? (reimb.km || 0) + (reimb.phone || 0) + (reimb.other || 0) : 0;
+  const extraReimb = reimb ? (reimb.km || 0) + (reimb.phone || 0) + (reimb.storage || 0) + (reimb.other || 0) : 0;
   return { grossUp, totalRetenues, net, extraReimb, gains: grossUp + extraReimb, netPlusReimb: net + extraReimb };
 }
 
@@ -71,8 +71,8 @@ export function buildClosing({ opening, result, ccq, reimb, pay }) {
     vacationPay: add("vacationPay", hourlyLinesVacation(pay)),
     kmIndemnity: add("kmIndemnity", reimb?.km),
     // The stub's « Autre Revenu 1 » line is the cellular reimbursement plus any other non-taxable income
-    // (S40: 14,00 + 7,11 = 21,11).
-    otherIncome: add("otherIncome", (Number(reimb?.phone) || 0) + (Number(reimb?.other) || 0)),
+    // (S40: 14,00 + 7,11 = 21,11), storage allowance included.
+    otherIncome: add("otherIncome", (Number(reimb?.phone) || 0) + (Number(reimb?.storage) || 0) + (Number(reimb?.other) || 0)),
     hoursYtd: add("hoursYtd", hours),
   };
   Object.keys(closing).forEach((k) => { if (typeof closing[k] === "number") closing[k] = round2(closing[k]); });

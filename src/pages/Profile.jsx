@@ -5,7 +5,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { COMPANY_FORMS } from "@/lib/forms";
+import ReferenceContent from "@/components/ReferenceContent";
+import { useLanguage } from "@/components/language-provider";
+import { directLink } from "@/lib/reference-blocks";
+import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { useT } from "@/lib/use-t";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
@@ -22,26 +25,33 @@ export default function Profile() {
   const effectiveUserId = isViewMode ? viewedEmployee.id : user?.id;
   const [profile, setProfile] = useState(null);
   const [forms, setForms] = useState([]);
+  const [references, setReferences] = useState([]);
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     if (!effectiveUserId) return;
-    const [profileResult, formsResult, accessResult] = await Promise.all([
+    const [profileResult, formsResult, accessResult, referencesResult] = await Promise.all([
       supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, show_on_boards").eq("id", effectiveUserId).single(),
-      supabase.from("employee_forms").select("form_id").eq("enabled", true),
+      supabase.from("employee_forms").select("form_id, name_fr, name_en, url, employee_specific, sort_order").eq("enabled", true).order("sort_order").limit(QUERY_BUDGETS.managedForms),
       supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
+      supabase.from("profile_references").select("id, section, title, description, blocks").eq("published", true).order("sort_order").order("created_at").limit(QUERY_BUDGETS.profileReferences),
     ]);
-    const loadError = profileResult.error || formsResult.error || accessResult.error;
+    const loadError = profileResult.error || formsResult.error || accessResult.error || referencesResult.error;
     if (loadError) setError(loadError.message);
     else {
       setProfile(profileResult.data);
-      const enabledIds = new Set((formsResult.data || []).map((row) => row.form_id));
       const accessibleIds = new Set((accessResult.data || []).map((row) => row.form_id));
-      setForms(COMPANY_FORMS.filter((form) => enabledIds.has(form.id) && (!form.employeeSpecific || accessibleIds.has(form.id))));
+      setForms((formsResult.data || []).filter((form) => form.url && (!form.employee_specific || accessibleIds.has(form.form_id))));
+      setReferences(referencesResult.data || []);
     }
     setLoading(false);
   }, [effectiveUserId, user?.id]);
+
+  const formName = (form) => (language === "en" ? form.name_en || form.name_fr : form.name_fr || form.name_en) || "—";
+  const quickReferences = references.filter((reference) => reference.section === "quick");
+  const contactReferences = references.filter((reference) => reference.section === "contacts");
 
   useEffect(() => { load(); }, [load]);
 
@@ -93,15 +103,17 @@ export default function Profile() {
               )}
             </CollapsibleCard>
 
-            <QuickReferenceCard />
+            <QuickReferenceCard references={quickReferences} />
 
-            <CollapsibleCard icon={Phone} title={t("profile.contacts")} description={t("profile.contactsDescription")}>
-              <ContactsReference />
-            </CollapsibleCard>
+            {contactReferences.length > 0 && (
+              <CollapsibleCard icon={Phone} title={t("profile.contacts")} description={t("profile.contactsDescription")}>
+                <ContactsReference references={contactReferences} />
+              </CollapsibleCard>
+            )}
 
             <CollapsibleCard icon={ClipboardList} title={t("profile.forms")} description={t("profile.formsDescription")}>
               <div className="grid gap-3 sm:grid-cols-2">
-                {forms.map((form) => <a key={form.id} href={form.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-lg border p-4 font-medium hover:border-primary/50 hover:bg-accent">{t(form.nameKey)}<ExternalLink className="h-4 w-4 text-muted-foreground" /></a>)}
+                {forms.map((form) => <a key={form.form_id} href={form.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between rounded-lg border p-4 font-medium hover:border-primary/50 hover:bg-accent">{formName(form)}<ExternalLink className="h-4 w-4 text-muted-foreground" /></a>)}
                 {forms.length === 0 && <p className="col-span-full text-sm text-muted-foreground">{t("profile.noForms")}</p>}
               </div>
             </CollapsibleCard>
@@ -113,35 +125,58 @@ export default function Profile() {
   );
 }
 
-function QuickReferenceCard() {
+function ReferenceButton({ reference }) {
+  const href = directLink(reference);
+  const className = "flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        <span>{reference.title}</span>
+        <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </a>
+    );
+  }
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className={className}>
+          <span>{reference.title}</span>
+          <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{reference.title}</DialogTitle>
+          {reference.description && <DialogDescription>{reference.description}</DialogDescription>}
+        </DialogHeader>
+        <ReferenceContent blocks={reference.blocks} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function QuickReferenceCard({ references }) {
   const t = useT();
   return (
     <CollapsibleCard icon={BookOpen} title={t("profile.quickReference")} description={t("profile.quickReferenceDescription")}>
       <div className="space-y-3">
-        <ReservationStatusReference />
-        <CalypsoV1Reference />
-        <ThermostatSpacingReference />
-        <StorageTemperatureReference />
-        <a
-          href="https://support.sinopetech.com/wp-content/uploads/2026/04/660-0735-0022-E_TH1300ZB-ENG-Avec-GT130_web.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <span>Thermostat plancher chauffant — TH1300ZB (manuel)</span>
-          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </a>
-        <a
-          href="https://support.sinopetech.com/wp-content/uploads/2026/01/660-0339-0000-29012026-Guide-dinstallation-RM3510WF-FR.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <span>Calypso V2 — RM3510WF (guide d&apos;installation)</span>
-          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </a>
+        {references.map((reference) => <ReferenceButton key={reference.id} reference={reference} />)}
+        {references.length === 0 && <p className="text-sm text-muted-foreground">{t("profile.noReferences")}</p>}
       </div>
     </CollapsibleCard>
+  );
+}
+
+// Shown inline inside its collapsible card: one titled section per contact reference.
+function ContactsReference({ references }) {
+  return (
+    <div className="space-y-5 text-sm leading-relaxed">
+      {references.map((reference) => (
+        <ReferenceSection key={reference.id} title={reference.title}>
+          <ReferenceContent blocks={reference.blocks} />
+        </ReferenceSection>
+      ))}
+    </div>
   );
 }
 
@@ -159,269 +194,6 @@ function CollapsibleCard({ icon: Icon, title, description, defaultOpen = false, 
         <div className="border-t p-4">{children}</div>
       </details>
     </Card>
-  );
-}
-
-function ReservationStatusReference() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button type="button" className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-          <span>Status de réservation</span>
-          <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Status de réservation</DialogTitle>
-          <DialogDescription>
-            Rappel de la bonne utilisation des statuts lors de la fermeture des OT.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-5 text-sm leading-relaxed">
-          <p>Il existe plusieurs statuts de réservation lors de la fermeture des OT. Ce message est un rappel de la bonne utilisation de chacun d&apos;entre eux.</p>
-
-          <ReferenceSection title="Annulé – Refus d'installer">
-            <p>À utiliser lorsque le client ne souhaite plus la solution Hilo, change d&apos;idée ou refuse définitivement l&apos;installation.</p>
-          </ReferenceSection>
-
-          <ReferenceSection title="Annulé – Client absent">
-            <p>Appelez le client au numéro inscrit au dossier en composant <strong>#31#</strong> avant le numéro.</p>
-            <p className="font-semibold">Si le client répond :</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>Peut-il être présent dans les 15 prochaines minutes?</li>
-              <li><strong>Oui :</strong> attendez sur place et procédez à l&apos;installation.</li>
-              <li><strong>Non :</strong> mettez le statut « Annulé – Client absent » et informez la répartition.</li>
-            </ul>
-            <p className="font-semibold">Si le client ne répond pas :</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>Communiquez avec la répartition afin qu&apos;elle tente également de joindre le client.</li>
-              <li>Après 15 minutes, mettez le statut « Annulé – Client absent » et informez la répartition.</li>
-              <li>Ajoutez une photo de la porte du client dans la section « Notes rapides » de l&apos;OT.</li>
-              <li>Inscrivez toute information pertinente pouvant expliquer la situation.</li>
-            </ul>
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-              <strong>Important :</strong> Si le client n&apos;est pas prêt pour l&apos;installation, mais souhaite qu&apos;elle soit effectuée à une date ultérieure, utilisez également le statut « Annulé – Client absent » et expliquez clairement la situation dans les notes.
-            </div>
-          </ReferenceSection>
-
-          <ReferenceSection title="En attente de thermostats">
-            <p className="font-semibold text-destructive dark:text-red-300">Ce statut ne doit jamais être utilisé.</p>
-          </ReferenceSection>
-
-          <ReferenceSection title="Non admissible">
-            <p>Utilisez ce statut uniquement dans les situations suivantes :</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>Absence de réseau Internet.</li>
-              <li>Le client ne possède pas de téléphone intelligent ou de tablette compatible.</li>
-              <li>Installation impossible pour une raison technique ou autre.</li>
-            </ul>
-            <p>Dans tous les cas de non-admissibilité, veuillez inscrire dans les notes la raison précise pour laquelle l&apos;installation n&apos;a pas pu être réalisée. Ces informations nous permettent de bien comprendre la situation, de l&apos;expliquer au client au besoin et d&apos;éviter des communications inutiles.</p>
-          </ReferenceSection>
-
-          <p className="border-t pt-4 font-medium">Merci à tous de votre collaboration et de votre vigilance dans l&apos;utilisation des statuts.</p>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CalypsoV1Reference() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button type="button" className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-          <span>Calypso V1</span>
-          <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Calypso V1</DialogTitle>
-          <DialogDescription>Information importante concernant les appareils Calypso V1.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 text-sm leading-relaxed">
-          <p className="font-semibold text-destructive dark:text-red-300">
-            Svp ne plus installer de Calypso V1.
-          </p>
-          <p>
-            S&apos;il vous en reste en votre possession, veuillez les rapporter à votre entrepôt.
-          </p>
-          <p>
-            Nous sommes présentement en train de faire des tests sur les V1.
-          </p>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Radix DialogTrigger `asChild` clones its child and injects onClick + a ref.
-// forwardRef + {...props} are required, otherwise the trigger never wires up and
-// the popup won't open on click.
-const ReferenceButton = React.forwardRef(function ReferenceButton({ label, ...props }, ref) {
-  return (
-    <button ref={ref} type="button" {...props} className="flex w-full items-center justify-between rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-      <span>{label}</span>
-      <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-    </button>
-  );
-});
-
-function ThermostatSpacingReference() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild><ReferenceButton label="Distance entre thermostats" /></DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Distance entre thermostats</DialogTitle>
-          <DialogDescription>Distance minimale à respecter entre 2 thermostats.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-5 text-sm leading-relaxed">
-          <p>Au moment de faire votre installation, nos manufacturiers recommandent une distance minimale à respecter entre 2 thermostats.</p>
-
-          <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
-            <p className="font-semibold">Distance minimale entre 2 thermostats</p>
-            <p className="mt-1">6 pouces (15,24 cm) de dégagement de chaque côté (à gauche et à droite).</p>
-          </div>
-
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-            <p className="font-semibold">Exception — plancher chauffant</p>
-            <p className="mt-1">Un thermostat de plancher chauffant n&apos;est pas considéré dans cette distance uniquement s&apos;il possède absolument une sonde de plancher.</p>
-          </div>
-
-          <ReferenceSection title="Superposition (un au-dessus de l'autre)">
-            <p>Il est impossible de garantir le fonctionnement de thermostats positionnés un au-dessus de l&apos;autre, puisque la chaleur dégagée par celui du dessous viendra biaiser la température de celui du haut.</p>
-          </ReferenceSection>
-
-          <ReferenceSection title="Si les règles ne peuvent pas être respectées">
-            <p>Il est de votre responsabilité d&apos;expliquer la situation au client et d&apos;éviter ce genre d&apos;installation pour tous les thermostats en cause, et de laisser ces installations telles quelles.</p>
-            <p>Le client a toujours la possibilité de faire corriger la situation par un électricien certifié et de faire une commande supplémentaire dans le futur.</p>
-          </ReferenceSection>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function StorageTemperatureReference() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild><ReferenceButton label="Température d'entreposage" /></DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Température d&apos;entreposage</DialogTitle>
-          <DialogDescription>Choc thermique et condensation en période de grand froid.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-5 text-sm leading-relaxed">
-          <p>La grande différence de température entre les appareils qui arrivent de l&apos;extérieur en périodes de grands froids et la température ambiante chez le client peut créer un problème à l&apos;installation des thermostats et des contrôleurs de chauffe-eau.</p>
-          <p>Le choc thermique entre les températures très froides à l&apos;extérieur et autour de +20 °C à l&apos;intérieur risque de causer de la condensation sous la forme d&apos;une couche d&apos;humidité au niveau des composantes électroniques. Celle-ci génère un pont entre les points de soudure, ce qui peut entraîner des courts-circuits qui endommagent les appareils lorsqu&apos;on rétablit le courant.</p>
-
-          <ReferenceSection title="Observations">
-            <p>Les cas observés ont démontré des tâches noires et des étincelles apparentes. Les équipements ont dû être remplacés.</p>
-          </ReferenceSection>
-
-          <ReferenceSection title="Comportements souhaités">
-            <ul className="list-disc space-y-1 pl-5">
-              <li>Ne pas laisser les appareils à l&apos;extérieur, même dans le coffre d&apos;une voiture, durant la période hivernale.</li>
-              <li>Laisser les appareils atteindre le plus près possible de la température de la pièce avant de les installer.</li>
-            </ul>
-          </ReferenceSection>
-
-          <ReferenceSection title="Rappels">
-            <p className="font-semibold">Température d&apos;entreposage minimum</p>
-            <ul className="list-disc space-y-1 pl-5"><li>−40 °C à 50 °C pour tous les appareils.</li></ul>
-            <p className="mt-2 font-semibold">Température d&apos;utilisation</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>−20 °C à 50 °C pour les thermostats.</li>
-              <li>0 °C à 40 °C pour les contrôleurs de chauffe-eau.</li>
-            </ul>
-          </ReferenceSection>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ContactsReference() {
-  // Our own company contacts, shown first.
-  const messier = [
-    { name: "Karine Messier", email: "messierconnexion@gmail.com", phone: "514-799-8879" },
-    { name: "Simon Bellerive", email: "simon1984bjeux@gmail.com", phone: "438-392-4672" },
-  ];
-  const britton = [
-    { name: "Olivier Dagenais", role: "Contremaître", email: "odagenais@britton.ca", phone: "438-828-7070" },
-    { name: "Mélanie Noël-Richard", role: "Contremaître", email: "mrichard@britton.ca", phone: "514-799-0097" },
-    { name: "Marc-Antoine Charette", role: "Contremaître", email: "mcharette@britton.ca", phone: "514-912-7847" },
-    { name: "Yanni Chabot-Valin", role: "Contremaître", email: "yvalin@britton.ca", phone: "514-668-3736" },
-  ];
-  // Contacts for on-site installation support (phone only), shown below Britton.
-  const installSupport = [
-    { name: "François Belhumeur", phone: "438-396-8405" },
-    { name: "Jonathan Charron", phone: "438-402-1023" },
-  ];
-  // Shown inline inside its collapsible card — no dialog. Unfolding the card reveals
-  // the contacts directly.
-  return (
-    <div className="space-y-5 text-sm leading-relaxed">
-      <ReferenceSection title="Messier Connexion inc.">
-        <div className="space-y-2">
-          {messier.map((c) => (
-            <div key={c.email} className="rounded-md border p-3">
-              <div className="font-medium">{c.name}</div>
-              {c.phone && (
-                <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
-                  <Phone className="h-3.5 w-3.5" />{c.phone}
-                </a>
-              )}
-              <a href={`mailto:${c.email}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
-                <Mail className="h-3.5 w-3.5" />{c.email}
-              </a>
-            </div>
-          ))}
-        </div>
-      </ReferenceSection>
-
-      <ReferenceSection title="HILO — Répartition">
-        <div className="rounded-md border p-3">
-          <a href="tel:+14382894456" className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
-            <Phone className="h-3.5 w-3.5" />438-289-4456
-          </a>
-          <p className="mt-1 text-xs text-muted-foreground">Choix caché : composez le 7.</p>
-        </div>
-      </ReferenceSection>
-
-      <ReferenceSection title="Britton">
-        <div className="space-y-2">
-          {britton.map((c) => (
-            <div key={c.email} className="rounded-md border p-3">
-              <div className="font-medium">{c.name}{c.role ? <span className="ml-2 text-xs font-normal text-muted-foreground">{c.role}</span> : null}</div>
-              {c.phone && (
-                <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
-                  <Phone className="h-3.5 w-3.5" />{c.phone}
-                </a>
-              )}
-              <a href={`mailto:${c.email}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
-                <Mail className="h-3.5 w-3.5" />{c.email}
-              </a>
-            </div>
-          ))}
-        </div>
-      </ReferenceSection>
-
-      <ReferenceSection title="Support installation">
-        <div className="space-y-2">
-          {installSupport.map((c) => (
-            <div key={c.phone} className="rounded-md border p-3">
-              <div className="font-medium">{c.name}</div>
-              <a href={`tel:+1${c.phone.replace(/\D/g, "")}`} className="mt-1 flex items-center gap-1.5 text-primary hover:underline">
-                <Phone className="h-3.5 w-3.5" />{c.phone}
-              </a>
-            </div>
-          ))}
-        </div>
-      </ReferenceSection>
-    </div>
   );
 }
 

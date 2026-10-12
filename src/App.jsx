@@ -10,7 +10,7 @@ import History from "./pages/History";
 import Week from "./pages/Week";
 import ManagerLayout from "./components/manager/ManagerLayout";
 import {
-  AbsencesPage, AuditPage, CcqPage, CostsPage, DownloadsPage, EmployeesPage, EmergencyPage, FormsPage, HealthPage, LivePage,
+  AbsencesPage, AuditPage, CcqPage, CostsPage, DownloadsPage, EmployeesPage, EmergencyPage, FormsPage, HealthPage, LivePage, ReferencesPage,
   ManagerIndex, MessagesPage, PayrollCalculPage, PayrollDasPage, PayrollRoePage, PayrollStubsPage, PeriodPage,
   InventoryPage, ReceiptsPage, RulesPage, SettingsPage, TimesheetsPage,
 } from "./pages/manager/ManagerPages";
@@ -133,6 +133,7 @@ export default function App() {
           <Route path="config" element={<Navigate to="rules" replace />} />
           <Route path="config/rules" element={<RulesPage />} />
           <Route path="config/settings" element={<SettingsPage />} />
+          <Route path="config/references" element={<ReferencesPage />} />
           <Route path="advanced" element={<Navigate to="audit" replace />} />
           <Route path="advanced/audit" element={<AuditPage />} />
           <Route path="advanced/health" element={<HealthPage />} />

@@ -155,3 +155,24 @@ describe("migration 0075 database contract", () => {
     }
   });
 });
+
+describe("migration 0078 delete_manager_entry", () => {
+  const deleteSql = readFileSync(fileURLToPath(new URL(
+    "../../supabase/migrations/20261009180000_0078_delete_manager_entry.sql", import.meta.url
+  )), "utf8");
+
+  it("is owner-only, locks the row and refuses anything already validated", () => {
+    expect(deleteSql).toContain("not public.is_privileged()");
+    expect(deleteSql).toContain("owner_role_required");
+    expect(deleteSql).toContain("for update");
+    expect(deleteSql).toContain("current_job.manager_entry_at is null");
+    expect(deleteSql).toContain("current_job.employee_confirmed_at is not null");
+    expect(deleteSql).toContain("job_state_changed");
+  });
+
+  it("audits the deletion and is exposed only to signed-in users", () => {
+    expect(deleteSql).toContain("'manager_entry_deleted'");
+    expect(deleteSql).toContain("revoke all on function public.delete_manager_entry(uuid) from public, anon");
+    expect(deleteSql).toContain("grant execute on function public.delete_manager_entry(uuid) to authenticated");
+  });
+});

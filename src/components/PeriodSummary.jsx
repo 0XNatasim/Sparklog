@@ -10,6 +10,7 @@ import { formatHM } from "@/lib/time";
 import { useT } from "@/lib/use-t";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
+import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 
 dayjs.extend(isoWeek);
 
@@ -63,7 +64,7 @@ export default function PeriodSummary({ mode = "week" }) {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid"),
+        supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid"),
         supabase.from("jobs").select("id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
@@ -98,15 +99,16 @@ export default function PeriodSummary({ mode = "week" }) {
           byUser.get(j.user_id).push(j);
         });
 
-        let labor = 0, conges = 0, contribTotal = 0, kmCost = 0, workedMin = 0, otJobs = 0, phoneData = 0;
+        let labor = 0, conges = 0, contribTotal = 0, kmCost = 0, workedMin = 0, otJobs = 0, phoneData = 0, storage = 0;
         for (const [uid, ujobs] of byUser) {
           const profile = profileById.get(uid);
           const isNonCcq = isNonCcqRole(profile?.role);
           const isSub = isSubcontractorRole(profile?.role);
           const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
-          // Weekly phone/data reimbursement × distinct CCQ weeks worked in this bucket.
+          // Weekly phone/data and storage allowances × distinct CCQ weeks worked in this bucket.
           const weeksWorked = new Set(ujobs.map((j) => ccqWeek(j.job_date).key)).size;
-          phoneData += weeksWorked * (Number(profile?.phone_data_reimbursement) || 0);
+          phoneData += weeksWorked * weeklyPhoneAmount(profile);
+          storage += weeksWorked * weeklyStorageAmount(profile);
           const level = profile?.apprentice_level || null;
           const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
@@ -136,7 +138,7 @@ export default function PeriodSummary({ mode = "week" }) {
           }
         }
 
-        const expenses = kmCost + b.meals + b.parking + phoneData;
+        const expenses = kmCost + b.meals + b.parking + phoneData + storage;
         const title = mode === "month" ? b.end.format("MMMM YYYY") : `${t("manager.weekShort")} ${b.end.isoWeek()}`;
         result.push({
           key: b.key,
@@ -155,6 +157,7 @@ export default function PeriodSummary({ mode = "week" }) {
           supper: b.meals,
           parking: b.parking,
           phone: phoneData,
+          storage,
           expenses,
           total: labor + conges + contribTotal + expenses,
         });
@@ -192,6 +195,7 @@ export default function PeriodSummary({ mode = "week" }) {
               <Stat label={t("testing.week.supper")} value={money(w.supper)} />
               <Stat label={t("testing.week.parking")} value={money(w.parking)} />
               <Stat label={t("testing.week.phoneData")} value={money(w.phone)} />
+              <Stat label={t("employees.storage")} value={money(w.storage)} />
             </div>
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t pt-3 text-sm">
               <span className="text-muted-foreground">{t("testing.week.indemnity")}: <span className="font-mono">{money(w.conges)}</span></span>

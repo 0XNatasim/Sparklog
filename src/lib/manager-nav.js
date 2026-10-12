@@ -37,6 +37,7 @@ export const MANAGER_NAV = Object.freeze([
     { id: "config-rules", path: "config/rules", grant: "employees", labelKey: "mgr.nav.rules" },
     { id: "config-settings", path: "config/settings", grant: null, labelKey: "mgr.nav.settings" },
     { id: "forms", path: "forms", grant: "forms", labelKey: "mgr.nav.forms" },
+    { id: "references", path: "config/references", grant: null, labelKey: "mgr.nav.references" },
   ] },
   { id: "advanced", labelKey: "mgr.group.advanced", items: [
     { id: "advanced-audit", path: "advanced/audit", grant: null, labelKey: "mgr.nav.audit" },

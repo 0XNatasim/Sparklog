@@ -53,6 +53,12 @@ describe("manager navigation", () => {
     expect(groupOf("forms")).toBe("config");
     const config = MANAGER_NAV.find((group) => group.id === "config").items.map((item) => item.id);
     expect(config.indexOf("forms")).toBe(config.indexOf("config-settings") + 1);
+    expect(config.indexOf("references")).toBe(config.indexOf("forms") + 1);
+  });
+
+  it("keeps the references editor manager-only (never reachable through an admin grant)", () => {
+    expect(ids("manager", [])).toContain("references");
+    expect(ids("admin", [...GRANTABLE_ADMIN_SECTIONS])).not.toContain("references");
   });
 
   it("keeps the inventory screenshots page manager-only", () => {

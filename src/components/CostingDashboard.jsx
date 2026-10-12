@@ -11,6 +11,7 @@ import EmployerContributionsManager from "@/components/EmployerContributionsMana
 import CongesIndemnityManager from "@/components/CongesIndemnityManager";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
+import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 
 const montrealToday = companyDate;
 
@@ -75,7 +76,7 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid"),
+        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid"),
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
         // 'saved' drafts and 'updated' un-reviewed edits). Claims: pending + approved
         // (exclude rejected — a rejected expense must not inflate the estimate).
@@ -154,10 +155,11 @@ export default function CostingDashboard() {
         // km and parking are actual expense reimbursements and still apply.
         const mealsCost = isNonCcq ? 0 : (mealByUser.get(userId) || 0);
         const parkingCost = parkingByUser.get(userId) || 0;
-        // Phone/data reimbursement is a fixed weekly amount — prorate by the number
+        // Phone/data and storage are fixed weekly amounts — prorate by the number
         // of distinct CCQ weeks the employee actually worked in the range.
         const weeksWorked = new Set((jobsByUser.get(userId) || []).map((j) => ccqWeekKey(j.job_date))).size;
-        const phoneData = weeksWorked * (Number(profile?.phone_data_reimbursement) || 0);
+        const phoneData = weeksWorked * weeklyPhoneAmount(profile);
+        const storageCost = weeksWorked * weeklyStorageAmount(profile);
 
         result.push({
           userId,
@@ -169,8 +171,8 @@ export default function CostingDashboard() {
           regHours: (regMin + returnMin) / 60,
           otHours: (ot50Min + ot100Min) / 60,
           returnNbHours: returnNbMin / 60,
-          labor: labor + laborNoBenefit, conges, contribTotal, contribLines, kmCost, mealsCost, parkingCost, phoneData,
-          total: labor + laborNoBenefit + conges + contribTotal + kmCost + mealsCost + parkingCost + phoneData,
+          labor: labor + laborNoBenefit, conges, contribTotal, contribLines, kmCost, mealsCost, parkingCost, phoneData, storageCost,
+          total: labor + laborNoBenefit + conges + contribTotal + kmCost + mealsCost + parkingCost + phoneData + storageCost,
         });
       });
       result.sort((a, b) => b.total - a.total);
@@ -186,7 +188,7 @@ export default function CostingDashboard() {
     labor: acc.labor + r.labor,
     conges: acc.conges + r.conges,
     contribTotal: acc.contribTotal + r.contribTotal,
-    expenses: acc.expenses + r.kmCost + r.mealsCost + r.parkingCost + r.phoneData,
+    expenses: acc.expenses + r.kmCost + r.mealsCost + r.parkingCost + r.phoneData + r.storageCost,
     total: acc.total + r.total,
   }), { regHours: 0, otHours: 0, labor: 0, conges: 0, contribTotal: 0, expenses: 0, total: 0 });
 
@@ -252,7 +254,7 @@ export default function CostingDashboard() {
               <tbody>
                 {rows.map((r) => {
                   const isOpen = expanded.has(r.userId);
-                  const expenses = r.kmCost + r.mealsCost + r.parkingCost + r.phoneData;
+                  const expenses = r.kmCost + r.mealsCost + r.parkingCost + r.phoneData + r.storageCost;
                   return (
                     <React.Fragment key={r.userId}>
                       <tr className="border-b last:border-0 hover:bg-muted/20">
@@ -286,6 +288,7 @@ export default function CostingDashboard() {
                               <Detail label={t("costing.col.meals")} value={money(r.mealsCost)} />
                               <Detail label={t("costing.col.parking")} value={money(r.parkingCost)} />
                               <Detail label={t("costing.col.phoneData")} value={money(r.phoneData)} />
+                              <Detail label={t("employees.storage")} value={money(r.storageCost)} />
                             </div>
                           </td>
                         </tr>

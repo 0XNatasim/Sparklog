@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { BellRing, Camera, FilePlus2 } from "lucide-react";
+import { BellRing, Camera, FilePlus2, Trash2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export default function EmergencyTimesheet() {
   const [pendingOnly, setPendingOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [remindingId, setRemindingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
   const [error, setError] = useState("");
@@ -196,6 +197,26 @@ export default function EmergencyTimesheet() {
     }
   }
 
+  async function remove(entry) {
+    if (deletingId) return;
+    setError("");
+    setInfo("");
+    const ok = await confirm(t("emergency.deleteConfirm", { name: nameById.get(entry.user_id) || "", date: entry.job_date }));
+    if (!ok) return;
+    setDeletingId(entry.id);
+    try {
+      const { error: rpcError } = await withTimeout(supabase.rpc("delete_manager_entry", { p_job_id: entry.id }), 12000);
+      if (rpcError) throw rpcError;
+      setInfo(t("emergency.deleted"));
+      await loadEntries().catch(() => undefined);
+    } catch (deleteError) {
+      setError(friendlyErrorMessage(deleteError, t, "emergency.errors.delete"));
+      await loadEntries().catch(() => undefined);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const visibleEntries = pendingOnly ? entries.filter((entry) => managerEntryState(entry) === "pending") : entries;
   const pendingCount = entries.filter((entry) => managerEntryState(entry) === "pending").length;
 
@@ -308,10 +329,16 @@ export default function EmergencyTimesheet() {
                     <div className="flex items-center gap-2">
                       <Badge variant={STATE_VARIANT[state] || "secondary"} className="uppercase tracking-wide">{t(`emergency.state.${state}`)}</Badge>
                       {state === "pending" && (
-                        <Button type="button" size="sm" variant="outline" disabled={Boolean(remindingId)} onClick={() => remind(entry)}>
-                          <BellRing className="mr-1 h-4 w-4" aria-hidden="true" />
-                          {remindingId === entry.id ? t("common.saving") : t("emergency.remind")}
-                        </Button>
+                        <>
+                          <Button type="button" size="sm" variant="outline" disabled={Boolean(remindingId || deletingId)} onClick={() => remind(entry)}>
+                            <BellRing className="mr-1 h-4 w-4" aria-hidden="true" />
+                            {remindingId === entry.id ? t("common.saving") : t("emergency.remind")}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" className="text-destructive" disabled={Boolean(remindingId || deletingId)} onClick={() => remove(entry)}>
+                            <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />
+                            {deletingId === entry.id ? t("common.saving") : t("emergency.delete")}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </li>
