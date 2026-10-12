@@ -56,6 +56,7 @@ export function buildCalculTalon({ opening = {}, closing, result, ccq = null, re
     n(reimb.other) ? tx("Autre revenu non imposable (à verser)", 1, n(reimb.other), reimb.other) : null,
     n(pay.premium) ? tx("Régulier à taux horaire", n(pay.regularHours), n(pay.premium), lines.regularPremium) : null,
     phone ? tx("Remboursement données cellulaire", phoneUnits, phoneUnits === 1 ? phone : 7, phone) : null,
+    n(reimb.storage) ? tx("Entreposage", 1, n(reimb.storage), reimb.storage) : null,
     n(pay.baseOnlyHours) ? tx("Régulier à taux horaire", n(pay.baseOnlyHours), base, lines.baseOnly) : null,
   ].filter(Boolean);
 

@@ -35,7 +35,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
   const model = buildStubModel({ result, ytd, pay, reimb, ccq: ccqPeriod });
   if (!model) return null;
-  const { gains, sommaire, groupLabel, rulesTag, grossUp, totalRetenues, net, netPlusReimb, kmReimb, phoneReimb } = model;
+  const { gains, sommaire, groupLabel, rulesTag, grossUp, totalRetenues, net, netPlusReimb, kmReimb, phoneReimb, storageReimb } = model;
 
   // Advance the cumulatives (if the parent opted in) after the stub is output.
   function afterOutput() { try { onOutput?.(); } catch { /* non-fatal */ } }
@@ -151,12 +151,13 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
             ))}
           </div>
 
-          {/* Amount actually paid = paie nette + non-taxable reimbursements (KM, phone) */}
+          {/* Amount actually paid = paie nette + non-taxable reimbursements (KM, phone, storage) */}
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-neutral-900 bg-slate-900 px-3 py-2 text-white">
             <span className="text-[11px]">
               Paie nette {money(net)}
               {kmReimb > 0 && <> + Indemnité KM <span className="text-green-300">{money(kmReimb)}</span></>}
               {phoneReimb > 0 && <> + Données cellulaire <span className="text-green-300">{money(phoneReimb)}</span></>}
+              {storageReimb > 0 && <> + Entreposage <span className="text-green-300">{money(storageReimb)}</span></>}
             </span>
             <span className="font-semibold">Paie nette + remboursements <span className="ml-2 font-mono text-lg font-extrabold">{money(netPlusReimb)}</span></span>
           </div>

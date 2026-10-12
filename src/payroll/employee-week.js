@@ -14,6 +14,7 @@ import {
 } from "./index.js";
 import { printedPayLines } from "./earnings.js";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 
 const toCents = (d) => Math.round((Number(d) || 0) * 100);
 
@@ -77,7 +78,7 @@ export function snapshotFromRow(row) {
 
 // Compute one employee's talon for a set of jobs (normally one CCQ week) on top of the
 // opening YTD balance. Returns everything PayStubPrint + the DAS tab need.
-export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, employer = DEFAULT_EMPLOYER, weekDate, messierMethod = false }) {
+export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, includeStorage = false, employer = DEFAULT_EMPLOYER, weekDate, messierMethod = false }) {
   // Pay-week date used to pick the dated union-dues rule. Explicit wins; else the
   // earliest job_date in the set (any day of a CCQ week resolves the same rule window).
   const payWeekDate = weekDate || (jobs || []).reduce((min, j) => (j?.job_date && (!min || j.job_date < min) ? j.job_date : min), null) || undefined;
@@ -129,11 +130,12 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const unionDuesFederalAnnual = (ccqAmounts.federalDeduction || 0) * (PAY_PERIODS_PER_YEAR[frequency] || 52);
 
   const kmReimb = pay.km * pay.kmRate;
-  // Weekly cell-phone data reimbursement (profiles.phone_data_reimbursement, set per employee in
-  // Règles de temps). Paid once per worked week; non-taxable, so it only adds to the paid amount.
-  const phoneReimb = includePhone ? (Number(profile?.phone_data_reimbursement) || 0) : 0;
+  // Weekly phone-data and storage allowances (set per employee in Règles de temps). Paid once per
+  // worked week; non-taxable, so they only add to the paid amount.
+  const phoneReimb = includePhone ? weeklyPhoneAmount(profile) : 0;
+  const storageReimb = includeStorage ? weeklyStorageAmount(profile) : 0;
   const safety = ccqAmounts.safetyEquipment || 0;
-  const reimb = { km: kmReimb, phone: phoneReimb, safety, total: kmReimb + phoneReimb + safety };
+  const reimb = { km: kmReimb, phone: phoneReimb, storage: storageReimb, safety, total: kmReimb + phoneReimb + storageReimb + safety };
 
   const result = calculatePayroll({
     taxYear: 2026,

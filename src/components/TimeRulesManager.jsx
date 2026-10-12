@@ -33,7 +33,7 @@ export default function TimeRulesManager() {
   async function load() {
     // Deadline, evidence retention and the CCQ calendar live in Réglage.
     const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_overtime_no_benefits, km_rate, phone_data_reimbursement, storage_compensation").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_overtime_no_benefits, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
     ]);
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
@@ -138,8 +138,8 @@ export default function TimeRulesManager() {
     }
   }
 
-  // Per-employee reimbursements (km rate, weekly phone data). Edited locally, saved on blur;
-  // an empty field saves the column default meaning (no km rate / no phone reimbursement).
+  // Per-employee reimbursements (km rate, weekly phone data, weekly storage). Edited locally, saved
+  // on blur; an empty field means none (no km rate / a 0 $ allowance).
   function setPayRuleLocal(id, field, value) {
     setPayRuleRows((rows) => rows.map((row) => (row.id === id ? { ...row, [field]: value } : row)));
   }
@@ -266,15 +266,22 @@ export default function TimeRulesManager() {
                           </span>
                         </label>
                         {storageEligible && (
-                          <label className="flex cursor-pointer items-center justify-between gap-3 rounded border bg-background px-2 py-2 text-xs">
-                            <span>{t("employees.storage")} <b className="text-primary">$50</b></span>
-                            <input
-                              type="checkbox"
-                              checked={Boolean(row.storage_compensation)}
-                              onChange={(e) => setPayRule(row.id, "storage_compensation", e.target.checked)}
-                              className="h-5 w-5 shrink-0 rounded border-input accent-primary"
-                            />
-                          </label>
+                          <div title={t("employees.storageHint")} className="flex items-center justify-between gap-3 rounded border bg-background px-2 py-1.5 text-xs">
+                            <label className="flex cursor-pointer items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(row.storage_compensation)}
+                                onChange={(e) => setPayRule(row.id, "storage_compensation", e.target.checked)}
+                                className="h-5 w-5 shrink-0 rounded border-input accent-primary"
+                              />
+                              <span>{t("employees.storage")}</span>
+                            </label>
+                            <span className={`flex items-center gap-1 ${row.storage_compensation ? "" : "opacity-50"}`}>
+                              <span className="text-muted-foreground">$</span>
+                              <Input type="number" step="0.01" min="0" inputMode="decimal" aria-label={t("employees.storage")} disabled={!row.storage_compensation} value={row.storage_compensation_amount ?? ""} onChange={(e) => setPayRuleLocal(row.id, "storage_compensation_amount", e.target.value)} onBlur={(e) => savePayAmount(row.id, "storage_compensation_amount", e.target.value)} placeholder="50.00" className="h-8 w-20 text-right font-mono" />
+                              <span className="text-muted-foreground">/{t("employees.perWeek")}</span>
+                            </span>
+                          </div>
                         )}
                       </div>
                     )}
