@@ -294,6 +294,8 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ## 6. À faire / à préciser (mis à jour 2026-10-12, après la PR #395 — V2.4.99)
 
+> Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
+
 Liste unique des points ouverts. Les sections 1 à 5 gardent le détail ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
 
