@@ -201,7 +201,7 @@ export default function DasTab({ messier = false }) {
             {period === "month" ? (
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.das.monthSelect")}</span>
-                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   {months.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
                   {months.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
                 </select>
@@ -209,7 +209,7 @@ export default function DasTab({ messier = false }) {
             ) : (
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-                <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   {weekKeys.map((w) => (
                     <option key={w.key} value={w.key}>{t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
                   ))}
@@ -221,7 +221,7 @@ export default function DasTab({ messier = false }) {
             {/* Employee filter */}
             <label className="block text-xs">
               <span className="text-muted-foreground">{t("payroll.employee")}</span>
-              <select value={selectedEmp} onChange={(e) => setSelectedEmp(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={selectedEmp} onChange={(e) => setSelectedEmp(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="">{t("payroll.das.allEmployees")}</option>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
               </select>

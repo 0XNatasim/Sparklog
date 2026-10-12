@@ -212,14 +212,17 @@ Precache PWA : 3 562 Ko → 2 027 Ko (28 → 23 entrées). Bundle JS inchangé (
 - [x] `public/inventory-examples` : 3 × 1080×2340 (≈ 250 Ko) → 480×1040 WebP (22 Ko) ; gardés en precache
   pour que les exemples restent visibles hors ligne.
 
-### Lot 2 — Contrastes et thème (`src/index.css`, `AppShell.jsx`, `index.html`)
-- [ ] Sombre : `--destructive` `0 62.8% 30.6%` utilisé comme texte (`text-destructive`, 85 usages) = **1,99:1**
-  → ~`0 84% 65%` (ou jeton texte séparé).
-- [ ] Clair : `--destructive` `0 84.2% 60.2%` + texte blanc = 3,59:1 → ~`0 72% 45%`.
-- [ ] Clair : `--input`/`--border` = 1,23:1 → assombrir `--input` jusqu'à ~3:1 (champs lisibles au soleil).
-- [ ] Deux noirs en sombre : `dark:bg-[#151515]` en dur (`AppShell.jsx:97,159`) vs `--background` `#09090b`
-  → une seule valeur via le jeton.
-- [ ] `theme-color` fixé à `#151515` même en clair → une balise `<meta name="theme-color" media=…>` par mode.
+### Lot 2 — Contrastes et thème — ✅ fait (V2.4.95)
+- [x] Sombre : `--destructive` `0 84% 64%` (texte sur fond 5,4:1, sur carte 5,1:1) avec
+  `--destructive-foreground` foncé (5,4:1) — avant 1,99:1.
+- [x] Clair : `--destructive` `0 72% 45%`, texte blanc 5,8:1 (avant 3,59:1).
+- [x] `--input` : clair `215 16% 58%` (3,2:1), sombre `0 0% 42%` (3,4:1). Les 30 `<select>`/`<input>`/`<textarea>`
+  natifs qui n'avaient que `border` utilisent maintenant `border-input` comme le composant `Input`.
+- [x] Sombre unifié sur `#151515` (couleur du fond du logo et du splash) : `--background 0 0% 8.2%`,
+  cartes `10.6%`, gris neutres (sans teinte bleue), `--border 20%`. `dark:bg-[#151515]` retiré
+  (`AppShell`, `ManagerLayout`) ; la carte de `Login` utilise `dark:bg-background`.
+- [x] `theme-color` : une balise par mode dans `index.html`, puis `theme-provider.jsx` aligne la couleur sur
+  le thème choisi dans l'app (`#ffffff` / `#151515`), y compris quand il diffère du système.
 
 ### Lot 3 — Chargement (P-1, P-7)
 - [ ] `React.lazy` + `Suspense` pour toutes les pages `/manager/*` et `PayrollEngineTester`.

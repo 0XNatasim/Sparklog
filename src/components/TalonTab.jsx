@@ -267,7 +267,7 @@ export default function TalonTab({ messier = false }) {
               {batchMsg && <p className="mt-1 text-xs text-muted-foreground">{batchMsg}</p>}
             </div>
             <div className="flex items-center gap-2">
-              <select value={batchWeek} onChange={(e) => { setBatchWeek(e.target.value); setBatchMsg(""); }} className="rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={batchWeek} onChange={(e) => { setBatchWeek(e.target.value); setBatchMsg(""); }} className="rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 {weeks.map((w) => (
                   <option key={w.key} value={w.key}>S{w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
                 ))}

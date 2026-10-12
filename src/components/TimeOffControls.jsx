@@ -137,7 +137,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
 
       <label className="mb-2 block text-xs sm:max-w-xs">
         <span className="mb-1 block text-muted-foreground">{t("timeOff.category")}</span>
-        <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+        <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
           {TIME_OFF_CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c, t)}</option>)}
         </select>
       </label>

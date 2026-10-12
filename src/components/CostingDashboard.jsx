@@ -210,7 +210,7 @@ export default function CostingDashboard() {
                 <select
                   value={weekEnd}
                   onChange={(e) => setWeekEnd(e.target.value)}
-                  className="rounded-md border bg-background px-2 py-1.5 text-sm"
+                  className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                   aria-label={t("costing.selectWeek")}
                 >
                   {weekOptions.map((w) => (

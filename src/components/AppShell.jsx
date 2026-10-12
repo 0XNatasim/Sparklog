@@ -92,7 +92,7 @@ export default function AppShell({ children }) {
           </div>
         </div>
       )}
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30 dark:bg-[#151515]">
+      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3">
           <Link to={`/form${viewSuffix}`} className="flex shrink-0 items-baseline gap-1 text-base font-extrabold tracking-tight sm:text-lg">
@@ -154,7 +154,7 @@ export default function AppShell({ children }) {
 
       <nav
         aria-label={t("mgr.bottomNav.label")}
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden dark:bg-[#151515]"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden"
       >
         <BottomNavItem to={`/form${viewSuffix}`} icon={ClipboardList}>{t("nav.form")}</BottomNavItem>
         <BottomNavItem to={`/history${viewSuffix}`} icon={History}>{t("nav.history")}</BottomNavItem>

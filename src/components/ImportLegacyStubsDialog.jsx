@@ -147,7 +147,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
 
         <label className="block text-xs">
           <span className="text-muted-foreground">{t("payroll.employee")}</span>
-          <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); resetParse(); }} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+          <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); resetParse(); }} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
             <option value="">{t("testing.roe.employeePlaceholder")}</option>
             {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
           </select>

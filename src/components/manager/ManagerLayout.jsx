@@ -262,7 +262,7 @@ export default function ManagerLayout() {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-background/90 px-2 backdrop-blur sm:px-4 dark:bg-[#151515]">
+          <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-background/90 px-2 backdrop-blur sm:px-4">
             <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 md:hidden" onClick={() => setDrawerOpen(true)} aria-label={t("mgr.menu.open")}>
               <Menu className="h-4 w-4" />{t("mgr.menu.button")}
             </Button>

@@ -83,12 +83,12 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
         {/* Controls (not printed) */}
         <div className="payslip-noprint mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <label className="text-xs"><span className="text-muted-foreground">Employeur</span><input value={hdr.employer} onChange={setH("employer")} placeholder="Nom de l'employeur" className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">Période du</span><input type="date" value={hdr.periodStart} onChange={setH("periodStart")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">au</span><input type="date" value={hdr.periodEnd} onChange={setH("periodEnd")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">Date de paie</span><input type="date" value={hdr.payDate} onChange={setH("payDate")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">Semaine</span><input value={hdr.week} onChange={setH("week")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">No. réf.</span><input value={hdr.ref} onChange={setH("ref")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Employeur</span><input value={hdr.employer} onChange={setH("employer")} placeholder="Nom de l'employeur" className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Période du</span><input type="date" value={hdr.periodStart} onChange={setH("periodStart")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">au</span><input type="date" value={hdr.periodEnd} onChange={setH("periodEnd")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Date de paie</span><input type="date" value={hdr.payDate} onChange={setH("payDate")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Semaine</span><input value={hdr.week} onChange={setH("week")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">No. réf.</span><input value={hdr.ref} onChange={setH("ref")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
         </div>
         <div className="payslip-noprint mb-3 flex flex-wrap items-center justify-end gap-2">
           {canApproveOfficial && (

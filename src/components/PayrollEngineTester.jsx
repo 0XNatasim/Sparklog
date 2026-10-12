@@ -135,7 +135,7 @@ function Field({ label, value, onChange, type = "number", step = "0.01", suffix,
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full rounded-md border px-2 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}
+          className={`w-full rounded-md border border-input px-2 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}
         />
         {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
       </div>
@@ -821,7 +821,7 @@ export default function PayrollEngineTester({ messier = false }) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-xs">
               <span className="text-muted-foreground">{t("payroll.employee")}</span>
-              <select value={selectedId} onChange={(e) => handleSelectEmployee(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={selectedId} onChange={(e) => handleSelectEmployee(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="">{t("payroll.manual")}</option>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.role && e.role !== "employee" ? ` · ${e.role}` : ""}</option>)}
               </select>
@@ -829,7 +829,7 @@ export default function PayrollEngineTester({ messier = false }) {
             {selectedId && (
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-                <select value={selectedWeek} onChange={(e) => handleSelectWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={selectedWeek} onChange={(e) => handleSelectWeek(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   <option value="">{t("payroll.weekManual")}</option>
                   {weekOptions.map((w) => (
                     <option key={w.key} value={w.key}>
@@ -843,7 +843,7 @@ export default function PayrollEngineTester({ messier = false }) {
             {selectedId && !selectedWeek && ledger.length > 0 && (
               <label className="block text-xs sm:col-span-2">
                 <span className="text-muted-foreground">{t("payroll.startFrom")}</span>
-                <select value={startFromEnd} onChange={(e) => handleStartFrom(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={startFromEnd} onChange={(e) => handleStartFrom(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   <option value="">{t("payroll.startFromSeed")}</option>
                   {[...ledger].sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1)).map((r) => (
                     <option key={r.periodEnd} value={r.periodEnd}>
@@ -863,7 +863,7 @@ export default function PayrollEngineTester({ messier = false }) {
                   type="date"
                   value={calcWeekEnd}
                   onChange={(e) => setCalcWeekEnd(e.target.value)}
-                  className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm sm:max-w-xs"
+                  className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 font-mono text-sm sm:max-w-xs"
                 />
                 <span className="mt-1 block text-muted-foreground">
                   {dayjs(calcWeekEnd).day() !== 6 ? t("payroll.weekEnd.notSaturday") : t("payroll.weekEnd.hint")}
@@ -945,11 +945,11 @@ export default function PayrollEngineTester({ messier = false }) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <label className="block text-xs">
             <span className="text-muted-foreground">{t("payroll.province")}</span>
-            <input value="Québec" disabled className="mt-1 w-full rounded-md border bg-muted/40 px-2 py-1.5 text-sm" />
+            <input value="Québec" disabled className="mt-1 w-full rounded-md border border-input bg-muted/40 px-2 py-1.5 text-sm" />
           </label>
           <label className="block text-xs">
             <span className="text-muted-foreground">{t("payroll.frequency")}</span>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
               <option value="weekly">{t("payroll.freq.weekly")}</option>
               <option value="biweekly">{t("payroll.freq.biweekly")}</option>
               <option value="semimonthly">{t("payroll.freq.semimonthly")}</option>
@@ -1020,7 +1020,7 @@ export default function PayrollEngineTester({ messier = false }) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
-                <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
+                <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border border-input px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
                   {CCQ_LEVELS.map((k) => (
                     <option key={k} value={k}>
                       {CCQ_ELECTRICIAN_IC_C3.levels[k].label} · {(CCQ_ELECTRICIAN_IC_C3.levels[k].employeePensionRate * 100).toFixed(1)}%
@@ -1030,7 +1030,7 @@ export default function PayrollEngineTester({ messier = false }) {
               </label>
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqUnion")}</span>
-                <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
+                <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border border-input px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
                   {CCQ_UNION_KEYS.map((k) => (
                     <option key={k} value={k}>{CCQ_UNIONS[k].label}</option>
                   ))}
@@ -1053,7 +1053,7 @@ export default function PayrollEngineTester({ messier = false }) {
             <Field label={t("payroll.annualPayroll")} value={employer.annualPayrollEstimate} onChange={setEr("annualPayrollEstimate")} step="1000" />
             <label className="block text-xs">
               <span className="text-muted-foreground">{t("payroll.fssCategory")}</span>
-              <select value={employer.fssCategory} onChange={(e) => setEr("fssCategory")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={employer.fssCategory} onChange={(e) => setEr("fssCategory")(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="general">{t("payroll.fss.general")}</option>
                 <option value="primary_manufacturing">{t("payroll.fss.primary")}</option>
                 <option value="public">{t("payroll.fss.public")}</option>

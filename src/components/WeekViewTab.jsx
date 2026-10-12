@@ -102,7 +102,7 @@ export default function WeekViewTab() {
         <CardContent className="p-4">
           <label className="block text-xs sm:max-w-sm">
             <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-            <select value={selectedWeek} onChange={(e) => { setSelectedWeek(e.target.value); setOpenId(null); }} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+            <select value={selectedWeek} onChange={(e) => { setSelectedWeek(e.target.value); setOpenId(null); }} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
               {weeks.map((w) => (
                 <option key={w.key} value={w.key}>{t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
               ))}

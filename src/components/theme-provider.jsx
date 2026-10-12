@@ -4,15 +4,22 @@ const ThemeContext = createContext({ theme: "system", setTheme: () => {} });
 
 const STORAGE_KEY = "sparklog-theme";
 
+// Browser/OS status-bar colour per mode; must match --background in index.css.
+const THEME_COLORS = { light: "#ffffff", dark: "#151515" };
+
 function applyTheme(theme) {
   const root = document.documentElement;
   root.classList.remove("light", "dark");
-  if (theme === "system") {
-    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    root.classList.add(isDark ? "dark" : "light");
-  } else {
-    root.classList.add(theme);
-  }
+  const resolved = theme === "system"
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : theme;
+  root.classList.add(resolved);
+  // index.html ships one media-scoped tag per mode for first paint; once the app picks a
+  // theme (possibly overriding the system one), both follow it.
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.removeAttribute("media");
+    meta.setAttribute("content", THEME_COLORS[resolved]);
+  });
 }
 
 export function ThemeProvider({ children, defaultTheme = "system" }) {

@@ -162,7 +162,7 @@ export default function Login() {
         <ThemeToggle />
         <LanguageToggle />
       </div>
-      <Card className="w-full max-w-md dark:bg-[#151515]">
+      <Card className="w-full max-w-md dark:bg-background">
         <div className="flex justify-center px-6 pt-6">
           <img src="/header-light.webp" alt="Messier Connexion" className="w-64 max-w-full rounded dark:hidden" />
           <img src="/header-dark.webp" alt="Messier Connexion" className="hidden w-64 max-w-full dark:block" />
