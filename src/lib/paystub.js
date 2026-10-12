@@ -53,6 +53,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const caisse = n(ccqPeriod?.caisseEducationSyndicale);
   const kmReimb = n(reimb?.km);
   const phoneReimb = n(reimb?.phone);
+  const storageReimb = n(reimb?.storage);
   const otherReimb = n(reimb?.other);
 
   // ── Gross-up presentation (matches the CCQ stub) ──
@@ -62,7 +63,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const withheld = statutory + pension + medicTotal + union + prel + caisse;
   const totalRetenues = reversals + withheld;
   const net = grossUp - totalRetenues;
-  const netPlusReimb = net + kmReimb + phoneReimb + otherReimb;
+  const netPlusReimb = net + kmReimb + phoneReimb + storageReimb + otherReimb;
 
   const gainsRRQ = cash + vac + imposable;
   const gainsAE = cash + vac;
@@ -76,6 +77,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
     safety ? { label: "Équipement de sécurité", unit: hours, taux: safety / (hours || 1), montant: safety } : null,
     kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, taux: pay.kmRate, montant: kmReimb } : null,
     phoneReimb ? { label: "Remboursement données cellulaire", unit: "", taux: "", montant: phoneReimb } : null,
+    storageReimb ? { label: "Entreposage", unit: "", taux: "", montant: storageReimb } : null,
     otherReimb ? { label: "Autre revenu non imposable", unit: "", taux: "", montant: otherReimb } : null,
     n(pay.taxableBenefit) ? { label: "Autre avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
   ].filter((r) => r && (r.montant || r.label));
@@ -108,7 +110,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
 
   return {
     gains, sommaire, groupLabel, rulesTag,
-    grossUp, totalRetenues, net, netPlusReimb, kmReimb, phoneReimb, otherReimb,
+    grossUp, totalRetenues, net, netPlusReimb, kmReimb, phoneReimb, storageReimb, otherReimb,
   };
 }
 
@@ -198,7 +200,7 @@ export function stubSheetHtml({ model, hdr, employee, frequency, official = fals
       <div><div class="lbl">Paie nette</div><div class="val">${money(model.net)}</div></div>
     </div>
     <div class="paid">
-      <span class="paid-detail">Paie nette ${money(model.net)}${model.kmReimb > 0 ? ` + Indemnité KM ${money(model.kmReimb)}` : ""}${model.phoneReimb > 0 ? ` + Données cellulaire ${money(model.phoneReimb)}` : ""}${model.otherReimb > 0 ? ` + Autre revenu ${money(model.otherReimb)}` : ""}</span>
+      <span class="paid-detail">Paie nette ${money(model.net)}${model.kmReimb > 0 ? ` + Indemnité KM ${money(model.kmReimb)}` : ""}${model.phoneReimb > 0 ? ` + Données cellulaire ${money(model.phoneReimb)}` : ""}${model.storageReimb > 0 ? ` + Entreposage ${money(model.storageReimb)}` : ""}${model.otherReimb > 0 ? ` + Autre revenu ${money(model.otherReimb)}` : ""}</span>
       <span class="paid-total">Paie nette + remboursements <b>${money(model.netPlusReimb)}</b></span>
     </div>
     <div class="cols">

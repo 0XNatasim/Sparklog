@@ -17,6 +17,7 @@ import { payDateFor } from "@/lib/paystub";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 import { isSubcontractorRole } from "@/lib/roles";
+import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 
 const TAX_YEAR = 2026;
 
@@ -187,7 +188,7 @@ function Row({ label, value, strong, tone }) {
 export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, otherReimb: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, storage: 0, otherReimb: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
@@ -197,7 +198,7 @@ export default function PayrollEngineTester({ messier = false }) {
   const [asOfDate, setAsOfDate] = useState("");
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
   const [result, setResult] = useState(null);
-  const [reimb, setReimb] = useState({ km: 0, phone: 0, other: 0, total: 0 });
+  const [reimb, setReimb] = useState({ km: 0, phone: 0, storage: 0, other: 0, total: 0 });
   // CCQ benefit modelling (folded into the DAS bases via baseAdjustments). Rates
   // seed from the sourced électricien-C3 config but stay editable per métier. The
   // pension rate follows the level (compagnon 9 % / apprenti 4,5 %); the deductible
@@ -270,7 +271,7 @@ export default function PayrollEngineTester({ messier = false }) {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid")
         .order("full_name", { ascending: true });
       // Subcontractors record time but are never part of the company's DAS payroll run.
       if (!cancelled) setEmployees((data || []).filter((employee) => !isSubcontractorRole(employee.role)));
@@ -293,6 +294,8 @@ export default function PayrollEngineTester({ messier = false }) {
         baseRate: Number(profile.hourly_rate) || 0,
         premium: Number(profile.team_leader_premium) || 0,
         kmRate: Number(profile.km_rate) || 0,
+        phone: weeklyPhoneAmount(profile),
+        storage: weeklyStorageAmount(profile),
       }));
     }
     // CCQ level + union come from the employee's profile (no manual selection):
@@ -671,8 +674,10 @@ export default function PayrollEngineTester({ messier = false }) {
     // phone/data + CCQ safety-equipment allowance (added once CCQ is computed).
     const profile = employees.find((e) => e.id === selectedId);
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
-    // Phone-data and other non-taxable reimbursements are typed amounts (never added automatically).
+    // Phone-data, storage and other non-taxable reimbursements are typed amounts (phone and storage
+    // are prefilled from the employee's Règles de temps settings).
     const phoneReimb = Number(pay.phone) || 0;
+    const storageReimb = Number(pay.storage) || 0;
     const otherReimb = Number(pay.otherReimb) || 0;
 
     // CCQ benefits (upstream of the tax engine): fold the collective-agreement
@@ -724,7 +729,7 @@ export default function PayrollEngineTester({ messier = false }) {
     } else {
       setCcqAmounts(null);
     }
-    setReimb({ km: kmReimb, phone: phoneReimb, other: otherReimb, safety: safetyEquip, total: kmReimb + phoneReimb + otherReimb + safetyEquip });
+    setReimb({ km: kmReimb, phone: phoneReimb, storage: storageReimb, other: otherReimb, safety: safetyEquip, total: kmReimb + phoneReimb + storageReimb + otherReimb + safetyEquip });
 
     setResult(calculatePayroll({
       taxYear: 2026,
@@ -980,6 +985,7 @@ export default function PayrollEngineTester({ messier = false }) {
           <Field label={t("payroll.kmRate")} value={pay.kmRate} onChange={setP("kmRate")} step="0.01" disabled={payLocked} />
           <Field label={t("payroll.taxableBenefits")} value={pay.taxableBenefit} onChange={setP("taxableBenefit")} disabled={payLocked} />
           <Field label={t("payroll.reimbPhone")} value={pay.phone} onChange={setP("phone")} step="0.01" disabled={payLocked} />
+          <Field label={t("payroll.reimbStorage")} value={pay.storage} onChange={setP("storage")} step="0.01" disabled={payLocked} />
           <Field label={t("payroll.otherReimb")} value={pay.otherReimb} onChange={setP("otherReimb")} step="0.01" disabled={payLocked} />
         </div>
       </Collapsible>
@@ -1238,6 +1244,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
                   <>
                     {reimb.km > 0 && <Row label={t("payroll.reimbKm")} value={money(reimb.km)} tone="add" />}
                     {reimb.phone > 0 && <Row label={t("payroll.reimbPhone")} value={money(reimb.phone)} tone="add" />}
+                    {reimb.storage > 0 && <Row label={t("payroll.reimbStorage")} value={money(reimb.storage)} tone="add" />}
                     {reimb.other > 0 && <Row label={t("payroll.otherReimb")} value={money(reimb.other)} tone="add" />}
                     <Row label={t("payroll.netPlusReimb")} value={money(net + extraReimb)} strong />
                   </>

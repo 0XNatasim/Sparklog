@@ -51,7 +51,7 @@ export default function TalonTab({ messier = false }) {
       try {
         const since = dayjs().subtract(NB_WEEKS + 2, "week").format("YYYY-MM-DD");
         const [{ data: profs, error: pErr }, { data: jobs, error: jErr }, { data: seeds }, { data: ledgers }] = await Promise.all([
-          supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid").order("full_name", { ascending: true }),
+          supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid").order("full_name", { ascending: true }),
           supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, status").gte("job_date", since),
           supabase.from("payroll_ytd").select("*").eq("tax_year", 2026),
           supabase.from("payroll_period_ledger").select("*").eq("tax_year", 2026).order("period_end", { ascending: true }),
@@ -131,7 +131,7 @@ export default function TalonTab({ messier = false }) {
   function openTalon(profile, week, jobs) {
     try {
       const opening = openingFor(profile.id, week.start);
-      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
+      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
       // Reference is assigned at comptabilisation only; blank for an aperçu.
       const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
       const reference = formatTalonRef(ledgerRow?.talon_seq);
@@ -177,7 +177,7 @@ export default function TalonTab({ messier = false }) {
       if (st.kind !== "comptabilise" && st.kind !== "apercu") continue;
       try {
         const opening = openingFor(profile.id, week.start);
-        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
+        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
         const model = buildStubModel({ result: talon.result, ytd: opening, pay: talon.pay, reimb: talon.reimb, ccq: talon.ccqAmounts });
         if (!model) continue;
         const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);

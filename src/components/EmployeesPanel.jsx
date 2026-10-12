@@ -191,9 +191,6 @@ export default function EmployeesPanel() {
     if (field === "km_rate" || field === "hourly_rate") {
       value = rawValue === "" || rawValue == null ? null : Number(rawValue);
       if (value != null && Number.isNaN(value)) return;
-    } else if (field === "phone_data_reimbursement") {
-      value = rawValue === "" || rawValue == null ? 0 : Number(rawValue);
-      if (Number.isNaN(value)) return;
     } else if (typeof value === "string") {
       value = value.trim() || null;
     }
@@ -824,30 +821,8 @@ export default function EmployeesPanel() {
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
               </summary>
               <div className="space-y-3 border-t p-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label={t("employees.kmRate")}>
-                    <div className="flex h-9 items-center gap-1">
-                      <span className="text-sm text-muted-foreground">$</span>
-                      <Input type="number" step="0.01" min="0" max="9.99" inputMode="decimal" value={p.km_rate ?? ""} onChange={(e) => setLocal(p.id, "km_rate", e.target.value)} onBlur={(e) => saveField(p.id, "km_rate", e.target.value)} placeholder="0.65" className="h-9" />
-                      <span className="text-xs text-muted-foreground">/km</span>
-                    </div>
-                  </Field>
-                  <Field label={t("employees.phoneData")}>
-                    <div className="flex h-9 items-center gap-1">
-                      <span className="text-sm text-muted-foreground">$</span>
-                      <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.phone_data_reimbursement ?? ""} onChange={(e) => setLocal(p.id, "phone_data_reimbursement", e.target.value)} onBlur={(e) => saveField(p.id, "phone_data_reimbursement", e.target.value)} placeholder="7.00" className="h-9" />
-                      <span className="text-xs text-muted-foreground">/{t("employees.perWeek")}</span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">{t("employees.phoneDataHint")}</span>
-                  </Field>
-                </div>
+                <p className="text-[11px] text-muted-foreground">{t("employees.payAmountsMoved")}</p>
                 <div className="grid gap-2 md:grid-cols-2">
-                  {!isSubcontractorRole(p.role) && (
-                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
-                    <span className="text-sm font-medium">{t("employees.storage")} <b className="text-primary">$50</b></span>
-                    <input type="checkbox" checked={Boolean(p.storage_compensation)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "storage_compensation", checked); saveField(p.id, "storage_compensation", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
-                  </label>
-                  )}
                   <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
                     <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
                     <input type="checkbox" checked={Boolean(p.parking_receipts_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "parking_receipts_enabled", checked); saveField(p.id, "parking_receipts_enabled", checked); }} className="h-5 w-5 rounded border-input accent-amber-600" />
