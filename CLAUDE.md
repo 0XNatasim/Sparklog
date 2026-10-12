@@ -354,8 +354,6 @@ d'essai `requires_review` (`RULE_VERSION.status = "draft"`, `src/payroll/rules/2
   alors qu'il est vérifié (T4127). Les vrais restants : CNT, FDRCMO, CNESST.
 
 ### 6.3 Technique (code) — ouvert
-- [ ] **Libellé tronqué** : « Préparation du relevé d'emploi » (`mgr.nav.roe`) est coupé dans le menu
-  latéral gestionnaire (largeur 240 px) — raccourcir le libellé ou permettre 2 lignes.
 - [ ] S-2 export NAS côté serveur et audité ; S-3b soumission atomique (preuve + job) ; P-12 rollback
   d'export qui ré-estampille le taux ; P-5 agrégation des coûts côté serveur ; P-11 N+1 `getUserById`.
 - [ ] Filtres gestionnaire : annuler les requêtes qui se chevauchent (AbortController / id de requête) ;

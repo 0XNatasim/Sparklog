@@ -49,7 +49,7 @@ The Manager workspace is a sidebar (a drawer on phones); every page has its own 
 | **Today** | Live crew (who is working today; pauses polling while the tab is hidden) |
 | **Time** | Timesheets (review, filter, unlock, approve one job or a whole week before export; CCQ weeks run Sunday→Saturday) · Receipts & proofs (overtime screenshots, suppers, parking) |
 | **Team** | Employees (CCQ metadata, rates, options, roles, pause) · Time off · Inventory |
-| **Payroll** | Calculation (DAS test bench) · Pay stubs · DAS · Record of employment worksheet |
+| **Payroll** | Calculation (DAS test bench) · Pay stubs · DAS · Record of employment (preparation worksheet) |
 | **Reports** | Costs (employer cost estimate) · Week / month · CCQ rates · Downloads (CCQ export) |
 | **Communications** | Announcements |
 | **Configuration** | Time rules · Settings · Forms · References |
