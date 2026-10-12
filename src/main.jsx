@@ -5,21 +5,25 @@ import "./index.css";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { ThemeProvider } from "./components/theme-provider.jsx";
 import { LanguageProvider } from "./components/language-provider.jsx";
+import { ErrorBoundary, RootErrorFallback } from "./components/ErrorBoundary.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <ThemeProvider defaultTheme="system">
-      <LanguageProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary fallback={RootErrorFallback}>
+      <ThemeProvider defaultTheme="system">
+        <LanguageProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );
 
-// Fade out the launch splash (installed PWA only) once the app has painted.
-// Kept up briefly so it reads as a launch screen rather than a flicker.
+// Fade out the launch splash (installed PWA only) as soon as the app has painted its
+// first frame — no fixed delay, so a crew member can start entering time right away.
+// The 0.4s CSS fade keeps it from reading as a flicker.
 (function hideSplash() {
   const splash = document.getElementById("app-splash");
   if (!splash) return;
@@ -27,8 +31,22 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     splash.style.opacity = "0";
     setTimeout(() => splash.remove(), 450);
   };
-  setTimeout(remove, 1000);
+  requestAnimationFrame(() => requestAnimationFrame(remove));
 })();
+
+// Pages load on demand. If a deploy removed the files this tab started with, the next
+// page change fails to fetch its code: reload once to pick up the current version
+// (drafts live in IndexedDB). The one-minute guard stops a reload loop when offline.
+window.addEventListener("vite:preloadError", () => {
+  const KEY = "sparklog.chunkReloadAt";
+  try {
+    if (Date.now() - Number(sessionStorage.getItem(KEY) || 0) < 60 * 1000) return;
+    sessionStorage.setItem(KEY, String(Date.now()));
+  } catch {
+    return;
+  }
+  window.location.reload();
+});
 
 // Auto-apply a new deploy — but never while the tab is in active use (that
 // would reload mid-entry and lose a timesheet). Check for updates on focus and

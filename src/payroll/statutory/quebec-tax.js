@@ -12,6 +12,7 @@ export function calculateQuebecTax({
   taxableThisPeriod, // cents
   periodsPerYear,
   rules,
+  // eslint-disable-next-line no-unused-vars -- part of the documented input shape
   credits, // { rrqBaseCents, eiCents, rqapCents } — employee period contributions
   personalTaxCredits, // dollars; defaults to basic personal amount (TP-1015.3)
   annualDeductions = 0, // cents

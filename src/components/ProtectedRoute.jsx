@@ -1,7 +1,5 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import headerLight from "../../public/header-light.jpg";
-import headerDark from "../../public/header-dark.jpg";
 import { useAuth } from "../contexts/AuthContext";
 import { hasManagementAccess, isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
@@ -13,8 +11,8 @@ function BrandedScreen({ title, children }) {
   return (
     <div className="grid min-h-screen place-items-center bg-background p-6 text-foreground">
       <div className="w-full max-w-sm space-y-4 text-center">
-        <img src={headerLight} alt="SparkLog" className="mx-auto w-56 max-w-full rounded dark:hidden" />
-        <img src={headerDark} alt="SparkLog" className="mx-auto hidden w-56 max-w-full dark:block" />
+        <img src="/header-light.webp" alt="SparkLog" className="mx-auto w-56 max-w-full rounded dark:hidden" />
+        <img src="/header-dark.webp" alt="SparkLog" className="mx-auto hidden w-56 max-w-full dark:block" />
         <div className="text-xl font-bold">{title}</div>
         {children}
       </div>
@@ -45,7 +43,7 @@ export default function ProtectedRoute({ children, requireRole }) {
         >
           {t("auth.retry")}
         </button>
-        <p className="text-[11px] text-muted-foreground/70">{authError}</p>
+        <p className="text-xs text-muted-foreground/70">{authError}</p>
       </BrandedScreen>
     );
   }

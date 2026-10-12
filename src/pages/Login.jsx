@@ -1,7 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import headerLight from "../../public/header-light.jpg";
-import headerDark from "../../public/header-dark.jpg";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -164,10 +162,10 @@ export default function Login() {
         <ThemeToggle />
         <LanguageToggle />
       </div>
-      <Card className="w-full max-w-md dark:bg-[#151515]">
+      <Card className="w-full max-w-md dark:bg-background">
         <div className="flex justify-center px-6 pt-6">
-          <img src={headerLight} alt="Messier Connexion" className="w-64 max-w-full rounded dark:hidden" />
-          <img src={headerDark} alt="Messier Connexion" className="hidden w-64 max-w-full dark:block" />
+          <img src="/header-light.webp" alt="Messier Connexion" className="w-64 max-w-full rounded dark:hidden" />
+          <img src="/header-dark.webp" alt="Messier Connexion" className="hidden w-64 max-w-full dark:block" />
         </div>
         <CardHeader>
           <CardTitle className="text-2xl">{t("auth.title")}</CardTitle>
@@ -263,19 +261,19 @@ export default function Login() {
                   </button>
                 </div>
                 {confirmPassword && !passwordsMatch && (
-                  <span className="text-xs text-destructive dark:text-red-300">{t("auth.passwordsDoNotMatch")}</span>
+                  <span className="text-xs text-destructive">{t("auth.passwordsDoNotMatch")}</span>
                 )}
               </div>
             )}
 
             {errorMsg && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {errorMsg}
               </div>
             )}
 
             {successMsg && (
-              <div className="rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-700 dark:text-green-400" role="status">
+              <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success" role="status">
                 {successMsg}
               </div>
             )}

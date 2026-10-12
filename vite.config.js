@@ -35,7 +35,8 @@ export default defineConfig({
         theme_color: "#151515",
         background_color: "#151515",
         display: "standalone",
-        orientation: "portrait",
+        // "any": managers use tablets in landscape for the wide payroll/timesheet tables.
+        orientation: "any",
         start_url: "/",
         scope: "/",
         icons: [
@@ -49,7 +50,7 @@ export default defineConfig({
         // opens offline. API/auth calls are never cached (must hit the network).
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/functions\//, /supabase/i],
-        globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff2}"],
         cleanupOutdatedCaches: true,
         // Push + notification-click handlers live in public/push-sw.js.
         importScripts: ["push-sw.js"],
@@ -58,6 +59,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Libraries change far less often than app code: keeping them in their own
+        // files means a deploy only re-downloads the app chunks.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|@remix-run[\\/]router|scheduler)[\\/]/.test(id)) return "vendor-react";
+          if (id.includes("@supabase")) return "vendor-supabase";
+          if (id.includes("@radix-ui")) return "vendor-radix";
+          if (id.includes("lucide-react")) return "vendor-icons";
+          return undefined;
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

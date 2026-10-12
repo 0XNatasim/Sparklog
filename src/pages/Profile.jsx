@@ -74,7 +74,7 @@ export default function Profile() {
           <p className="text-sm text-muted-foreground">{t("profile.description")}</p>
         </div>
         {loading && <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">{t("common.loading")}</div>}
-        {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
+        {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
         {!loading && !error && (
           <>
             <CollapsibleCard icon={UserRound} title={t("profile.information")}>

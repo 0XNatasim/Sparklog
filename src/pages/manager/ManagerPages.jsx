@@ -6,29 +6,33 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
 import { firstAllowedPath, legacySectionTarget } from "@/lib/manager-nav";
-import LiveCrew from "@/components/LiveCrew";
-import EmployeesPanel from "@/components/EmployeesPanel";
-import CongesManager from "@/components/CongesManager";
-import FormsManager from "@/components/FormsManager";
-import ReferencesManager from "@/components/ReferencesManager";
-import BroadcastManager from "@/components/BroadcastManager";
-import TimeRulesManager from "@/components/TimeRulesManager";
-import SettingsPanel from "@/components/SettingsPanel";
-import PayrollEngineTester from "@/components/PayrollEngineTester";
-import TalonTab from "@/components/TalonTab";
-import DasTab from "@/components/DasTab";
-import RecordOfEmploymentTab from "@/components/RecordOfEmploymentTab";
-import CostingDashboard from "@/components/CostingDashboard";
-import PeriodSummary from "@/components/PeriodSummary";
-import WeekViewTab from "@/components/WeekViewTab";
-import CcqRatesPanel from "@/components/CcqRatesPanel";
-import ManagerDownloads from "@/components/ManagerDownloads";
-import AuditLog from "@/components/AuditLog";
-import EmployeeActivityLog from "@/components/EmployeeActivityLog";
-import InfraHealthCard from "@/components/InfraHealthCard";
-import InventoryScreenshotsPanel from "@/components/InventoryScreenshotsPanel";
-import EmergencyTimesheet from "@/components/EmergencyTimesheet";
-import ManagerDashboard from "@/pages/ManagerDashboard";
+import { lazyPanel } from "@/components/LazyLoading";
+
+// Each page loads on first visit, so employees never download manager code and a
+// manager only fetches the pages they open (each shows its own fallback meanwhile).
+const LiveCrew = lazyPanel(() => import("@/components/LiveCrew"));
+const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
+const CongesManager = lazyPanel(() => import("@/components/CongesManager"));
+const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
+const ReferencesManager = lazyPanel(() => import("@/components/ReferencesManager"));
+const BroadcastManager = lazyPanel(() => import("@/components/BroadcastManager"));
+const TimeRulesManager = lazyPanel(() => import("@/components/TimeRulesManager"));
+const SettingsPanel = lazyPanel(() => import("@/components/SettingsPanel"));
+const PayrollEngineTester = lazyPanel(() => import("@/components/PayrollEngineTester"));
+const TalonTab = lazyPanel(() => import("@/components/TalonTab"));
+const DasTab = lazyPanel(() => import("@/components/DasTab"));
+const RecordOfEmploymentTab = lazyPanel(() => import("@/components/RecordOfEmploymentTab"));
+const CostingDashboard = lazyPanel(() => import("@/components/CostingDashboard"));
+const PeriodSummary = lazyPanel(() => import("@/components/PeriodSummary"));
+const WeekViewTab = lazyPanel(() => import("@/components/WeekViewTab"));
+const CcqRatesPanel = lazyPanel(() => import("@/components/CcqRatesPanel"));
+const ManagerDownloads = lazyPanel(() => import("@/components/ManagerDownloads"));
+const AuditLog = lazyPanel(() => import("@/components/AuditLog"));
+const EmployeeActivityLog = lazyPanel(() => import("@/components/EmployeeActivityLog"));
+const InfraHealthCard = lazyPanel(() => import("@/components/InfraHealthCard"));
+const InventoryScreenshotsPanel = lazyPanel(() => import("@/components/InventoryScreenshotsPanel"));
+const EmergencyTimesheet = lazyPanel(() => import("@/components/EmergencyTimesheet"));
+const ManagerDashboard = lazyPanel(() => import("@/pages/ManagerDashboard"));
 
 // #/manager → first page the user may open; old `?section=` links keep working.
 export function ManagerIndex() {
@@ -112,7 +116,7 @@ function MethodNote({ method }) {
       <p className="mt-1 text-muted-foreground">{t("payroll.messierNote.body")}</p>
     </div>
   ) : (
-    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+    <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
       <div className="font-semibold">{t("payroll.bookNote.title")}</div>
       <p className="mt-1">{t("payroll.bookNote.body")}</p>
     </div>
@@ -134,7 +138,7 @@ function PayrollPage({ Component, writes = false }) {
       <MethodSwitch method={method} onChange={setMethod} />
       <MethodNote method={method} />
       {writes && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-600/50 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+        <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning">
           <Save className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{t("mgr.payroll.writesNote")}</span>
         </div>

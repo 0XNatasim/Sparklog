@@ -8,10 +8,10 @@ import { withRetry } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 
 const TONES = {
-  good: "text-emerald-600 dark:text-emerald-400",
-  ok: "text-sky-600 dark:text-sky-400",
-  warn: "text-amber-600 dark:text-amber-400",
-  bad: "text-destructive dark:text-red-300",
+  good: "text-success",
+  ok: "text-info",
+  warn: "text-warning",
+  bad: "text-destructive",
 };
 
 function fmtBytes(n) {
@@ -102,7 +102,7 @@ export default function InfraHealthCard() {
         aria-expanded={open}
         className="flex w-full items-center gap-3 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <Activity className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <Activity className="h-5 w-5 shrink-0 text-success" />
         <div className="min-w-0 flex-1">
           <div className="font-semibold">{t("infra.title")}</div>
           <div className="truncate text-xs text-muted-foreground">{t("infra.subtitle")}</div>
@@ -113,7 +113,7 @@ export default function InfraHealthCard() {
       {open && (
         <CardContent className="space-y-4 border-t p-4">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("infra.liveTitle")}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("infra.liveTitle")}</div>
             <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
               <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
             </Button>
@@ -134,10 +134,10 @@ export default function InfraHealthCard() {
           )}
 
           {stats?.as_of && (
-            <p className="text-[10px] text-muted-foreground">{t("live.updated", { time: dayjs(stats.as_of).format("YYYY-MM-DD HH:mm:ss") })}</p>
+            <p className="text-xs text-muted-foreground">{t("live.updated", { time: dayjs(stats.as_of).format("YYYY-MM-DD HH:mm:ss") })}</p>
           )}
 
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {host ? t("infra.hostTitle") : t("infra.snapshotTitle")}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -148,7 +148,7 @@ export default function InfraHealthCard() {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground">{host ? t("infra.hostNote") : t("infra.snapshotNote")}</p>
+          <p className="text-xs text-muted-foreground">{host ? t("infra.hostNote") : t("infra.snapshotNote")}</p>
         </CardContent>
       )}
     </Card>

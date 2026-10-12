@@ -55,7 +55,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
   }
 
   // Green = gain/addition, red = deduction, neutral = informational base (or hours).
-  const toneClass = (group) => group === "gain" ? "text-green-700" : group === "ded" ? "text-red-600" : "";
+  const toneClass = (group) => group === "gain" ? "text-success" : group === "ded" ? "text-destructive" : "";
   const Row = ({ r }) => {
     const tc = r.hours ? "" : toneClass(r.group);
     return (
@@ -83,18 +83,18 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
         {/* Controls (not printed) */}
         <div className="payslip-noprint mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <label className="text-xs"><span className="text-muted-foreground">Employeur</span><input value={hdr.employer} onChange={setH("employer")} placeholder="Nom de l'employeur" className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">Période du</span><input type="date" value={hdr.periodStart} onChange={setH("periodStart")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">au</span><input type="date" value={hdr.periodEnd} onChange={setH("periodEnd")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">Date de paie</span><input type="date" value={hdr.payDate} onChange={setH("payDate")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">Semaine</span><input value={hdr.week} onChange={setH("week")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
-          <label className="text-xs"><span className="text-muted-foreground">No. réf.</span><input value={hdr.ref} onChange={setH("ref")} className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Employeur</span><input value={hdr.employer} onChange={setH("employer")} placeholder="Nom de l'employeur" className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Période du</span><input type="date" value={hdr.periodStart} onChange={setH("periodStart")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">au</span><input type="date" value={hdr.periodEnd} onChange={setH("periodEnd")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Date de paie</span><input type="date" value={hdr.payDate} onChange={setH("payDate")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">Semaine</span><input value={hdr.week} onChange={setH("week")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
+          <label className="text-xs"><span className="text-muted-foreground">No. réf.</span><input value={hdr.ref} onChange={setH("ref")} className="mt-1 w-full rounded border border-input bg-background px-2 py-1 text-sm" /></label>
         </div>
         <div className="payslip-noprint mb-3 flex flex-wrap items-center justify-end gap-2">
           {canApproveOfficial && (
             <label className="mr-auto flex items-center gap-2 text-sm">
               <input type="checkbox" checked={official} onChange={(e) => onToggleOfficial?.(e.target.checked)} />
-              <span className="font-medium text-green-700 dark:text-green-400">Approved by Boss (officiel)</span>
+              <span className="font-medium text-success">Approved by Boss (officiel)</span>
             </label>
           )}
           <Button size="sm" variant="outline" onClick={printStub}><Printer className="mr-1.5 h-4 w-4" />Imprimer</Button>
@@ -105,7 +105,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
         <div className="payslip-print relative overflow-hidden rounded border border-neutral-900 bg-white text-[11px] leading-tight text-black">
           {!official && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="rotate-[-24deg] text-3xl font-black tracking-widest text-red-500/10 sm:text-5xl">BROUILLON · DRAFT</span>
+              <span className="rotate-[-24deg] text-3xl font-black tracking-widest text-destructive/10 sm:text-5xl">BROUILLON · DRAFT</span>
             </div>
           )}
 
@@ -143,7 +143,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
 
           {/* Totals band — Gains green, Retenues red, Paie nette neutral */}
           <div className="grid grid-cols-3">
-            {[["Gains", grossUp, "text-green-700"], ["Retenues", totalRetenues, "text-red-600"], ["Paie nette", net, ""]].map(([lbl, val, tc], i) => (
+            {[["Gains", grossUp, "text-success"], ["Retenues", totalRetenues, "text-destructive"], ["Paie nette", net, ""]].map(([lbl, val, tc], i) => (
               <div key={i} className={`border-b border-neutral-900 px-3 py-2 ${i < 2 ? "border-r border-neutral-900" : "bg-slate-100"}`}>
                 <div className="text-[10px] uppercase tracking-wide text-slate-500">{lbl}</div>
                 <div className={`font-mono text-base font-extrabold ${tc}`}>{money(val)}</div>
@@ -155,9 +155,9 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-neutral-900 bg-slate-900 px-3 py-2 text-white">
             <span className="text-[11px]">
               Paie nette {money(net)}
-              {kmReimb > 0 && <> + Indemnité KM <span className="text-green-300">{money(kmReimb)}</span></>}
-              {phoneReimb > 0 && <> + Données cellulaire <span className="text-green-300">{money(phoneReimb)}</span></>}
-              {storageReimb > 0 && <> + Entreposage <span className="text-green-300">{money(storageReimb)}</span></>}
+              {kmReimb > 0 && <> + Indemnité KM <span className="text-success">{money(kmReimb)}</span></>}
+              {phoneReimb > 0 && <> + Données cellulaire <span className="text-success">{money(phoneReimb)}</span></>}
+              {storageReimb > 0 && <> + Entreposage <span className="text-success">{money(storageReimb)}</span></>}
             </span>
             <span className="font-semibold">Paie nette + remboursements <span className="ml-2 font-mono text-lg font-extrabold">{money(netPlusReimb)}</span></span>
           </div>
@@ -174,7 +174,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                       <td className="py-0.5">{r.label}</td>
                       <td className="text-right font-mono">{r.unit === "" ? "" : n(r.unit).toFixed(2)}</td>
                       <td className="text-right font-mono">{r.taux === "" ? "" : n(r.taux).toFixed(4)}</td>
-                      <td className="text-right font-mono text-green-700">{money(r.montant)}</td>
+                      <td className="text-right font-mono text-success">{money(r.montant)}</td>
                     </tr>
                   ))}
                 </tbody>

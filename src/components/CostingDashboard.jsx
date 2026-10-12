@@ -116,7 +116,7 @@ export default function CostingDashboard() {
         // Subcontractor: negotiated double-time rate for hours over 8h/day (not 2x simple).
         const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
 
-        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, totalKm = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
+        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
         const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], overtimeOptionsFromProfile(profile));
         entries.forEach((e) => {
           regMin += e.regularWorkMinutes;
@@ -124,7 +124,6 @@ export default function CostingDashboard() {
           ot100Min += e.overtime100Minutes;
           returnMin += e.returnRegularMinutes;
           returnNbMin += e.returnNoBenefitMinutes;
-          totalKm += e.totalKm;
           // Rate frozen on the job at submission (0034); fall back to current profile rate.
           const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
           const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;
@@ -203,14 +202,14 @@ export default function CostingDashboard() {
               <div className="font-semibold">{t("costing.estimateLabel")} · {dayjs(range.start).format("DD MMM")} – {dayjs(range.end).format("DD MMM YYYY")}</div>
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.description")}</p>
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.scopeNote")}</p>
-              <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">{t("costing.reviewNotice")}</p>
+              <p className="mt-1 text-xs font-semibold text-warning">{t("costing.reviewNotice")}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {period === "week" && (
                 <select
                   value={weekEnd}
                   onChange={(e) => setWeekEnd(e.target.value)}
-                  className="rounded-md border bg-background px-2 py-1.5 text-sm"
+                  className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                   aria-label={t("costing.selectWeek")}
                 >
                   {weekOptions.map((w) => (
@@ -263,10 +262,10 @@ export default function CostingDashboard() {
                             <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
                           </button>
                           {r.name}
-                          {r.premium > 0 && <span className="ml-2 text-[11px] font-normal text-primary">({t("costing.teamLeader")} +{money(r.premium)}/h)</span>}
-                          {!r.hasRate && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noRate")})</span>}
-                          {r.isNonCcq && <span className="ml-2 text-[11px] font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
-                          {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-[11px] font-normal text-amber-600 dark:text-amber-400">({t("costing.noLevel")})</span>}
+                          {r.premium > 0 && <span className="ml-2 text-xs font-normal text-primary">({t("costing.teamLeader")} +{money(r.premium)}/h)</span>}
+                          {!r.hasRate && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noRate")})</span>}
+                          {r.isNonCcq && <span className="ml-2 text-xs font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
+                          {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noLevel")})</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono">{r.regHours.toFixed(2)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{r.otHours.toFixed(2)}</td>

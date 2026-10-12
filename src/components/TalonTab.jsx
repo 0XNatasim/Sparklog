@@ -194,14 +194,14 @@ export default function TalonTab({ messier = false }) {
     const st = cellState(profile, week);
     if (st.kind === "none") return <span className="text-muted-foreground/40">·</span>;
     if (st.kind === "draft") return <span className="text-muted-foreground/60" title={t("payroll.talon.cell.draft")}>—</span>;
-    if (st.kind === "pending") return <Clock className="mx-auto h-4 w-4 text-amber-500" title={t("payroll.talon.cell.pending")} />;
+    if (st.kind === "pending") return <Clock className="mx-auto h-4 w-4 text-warning" title={t("payroll.talon.cell.pending")} />;
     if (st.kind === "imported") {
       return (
         <button
           type="button"
           onClick={() => printLegacyTalon(st.talon, `${t("payroll.subtabs.talon")} — S${week.weekNo} — ${profile.full_name || ""}`)}
           title={t("payroll.talon.cell.imported")}
-          className="mx-auto flex h-9 w-9 items-center sm:h-7 sm:w-7 justify-center rounded-md text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+          className="mx-auto flex h-9 w-9 items-center sm:h-7 sm:w-7 justify-center rounded-md text-info transition-colors hover:bg-info/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <FileText className="h-4 w-4" strokeWidth={2.2} />
         </button>
@@ -210,9 +210,9 @@ export default function TalonTab({ messier = false }) {
     const official = st.kind === "official";
     const comptabilise = st.kind === "comptabilise";
     const cls = official
-      ? "text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/40"
+      ? "text-success hover:bg-success/10"
       : comptabilise
-      ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+      ? "text-destructive hover:bg-destructive/10"
       : "text-muted-foreground hover:bg-accent";
     const title = official ? t("payroll.talon.cell.official") : comptabilise ? t("payroll.talon.cell.comptabilise") : t("payroll.talon.cell.apercu");
     return (
@@ -231,7 +231,7 @@ export default function TalonTab({ messier = false }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+      <div className="rounded-lg border border-info/30 bg-info/10 p-3 text-xs text-info">
         <div className="flex items-start gap-2">
           <FileText className="mt-0.5 h-4 w-4 shrink-0" />
           <div><b>{t("payroll.talon.title")}</b> {t("payroll.talon.matrixIntro")}</div>
@@ -240,11 +240,11 @@ export default function TalonTab({ messier = false }) {
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5"><BadgeCheck className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={2.2} /> {t("payroll.talon.cell.official")}</span>
-        <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={2.2} /> {t("payroll.talon.cell.comptabilise")}</span>
+        <span className="flex items-center gap-1.5"><BadgeCheck className="h-4 w-4 text-success" strokeWidth={2.2} /> {t("payroll.talon.cell.official")}</span>
+        <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-destructive" strokeWidth={2.2} /> {t("payroll.talon.cell.comptabilise")}</span>
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 opacity-70" strokeWidth={1.6} /> {t("payroll.talon.cell.apercu")}</span>
-        <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-300" strokeWidth={2.2} /> {t("payroll.talon.cell.imported")}</span>
-        <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-amber-500" /> {t("payroll.talon.cell.pending")}</span>
+        <span className="flex items-center gap-1.5"><FileText className="h-4 w-4 text-info" strokeWidth={2.2} /> {t("payroll.talon.cell.imported")}</span>
+        <span className="flex items-center gap-1.5"><Clock className="h-4 w-4 text-warning" /> {t("payroll.talon.cell.pending")}</span>
         <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" onClick={() => setImportOpen(true)}>
           <Upload className="mr-1.5 h-3.5 w-3.5" /> {t("payroll.legacy.title")}
         </Button>
@@ -267,7 +267,7 @@ export default function TalonTab({ messier = false }) {
               {batchMsg && <p className="mt-1 text-xs text-muted-foreground">{batchMsg}</p>}
             </div>
             <div className="flex items-center gap-2">
-              <select value={batchWeek} onChange={(e) => { setBatchWeek(e.target.value); setBatchMsg(""); }} className="rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={batchWeek} onChange={(e) => { setBatchWeek(e.target.value); setBatchMsg(""); }} className="rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 {weeks.map((w) => (
                   <option key={w.key} value={w.key}>S{w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
                 ))}
@@ -296,7 +296,7 @@ export default function TalonTab({ messier = false }) {
                       {shown.map((w) => (
                         <div key={w.key} className="flex flex-col items-center gap-0.5" title={`${w.start.format("DD MMM")}–${w.end.format("DD MMM YYYY")}`}>
                           <Cell profile={profile} week={w} />
-                          <span className="text-[11px] font-medium text-muted-foreground">S{w.weekNo}</span>
+                          <span className="text-xs font-medium text-muted-foreground">S{w.weekNo}</span>
                         </div>
                       ))}
                       {shown.length === 0 && <span className="col-span-5 text-xs text-muted-foreground">—</span>}
@@ -338,7 +338,7 @@ export default function TalonTab({ messier = false }) {
               </table>
             </div>
           )}
-          <p className="border-t px-4 py-3 text-[11px] text-muted-foreground">{t("payroll.talon.disclaimer")}</p>
+          <p className="border-t px-4 py-3 text-xs text-muted-foreground">{t("payroll.talon.disclaimer")}</p>
         </CardContent>
       </Card>
 

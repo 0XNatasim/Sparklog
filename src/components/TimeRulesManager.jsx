@@ -232,7 +232,7 @@ export default function TimeRulesManager() {
                 ];
                 return (
                   <div key={row.id} className="rounded border bg-muted/30 px-3 py-2">
-                    <div className="mb-1 text-sm font-semibold">{row.full_name || row.email || row.id}{fixed ? <span className="ml-2 text-[11px] font-normal text-muted-foreground">{t("timeRules.payRules.subcontractor")}</span> : null}</div>
+                    <div className="mb-1 text-sm font-semibold">{row.full_name || row.email || row.id}{fixed ? <span className="ml-2 text-xs font-normal text-muted-foreground">{t("timeRules.payRules.subcontractor")}</span> : null}</div>
                     <div className="grid gap-1 md:grid-cols-3">
                       {rules.map((rule) => (
                         <label key={rule.field} title={rule.hint} className={`flex items-center justify-between gap-3 rounded border bg-background px-2 py-2 text-xs ${rule.locked ? "opacity-70" : "cursor-pointer"}`}>

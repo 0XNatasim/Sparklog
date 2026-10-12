@@ -2,7 +2,7 @@
 // (see vite.config.js). Kept separate so the precache/offline logic stays generated.
 
 self.addEventListener("push", (event) => {
-  let data = {};
+  let data;
   try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data ? event.data.text() : "" }; }
   const title = data.title || "SparkLog";
   const tasks = [

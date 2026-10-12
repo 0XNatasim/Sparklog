@@ -10,16 +10,16 @@ import { useT } from "@/lib/use-t";
 const PAGE_SIZE = 100;
 
 const ACTION_META = {
-  user_deleted: { icon: Trash2, tone: "text-destructive dark:text-red-300" },
-  inventory_deleted: { icon: Images, tone: "text-destructive dark:text-red-300" },
+  user_deleted: { icon: Trash2, tone: "text-destructive" },
+  inventory_deleted: { icon: Images, tone: "text-destructive" },
   role_change: { icon: UserCog, tone: "text-primary" },
-  pause_change: { icon: PauseCircle, tone: "text-amber-600 dark:text-amber-300" },
-  job_unlock: { icon: Unlock, tone: "text-amber-600 dark:text-amber-300" },
-  job_approved: { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-300" },
+  pause_change: { icon: PauseCircle, tone: "text-warning" },
+  job_unlock: { icon: Unlock, tone: "text-warning" },
+  job_approved: { icon: CheckCircle2, tone: "text-success" },
   job_created_by_owner: { icon: FilePlus2, tone: "text-primary" },
-  manager_entry_confirmed: { icon: UserCheck, tone: "text-emerald-600 dark:text-emerald-300" },
+  manager_entry_confirmed: { icon: UserCheck, tone: "text-success" },
   manager_entry_deleted: { icon: Trash2, tone: "text-destructive" },
-  manager_entry_reminded: { icon: BellRing, tone: "text-amber-600 dark:text-amber-300" },
+  manager_entry_reminded: { icon: BellRing, tone: "text-warning" },
   meal_reviewed: { icon: Utensils, tone: "text-primary" },
   parking_reviewed: { icon: SquareParking, tone: "text-primary" },
 };
@@ -106,7 +106,7 @@ export default function AuditLog() {
         </CardContent>
       </Card>
 
-      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
+      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
       {!loading && rows.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("audit.empty")}</CardContent></Card>}
 
       <div className="space-y-2">

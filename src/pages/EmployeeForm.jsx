@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
 import { Camera, CircleCheck, TriangleAlert } from "lucide-react";
-import autofillExample from "../../public/Auto-fill.jpg";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -81,13 +80,6 @@ function formatReturnMinutes(minutes) {
   return `${hours} h ${remainder}`;
 }
 
-function validateOvertimeSmsText(text) {
-  const normalized = String(text || "").toLocaleLowerCase("fr-CA");
-  const mentionsOvertime = /temps\s+suppl[eé]mentaire|\bts\b/.test(normalized);
-  const confirmsApproval = /approuv[eé]e?|autoris[eé]e?|accord[eé]e?/.test(normalized);
-  const includesDuration = /\b\d+(?:[.,]\d+)?\s*(?:h(?:eure)?s?|min(?:ute)?s?)\b/.test(normalized);
-  return mentionsOvertime && confirmsApproval && includesDuration;
-}
 
 export default function EmployeeForm() {
   const { user, role } = useAuth();
@@ -515,8 +507,6 @@ export default function EmployeeForm() {
         }
       }
 
-      const nextLocked = nextStatus === "submitted";
-
       if (mode === "submit") {
         const contractErrors = validateJobSubmissionContract({
           depart,
@@ -682,10 +672,10 @@ export default function EmployeeForm() {
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
-    let needsEvidence = false;
+    let needsEvidence;
     try {
       needsEvidence = requiresEvidenceBeforeSave(requestedMode)
-        ? await requiresOvertimeEvidence(minutes)
+        ? await requiresOvertimeEvidence()
         : false;
     } catch (error) {
       const message = friendlyErrorMessage(error, t, "form.errors.saveFailed");
@@ -842,7 +832,7 @@ export default function EmployeeForm() {
     }
   }
 
-  async function requiresOvertimeEvidence(candidateReturnMinutes) {
+  async function requiresOvertimeEvidence() {
     // CCQ overtime authorization (the screenshot) does not apply to office staff.
     if (officeEmployee) return false;
     // Known locally without any network call, so it stays valid even if the
@@ -1001,7 +991,7 @@ export default function EmployeeForm() {
       } catch (error) {
         console.error("[overtime evidence] Screenshot upload failed", error);
         const failure = evidenceUploadFailure(error);
-        throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`);
+        throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`, { cause: error });
       }
 
       let savedJobId = pendingEvidenceJobId;
@@ -1024,7 +1014,7 @@ export default function EmployeeForm() {
           setParkingFile(null);
         } catch (error) {
           console.error("[overtime evidence] Parking receipt retry failed", { savedJobId, error });
-          throw new Error(error?.message || t("form.evidence.jobSaveFailed"));
+          throw new Error(error?.message || t("form.evidence.jobSaveFailed"), { cause: error });
         }
       }
 
@@ -1042,7 +1032,7 @@ export default function EmployeeForm() {
         overtimeSettings = data;
       } catch (error) {
         console.error("[overtime evidence] Retention settings load failed", error);
-        throw new Error(t("form.evidence.settingsFailed"));
+        throw new Error(t("form.evidence.settingsFailed"), { cause: error });
       }
       const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
@@ -1058,7 +1048,7 @@ export default function EmployeeForm() {
         evidenceRecorded = true;
       } catch (error) {
         console.error("[overtime evidence] Evidence record insert failed", error);
-        throw new Error(t("form.evidence.recordFailed"));
+        throw new Error(t("form.evidence.recordFailed"), { cause: error });
       }
 
       const { error: notificationError } = await withTimeout(
@@ -1169,7 +1159,7 @@ export default function EmployeeForm() {
     <AppShell>
       <div className="space-y-2 sm:space-y-3">
         {err && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <span>{err}</span>
             {editId && editLoadFailed && (
               <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={loadingEdit} onClick={loadEdit}>
@@ -1179,7 +1169,7 @@ export default function EmployeeForm() {
           </div>
         )}
         {managerEntryBy && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-200" role="status">
+          <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning" role="status">
             {t("form.managerEntry.banner", { name: managerEntryBy })}
           </div>
         )}
@@ -1194,12 +1184,12 @@ export default function EmployeeForm() {
           </div>
         )}
         {warning && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-200" role="alert">
+          <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning" role="alert">
             {warning}
           </div>
         )}
         {entryBlockedReason && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive dark:text-red-300" role="alert">
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive" role="alert">
             <span>{entryBlockedReason}</span>
             {(editId || job_date !== companyDate()) && (
               <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={saving} onClick={returnToTodaysJobCard}>
@@ -1373,7 +1363,7 @@ export default function EmployeeForm() {
                       {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
                     </Button>
                     {hasParkingReceipt && (
-                      <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600 dark:text-green-400" title={t("form.parking.receiptSaved")}>
+                      <span className="inline-flex items-center gap-1 text-sm font-medium text-success" title={t("form.parking.receiptSaved")}>
                         <CircleCheck className="h-5 w-5" aria-hidden="true" />
                         <span className="sr-only">{t("form.parking.receiptSaved")}</span>
                       </span>
@@ -1387,11 +1377,11 @@ export default function EmployeeForm() {
             <div className="space-y-2 pt-3">
               {(dirty || editId) && !locked && (
                 <>
-                  <Button type="button" className="h-12 w-full text-base font-semibold bg-blue-600 text-white hover:bg-blue-700" disabled={disableInputs || !formComplete} onClick={saveDraft}>
+                  <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs || !formComplete} onClick={saveDraft}>
                     {saving ? t("common.saving") : t("form.buttons.save")}
                   </Button>
                   {!formComplete && (
-                    <p className="text-center text-xs font-medium text-amber-700 dark:text-amber-300" role="status">
+                    <p className="text-center text-xs font-medium text-warning" role="status">
                       {t("form.missing.hint", { fields: missingFields.join(", ") })}
                     </p>
                   )}
@@ -1465,7 +1455,7 @@ export default function EmployeeForm() {
                   </ul>
                 </div>
                 <img
-                  src={autofillExample}
+                  src="/Auto-fill.webp"
                   alt={t("form.autofillTip.exampleAlt")}
                   className="mx-auto w-full rounded-md border object-contain"
                   style={{ maxHeight: "60vh" }}
@@ -1505,7 +1495,7 @@ export default function EmployeeForm() {
       }}>
         <DialogContent className="max-w-md">
           {returnSaveError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
               {returnSaveError}
             </div>
           )}
@@ -1605,7 +1595,7 @@ export default function EmployeeForm() {
                 <DialogTitle>{t("form.evidence.title")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
                   {t("form.evidence.description")}
                 </div>
                 <div className="rounded-md border bg-muted/40 p-3">
@@ -1629,15 +1619,15 @@ export default function EmployeeForm() {
                   {showOvertimeExample && (
                     <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
                       <img
-                        src="/overtime-evidence-example.jpg"
+                        src="/overtime-evidence-example.webp"
                         alt={t("form.evidence.exampleAlt")}
                         className="max-h-96 w-full rounded object-contain"
                       />
                     </div>
                   )}
                 </div>
-                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{evidenceValidationError}</div>}
-                {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300">{err}</div>}
+                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{evidenceValidationError}</div>}
+                {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{err}</div>}
                 <input
                   ref={overtimeInputRef}
                   type="file"
@@ -1678,7 +1668,7 @@ export default function EmployeeForm() {
                 {showInventoryExamples && (
                   <div className="grid grid-cols-3 gap-2 rounded-md border bg-background p-2">
                     {INVENTORY_SLOTS.map((slot) => (
-                      <img key={slot} src={`/inventory-examples/${slot}.jpg`} alt={t("form.inventory.exampleAlt", { n: slot })} className="max-h-72 w-full rounded object-contain" />
+                      <img key={slot} src={`/inventory-examples/${slot}.webp`} alt={t("form.inventory.exampleAlt", { n: slot })} className="max-h-72 w-full rounded object-contain" />
                     ))}
                   </div>
                 )}
@@ -1689,7 +1679,7 @@ export default function EmployeeForm() {
                     return (
                       <li key={slot} className="flex items-center justify-between gap-2 rounded-md border p-2">
                         <span className="flex items-center gap-2 font-medium">
-                          {done && <CircleCheck className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden="true" />}
+                          {done && <CircleCheck className="h-5 w-5 text-success" aria-hidden="true" />}
                           {t("form.inventory.slot", { n: slot })}
                         </span>
                         <Button type="button" size="sm" variant={done ? "outline" : "default"} disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(slot)}>
@@ -1699,7 +1689,7 @@ export default function EmployeeForm() {
                     );
                   })}
                 </ul>
-                {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive dark:text-red-300" role="alert">{inventoryError}</div>}
+                {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive" role="alert">{inventoryError}</div>}
                 <input ref={inventoryInputRef} type="file" accept="image/*" className="hidden" onChange={handleInventoryFile} />
               </div>
               <DialogFooter>
@@ -1714,12 +1704,12 @@ export default function EmployeeForm() {
             <>
               <DialogHeader><DialogTitle>{t("form.day.readyTitle")}</DialogTitle></DialogHeader>
               <p className="text-sm text-muted-foreground">{t(!officeEmployee && inventoryEnabled ? "form.day.readyDescription" : "form.day.readyDescriptionPlain")}</p>
-              {daySubmitError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300" role="alert">{daySubmitError}</div>}
+              {daySubmitError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{daySubmitError}</div>}
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" disabled={daySubmitBusy} onClick={() => { closeReturnDialog(); navigate("/history"); }}>
                   {t("form.day.review")}
                 </Button>
-                <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={daySubmitBusy} onClick={submitEndOfDay}>
+                <Button type="button" variant="success" disabled={daySubmitBusy} onClick={submitEndOfDay}>
                   {daySubmitBusy ? t("common.submitting") : t("form.day.submit")}
                 </Button>
               </DialogFooter>
@@ -1751,7 +1741,7 @@ export default function EmployeeForm() {
       <Dialog open={kmMissingAlert} onOpenChange={setKmMissingAlert}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+            <DialogTitle className="flex items-center gap-2 text-warning">
               <TriangleAlert className="h-5 w-5" />{t("form.kmMissing.title")}
             </DialogTitle>
           </DialogHeader>

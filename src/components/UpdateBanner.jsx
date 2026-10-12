@@ -50,7 +50,7 @@ export default function UpdateBanner() {
   if (!latest) return null;
 
   return (
-    <div className="sticky top-0 z-50 border-b-2 border-sky-500 bg-sky-100 px-4 py-3 text-sky-950 dark:bg-sky-900/60 dark:text-sky-100" role="status">
+    <div className="sticky top-0 z-50 border-b-2 border-info bg-info/10 px-4 py-3 text-info" role="status">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-3 text-sm font-semibold sm:text-base">
         <span>{t("update.banner", { version: latest, current: APP_VERSION })}</span>
         <Button type="button" size="sm" disabled={busy} onClick={refresh}>

@@ -175,7 +175,7 @@ export default function PeriodSummary({ mode = "week" }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{t("costing.reviewNotice")}</p>
+      <p className="text-xs font-semibold text-warning">{t("costing.reviewNotice")}</p>
       {periods.map((w) => (
         <Card key={w.key}>
           <CardContent className="p-4">
@@ -210,13 +210,13 @@ export default function PeriodSummary({ mode = "week" }) {
 
 function Stat({ label, value, accent }) {
   const tone = accent === "emerald"
-    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/40"
+    ? "border-success/30 bg-success/10"
     : accent === "sky"
-      ? "border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40"
+      ? "border-info/30 bg-info/10"
       : "bg-muted/30";
   return (
     <div className={`rounded-lg border p-2.5 ${tone}`}>
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-0.5 font-mono text-base font-semibold">{value}</div>
     </div>
   );

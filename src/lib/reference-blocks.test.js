@@ -136,7 +136,7 @@ describe("migration 0079 database contract", () => {
     expect(migrationSql).toContain("array['application/pdf', 'image/jpeg', 'image/png', 'image/webp']");
   });
   it("seeds the 8 existing forms without touching their enabled flag, and the existing references", () => {
-    expect(migrationSql.match(/^  \('[a-z-]+', false, '/gm)).toHaveLength(8);
+    expect(migrationSql.match(/^ {2}\('[a-z-]+', false, '/gm)).toHaveLength(8);
     expect(migrationSql).not.toMatch(/set\s+[^;]*enabled\s*=/);
     expect(migrationSql).toContain("where not exists (select 1 from public.profile_references)");
     for (const title of ["Status de réservation", "Calypso V1", "Distance entre thermostats", "Température d'entreposage", "Britton", "Support installation"]) {

@@ -40,7 +40,7 @@ auth adapter, or payroll engine), not only in one screen.
 | Date/time ambiguity | Low | Overnight, device timezone, or DST could produce a different date/duration in another screen | Montréal dates use shared `companyDate()`; jobs resolve to `started_at`/`ended_at` with `America/Toronto`; DST gaps/folds are rejected and overlap is checked on instants | Keep all new civil-date features on the shared helper and add transition-year fixtures when timezone rules change |
 | Authorization policy drift | Low–medium | A new role or policy could restore excess access or let a manager rewrite an approved fact | An executable role × operation matrix covers every persisted role, every grantable admin section, paused personas, CCQ inclusion and owner-only NAS; database-source assertions lock the matching RLS/RPC invariants | Update the matrix first whenever a role, section or privileged operation is introduced |
 | Database load regression | Low–medium | New dashboards could repeat unbounded reads/counts and exhaust Disk IO again | Named query budgets cap manager/history/review reads; manager/history use stable keyset pagination; four count scans are one aggregate RPC; pending-review/keyset indexes support those paths | Update and test the budget before increasing a page/queue size; retain infrastructure observability |
-| Render failure loses unsaved work | Low–medium | An unforeseen component exception can still blank a route | Employee drafts are schema-versioned, owner-scoped and persisted in IndexedDB with 30-day expiry; reload/offline recovery restores them | Add route-level error boundaries (S-7); keep attachment persistence in point 10 |
+| Render failure loses unsaved work | Low | An unforeseen component exception could blank a route | Root, route and manager-panel error boundaries show a recoverable error (reload keeps the IndexedDB draft); employee drafts are schema-versioned, owner-scoped and persisted in IndexedDB with 30-day expiry | Keep attachment persistence in point 10; wrap any new top-level layout in the route boundary |
 
 ### Release gates for recurrence-prone changes
 
@@ -117,16 +117,8 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 
 | ID | Finding | Anchor | Fix |
 |----|---------|--------|-----|
-| P-1 | No route-splitting; employees download manager code; ~784 kB bundle | `App.jsx:7-13` | `React.lazy` + `Suspense`; vendor chunks |
-| P-2 | Notifications panel does unbounded full-table reads | `ManagerDashboard.jsx:237-239,301-304,347-349` | date/status window + `.limit()` + indexes |
-| P-3 | 4 exact-count queries per filter change | `ManagerDashboard.jsx:117-146` | single RPC with `count(*) filter (where …)` |
-| P-4 | Employee History/Week fetch all-time jobs | `History.jsx`, `Week.jsx` | default 8–12 weeks + cursor paging |
 | P-5 | Costing does full client-side joins/aggregation (now status-scoped, still client-side) | `CostingDashboard.jsx` | server aggregation endpoint |
-| P-7 | LiveCrew polls roster every 30s | `LiveCrew.jsx` | cache roster; realtime; pause when hidden; abort in-flight |
-| P-8 | Missing review indexes on `created_at`/status | `overtime_evidence`, `parking_receipts`, `meal_claims` | partial indexes |
-| P-9 | Offset pagination over mutable `updated_at` sort skips/dupes | `ManagerDashboard.jsx:178-180` | keyset pagination on `(job_date, id)` |
-| P-10 | Card renderers recreated each render; lists unmemoized | `ManagerDashboard.jsx:685,793` | `React.memo` card + `useCallback` handlers |
-| P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts` | one bulk lookup, or avoid exporting contact data |
+| P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts:202-207` | one bulk lookup, or avoid exporting contact data |
 
 ---
 
@@ -156,11 +148,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   message text is not retained. Existing raw OCR text is purged by migration `0065`.
 - **Status:** ✅ resolved
 
-### S-7 — No React error boundaries — MEDIUM
-- No boundary in `App.jsx`/`ProtectedRoute`; one render exception blanks the app and discards in-memory work.
-- **Fix:** top-level + per-route boundaries with safe recovery, preserving any local draft.
-- **Status:** ☐ open
-
 ### S-3b / robustness — Non-atomic employee submission — MEDIUM
 - `EmployeeForm.jsx:449-474,634-712`: storage upload precedes the row insert; a mid-sequence failure orphans
   the object or flags a job as having evidence with no metadata; manager notification insert is best-effort.
@@ -184,11 +171,9 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Employee | Offline Save, then reload | Durable IndexedDB draft, with stale-edit conflict prompt | Durable on-device draft | C-8 (done) |
 | Employee | Dropped conn after upload | Orphaned object / flagged job w/o metadata | Atomic or queued | S-3b |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
-| Manager | 100+ employees notifications | Unbounded full-table reads | Paginated review RPC | P-2/P-8 |
-| Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | P-9 + AbortController |
+| Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | AbortController / request id |
 | Manager | Sensitive export | Owner can bulk-read NAS un-audited from the browser | Audited server-side export | S-2 |
 | Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
-| Both | Render exception | Whole app blanks | Recover, keep draft | S-7 |
 
 **Also tracked (lower tier):**
 - **P-12 export rollback re-rates pending jobs (open, pre-existing):** `revertClaim` in
@@ -197,6 +182,113 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   `approved → submitted` (keep the snapshot taken at submission).
 - **C-8 offline drafts (done):** schema-versioned IndexedDB drafts are keyed by owner and job; edit drafts
   restore only when newer than the server copy and after explicit employee confirmation.
+
+---
+
+## 5. Optimisation — bundle, couleurs, interface (audit 2026-10-09)
+
+Mesures initiales : `vite build` → un seul chunk `index-*.js` de 1,27 Mo (360 Ko gzip) ; precache PWA 3,5 Mo.
+Contrastes calculés selon WCAG 2.x (texte ≥ 4,5:1, bordures de champs ≥ 3:1). Une PR par lot, chacune
+avec le bump de `APP_VERSION`.
+
+### Lot 1 — Nettoyage (risque faible) — ✅ fait (V2.4.94)
+Precache PWA : 3 562 Ko → 2 027 Ko (28 → 23 entrées). Bundle JS inchangé (le gain JS est au Lot 3).
+- [x] Dépendances jamais importées retirées : `@mui/material`, `@mui/x-date-pickers`, `@emotion/react`,
+  `@emotion/styled`, `next-themes`, `@radix-ui/react-select`, `jimp` (145 paquets en moins).
+- [x] Fichiers morts supprimés : `src/App.css`, `src/assets/react.svg`, `public/vite.svg`, `public/logo.jpg`.
+- [x] Images converties en WebP : en-têtes 171/122 Ko → 14/13 Ko (light réduit à 768 px de large),
+  `Auto-fill` 57 → 17 Ko, exemple de preuve 27 → 10 Ko.
+- [x] Plus de copie hachée en double : `AppShell`, `Login`, `ProtectedRoute` et `EmployeeForm` référencent
+  `/…webp` dans `public/` au lieu d'importer `../../public/…` ; `globPatterns` inclut `webp`.
+- [x] `public/inventory-examples` : 3 × 1080×2340 (≈ 250 Ko) → 480×1040 WebP (22 Ko) ; gardés en precache
+  pour que les exemples restent visibles hors ligne.
+
+### Lot 2 — Contrastes et thème — ✅ fait (V2.4.95)
+- [x] Sombre : `--destructive` `0 84% 64%` (texte sur fond 5,4:1, sur carte 5,1:1) avec
+  `--destructive-foreground` foncé (5,4:1) — avant 1,99:1.
+- [x] Clair : `--destructive` `0 72% 45%`, texte blanc 5,8:1 (avant 3,59:1).
+- [x] `--input` : clair `215 16% 58%` (3,2:1), sombre `0 0% 42%` (3,4:1). Les 30 `<select>`/`<input>`/`<textarea>`
+  natifs qui n'avaient que `border` utilisent maintenant `border-input` comme le composant `Input`.
+- [x] Sombre unifié sur `#151515` (couleur du fond du logo et du splash) : `--background 0 0% 8.2%`,
+  cartes `10.6%`, gris neutres (sans teinte bleue), `--border 20%`. `dark:bg-[#151515]` retiré
+  (`AppShell`, `ManagerLayout`) ; la carte de `Login` utilise `dark:bg-background`.
+- [x] `theme-color` : une balise par mode dans `index.html`, puis `theme-provider.jsx` aligne la couleur sur
+  le thème choisi dans l'app (`#ffffff` / `#151515`), y compris quand il diffère du système.
+
+### Lot 3 — Chargement (P-1, P-7) — ✅ fait (V2.4.96)
+JS téléchargé à l'ouverture par un employé : 1 292 Ko (364 Ko gzip) → 792 Ko (233 Ko gzip), −36 %.
+Le precache PWA reste ≈ 2 050 Ko (tous les chunks y sont, téléchargés en arrière-plan une fois).
+- [x] `App.jsx` : `EmployeeForm` et `Login` restent dans le bundle principal ; `History`, `Week`, `Profile`,
+  `ResetPassword`, `ManagerLayout` et `ManagerPages` sont en `React.lazy` sous un `Suspense` (`PageLoading`).
+- [x] `ManagerPages.jsx` : chaque panneau (dont `PayrollEngineTester`, 63 Ko) est un chunk séparé via
+  `lazyPanel()` (`components/LazyLoading.jsx`), avec son propre `Suspense` : la barre latérale et les onglets
+  restent affichés pendant le chargement. `ManagerLayout` entoure aussi `<Outlet/>` d'un `Suspense`.
+- [x] `manualChunks` : `vendor-react`, `vendor-supabase`, `vendor-radix`, `vendor-icons` (un déploiement ne
+  re-télécharge que le code de l'app ; 76 entrées de precache au lieu de 101 sans le chunk d'icônes).
+- [x] Cycle `payroll/index.js` ⇄ `employee-week.js` cassé (imports directs) — Rollup signalait un ordre
+  d'exécution cassé une fois le code découpé.
+- [x] Après un déploiement, un chunk disparu déclenche `vite:preloadError` → un seul rechargement
+  (`main.jsx`, garde d'une minute en `sessionStorage` contre les boucles hors ligne).
+- [x] `LiveCrew.jsx` : pas de requête quand l'onglet est caché ; rafraîchit dès qu'il redevient visible.
+- Vérifié dans Chromium avec Supabase simulé : un employé ne charge aucun chunk gestionnaire ; un
+  propriétaire ouvre Direct, Calcul, Semaine/mois, Journal et Employés sans erreur.
+- [ ] Non fait (volontairement) : charger une seule langue de `i18n.js` (206 Ko source). `use-t.js` retombe sur
+  `dictionaries.en` pour toute clé française manquante, donc les deux restent nécessaires tant que ce
+  repli existe.
+
+### Lot 4 — Couleurs sémantiques — ✅ fait (V2.4.97)
+Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f30, sombre `120 40% 55%`).
+- [x] Jetons `--success` (teal, pour ne pas se confondre avec le vert d'action), `--warning`, `--info`
+  + `-foreground`, clair et sombre ; entrées `tailwind.config.js`.
+- [x] Couleurs en dur migrées vers les jetons (≈ 450 classes dans 47 fichiers) : amber/yellow/orange → warning,
+  red/rose → destructive, emerald/green/lime/teal → success, sky/blue/cyan/indigo → info. Les variantes
+  `dark:` correspondantes sont supprimées (215 → 16 `dark:` restants). CSS 52,7 → 44,4 Ko.
+- [x] Une seule couleur « succès » ; les nuances `-600` trop pâles en clair disparaissent avec les jetons.
+- [x] `button` / `badge` : variantes `success`, `warning`, `info` sur les jetons. Statut `saved` → badge `info`
+  (bleu, comme avant) pour qu'un brouillon ne ressemble pas à l'action principale verte.
+- [x] Corrections manuelles : bouton Enregistrer de la fiche = bouton principal (n'est plus bleu forcé) ;
+  « Soumettre la journée » = `variant="success"` ; bouton du bandeau « vue employé » lisible sur l'ambre.
+- [x] `src/lib/theme-contrast.test.js` verrouille les contrastes WCAG de tous les jetons (texte sur fond, carte
+  et teinte /15 ; `-foreground` sur fond plein ; `--input` ≥ 3:1). Il a imposé `--destructive` sombre
+  `0 92% 70%` (le `0 84% 64%` du Lot 2 tombait à 4,2:1 sur sa propre teinte).
+- Reste : `bg-violet`/`slate` ponctuels et le gris de `badge neutral` (non sémantiques) ; couleurs hex du
+  talon imprimé (`lib/paystub.js`), volontairement neutres.
+
+### Lot 5 — Ergonomie terrain — ✅ fait (V2.4.98)
+- [x] En-tête mobile : Actualiser / Thème / Langue / Déconnexion regroupés dans un menu ⋮ (`PhoneMenu`,
+  entrées de 44 px) ; cloches, menu et lien Gestion à 44 × 44 (`size="touch"` dans `ui/button.jsx` :
+  44 px sur téléphone, 40 px dès `sm`). Corrige aussi un débordement existant : à 360 px l'en-tête d'un
+  gestionnaire faisait 378 px. En-tête et menu de `ManagerLayout` à 44 px.
+- [x] 71 textes `text-[10px]`/`[11px]` → `text-xs` (12 px). Exceptions voulues : talon imprimé
+  (`PayStubPrint`), pastilles de compte des cloches, glyphe EN/FR de 16 px, libellés de la barre du bas
+  (11 px, sinon « Fiche de travail » est tronqué à 360 px).
+- [x] Splash PWA retiré au premier rendu (double `requestAnimationFrame`) au lieu d'1 s fixe.
+- [x] Manifeste `orientation: "any"`.
+- [x] S-7 : `components/ErrorBoundary.jsx` — racine (`main.jsx`, texte bilingue statique), route (`App.jsx`,
+  réinitialisée au changement de page) et panneau gestionnaire (`ManagerLayout`, la barre latérale reste).
+  Boutons Recharger / Réessayer / Accueil ; le brouillon IndexedDB est restauré au rechargement.
+- Vérifié dans Chromium (Supabase simulé) : pas de défilement horizontal sur 10 écrans à 360 et 1280 px ;
+  plantage forcé (build de test) d'Historique et d'Équipe en direct → erreur récupérable, navigation OK.
+
+### Lot 6 — Qualité du code — ✅ en partie (V2.4.99)
+- [x] ESLint 10 (`eslint`, `@eslint/js`, `globals`, `eslint-plugin-react-hooks` 7, `eslint-plugin-react-refresh`)
+  en devDependencies, script `npm run lint`, étape `npm run lint` dans `.github/workflows/ci.yml`.
+  Config par environnement (Node pour configs/tests, service worker pour `push-sw.js`) ; les sources Apps
+  Script (`apps-script-*.js`) sont exclues. 0 erreur, ~60 avertissements : les règles « React Compiler »
+  de react-hooks 7 (`set-state-in-effect`, `refs`, `purity`…) et `exhaustive-deps` sont en *warn* — à
+  corriger écran par écran, pas en masse.
+- [x] Erreurs corrigées : clés i18n en double (`manager.filters.today/clearDay`, `profile.noReferences` — on
+  garde la valeur déjà affichée), code mort (imports, variables, `validateOvertimeSmsText`, fonctions
+  d'édition des écrans de taux en lecture seule `CongesIndemnityManager`/`EmployerContributionsManager`),
+  `{ cause }` sur les erreurs relancées de la preuve de temps supplémentaire. Moteur de paie : aucun
+  changement de logique (deux commentaires `eslint-disable` documentés).
+- [x] P-10 : carte de feuille de temps extraite dans `components/manager/JobCard.jsx` (`React.memo`, props
+  primitives, `onApprove`/`onUnlock` stables via ref) ; `useT()` mémoïsé par langue. Mesuré (build de test,
+  20 cartes) : ouvrir la confirmation d'approbation re-rendait toutes les cartes, maintenant 0.
+- [ ] Reste : découper `EmployeeForm.jsx` (≈ 1 750 l.) et `EmployeesPanel.jsx` (≈ 900 l.), et la carte de
+  notification de `ManagerDashboard`. Volontairement non fait ici : `EmployeeForm` est le chemin de saisie
+  du temps soumis aux « release gates » (timeouts, double-clic, DST…) ; un découpage doit venir avec des
+  tests de composant (pas encore d'environnement jsdom/testing-library dans le projet).
 
 ---
 

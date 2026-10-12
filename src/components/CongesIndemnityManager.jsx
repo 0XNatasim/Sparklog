@@ -20,7 +20,6 @@ export default function CongesIndemnityManager() {
   const t = useT();
   const [row, setRow] = useState(null);
   const [err, setErr] = useState("");
-  const [saved, setSaved] = useState(false);
 
   async function load() {
     const { data, error } = await supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle();
@@ -32,17 +31,6 @@ export default function CongesIndemnityManager() {
   const asPct = (v) => (v == null || v === "" ? "" : (Number(v) * 100).toString());
   const total = FIELDS.reduce((s, f) => s + (Number(row?.[f.key]) || 0), 0);
 
-  function setLocal(key, pctValue) {
-    setRow((r) => ({ ...r, [key]: pctValue === "" ? "" : Number(pctValue) / 100 }));
-  }
-
-  async function saveField(key, pctValue) {
-    const value = pctValue === "" || pctValue == null ? 0 : Number(pctValue) / 100;
-    if (Number.isNaN(value)) return;
-    const { error } = await supabase.from("conges_indemnity_rate").update({ [key]: value }).eq("id", true);
-    if (error) setErr(error.message);
-    else { setSaved(true); setTimeout(() => setSaved(false), 1200); }
-  }
 
   return (
     <Card>
@@ -54,7 +42,7 @@ export default function CongesIndemnityManager() {
           </summary>
           <div className="border-t p-4">
             <p className="mb-3 text-xs text-muted-foreground">{t("costing.conges.description")}</p>
-            {err && <div className="mb-2 text-xs text-destructive dark:text-red-300">{err}</div>}
+            {err && <div className="mb-2 text-xs text-destructive">{err}</div>}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {FIELDS.map((f) => (
                 <div key={f.key} className="block text-xs">
@@ -67,11 +55,11 @@ export default function CongesIndemnityManager() {
               <div className="block text-xs">
                 <span className="text-muted-foreground">{t("costing.conges.total")}</span>
                 <div className="mt-1 flex h-9 items-center justify-end rounded-md border bg-muted/40 px-2 font-mono text-sm">
-                  {(total * 100).toFixed(1)}% {saved && <span className="ml-2 text-[11px] text-emerald-600 dark:text-emerald-400">✓</span>}
+                  {(total * 100).toFixed(1)}%
                 </div>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("costing.conges.note")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("costing.conges.note")}</p>
           </div>
         </details>
       </CardContent>

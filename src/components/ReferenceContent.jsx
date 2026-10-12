@@ -6,7 +6,7 @@ import { withTimeout } from "@/lib/utils";
 
 const CALLOUT_STYLES = {
   info: "border-primary/30 bg-primary/10",
-  warning: "border-amber-500/30 bg-amber-500/10",
+  warning: "border-warning/30 bg-warning/10",
   danger: "border-destructive/30 bg-destructive/10",
 };
 

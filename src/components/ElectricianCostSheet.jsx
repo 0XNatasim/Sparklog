@@ -116,7 +116,7 @@ export default function ElectricianCostSheet() {
                       <td className="px-3 py-2 align-top text-xs text-muted-foreground">({r.n})</td>
                       <td className="px-3 py-2 align-top">
                         <div>{r.label}</div>
-                        {r.note && <div className="mt-0.5 text-[11px] font-normal leading-snug text-muted-foreground">{r.note}</div>}
+                        {r.note && <div className="mt-0.5 text-xs font-normal leading-snug text-muted-foreground">{r.note}</div>}
                       </td>
                       <td className="px-3 py-2 text-right align-top">
                         <div className="flex items-center justify-end gap-1">

@@ -117,8 +117,8 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
         {t("ccqCard.upload")}
       </Button>
 
-      {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive dark:text-red-300">{err}</div>}
-      {info && <div className="text-sm text-emerald-700 dark:text-emerald-300">{info}</div>}
+      {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{err}</div>}
+      {info && <div className="text-sm text-success">{info}</div>}
     </div>
   );
 }

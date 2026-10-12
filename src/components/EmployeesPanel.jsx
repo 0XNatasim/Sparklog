@@ -360,7 +360,7 @@ export default function EmployeesPanel() {
   return (
     <div className="space-y-3">
       {err && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-300 flex items-center justify-between gap-3">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive flex items-center justify-between gap-3">
           <span>{err}</span>
           <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={load}>
             {t("common.retry")}
@@ -371,7 +371,7 @@ export default function EmployeesPanel() {
         <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary">{info}</div>
       )}
       {!loading && rateSuggestions.size > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
           <span>{t("employees.rates.pending", { count: rateSuggestions.size })}</span>
           <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={applyRateSuggestions} disabled={applyingRates}>
             {applyingRates ? t("common.working") : t("employees.rates.applyBtn")}
@@ -386,11 +386,11 @@ export default function EmployeesPanel() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button size="sm" onClick={() => { setAddOpen(true); setAddResult(null); }}>{t("employees.add.button")}</Button>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-1 font-semibold text-emerald-700 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-1 font-semibold text-success">
                     {activeCount} · {t("employees.active")}
                   </span>
                   {attentionCount > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-1 font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 font-semibold text-warning">
                       <TriangleAlert className="h-3.5 w-3.5" />{attentionCount} · {t("employees.needAttention")}
                     </span>
                   )}
@@ -420,11 +420,11 @@ export default function EmployeesPanel() {
               </form>
             )}
             {addResult && (
-              <div className="mt-3 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
+              <div className="mt-3 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
                 <div className="font-semibold">{t("employees.add.credentials")}</div>
                 <div className="mt-1 font-mono text-xs">{addResult.email}</div>
                 <div className="font-mono text-xs">{t("employees.add.tempPassword")}: <b>{addResult.password}</b></div>
-                <p className="mt-1 text-[11px]">{t("employees.add.share")}</p>
+                <p className="mt-1 text-xs">{t("employees.add.share")}</p>
               </div>
             )}
           </CardContent>
@@ -443,7 +443,7 @@ export default function EmployeesPanel() {
         // Non-CCQ roles (administration + owner) skip the CCQ "missing fields" check.
         const missingFields = isNonCcqRole(p.role) ? [] : getMissingEmployeeFields(p, t);
         return (
-        <Card key={p.id} className={p.is_paused ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-amber-500/40" : ""}>
+        <Card key={p.id} className={p.is_paused ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-warning/40" : ""}>
           <button
             type="button"
             onClick={() => toggleExpanded(p.id)}
@@ -454,25 +454,25 @@ export default function EmployeesPanel() {
               <div className="flex items-center gap-1.5 truncate font-semibold">
                 {p.employee_number && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">#{p.employee_number}</span>}
                 {p.role === "owner"
-                  ? <Crown className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.bossLabel")} />
+                  ? <Crown className="h-4 w-4 shrink-0 text-warning" aria-label={t("manager.bossLabel")} />
                   : p.role === "admin"
                     ? <Briefcase className="h-4 w-4 shrink-0 text-violet-500" aria-label={t("manager.adminLabel")} />
-                    : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-amber-500" aria-label={t("manager.roleLabel")} />}
-                {Number(p.team_leader_premium) > 0 && <Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-500" aria-label={t("employees.teamLeader")} />}
+                    : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-warning" aria-label={t("manager.roleLabel")} />}
+                {Number(p.team_leader_premium) > 0 && <Star className="h-4 w-4 shrink-0 fill-warning text-warning" aria-label={t("employees.teamLeader")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
                 {REGION_NAME.get(p.work_region) && (
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal text-muted-foreground" title={t("employees.workRegion")}>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground" title={t("employees.workRegion")}>
                     {p.work_region} — {REGION_NAME.get(p.work_region)}
                   </span>
                 )}
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
             </div>
-            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.is_paused ? "bg-muted-foreground/15 text-muted-foreground" : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"}`}>
+            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.is_paused ? "bg-muted-foreground/15 text-muted-foreground" : "bg-success/15 text-success "}`}>
               {p.is_paused ? t("employees.paused") : t("employees.active")}
             </span>
             {missingFields.length > 0 && (
-              <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+              <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-xs font-semibold text-warning">
                 <TriangleAlert className="h-3.5 w-3.5" />{t("employees.missingCount", { count: missingFields.length })}
               </span>
             )}
@@ -500,7 +500,7 @@ export default function EmployeesPanel() {
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">{t("employees.chooseTypeOwnerOnly")}</p>
+                  <p className="text-xs text-warning">{t("employees.chooseTypeOwnerOnly")}</p>
                 )}
               </div>
             )}
@@ -512,7 +512,7 @@ export default function EmployeesPanel() {
               </Button>
             )}
             {missingFields.length > 0 && (
-              <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200" role="alert">
+              <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning" role="alert">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
               </div>
@@ -549,8 +549,8 @@ export default function EmployeesPanel() {
                 )}
               </Field>
               <Field label={t("employees.pauseAccount")}>
-                <label className={`flex h-9 items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 ${p.type_confirmed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
-                  <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-amber-600 dark:text-amber-300" />{p.is_paused ? t("employees.paused") : t("employees.active")}</span>
+                <label className={`flex h-9 items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/5 px-3 ${p.type_confirmed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
+                  <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-warning" />{p.is_paused ? t("employees.paused") : t("employees.active")}</span>
                   <input
                     type="checkbox"
                     checked={Boolean(p.is_paused)}
@@ -560,10 +560,10 @@ export default function EmployeesPanel() {
                       setLocal(p.id, "is_paused", checked);
                       saveField(p.id, "is_paused", checked);
                     }}
-                    className="h-5 w-5 rounded border-input accent-amber-600 disabled:cursor-not-allowed"
+                    className="h-5 w-5 rounded border-input accent-warning disabled:cursor-not-allowed"
                   />
                 </label>
-                {!p.type_confirmed && <span className="text-[11px] text-amber-700 dark:text-amber-300">{t("employees.activateNeedsType")}</span>}
+                {!p.type_confirmed && <span className="text-xs text-warning">{t("employees.activateNeedsType")}</span>}
               </Field>
             </div>
 
@@ -610,7 +610,7 @@ export default function EmployeesPanel() {
               <div className="rounded-lg border bg-muted/20 p-3">
                 {cardViews[p.id]?.loading && <div className="text-xs text-muted-foreground">{t("common.loading")}</div>}
                 {cardViews[p.id]?.url && <img src={cardViews[p.id].url} alt={t("ccqCard.title")} className="max-h-80 w-full rounded-md border object-contain" />}
-                {cardViews[p.id]?.error && <div className="text-xs text-destructive dark:text-red-300">{cardViews[p.id].error}</div>}
+                {cardViews[p.id]?.error && <div className="text-xs text-destructive">{cardViews[p.id].error}</div>}
               </div>
             )}
 
@@ -620,7 +620,7 @@ export default function EmployeesPanel() {
                 <span className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-primary" />{t("timeOff.title")}
                   {(timeOff.get(p.id) || []).length > 0 && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground">{(timeOff.get(p.id) || []).length}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{(timeOff.get(p.id) || []).length}</span>
                   )}
                 </span>
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -657,7 +657,7 @@ export default function EmployeesPanel() {
                       />
                       <span className="text-xs text-muted-foreground">/h</span>
                     </div>
-                    <span className="text-[11px] text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
+                    <span className="text-xs text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
                   </Field>
                 </div>
               </details>
@@ -777,10 +777,10 @@ export default function EmployeesPanel() {
                   ) : (
                     <>
                       <Input value={p.wage_schedule || ""} placeholder="C3" onChange={(e) => setLocal(p.id, "wage_schedule", e.target.value.toUpperCase())} onBlur={(e) => saveField(p.id, "wage_schedule", e.target.value.toUpperCase())} className="h-9" />
-                      <span className="text-[11px] text-amber-700 dark:text-amber-300">{t("employees.wageScheduleManual")}</span>
+                      <span className="text-xs text-warning">{t("employees.wageScheduleManual")}</span>
                     </>
                   )}
-                  <span className="text-[11px] text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
+                  <span className="text-xs text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
                 </Field>
                 {isSubcontractorRole(p.role) ? (
                   <>
@@ -797,13 +797,13 @@ export default function EmployeesPanel() {
                         <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.hourly_rate_double ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate_double", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate_double", e.target.value)} placeholder="0.00" className="h-9" />
                         <span className="text-xs text-muted-foreground">/h</span>
                       </div>
-                      <span className="text-[11px] text-muted-foreground">{t("employees.doubleHourlyRateHint")}</span>
+                      <span className="text-xs text-muted-foreground">{t("employees.doubleHourlyRateHint")}</span>
                     </Field>
                   </>
                 ) : (
                   <Field label={t("employees.hourlyRate")}>
                     <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
-                    <span className="text-[11px] text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
+                    <span className="text-xs text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
                   </Field>
                 )}
               </div>
@@ -821,11 +821,11 @@ export default function EmployeesPanel() {
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
               </summary>
               <div className="space-y-3 border-t p-3">
-                <p className="text-[11px] text-muted-foreground">{t("employees.payAmountsMoved")}</p>
+                <p className="text-xs text-muted-foreground">{t("employees.payAmountsMoved")}</p>
                 <div className="grid gap-2 md:grid-cols-2">
                   <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
                     <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
-                    <input type="checkbox" checked={Boolean(p.parking_receipts_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "parking_receipts_enabled", checked); saveField(p.id, "parking_receipts_enabled", checked); }} className="h-5 w-5 rounded border-input accent-amber-600" />
+                    <input type="checkbox" checked={Boolean(p.parking_receipts_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "parking_receipts_enabled", checked); saveField(p.id, "parking_receipts_enabled", checked); }} className="h-5 w-5 rounded border-input accent-warning" />
                   </label>
                   {!isAdminEmployee(p.role) && (
                   <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
@@ -847,7 +847,7 @@ export default function EmployeesPanel() {
             {p.is_paused && !isManagerRole(p.role) && p.id !== user?.id && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-destructive dark:text-red-300">{t("employees.deleteUser")}</span>
+                  <span className="text-sm font-semibold text-destructive">{t("employees.deleteUser")}</span>
                   {confirmDelete === p.id ? (
                     <div className="flex items-center gap-2">
                       <Button type="button" size="sm" variant="outline" disabled={deleting} onClick={() => setConfirmDelete(null)}>{t("common.cancel")}</Button>

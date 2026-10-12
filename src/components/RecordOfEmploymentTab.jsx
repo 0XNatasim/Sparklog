@@ -212,7 +212,7 @@ export default function RecordOfEmploymentTab() {
             <select
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             >
               <option value="">{t("testing.roe.employeePlaceholder")}</option>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
@@ -224,7 +224,7 @@ export default function RecordOfEmploymentTab() {
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             >
               {SEPARATION_REASONS.map((r) => <option key={r.code} value={r.code}>{r.code} — {r.label}</option>)}
             </select>
@@ -235,7 +235,7 @@ export default function RecordOfEmploymentTab() {
               type="date"
               value={recall}
               onChange={(e) => setRecall(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             />
           </label>
           <div className="flex items-end">

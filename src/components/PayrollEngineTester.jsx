@@ -135,7 +135,7 @@ function Field({ label, value, onChange, type = "number", step = "0.01", suffix,
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full rounded-md border px-2 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}
+          className={`w-full rounded-md border border-input px-2 py-1.5 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${disabled ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}
         />
         {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
       </div>
@@ -173,7 +173,7 @@ function Collapsible({ title, children }) {
 
 // tone: "add" = a gain/addition (green), "ded" = a deduction (red), undefined = neutral.
 function Row({ label, value, strong, tone }) {
-  const toneClass = tone === "add" ? "text-green-600 dark:text-green-400" : tone === "ded" ? "text-red-600 dark:text-red-400" : "";
+  const toneClass = tone === "add" ? "text-success" : tone === "ded" ? "text-destructive" : "";
   return (
     <div className={`flex items-baseline justify-between gap-2 ${strong ? "border-t pt-2 font-semibold" : ""}`}>
       <span className={strong ? "" : "text-muted-foreground"}>{label}</span>
@@ -645,7 +645,6 @@ export default function PayrollEngineTester({ messier = false }) {
     setCcq((s) => (testRatesOn
       ? { ...s, prelevementCcq: levies.prelevementCcq }
       : { ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
 
   // Run the calculation (phone-data / other reimbursements come from typed fields).
@@ -672,7 +671,6 @@ export default function PayrollEngineTester({ messier = false }) {
 
     // Non-taxable reimbursements/allowances (outside the DAS calc): KM + weekly
     // phone/data + CCQ safety-equipment allowance (added once CCQ is computed).
-    const profile = employees.find((e) => e.id === selectedId);
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
     // Phone-data, storage and other non-taxable reimbursements are typed amounts (phone and storage
     // are prefilled from the employee's Règles de temps settings).
@@ -801,7 +799,7 @@ export default function PayrollEngineTester({ messier = false }) {
   return (
     <div className="space-y-3">
       {/* ── Boundary banner (ADR 0001 / payroll-rule gate) ── */}
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
@@ -821,7 +819,7 @@ export default function PayrollEngineTester({ messier = false }) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-xs">
               <span className="text-muted-foreground">{t("payroll.employee")}</span>
-              <select value={selectedId} onChange={(e) => handleSelectEmployee(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={selectedId} onChange={(e) => handleSelectEmployee(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="">{t("payroll.manual")}</option>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.role && e.role !== "employee" ? ` · ${e.role}` : ""}</option>)}
               </select>
@@ -829,7 +827,7 @@ export default function PayrollEngineTester({ messier = false }) {
             {selectedId && (
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-                <select value={selectedWeek} onChange={(e) => handleSelectWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={selectedWeek} onChange={(e) => handleSelectWeek(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   <option value="">{t("payroll.weekManual")}</option>
                   {weekOptions.map((w) => (
                     <option key={w.key} value={w.key}>
@@ -843,7 +841,7 @@ export default function PayrollEngineTester({ messier = false }) {
             {selectedId && !selectedWeek && ledger.length > 0 && (
               <label className="block text-xs sm:col-span-2">
                 <span className="text-muted-foreground">{t("payroll.startFrom")}</span>
-                <select value={startFromEnd} onChange={(e) => handleStartFrom(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={startFromEnd} onChange={(e) => handleStartFrom(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   <option value="">{t("payroll.startFromSeed")}</option>
                   {[...ledger].sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1)).map((r) => (
                     <option key={r.periodEnd} value={r.periodEnd}>
@@ -863,7 +861,7 @@ export default function PayrollEngineTester({ messier = false }) {
                   type="date"
                   value={calcWeekEnd}
                   onChange={(e) => setCalcWeekEnd(e.target.value)}
-                  className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm sm:max-w-xs"
+                  className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 font-mono text-sm sm:max-w-xs"
                 />
                 <span className="mt-1 block text-muted-foreground">
                   {dayjs(calcWeekEnd).day() !== 6 ? t("payroll.weekEnd.notSaturday") : t("payroll.weekEnd.hint")}
@@ -915,7 +913,7 @@ export default function PayrollEngineTester({ messier = false }) {
             <Button size="sm" variant="outline" onClick={() => stubInputRef.current?.click()} disabled={stubParse.status === "loading"} className="text-xs">
               <Upload className="mr-1.5 h-3.5 w-3.5" /> {stubParse.status === "loading" ? t("payroll.stub.reading") : t("payroll.stub.upload")}
             </Button>
-            <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs border-amber-600 bg-amber-500/10 font-semibold text-amber-900 hover:bg-amber-500/20 dark:text-amber-200">
+            <Button size="sm" variant="outline" onClick={handleSaveYtd} disabled={saveState.status === "saving"} className="text-xs border-warning bg-warning/10 font-semibold text-warning hover:bg-warning/20">
               <Save className="mr-1.5 h-3.5 w-3.5" /> {saveState.status === "saving" ? t("payroll.saving") : t("payroll.save")}
             </Button>
             {stubParse.message && (
@@ -935,7 +933,7 @@ export default function PayrollEngineTester({ messier = false }) {
                 <Field key={k} label={label} value={ytd[k]} onChange={setY(k)} disabled={openingLocked} />
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
           </div>
         </details>
       </Collapsible>
@@ -945,11 +943,11 @@ export default function PayrollEngineTester({ messier = false }) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <label className="block text-xs">
             <span className="text-muted-foreground">{t("payroll.province")}</span>
-            <input value="Québec" disabled className="mt-1 w-full rounded-md border bg-muted/40 px-2 py-1.5 text-sm" />
+            <input value="Québec" disabled className="mt-1 w-full rounded-md border border-input bg-muted/40 px-2 py-1.5 text-sm" />
           </label>
           <label className="block text-xs">
             <span className="text-muted-foreground">{t("payroll.frequency")}</span>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
               <option value="weekly">{t("payroll.freq.weekly")}</option>
               <option value="biweekly">{t("payroll.freq.biweekly")}</option>
               <option value="semimonthly">{t("payroll.freq.semimonthly")}</option>
@@ -993,16 +991,16 @@ export default function PayrollEngineTester({ messier = false }) {
       {/* ── Avantages CCQ — foldable; level/union from profile, rates auto-filled + locked ── */}
       <Collapsible title={ccqTitle}>
             {startFromEnd && (
-              <div className="mb-3 space-y-2 rounded-md border border-dashed border-amber-500/60 bg-amber-500/5 p-3">
+              <div className="mb-3 space-y-2 rounded-md border border-dashed border-warning/60 bg-warning/5 p-3">
                 <label className="flex items-center gap-2 text-xs font-semibold">
                   <input type="checkbox" checked={testRates.enabled} onChange={(e) => toggleTestRates(e.target.checked)} />
                   {t("payroll.testRates.toggle")}
                 </label>
-                <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.hint")}</p>
+                <p className="text-xs text-muted-foreground">{t("payroll.testRates.hint")}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" size="sm" variant={presetKind === "before" ? "default" : "outline"} onClick={() => applyPresetKind("before")}>{t("payroll.testRates.preset")}</Button>
                   <Button type="button" size="sm" variant={presetKind === "after" ? "default" : "outline"} onClick={() => applyPresetKind("after")}>{t("payroll.testRates.presetAfter")}</Button>
-                  {presetKind && <span className="text-[11px] text-muted-foreground">{t("payroll.testRates.presetAuto")}</span>}
+                  {presetKind && <span className="text-xs text-muted-foreground">{t("payroll.testRates.presetAuto")}</span>}
                 </div>
                 {testRates.enabled && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1013,14 +1011,14 @@ export default function PayrollEngineTester({ messier = false }) {
                   </div>
                 )}
                 {testRates.enabled && unionSuggestion != null && (
-                  <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.unionSuggest", { amount: unionSuggestion.toFixed(2) })}</p>
+                  <p className="text-xs text-muted-foreground">{t("payroll.testRates.unionSuggest", { amount: unionSuggestion.toFixed(2) })}</p>
                 )}
               </div>
             )}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqStatus")}</span>
-                <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
+                <select value={ccq.status} onChange={(e) => setC("status")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border border-input px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
                   {CCQ_LEVELS.map((k) => (
                     <option key={k} value={k}>
                       {CCQ_ELECTRICIAN_IC_C3.levels[k].label} · {(CCQ_ELECTRICIAN_IC_C3.levels[k].employeePensionRate * 100).toFixed(1)}%
@@ -1030,7 +1028,7 @@ export default function PayrollEngineTester({ messier = false }) {
               </label>
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.ccqUnion")}</span>
-                <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
+                <select value={ccq.union} onChange={(e) => setC("union")(e.target.value)} disabled={!!selectedId} className={`mt-1 w-full rounded-md border border-input px-2 py-1.5 text-sm ${selectedId ? "cursor-not-allowed bg-muted/40 text-muted-foreground" : "bg-background"}`}>
                   {CCQ_UNION_KEYS.map((k) => (
                     <option key={k} value={k}>{CCQ_UNIONS[k].label}</option>
                   ))}
@@ -1043,7 +1041,7 @@ export default function PayrollEngineTester({ messier = false }) {
               <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" disabled={!testRatesOn} />
               <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" disabled={!testRatesOn} />
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqAutoNote")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("payroll.ccqAutoNote")}</p>
       </Collapsible>
 
       <Card>
@@ -1053,7 +1051,7 @@ export default function PayrollEngineTester({ messier = false }) {
             <Field label={t("payroll.annualPayroll")} value={employer.annualPayrollEstimate} onChange={setEr("annualPayrollEstimate")} step="1000" />
             <label className="block text-xs">
               <span className="text-muted-foreground">{t("payroll.fssCategory")}</span>
-              <select value={employer.fssCategory} onChange={(e) => setEr("fssCategory")(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={employer.fssCategory} onChange={(e) => setEr("fssCategory")(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="general">{t("payroll.fss.general")}</option>
                 <option value="primary_manufacturing">{t("payroll.fss.primary")}</option>
                 <option value="public">{t("payroll.fss.public")}</option>
@@ -1078,7 +1076,7 @@ export default function PayrollEngineTester({ messier = false }) {
               <Printer className="mr-2 h-4 w-4" /> {t("payroll.printStub")}
             </Button>
             {selectedId && (
-              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full border-amber-600 bg-amber-500/10 font-semibold text-amber-900 hover:bg-amber-500/20 dark:text-amber-200 sm:w-auto">
+              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full border-warning bg-warning/10 font-semibold text-warning hover:bg-warning/20 sm:w-auto">
                 <Save className="mr-2 h-4 w-4" /> {t("payroll.post")}
               </Button>
             )}
@@ -1107,7 +1105,7 @@ export default function PayrollEngineTester({ messier = false }) {
       {result && result.employee && calcCtx && startFromEnd && !selectedWeek && (
         <div className="space-y-2 rounded-lg border border-dashed p-3">
           {cmp?.acceptable && stubWeekMismatch && (
-            <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs text-amber-900 dark:text-amber-200">
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning/50 bg-warning/10 p-2 text-xs text-warning">
               <span>{t("payroll.keep.weekMismatch", { stub: dayjs(stubEnd).format("DD MMM YYYY"), calc: dayjs(calcCtx.periodEnd).format("DD MMM YYYY") })}</span>
               <Button type="button" size="sm" variant="outline" onClick={() => setCalcWeekEnd(stubEnd)}>{t("payroll.keep.useStubWeek")}</Button>
             </div>
@@ -1158,7 +1156,7 @@ export default function PayrollEngineTester({ messier = false }) {
                     <li key={i} className="rounded-md border bg-muted/20 p-2 text-xs">
                       <div className="font-medium">
                         {it.name}
-                        {it.draft && <span className="ml-2 rounded bg-amber-200 px-1 py-0.5 text-[10px] font-semibold uppercase text-amber-900 dark:bg-amber-900/50 dark:text-amber-200">draft</span>}
+                        {it.draft && <span className="ml-2 rounded bg-warning/20 px-1 py-0.5 text-xs font-semibold uppercase text-warning">draft</span>}
                       </div>
                       {it.note && <div className="mt-0.5 text-muted-foreground">{it.note}</div>}
                     </li>
@@ -1175,12 +1173,12 @@ export default function PayrollEngineTester({ messier = false }) {
 
 // One readable line: bold label, muted formula, right-aligned amount.
 function DetailRow({ label, formula, value, tone }) {
-  const toneClass = tone === "add" ? "text-green-600 dark:text-green-400" : tone === "ded" ? "text-red-600 dark:text-red-400" : "";
+  const toneClass = tone === "add" ? "text-success" : tone === "ded" ? "text-destructive" : "";
   return (
     <div className="flex items-baseline justify-between gap-3 py-0.5">
       <span className="text-muted-foreground">
         <span className="text-foreground">{label}</span>
-        {formula ? <span className="ml-1 text-[11px]">— {formula}</span> : null}
+        {formula ? <span className="ml-1 text-xs">— {formula}</span> : null}
       </span>
       <span className={`shrink-0 font-mono ${toneClass}`}>{value}</span>
     </div>
@@ -1192,17 +1190,17 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
     return (
       <Card>
         <CardContent className="p-4 text-sm">
-          <div className="font-semibold text-amber-700 dark:text-amber-300">{t("payroll.requiresReview")}</div>
+          <div className="font-semibold text-warning">{t("payroll.requiresReview")}</div>
           <ul className="mt-2 list-disc pl-5 text-muted-foreground">{result.reviewReasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
         </CardContent>
       </Card>
     );
   }
-  const { gross, employee, employer, das } = result;
+  const { employee, employer, das } = result;
   return (
     <div className="space-y-3">
       {result.requiresReview && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           <b>{result.label}.</b> {result.reviewReasons.join(" ")}
         </div>
       )}
@@ -1272,7 +1270,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
           <Row label="Revenu Québec" value={money(das.quebec)} />
           <Row label={t("payroll.arcFederal")} value={money(das.arc)} />
           <Row label={t("payroll.totalDas")} value={money(das.total)} strong />
-          <div className="pt-2 text-[11px] text-muted-foreground">
+          <div className="pt-2 text-xs text-muted-foreground">
             {t("payroll.dasFooter")}
           </div>
         </CardContent></Card>
@@ -1341,7 +1339,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
                   {e.cnesst && <DetailRow label="CNESST" formula={`${money(e.cnesst.base)} × ${pct(e.cnesst.rate)}`} value={money(e.cnesst.contribution)} />}
                 </div>
 
-                <details className="text-[11px] text-muted-foreground">
+                <details className="text-xs text-muted-foreground">
                   <summary className="cursor-pointer select-none">{t("payroll.detailRawJson")}</summary>
                   <pre className="mt-2 max-h-64 overflow-auto rounded bg-muted/30 p-2">{JSON.stringify(result.explanation, null, 2)}</pre>
                 </details>
@@ -1351,7 +1349,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
         </CardContent>
       </Card>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         {t("payroll.ruleSetLine", { quebec: result.meta.rulesVersion.quebec, federal: result.meta.rulesVersion.federal, status: result.meta.rulesVersion.status })}
       </p>
     </div>

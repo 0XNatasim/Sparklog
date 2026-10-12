@@ -49,11 +49,11 @@ export default function TalonCompare({ opening, closing, totals, onComparison })
   const header = talon?.header || {};
 
   const renderRows = (rows) => rows.map((row) => (
-    <tr key={row.key || row.label} className={`border-b last:border-0 ${row.ok ? "" : "bg-red-500/10"}`}>
+    <tr key={row.key || row.label} className={`border-b last:border-0 ${row.ok ? "" : "bg-destructive/10"}`}>
       <td className="px-3 py-1.5">{row.label}</td>
       <td className="px-3 py-1.5 text-right font-mono">{fmt(row.app, row.unit)}</td>
       <td className="px-3 py-1.5 text-right font-mono">{fmt(row.talon, row.unit)}</td>
-      <td className={`px-3 py-1.5 text-right font-mono font-semibold ${row.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-700 dark:text-red-300"}`}>
+      <td className={`px-3 py-1.5 text-right font-mono font-semibold ${row.ok ? "text-success " : "text-destructive "}`}>
         {row.ok ? "✓" : fmtDiff(row.diff, row.unit)}
       </td>
     </tr>
@@ -82,7 +82,7 @@ export default function TalonCompare({ opening, closing, totals, onComparison })
             <div className="text-xs text-muted-foreground">
               {fileName} · {header.ref || "—"} · {header.periodStart || "?"} → {header.periodEnd || "?"}
             </div>
-            <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${comparison.exact ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : comparison.qcTolerated ? "border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200" : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200"}`}>
+            <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${comparison.exact ? "border-success/40 bg-success/10 text-success " : comparison.qcTolerated ? "border-warning/50 bg-warning/10 text-warning " : "border-destructive/40 bg-destructive/10 text-destructive "}`}>
               {comparison.exact ? <CheckCircle2 className="h-4 w-4" /> : <TriangleAlert className="h-4 w-4" />}
               {comparison.exact ? t("payroll.compare.exact") : comparison.qcTolerated ? t("payroll.compare.qcTolerated") : t("payroll.compare.mismatches", { count: comparison.mismatches })}
             </div>
@@ -99,13 +99,13 @@ export default function TalonCompare({ opening, closing, totals, onComparison })
                 <tbody>
                   {renderRows(comparison.totals)}
                   {comparison.totals.length > 0 && comparison.lines.length > 0 && (
-                    <tr className="border-b bg-muted/30"><td colSpan={4} className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.compare.period")}</td></tr>
+                    <tr className="border-b bg-muted/30"><td colSpan={4} className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.compare.period")}</td></tr>
                   )}
                   {renderRows(comparison.lines)}
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-muted-foreground">{t("payroll.compare.note")}</p>
+            <p className="text-xs text-muted-foreground">{t("payroll.compare.note")}</p>
           </>
         )}
       </CardContent>

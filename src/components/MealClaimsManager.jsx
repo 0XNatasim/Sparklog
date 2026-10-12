@@ -69,14 +69,14 @@ export default function MealClaimsManager() {
 
   return <div className="space-y-3">
     <Card><CardContent className="p-4"><h2 className="font-semibold">{t("meals.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("meals.description")}</p></CardContent></Card>
-    {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
+    {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
     {claims.map((claim) => {
       const person = profiles.get(claim.user_id);
       const job = jobs.get(claim.job_id);
       const total = job ? hoursBetween(dayjs(`${job.job_date}T${job.depart}`), dayjs(`${job.job_date}T${job.fin}`)) : 0;
       const kilometres = job ? getKilometreBreakdown(job).totalKm : 0;
       const pending = claim.status === "pending";
-      return <Card key={claim.id} id={`meal-job-${claim.job_id}`} className={focusedJobId === claim.job_id ? "ring-2 ring-emerald-500" : ""}><CardContent className="space-y-3 p-4">
+      return <Card key={claim.id} id={`meal-job-${claim.job_id}`} className={focusedJobId === claim.job_id ? "ring-2 ring-success" : ""}><CardContent className="space-y-3 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2 font-bold">

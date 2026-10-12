@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import dayjs from "dayjs";
 import { CalendarDays, History, Pencil, Plus, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,7 +64,7 @@ function TimeOffEditForm({ row, onSaved, onCancel }) {
     <div className="space-y-2 rounded-md border bg-muted/30 p-3">
       <div className="flex flex-wrap items-end gap-2">
         {field(t("timeOff.category"), (
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm">
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
             {TIME_OFF_CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c, t)}</option>)}
           </select>
         ))}
@@ -195,7 +194,7 @@ export default function CongesManager() {
             <select
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             >
               <option value="">{t("conges.employeePlaceholder")}</option>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}{e.is_paused ? ` — ${t("employees.paused")}` : ""}</option>)}
@@ -218,7 +217,7 @@ export default function CongesManager() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-semibold"><History className="h-4 w-4 text-primary" />{t("conges.historyTitle")}</div>
             <label className="text-xs">
-              <select value={filterEmp} onChange={(e) => setFilterEmp(e.target.value)} className="rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={filterEmp} onChange={(e) => setFilterEmp(e.target.value)} className="rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="all">{t("conges.allEmployees")}</option>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
               </select>
@@ -234,7 +233,7 @@ export default function CongesManager() {
           {[["recurring", recurring], ["oneOff", oneOff]].map(([key, list]) => list.length > 0 && (
             <div key={key}>
               {recurring.length > 0 && oneOff.length > 0 && (
-                <div className="border-b bg-muted/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="border-b bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t(key === "recurring" ? "conges.recurringHeading" : "conges.oneOffHeading")} ({list.length})
                 </div>
               )}
@@ -248,8 +247,8 @@ export default function CongesManager() {
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{nameById.get(row.user_id) || row.user_id}</div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase">{categoryLabel(row.category, t)}</span>
-                            {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold uppercase">{categoryLabel(row.category, t)}</span>
+                            {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
                             <span>{formatTimeOff(row, t)}</span>
                           </div>
                         </div>

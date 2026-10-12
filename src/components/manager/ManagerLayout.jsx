@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign, Banknote, BarChart3, CalendarClock, CalendarDays, CalendarOff, ChevronDown, ClipboardList,
@@ -21,6 +21,8 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import { PanelLoading } from "@/components/LazyLoading";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const COMPANY_NAME = "Messier Connexion";
 const COLLAPSE_KEY = "sparklog.managerNavCollapsed";
@@ -151,39 +153,39 @@ function AccountMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={t("mgr.account.label")} title={t("mgr.account.label")}>
+        <Button variant="ghost" size="touch" aria-label={t("mgr.account.label")} title={t("mgr.account.label")}>
           <UserCircle className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
-        <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("mgr.account.mySpace")}</div>
+        <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("mgr.account.mySpace")}</div>
         {mySpace.map(([to, label, Icon]) => (
-          <DropdownMenuItem key={to} onSelect={() => navigate(to)} className="gap-2">
+          <DropdownMenuItem key={to} onSelect={() => navigate(to)} className="min-h-11 gap-2 sm:min-h-9">
             <Icon className="h-4 w-4" />{label}
           </DropdownMenuItem>
         ))}
         <div className="my-1 border-t" />
         <DropdownMenuItem
           onSelect={(event) => { event.preventDefault(); setTheme(theme === "dark" || (theme !== "light" && isDark) ? "light" : "dark"); }}
-          className="gap-2"
+          className="min-h-11 gap-2 sm:min-h-9"
         >
           {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{t("mgr.account.theme")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={(event) => { event.preventDefault(); setLanguage(language === "fr" ? "en" : "fr"); }}
-          className="gap-2"
+          className="min-h-11 gap-2 sm:min-h-9"
         >
           <span className="inline-flex h-4 w-4 items-center justify-center text-[10px] font-bold">{language === "fr" ? "EN" : "FR"}</span>
           {language === "fr" ? "English" : "Français"}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => window.location.reload()} className="gap-2">
+        <DropdownMenuItem onSelect={() => window.location.reload()} className="min-h-11 gap-2 sm:min-h-9">
           <RefreshCw className="h-4 w-4" />{t("nav.refresh")}
         </DropdownMenuItem>
         <div className="my-1 border-t" />
-        <DropdownMenuItem onSelect={handleLogout} className="gap-2">
+        <DropdownMenuItem onSelect={handleLogout} className="min-h-11 gap-2 sm:min-h-9">
           <LogOut className="h-4 w-4" />{t("nav.signOut")}
         </DropdownMenuItem>
-        <div className="px-2 py-1 font-mono text-[10px] text-muted-foreground">V{APP_VERSION}</div>
+        <div className="px-2 py-1 font-mono text-xs text-muted-foreground">V{APP_VERSION}</div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -231,7 +233,7 @@ export default function ManagerLayout() {
         <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r bg-card md:flex", collapsed ? "w-14" : "w-60")}>
           <div className={cn("flex h-12 shrink-0 items-center border-b px-3", collapsed && "justify-center px-0")}>
             <Link to="/manager" className="flex items-baseline gap-1 font-extrabold tracking-tight">
-              {collapsed ? "S" : <>SparkLog<span className="font-mono text-[10px] font-normal text-muted-foreground">V{APP_VERSION}</span></>}
+              {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
           <SidebarNav groups={groups} collapsed={collapsed} activePath={activePath} />
@@ -252,7 +254,7 @@ export default function ManagerLayout() {
             <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-card shadow-xl">
               <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
                 <span className="font-extrabold tracking-tight">SparkLog</span>
-                <Button variant="ghost" size="icon" className="h-8 w-8" autoFocus onClick={() => setDrawerOpen(false)} aria-label={t("mgr.menu.close")}>
+                <Button variant="ghost" size="touch" autoFocus onClick={() => setDrawerOpen(false)} aria-label={t("mgr.menu.close")}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -262,12 +264,12 @@ export default function ManagerLayout() {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-background/90 px-2 backdrop-blur sm:px-4 dark:bg-[#151515]">
-            <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 md:hidden" onClick={() => setDrawerOpen(true)} aria-label={t("mgr.menu.open")}>
+          <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-background/90 px-2 backdrop-blur sm:px-4">
+            <Button variant="ghost" size="sm" className="h-11 gap-1.5 px-2 md:hidden" onClick={() => setDrawerOpen(true)} aria-label={t("mgr.menu.open")}>
               <Menu className="h-4 w-4" />{t("mgr.menu.button")}
             </Button>
             <div className="min-w-0 flex-1">
-              <div className="hidden truncate text-[11px] leading-none text-muted-foreground sm:block">{COMPANY_NAME}</div>
+              <div className="hidden truncate text-xs leading-none text-muted-foreground sm:block">{COMPANY_NAME}</div>
               <h1 className="truncate text-sm font-semibold leading-tight sm:text-base">{current ? t(current.labelKey) : t("nav.manager")}</h1>
             </div>
             <NotificationsBell />
@@ -275,7 +277,12 @@ export default function ManagerLayout() {
             <AccountMenu />
           </header>
           <main className="min-w-0 flex-1 px-2 py-3 sm:px-4 sm:py-4">
-            <Outlet />
+            {/* A crashing page keeps the sidebar, so the manager can move on. */}
+            <ErrorBoundary resetKey={location.pathname}>
+              <Suspense fallback={<PanelLoading />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </main>
         </div>
       </div>

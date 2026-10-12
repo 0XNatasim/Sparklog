@@ -178,7 +178,7 @@ export default function DasTab({ messier = false }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-xs text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+      <div className="rounded-lg border border-info/30 bg-info/10 p-3 text-xs text-info">
         <div className="flex items-start gap-2">
           <Landmark className="mt-0.5 h-4 w-4 shrink-0" />
           <div><b>{t("payroll.das.title")}</b> {t("payroll.das.intro")} {t("payroll.das.freqNote")}</div>
@@ -201,7 +201,7 @@ export default function DasTab({ messier = false }) {
             {period === "month" ? (
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.das.monthSelect")}</span>
-                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   {months.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
                   {months.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
                 </select>
@@ -209,7 +209,7 @@ export default function DasTab({ messier = false }) {
             ) : (
               <label className="block text-xs">
                 <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-                <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                   {weekKeys.map((w) => (
                     <option key={w.key} value={w.key}>{t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
                   ))}
@@ -221,7 +221,7 @@ export default function DasTab({ messier = false }) {
             {/* Employee filter */}
             <label className="block text-xs">
               <span className="text-muted-foreground">{t("payroll.employee")}</span>
-              <select value={selectedEmp} onChange={(e) => setSelectedEmp(e.target.value)} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+              <select value={selectedEmp} onChange={(e) => setSelectedEmp(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="">{t("payroll.das.allEmployees")}</option>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
               </select>
@@ -241,7 +241,7 @@ export default function DasTab({ messier = false }) {
           {blocked.length > 0 && (
             <Card>
               <CardContent className="flex items-start gap-2 p-4 text-xs text-muted-foreground">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div>{t("payroll.das.pending", { names: blocked.map((r) => r.profile.full_name).join(", ") })}</div>
               </CardContent>
             </Card>
@@ -252,7 +252,7 @@ export default function DasTab({ messier = false }) {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
-                    <tr className="border-b bg-muted/40 text-left text-[10px] uppercase text-muted-foreground">
+                    <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                       <th className="px-3 py-2.5 font-medium">{t("payroll.employee")}</th>
                       <th className="px-3 py-2.5 text-right font-medium">{t("payroll.das.hours")}</th>
                       <th className="px-3 py-2.5 text-right font-medium">{t("payroll.das.gross")}</th>
@@ -308,7 +308,7 @@ export default function DasTab({ messier = false }) {
                   )}
                 </table>
               </div>
-              <div className="border-t px-4 py-3 text-[11px] text-muted-foreground">
+              <div className="border-t px-4 py-3 text-xs text-muted-foreground">
                 <b>{t("payroll.das.remTotalLabel")}:</b> {money(totals.remTotal)} · {t("payroll.das.disclaimer")}
               </div>
             </CardContent>

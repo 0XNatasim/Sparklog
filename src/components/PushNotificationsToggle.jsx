@@ -41,7 +41,7 @@ export default function PushNotificationsToggle() {
         <input type="checkbox" className="h-4 w-4" checked={status === "on"} disabled={disabled} onChange={(event) => toggle(event.target.checked)} />
       </label>
       <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-      {error && <p className="mt-1 text-xs text-destructive dark:text-red-300">{error}</p>}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }

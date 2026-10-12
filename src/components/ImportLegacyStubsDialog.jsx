@@ -46,7 +46,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
   const [existing, setExisting] = useState([]);
 
   useEffect(() => { if (!open) { setSelectedId(""); resetParse(); } }, [open]);
-  useEffect(() => { if (selectedId) loadExisting(); else setExisting([]); /* eslint-disable-next-line */ }, [selectedId]);
+  useEffect(() => { if (selectedId) loadExisting(); else setExisting([]); }, [selectedId]);
 
   function resetParse() { setTalon(null); setSnapshot(null); setPeriodEnd(""); setFileName(""); setMsg(""); setErr(""); }
 
@@ -147,7 +147,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
 
         <label className="block text-xs">
           <span className="text-muted-foreground">{t("payroll.employee")}</span>
-          <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); resetParse(); }} className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+          <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); resetParse(); }} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
             <option value="">{t("testing.roe.employeePlaceholder")}</option>
             {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
           </select>
@@ -163,13 +163,13 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
           </div>
         )}
 
-        {msg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{msg}</p>}
+        {msg && <p className="text-xs text-success">{msg}</p>}
         {err && <p className="text-xs text-destructive">{err}</p>}
 
         {talon && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.preview")}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.preview")}</div>
               <Button type="button" size="sm" variant="outline" onClick={() => printLegacyTalon(talon, printTitle())}>
                 <Printer className="mr-2 h-4 w-4" />{t("payroll.legacy.print")}
               </Button>
@@ -180,14 +180,14 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
 
         {snapshot && (
           <div className="space-y-3 rounded-lg border p-3">
-            <div className="text-[11px] text-muted-foreground">{t("payroll.legacy.verifyHint")}</div>
+            <div className="text-xs text-muted-foreground">{t("payroll.legacy.verifyHint")}</div>
             <label className="block text-xs sm:max-w-xs">
               <span className="text-muted-foreground">{t("payroll.legacy.periodEnd")}</span>
               <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="mt-1 h-9" />
             </label>
 
             <div>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.statutory")}</div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.statutory")}</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {YTD_STATUTORY.map(([k, , label]) => (
                   <label key={k} className="block text-xs">
@@ -199,7 +199,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
             </div>
 
             <div>
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.ccq")}</div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.ccq")}</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {CCQ_CUMUL.map(([k, , label]) => (
                   <label key={k} className="block text-xs">
@@ -218,7 +218,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
 
         {existing.length > 0 && (
           <div className="rounded-lg border">
-            <div className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.existing")}</div>
+            <div className="border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.legacy.existing")}</div>
             <div className="max-h-52 divide-y overflow-y-auto">
               {existing.map((r) => (
                 <div key={r.period_end} className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-sm hover:bg-accent">

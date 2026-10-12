@@ -1,12 +1,15 @@
 import React from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { CalendarDays, ClipboardList, History, LayoutDashboard, LogOut, RefreshCw, UserCircle } from "lucide-react";
+import { CalendarDays, ClipboardList, EllipsisVertical, History, Languages, LayoutDashboard, LogOut, Moon, RefreshCw, Sun, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useTheme } from "@/components/theme-provider";
+import { useLanguage } from "@/components/language-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { hasManagementAccess, isManagerRole } from "@/lib/roles";
+import { hasManagementAccess } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import NotificationsBell from "@/components/NotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
@@ -16,8 +19,6 @@ import UpdateBanner from "@/components/UpdateBanner";
 import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { APP_VERSION } from "@/lib/version";
-import headerLight from "../../public/header-light.jpg";
-import headerDark from "../../public/header-dark.jpg";
 
 function NavItem({ to, children }) {
   return (
@@ -39,6 +40,7 @@ function NavItem({ to, children }) {
 }
 
 // Phone only: four fixed destinations in thumb reach (field use, installed PWA).
+// Labels stay 11px (tab-bar convention, icon carries the meaning) so "Fiche de travail" fits at 360px.
 function BottomNavItem({ to, icon: Icon, children }) {
   return (
     <NavLink
@@ -54,6 +56,42 @@ function BottomNavItem({ to, icon: Icon, children }) {
       <Icon className="h-5 w-5" aria-hidden="true" />
       <span className="max-w-full truncate">{children}</span>
     </NavLink>
+  );
+}
+
+function PhoneMenu({ onSignOut }) {
+  const t = useT();
+  const { theme, setTheme } = useTheme();
+  const { language, setLanguage } = useLanguage();
+  const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  const item = "min-h-11 gap-3 text-base";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="touch" className="sm:hidden" aria-label={t("mgr.account.label")} title={t("mgr.account.label")}>
+          <EllipsisVertical className="h-5 w-5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuItem onSelect={() => window.location.reload()} className={item}>
+          <RefreshCw className="h-5 w-5" />{t("nav.refresh")}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(event) => { event.preventDefault(); setTheme(theme === "dark" || (theme !== "light" && isDark) ? "light" : "dark"); }}
+          className={item}
+        >
+          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}{t("mgr.account.theme")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(event) => { event.preventDefault(); setLanguage(language === "fr" ? "en" : "fr"); }} className={item}>
+          <Languages className="h-5 w-5" />{language === "fr" ? "English" : "Français"}
+        </DropdownMenuItem>
+        <div className="my-1 border-t" />
+        <DropdownMenuItem onSelect={onSignOut} className={item}>
+          <LogOut className="h-5 w-5" />{t("nav.signOut")}
+        </DropdownMenuItem>
+        <div className="px-2 py-1 font-mono text-xs text-muted-foreground">V{APP_VERSION}</div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -85,60 +123,62 @@ export default function AppShell({ children }) {
       {!isViewMode && <RegionOnboarding />}
       {!isViewMode && <BroadcastPopup />}
       {isViewMode && (
-        <div className="sticky top-0 z-50 border-b border-amber-500 bg-amber-300 px-3 py-2 text-amber-950 shadow-sm">
+        <div className="sticky top-0 z-50 border-b border-warning bg-warning px-3 py-2 text-warning-foreground shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div className="text-sm font-bold">{t("viewMode.banner", { name: viewedEmployee.name })}</div>
-            <Button size="sm" variant="outline" className="h-8 border-amber-700 bg-amber-50 text-amber-950 hover:bg-white" onClick={() => navigate("/manager/employees")}>
+            <Button size="sm" variant="outline" className="h-8 border-warning-foreground/40 bg-background text-foreground hover:bg-background/90" onClick={() => navigate("/manager/employees")}>
               {t("viewMode.return")}
             </Button>
           </div>
         </div>
       )}
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30 dark:bg-[#151515]">
+      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-30">
         {/* Top row: brand left, business name centered, controls right */}
         <div className="relative mx-auto flex max-w-6xl items-center gap-1.5 px-2 py-2 sm:min-h-20 sm:gap-3 sm:px-4 sm:py-3">
           <Link to={`/form${viewSuffix}`} className="flex shrink-0 items-baseline gap-1 text-base font-extrabold tracking-tight sm:text-lg">
             SparkLog
-            <span className="font-mono text-[10px] font-normal tracking-normal text-muted-foreground" title="Version">
+            <span className="font-mono text-xs font-normal tracking-normal text-muted-foreground" title="Version">
               V{APP_VERSION}
             </span>
           </Link>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
-            <img src={headerLight} alt="Entreprise Électrique Messier Connexion Inc" className="h-16 w-auto rounded dark:hidden" />
-            <img src={headerDark} alt="Entreprise Électrique Messier Connexion Inc" className="hidden h-16 w-auto rounded dark:block" />
+            <img src="/header-light.webp" alt="Entreprise Électrique Messier Connexion Inc" className="h-16 w-auto rounded dark:hidden" />
+            <img src="/header-dark.webp" alt="Entreprise Électrique Messier Connexion Inc" className="hidden h-16 w-auto rounded dark:block" />
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0">
             {canManage && !isViewMode && (
-              <Link to="/manager" className="mr-1 inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold text-primary hover:bg-accent sm:hidden" aria-label={t("nav.manager")}>
+              <Link to="/manager" className="mr-1 inline-flex h-11 items-center gap-1 rounded-md px-2 text-xs font-semibold text-primary hover:bg-accent sm:hidden" aria-label={t("nav.manager")}>
                 <LayoutDashboard className="h-4 w-4" />{t("nav.manager")}
               </Link>
             )}
             <NotificationsBell />
             <EmployeeNotificationsBell />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => window.location.reload()}
-              title={t("nav.refresh")}
-              aria-label={t("nav.refresh")}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <ThemeToggle className="h-8 w-8" />
-            <LanguageToggle className="h-8 w-8" />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={handleLogout}
-              title={t("nav.signOut")}
-              aria-label={t("nav.signOut")}
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            {/* Phones: one 44px menu instead of four small icons (and no accidental sign-out). */}
+            <PhoneMenu onSignOut={handleLogout} />
+            <div className="hidden items-center sm:flex">
+              <Button
+                variant="ghost"
+                size="touch"
+                onClick={() => window.location.reload()}
+                title={t("nav.refresh")}
+                aria-label={t("nav.refresh")}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <ThemeToggle className="h-10 w-10" />
+              <LanguageToggle className="h-10 w-10" />
+              <Button
+                variant="ghost"
+                size="touch"
+                onClick={handleLogout}
+                title={t("nav.signOut")}
+                aria-label={t("nav.signOut")}
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -156,7 +196,7 @@ export default function AppShell({ children }) {
 
       <nav
         aria-label={t("mgr.bottomNav.label")}
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden dark:bg-[#151515]"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden"
       >
         <BottomNavItem to={`/form${viewSuffix}`} icon={ClipboardList}>{t("nav.form")}</BottomNavItem>
         <BottomNavItem to={`/history${viewSuffix}`} icon={History}>{t("nav.history")}</BottomNavItem>

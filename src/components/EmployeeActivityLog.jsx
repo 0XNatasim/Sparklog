@@ -16,10 +16,10 @@ import { MISSING_ENTRY_TRACKING_START, missingEntryDays } from "@/lib/live-crew"
 
 const EVENT_META = {
   login: { icon: LogIn, tone: "text-primary" },
-  app_open: { icon: MonitorSmartphone, tone: "text-sky-600 dark:text-sky-300" },
-  job_saved: { icon: FilePen, tone: "text-amber-600 dark:text-amber-300" },
-  job_submitted: { icon: CheckCircle2, tone: "text-emerald-600 dark:text-emerald-300" },
-  job_deleted: { icon: Trash2, tone: "text-destructive dark:text-red-300" },
+  app_open: { icon: MonitorSmartphone, tone: "text-info" },
+  job_saved: { icon: FilePen, tone: "text-warning" },
+  job_submitted: { icon: CheckCircle2, tone: "text-success" },
+  job_deleted: { icon: Trash2, tone: "text-destructive" },
 };
 
 const TYPE_FILTERS = {
@@ -246,7 +246,7 @@ export default function EmployeeActivityLog() {
                 .map((item) => (
                   <button key={item.id} type="button" onClick={() => setEmployee(item.id)} className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="truncate font-medium">{item.name}</span>
-                    <span className={item.count > 0 ? "shrink-0 font-semibold text-red-600 dark:text-red-400" : "shrink-0 text-muted-foreground"}>
+                    <span className={item.count > 0 ? "shrink-0 font-semibold text-destructive" : "shrink-0 text-muted-foreground"}>
                       {t("activity.missing.days", { n: item.count })}
                     </span>
                   </button>
@@ -264,7 +264,7 @@ export default function EmployeeActivityLog() {
               {lastSeen.map((e) => (
                 <button key={e.id} type="button" onClick={() => setEmployee(e.id)} className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-left text-xs hover:bg-muted">
                   <span className="truncate font-medium">{e.name}</span>
-                  <span className={e.at ? "shrink-0 text-muted-foreground" : "shrink-0 text-amber-600 dark:text-amber-300"}>
+                  <span className={e.at ? "shrink-0 text-muted-foreground" : "shrink-0 text-warning"}>
                     {e.at ? dayjs(e.at).format("DD MMM HH:mm") : t("activity.notSeen")}
                   </span>
                 </button>
@@ -274,7 +274,7 @@ export default function EmployeeActivityLog() {
         </Card>
       )}
 
-      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive dark:text-red-300">{error}</div>}
+      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
       {!loading && rows.length === 0 && !error && (
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("activity.empty")}</CardContent></Card>
       )}
