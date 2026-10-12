@@ -187,7 +187,7 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 
 ## 5. Optimisation — bundle, couleurs, interface (audit 2026-10-09)
 
-Mesures initiales : `vite build` → un seul chunk `index-*.js` de 1,27 Mo (360 Ko gzip) ; precache PWA 3,5 Mo.
+Livré par la PR #395 (fusionnée le 2026-10-12, V2.4.99). Mesures initiales : `vite build` → un seul chunk `index-*.js` de 1,27 Mo (360 Ko gzip) ; precache PWA 3,5 Mo.
 Contrastes calculés selon WCAG 2.x (texte ≥ 4,5:1, bordures de champs ≥ 3:1). Une PR par lot, chacune
 avec le bump de `APP_VERSION`.
 
@@ -289,6 +289,80 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
   notification de `ManagerDashboard`. Volontairement non fait ici : `EmployeeForm` est le chemin de saisie
   du temps soumis aux « release gates » (timeouts, double-clic, DST…) ; un découpage doit venir avec des
   tests de composant (pas encore d'environnement jsdom/testing-library dans le projet).
+
+---
+
+## 6. À faire / à préciser (mis à jour 2026-10-12, après la PR #395 — V2.4.99)
+
+> Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
+
+Liste unique des points ouverts. Les sections 1 à 5 gardent le détail ; ici, ce qu'il reste à **fournir**,
+à **trancher** ou à **coder**, par priorité.
+
+### 6.1 Paie — ce qui manque pour passer de « estimation » à « paie finale »
+
+Le calcul des **heures** (8 h/jour, 1re heure sup. de la semaine à 1,5×, le reste à 2×, souper, options
+par employé) est en production et testé. Les **montants** (avantages CCQ + retenues DAS) restent un banc
+d'essai `requires_review` (`RULE_VERSION.status = "draft"`, `src/payroll/rules/2026.js`). Il manque :
+
+**A. Documents officiels / sources à fournir (citation : document + article + date d'effet)**
+- [ ] **Convention collective ICI 2025-2029 (ACQ)** — articles qui fondent : heures normales (8 h/jour,
+  40 h/sem.), taux et ordre du temps supplémentaire (1,5× puis 2×, et le fait que la 1,5× soit
+  **hebdomadaire**), indemnité de repas (30 $ et seuil de 10 h 15), prime de chef d'équipe, temps de
+  transport/retour à l'entrepôt, frais de déplacement (km). Aujourd'hui : validés par l'autorité paie
+  intérimaire (2026-09-04/05) sans citation (`docs/rules/compensation-rules.md`).
+- [ ] **CCQ — taux de la cotisation patronale « avantages sociaux »** électricien ICI 2026-2027 :
+  `employerSocialBenefitPerHour = 8,875 $/h` est déduit d'un talon (355 $ / 40 h), pas d'une table.
+- [ ] **CCQ — prélèvement** : taux (le code applique **0,75 %**, part salarié ; la liste de contrôle du
+  README indiquait 1,5 %, probablement salarié + employeur) et **base** (prime de chef d'équipe incluse
+  ou non). Source : règlement / guide du rapport mensuel CCQ.
+- [ ] **Normes du travail (CNT) 2026** : taux (0,06 % codé) et maximum cotisable (103 000 $ codé) —
+  `_PLACEHOLDER`, guide TP-1015.G.
+- [ ] **FDRCMO** : seuil de masse salariale (2 M$ codé) et taux 1 %. Probablement non applicable si la
+  masse salariale de Messier est sous le seuil — à confirmer avec le chiffre réel.
+- [ ] **CNESST** : l'**avis de cotisation de Messier** (taux de l'unité de classification). Aucun défaut
+  possible : le calcul renvoie `requires_review` tant qu'il manque.
+- [ ] **Cotisations syndicales** : confirmer pour chaque employé son association **et son local**
+  (FIPOE / local 568 : formule électricien par local et période d'apprentissage) ; date de début exacte
+  de l'ancienne règle SQC (seule la fin, 2026-06-27, est sourcée).
+
+**B. Informations par employé (formulaires)**
+- [ ] **TD1 (fédéral) et TP-1015.3 (Québec)** de chaque employé : montants de crédits personnels et
+  impôt additionnel demandé. Non stockés aujourd'hui ; le calcul prend les montants de base par défaut.
+- [ ] **Échelon / période d'apprentissage** et taux horaire confirmés contre le certificat CCQ
+  (liste de contrôle « CCQ monthly-report » du README).
+
+**C. Validation et approbation**
+- [ ] **3 à 5 vrais talons** à comparer au centime avec WebRAS (Québec) et PDOC (fédéral) : un apprenti,
+  une semaine avec temps supplémentaire, une semaine avec souper/stationnement, une semaine avec
+  chef d'équipe. Aujourd'hui un seul talon de référence (compagnon, D0033-0007).
+- [ ] **Signature d'un spécialiste** paie/CCQ nommé (comptable ou firme de paie) — exigée par l'ADR 0001
+  et le gabarit de PR avant de passer `RULE_VERSION.status` à `"validated"`.
+
+**D. Règles non encore spécifiées (ne pas deviner)**
+- [ ] Fériés et vacances payés en dehors de l'indemnité de 13 % (si applicable).
+- [ ] Primes autres que chef d'équipe.
+- [ ] Changement d'heure d'automne : choix gestionnaire de la 1re ou 2e occurrence de l'heure répétée
+  (C-6, §1).
+
+### 6.2 Incohérences documentation ↔ code à trancher (aucune modification de code faite)
+- [ ] **Temps de retour à l'entrepôt.** Le README disait « toujours payé au taux régulier, ne crée jamais
+  de temps supplémentaire ». Le moteur (`payroll_engine.js` 2.1.0) le compte **dans** la journée : il
+  peut créer du temps sup., sauf pour un employé avec l'option « retour sans avantages » (au-delà de 8 h,
+  le retour est payé au taux de base, sans avantages). Confirmer la règle voulue.
+- [ ] **Prélèvement CCQ 0,75 % vs 1,5 %** (voir 6.1 A).
+- [ ] `docs/rules/2026-das-payroll.md` dit l'impôt du Québec « placeholder », alors que `rules/2026.js`
+  le marque vérifié contre TP-1015.F (2026-01) ; les commentaires de `EI` disent encore `_PLACEHOLDER`
+  alors qu'il est vérifié (T4127). Les vrais restants : CNT, FDRCMO, CNESST.
+
+### 6.3 Technique (code) — ouvert
+- [ ] S-2 export NAS côté serveur et audité ; S-3b soumission atomique (preuve + job) ; P-12 rollback
+  d'export qui ré-estampille le taux ; P-5 agrégation des coûts côté serveur ; P-11 N+1 `getUserById`.
+- [ ] Filtres gestionnaire : annuler les requêtes qui se chevauchent (AbortController / id de requête) ;
+  adaptateur API commun (401 → rafraîchir, 5xx → file d'attente).
+- [ ] Lot 6 restant : découper `EmployeeForm.jsx` / `EmployeesPanel.jsx` avec des tests de composant
+  (jsdom + testing-library à ajouter) ; corriger les ~63 avertissements ESLint écran par écran.
+- [ ] Optionnel : charger une seule langue de `i18n.js` (nécessite de retirer le repli anglais).
 
 ---
 

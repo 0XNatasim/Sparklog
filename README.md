@@ -41,16 +41,19 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
-The Manager workspace has six sections:
+The Manager workspace is a sidebar (a drawer on phones); every page has its own URL
+(`#/manager/…`) and only the pages a manager is allowed to open are listed:
 
-| Section | Purpose |
+| Group | Pages |
 |---|---|
-| **Live crew** | See who is working today. |
-| **Time-sheet** | Review submitted jobs, filter by employee / status / day, unlock entries, and approve jobs individually or a full week before Google Sheets export. Weeks run Sunday→Saturday (matching the payroll engine) and are grouped under their CCQ monthly report period (which ends on the last Saturday of the month). Job cards are tinted by code prefix (AD… = administration, JOB… = project) and flagged when a day exceeds 8 h with no overtime screenshot. Two read-only snapshot buttons open overviews: **Hier à 23 h 58** (yesterday's Live-crew board) and **Cette semaine** (current Sunday→Saturday week: one row per employee, one cell per day with total time and number of ORs, coloured orange = saved, green = submitted/approved, red = nothing entered on a past weekday, blue = leave; click a cell to open that day's time-sheet). |
-| **Notifications** | Review overtime authorizations, supper claims, and parking receipts in one place. |
-| **Employees** | Edit employee/CCQ metadata, choose the commercial appendix, enable Parking, configure storage/return-time options, set day/week time off, manage company holidays, and pause accounts (or delete already-inactive ones) without losing history. The list is grouped by role (owner → admin → manager → employee, alphabetical within each). Owners can assign roles here; `admin` staff show a flat-hourly pay field instead of CCQ metadata. |
-| **Forms** | Open company forms and control which forms employees can see. |
-| **Testing** | Tools and previews: the costing dashboard (full employer cost — see below), the CCQ JSON export/download, the CCQ rate / ACQ employer-cost tables, the **Payroll DAS test bench** (deterministic source-deductions engine — see below), and the sensitive-actions audit log. |
+| **Today** | Live crew (who is working today; pauses polling while the tab is hidden) |
+| **Time** | Timesheets (review, filter, unlock, approve one job or a whole week before export; CCQ weeks run Sunday→Saturday) · Receipts & proofs (overtime screenshots, suppers, parking) |
+| **Team** | Employees (CCQ metadata, rates, options, roles, pause) · Time off · Inventory |
+| **Payroll** | Calculation (DAS test bench) · Pay stubs · DAS · Record of employment (preparation worksheet) |
+| **Reports** | Costs (employer cost estimate) · Week / month · CCQ rates · Downloads (CCQ export) |
+| **Communications** | Announcements |
+| **Configuration** | Time rules · Settings · Forms · References |
+| **Advanced** | Activity log · Service status · Emergency timesheet (owner only) |
 
 Managers can also broadcast announcements, synchronize CCQ rates, view the app as any employee, and force a manual refresh from the header (useful in installed PWA/App mode).
 
@@ -84,24 +87,28 @@ Parking receipt pictures and overtime proof screenshots are stored as images wit
 - Vercel as the primary static host; Render is also configured
 - `dayjs` for date/week calculations
 - ocr.space with an in-browser Tesseract fallback
+- ESLint 10 (`npm run lint`, run in CI) and Vitest
 
 ## Repository layout
 
 ```text
 src/
-  components/       Shared UI and manager panels (LiveCrew, WeekSnapshot, UpdateBanner, …)
+  components/       Shared UI and manager panels (LiveCrew, JobCard, ErrorBoundary, …)
   contexts/         Authentication/profile state
-  lib/              CCQ export/rate helpers, i18n, and static lists
-  pages/            Employee, manager, history, profile, week, and testing pages
+  lib/              CCQ export/rate helpers, i18n, job contract, time helpers
+  pages/            Employee pages and the lazily loaded manager pages
+  payroll/          DAS test-bench engine, CCQ benefit layer, 2026 rule constants
 supabase/
-  functions/        Server-side integrations and scheduled maintenance
+  functions/        Server-side integrations (the shared payroll engine lives in _shared/)
   migrations/       Incremental database, RLS, Storage, and cron changes
-public/              Static instructional images
+docs/               ADRs, payroll rules and sources, security matrix, ops notes
+tests/              Official reference PDFs (CCQ tables, T4127, TP-1015.F) and the RLS suite
+public/             Static images (WebP) and the push service worker
 ```
 
 ## Prerequisites
 
-- Node.js 18 or newer
+- Node.js 20.19 or newer (required by ESLint 10; CI uses Node 20)
 - npm
 - A Supabase project
 - A Vercel or Render project
@@ -137,9 +144,11 @@ Start the application:
 npm run dev
 ```
 
-Build the production bundle:
+Check and build (the same three steps CI runs on every pull request):
 
 ```bash
+npm run lint    # ESLint — 0 errors required; React-Compiler rules are warnings
+npm test        # Vitest — includes payroll parity fixtures and the WCAG theme-contrast test
 npm run build
 ```
 
@@ -303,7 +312,7 @@ Rules are recorded as data in the `public.payroll_rules` table and documented in
   estimate (statutory annual maximums are not modelled). `admin` (non-CCQ) staff are costed
   at wages + km/parking only — no indemnity, contributions, or meal allowance.
 - Job kilometres from image autofill or manual entry are the **total shown on the work order**. If an employee records a return to storage, the return kilometres are subtracted from that total to produce the client leg; they are never added a second time.
-- Return-to-storage time is always regular-rate paid time. It never creates overtime, including when the workday is already longer than eight hours.
+- Return-to-storage time is part of the day's paid span, so it counts toward the 8 h and can create overtime. For employees with the **"return without benefits"** option, on a day over 8 h the return portion is instead carved out and paid at the base rate without social benefits (engine `payroll_engine.js` 2.1.0). *Which of the two is the intended company rule is still to confirm — see `CLAUDE.md` §6.2.*
 - A weekday supper claim becomes available at exactly 2 h 15 of overtime. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
 - Parking is enabled per employee, requires an amount and receipt, and is capped at $20 per employee/day.
 - Employee job entry uses `America/Toronto`. The full configured deadline minute is accepted (the default `23:59` blocks at midnight); CCQ construction vacations and statutory holidays are installed automatically by dated migrations, and managers can unlock a specific employee/date.
@@ -333,11 +342,22 @@ Rules are recorded as data in the `public.payroll_rules` table and documented in
 
 Every build emits `/version.json` (generated from `APP_VERSION` in `src/lib/version.js`,
 never precached by the service worker). `UpdateBanner` checks it on load, on focus and
-every 5 minutes; when a newer version is deployed than the one running on the device it
-shows a banner asking the user to refresh or sign back in, with a **Rafraîchir
-maintenant** button that unregisters the service worker, clears caches and reloads. It
-never reloads on its own, so a form in progress is not lost. Always bump the patch of
-`APP_VERSION` in every PR (it is shown in the header as `V…`).
+every 5 minutes and offers a **Rafraîchir maintenant** button. In addition, `main.jsx`
+applies a newly installed service worker only when the tab goes to the background, so a
+form in progress is never reloaded under the user. Pages are code-split: if a deploy
+removed a file an open tab still needs, the app reloads **once** (guarded against loops).
+Every chunk is precached, so the installed app opens and navigates fully offline.
+Always bump the patch of `APP_VERSION` in every PR (it is shown in the header as `V…`).
+
+## Interface and accessibility
+
+- Colours are theme tokens in `src/index.css` (`primary` = Messier green, `success` = teal,
+  `warning`, `info`, `destructive`), light and dark. `src/lib/theme-contrast.test.js` fails
+  the build if any token drops below WCAG contrast (4.5:1 text, 3:1 field borders).
+  Use the tokens instead of Tailwind palette colours (`text-success`, not `text-green-600`).
+- Phone header: 44 px touch targets; secondary actions live in the ⋮ menu.
+- Root, route and manager-panel error boundaries replace a blank screen with a
+  recoverable error; the employee's draft is kept in IndexedDB.
 
 ## Reliability (free-tier keep-warm)
 
@@ -353,10 +373,10 @@ keep it responsive despite cold starts:
 This is best-effort, not an SLA. When uptime becomes critical, move to **Supabase Pro**
 (no pausing, steadier compute, daily backups). See `docs/ops/supabase-reliability.md`.
 
-## Payroll DAS engine (Testing → Payroll)
+## Payroll DAS engine (Manager → Payroll → Calculation)
 
 A deterministic, pure source-deductions (DAS) engine lives under `src/payroll/` and is
-exercised from the **Testing → Payroll** bench. It is a **test bench only** — every
+exercised from the **Payroll → Calculation** bench. It is a **test bench only** — every
 result is labeled *"Not finalized payroll · Requires payroll review"* and the rule set
 stays `draft` (`requires_review = true`) until validated against WebRAS/PDOC with
 specialist sign-off (per the payroll-rule gate). Money is computed in integer cents.
@@ -379,6 +399,24 @@ specialist sign-off (per the payroll-rule gate). Money is computed in integer ce
   withholding (the CCQ *prélèvement* is not a federal deduction; residual is
   TD1/rounding), to settle against PDOC. Constants and their sources are registered in
   `docs/rules/2026-das-payroll.md`.
+
+### What is still missing before finalized payroll
+
+Hours classification is in production. The **dollar amounts** stay an estimate until:
+
+1. **Official sources are cited** — ICI collective agreement articles (8 h/day, overtime
+   order and rates, supper, team-leader premium, return travel, mileage); the CCQ employer
+   social-benefit rate; the CCQ levy rate and base; CNT and FDRCMO 2026 figures.
+2. **Company documents are provided** — Messier's CNESST assessment notice (rate), annual
+   payroll total (FDRCMO threshold).
+3. **Employee forms are recorded** — each employee's TD1 and TP-1015.3 (personal credits),
+   union and local, apprenticeship period.
+4. **3–5 real pay stubs reproduce to the cent** in WebRAS and PDOC (apprentice, overtime,
+   supper/parking, team leader).
+5. **A named payroll/CCQ specialist signs off**, then `RULE_VERSION.status` becomes
+   `validated`.
+
+The itemised, up-to-date list is in `CLAUDE.md` §6.1.
 
 ## Governance & documentation
 
@@ -462,7 +500,7 @@ official tables before any dollar figure is trusted.
 | Regular / 150% / 200% hourly rates | CCQ rate sync (`ccq_rate_snapshots`) | |
 | Avantages sociaux ($/h) | CCQ rate sync | |
 | Congés & jours fériés (13 % = 6 % vac + 5.5 % fériés + 1.5 % maladie) | CCQ chèque-vacances — **confirmed** | |
-| Prélèvement CCQ (1.5 %) | CCQ | |
+| Prélèvement CCQ (code: **0.75 %** employee share; 1.5 % = employee + employer?) — rate and base to confirm | CCQ | |
 | Contribution sectorielle ($0.02/h) | CCQ | |
 | Fonds d'indemnisation ($0.02/h) | CCQ | |
 | Fonds de formation ($0.20/h) | CCQ | |
