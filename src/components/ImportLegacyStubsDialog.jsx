@@ -46,7 +46,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
   const [existing, setExisting] = useState([]);
 
   useEffect(() => { if (!open) { setSelectedId(""); resetParse(); } }, [open]);
-  useEffect(() => { if (selectedId) loadExisting(); else setExisting([]); /* eslint-disable-next-line */ }, [selectedId]);
+  useEffect(() => { if (selectedId) loadExisting(); else setExisting([]); }, [selectedId]);
 
   function resetParse() { setTalon(null); setSnapshot(null); setPeriodEnd(""); setFileName(""); setMsg(""); setErr(""); }
 

@@ -80,13 +80,6 @@ function formatReturnMinutes(minutes) {
   return `${hours} h ${remainder}`;
 }
 
-function validateOvertimeSmsText(text) {
-  const normalized = String(text || "").toLocaleLowerCase("fr-CA");
-  const mentionsOvertime = /temps\s+suppl[eé]mentaire|\bts\b/.test(normalized);
-  const confirmsApproval = /approuv[eé]e?|autoris[eé]e?|accord[eé]e?/.test(normalized);
-  const includesDuration = /\b\d+(?:[.,]\d+)?\s*(?:h(?:eure)?s?|min(?:ute)?s?)\b/.test(normalized);
-  return mentionsOvertime && confirmsApproval && includesDuration;
-}
 
 export default function EmployeeForm() {
   const { user, role } = useAuth();
@@ -514,8 +507,6 @@ export default function EmployeeForm() {
         }
       }
 
-      const nextLocked = nextStatus === "submitted";
-
       if (mode === "submit") {
         const contractErrors = validateJobSubmissionContract({
           depart,
@@ -681,10 +672,10 @@ export default function EmployeeForm() {
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
-    let needsEvidence = false;
+    let needsEvidence;
     try {
       needsEvidence = requiresEvidenceBeforeSave(requestedMode)
-        ? await requiresOvertimeEvidence(minutes)
+        ? await requiresOvertimeEvidence()
         : false;
     } catch (error) {
       const message = friendlyErrorMessage(error, t, "form.errors.saveFailed");
@@ -841,7 +832,7 @@ export default function EmployeeForm() {
     }
   }
 
-  async function requiresOvertimeEvidence(candidateReturnMinutes) {
+  async function requiresOvertimeEvidence() {
     // CCQ overtime authorization (the screenshot) does not apply to office staff.
     if (officeEmployee) return false;
     // Known locally without any network call, so it stays valid even if the
@@ -1000,7 +991,7 @@ export default function EmployeeForm() {
       } catch (error) {
         console.error("[overtime evidence] Screenshot upload failed", error);
         const failure = evidenceUploadFailure(error);
-        throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`);
+        throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`, { cause: error });
       }
 
       let savedJobId = pendingEvidenceJobId;
@@ -1023,7 +1014,7 @@ export default function EmployeeForm() {
           setParkingFile(null);
         } catch (error) {
           console.error("[overtime evidence] Parking receipt retry failed", { savedJobId, error });
-          throw new Error(error?.message || t("form.evidence.jobSaveFailed"));
+          throw new Error(error?.message || t("form.evidence.jobSaveFailed"), { cause: error });
         }
       }
 
@@ -1041,7 +1032,7 @@ export default function EmployeeForm() {
         overtimeSettings = data;
       } catch (error) {
         console.error("[overtime evidence] Retention settings load failed", error);
-        throw new Error(t("form.evidence.settingsFailed"));
+        throw new Error(t("form.evidence.settingsFailed"), { cause: error });
       }
       const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
       const dailyMinutes = overtimeDailyMinutes;
@@ -1057,7 +1048,7 @@ export default function EmployeeForm() {
         evidenceRecorded = true;
       } catch (error) {
         console.error("[overtime evidence] Evidence record insert failed", error);
-        throw new Error(t("form.evidence.recordFailed"));
+        throw new Error(t("form.evidence.recordFailed"), { cause: error });
       }
 
       const { error: notificationError } = await withTimeout(

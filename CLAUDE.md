@@ -118,7 +118,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | ID | Finding | Anchor | Fix |
 |----|---------|--------|-----|
 | P-5 | Costing does full client-side joins/aggregation (now status-scoped, still client-side) | `CostingDashboard.jsx` | server aggregation endpoint |
-| P-10 | Card renderers recreated each render; lists unmemoized | `ManagerDashboard.jsx` | `React.memo` card + `useCallback` handlers |
 | P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts:202-207` | one bulk lookup, or avoid exporting contact data |
 
 ---
@@ -271,10 +270,25 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 - Vérifié dans Chromium (Supabase simulé) : pas de défilement horizontal sur 10 écrans à 360 et 1280 px ;
   plantage forcé (build de test) d'Historique et d'Équipe en direct → erreur récupérable, navigation OK.
 
-### Lot 6 — Qualité du code
-- [ ] `eslint.config.js` existe mais ESLint n'est pas en devDependencies ni en script → ajouter `npm run lint`.
-- [ ] Découper `EmployeeForm.jsx` (1 755 l.), `ManagerDashboard.jsx` (1 364 l.), `EmployeesPanel.jsx` (920 l.).
-- [ ] Mémoïser les cartes du tableau de bord (P-10).
+### Lot 6 — Qualité du code — ✅ en partie (V2.4.99)
+- [x] ESLint 10 (`eslint`, `@eslint/js`, `globals`, `eslint-plugin-react-hooks` 7, `eslint-plugin-react-refresh`)
+  en devDependencies, script `npm run lint`, étape `npm run lint` dans `.github/workflows/ci.yml`.
+  Config par environnement (Node pour configs/tests, service worker pour `push-sw.js`) ; les sources Apps
+  Script (`apps-script-*.js`) sont exclues. 0 erreur, ~60 avertissements : les règles « React Compiler »
+  de react-hooks 7 (`set-state-in-effect`, `refs`, `purity`…) et `exhaustive-deps` sont en *warn* — à
+  corriger écran par écran, pas en masse.
+- [x] Erreurs corrigées : clés i18n en double (`manager.filters.today/clearDay`, `profile.noReferences` — on
+  garde la valeur déjà affichée), code mort (imports, variables, `validateOvertimeSmsText`, fonctions
+  d'édition des écrans de taux en lecture seule `CongesIndemnityManager`/`EmployerContributionsManager`),
+  `{ cause }` sur les erreurs relancées de la preuve de temps supplémentaire. Moteur de paie : aucun
+  changement de logique (deux commentaires `eslint-disable` documentés).
+- [x] P-10 : carte de feuille de temps extraite dans `components/manager/JobCard.jsx` (`React.memo`, props
+  primitives, `onApprove`/`onUnlock` stables via ref) ; `useT()` mémoïsé par langue. Mesuré (build de test,
+  20 cartes) : ouvrir la confirmation d'approbation re-rendait toutes les cartes, maintenant 0.
+- [ ] Reste : découper `EmployeeForm.jsx` (≈ 1 750 l.) et `EmployeesPanel.jsx` (≈ 900 l.), et la carte de
+  notification de `ManagerDashboard`. Volontairement non fait ici : `EmployeeForm` est le chemin de saisie
+  du temps soumis aux « release gates » (timeouts, double-clic, DST…) ; un découpage doit venir avec des
+  tests de composant (pas encore d'environnement jsdom/testing-library dans le projet).
 
 ---
 

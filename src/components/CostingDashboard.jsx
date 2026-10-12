@@ -116,7 +116,7 @@ export default function CostingDashboard() {
         // Subcontractor: negotiated double-time rate for hours over 8h/day (not 2x simple).
         const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
 
-        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, totalKm = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
+        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
         const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], overtimeOptionsFromProfile(profile));
         entries.forEach((e) => {
           regMin += e.regularWorkMinutes;
@@ -124,7 +124,6 @@ export default function CostingDashboard() {
           ot100Min += e.overtime100Minutes;
           returnMin += e.returnRegularMinutes;
           returnNbMin += e.returnNoBenefitMinutes;
-          totalKm += e.totalKm;
           // Rate frozen on the job at submission (0034); fall back to current profile rate.
           const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
           const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;

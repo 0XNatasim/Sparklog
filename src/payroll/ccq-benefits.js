@@ -331,6 +331,7 @@ export function computeCcqBenefits({
   const round2 = (x) => Math.round(x * 100) / 100; // to the cent
   const h = Math.max(0, Number(hours) || 0);
   const wage = Number(hourlyWage) || 0;
+  // eslint-disable-next-line no-unused-vars -- documented base kept for the pension/other bases
   const baseWage = h * wage; // straight-time base wage, no premium (pension/other bases)
 
   // Indemnité de congés (13 %): on the wage earned at base + overtime rates (regular

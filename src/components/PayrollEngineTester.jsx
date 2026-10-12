@@ -645,7 +645,6 @@ export default function PayrollEngineTester({ messier = false }) {
     setCcq((s) => (testRatesOn
       ? { ...s, prelevementCcq: levies.prelevementCcq }
       : { ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
 
   // Run the calculation (phone-data / other reimbursements come from typed fields).
@@ -672,7 +671,6 @@ export default function PayrollEngineTester({ messier = false }) {
 
     // Non-taxable reimbursements/allowances (outside the DAS calc): KM + weekly
     // phone/data + CCQ safety-equipment allowance (added once CCQ is computed).
-    const profile = employees.find((e) => e.id === selectedId);
     const kmReimb = Number(pay.km) * Number(pay.kmRate);
     // Phone-data, storage and other non-taxable reimbursements are typed amounts (phone and storage
     // are prefilled from the employee's Règles de temps settings).
@@ -1198,7 +1196,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
       </Card>
     );
   }
-  const { gross, employee, employer, das } = result;
+  const { employee, employer, das } = result;
   return (
     <div className="space-y-3">
       {result.requiresReview && (

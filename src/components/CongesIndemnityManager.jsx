@@ -20,7 +20,6 @@ export default function CongesIndemnityManager() {
   const t = useT();
   const [row, setRow] = useState(null);
   const [err, setErr] = useState("");
-  const [saved, setSaved] = useState(false);
 
   async function load() {
     const { data, error } = await supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle();
@@ -32,17 +31,6 @@ export default function CongesIndemnityManager() {
   const asPct = (v) => (v == null || v === "" ? "" : (Number(v) * 100).toString());
   const total = FIELDS.reduce((s, f) => s + (Number(row?.[f.key]) || 0), 0);
 
-  function setLocal(key, pctValue) {
-    setRow((r) => ({ ...r, [key]: pctValue === "" ? "" : Number(pctValue) / 100 }));
-  }
-
-  async function saveField(key, pctValue) {
-    const value = pctValue === "" || pctValue == null ? 0 : Number(pctValue) / 100;
-    if (Number.isNaN(value)) return;
-    const { error } = await supabase.from("conges_indemnity_rate").update({ [key]: value }).eq("id", true);
-    if (error) setErr(error.message);
-    else { setSaved(true); setTimeout(() => setSaved(false), 1200); }
-  }
 
   return (
     <Card>
@@ -67,7 +55,7 @@ export default function CongesIndemnityManager() {
               <div className="block text-xs">
                 <span className="text-muted-foreground">{t("costing.conges.total")}</span>
                 <div className="mt-1 flex h-9 items-center justify-end rounded-md border bg-muted/40 px-2 font-mono text-sm">
-                  {(total * 100).toFixed(1)}% {saved && <span className="ml-2 text-xs text-success">✓</span>}
+                  {(total * 100).toFixed(1)}%
                 </div>
               </div>
             </div>

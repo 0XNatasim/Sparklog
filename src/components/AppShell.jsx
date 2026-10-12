@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { hasManagementAccess, isManagerRole } from "@/lib/roles";
+import { hasManagementAccess } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import NotificationsBell from "@/components/NotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";

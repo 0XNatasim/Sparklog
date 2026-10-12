@@ -26,7 +26,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
 
   async function add() {
     if (!employeeId) return;
-    let payload = null;
+    let payload;
     if (mode === "range") {
       const from = draft.from;
       const to = draft.to || draft.from;
