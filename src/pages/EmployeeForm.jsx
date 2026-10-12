@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
 import { Camera, CircleCheck, TriangleAlert } from "lucide-react";
-import autofillExample from "../../public/Auto-fill.jpg";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -1465,7 +1464,7 @@ export default function EmployeeForm() {
                   </ul>
                 </div>
                 <img
-                  src={autofillExample}
+                  src="/Auto-fill.webp"
                   alt={t("form.autofillTip.exampleAlt")}
                   className="mx-auto w-full rounded-md border object-contain"
                   style={{ maxHeight: "60vh" }}
@@ -1629,7 +1628,7 @@ export default function EmployeeForm() {
                   {showOvertimeExample && (
                     <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
                       <img
-                        src="/overtime-evidence-example.jpg"
+                        src="/overtime-evidence-example.webp"
                         alt={t("form.evidence.exampleAlt")}
                         className="max-h-96 w-full rounded object-contain"
                       />
@@ -1678,7 +1677,7 @@ export default function EmployeeForm() {
                 {showInventoryExamples && (
                   <div className="grid grid-cols-3 gap-2 rounded-md border bg-background p-2">
                     {INVENTORY_SLOTS.map((slot) => (
-                      <img key={slot} src={`/inventory-examples/${slot}.jpg`} alt={t("form.inventory.exampleAlt", { n: slot })} className="max-h-72 w-full rounded object-contain" />
+                      <img key={slot} src={`/inventory-examples/${slot}.webp`} alt={t("form.inventory.exampleAlt", { n: slot })} className="max-h-72 w-full rounded object-contain" />
                     ))}
                   </div>
                 )}

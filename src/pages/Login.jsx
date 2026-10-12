@@ -1,7 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import headerLight from "../../public/header-light.jpg";
-import headerDark from "../../public/header-dark.jpg";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -166,8 +164,8 @@ export default function Login() {
       </div>
       <Card className="w-full max-w-md dark:bg-[#151515]">
         <div className="flex justify-center px-6 pt-6">
-          <img src={headerLight} alt="Messier Connexion" className="w-64 max-w-full rounded dark:hidden" />
-          <img src={headerDark} alt="Messier Connexion" className="hidden w-64 max-w-full dark:block" />
+          <img src="/header-light.webp" alt="Messier Connexion" className="w-64 max-w-full rounded dark:hidden" />
+          <img src="/header-dark.webp" alt="Messier Connexion" className="hidden w-64 max-w-full dark:block" />
         </div>
         <CardHeader>
           <CardTitle className="text-2xl">{t("auth.title")}</CardTitle>

@@ -16,8 +16,6 @@ import UpdateBanner from "@/components/UpdateBanner";
 import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { APP_VERSION } from "@/lib/version";
-import headerLight from "../../public/header-light.jpg";
-import headerDark from "../../public/header-dark.jpg";
 
 function NavItem({ to, children }) {
   return (
@@ -105,8 +103,8 @@ export default function AppShell({ children }) {
           </Link>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
-            <img src={headerLight} alt="Entreprise Électrique Messier Connexion Inc" className="h-16 w-auto rounded dark:hidden" />
-            <img src={headerDark} alt="Entreprise Électrique Messier Connexion Inc" className="hidden h-16 w-auto rounded dark:block" />
+            <img src="/header-light.webp" alt="Entreprise Électrique Messier Connexion Inc" className="h-16 w-auto rounded dark:hidden" />
+            <img src="/header-dark.webp" alt="Entreprise Électrique Messier Connexion Inc" className="hidden h-16 w-auto rounded dark:block" />
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-0">

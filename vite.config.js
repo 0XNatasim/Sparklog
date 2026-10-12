@@ -49,7 +49,7 @@ export default defineConfig({
         // opens offline. API/auth calls are never cached (must hit the network).
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/functions\//, /supabase/i],
-        globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff2}"],
         cleanupOutdatedCaches: true,
         // Push + notification-click handlers live in public/push-sw.js.
         importScripts: ["push-sw.js"],

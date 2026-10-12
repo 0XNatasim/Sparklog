@@ -196,20 +196,21 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 
 ## 5. Optimisation — bundle, couleurs, interface (audit 2026-10-09)
 
-Mesures : `vite build` → un seul chunk `index-*.js` de 1,27 Mo (360 Ko gzip) ; precache PWA 3,5 Mo.
+Mesures initiales : `vite build` → un seul chunk `index-*.js` de 1,27 Mo (360 Ko gzip) ; precache PWA 3,5 Mo.
 Contrastes calculés selon WCAG 2.x (texte ≥ 4,5:1, bordures de champs ≥ 3:1). Une PR par lot, chacune
-avec le bump de `APP_VERSION`.
+avec le bump de `APP_VERSION`. Note : le logo Messier est vert alors que `--primary` est bleu — à trancher au Lot 4.
 
-### Lot 1 — Nettoyage (risque faible)
-- [ ] Retirer les dépendances jamais importées : `@mui/material`, `@mui/x-date-pickers`, `@emotion/react`,
-  `@emotion/styled`, `next-themes`, `@radix-ui/react-select`, `jimp` (dev).
-- [ ] Supprimer les fichiers morts : `src/App.css` (boilerplate Vite, non importé), `src/assets/react.svg`,
-  `public/vite.svg`, `public/logo.jpg` (189 Ko, non référencé) — re-vérifier les références avant.
-- [ ] `public/header-light.jpg` (1712×608, 176 Ko) et `header-dark.jpg` (126 Ko) affichés à 64 px de haut →
-  WebP ~360 px de large.
-- [ ] `AppShell.jsx:19-20` importe les en-têtes depuis `../../public/` → copie hachée en double dans le
-  precache ; référencer `/header-*.…` (ou déplacer dans `src/assets`).
-- [ ] `public/inventory-examples` (748 Ko) est précaché pour tous → exclure du `globPatterns`, charger à la demande.
+### Lot 1 — Nettoyage (risque faible) — ✅ fait (V2.4.94)
+Precache PWA : 3 562 Ko → 2 027 Ko (28 → 23 entrées). Bundle JS inchangé (le gain JS est au Lot 3).
+- [x] Dépendances jamais importées retirées : `@mui/material`, `@mui/x-date-pickers`, `@emotion/react`,
+  `@emotion/styled`, `next-themes`, `@radix-ui/react-select`, `jimp` (145 paquets en moins).
+- [x] Fichiers morts supprimés : `src/App.css`, `src/assets/react.svg`, `public/vite.svg`, `public/logo.jpg`.
+- [x] Images converties en WebP : en-têtes 171/122 Ko → 14/13 Ko (light réduit à 768 px de large),
+  `Auto-fill` 57 → 17 Ko, exemple de preuve 27 → 10 Ko.
+- [x] Plus de copie hachée en double : `AppShell`, `Login`, `ProtectedRoute` et `EmployeeForm` référencent
+  `/…webp` dans `public/` au lieu d'importer `../../public/…` ; `globPatterns` inclut `webp`.
+- [x] `public/inventory-examples` : 3 × 1080×2340 (≈ 250 Ko) → 480×1040 WebP (22 Ko) ; gardés en precache
+  pour que les exemples restent visibles hors ligne.
 
 ### Lot 2 — Contrastes et thème (`src/index.css`, `AppShell.jsx`, `index.html`)
 - [ ] Sombre : `--destructive` `0 62.8% 30.6%` utilisé comme texte (`text-destructive`, 85 usages) = **1,99:1**
