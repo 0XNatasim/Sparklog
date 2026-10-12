@@ -424,7 +424,7 @@ export default function EmployeesPanel() {
                 <div className="font-semibold">{t("employees.add.credentials")}</div>
                 <div className="mt-1 font-mono text-xs">{addResult.email}</div>
                 <div className="font-mono text-xs">{t("employees.add.tempPassword")}: <b>{addResult.password}</b></div>
-                <p className="mt-1 text-[11px]">{t("employees.add.share")}</p>
+                <p className="mt-1 text-xs">{t("employees.add.share")}</p>
               </div>
             )}
           </CardContent>
@@ -461,7 +461,7 @@ export default function EmployeesPanel() {
                 {Number(p.team_leader_premium) > 0 && <Star className="h-4 w-4 shrink-0 fill-warning text-warning" aria-label={t("employees.teamLeader")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
                 {REGION_NAME.get(p.work_region) && (
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal text-muted-foreground" title={t("employees.workRegion")}>
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground" title={t("employees.workRegion")}>
                     {p.work_region} — {REGION_NAME.get(p.work_region)}
                   </span>
                 )}
@@ -563,7 +563,7 @@ export default function EmployeesPanel() {
                     className="h-5 w-5 rounded border-input accent-warning disabled:cursor-not-allowed"
                   />
                 </label>
-                {!p.type_confirmed && <span className="text-[11px] text-warning">{t("employees.activateNeedsType")}</span>}
+                {!p.type_confirmed && <span className="text-xs text-warning">{t("employees.activateNeedsType")}</span>}
               </Field>
             </div>
 
@@ -620,7 +620,7 @@ export default function EmployeesPanel() {
                 <span className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-primary" />{t("timeOff.title")}
                   {(timeOff.get(p.id) || []).length > 0 && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground">{(timeOff.get(p.id) || []).length}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{(timeOff.get(p.id) || []).length}</span>
                   )}
                 </span>
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -657,7 +657,7 @@ export default function EmployeesPanel() {
                       />
                       <span className="text-xs text-muted-foreground">/h</span>
                     </div>
-                    <span className="text-[11px] text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
+                    <span className="text-xs text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
                   </Field>
                 </div>
               </details>
@@ -777,10 +777,10 @@ export default function EmployeesPanel() {
                   ) : (
                     <>
                       <Input value={p.wage_schedule || ""} placeholder="C3" onChange={(e) => setLocal(p.id, "wage_schedule", e.target.value.toUpperCase())} onBlur={(e) => saveField(p.id, "wage_schedule", e.target.value.toUpperCase())} className="h-9" />
-                      <span className="text-[11px] text-warning">{t("employees.wageScheduleManual")}</span>
+                      <span className="text-xs text-warning">{t("employees.wageScheduleManual")}</span>
                     </>
                   )}
-                  <span className="text-[11px] text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
+                  <span className="text-xs text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
                 </Field>
                 {isSubcontractorRole(p.role) ? (
                   <>
@@ -797,13 +797,13 @@ export default function EmployeesPanel() {
                         <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.hourly_rate_double ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate_double", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate_double", e.target.value)} placeholder="0.00" className="h-9" />
                         <span className="text-xs text-muted-foreground">/h</span>
                       </div>
-                      <span className="text-[11px] text-muted-foreground">{t("employees.doubleHourlyRateHint")}</span>
+                      <span className="text-xs text-muted-foreground">{t("employees.doubleHourlyRateHint")}</span>
                     </Field>
                   </>
                 ) : (
                   <Field label={t("employees.hourlyRate")}>
                     <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
-                    <span className="text-[11px] text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
+                    <span className="text-xs text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
                   </Field>
                 )}
               </div>
@@ -821,7 +821,7 @@ export default function EmployeesPanel() {
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
               </summary>
               <div className="space-y-3 border-t p-3">
-                <p className="text-[11px] text-muted-foreground">{t("employees.payAmountsMoved")}</p>
+                <p className="text-xs text-muted-foreground">{t("employees.payAmountsMoved")}</p>
                 <div className="grid gap-2 md:grid-cols-2">
                   <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
                     <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>

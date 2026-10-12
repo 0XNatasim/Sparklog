@@ -184,12 +184,12 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
               tile.onClick ? (
                 <button key={tile.label} type="button" onClick={tile.onClick} title={tile.title || t("live.unlock.open")} className="rounded px-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <div className={`text-base font-bold leading-tight tabular-nums underline decoration-dotted underline-offset-2 ${tile.cls}`}>{tile.value}</div>
-                  <div className="text-[10px] leading-tight text-muted-foreground">{tile.label}</div>
+                  <div className="text-xs leading-tight text-muted-foreground">{tile.label}</div>
                 </button>
               ) : (
                 <div key={tile.label} className="px-1">
                   <div className={`text-base font-bold leading-tight tabular-nums ${tile.cls}`}>{tile.value}</div>
-                  <div className="text-[10px] leading-tight text-muted-foreground">{tile.label}</div>
+                  <div className="text-xs leading-tight text-muted-foreground">{tile.label}</div>
                 </div>
               )
             ))}
@@ -242,12 +242,12 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                       </span>
                     )}
                     {exceptionToday.has(employee.id) && (
-                      <span title={t("live.exceptionTooltip")} className="shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warning">
+                      <span title={t("live.exceptionTooltip")} className="shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-xs font-semibold uppercase text-warning">
                         {t("live.exceptionBadge")}
                       </span>
                     )}
                   </span>
-                  <span className="shrink-0 rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t("live.jobsCount", { count: jobs.length })}</span>
+                  <span className="shrink-0 rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{t("live.jobsCount", { count: jobs.length })}</span>
                 </div>
                 {jobs.length === 0 ? (
                   <p className="text-xs text-muted-foreground">{t("live.noJobs")}</p>
@@ -256,7 +256,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                     {jobs.map((job, index) => (
                       <div key={job.id} className={cn("flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-sm", jobCodeTintClass(job.ot))}>
                         <span className="flex items-center gap-2 truncate">
-                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">{index + 1}</span>
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{index + 1}</span>
                           <span className={cn("truncate font-semibold", jobOtColorClass(job.status))}>{job.ot || "—"}</span>
                         </span>
                         <span className="shrink-0 font-mono font-semibold">{fmtHM(hoursBetween(

@@ -216,7 +216,7 @@ function Stat({ label, value, accent }) {
       : "bg-muted/30";
   return (
     <div className={`rounded-lg border p-2.5 ${tone}`}>
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-0.5 font-mono text-base font-semibold">{value}</div>
     </div>
   );

@@ -84,7 +84,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
             </div>
             <p className="mt-1 text-xs text-muted-foreground">{t("live.week.description")}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full bg-warning/15 px-2 py-0.5 text-warning">{t("live.week.legendSaved")}</span>
             <span className="rounded-full bg-success/15 px-2 py-0.5 text-success">{t("live.week.legendSubmitted")}</span>
             <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-destructive">{t("live.week.legendMissing")}</span>

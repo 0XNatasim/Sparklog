@@ -1,12 +1,13 @@
 // src/App.jsx
 import React, { Suspense, lazy } from "react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 
 import Login from "./pages/Login";
 import EmployeeForm from "./pages/EmployeeForm";
 import { PageLoading } from "@/components/LazyLoading";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // The time-entry form (employees' landing page) and login stay in the main bundle;
 // everything else loads on first visit. Manager code is never sent to employees.
@@ -53,6 +54,13 @@ function RoleLanding() {
   return <Navigate to={isManagerRole(role) ? "/manager" : "/form"} replace />;
 }
 
+// A crash on one page shows a recoverable error instead of a blank app; changing
+// page clears it.
+function RouteErrorBoundary({ children }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+}
+
 export default function App() {
   const isPasswordRecovery = window.location.pathname === "/reset-password";
 
@@ -73,6 +81,7 @@ export default function App() {
     <HashRouter>
       <ViewModeProvider>
       <InstallPrompt />
+      <RouteErrorBoundary>
       <Suspense fallback={<PageLoading />}>
       <Routes>
         {/* Public */}
@@ -179,6 +188,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+      </RouteErrorBoundary>
       </ViewModeProvider>
     </HashRouter>
   );

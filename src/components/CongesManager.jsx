@@ -234,7 +234,7 @@ export default function CongesManager() {
           {[["recurring", recurring], ["oneOff", oneOff]].map(([key, list]) => list.length > 0 && (
             <div key={key}>
               {recurring.length > 0 && oneOff.length > 0 && (
-                <div className="border-b bg-muted/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="border-b bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t(key === "recurring" ? "conges.recurringHeading" : "conges.oneOffHeading")} ({list.length})
                 </div>
               )}
@@ -248,8 +248,8 @@ export default function CongesManager() {
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{nameById.get(row.user_id) || row.user_id}</div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase">{categoryLabel(row.category, t)}</span>
-                            {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold uppercase">{categoryLabel(row.category, t)}</span>
+                            {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
                             <span>{formatTimeOff(row, t)}</span>
                           </div>
                         </div>

@@ -113,7 +113,7 @@ export default function InfraHealthCard() {
       {open && (
         <CardContent className="space-y-4 border-t p-4">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("infra.liveTitle")}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("infra.liveTitle")}</div>
             <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
               <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
             </Button>
@@ -134,10 +134,10 @@ export default function InfraHealthCard() {
           )}
 
           {stats?.as_of && (
-            <p className="text-[10px] text-muted-foreground">{t("live.updated", { time: dayjs(stats.as_of).format("YYYY-MM-DD HH:mm:ss") })}</p>
+            <p className="text-xs text-muted-foreground">{t("live.updated", { time: dayjs(stats.as_of).format("YYYY-MM-DD HH:mm:ss") })}</p>
           )}
 
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {host ? t("infra.hostTitle") : t("infra.snapshotTitle")}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -148,7 +148,7 @@ export default function InfraHealthCard() {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground">{host ? t("infra.hostNote") : t("infra.snapshotNote")}</p>
+          <p className="text-xs text-muted-foreground">{host ? t("infra.hostNote") : t("infra.snapshotNote")}</p>
         </CardContent>
       )}
     </Card>

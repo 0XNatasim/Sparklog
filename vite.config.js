@@ -35,7 +35,8 @@ export default defineConfig({
         theme_color: "#151515",
         background_color: "#151515",
         display: "standalone",
-        orientation: "portrait",
+        // "any": managers use tablets in landscape for the wide payroll/timesheet tables.
+        orientation: "any",
         start_url: "/",
         scope: "/",
         icons: [

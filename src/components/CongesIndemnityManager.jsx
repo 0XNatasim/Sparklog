@@ -67,11 +67,11 @@ export default function CongesIndemnityManager() {
               <div className="block text-xs">
                 <span className="text-muted-foreground">{t("costing.conges.total")}</span>
                 <div className="mt-1 flex h-9 items-center justify-end rounded-md border bg-muted/40 px-2 font-mono text-sm">
-                  {(total * 100).toFixed(1)}% {saved && <span className="ml-2 text-[11px] text-success">✓</span>}
+                  {(total * 100).toFixed(1)}% {saved && <span className="ml-2 text-xs text-success">✓</span>}
                 </div>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("costing.conges.note")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("costing.conges.note")}</p>
           </div>
         </details>
       </CardContent>

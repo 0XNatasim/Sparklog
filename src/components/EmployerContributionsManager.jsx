@@ -81,7 +81,7 @@ export default function EmployerContributionsManager() {
                     <tr key={r.code} className="border-b last:border-0">
                       <td className="px-3 py-1.5">
                         {r.label}
-                        {savedCode === r.code && <span className="ml-2 text-[11px] text-success">✓</span>}
+                        {savedCode === r.code && <span className="ml-2 text-xs text-success">✓</span>}
                       </td>
                       {LEVEL_COLUMNS.map((c) => (
                         <td key={c.key} className="px-2 py-1.5 text-right">
@@ -98,7 +98,7 @@ export default function EmployerContributionsManager() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("costing.contrib.perHourNote")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("costing.contrib.perHourNote")}</p>
           </div>
         </details>
       </CardContent>

@@ -252,7 +252,7 @@ export default function DasTab({ messier = false }) {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
-                    <tr className="border-b bg-muted/40 text-left text-[10px] uppercase text-muted-foreground">
+                    <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                       <th className="px-3 py-2.5 font-medium">{t("payroll.employee")}</th>
                       <th className="px-3 py-2.5 text-right font-medium">{t("payroll.das.hours")}</th>
                       <th className="px-3 py-2.5 text-right font-medium">{t("payroll.das.gross")}</th>
@@ -308,7 +308,7 @@ export default function DasTab({ messier = false }) {
                   )}
                 </table>
               </div>
-              <div className="border-t px-4 py-3 text-[11px] text-muted-foreground">
+              <div className="border-t px-4 py-3 text-xs text-muted-foreground">
                 <b>{t("payroll.das.remTotalLabel")}:</b> {money(totals.remTotal)} · {t("payroll.das.disclaimer")}
               </div>
             </CardContent>

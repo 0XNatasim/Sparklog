@@ -105,8 +105,8 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
             <div key={row.id} className="space-y-1.5 rounded-md border bg-muted/30 px-2 py-1.5 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">{categoryLabel(row.category, t)}</span>
-                  {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold uppercase text-muted-foreground">{categoryLabel(row.category, t)}</span>
+                  {row.kind === "recurring_weekly" && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold uppercase text-primary">{t("timeOff.recurringTag")}</span>}
                   {formatTimeOff(row, t)}
                 </span>
                 <button type="button" onClick={() => remove(row.id)} aria-label={t("common.cancel")} className="rounded p-1 text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
@@ -114,7 +114,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
               {row.kind === "recurring_weekly" && (
                 <div className="flex flex-wrap items-center gap-1.5 pl-1">
                   {(row.exception_dates || []).slice().sort().map((date) => (
-                    <span key={date} className="flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-[11px]">
+                    <span key={date} className="flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs">
                       {dayjs(date).format("DD MMM YYYY")}
                       <button type="button" onClick={() => removeException(row, date)} aria-label={t("common.cancel")} className="text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>
                     </span>
@@ -205,7 +205,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
             </label>
             <Button type="button" size="sm" disabled={busy} onClick={add}>{t("timeOff.add")}</Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">{t("timeOff.recurringHint")}</p>
+          <p className="text-xs text-muted-foreground">{t("timeOff.recurringHint")}</p>
         </div>
       )}
 

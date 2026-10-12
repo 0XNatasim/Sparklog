@@ -40,7 +40,7 @@ auth adapter, or payroll engine), not only in one screen.
 | Date/time ambiguity | Low | Overnight, device timezone, or DST could produce a different date/duration in another screen | Montréal dates use shared `companyDate()`; jobs resolve to `started_at`/`ended_at` with `America/Toronto`; DST gaps/folds are rejected and overlap is checked on instants | Keep all new civil-date features on the shared helper and add transition-year fixtures when timezone rules change |
 | Authorization policy drift | Low–medium | A new role or policy could restore excess access or let a manager rewrite an approved fact | An executable role × operation matrix covers every persisted role, every grantable admin section, paused personas, CCQ inclusion and owner-only NAS; database-source assertions lock the matching RLS/RPC invariants | Update the matrix first whenever a role, section or privileged operation is introduced |
 | Database load regression | Low–medium | New dashboards could repeat unbounded reads/counts and exhaust Disk IO again | Named query budgets cap manager/history/review reads; manager/history use stable keyset pagination; four count scans are one aggregate RPC; pending-review/keyset indexes support those paths | Update and test the budget before increasing a page/queue size; retain infrastructure observability |
-| Render failure loses unsaved work | Low–medium | An unforeseen component exception can still blank a route | Employee drafts are schema-versioned, owner-scoped and persisted in IndexedDB with 30-day expiry; reload/offline recovery restores them | Add route-level error boundaries (S-7); keep attachment persistence in point 10 |
+| Render failure loses unsaved work | Low | An unforeseen component exception could blank a route | Root, route and manager-panel error boundaries show a recoverable error (reload keeps the IndexedDB draft); employee drafts are schema-versioned, owner-scoped and persisted in IndexedDB with 30-day expiry | Keep attachment persistence in point 10; wrap any new top-level layout in the route boundary |
 
 ### Release gates for recurrence-prone changes
 
@@ -149,11 +149,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   message text is not retained. Existing raw OCR text is purged by migration `0065`.
 - **Status:** ✅ resolved
 
-### S-7 — No React error boundaries — MEDIUM
-- No boundary in `App.jsx`/`ProtectedRoute`; one render exception blanks the app and discards in-memory work.
-- **Fix:** top-level + per-route boundaries with safe recovery, preserving any local draft.
-- **Status:** ☐ open
-
 ### S-3b / robustness — Non-atomic employee submission — MEDIUM
 - `EmployeeForm.jsx:449-474,634-712`: storage upload precedes the row insert; a mid-sequence failure orphans
   the object or flags a job as having evidence with no metadata; manager notification insert is best-effort.
@@ -180,7 +175,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | AbortController / request id |
 | Manager | Sensitive export | Owner can bulk-read NAS un-audited from the browser | Audited server-side export | S-2 |
 | Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
-| Both | Render exception | Whole app blanks | Recover, keep draft | S-7 |
 
 **Also tracked (lower tier):**
 - **P-12 export rollback re-rates pending jobs (open, pre-existing):** `revertClaim` in
@@ -261,12 +255,21 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 - Reste : `bg-violet`/`slate` ponctuels et le gris de `badge neutral` (non sémantiques) ; couleurs hex du
   talon imprimé (`lib/paystub.js`), volontairement neutres.
 
-### Lot 5 — Ergonomie terrain
-- [ ] Boutons d'en-tête 32×32 px (`AppShell.jsx:123-135`) → cible tactile ≥ 44 px.
-- [ ] 85 textes en `text-[9px]`/`[10px]`/`[11px]` → 12 px minimum pour l'information utile.
-- [ ] Splash PWA maintenu ≥ 1 s (`main.jsx`) → retirer au premier rendu (≤ 300 ms).
-- [ ] Manifeste `orientation: "portrait"` (`vite.config.js`) → `"any"` (tablettes gestionnaires).
-- [ ] Error boundaries global + par route, brouillon préservé (S-7).
+### Lot 5 — Ergonomie terrain — ✅ fait (V2.4.98)
+- [x] En-tête mobile : Actualiser / Thème / Langue / Déconnexion regroupés dans un menu ⋮ (`PhoneMenu`,
+  entrées de 44 px) ; cloches, menu et lien Gestion à 44 × 44 (`size="touch"` dans `ui/button.jsx` :
+  44 px sur téléphone, 40 px dès `sm`). Corrige aussi un débordement existant : à 360 px l'en-tête d'un
+  gestionnaire faisait 378 px. En-tête et menu de `ManagerLayout` à 44 px.
+- [x] 71 textes `text-[10px]`/`[11px]` → `text-xs` (12 px). Exceptions voulues : talon imprimé
+  (`PayStubPrint`), pastilles de compte des cloches, glyphe EN/FR de 16 px, libellés de la barre du bas
+  (11 px, sinon « Fiche de travail » est tronqué à 360 px).
+- [x] Splash PWA retiré au premier rendu (double `requestAnimationFrame`) au lieu d'1 s fixe.
+- [x] Manifeste `orientation: "any"`.
+- [x] S-7 : `components/ErrorBoundary.jsx` — racine (`main.jsx`, texte bilingue statique), route (`App.jsx`,
+  réinitialisée au changement de page) et panneau gestionnaire (`ManagerLayout`, la barre latérale reste).
+  Boutons Recharger / Réessayer / Accueil ; le brouillon IndexedDB est restauré au rechargement.
+- Vérifié dans Chromium (Supabase simulé) : pas de défilement horizontal sur 10 écrans à 360 et 1280 px ;
+  plantage forcé (build de test) d'Historique et d'Équipe en direct → erreur récupérable, navigation OK.
 
 ### Lot 6 — Qualité du code
 - [ ] `eslint.config.js` existe mais ESLint n'est pas en devDependencies ni en script → ajouter `npm run lint`.

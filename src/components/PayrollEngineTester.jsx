@@ -935,7 +935,7 @@ export default function PayrollEngineTester({ messier = false }) {
                 <Field key={k} label={label} value={ytd[k]} onChange={setY(k)} disabled={openingLocked} />
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("payroll.ccqCumulNote")}</p>
           </div>
         </details>
       </Collapsible>
@@ -998,11 +998,11 @@ export default function PayrollEngineTester({ messier = false }) {
                   <input type="checkbox" checked={testRates.enabled} onChange={(e) => toggleTestRates(e.target.checked)} />
                   {t("payroll.testRates.toggle")}
                 </label>
-                <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.hint")}</p>
+                <p className="text-xs text-muted-foreground">{t("payroll.testRates.hint")}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" size="sm" variant={presetKind === "before" ? "default" : "outline"} onClick={() => applyPresetKind("before")}>{t("payroll.testRates.preset")}</Button>
                   <Button type="button" size="sm" variant={presetKind === "after" ? "default" : "outline"} onClick={() => applyPresetKind("after")}>{t("payroll.testRates.presetAfter")}</Button>
-                  {presetKind && <span className="text-[11px] text-muted-foreground">{t("payroll.testRates.presetAuto")}</span>}
+                  {presetKind && <span className="text-xs text-muted-foreground">{t("payroll.testRates.presetAuto")}</span>}
                 </div>
                 {testRates.enabled && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1013,7 +1013,7 @@ export default function PayrollEngineTester({ messier = false }) {
                   </div>
                 )}
                 {testRates.enabled && unionSuggestion != null && (
-                  <p className="text-[11px] text-muted-foreground">{t("payroll.testRates.unionSuggest", { amount: unionSuggestion.toFixed(2) })}</p>
+                  <p className="text-xs text-muted-foreground">{t("payroll.testRates.unionSuggest", { amount: unionSuggestion.toFixed(2) })}</p>
                 )}
               </div>
             )}
@@ -1043,7 +1043,7 @@ export default function PayrollEngineTester({ messier = false }) {
               <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" disabled={!testRatesOn} />
               <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" disabled={!testRatesOn} />
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">{t("payroll.ccqAutoNote")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("payroll.ccqAutoNote")}</p>
       </Collapsible>
 
       <Card>
@@ -1158,7 +1158,7 @@ export default function PayrollEngineTester({ messier = false }) {
                     <li key={i} className="rounded-md border bg-muted/20 p-2 text-xs">
                       <div className="font-medium">
                         {it.name}
-                        {it.draft && <span className="ml-2 rounded bg-warning/20 px-1 py-0.5 text-[10px] font-semibold uppercase text-warning">draft</span>}
+                        {it.draft && <span className="ml-2 rounded bg-warning/20 px-1 py-0.5 text-xs font-semibold uppercase text-warning">draft</span>}
                       </div>
                       {it.note && <div className="mt-0.5 text-muted-foreground">{it.note}</div>}
                     </li>
@@ -1180,7 +1180,7 @@ function DetailRow({ label, formula, value, tone }) {
     <div className="flex items-baseline justify-between gap-3 py-0.5">
       <span className="text-muted-foreground">
         <span className="text-foreground">{label}</span>
-        {formula ? <span className="ml-1 text-[11px]">— {formula}</span> : null}
+        {formula ? <span className="ml-1 text-xs">— {formula}</span> : null}
       </span>
       <span className={`shrink-0 font-mono ${toneClass}`}>{value}</span>
     </div>
@@ -1272,7 +1272,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
           <Row label="Revenu Québec" value={money(das.quebec)} />
           <Row label={t("payroll.arcFederal")} value={money(das.arc)} />
           <Row label={t("payroll.totalDas")} value={money(das.total)} strong />
-          <div className="pt-2 text-[11px] text-muted-foreground">
+          <div className="pt-2 text-xs text-muted-foreground">
             {t("payroll.dasFooter")}
           </div>
         </CardContent></Card>
@@ -1341,7 +1341,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
                   {e.cnesst && <DetailRow label="CNESST" formula={`${money(e.cnesst.base)} × ${pct(e.cnesst.rate)}`} value={money(e.cnesst.contribution)} />}
                 </div>
 
-                <details className="text-[11px] text-muted-foreground">
+                <details className="text-xs text-muted-foreground">
                   <summary className="cursor-pointer select-none">{t("payroll.detailRawJson")}</summary>
                   <pre className="mt-2 max-h-64 overflow-auto rounded bg-muted/30 p-2">{JSON.stringify(result.explanation, null, 2)}</pre>
                 </details>
@@ -1351,7 +1351,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
         </CardContent>
       </Card>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         {t("payroll.ruleSetLine", { quebec: result.meta.rulesVersion.quebec, federal: result.meta.rulesVersion.federal, status: result.meta.rulesVersion.status })}
       </p>
     </div>

@@ -43,7 +43,7 @@ export default function ProtectedRoute({ children, requireRole }) {
         >
           {t("auth.retry")}
         </button>
-        <p className="text-[11px] text-muted-foreground/70">{authError}</p>
+        <p className="text-xs text-muted-foreground/70">{authError}</p>
       </BrandedScreen>
     );
   }

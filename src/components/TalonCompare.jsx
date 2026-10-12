@@ -99,13 +99,13 @@ export default function TalonCompare({ opening, closing, totals, onComparison })
                 <tbody>
                   {renderRows(comparison.totals)}
                   {comparison.totals.length > 0 && comparison.lines.length > 0 && (
-                    <tr className="border-b bg-muted/30"><td colSpan={4} className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.compare.period")}</td></tr>
+                    <tr className="border-b bg-muted/30"><td colSpan={4} className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.compare.period")}</td></tr>
                   )}
                   {renderRows(comparison.lines)}
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-muted-foreground">{t("payroll.compare.note")}</p>
+            <p className="text-xs text-muted-foreground">{t("payroll.compare.note")}</p>
           </>
         )}
       </CardContent>

@@ -100,7 +100,7 @@ export default function EmployeeNotificationsBell() {
     <>
       <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative h-8 w-8" aria-label={t("notifications.employeeTitle")}>
+          <Button variant="ghost" size="touch" className="relative" aria-label={t("notifications.employeeTitle")}>
             <Bell className="h-5 w-5" />
             {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-destructive px-1 text-[10px] font-bold leading-4 text-destructive-foreground">{unread > 99 ? "99+" : unread}</span>}
           </Button>
@@ -115,7 +115,7 @@ export default function EmployeeNotificationsBell() {
               className={`block border-t px-3 py-3 ${item.acknowledged_at ? "opacity-70" : "bg-destructive/10"}`}
             >
               <div className={`line-clamp-2 whitespace-pre-wrap text-sm ${item.acknowledged_at ? "" : "font-semibold"}`}>{item.manager_broadcasts.body || t("broadcast.popupTitle")}</div>
-              <div className="mt-1 text-[11px] text-muted-foreground">{dayjs(item.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{dayjs(item.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</div>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

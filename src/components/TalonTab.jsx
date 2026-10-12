@@ -296,7 +296,7 @@ export default function TalonTab({ messier = false }) {
                       {shown.map((w) => (
                         <div key={w.key} className="flex flex-col items-center gap-0.5" title={`${w.start.format("DD MMM")}–${w.end.format("DD MMM YYYY")}`}>
                           <Cell profile={profile} week={w} />
-                          <span className="text-[11px] font-medium text-muted-foreground">S{w.weekNo}</span>
+                          <span className="text-xs font-medium text-muted-foreground">S{w.weekNo}</span>
                         </div>
                       ))}
                       {shown.length === 0 && <span className="col-span-5 text-xs text-muted-foreground">—</span>}
@@ -338,7 +338,7 @@ export default function TalonTab({ messier = false }) {
               </table>
             </div>
           )}
-          <p className="border-t px-4 py-3 text-[11px] text-muted-foreground">{t("payroll.talon.disclaimer")}</p>
+          <p className="border-t px-4 py-3 text-xs text-muted-foreground">{t("payroll.talon.disclaimer")}</p>
         </CardContent>
       </Card>
 

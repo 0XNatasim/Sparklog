@@ -92,7 +92,7 @@ export default function NotificationsBell() {
   return (
     <DropdownMenu onOpenChange={(open) => { if (open) load(); }}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8 text-destructive hover:text-destructive" aria-label={t("notifications.title")}>
+        <Button variant="ghost" size="icon" className="relative h-11 w-11 text-destructive hover:text-destructive sm:h-10 sm:w-10" aria-label={t("notifications.title")}>
           <Bell className="h-5 w-5" />
           {unread > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-destructive px-1 text-[10px] font-bold leading-4 text-destructive-foreground">{unread > 99 ? "99+" : unread}</span>}
         </Button>
@@ -115,7 +115,7 @@ export default function NotificationsBell() {
                   : t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}
             </div>
             {notification.type === "overtime_job_edited" && notification.changes && Object.keys(notification.changes).length > 0 && (
-              <div className="mt-1.5 space-y-0.5 rounded-md border bg-muted/40 p-1.5 text-[11px]">
+              <div className="mt-1.5 space-y-0.5 rounded-md border bg-muted/40 p-1.5 text-xs">
                 <div className="font-semibold text-muted-foreground">{t("notifications.changesTitle")}</div>
                 {Object.entries(notification.changes).map(([field, val]) => (
                   <div key={field} className="flex flex-wrap items-center gap-x-1">
@@ -127,7 +127,7 @@ export default function NotificationsBell() {
                 ))}
               </div>
             )}
-            <div className="mt-1 text-[11px] text-muted-foreground">{new Date(notification.created_at).toLocaleString()}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{new Date(notification.created_at).toLocaleString()}</div>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
