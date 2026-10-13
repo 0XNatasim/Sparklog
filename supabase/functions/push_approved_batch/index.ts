@@ -194,7 +194,7 @@ serve(async (req) => {
     const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid")
+      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
@@ -236,9 +236,10 @@ serve(async (req) => {
         // double time (no 1.5x tier). The sheet applies the CCQ overtime split, so it
         // needs this flag to match SparkLog's calculation.
         employee_ot_first_hour_double: Boolean(prof?.overtime_first_hour_double),
-        // When true and the day exceeds 8h, the return-to-warehouse time is paid at the
-        // base rate without social benefits (the sheet applies this).
-        employee_return_ot_no_benefits: Boolean(prof?.return_overtime_no_benefits),
+        // Return-to-warehouse time is never overtime. By default it is paid at the base rate
+        // without social benefits; when true, it keeps its benefits while the day (work +
+        // return) stays within 8h. Subcontractors: always false.
+        employee_return_with_benefits_to_8h: prof?.role !== "subcontractor_1" && Boolean(prof?.return_with_benefits_to_8h),
         // When true, Départ→Arrivée of the employee's first job of the day is unpaid travel.
         employee_first_trip_unpaid: Boolean(prof?.first_trip_unpaid),
         approved_at: approved_at_label,

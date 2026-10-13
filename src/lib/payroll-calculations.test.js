@@ -109,36 +109,62 @@ describe("return-to-storage time", () => {
     expect(e.overtimeWorkMinutes).toBe(0);
     // Return minutes are not paid again: the drive back is already logged within the job span.
     expect(e.returnRegularMinutes).toBe(0);
-    expect(e.regularPaidMinutes).toBe(480);
     expect(e.totalPaidMinutes).toBe(480);
-    expect(e.returnNoBenefitMinutes).toBe(0);
+    expect(e.regularWorkMinutes + e.returnNoBenefitMinutes).toBe(480);
   });
 });
 
-describe("returnOtNoBenefits: return paid without social benefits over 8h", () => {
-  // 7h work + 2h return = 9h span (08:00→17:00, return_time_minutes=120), day > 8h.
-  const job = { id: "j1", job_date: "2026-06-01", depart: "08:00", fin: "17:00", return_time_minutes: 120 };
-  it("day ≤ 8h → return stays inside regular hours (not carved)", () => {
-    const short = { id: "j2", job_date: "2026-06-02", depart: "08:00", fin: "16:00", return_time_minutes: 120 };
-    const e = calculatePayrollEntries([short], { returnOtNoBenefits: true }).get("j2");
-    expect(e.returnNoBenefitMinutes).toBe(0);
-    expect(e.regularWorkMinutes).toBe(480);
+// Messier rule (owner decision 2026-10-13): return time is never overtime and is left out of
+// the 8h split. Default: paid at the base rate without benefits. With returnWithBenefitsTo8h:
+// with benefits while work + return stays within 8h, without benefits beyond.
+describe("return-to-warehouse time: never overtime, benefits only up to 8h when checked", () => {
+  const day = (fin, ret, extra = {}) => ({ id: "j1", job_date: "2026-06-01", depart: "07:00", fin, return_time_minutes: ret, ...extra });
+  const run = (jobs, options) => [...calculatePayrollEntries(jobs, options).values()];
+  const sum = (entries, key) => entries.reduce((t, e) => t + e[key], 0);
+
+  it.each([
+    // [label, fin, return, default (reg / no-benefit), checked (reg / no-benefit)]
+    ["6h30 job + 1h return (7h30)", "14:30", 60, [390, 60], [450, 0]],
+    ["6h30 job + 2h return (8h30)", "15:30", 120, [390, 120], [480, 30]],
+    ["8h job + 1h return (9h)", "16:00", 60, [480, 60], [480, 60]],
+  ])("%s", (_, fin, ret, [defReg, defNb], [chkReg, chkNb]) => {
+    const def = calculatePayrollEntries([day(fin, ret)]).get("j1");
+    expect([def.regularWorkMinutes, def.returnNoBenefitMinutes, def.overtimeWorkMinutes]).toEqual([defReg, defNb, 0]);
+    const chk = calculatePayrollEntries([day(fin, ret)], { returnWithBenefitsTo8h: true }).get("j1");
+    expect([chk.regularWorkMinutes, chk.returnNoBenefitMinutes, chk.overtimeWorkMinutes]).toEqual([chkReg, chkNb, 0]);
+    expect(def.totalPaidMinutes).toBe(chk.totalPaidMinutes); // same minutes, only recategorised
   });
-  it("day > 8h → return (120min) carved out at base rate, no benefits; work split on the rest", () => {
-    const e = calculatePayrollEntries([job], { returnOtNoBenefits: true }).get("j1");
-    expect(e.returnNoBenefitMinutes).toBe(120);
-    expect(e.regularWorkMinutes).toBe(420); // 7h work, all regular (< 8h)
-    expect(e.overtime50Minutes).toBe(0);
-    expect(e.overtime100Minutes).toBe(0);
-    expect(e.totalPaidMinutes).toBe(540); // 9h still fully paid, just recategorised
-  });
-  it("off by default → 9h span splits 8h reg + 1h ot, return not carved", () => {
-    const e = calculatePayrollEntries([job]).get("j1");
-    expect(e.returnNoBenefitMinutes).toBe(0);
+
+  it("work over 8h is still overtime; the return on top never is", () => {
+    // 9h job + 1h return: 8h regular + 1h overtime (work) + 1h return without benefits.
+    const e = calculatePayrollEntries([day("17:00", 60)], { returnWithBenefitsTo8h: true }).get("j1");
     expect(e.regularWorkMinutes).toBe(480);
     expect(e.overtimeWorkMinutes).toBe(60);
+    expect(e.returnNoBenefitMinutes).toBe(60);
+  });
+
+  it("work takes the 8h first even when the return is logged on an earlier job", () => {
+    const jobs = [
+      { id: "a", job_date: "2026-06-01", depart: "07:00", fin: "11:00", return_time_minutes: 60 }, // 3h work + 1h return
+      { id: "b", job_date: "2026-06-01", depart: "11:00", fin: "16:00", return_time_minutes: 0 },  // 5h work
+    ];
+    const entries = run(jobs, { returnWithBenefitsTo8h: true });
+    // 8h of work fills the day: the 1h return gets no benefits and creates no overtime.
+    expect(sum(entries, "regularWorkMinutes")).toBe(480);
+    expect(sum(entries, "returnNoBenefitMinutes")).toBe(60);
+    expect(sum(entries, "overtimeWorkMinutes")).toBe(0);
+  });
+
+  it("an unpaid first trip is removed before the 8h room is measured", () => {
+    // 07:00→07:30 unpaid trip, then 6h work + 2h return (span 07:00→15:30).
+    const job = day("15:30", 120, { arrivee: "07:30" });
+    const e = calculatePayrollEntries([job], { returnWithBenefitsTo8h: true, firstTripUnpaid: true }).get("j1");
+    expect(e.regularWorkMinutes).toBe(480); // 6h work + 2h return with benefits
+    expect(e.returnNoBenefitMinutes).toBe(0);
+    expect(e.totalPaidMinutes).toBe(480);
   });
 });
+
 
 describe("isMealEligible (supper: >8h + 2h15 = 615 min, weekday only)", () => {
   it("614 min → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 614 })).toBe(false));

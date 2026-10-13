@@ -17,14 +17,14 @@ Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · �
 
 ## Étape 1 — Tes décisions 👤
 
-La convention collective a été lue le 13 octobre. Elle tranche certains points, mais six choix restent
+La convention collective a été lue le 13 octobre. Elle tranche certains points, mais quelques choix restent
 à faire. Pour chacun, l'article de la convention est indiqué.
 
-- [ ] **Temps de retour à l'entrepôt.** Selon la convention (art. 23.04 et 23.15), un trajet demandé par
-  l'employeur après la journée est du « temps de transport ». Il est payé au taux simple, sans avantages
-  sociaux ni 13 %, et ne crée donc pas de temps sup. Aujourd'hui, l'app ne fait ça que pour les employés
-  qui ont l'option « retour sans avantages ». Faut-il l'appliquer à tout le monde ? Si le retour est du
-  vrai travail (décharger, ranger le camion), il reste du temps travaillé.
+- [x] **Temps de retour à l'entrepôt.** Réglé le 13 octobre. Le retour n'est jamais du temps sup.
+  Par défaut, il est payé au taux simple, sans avantages sociaux. Si la case « Temps de retour avec
+  avantages sociaux jusqu'à 8h » est cochée dans **Règles de temps**, il garde ses avantages tant que la
+  journée ne dépasse pas 8 h. Au départ, la case n'est cochée pour personne : à toi de la cocher pour
+  les employés concernés.
 - [ ] **Prime de chef d'équipe en temps sup.** Selon la convention (art. 22.01), la prime de chef d'équipe
   est **aussi majorée** en heures sup. (1,5× ou 2×). L'app la paie seulement sur les heures normales.
   Regarde un talon de chef d'équipe avec du temps sup. : la prime y est-elle majorée ?

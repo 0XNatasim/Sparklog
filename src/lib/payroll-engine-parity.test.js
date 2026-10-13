@@ -20,7 +20,7 @@ const fixtures = [
 describe("engine parity: app copy === Edge Function copy", () => {
   it("ENGINE_VERSION matches", () => {
     expect(app.ENGINE_VERSION).toBe(shared.ENGINE_VERSION);
-    expect(app.ENGINE_VERSION).toBe("2.1.0");
+    expect(app.ENGINE_VERSION).toBe("2.2.0");
     expect(app.computeWeek).toBe(shared.computeWeek);
     expect(app.calculatePayrollEntries).toBe(shared.calculatePayrollEntries);
   });
@@ -32,11 +32,11 @@ describe("engine parity: app copy === Edge Function copy", () => {
   });
 
   it.each([
-    { firstOtHourDouble: false, returnOtNoBenefits: false, messierMethod: false },
-    { firstOtHourDouble: true, returnOtNoBenefits: false, messierMethod: false },
-    { firstOtHourDouble: false, returnOtNoBenefits: true, messierMethod: false },
-    { firstOtHourDouble: false, returnOtNoBenefits: true, messierMethod: true },
-    { firstOtHourDouble: false, returnOtNoBenefits: true, messierMethod: false, firstTripUnpaid: true },
+    { firstOtHourDouble: false, returnWithBenefitsTo8h: false, messierMethod: false },
+    { firstOtHourDouble: true, returnWithBenefitsTo8h: false, messierMethod: false },
+    { firstOtHourDouble: false, returnWithBenefitsTo8h: true, messierMethod: false },
+    { firstOtHourDouble: false, returnWithBenefitsTo8h: false, messierMethod: true },
+    { firstOtHourDouble: false, returnWithBenefitsTo8h: true, messierMethod: false, firstTripUnpaid: true },
   ])("produces the same versioned result for policy options %o", (options) => {
     for (const jobs of fixtures) {
       expect(strip(app.computeWeek(jobs, options))).toEqual(strip(shared.computeWeek(jobs, options)));
@@ -44,16 +44,17 @@ describe("engine parity: app copy === Edge Function copy", () => {
   });
 
   it("keeps employee-type policy mapping identical at the server boundary", () => {
-    expect(app.overtimeOptionsFromProfile({ role: "subcontractor_1" })).toEqual({
+    // Subcontractors: return never keeps benefits, even if the stored flag is on.
+    expect(app.overtimeOptionsFromProfile({ role: "subcontractor_1", return_with_benefits_to_8h: true })).toEqual({
       firstOtHourDouble: true,
-      returnOtNoBenefits: true,
+      returnWithBenefitsTo8h: false,
       firstTripUnpaid: false,
     });
     expect(app.overtimeOptionsFromProfile({
       role: "employee",
       overtime_first_hour_double: false,
-      return_overtime_no_benefits: true,
-    })).toEqual({ firstOtHourDouble: false, returnOtNoBenefits: true, firstTripUnpaid: false });
+      return_with_benefits_to_8h: true,
+    })).toEqual({ firstOtHourDouble: false, returnWithBenefitsTo8h: true, firstTripUnpaid: false });
   });
 });
 

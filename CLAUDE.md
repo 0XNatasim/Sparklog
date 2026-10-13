@@ -345,10 +345,11 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 
 ### 6.2 Écarts code ↔ convention / documentation à trancher (aucune règle modifiée)
 - [x] **Prélèvement CCQ 0,75 % vs 1,5 %** : tranché, 1,5 % = 0,75 % salarié + 0,75 % employeur.
-- [ ] **Retour à l'entrepôt — la convention penche pour l'option « retour sans avantages »** : 23.04 2) a)
-  et 23.15 paient le trajet demandé après la journée en « temps de transport », au taux non majoré, sans
-  avantages ni 13 % (donc sans temps sup.). Le moteur ne le fait que pour les employés qui ont l'option.
-  Si le retour est du vrai travail à l'atelier (décharger, ranger), c'est du temps travaillé.
+- [x] **Retour à l'entrepôt** — tranché le 2026-10-13, codé en V2.4.101 (moteur 2.2.0, migration 0081) :
+  jamais de temps sup. ; par défaut sans avantages ; case `return_with_benefits_to_8h` (bonus Messier) =
+  avec avantages jusqu'à 8 h. Repas et preuve > 8 h comptent toujours le retour. Détail :
+  `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
+  (à supprimer dans une migration ultérieure).
 - [ ] **Prime de chef d'équipe en temps sup.** : 22.01 exclut les primes de 22.03 de la règle « majoration
   avant prime » → la prime de chef est **majorée** en heures sup. Le moteur (`earnings.js`) la paie
   seulement sur les heures normales. À confirmer contre un talon puis corriger.

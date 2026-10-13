@@ -271,7 +271,7 @@ export default function PayrollEngineTester({ messier = false }) {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
         .order("full_name", { ascending: true });
       // Subcontractors record time but are never part of the company's DAS payroll run.
       if (!cancelled) setEmployees((data || []).filter((employee) => !isSubcontractorRole(employee.role)));

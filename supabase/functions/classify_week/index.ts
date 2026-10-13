@@ -69,7 +69,7 @@ serve(async (req) => {
     // Per-employee overtime policy: some employers pay the first overtime hour at
     // double time (no 1.5x tier). Read the target employee's flag for the split.
     const { data: targetProfile } = await admin
-      .from("profiles").select("role, overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid").eq("id", employeeId).maybeSingle();
+      .from("profiles").select("role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").eq("id", employeeId).maybeSingle();
     const result = computeWeek(jobs || [], overtimeOptionsFromProfile(targetProfile));
     return json({
       ok: true,
