@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { dailyOvertimeEvidenceRequirement } from "./job-submission";
-import { dayFirstTripUnpaidMinutes, isMealEligible } from "./payroll-calculations";
+import { dayFirstTripUnpaidMinutes, isMealEligible, MEAL_AFTER_DAILY_WORK_MINUTES } from "./payroll-calculations";
+import { mealDecision } from "./meal-eligibility";
 
-// Current body of reconcile_overtime_meal (0082); its re-check trigger is still the 0077 one.
+// Current body of reconcile_overtime_meal (0086); its re-check trigger is still the 0077 one.
 const sql = readFileSync(fileURLToPath(new URL(
-  "../../supabase/migrations/20261013150000_0082_meal_after_10h_and_premium_overtime.sql",
+  "../../supabase/migrations/20261013230000_0086_supper_after_2h15_overtime.sql",
   import.meta.url
 )), "utf8");
 const triggerSql = readFileSync(fileURLToPath(new URL(
@@ -14,59 +14,63 @@ const triggerSql = readFileSync(fileURLToPath(new URL(
   import.meta.url
 )), "utf8");
 
-// Wednesday. Jobs: 06:00-09:00 (arrival 06:30 => 30 min unpaid trip), 09:00-13:00, 13:00-fin.
-const day = [
-  { id: "a", job_date: "2026-10-07", depart: "06:00", arrivee: "06:30", fin: "09:00", status: "saved" },
-  { id: "b", job_date: "2026-10-07", depart: "09:00", arrivee: "09:10", fin: "13:00", status: "saved" },
-];
-const last = (fin) => ({ id: "c", job_date: "2026-10-07", depart: "13:00", arrivee: "13:20", fin, status: "saved" });
-const paid = (fin, firstTripUnpaid) => dailyOvertimeEvidenceRequirement(last(fin), day, { firstTripUnpaid }).totalMinutes;
-const eligible = (fin, firstTripUnpaid) => isMealEligible({ jobDate: "2026-10-07", dailyWorkMinutes: paid(fin, firstTripUnpaid) });
+// Tuesday 2026-10-06.
+const job = (id, depart, fin, extra = {}) => ({ id, job_date: "2026-10-06", depart, arrivee: depart, fin, return_time_minutes: 0, ...extra });
+const decide = (jobs, profile = {}) => mealDecision(jobs, "2026-10-06", profile);
 
-describe("supper eligibility on paid time", () => {
-  it("is unchanged without the option: 630 min gross is eligible", () => {
-    expect(paid("16:30", false)).toBe(630);
-    expect(eligible("16:30", false)).toBe(true);
+describe("supper: 2 h 15 of overtime (1.5× or 2×) = 10 h 15 of work, return excluded (owner decision 2026-10-13)", () => {
+  it("is 615 minutes of work", () => expect(MEAL_AFTER_DAILY_WORK_MINUTES).toBe(615));
+
+  it("10 h 15 of work → eligible, whatever the overtime rate", () => {
+    expect(decide([job("a", "06:00", "16:15")])).toEqual({ dailyWorkMinutes: 615, eligible: true });
   });
 
-  it("with the option the 30-minute first trip no longer counts: exactly 600 min (10 h), not eligible", () => {
-    expect(paid("16:30", true)).toBe(600);
-    expect(eligible("16:30", true)).toBe(false);
+  it("10 h 14 → not eligible", () => {
+    expect(decide([job("a", "06:00", "16:14")]).eligible).toBe(false);
   });
 
-  it("is eligible as soon as paid time goes past 10 h (601 min), not at 10 h", () => {
-    expect(paid("16:31", true)).toBe(601);
-    expect(eligible("16:31", true)).toBe(true);
-    expect(eligible("16:35", true)).toBe(true);
+  it("adds up every job of the day", () => {
+    expect(decide([job("a", "06:00", "12:00"), job("b", "12:00", "16:15")]).eligible).toBe(true);
   });
 
-  it("never applies on a weekend whatever the paid time", () => {
+  it("return time never counts: 11 h 30 span with 1 h 30 of return is 10 h of work", () => {
+    const r = decide([job("a", "06:00", "17:30", { return_time_minutes: 90 })]);
+    expect(r.dailyWorkMinutes).toBe(600);
+    expect(r.eligible).toBe(false);
+  });
+
+  it("the unpaid first trip is not work either", () => {
+    const day = [{ id: "a", job_date: "2026-10-06", depart: "06:00", arrivee: "06:30", fin: "16:15", return_time_minutes: 0 }];
+    expect(decide(day).eligible).toBe(true);
+    expect(decide(day, { first_trip_unpaid: true })).toEqual({ dailyWorkMinutes: 585, eligible: false });
+    expect(dayFirstTripUnpaidMinutes(day)).toBe(30);
+  });
+
+  it("never applies on a weekend", () => {
     expect(isMealEligible({ jobDate: "2026-10-10", dailyWorkMinutes: 900 })).toBe(false);
-  });
-
-  it("uses the same unpaid trip as the overtime proof and the payroll", () => {
-    expect(dayFirstTripUnpaidMinutes([...day, last("16:30")])).toBe(30);
+    expect(isMealEligible({ jobDate: "2026-10-11", dailyWorkMinutes: 900 })).toBe(false);
   });
 });
 
-describe("migrations 0077/0082 database contract", () => {
-  it("deducts the unpaid first trip before the past-10-h test", () => {
+describe("migration 0086 database contract", () => {
+  it("excludes return time and uses the same 615-minute threshold", () => {
+    expect(sql).toContain("least(greatest(coalesce(s.return_time_minutes, 0), 0), s.span)");
+    expect(sql).toContain("(daily_work_minutes - coalesce(unpaid_trip_minutes, 0)) >= 615");
     expect(sql).toContain("p.first_trip_unpaid");
-    expect(sql).toContain("(daily_minutes - coalesce(unpaid_trip_minutes, 0)) > 600");
   });
 
-  it("dates the rule change in payroll_rules (SUPPER v1 ends, v2 starts)", () => {
-    expect(sql).toContain("set effective_to = date '2026-10-12'");
-    expect(sql).toContain('"min_daily_worked_minutes":601');
+  it("dates the rule change in payroll_rules (v2 emptied, v3 starts)", () => {
+    expect(sql).toContain("set effective_to = date '2026-10-13'");
+    expect(sql).toContain('"min_daily_work_minutes":615');
+    expect(sql).toContain('"return_time_counts":false');
   });
 
-  it("mirrors the engine ordering and clamp", () => {
+  it("mirrors the engine ordering and clamp for the first trip", () => {
     expect(sql).toContain('order by coalesce(left(j.depart::text, 5), \'\') collate "C", j.id::text collate "C"');
     expect(sql).toContain("d.depart is null or d.arrivee is null or d.fin is null then 0");
-    expect(sql).toContain("least(");
   });
 
-  it("re-checks when the first job's Arrivée changes and still only deletes unreviewed claims", () => {
+  it("re-checks on time or return changes and still only deletes unreviewed claims", () => {
     expect(triggerSql).toContain("after update of depart, arrivee, fin, return_time_minutes on public.jobs");
     expect(sql).toContain("m.reviewed_by is null");
     expect(sql).not.toContain("overtime_evidence");

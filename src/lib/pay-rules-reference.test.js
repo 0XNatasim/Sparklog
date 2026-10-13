@@ -15,7 +15,8 @@ describe("pay rules reference sheet", () => {
 
   it("reads the values from the calculation code", () => {
     const rows = Object.fromEntries(payRulesReference("fr").flatMap((g) => g.rows).map((r) => [r.id, r]));
-    expect(rows.meal.value).toContain("10 h");
+    expect(rows.meal.value).toContain("2 h 15");
+    expect(rows.meal.value).toContain("10 h 15");
     expect(rows["employer-benefits"].value).toContain("7,955");
     expect(rows["employer-benefits"].value).toContain("8,875");
     expect(rows.medic.value).toContain("0,68");

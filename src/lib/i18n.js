@@ -1438,7 +1438,7 @@ export const dictionaries = {
     "form.deadline.holiday": "Entries are blocked for this company holiday: {name}.",
     "form.deadline.backToJobCard": "Back to job card",
     "form.meal.title": "$30 supper added",
-    "form.meal.description": "Your day went past 10 h. A $30 supper has been automatically added to today’s payroll.",
+    "form.meal.description": "You worked at least 10 h 15 today (return time not counted). A $30 supper has been automatically added to today’s payroll.",
     "form.meal.failed": "The automatic $30 supper could not be added. Please contact your manager.",
     "form.evidence.invalid": "This screenshot does not clearly contain an overtime approval and a duration. Crop the approval message and duration reply, then try again.",
 
@@ -3026,7 +3026,7 @@ export const dictionaries = {
     "form.deadline.holiday": "Les entrées sont bloquées pour ce jour férié de l’entreprise : {name}.",
     "form.deadline.backToJobCard": "Retour à la fiche de travail",
     "form.meal.title": "Souper de 30 $ ajouté",
-    "form.meal.description": "Votre journée a dépassé 10 h. Un souper de 30 $ a été ajouté automatiquement à la paie d’aujourd’hui.",
+    "form.meal.description": "Vous avez travaillé au moins 10 h 15 aujourd’hui (sans le temps de retour). Un souper de 30 $ a été ajouté automatiquement à la paie d’aujourd’hui.",
     "form.meal.failed": "Le souper automatique de 30 $ n’a pas pu être ajouté. Communiquez avec votre gestionnaire.",
     "form.evidence.invalid": "Cette capture ne contient pas clairement une approbation de temps supplémentaire et une durée. Cadrez le message d’approbation et la réponse avec la durée, puis réessayez.",
 

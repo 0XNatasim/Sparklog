@@ -249,15 +249,27 @@ export function calculateDailyTotals(jobs, options) {
   return days;
 }
 
-// Supper (30 $): a weekday whose paid time goes PAST 10 h (owner decision 2026-10-13;
-// convention ICI 20.07 3) c) i.: overtime « consécutives à une journée de dix heures »).
-// `dailyWorkMinutes` is the day's PAID work: for an employee with the "first trip unpaid"
-// option, pass the span minus dayFirstTripUnpaidMinutes (the database twin is
-// reconcile_overtime_meal, migration 0082).
-export const MEAL_AFTER_DAILY_MINUTES = 600;
+// Supper (30 $), owner decision 2026-10-13 (revised the same day): due on a weekday once
+// the day has 2 h 15 of overtime (at 1.5× or 2×, both count), i.e. at least 10 h 15 of paid
+// WORK. Return-to-warehouse time never counts (it is never overtime). `dailyWorkMinutes` is
+// the day's paid work WITHOUT return (see dayWorkMinutesWithoutReturn); the database twin is
+// reconcile_overtime_meal (migration 0086).
+export const MEAL_OVERTIME_MINUTES = 135;
+export const MEAL_AFTER_DAILY_WORK_MINUTES = 480 + MEAL_OVERTIME_MINUTES;
 export function isMealEligible({ jobDate, dailyWorkMinutes }) {
   const weekday = dayOfWeek(jobDate);
-  return weekday !== null && weekday !== 0 && weekday !== 6 && dailyWorkMinutes > MEAL_AFTER_DAILY_MINUTES;
+  return weekday !== null && weekday !== 0 && weekday !== 6 && (Number(dailyWorkMinutes) || 0) >= MEAL_AFTER_DAILY_WORK_MINUTES;
+}
+
+// The day's paid work without return time: each job's Départ→Fin span minus its return
+// minutes, minus the unpaid first trip for an employee with that option.
+export function dayWorkMinutesWithoutReturn(dayJobs, { firstTripUnpaid = false } = {}) {
+  const jobs = dayJobs || [];
+  const work = jobs.reduce((total, job) => {
+    const span = minutesBetween(job.depart, job.fin);
+    return total + span - jobReturnMinutes(job, span);
+  }, 0);
+  return Math.max(0, work - (firstTripUnpaid ? dayFirstTripUnpaidMinutes(jobs) : 0));
 }
 
 export function roundHours(minutes) {

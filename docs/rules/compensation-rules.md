@@ -22,7 +22,7 @@ Sources, filed in `docs/reference/`:
 |---|---|---|
 | 8 h/day, 40 h/week, Mon–Fri | CC 20.02 1), 2) | ✅ confirmed |
 | First OT hour of the **week** at 1.5×, then 2× | CC 21.02 a) | ✅ confirmed |
-| Meal 30 $ for an electrician, past 10 h | CC 20.07 3) c) i.: OT « consécutives à une journée de dix heures » | ✅ since V2.4.102 (> 600 paid min, migration 0082); 2nd meal « après quatre autres heures » not coded |
+| Meal 30 $ for an electrician | CC 20.07 3) c) i.: OT « consécutives à une journée de dix heures » | Messier rule since V2.4.110: 2 h 15 of overtime (1.5× or 2×) = ≥ 10 h 15 of work, return excluded (migration 0086); 2nd meal « après quatre autres heures » not coded |
 | Team-leader premium 8 % (4,06 $ = 8 % × 50,79) | CC 22.03 1); 22.01: OT majoration applies to 22.03 premiums | ✅ rate; per-employee option `team_leader_premium_overtime` (V2.4.102) pays it majorée on OT; off = regular hours only (Messier stubs) |
 | 13 % indemnity (6 + 5,5 + 1,5), base includes OT | CC 19.05 1) | ✅ confirmed |
 | Wages 50,79 / 25,40 / 30,47 / 35,55 / 43,17 | CC annexe C, ACQ (1) | ✅ confirmed |
@@ -70,8 +70,8 @@ Sources, filed in `docs/reference/`:
   day's work + return stays within 8h; the part beyond 8h is paid without benefits.
 - Work always takes the 8h first, whatever the job order. An unpaid first trip is removed
   before the 8h room is measured. Subcontractors: always the default.
-- The meal (10h15) and >8h overtime-proof thresholds still count return time (owner
-  decision 2026-10-13).
+- The >8h overtime-proof threshold still counts return time; the supper never does (owner
+  decisions 2026-10-13, see SUPPER).
 - Examples: 6h30 job + 1h return → default 6h30 regular + 1h without benefits; checked
   7h30 regular. 6h30 job + 2h return → checked 8h regular + 0h30 without benefits.
   9h job + 1h return → 8h regular + 1h overtime + 1h return without benefits.
@@ -79,10 +79,14 @@ Sources, filed in `docs/reference/`:
   `src/lib/payroll-calculations.test.js`.
 
 ## SUPPER — meal eligibility
-- Eligible when a weekday's paid time goes **past 10 h (> 600 min)** — owner decision
-  2026-10-13, convention 20.07 3) c) i. (was ≥ 615 min / 10h15 until 2026-10-12;
-  `payroll_rules` SUPPER v1 → v2, migration 0082). Twins: `isMealEligible` and
-  `reconcile_overtime_meal`.
+- Eligible on a weekday once the day has **2 h 15 of overtime — at 1.5× or 2×, both are work
+  time** — i.e. **at least 10 h 15 (615 min) of paid work**. **Return-to-warehouse time never
+  counts.** Owner decision 2026-10-13 (revised the same day; `payroll_rules` SUPPER v3,
+  migration 0086). The unpaid first trip (option) is not work either.
+- History: v1 ≥ 615 paid min until 2026-10-12; v2 > 600 paid min with return included,
+  replaced the same day (empty range kept for the record).
+- Twins: `isMealEligible` / `dayWorkMinutesWithoutReturn` (engine, used through
+  `src/lib/meal-eligibility.js`) and `reconcile_overtime_meal` (same 615-minute test).
 - Weekdays only; no weekend work.
 
 ## HOLIDAY — statutory holidays & construction vacation

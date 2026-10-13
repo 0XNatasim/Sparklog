@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.109)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.110)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -334,15 +334,17 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Prélèvement CCQ 0,75 % vs 1,5 %** : tranché, 1,5 % = 0,75 % salarié + 0,75 % employeur.
 - [x] **Retour à l'entrepôt** — tranché le 2026-10-13, codé en V2.4.101 (moteur 2.2.0, migration 0081) :
   jamais de temps sup. ; par défaut sans avantages ; case `return_with_benefits_to_8h` (bonus Messier) =
-  avec avantages jusqu'à 8 h. Repas et preuve > 8 h comptent toujours le retour. Détail :
+  avec avantages jusqu'à 8 h. La preuve > 8 h compte le retour ; le souper ne le compte jamais (V2.4.110). Détail :
   `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
   (à supprimer dans une migration ultérieure).
 - [x] **Prime de chef d'équipe en temps sup.** — option par employé `team_leader_premium_overtime`
   (V2.4.102, migration 0082, décochée par défaut) : prime majorée ×1,5 / ×2 sur les heures sup.
   (`printedPayLines`, talon, coûts). Décochée = heures normales seulement, comme les talons Messier.
-- [x] **Repas** — dès que la journée payée dépasse **10 h** (> 600 min), V2.4.102, migration 0082
-  (`isMealEligible`, `reconcile_overtime_meal`, `payroll_rules` SUPPER v2). Le 2e repas « après quatre
-  autres heures supplémentaires » (20.07) n'est pas codé.
+- [x] **Repas** — révisé le 2026-10-13 (V2.4.110, migration 0086, SUPPER v3) : souper dû dès **2 h 15 de temps
+  sup. (1,5× ou 2×, les deux comptent)**, soit **10 h 15 de travail** dans la journée, **temps de retour jamais
+  compté** (premier trajet non payé exclu aussi). `isMealEligible` / `dayWorkMinutesWithoutReturn` (moteur) et
+  `reconcile_overtime_meal` appliquent le même seuil de 615 min. Le 2e repas « après quatre autres heures
+  supplémentaires » (20.07) n'est pas codé.
 - [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
   2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.
 - [x] **Samedi, dimanche, fériés** — moteur 2.3.0 (V2.4.102) : samedi tout en temps sup. (heure à 1,5× de la

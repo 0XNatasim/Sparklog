@@ -17,7 +17,7 @@ import { isAdminEmployee, isManagerRole } from "@/lib/roles";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { refreshSessionOnce, withRetry, withTimeout } from "@/lib/utils";
-import { isMealEligible } from "@/lib/payroll-calculations";
+import { mealDecision } from "@/lib/meal-eligibility";
 import { buildJobSaveRpcArgs, buildJobSaveWithEvidenceRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
@@ -936,7 +936,21 @@ export default function EmployeeForm() {
   async function shouldRequestMealClaim(jobId) {
     // Meal (supper) claims are a CCQ field-crew benefit; office staff are non-CCQ.
     if (officeEmployee) return false;
-    if (!isMealEligible({ jobDate: job_date, dailyWorkMinutes: overtimeDailyMinutes })) return false;
+    // Supper: 2 h 15 of overtime (1.5× or 2×) = at least 10 h 15 of paid work that day, return
+    // time never counted. Decided from the employee's saved jobs of the day (this one included).
+    const [{ data: dayJobs, error: dayError }, { data: policy, error: policyError }] = await Promise.all([
+      withTimeout(
+        supabase.from("jobs").select("id, job_date, depart, arrivee, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
+        10000
+      ),
+      withTimeout(
+        supabase.from("profiles").select("first_trip_unpaid").eq("id", user.id).maybeSingle(),
+        10000
+      ),
+    ]);
+    if (dayError) throw dayError;
+    if (policyError) throw policyError;
+    if (!mealDecision(dayJobs || [], job_date, policy).eligible) return false;
     const { data, error } = await withTimeout(
       supabase.from("meal_claims").select("id").eq("user_id", user.id).eq("job_date", job_date).limit(1),
       10000
