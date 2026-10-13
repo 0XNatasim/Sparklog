@@ -14,6 +14,7 @@ const submissionMigration = migration("20260927025008_0060_atomic_idempotent_job
 const transitionMigration = migration("20260927025045_0061_manager_state_transition_rpcs.sql");
 const timezoneMigration = migration("20260927025233_0063_montreal_timezone_and_dst.sql");
 const privilegeMigration = migration("20260910220157_0032_owner_role_replaces_hardcoded_privileged.sql");
+const snapshotMigration = migration("20261013220000_0085_rate_snapshot_only_at_submission.sql");
 const vaultMigration = migration("20261013200000_0084_nas_server_export_and_atomic_overtime_evidence.sql");
 
 describe("application authorization matrix", () => {
@@ -141,5 +142,10 @@ describe("database authorization contract", () => {
     expect(vaultMigration).toContain("coalesce(p_overtime_evidence_captured, false) and day_has_evidence");
     expect(vaultMigration).toContain("'evidence_file_missing'");
     expect(vaultMigration).toContain("'invalid_evidence_path'");
+  });
+
+  it("stamps the rate snapshot only at submission, never on an export rollback (0085)", () => {
+    expect(snapshotMigration).toContain("tg_op = 'INSERT' or coalesce(old.status, 'saved') in ('saved', 'updated')");
+    expect(snapshotMigration).not.toMatch(/if new\.status = 'submitted'\s*\n\s*or/);
   });
 });
