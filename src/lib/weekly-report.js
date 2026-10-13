@@ -1,6 +1,6 @@
 // Printable weekly summary (Rapports › Période › Vue semaine › Imprimer): every employee's
 // jobs for one CCQ week (OT number, time, km), the week recap per employee, the employee pay,
-// the employer cost and the DAS, plus a per-OT recap and the week totals.
+// the employer cost and the DAS, plus the week totals.
 //
 // The pay, employer and DAS figures come from computeEmployeeWeekTalon — the same calculation
 // as Talons and DAS — so the printed week agrees with those screens. ⚠️ Draft rule set: every
@@ -177,22 +177,6 @@ export function buildWeeklyReport({
     });
   }
 
-  const otMap = new Map();
-  for (const emp of employees) {
-    for (const row of emp.jobs) {
-      const key = row.ot || "";
-      if (!otMap.has(key)) otMap.set(key, { ot: key, jobs: 0, employees: new Set(), paidMinutes: 0, km: 0 });
-      const o = otMap.get(key);
-      o.jobs += 1;
-      o.employees.add(emp.id);
-      o.paidMinutes += row.paidMinutes;
-      o.km += row.km;
-    }
-  }
-  const otSummary = [...otMap.values()]
-    .map((o) => ({ ...o, employees: o.employees.size }))
-    .sort((a, b) => (a.ot === "" ? 1 : b.ot === "" ? -1 : a.ot.localeCompare(b.ot, "fr", { numeric: true })));
-
   const paid = employees.filter((e) => e.pay);
   const totals = {
     employees: employees.length,
@@ -212,7 +196,7 @@ export function buildWeeklyReport({
   };
   const reviewReasons = [...new Set(paid.flatMap((e) => e.pay.reviewReasons))];
 
-  return { week, employees, otSummary, totals, reviewReasons };
+  return { week, employees, totals, reviewReasons };
 }
 
 // ── Printable HTML ───────────────────────────────────────────────────────────
@@ -369,7 +353,7 @@ const REPORT_STYLES = `
 `;
 
 export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {}) {
-  const { week, employees, otSummary, totals, reviewReasons } = report;
+  const { week, employees, totals, reviewReasons } = report;
   const title = `Sommaire de la semaine ${week.weekNo ?? ""} — ${week.start} au ${week.end}`;
   const stat = (label, value) => `<div class="stat"><div class="l">${esc(label)}</div><div class="v">${esc(value)}</div></div>`;
 
@@ -386,15 +370,6 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td class="num">${e.pay ? fmtMoney(e.pay.das.arc) : "—"}</td>
       <td class="num">${e.pay ? fmtMoney(e.pay.das.quebec) : "—"}</td>
       <td class="num">${e.pay ? fmtMoney(e.pay.employer.total) : "—"}</td>
-    </tr>`).join("");
-
-  const otRows = otSummary.map((o) => `
-    <tr>
-      <td class="ot">${esc(o.ot || "(sans n° OT)")}</td>
-      <td class="num">${o.jobs}</td>
-      <td class="num">${o.employees}</td>
-      <td class="num">${fmtHM(o.paidMinutes)}</td>
-      <td class="num">${fmtKm(o.km)}</td>
     </tr>`).join("");
 
   const warnings = [
@@ -446,12 +421,6 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td class="num">${fmtMoney(totals.dasQuebec)}</td>
       <td class="num">${fmtMoney(totals.employerCost)}</td>
     </tr></tfoot>
-  </table>
-
-  <h3>Sommaire par n° OT</h3>
-  <table>
-    <thead><tr><th>N° OT</th><th class="num">Jobs</th><th class="num">Employés</th><th class="num">Temps total</th><th class="num">km</th></tr></thead>
-    <tbody>${otRows}</tbody>
   </table>
 
   <div class="page-break"></div>

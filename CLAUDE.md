@@ -374,7 +374,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   l'API Auth que pour un profil sans courriel (vérifié : 32/32 identiques à auth.users). Fonction à redéployer.
 - [x] **Sommaire hebdomadaire imprimable** (V2.4.112) : Rapports › Semaine/mois › Vue semaine › « Imprimer le
   sommaire de la semaine ». `src/lib/weekly-report.js` (`buildWeeklyReport` / `buildWeeklyReportHtml`) : chaque job
-  (n° OT, heures rég./1,5×/2×/retour s.a., km, statut), sommaire par employé et par n° OT, paie, coût employeur et DAS
+  (n° OT, heures rég./1,5×/2×/retour s.a., km, statut), sommaire par employé, paie, coût employeur et DAS
   via `computeEmployeeWeekTalon` (mêmes chiffres que Talons/DAS) ; les cotisations par heure de
   `employer_contributions` déjà calculées par le moteur (RRQ, AE, RQAP, FSS, CNESST, avantages sociaux, équipement)
   ne sont pas recomptées. Jobs soumises/modifiées imprimées mais signalées non approuvées ; rôles hors CCQ sans paie

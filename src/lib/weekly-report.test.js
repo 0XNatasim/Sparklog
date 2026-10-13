@@ -49,13 +49,6 @@ describe("buildWeeklyReport", () => {
     expect(a.hours.km).toBe(70);
   });
 
-  it("recaps each OT number across employees", () => {
-    const ot = new Map(report.otSummary.map((o) => [o.ot, o]));
-    expect(ot.get("1234")).toMatchObject({ jobs: 3, employees: 2, paidMinutes: 8 * 60 + 10 * 60 + 4 * 60, km: 75 });
-    expect(ot.get("")).toMatchObject({ jobs: 1, paidMinutes: 240 });
-    expect(report.otSummary.at(-1).ot).toBe(""); // jobs without an OT number come last
-  });
-
   it("uses the Talon/DAS calculation for pay and DAS", () => {
     const a = byId.get("a");
     const talon = computeEmployeeWeekTalon({
@@ -92,10 +85,10 @@ describe("buildWeeklyReport", () => {
 describe("buildWeeklyReportHtml", () => {
   const html = buildWeeklyReportHtml(report, { generatedAt: new Date("2026-10-13T12:00:00") });
 
-  it("escapes names and prints the jobs, OT recap, DAS and employer cost", () => {
+  it("escapes names and prints the jobs, DAS and employer cost, without a per-OT recap", () => {
     expect(html).toContain("Alice &lt;Test&gt;");
     expect(html).not.toContain("Alice <Test>");
-    expect(html).toContain("Sommaire par n° OT");
+    expect(html).not.toContain("Sommaire par n° OT");
     expect(html).toContain("JOB-9");
     expect(html).toContain("DAS à remettre");
     expect(html).toContain("Coût employeur");
