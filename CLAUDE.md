@@ -340,12 +340,11 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Prime de chef d'équipe en temps sup.** — option par employé `team_leader_premium_overtime`
   (V2.4.102, migration 0082, décochée par défaut) : prime majorée ×1,5 / ×2 sur les heures sup.
   (`printedPayLines`, talon, coûts). Décochée = heures normales seulement, comme les talons Messier.
-- [x] **Repas** — révisé le 2026-10-13 (V2.4.110, migration 0086, SUPPER v3) : souper dû dès **2 h 15 payées à
-  temps double (2×)** dans la journée, **temps de retour exclu** ; calculé avec la semaine (1re heure sup. à
-  1,5×) : 10 h 15 de travail la plupart des jours, 11 h 15 le jour où tombe l'heure à 1,5×.
-  `isMealEligible` / `dayDoubleTimeMinutes` (moteur), `src/lib/meal-eligibility.js` ; la base
-  (`reconcile_overtime_meal`) ne retire une demande que si la journée ne peut pas l'atteindre (< 615 min de
-  travail sans retour). Le 2e repas « après quatre autres heures supplémentaires » (20.07) n'est pas codé.
+- [x] **Repas** — révisé le 2026-10-13 (V2.4.110, migration 0086, SUPPER v3) : souper dû dès **2 h 15 de temps
+  sup. (1,5× ou 2×, les deux comptent)**, soit **10 h 15 de travail** dans la journée, **temps de retour jamais
+  compté** (premier trajet non payé exclu aussi). `isMealEligible` / `dayWorkMinutesWithoutReturn` (moteur) et
+  `reconcile_overtime_meal` appliquent le même seuil de 615 min. Le 2e repas « après quatre autres heures
+  supplémentaires » (20.07) n'est pas codé.
 - [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
   2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.
 - [x] **Samedi, dimanche, fériés** — moteur 2.3.0 (V2.4.102) : samedi tout en temps sup. (heure à 1,5× de la

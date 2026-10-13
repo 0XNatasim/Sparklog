@@ -250,26 +250,26 @@ export function calculateDailyTotals(jobs, options) {
 }
 
 // Supper (30 $), owner decision 2026-10-13 (revised the same day): due on a weekday once
-// the day has at least 2,25 h PAID AT DOUBLE TIME (2×). Return-to-warehouse time never
-// counts (it is never overtime). Double time depends on the week — its first overtime hour
-// is paid 1.5× — so classify the day with its whole payroll week (dayDoubleTimeMinutes).
-// The database twin (reconcile_overtime_meal, migration 0086) only withdraws a pending claim
-// when the day cannot reach it (work without return under 8 h + 2,25 h).
-export const MEAL_DOUBLE_TIME_MINUTES = 135;
-export function isMealEligible({ jobDate, doubleTimeMinutes }) {
+// the day has 2 h 15 of overtime (at 1.5× or 2×, both count), i.e. at least 10 h 15 of paid
+// WORK. Return-to-warehouse time never counts (it is never overtime). `dailyWorkMinutes` is
+// the day's paid work WITHOUT return (see dayWorkMinutesWithoutReturn); the database twin is
+// reconcile_overtime_meal (migration 0086).
+export const MEAL_OVERTIME_MINUTES = 135;
+export const MEAL_AFTER_DAILY_WORK_MINUTES = 480 + MEAL_OVERTIME_MINUTES;
+export function isMealEligible({ jobDate, dailyWorkMinutes }) {
   const weekday = dayOfWeek(jobDate);
-  return weekday !== null && weekday !== 0 && weekday !== 6 && (Number(doubleTimeMinutes) || 0) >= MEAL_DOUBLE_TIME_MINUTES;
+  return weekday !== null && weekday !== 0 && weekday !== 6 && (Number(dailyWorkMinutes) || 0) >= MEAL_AFTER_DAILY_WORK_MINUTES;
 }
 
-// Minutes paid at 2× on `jobDate`, classified together with the employee's other jobs of
-// the same payroll week (`weekJobs`, any order) and their overtime options.
-export function dayDoubleTimeMinutes(weekJobs, jobDate, options = {}) {
-  const date = String(jobDate || "").slice(0, 10);
-  let total = 0;
-  for (const entry of calculatePayrollEntries(weekJobs || [], options).values()) {
-    if (String(entry.job.job_date).slice(0, 10) === date) total += entry.overtime100Minutes;
-  }
-  return total;
+// The day's paid work without return time: each job's Départ→Fin span minus its return
+// minutes, minus the unpaid first trip for an employee with that option.
+export function dayWorkMinutesWithoutReturn(dayJobs, { firstTripUnpaid = false } = {}) {
+  const jobs = dayJobs || [];
+  const work = jobs.reduce((total, job) => {
+    const span = minutesBetween(job.depart, job.fin);
+    return total + span - jobReturnMinutes(job, span);
+  }, 0);
+  return Math.max(0, work - (firstTripUnpaid ? dayFirstTripUnpaidMinutes(jobs) : 0));
 }
 
 export function roundHours(minutes) {

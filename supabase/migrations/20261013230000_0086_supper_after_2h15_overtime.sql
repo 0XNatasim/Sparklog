@@ -1,16 +1,14 @@
 -- 0086: supper rule revised by the owner on 2026-10-13 (interim payroll authority).
 --
--- The 30 $ supper is due on a weekday once the day has at least 2,25 h PAID AT DOUBLE TIME
--- (2×). Return-to-warehouse time never counts: it is never overtime (0081). Because the
--- week's first overtime hour is paid 1.5×, that is 10 h 15 of work on most days and 11 h 15
--- on the day that hour falls. The app decides with the payroll engine over the whole week
--- (isMealEligible / dayDoubleTimeMinutes in supabase/functions/_shared/payroll_engine.js).
+-- The 30 $ supper is due on a weekday once the day has 2 h 15 of overtime — at 1.5× or 2×,
+-- both are work time — i.e. at least 10 h 15 (615 min) of paid WORK. Return-to-warehouse
+-- time never counts (it is never overtime, 0081). Before: > 600 paid minutes, return
+-- included (0082). Twin of isMealEligible / dayWorkMinutesWithoutReturn in
+-- supabase/functions/_shared/payroll_engine.js.
 --
--- reconcile_overtime_meal (re-run by the 0077 triggers whenever a job's times or return
--- change) does not re-implement the weekly classification: it withdraws a pending claim
--- only when the day CANNOT reach the threshold — paid work without return under
--- 8 h + 2,25 h (615 min). Body otherwise as in 0082 (first trip unpaid, weekdays only;
--- claims already reviewed are kept).
+-- reconcile_overtime_meal is re-run by the 0077 triggers whenever a job's times or return
+-- change; body otherwise as in 0082 (first trip unpaid, weekdays only, claims already
+-- reviewed are kept).
 
 create or replace function public.reconcile_overtime_meal(p_user uuid, p_date date)
 returns void
@@ -21,7 +19,7 @@ as $$
 declare
   daily_work_minutes integer := 0;
   unpaid_trip_minutes integer := 0;
-  meal_possible boolean;
+  meal_eligible boolean;
 begin
   if p_user is null or p_date is null then return; end if;
 
@@ -59,12 +57,11 @@ begin
       ) d;
   end if;
 
-  -- Double time on a weekday can only start after 8 h of work: below 8 h + 2,25 h the
-  -- supper is out of reach whatever the week.
-  meal_possible := extract(dow from p_date) not in (0, 6)
+  -- 8 h + 2 h 15 of overtime = 615 minutes of paid work, return excluded.
+  meal_eligible := extract(dow from p_date) not in (0, 6)
                    and (daily_work_minutes - coalesce(unpaid_trip_minutes, 0)) >= 615;
 
-  if not meal_possible then
+  if not meal_eligible then
     delete from public.manager_notifications n
       where n.type = 'meal_claim'
         and n.job_id in (select id from public.jobs where user_id = p_user and job_date = p_date);
@@ -91,7 +88,7 @@ select
   'SUPPER', 'Supper / meal eligibility', 'C', '220', 'standard_8h',
   date '2026-10-13', null,
   'Interim authority decision (simon1984bjeux@gmail.com), 2026-10-13 (revised); convention collective ICI 2025-2029, art. 20.07 3) c) i.',
-  '{"min_double_time_minutes":135,"return_time_counts":false,"weekdays_only":true,"weekend_worked":false}'::jsonb,
-  '[{"input":"weekday, 10 h 15 of work without return, week''s 1.5x hour already used","expected":"supper eligible (2 h 15 at 2x)"},{"input":"weekday, 10 h 15 of work without return, the week''s first overtime hour falls that day","expected":"not eligible (1 h 15 at 2x); 11 h 15 needed"},{"input":"weekday, 9 h of work + 1 h 30 of return","expected":"not eligible (return never counts)"},{"input":"weekend","expected":"not applicable - no weekend work"}]'::jsonb,
+  '{"min_overtime_minutes":135,"min_daily_work_minutes":615,"overtime_rates_counted":["1.5x","2x"],"return_time_counts":false,"weekdays_only":true,"weekend_worked":false}'::jsonb,
+  '[{"input":"weekday, 10 h 15 of work without return (2 h 15 of overtime, 1.5x or 2x)","expected":"supper eligible"},{"input":"weekday, 10 h 14 of work without return","expected":"not eligible"},{"input":"weekday, 9 h of work + 1 h 30 of return","expected":"not eligible (return never counts)"},{"input":"weekend","expected":"not applicable - no weekend work"}]'::jsonb,
   '[]'::jsonb, 3, 'approved', 'simon1984bjeux@gmail.com (interim authority)', now()
 where not exists (select 1 from public.payroll_rules where rule_code = 'SUPPER' and version = 3);
