@@ -1,81 +1,46 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.103).
-> Coche les cases au fur et à mesure.
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.104).
+> Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
 
-- ✅ **L'app fonctionne.** Les employés entrent leurs heures, les gestionnaires approuvent et exportent.
-- ✅ **Les heures sont bien classées** : 8 h par jour en régulier, la 1re heure sup. de la semaine à 1,5×,
-  le reste à 2×, le souper de 30 $, les options par employé. C'est en production et testé.
+- ✅ L'app fonctionne et les heures sont bien classées. Toutes tes décisions de paie sont dans l'app.
 - ⚠️ **Les montants en dollars de la paie** (avantages CCQ, impôts, cotisations) sont **des estimations**.
-  Ils sont affichés « à réviser » tant que les étapes 1 à 5 ci-dessous ne sont pas faites.
+  Ils restent « à réviser » tant que les étapes 1 à 4 ci-dessous ne sont pas faites.
 
-📋 Toutes les règles de paie en vigueur, avec leurs options et leurs sources, sont dans l'app :
+📋 Toutes les règles de paie en vigueur, avec leurs options et leurs sources :
 **Gestion › Avancé › Règles de paie**.
 
 Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · 💻 **Claude** (du code, sur demande)
 
 ---
 
-## Étape 1 — Tes décisions 👤
+## Étape 1 — Infos de l'employeur 👤
 
-La convention collective a été lue le 13 octobre et toutes tes décisions sont entrées dans l'app.
+À inscrire dans **Configuration › Paramètres › Paie — employeur**.
 
-- [x] **Temps de retour à l'entrepôt.** Réglé le 13 octobre. Le retour n'est jamais du temps sup.
-  Par défaut, il est payé au taux simple, sans avantages sociaux. Si la case « Temps de retour avec
-  avantages sociaux jusqu'à 8h » est cochée dans **Règles de temps**, il garde ses avantages tant que la
-  journée ne dépasse pas 8 h. Au départ, la case n'est cochée pour personne : à toi de la cocher pour
-  les employés concernés.
-- [x] **Prime de chef d'équipe en temps sup.** Nouvelle case « Prime de chef d'équipe majorée en temps
-  sup. » dans **Règles de temps**. Elle n'apparaît que pour les employés qui ont une prime.
-  - Cochée : la prime est aussi payée sur les heures sup., majorée comme le salaire (1,5× ou 2×). C'est
-    ce que prévoit la convention (art. 22.01).
-  - Décochée (par défaut) : la prime est payée sur les heures normales seulement, comme sur les talons
-    actuels de Messier.
-- [x] **Repas.** Le souper de 30 $ est dû dès que la journée payée dépasse **10 h**. Avant, il fallait
-  10 h 15. Le 2e repas que prévoit la convention, après 4 autres heures sup., n'est pas dans l'app.
-- [x] **Assurance MÉDIC.** L'app a raison de retenir **0,68 $/h**. La convention prévoyait 0,86 $ à partir
-  du 26 avril 2026. Mais la CCQ a annoncé le 20 avril 2026 que le comité des avantages sociaux (CASIC)
-  garde 0,68 $ pour l'employé (et 2,93 $ pour l'employeur) **jusqu'au 24 avril 2027**. ⚠️ À revoir
-  avant cette date : la convention prévoit 1,06 $ ensuite.
-- [x] **Samedi, dimanche, fériés.** Si quelqu'un travaille ces jours-là (par la feuille d'urgence), l'app paie
-  comme la convention : le samedi est tout en temps sup., le dimanche et les fériés sont à 2× dès la 1re heure.
-- [x] **Dîner.** Les employés l'enlèvent déjà de leurs heures. Rien à changer dans l'app.
-- [x] **Prélèvement CCQ et primes.** 0,75 % pour l'employé + 0,75 % pour l'employeur. Il y a maintenant
-  **deux primes** par employé, dans **Règles de temps › Chef d'équipe** :
-  - la **prime hors CCQ** (l'ancienne prime, comme sur les talons) : hors 13 % et hors prélèvement ;
-  - la **prime de chef d'équipe CCQ** : comprise dans le 13 % et dans le prélèvement.
-
-➡️ Quand tu as tranché, dis-le à Claude : il met le code et la documentation à jour.
-
-## Étape 2 — Documents officiels 👤 🧾
-
-Les documents publics sont reçus et rangés dans `docs/reference/` : convention collective, grille de
-l'ACQ, guide TP-1015.G et tableau CCQ. Le détail, article par article, est dans
-`docs/rules/compensation-rules.md`.
-
-- [x] **Convention collective ICI 2025-2029.** Elle confirme : 8 h par jour, la 1re heure sup. de la
-  semaine à 1,5× puis 2×, le repas de 30 $, le chef d'équipe à 8 %, le 13 %, les salaires et la retraite.
-- [x] **Cotisation patronale aux avantages sociaux** : 8,875 $/h pour le compagnon, 7,955 $/h pour les
-  apprentis. Le taux des apprentis est corrigé dans l'app (V2.4.101).
-- [x] **Normes du travail (CNT) 2026** : 0,06 %, jusqu'à 103 000 $ par employé. C'est ce que l'app utilise.
 - [ ] **Masse salariale annuelle de Messier.** La cotisation FDRCMO (1 %) ne s'applique qu'au-delà de 2 M$.
-  *Où la trouver :* ton comptable. *Où l'inscrire :* **Configuration › Paramètres › Paie — employeur**.
+  *Où la trouver :* ton comptable.
 - [ ] **Avis de cotisation CNESST de Messier** : le taux par 100 $ de masse salariale. Sans lui, ce calcul
-  reste « à réviser ». *Où le trouver :* ton dossier CNESST en ligne. *Où l'inscrire :* au même endroit.
+  reste « à réviser ». *Où le trouver :* ton dossier CNESST en ligne.
 
-## Étape 3 — Infos de chaque employé 👤
+## Étape 2 — Infos de chaque employé 👤
 
 - [ ] **Formulaires TD1 (fédéral) et TP-1015.3 (Québec)** remplis et signés par chaque employé. Ils
   donnent les crédits d'impôt personnels. *Où l'inscrire :* **Configuration › Paramètres › Paie — TD1 /
   TP-1015.3 des employés**. Inscris seulement les montants, jamais le NAS ni une copie du formulaire.
   Tant qu'un employé n'a rien, l'app prend le montant personnel de base.
+- [ ] **Cumul de l'année avant Sparklog** (salaire, RRQ, AE, RQAP, impôts déjà retenus). Sans lui, l'app
+  croit que l'année commence à zéro et ne sait pas quand arrêter les retenues à leur maximum annuel
+  (RRQ à 74 600 $ puis 85 000 $ de salaire, AE à 68 900 $, RQAP à 103 000 $). *Où l'inscrire :*
+  **Paie › Calcul**, en tapant les montants ou en important le dernier talon PDF de l'employé.
+  Ensuite, **comptabiliser chaque semaine** pour que le cumul suive.
 - [ ] **Syndicat et local** de chaque employé (par ex. FIPOE, local 568…).
 - [ ] **Niveau** (compagnon ou apprenti, et quelle période) et **taux horaire**, vérifiés sur la carte ou
   le certificat CCQ. La liste de contrôle à remplir est à la fin du `README.md`.
 
-## Étape 4 — Valider avec de vrais talons de paie 👤 🧾
+## Étape 3 — Valider avec de vrais talons de paie 👤 🧾
 
 - [ ] Fournir **3 à 5 vrais talons** de paie récents :
   - un apprenti ;
@@ -87,14 +52,14 @@ l'ACQ, guide TP-1015.G et tableau CCQ. Le détail, article par article, est dans
 
 Aujourd'hui, un seul talon a été vérifié (un compagnon).
 
-## Étape 5 — Faire approuver 🧾
+## Étape 4 — Faire approuver 🧾
 
 - [ ] Un **spécialiste de la paie ou de la CCQ, nommé** (comptable ou firme de paie), relit les règles et
   les résultats et donne son accord par écrit.
 - [ ] Ensuite seulement, Claude fait passer le moteur de paie de « brouillon » à « validé ». Les
   montants ne sont plus marqués « à réviser ».
 
-## Étape 6 — Améliorations techniques, sans document 💻
+## Étape 5 — Améliorations techniques, sans document 💻
 
 Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
@@ -114,12 +79,17 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
   et corriger environ 60 avertissements du vérificateur de code. Il faudra d'abord ajouter des tests
   d'écran.
 
+## À surveiller 👤
+
+- [ ] **Assurance MÉDIC** : 0,68 $/h jusqu'au **24 avril 2027** (décision du CASIC). Avant cette date,
+  vérifier le nouveau taux (la convention prévoit 1,06 $) et le dire à Claude.
+
 ## Comment demander à Claude
 
 Une phrase suffit, par exemple :
-- « J'ai la convention collective, voici l'article sur le temps sup. »
-- « Le retour à l'entrepôt doit toujours être au taux simple, applique-le. »
-- « Fais l'étape 6, le point sur l'export des NAS. »
+- « Voici 3 talons de paie, compare-les avec l'app. »
+- « Ajoute une prime de soir de 2 $/h pour tel employé. »
+- « Fais l'étape 5, le point sur l'export des NAS. »
 
 Claude crée une PR. Toi, tu vérifies l'aperçu Vercel, puis tu fusionnes.
 
