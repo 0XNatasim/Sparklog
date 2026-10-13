@@ -122,8 +122,7 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 
 | ID | Finding | Anchor | Fix |
 |----|---------|--------|-----|
-| P-5 | Costing does full client-side joins/aggregation (now status-scoped, still client-side) | `CostingDashboard.jsx` | server aggregation endpoint |
-| P-11 | Batch approval calls Auth Admin `getUserById` once per employee (N+1) | `push_approved_batch/index.ts:202-207` | one bulk lookup, or avoid exporting contact data |
+| P-5 | Costing aggregates client-side with the shared payroll engine (status- and date-scoped, every page read via `fetchAllRows` since V2.4.109). A SQL aggregation would fork the payroll rules; revisit only if the payload grows (≈ 90 kB for 760 jobs) | `CostingDashboard.jsx` | optional: Edge Function running the same engine |
 
 ---
 
@@ -160,8 +159,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Employee | Zero/equal times | ✅ Rejected by `trg_validate_job_submission` | Rejected | C-5 (done) |
 | Employee | Offline Save, then reload | Durable IndexedDB draft, with stale-edit conflict prompt | Durable on-device draft | C-8 (done) |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
-| Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | AbortController / request id |
-| Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
 
 **Also tracked (lower tier):**
 - **C-8 offline drafts (done):** schema-versioned IndexedDB drafts are keyed by owner and job; edit drafts
@@ -276,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.106)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.109)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -364,11 +361,23 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   le déduit du cumul employé × taux employeur / taux employé, plafonné ; utilisé par Talons, DAS et Calcul.
   Les retenues s'arrêtent aux maximums annuels (RRQ 74 600 $ puis 85 000 $, AE 68 900 $, RQAP 103 000 $)
   à condition que le cumul d'avant Sparklog soit saisi (`payroll_ytd`) et les semaines comptabilisées.
-- [ ] P-5 agrégation des coûts côté serveur ; P-11 N+1 `getUserById`. (Faits : S-2 export NAS et S-3b
-  preuve atomique en V2.4.105, migration 0084 ; P-12 taux figé à la soumission en V2.4.106, migration 0085 —
-  une annulation d'export ou une écriture sur une fiche en attente ne recopie plus le taux actuel.)
-- [ ] Filtres gestionnaire : annuler les requêtes qui se chevauchent (AbortController / id de requête) ;
-  adaptateur API commun (401 → rafraîchir, 5xx → file d'attente).
+- [x] **Plafond de 1 000 lignes** (V2.4.109) : Supabase renvoie au plus 1 000 lignes par requête et coupe le
+  reste sans erreur. Semaine/mois (16 sem.), DAS (14 mois), Talons, Coûts, Sommaire, export CCQ, RE et le
+  registre comptabilisé lisaient tous les employés sur de longues périodes en une seule requête (≈ 760 fiches
+  en 2 semaines : dépassement imminent). `src/lib/fetch-all.js` (`fetchAllRows`) lit toutes les pages avec un
+  tri stable ; vérifié dans Chromium (2 345 fiches → 3 pages, 2 345 h au total).
+- [x] **P-11** (V2.4.109) : `push_approved_batch` lit le courriel dans `profiles` (une requête) et n'appelle
+  l'API Auth que pour un profil sans courriel (vérifié : 32/32 identiques à auth.users). Fonction à redéployer.
+- [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
+- [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
+  annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
+  pas une requête annulée. Appliqué à Feuilles de temps (liste, compteurs, anomalies, « charger plus »),
+  Journal et Journal employé. Reproduit puis corrigé dans Chromium (réponse lente d'un ancien filtre).
+- [x] Erreurs réseau / serveur (V2.4.108) : `src/lib/api-errors.js` (`classifyApiError` : auth / transient /
+  permanent / unknown). `withRetry` ne réessaie plus un refus du serveur (code SQL ou 4xx) ; 401 et pannes
+  passagères gardent rafraîchir-puis-réessayer. Fiche de temps : après une panne passagère, la fiche reste sur
+  l'appareil et est renvoyée seule (retour du réseau, ou 15 / 30 / 60 / 120 / 240 s), même clé de soumission,
+  arrêt si l'employé la modifie. Vérifié dans Chromium : coupure réseau, 503, refus (aucun réessai).
 - [ ] Lot 6 restant : découper `EmployeeForm.jsx` / `EmployeesPanel.jsx` avec des tests de composant
   (jsdom + testing-library à ajouter) ; corriger les ~63 avertissements ESLint écran par écran.
 - [ ] Optionnel : charger une seule langue de `i18n.js` (nécessite de retirer le repli anglais).

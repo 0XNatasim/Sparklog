@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
+import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 
 const PAGE_SIZE = 100;
 
@@ -37,17 +38,21 @@ export default function AuditLog() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
 
+  // Latest filter wins: switching filters aborts the previous request and ignores its answer.
+  const request = useLatestRequest();
   const load = useCallback(async () => {
+    const ticket = request.begin();
     setLoading(true);
     setError("");
     let query = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(PAGE_SIZE);
     if (filter === "nas") query = query.in("action", NAS_ACTIONS);
     else if (filter !== "all") query = query.eq("action", filter);
-    const { data, error: loadError } = await query;
-    if (loadError) setError(loadError.message);
+    const { data, error: loadError } = await query.abortSignal(ticket.signal);
+    if (!ticket.isCurrent()) return;
+    if (loadError) { if (!isAbortError(loadError)) setError(loadError.message); }
     else setRows(data || []);
     setLoading(false);
-  }, [filter]);
+  }, [filter, request]);
 
   useEffect(() => { load(); }, [load]);
 

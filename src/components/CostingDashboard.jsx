@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { ChevronRight } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
@@ -82,9 +83,9 @@ export default function CostingDashboard() {
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
         // 'saved' drafts and 'updated' un-reviewed edits). Claims: pending + approved
         // (exclude rejected — a rejected expense must not inflate the estimate).
-        supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").in("status", ["submitted", "approved"]).gte("job_date", start).lte("job_date", end),
-        supabase.from("meal_claims").select("user_id, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end),
-        supabase.from("parking_receipts").select("user_id, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end),
+        fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").in("status", ["submitted", "approved"]).gte("job_date", start).lte("job_date", end).order("id")),
+        fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end).order("id")),
+        fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end).order("id")),
         supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }),
         supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle(),
       ]);

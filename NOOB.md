@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.106).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.109).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -63,10 +63,6 @@ Aujourd'hui, un seul talon a été vérifié (un compagnon).
 
 Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
-- [ ] **Tableau des coûts** et **approbation en lot** : calculs plus rapides côté serveur.
-- [ ] **Filtres du tableau de bord** : quand on change vite de filtre, une ancienne réponse ne doit plus
-  pouvoir écraser la nouvelle.
-- [ ] **Erreurs réseau pendant l'enregistrement** : reconnexion et nouvel essai automatiques.
 - [ ] **Changement d'heure de l'automne** : permettre au gestionnaire de choisir quelle « 2 h du matin »
   a été travaillée. Aujourd'hui, l'heure répétée est refusée.
 - [ ] **Ménage du code** : découper les deux plus gros écrans (la fiche employé et la liste des employés)
@@ -83,7 +79,7 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 Une phrase suffit, par exemple :
 - « Voici 3 talons de paie, compare-les avec l'app. »
 - « Ajoute une prime de soir de 2 $/h pour tel employé. »
-- « Fais l'étape 5, le point sur les filtres du tableau de bord. »
+- « Fais l'étape 5, le point sur le changement d'heure de l'automne. »
 
 Claude crée une PR. Toi, tu vérifies l'aperçu Vercel, puis tu fusionnes.
 
