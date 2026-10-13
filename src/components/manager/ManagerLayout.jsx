@@ -4,7 +4,7 @@ import {
   BadgeDollarSign, Banknote, BarChart3, CalendarClock, CalendarDays, CalendarOff, ChevronDown, ClipboardList,
   Clock3, FilePlus2, FileText, Files, HeartPulse, History, LogOut, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen,
   Percent, Radio, Receipt, ReceiptText, RefreshCw, ScrollText, Settings, ShieldCheck, SlidersHorizontal, Sun,
-  UserCircle, Users, Wallet, X,
+  Unlock, UserCircle, Users, Wallet, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -31,6 +31,7 @@ const ICONS = {
   live: Radio,
   timesheets: Clock3,
   receipts: Receipt,
+  "unlock-day": Unlock,
   employees: Users,
   absences: CalendarOff,
   forms: ClipboardList,

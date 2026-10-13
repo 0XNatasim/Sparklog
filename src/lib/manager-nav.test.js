@@ -43,7 +43,7 @@ describe("manager navigation", () => {
     for (const id of menu) {
       expect(id).not.toMatch(/^(payroll|reports|advanced|config-settings)/);
     }
-    expect(menu).toEqual(expect.arrayContaining(["live", "timesheets", "receipts", "employees", "forms", "messages", "config-rules"]));
+    expect(menu).toEqual(expect.arrayContaining(["live", "timesheets", "receipts", "unlock-day", "employees", "forms", "messages", "config-rules"]));
     expect(menu).not.toContain("absences");
   });
 
@@ -69,7 +69,7 @@ describe("manager navigation", () => {
   it("opens exactly the pages tied to one granted section", () => {
     expect(ids("admin", ["forms"])).toEqual(["forms"]);
     expect(ids("admin", ["notifications"])).toEqual(["receipts", "messages"]);
-    expect(ids("admin", ["employees"])).toEqual(["employees", "config-rules"]);
+    expect(ids("admin", ["employees"])).toEqual(["unlock-day", "employees", "config-rules"]);
   });
 
   it("agrees with the authorization matrix for every role and grant", () => {
