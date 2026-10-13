@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildJobSaveRpcArgs, dailyOvertimeEvidenceRequirement, kilometreFieldValue, requiresEvidenceBeforeSave } from "./job-submission";
+import { buildJobSaveRpcArgs, buildJobSaveWithEvidenceRpcArgs, dailyOvertimeEvidenceRequirement, kilometreFieldValue, requiresEvidenceBeforeSave } from "./job-submission";
 
 const base = {
   jobDate: "2026-09-26",
@@ -133,5 +133,29 @@ describe("kilometreFieldValue", () => {
   it("uses the stored total, or aller + retour for legacy rows", () => {
     expect(kilometreFieldValue({ km_total: "168", km_aller: "94", km_retour: "74" })).toBe("168");
     expect(kilometreFieldValue({ km_total: null, km_aller: "6", km_retour: "3" })).toBe("9");
+  });
+});
+
+describe("buildJobSaveWithEvidenceRpcArgs", () => {
+  it("sends the job, the proof file and the minutes, but never a client proof flag", () => {
+    const args = buildJobSaveWithEvidenceRpcArgs({
+      ...base,
+      newJobId: "new-id",
+      submissionKey: "stable-key",
+      submit: true,
+      overtimeEvidenceCaptured: true,
+      evidenceId: "ev-1",
+      storagePath: "user/2026-10-13/ev-1.jpg",
+      dailyMinutes: 630.4,
+    });
+    expect(args).toMatchObject({
+      p_new_job_id: "new-id",
+      p_submission_key: "stable-key",
+      p_submit: true,
+      p_evidence_id: "ev-1",
+      p_storage_path: "user/2026-10-13/ev-1.jpg",
+      p_daily_minutes: 630,
+    });
+    expect(args).not.toHaveProperty("p_overtime_evidence_captured");
   });
 });

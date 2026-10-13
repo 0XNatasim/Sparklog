@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { BellRing, FilePlus2, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking } from "lucide-react";
+import { BellRing, FilePlus2, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,13 @@ const ACTION_META = {
   manager_entry_reminded: { icon: BellRing, tone: "text-warning" },
   meal_reviewed: { icon: Utensils, tone: "text-primary" },
   parking_reviewed: { icon: SquareParking, tone: "text-primary" },
+  nas_reveal: { icon: Eye, tone: "text-warning" },
+  nas_update: { icon: KeyRound, tone: "text-warning" },
+  nas_bulk_export: { icon: FileDown, tone: "text-destructive" },
 };
+
+// Every access to the NAS vault (migrations 0026 and 0084), grouped under one filter.
+const NAS_ACTIONS = ["nas_reveal", "nas_update", "nas_bulk_export"];
 
 export default function AuditLog() {
   const t = useT();
@@ -35,7 +41,8 @@ export default function AuditLog() {
     setLoading(true);
     setError("");
     let query = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(PAGE_SIZE);
-    if (filter !== "all") query = query.eq("action", filter);
+    if (filter === "nas") query = query.in("action", NAS_ACTIONS);
+    else if (filter !== "all") query = query.eq("action", filter);
     const { data, error: loadError } = await query;
     if (loadError) setError(loadError.message);
     else setRows(data || []);
@@ -60,6 +67,9 @@ export default function AuditLog() {
       case "manager_entry_reminded": return t("audit.desc.managerEntryReminded", { name: target, date: d.job_date || "—" });
       case "meal_reviewed": return t("audit.desc.mealReviewed", { name: target, status: d.status || "—" });
       case "parking_reviewed": return t("audit.desc.parkingReviewed", { name: target, status: d.status || "—" });
+      case "nas_reveal": return t("audit.desc.nasReveal", { name: target });
+      case "nas_update": return t(d.cleared ? "audit.desc.nasCleared" : "audit.desc.nasUpdate", { name: target });
+      case "nas_bulk_export": return t("audit.desc.nasBulkExport", { count: d.returned ?? 0, reason: d.reason || "—" });
       default: return row.action;
     }
   }
@@ -84,6 +94,7 @@ export default function AuditLog() {
               <option value="job_created_by_owner">{t("audit.filter.jobCreatedByOwner")}</option>
               <option value="meal_reviewed">{t("audit.filter.mealReviewed")}</option>
               <option value="parking_reviewed">{t("audit.filter.parkingReviewed")}</option>
+              <option value="nas">{t("audit.filter.nas")}</option>
             </Select>
             <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
               <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}

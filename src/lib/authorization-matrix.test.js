@@ -14,6 +14,7 @@ const submissionMigration = migration("20260927025008_0060_atomic_idempotent_job
 const transitionMigration = migration("20260927025045_0061_manager_state_transition_rpcs.sql");
 const timezoneMigration = migration("20260927025233_0063_montreal_timezone_and_dst.sql");
 const privilegeMigration = migration("20260910220157_0032_owner_role_replaces_hardcoded_privileged.sql");
+const vaultMigration = migration("20261013200000_0084_nas_server_export_and_atomic_overtime_evidence.sql");
 
 describe("application authorization matrix", () => {
   it("covers every persisted application role", () => {
@@ -118,5 +119,27 @@ describe("database authorization contract", () => {
     expect(privilegeMigration).toMatch(/role = 'owner'/);
     expect(privilegeMigration).not.toMatch(/role in \('manager', 'owner'\)/);
   });
-});
 
+  it("makes the NAS vault RPC-only, owner-only, audited and rate-limited (0084)", () => {
+    for (const policy of ["privileged read", "privileged insert", "privileged update"]) {
+      expect(vaultMigration).toContain(`drop policy if exists "sensitive: ${policy}" on public.employee_sensitive`);
+    }
+    expect(vaultMigration).toContain("revoke all on public.employee_sensitive from anon, authenticated");
+    expect(vaultMigration).not.toMatch(/create policy[^;]*employee_sensitive/);
+    for (const fn of ["set_nas", "export_ccq_nas"]) {
+      const body = vaultMigration.slice(vaultMigration.indexOf(`function public.${fn}(`));
+      expect(body.slice(0, body.indexOf("$function$;")), fn).toContain("if not public.is_privileged() then");
+    }
+    expect(vaultMigration).toContain("'export_reason_required'");
+    expect(vaultMigration).toContain("'nas_export_rate_limited'");
+    expect(vaultMigration).toContain("'nas_bulk_export'");
+    expect(vaultMigration).toContain("'nas_update'");
+  });
+
+  it("records an overtime proof only with its job, inside one function (0084)", () => {
+    expect(vaultMigration).toContain('drop policy if exists "overtime evidence: owner insert" on public.overtime_evidence');
+    expect(vaultMigration).toContain("coalesce(p_overtime_evidence_captured, false) and day_has_evidence");
+    expect(vaultMigration).toContain("'evidence_file_missing'");
+    expect(vaultMigration).toContain("'invalid_evidence_path'");
+  });
+});

@@ -7,7 +7,8 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 
 // Sensitive NAS/SIN field. The value lives in the restricted `employee_sensitive`
-// vault (RLS: privileged only). Non-privileged managers only ever see a mask.
+// vault, reachable only through audited RPCs (reveal_nas / set_nas, owner only).
+// Non-privileged managers only ever see a mask.
 // Privileged users must re-enter their password before the value is revealed, and
 // every reveal is audited server-side via the reveal_nas() RPC.
 export default function NasField({ employeeId, initialHasNas, privileged }) {
@@ -55,10 +56,10 @@ export default function NasField({ employeeId, initialHasNas, privileged }) {
     setBusy(true); setErr("");
     try {
       const clean = value.replace(/\D/g, "");
+      if (clean && clean.length !== 9) throw new Error(t("employees.nasInvalid"));
+      // The vault has no direct table access (migration 0084): set_nas writes and audits.
       const { error } = await withTimeout(
-        supabase
-          .from("employee_sensitive")
-          .upsert({ user_id: employeeId, nas: clean || null, updated_at: new Date().toISOString() }),
+        supabase.rpc("set_nas", { target: employeeId, p_nas: clean || null }),
         12000
       );
       if (error) throw error;

@@ -83,3 +83,16 @@ export function buildJobSaveRpcArgs({
   if (confirmManagerEntry) args.p_confirm_manager_entry = true;
   return args;
 }
+
+// Same job fields for save_own_job_with_overtime_evidence (migration 0084): the job, its
+// overtime proof row and the manager notification are written in one transaction, after
+// the server checks the uploaded file. The proof flag is not sent: the server sets it.
+export function buildJobSaveWithEvidenceRpcArgs({ evidenceId, storagePath, dailyMinutes, ...job }) {
+  const { p_overtime_evidence_captured: _flag, ...args } = buildJobSaveRpcArgs(job);
+  return {
+    ...args,
+    p_evidence_id: evidenceId,
+    p_storage_path: storagePath,
+    p_daily_minutes: Math.max(0, Math.round(Number(dailyMinutes) || 0)),
+  };
+}

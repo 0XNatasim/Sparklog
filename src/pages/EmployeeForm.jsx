@@ -18,7 +18,7 @@ import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { refreshSessionOnce, withRetry, withTimeout } from "@/lib/utils";
 import { isMealEligible } from "@/lib/payroll-calculations";
-import { buildJobSaveRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
+import { buildJobSaveRpcArgs, buildJobSaveWithEvidenceRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
@@ -119,6 +119,7 @@ export default function EmployeeForm() {
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
   const lastSaveErrorRef = useRef("");
+  const lastSaveFailureRef = useRef(null); // raw error of the last failed save (offline vs refused)
   const loadedReturnRef = useRef({ minutes: 0, km: 0 });
   const autoSubmitDoneRef = useRef(false);
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -135,6 +136,7 @@ export default function EmployeeForm() {
   const [returnKm, setReturnKm] = useState("");
   const [pendingReturn, setPendingReturn] = useState(null);
   const [pendingEvidenceJobId, setPendingEvidenceJobId] = useState(null);
+  const pendingEvidence = useRef(null); // { jobId, evidenceId } of a proof committed before a later step failed
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [failedEvidenceFile, setFailedEvidenceFile] = useState(null); // kept so "Réessayer" needs no re-pick
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
@@ -433,7 +435,9 @@ export default function EmployeeForm() {
     return saveWithReturn(0, 0, "draft");
   }
 
-  async function saveJob(mode, returnValues = null, forcedId = null, captureEvidence = false) {
+  // `evidence` ({ evidenceId, storagePath, dailyMinutes }) saves the job, its overtime proof
+  // and the manager notification in one transaction (save_own_job_with_overtime_evidence).
+  async function saveJob(mode, returnValues = null, forcedId = null, evidence = null) {
     if (isViewMode) return false;
     if (!user?.id) {
       setErr(t("form.errors.notSignedIn"));
@@ -485,6 +489,7 @@ export default function EmployeeForm() {
     setErr("");
     setInfo("");
     setWarning("");
+    lastSaveFailureRef.current = null;
     savingRef.current = true; // set synchronously (before the first await) — see the guard above
     setSaving(true);
 
@@ -525,24 +530,28 @@ export default function EmployeeForm() {
       // The database owns the state transition and transaction. The idempotency key is
       // reused across retries, so a response lost after commit resolves to the same row.
       if (!editId && !submissionKeyRef.current) submissionKeyRef.current = crypto.randomUUID();
+      const jobFields = {
+        editId,
+        newJobId: forcedId,
+        submissionKey: submissionKeyRef.current,
+        submit: mode === "submit",
+        jobDate: job_date,
+        ot,
+        depart,
+        arrivee,
+        fin,
+        kmTotal: kmTotalNum,
+        kmAller: kmClientNum,
+        returnMinutes: returnValues?.minutes,
+        kmRetour: kmReturnNum,
+        overtimeEvidenceCaptured: hasOvertimeEvidence,
+        parkingReceiptCaptured: hasParkingReceipt,
+      };
       const { data } = await withRetry(
-        () => supabase.rpc("save_own_job", buildJobSaveRpcArgs({
-          editId,
-          newJobId: forcedId,
-          submissionKey: submissionKeyRef.current,
-          submit: mode === "submit",
-          jobDate: job_date,
-          ot,
-          depart,
-          arrivee,
-          fin,
-          kmTotal: kmTotalNum,
-          kmAller: kmClientNum,
-          returnMinutes: returnValues?.minutes,
-          kmRetour: kmReturnNum,
-          overtimeEvidenceCaptured: captureEvidence || hasOvertimeEvidence,
-          parkingReceiptCaptured: hasParkingReceipt,
-        })).single(),
+        () => (evidence
+          ? supabase.rpc("save_own_job_with_overtime_evidence", buildJobSaveWithEvidenceRpcArgs({ ...jobFields, ...evidence }))
+          : supabase.rpc("save_own_job", buildJobSaveRpcArgs(jobFields))
+        ).single(),
         12000
       );
       if (!data?.id) throw new Error(t("form.errors.insertNoId"));
@@ -565,6 +574,7 @@ export default function EmployeeForm() {
       await deleteDraft({ userId: effectiveUserId, editId }).catch(() => undefined);
       return savedJobId;
     } catch (e) {
+      lastSaveFailureRef.current = e;
       // Postgres unique_violation = "23505". Map it to a friendly message
       // since the raw "duplicate key value violates unique constraint…" is
       // useless to an employee.
@@ -977,36 +987,46 @@ export default function EmployeeForm() {
     setEvidenceValidationError("");
     setFailedEvidenceFile(null);
 
-    const jobId = pendingEvidenceJobId || editId || crypto.randomUUID();
-    const evidenceId = crypto.randomUUID();
+    const jobId = editId || crypto.randomUUID();
+    // A proof already committed with its job (only the parking receipt failed afterwards)
+    // is not uploaded or recorded again.
+    const committed = pendingEvidenceJobId ? pendingEvidence.current : null;
+    const evidenceId = committed?.evidenceId || crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
     let evidenceUploaded = false;
-    let evidenceRecorded = false;
     try {
-      let image;
-      try {
-        image = await prepareEvidenceImage(file);
-        await uploadEvidenceWithRefresh(storagePath, image);
-        evidenceUploaded = true;
-      } catch (error) {
-        console.error("[overtime evidence] Screenshot upload failed", error);
-        const failure = evidenceUploadFailure(error);
-        throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`, { cause: error });
-      }
+      let savedJobId = committed?.jobId || null;
+      if (!committed) {
+        try {
+          const image = await prepareEvidenceImage(file);
+          await uploadEvidenceWithRefresh(storagePath, image);
+          evidenceUploaded = true;
+        } catch (error) {
+          console.error("[overtime evidence] Screenshot upload failed", error);
+          const failure = evidenceUploadFailure(error);
+          throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`, { cause: error });
+        }
 
-      let savedJobId = pendingEvidenceJobId;
-      if (!savedJobId) {
-        savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, true);
+        // Job + proof row + manager notification in ONE transaction (migration 0084): a
+        // failure leaves none of them, so a job can never claim a proof that was not recorded.
+        savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, { evidenceId, storagePath, dailyMinutes: overtimeDailyMinutes });
         if (!savedJobId) {
-          const { data: partiallySavedJob } = await withTimeout(
-            supabase.from("jobs").select("id").eq("id", jobId).maybeSingle(),
+          // saveJob also fails when only the parking receipt (sent after the commit) fails.
+          const { data: committedJob } = await withTimeout(
+            supabase.from("jobs").select("id, overtime_evidence_captured").eq("id", jobId).maybeSingle(),
             8000
-          );
-          if (partiallySavedJob?.id) setPendingEvidenceJobId(partiallySavedJob.id);
-          console.error("[overtime evidence] Job save or parking receipt save failed", { jobId, reason: lastSaveErrorRef.current });
+          ).catch(() => ({ data: null }));
+          if (committedJob?.overtime_evidence_captured) {
+            pendingEvidence.current = { jobId: committedJob.id, evidenceId };
+            setPendingEvidenceJobId(committedJob.id);
+            evidenceUploaded = false; // the file now belongs to a committed proof
+          } else if (isOfflineError(lastSaveFailureRef.current)) {
+            // The request may still commit: keep the file (the cleanup worker removes it if not).
+            evidenceUploaded = false;
+          }
+          console.error("[overtime evidence] Atomic job + proof save failed", { jobId, reason: lastSaveErrorRef.current });
           throw new Error(lastSaveErrorRef.current || t("form.evidence.jobSaveFailed"));
         }
-        setPendingEvidenceJobId(savedJobId);
       } else if (parkingRequested && parkingFile) {
         try {
           await uploadParkingReceipt(savedJobId, parkingFile, normalizeNumber(parkingAmount));
@@ -1018,50 +1038,6 @@ export default function EmployeeForm() {
         }
       }
 
-      let overtimeSettings;
-      try {
-        const { data, error: settingsError } = await withTimeout(
-          supabase
-            .from("overtime_settings")
-            .select("evidence_retention_days")
-            .eq("id", true)
-            .maybeSingle(),
-          12000
-        );
-        if (settingsError) throw settingsError;
-        overtimeSettings = data;
-      } catch (error) {
-        console.error("[overtime evidence] Retention settings load failed", error);
-        throw new Error(t("form.evidence.settingsFailed"), { cause: error });
-      }
-      const retentionDays = Math.min(365, Math.max(1, Number(overtimeSettings?.evidence_retention_days) || 30));
-      const dailyMinutes = overtimeDailyMinutes;
-      const expiresAt = dayjs().add(retentionDays, "day").toISOString();
-      try {
-        const { error: evidenceError } = await withTimeout(
-          supabase
-            .from("overtime_evidence")
-            .insert({ id: evidenceId, job_id: savedJobId, user_id: user.id, job_date, storage_path: storagePath, daily_minutes: dailyMinutes, expires_at: expiresAt, ocr_status: "pending" }),
-          12000
-        );
-        if (evidenceError) throw evidenceError;
-        evidenceRecorded = true;
-      } catch (error) {
-        console.error("[overtime evidence] Evidence record insert failed", error);
-        throw new Error(t("form.evidence.recordFailed"), { cause: error });
-      }
-
-      const { error: notificationError } = await withTimeout(
-        supabase.from("manager_notifications").insert({
-          employee_id: user.id,
-          job_id: savedJobId,
-          evidence_id: evidenceId,
-          daily_minutes: dailyMinutes,
-        }),
-        12000
-      );
-      if (notificationError) console.error("[overtime evidence] Manager notification insert failed", notificationError);
-
       // Server-side OCR receives only the normalized JPEG and persists only its
       // classification, never the extracted conversation text.
       const { error: processingError } = await withTimeout(
@@ -1072,6 +1048,7 @@ export default function EmployeeForm() {
 
       setPendingReturn(null);
       setPendingEvidenceJobId(null);
+      pendingEvidence.current = null;
       setHasOvertimeEvidence(true);
       // The evidence is saved at this point. A failure while checking or
       // creating the automatic meal claim must not throw the user back to the
@@ -1085,7 +1062,7 @@ export default function EmployeeForm() {
       await finishAfterSave();
       navigate("/form", { replace: true });
     } catch (error) {
-      if (evidenceUploaded && !evidenceRecorded) {
+      if (evidenceUploaded) {
         await supabase.storage.from("overtime-evidence").remove([storagePath]).catch(() => undefined);
       }
       setErr(error?.message || t("form.evidence.failed"));

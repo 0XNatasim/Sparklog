@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.104).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.105).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -63,10 +63,6 @@ Aujourd'hui, un seul talon a été vérifié (un compagnon).
 
 Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
-- [ ] **Export des NAS** : le faire côté serveur avec une trace de chaque consultation. Aujourd'hui, le
-  propriétaire peut les lire en bloc depuis le navigateur sans trace.
-- [ ] **Envoi de la preuve de temps sup.** : envoyer la photo et la fiche en un seul bloc, pour éviter
-  qu'une coupure réseau laisse une photo sans fiche.
 - [ ] **Annulation d'un export** : garder le taux horaire d'origine. Aujourd'hui, l'annulation reprend le
   taux actuel de l'employé.
 - [ ] **Tableau des coûts** et **approbation en lot** : calculs plus rapides côté serveur.
@@ -89,7 +85,7 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 Une phrase suffit, par exemple :
 - « Voici 3 talons de paie, compare-les avec l'app. »
 - « Ajoute une prime de soir de 2 $/h pour tel employé. »
-- « Fais l'étape 5, le point sur l'export des NAS. »
+- « Fais l'étape 5, le point sur l'annulation d'un export. »
 
 Claude crée une PR. Toi, tu vérifies l'aperçu Vercel, puis tu fusionnes.
 
