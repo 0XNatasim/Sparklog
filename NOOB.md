@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.109).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.111).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -22,8 +22,9 @@ Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · �
 
 - [ ] **Masse salariale annuelle de Messier.** La cotisation FDRCMO (1 %) ne s'applique qu'au-delà de 2 M$.
   *Où la trouver :* ton comptable.
-- [ ] **Avis de cotisation CNESST de Messier** : le taux par 100 $ de masse salariale. Sans lui, ce calcul
-  reste « à réviser ». *Où le trouver :* ton dossier CNESST en ligne.
+- [ ] **Salaire maximum assurable CNESST 2026** : la CNESST ne cotise que jusqu'à ce montant par employé et
+  par année. Le taux de l'avis (3,17 $ par 100 $) est déjà inscrit ; ce plafond manque. *Où le trouver :*
+  page 2 de la décision de classification, ou le site de la CNESST. Le donner à Claude (voir étape 5).
 
 ## Étape 2 — Infos de chaque employé 👤
 
@@ -65,6 +66,11 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
 - [ ] **Changement d'heure de l'automne** : permettre au gestionnaire de choisir quelle « 2 h du matin »
   a été travaillée. Aujourd'hui, l'heure répétée est refusée.
+- [ ] **Plafond CNESST (trou du calcul)** : la cotisation CNESST (3,17 % du salaire) est calculée sur tout
+  le salaire, sans s'arrêter au salaire maximum assurable de l'année. Pour un employé qui dépasse ce
+  maximum (beaucoup de temps sup., par exemple), la cotisation de fin d'année est **trop élevée** dans
+  DAS, Calcul et Coûts. À corriger quand tu as le montant (étape 1) : arrêter la cotisation une fois le
+  maximum atteint, comme pour RRQ, AE et RQAP, avec le cumul de l'année.
 - [ ] **Ménage du code** : découper les deux plus gros écrans (la fiche employé et la liste des employés)
   et corriger environ 60 avertissements du vérificateur de code. Il faudra d'abord ajouter des tests
   d'écran.

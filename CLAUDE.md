@@ -303,9 +303,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   drapeau `unvalidated` de `rules/2026.js` peut passer à `false` avec la citation.
 - [ ] **FDRCMO** : seuil 2 M$ et 1 % confirmés (TP-1015.G §8). La **masse salariale** se saisit dans
   Configuration › Paramètres › Paie (`payroll_employer_settings`, V2.4.103) — reste à la saisir.
-- [ ] **CNESST** : le **taux de l'avis de cotisation** (par 100 $) se saisit au même endroit — reste à le
-  saisir. Sans lui, le calcul renvoie `requires_review` (plus aucun taux deviné : l'ancien défaut de
-  2 % de `DEFAULT_EMPLOYER` est retiré).
+- [ ] **CNESST** : taux de l'avis 2026 saisi (3,17 $/100 $, unité 80170, `payroll_employer_settings`,
+  2026-10-13). Reste : `calculateCnesst` (`src/payroll/employer/cnesst.js`) cotise sur tout le salaire, sans
+  **salaire maximum assurable** annuel ni cumul — cotisation trop élevée pour un employé au-delà du maximum.
+  Montant 2026 à fournir (ne pas deviner), puis plafonner avec le cumul comme RRQ/AE/RQAP.
 - [ ] **Cotisations syndicales** : confirmer pour chaque employé son association **et son local**
   (FIPOE / local 568 : formule électricien par local et période d'apprentissage) ; date de début exacte
   de l'ancienne règle SQC (seule la fin, 2026-06-27, est sourcée).
