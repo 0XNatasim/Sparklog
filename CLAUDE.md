@@ -292,7 +292,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-12, après la PR #395 — V2.4.99)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.101)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 
@@ -305,21 +305,19 @@ Le calcul des **heures** (8 h/jour, 1re heure sup. de la semaine à 1,5×, le re
 par employé) est en production et testé. Les **montants** (avantages CCQ + retenues DAS) restent un banc
 d'essai `requires_review` (`RULE_VERSION.status = "draft"`, `src/payroll/rules/2026.js`). Il manque :
 
-**A. Documents officiels / sources à fournir (citation : document + article + date d'effet)**
-- [ ] **Convention collective ICI 2025-2029 (ACQ)** — articles qui fondent : heures normales (8 h/jour,
-  40 h/sem.), taux et ordre du temps supplémentaire (1,5× puis 2×, et le fait que la 1,5× soit
-  **hebdomadaire**), indemnité de repas (30 $ et seuil de 10 h 15), prime de chef d'équipe, temps de
-  transport/retour à l'entrepôt, frais de déplacement (km). Aujourd'hui : validés par l'autorité paie
-  intérimaire (2026-09-04/05) sans citation (`docs/rules/compensation-rules.md`).
-- [ ] **CCQ — taux de la cotisation patronale « avantages sociaux »** électricien ICI 2026-2027 :
-  `employerSocialBenefitPerHour = 8,875 $/h` est déduit d'un talon (355 $ / 40 h), pas d'une table.
-- [ ] **CCQ — prélèvement** : taux (le code applique **0,75 %**, part salarié ; la liste de contrôle du
-  README indiquait 1,5 %, probablement salarié + employeur) et **base** (prime de chef d'équipe incluse
-  ou non). Source : règlement / guide du rapport mensuel CCQ.
-- [ ] **Normes du travail (CNT) 2026** : taux (0,06 % codé) et maximum cotisable (103 000 $ codé) —
-  `_PLACEHOLDER`, guide TP-1015.G.
-- [ ] **FDRCMO** : seuil de masse salariale (2 M$ codé) et taux 1 %. Probablement non applicable si la
-  masse salariale de Messier est sous le seuil — à confirmer avec le chiffre réel.
+**A. Documents officiels / sources** — reçus le 2026-10-13 et rangés dans `docs/reference/` ; le
+détail article par article est dans `docs/rules/compensation-rules.md` (« Primary-source citations »).
+- [x] **Convention collective ICI 2025-2029 (ACQ)** reçue. Confirme 8 h/40 h (20.02), 1re heure sup. de
+  la **semaine** à 1,5× puis 2× (21.02 a), repas électricien 30 $ (20.07 3) c), chef d'équipe 8 %
+  (22.03), 13 % (19.05), salaires (annexe C), retraite 9 % / 4,5 % (27.05). Écarts → §6.2.
+- [x] **CCQ — avantages sociaux patronaux** : grille ACQ du 26 avril 2026, colonne (8) : compagnon
+  8,875 $/h, apprentis **7,955 $/h** (corrigé par niveau en V2.4.101).
+- [x] **CCQ — prélèvement** : 0,75 % salarié + 0,75 % employeur sur le salaire brut (salaire + 13 %),
+  grille ACQ note 10. Reste : prime de chef d'équipe dans la base ou non (règlement CCQ).
+- [x] **CNT 2026** : 0,06 %, maximum 103 000 $ (TP-1015.G §7) — valeurs du code confirmées ; le
+  drapeau `unvalidated` de `rules/2026.js` peut passer à `false` avec la citation.
+- [ ] **FDRCMO** : seuil 2 M$ et 1 % confirmés (TP-1015.G §8) ; il manque la **masse salariale
+  réelle** de Messier pour savoir s'il s'applique.
 - [ ] **CNESST** : l'**avis de cotisation de Messier** (taux de l'unité de classification). Aucun défaut
   possible : le calcul renvoie `requires_review` tant qu'il manque.
 - [ ] **Cotisations syndicales** : confirmer pour chaque employé son association **et son local**
@@ -345,12 +343,23 @@ d'essai `requires_review` (`RULE_VERSION.status = "draft"`, `src/payroll/rules/2
 - [ ] Changement d'heure d'automne : choix gestionnaire de la 1re ou 2e occurrence de l'heure répétée
   (C-6, §1).
 
-### 6.2 Incohérences documentation ↔ code à trancher (aucune modification de code faite)
-- [ ] **Temps de retour à l'entrepôt.** Le README disait « toujours payé au taux régulier, ne crée jamais
-  de temps supplémentaire ». Le moteur (`payroll_engine.js` 2.1.0) le compte **dans** la journée : il
-  peut créer du temps sup., sauf pour un employé avec l'option « retour sans avantages » (au-delà de 8 h,
-  le retour est payé au taux de base, sans avantages). Confirmer la règle voulue.
-- [ ] **Prélèvement CCQ 0,75 % vs 1,5 %** (voir 6.1 A).
+### 6.2 Écarts code ↔ convention / documentation à trancher (aucune règle modifiée)
+- [x] **Prélèvement CCQ 0,75 % vs 1,5 %** : tranché, 1,5 % = 0,75 % salarié + 0,75 % employeur.
+- [x] **Retour à l'entrepôt** — tranché le 2026-10-13, codé en V2.4.101 (moteur 2.2.0, migration 0081) :
+  jamais de temps sup. ; par défaut sans avantages ; case `return_with_benefits_to_8h` (bonus Messier) =
+  avec avantages jusqu'à 8 h. Repas et preuve > 8 h comptent toujours le retour. Détail :
+  `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
+  (à supprimer dans une migration ultérieure).
+- [ ] **Prime de chef d'équipe en temps sup.** : 22.01 exclut les primes de 22.03 de la règle « majoration
+  avant prime » → la prime de chef est **majorée** en heures sup. Le moteur (`earnings.js`) la paie
+  seulement sur les heures normales. À confirmer contre un talon puis corriger.
+- [ ] **Repas** : 20.07 3) c) dit « heures supplémentaires consécutives à une journée de **dix** heures »
+  (le code exige 10 h 15) et prévoit un 2e repas « après quatre autres heures supplémentaires ».
+- [ ] **MÉDIC** : la convention (27.03 A) 2) passe la cotisation salariale à **0,86 $** le 26 avril 2026 ;
+  le code garde 0,68 $ (maintien CCQ noté dans `ccq-benefits.js`). Confirmer avec un talon récent / la CCQ.
+- [ ] **Samedi, dimanche, fériés** : samedi = temps sup. (21.01), dimanche et fériés à 2× dès la 1re heure
+  (21.02 b). Le moteur n'a pas de règle par jour ; il compte sur le blocage de la saisie.
+- [ ] **Dîner** : 20.02 3) prévoit ½ h ou 1 h non payée. Vérifier que la saisie Départ→Fin l'exclut.
 - [ ] `docs/rules/2026-das-payroll.md` dit l'impôt du Québec « placeholder », alors que `rules/2026.js`
   le marque vérifié contre TP-1015.F (2026-01) ; les commentaires de `EI` disent encore `_PLACEHOLDER`
   alors qu'il est vérifié (T4127). Les vrais restants : CNT, FDRCMO, CNESST.

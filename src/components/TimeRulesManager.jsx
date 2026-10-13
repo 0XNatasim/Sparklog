@@ -33,7 +33,7 @@ export default function TimeRulesManager() {
   async function load() {
     // Deadline, evidence retention and the CCQ calendar live in Réglage.
     const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_overtime_no_benefits, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
     ]);
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
@@ -227,8 +227,9 @@ export default function TimeRulesManager() {
                 const storageEligible = !isNonCcqRole(row.role);
                 const rules = [
                   { field: "first_trip_unpaid", label: t("settings.firstTrip.title"), hint: t("settings.firstTrip.help"), locked: false },
-                  { field: "return_overtime_no_benefits", label: t("employees.returnNoBenefits"), hint: t("employees.returnNoBenefitsHint"), locked: fixed },
-                  { field: "overtime_first_hour_double", label: t("employees.otFirstHourDouble"), hint: t("employees.otFirstHourDoubleHint"), locked: fixed },
+                  // Subcontractors: return always at the simple rate, first OT hour always double.
+                  { field: "return_with_benefits_to_8h", label: t("employees.returnWithBenefits"), hint: t("employees.returnWithBenefitsHint"), locked: fixed, lockedValue: false },
+                  { field: "overtime_first_hour_double", label: t("employees.otFirstHourDouble"), hint: t("employees.otFirstHourDoubleHint"), locked: fixed, lockedValue: true },
                 ];
                 return (
                   <div key={row.id} className="rounded border bg-muted/30 px-3 py-2">
@@ -239,7 +240,7 @@ export default function TimeRulesManager() {
                           <span>{rule.label}</span>
                           <input
                             type="checkbox"
-                            checked={rule.locked ? true : Boolean(row[rule.field])}
+                            checked={rule.locked ? rule.lockedValue : Boolean(row[rule.field])}
                             disabled={rule.locked}
                             onChange={(e) => setPayRule(row.id, rule.field, e.target.checked)}
                             className="h-5 w-5 shrink-0 rounded border-input accent-primary"

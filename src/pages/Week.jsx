@@ -55,7 +55,7 @@ export default function Week() {
 
   const [jobs, setJobs] = useState([]);
   const [otFirstHourDouble, setOtFirstHourDouble] = useState(false);
-  const [returnOtNoBenefits, setReturnOtNoBenefits] = useState(false);
+  const [returnWithBenefitsTo8h, setReturnWithBenefitsTo8h] = useState(false);
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -85,9 +85,9 @@ export default function Week() {
       setJobs(data || []);
       // Per-employee overtime policies drive the split in the weekly totals.
       const { data: prof } = await supabase
-        .from("profiles").select("overtime_first_hour_double, return_overtime_no_benefits, first_trip_unpaid").eq("id", effectiveUserId).maybeSingle();
+        .from("profiles").select("overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").eq("id", effectiveUserId).maybeSingle();
       setOtFirstHourDouble(Boolean(prof?.overtime_first_hour_double));
-      setReturnOtNoBenefits(Boolean(prof?.return_overtime_no_benefits));
+      setReturnWithBenefitsTo8h(Boolean(prof?.return_with_benefits_to_8h));
       setFirstTripUnpaid(Boolean(prof?.first_trip_unpaid));
     } catch (e) {
       setErr(e?.message || t("week.errors.failedLoad"));
@@ -103,7 +103,7 @@ export default function Week() {
   }, [effectiveUserId]);
 
   const { weekly, dailyByKey } = useMemo(() => {
-    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnOtNoBenefits, firstTripUnpaid });
+    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid });
     const dailyMap = new Map([...calculatedDays].map(([dayKey, totals]) => [dayKey, {
       ...totals,
       date: parseJobDate(dayKey),
@@ -154,7 +154,7 @@ export default function Week() {
 
     weeklyArr.sort((a, b) => (a.start.isAfter(b.start) ? -1 : 1));
     return { weekly: weeklyArr, dailyByKey: dailyMap };
-  }, [jobs, otFirstHourDouble, returnOtNoBenefits, firstTripUnpaid]);
+  }, [jobs, otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid]);
 
   function toggleWeek(weekKey) {
     setOpenWeekKey((prev) => (prev === weekKey ? null : weekKey));

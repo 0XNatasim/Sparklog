@@ -7,6 +7,36 @@
 - **System of record:** table `public.payroll_rules` (migrations 0019–0021). This file
   is the human-readable companion. Update both together.
 
+## Primary-source citations (checked 2026-10-13)
+
+Sources, filed in `docs/reference/`:
+- **CC** = *Convention collective 2025-2029, secteur institutionnel et commercial* (ACQ) —
+  `convention-collective-ici-2025-2029.pdf`.
+- **ACQ** = *Taux horaires suggérés de la main-d'œuvre*, 26 avril 2026 —
+  `acq-grilles-taux-ici-2026-04-26.pdf` (ligne Électricien).
+- **TP-1015.G** = Revenu Québec, *Guide de l'employeur* 2026-01 — `TP-1015.G(2026-01).pdf`.
+- **CCQ-AI** = CCQ, avantages imposables ICI 2026-04-26 → 2027-04-24 —
+  `tests/Tableau-Institutionnel-Commercial-2026-2027.pdf`.
+
+| Rule in the app | Source | Verdict |
+|---|---|---|
+| 8 h/day, 40 h/week, Mon–Fri | CC 20.02 1), 2) | ✅ confirmed |
+| First OT hour of the **week** at 1.5×, then 2× | CC 21.02 a) | ✅ confirmed |
+| Meal 30 $ for an electrician | CC 20.07 3) c) i. | ✅ amount; ⚠️ the text says OT « consécutives à une journée de dix heures » (10 h, not 10 h 15) and a 2nd meal « après quatre autres heures » |
+| Team-leader premium 8 % (4,06 $ = 8 % × 50,79) | CC 22.03 1) | ✅ rate; ❌ CC 22.01: OT majoration **does** apply to 22.03 premiums — the app pays the premium on regular hours only |
+| 13 % indemnity (6 + 5,5 + 1,5), base includes OT | CC 19.05 1) | ✅ confirmed |
+| Wages 50,79 / 25,40 / 30,47 / 35,55 / 43,17 | CC annexe C, ACQ (1) | ✅ confirmed |
+| Pension 9 % compagnon / 4,5 % apprenti on wage + indemnity | CC 27.05 2) | ✅ (apprentice minimum 0,80 $/h not coded; never binding at current rates) |
+| Employer avantages sociaux 8,875 $/h compagnon, **7,955 $/h apprentis** | ACQ (8) | ✅ per level since V2.4.101 |
+| Taxable benefit 3,377 $/h | CCQ-AI, code 220, C3 | ✅ confirmed |
+| Safety equipment 0,80 $/h | CC 25.05 3), ACQ (13) | ✅ confirmed |
+| Prélèvement CCQ 0,75 % employee, on wage + 13 % | ACQ (10): employer **also** pays 0,75 % of « salaire brut » | ✅ the old « 1,5 % » = both shares; premium in/out of the base still unsourced |
+| CNT 0,06 %, max 103 000 $ | TP-1015.G §7 | ✅ confirmed |
+| FDRCMO 1 % above 2 M$ payroll | TP-1015.G §8 | ✅ confirmed |
+| MÉDIC employee 0,68 $/h | CC 27.03 A) 2): « augmentée à 0,86 $ à compter du 26 avril 2026 » | ⚠️ conflicts with the CCQ hold noted in `ccq-benefits.js`; confirm with the CCQ |
+| Return-to-warehouse time | CC 23.04 2) a), 23.15: requested travel after the normal day is « temps de transport », « payé au taux de salaire non majoré, sans avantages sociaux ni indemnité de congés » | ✅ since V2.4.101 (engine 2.2.0): never overtime; default without benefits; Messier bonus option keeps benefits up to 8h — see RETURN below |
+| No weekend / holiday work | CC 21.01, 21.02 b): Saturday is OT; Sunday/holidays 200 % from the first hour | ⚠️ the engine has no day-of-week rule; it relies on entry being blocked |
+
 ## OVERTIME — thresholds and rates
 - Regular hours: up to **8h/day (480 min)**.
 - **Trigger:** hours **over 8h in a day are always overtime**, regardless of the weekly
@@ -25,6 +55,24 @@
 > per **week** (accumulator scoped to the week ending Saturday), matching this rule. The
 > golden cases above are pinned as tests in `payroll-calculations.test.js`. Previously
 > the 1.5× hour reset each day, which under-paid overtime on multi-day-OT weeks.
+
+## RETURN — return-to-warehouse time (owner decision 2026-10-13)
+- Return time (`return_time_minutes`, logged inside Départ→Fin) is **never overtime** and is
+  left out of the 8h/overtime split, which uses the work only.
+- **Default (everyone):** paid at the base rate **without social benefits** (no 13 %,
+  no CCQ benefits) — convention ICI 23.04 2) a), 23.15.
+- **Option `return_with_benefits_to_8h`** (Règles de temps, unchecked for everyone at
+  rollout): Messier bonus — return time is paid as regular time **with** benefits while the
+  day's work + return stays within 8h; the part beyond 8h is paid without benefits.
+- Work always takes the 8h first, whatever the job order. An unpaid first trip is removed
+  before the 8h room is measured. Subcontractors: always the default.
+- The meal (10h15) and >8h overtime-proof thresholds still count return time (owner
+  decision 2026-10-13).
+- Examples: 6h30 job + 1h return → default 6h30 regular + 1h without benefits; checked
+  7h30 regular. 6h30 job + 2h return → checked 8h regular + 0h30 without benefits.
+  9h job + 1h return → 8h regular + 1h overtime + 1h return without benefits.
+- Engine: `calculatePayrollEntries` (`payroll_engine.js` 2.2.0); tests in
+  `src/lib/payroll-calculations.test.js`.
 
 ## SUPPER — meal eligibility
 - Eligible when a person works **≥ 615 min (10h15) in a weekday**.
