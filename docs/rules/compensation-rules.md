@@ -70,8 +70,8 @@ Sources, filed in `docs/reference/`:
   day's work + return stays within 8h; the part beyond 8h is paid without benefits.
 - Work always takes the 8h first, whatever the job order. An unpaid first trip is removed
   before the 8h room is measured. Subcontractors: always the default.
-- The meal (10h15) and >8h overtime-proof thresholds still count return time (owner
-  decision 2026-10-13).
+- The >8h overtime-proof threshold still counts return time; the supper never does (owner
+  decisions 2026-10-13, see SUPPER).
 - Examples: 6h30 job + 1h return → default 6h30 regular + 1h without benefits; checked
   7h30 regular. 6h30 job + 2h return → checked 8h regular + 0h30 without benefits.
   9h job + 1h return → 8h regular + 1h overtime + 1h return without benefits.

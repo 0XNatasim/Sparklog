@@ -334,7 +334,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Prélèvement CCQ 0,75 % vs 1,5 %** : tranché, 1,5 % = 0,75 % salarié + 0,75 % employeur.
 - [x] **Retour à l'entrepôt** — tranché le 2026-10-13, codé en V2.4.101 (moteur 2.2.0, migration 0081) :
   jamais de temps sup. ; par défaut sans avantages ; case `return_with_benefits_to_8h` (bonus Messier) =
-  avec avantages jusqu'à 8 h. Repas et preuve > 8 h comptent toujours le retour. Détail :
+  avec avantages jusqu'à 8 h. La preuve > 8 h compte le retour ; le souper ne le compte jamais (V2.4.110). Détail :
   `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
   (à supprimer dans une migration ultérieure).
 - [x] **Prime de chef d'équipe en temps sup.** — option par employé `team_leader_premium_overtime`
