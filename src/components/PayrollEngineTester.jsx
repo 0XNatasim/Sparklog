@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import { BEFORE_PRESET, afterPreset, presetKindForWeekStart } from "@/lib/rate-presets";
 import TalonCompare from "@/components/TalonCompare";
-import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
+import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef, engineYtdFromOpening } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import { withHoursCumulative } from "@/lib/talon-import-core";
@@ -76,7 +76,6 @@ function ledgerRowToSnapshot(row) {
 }
 
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
-const toCents = (d) => Math.round((Number(d) || 0) * 100);
 
 // Primary sources behind the 2026 rule set + the D0033-0007 reconciliation, shown in
 // the "Sources" modal. `draft: true` marks a figure still to confirm.
@@ -785,23 +784,7 @@ export default function PayrollEngineTester({ messier = false }) {
       },
       earnings,
       baseAdjustments,
-      ytd: {
-        grossIncome: toCents(ytd.grossIncome),
-        rrqEmployee: toCents(ytd.rrqEmployee),
-        rrqEmployer: toCents(ytd.rrqEmployee),
-        rrq2Employee: toCents(ytd.rrq2Employee),
-        rrq2Employer: toCents(ytd.rrq2Employee),
-        eiEmployee: toCents(ytd.eiEmployee),
-        eiEmployer: toCents(ytd.eiEmployee),
-        rqapEmployee: toCents(ytd.rqapEmployee),
-        rqapEmployer: toCents(ytd.rqapEmployee),
-        federalTax: toCents(ytd.federalTax),
-        quebecTax: toCents(ytd.quebecTax),
-        pensionableIncomeRRQ: toCents(ytd.pensionableIncomeRRQ),
-        insurableIncomeEI: toCents(ytd.insurableIncomeEI),
-        insurableIncomeRQAP: toCents(ytd.insurableIncomeRQAP),
-        labourStandardsIncome: toCents(ytd.labourStandardsIncome),
-      },
+      ytd: engineYtdFromOpening(ytd),
     }));
     // Snapshot the baseline this result was computed against, so posting is idempotent.
     setCalcCtx({ ytdSnapshot: { ...ytd }, periodEnd: currentPeriodEnd(), posted: false });

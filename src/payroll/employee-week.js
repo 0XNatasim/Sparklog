@@ -11,10 +11,9 @@ import { calculatePayroll } from "./engine/calculatePayroll.js";
 import { computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { PAY_PERIODS_PER_YEAR } from "./rules/2026.js";
 import { printedPayLines } from "./earnings.js";
+import { engineYtdFromOpening } from "./ytd.js";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
-
-const toCents = (d) => Math.round((Number(d) || 0) * 100);
 
 // Cumulative talon reference. A single global counter (assigned at comptabilisation, in
 // comptabilisation order — the first ever is 1) rendered with a fixed batch prefix:
@@ -160,15 +159,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
     },
     earnings,
     baseAdjustments: ccqAmounts.baseAdjustments,
-    ytd: {
-      grossIncome: toCents(opening.grossIncome), rrqEmployee: toCents(opening.rrqEmployee), rrqEmployer: toCents(opening.rrqEmployee),
-      rrq2Employee: toCents(opening.rrq2Employee), rrq2Employer: toCents(opening.rrq2Employee),
-      eiEmployee: toCents(opening.eiEmployee), eiEmployer: toCents(opening.eiEmployee),
-      rqapEmployee: toCents(opening.rqapEmployee), rqapEmployer: toCents(opening.rqapEmployee),
-      federalTax: toCents(opening.federalTax), quebecTax: toCents(opening.quebecTax),
-      pensionableIncomeRRQ: toCents(opening.pensionableIncomeRRQ), insurableIncomeEI: toCents(opening.insurableIncomeEI),
-      insurableIncomeRQAP: toCents(opening.insurableIncomeRQAP), labourStandardsIncome: toCents(opening.labourStandardsIncome),
-    },
+    ytd: engineYtdFromOpening(opening),
   });
 
   return { result, ccqAmounts, reimb, pay, hours: { regularHours, ot150Hours, ot200Hours, returnNbHours, totalKm, totalHours } };

@@ -292,7 +292,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.103)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.104)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -374,6 +374,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   alors qu'il est vérifié (T4127). Les vrais restants : CNT, FDRCMO, CNESST.
 
 ### 6.3 Technique (code) — ouvert
+- [x] **Cumul employeur AE / RQAP** (V2.4.104) : le cumul de l'année côté employeur était copié de celui de
+  l'employé, donc la part employeur ne s'arrêtait pas à son propre maximum (jusqu'à ≈ 358 $ AE et 177 $
+  RQAP de trop par employé et par année dans DAS/coûts). `src/payroll/ytd.js` (`engineYtdFromOpening`)
+  le déduit du cumul employé × taux employeur / taux employé, plafonné ; utilisé par Talons, DAS et Calcul.
+  Les retenues s'arrêtent aux maximums annuels (RRQ 74 600 $ puis 85 000 $, AE 68 900 $, RQAP 103 000 $)
+  à condition que le cumul d'avant Sparklog soit saisi (`payroll_ytd`) et les semaines comptabilisées.
 - [ ] S-2 export NAS côté serveur et audité ; S-3b soumission atomique (preuve + job) ; P-12 rollback
   d'export qui ré-estampille le taux ; P-5 agrégation des coûts côté serveur ; P-11 N+1 `getUserById`.
 - [ ] Filtres gestionnaire : annuler les requêtes qui se chevauchent (AbortController / id de requête) ;

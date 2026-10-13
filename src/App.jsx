@@ -39,6 +39,7 @@ const PeriodPage = managerPage("PeriodPage");
 const InventoryPage = managerPage("InventoryPage");
 const ReceiptsPage = managerPage("ReceiptsPage");
 const RulesPage = managerPage("RulesPage");
+const UnlockDayPage = managerPage("UnlockDayPage");
 const SettingsPage = managerPage("SettingsPage");
 const TimesheetsPage = managerPage("TimesheetsPage");
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
@@ -149,6 +150,7 @@ export default function App() {
           <Route path="live" element={<LivePage />} />
           <Route path="timesheets" element={<TimesheetsPage />} />
           <Route path="receipts" element={<ReceiptsPage />} />
+          <Route path="unlock-day" element={<UnlockDayPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="absences" element={<AbsencesPage />} />
