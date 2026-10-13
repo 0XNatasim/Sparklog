@@ -344,7 +344,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Repas** — révisé le 2026-10-13 (V2.4.110, migration 0086, SUPPER v3) : souper dû dès **2 h 15 de temps
   sup. (1,5× ou 2×, les deux comptent)**, soit **10 h 15 de travail** dans la journée, **temps de retour jamais
   compté** (premier trajet non payé exclu aussi). `isMealEligible` / `dayWorkMinutesWithoutReturn` (moteur) et
-  `reconcile_overtime_meal` appliquent le même seuil de 615 min. Le 2e repas « après quatre autres heures
+  `reconcile_overtime_meal` appliquent le même seuil de 615 min. En vigueur depuis la **semaine 41 (2026-09-27)**
+  (migration 0087 : demandes en attente revérifiées, 5 sur 8 retirées). Le 2e repas « après quatre autres heures
   supplémentaires » (20.07) n'est pas codé.
 - [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
   2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.

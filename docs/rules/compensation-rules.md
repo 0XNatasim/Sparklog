@@ -82,9 +82,11 @@ Sources, filed in `docs/reference/`:
 - Eligible on a weekday once the day has **2 h 15 of overtime — at 1.5× or 2×, both are work
   time** — i.e. **at least 10 h 15 (615 min) of paid work**. **Return-to-warehouse time never
   counts.** Owner decision 2026-10-13 (revised the same day; `payroll_rules` SUPPER v3,
-  migration 0086). The unpaid first trip (option) is not work either.
-- History: v1 ≥ 615 paid min until 2026-10-12; v2 > 600 paid min with return included,
-  replaced the same day (empty range kept for the record).
+  migration 0086), **applied from CCQ week 41 — 2026-09-27** (migration 0087: pending claims
+  since that date re-checked, those below the threshold withdrawn; reviewed claims kept). The
+  unpaid first trip (option) is not work either.
+- History: v1 ≥ 615 paid min (return included) until 2026-09-26; v2 > 600 paid min with return
+  included, replaced the same day (empty range kept for the record).
 - Twins: `isMealEligible` / `dayWorkMinutesWithoutReturn` (engine, used through
   `src/lib/meal-eligibility.js`) and `reconcile_overtime_meal` (same 615-minute test).
 - Weekdays only; no weekend work.
