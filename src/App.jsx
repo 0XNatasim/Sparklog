@@ -26,6 +26,7 @@ const EmployeesPage = managerPage("EmployeesPage");
 const EmergencyPage = managerPage("EmergencyPage");
 const FormsPage = managerPage("FormsPage");
 const HealthPage = managerPage("HealthPage");
+const PayRulesPage = managerPage("PayRulesPage");
 const LivePage = managerPage("LivePage");
 const ReferencesPage = managerPage("ReferencesPage");
 const ManagerIndex = managerPage("ManagerIndex");
@@ -170,6 +171,7 @@ export default function App() {
           <Route path="advanced" element={<Navigate to="audit" replace />} />
           <Route path="advanced/audit" element={<AuditPage />} />
           <Route path="advanced/health" element={<HealthPage />} />
+          <Route path="advanced/pay-rules" element={<PayRulesPage />} />
           <Route path="advanced/emergency" element={<EmergencyPage />} />
           <Route path="*" element={<Navigate to="/manager" replace />} />
         </Route>

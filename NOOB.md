@@ -11,6 +11,9 @@
 - ⚠️ **Les montants en dollars de la paie** (avantages CCQ, impôts, cotisations) sont **des estimations**.
   Ils sont affichés « à réviser » tant que les étapes 1 à 5 ci-dessous ne sont pas faites.
 
+📋 Toutes les règles de paie en vigueur, avec leurs options et leurs sources, sont dans l'app :
+**Gestion › Avancé › Règles de paie**.
+
 Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · 💻 **Claude** (du code, sur demande)
 
 ---

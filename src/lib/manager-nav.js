@@ -42,6 +42,7 @@ export const MANAGER_NAV = Object.freeze([
   { id: "advanced", labelKey: "mgr.group.advanced", items: [
     { id: "advanced-audit", path: "advanced/audit", grant: null, labelKey: "mgr.nav.audit" },
     { id: "advanced-health", path: "advanced/health", grant: null, labelKey: "mgr.nav.health" },
+    { id: "advanced-pay-rules", path: "advanced/pay-rules", grant: null, labelKey: "mgr.nav.payRules" },
     { id: "advanced-emergency", path: "advanced/emergency", grant: null, ownerOnly: true, labelKey: "mgr.nav.emergency" },
   ] },
 ]);
