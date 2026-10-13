@@ -37,7 +37,10 @@ export function levelToStatus(apprenticeLevel) {
 
 // Employer settings affect only the employer contributions / DAS remittance side, not
 // the employee net. Defaults for the preview; refine per-company later.
-export const DEFAULT_EMPLOYER = { annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 0.02, workforceSkillsFundApplicable: false };
+// Fallback when Paramètres › Paie (payroll_employer_settings) is not filled in: no CNESST rate
+// (the engine returns requires_review instead of guessing), FSS at the general low-payroll rate.
+// Callers pass the saved settings through employerFromSettings() (src/lib/payroll-settings.js).
+export const DEFAULT_EMPLOYER = { annualPayrollEstimate: 0, fssCategory: "general", cnesstRate: undefined, workforceSkillsFundApplicable: false };
 
 // The YTD opening keys the engine consumes, and how they map from a payroll_ytd /
 // payroll_period_ledger row (dollars).
@@ -76,12 +79,13 @@ export function snapshotFromRow(row) {
 
 // Compute one employee's talon for a set of jobs (normally one CCQ week) on top of the
 // opening YTD balance. Returns everything PayStubPrint + the DAS tab need.
-export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, includeStorage = false, employer = DEFAULT_EMPLOYER, weekDate, messierMethod = false, holidayDates = [] }) {
+export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, includeStorage = false, employer = DEFAULT_EMPLOYER, weekDate, messierMethod = false, holidayDates = [], taxProfile = null }) {
   // Pay-week date used to pick the dated union-dues rule. Explicit wins; else the
   // earliest job_date in the set (any day of a CCQ week resolves the same rule window).
   const payWeekDate = weekDate || (jobs || []).reduce((min, j) => (j?.job_date && (!min || j.job_date < min) ? j.job_date : min), null) || undefined;
   const base = Number(profile?.hourly_rate) || 0;
   const prem = Number(profile?.team_leader_premium) || 0;
+  const ccqPremium = Number(profile?.team_leader_premium_ccq) || 0;
   const premiumOnOvertime = Boolean(profile?.team_leader_premium_overtime);
   const status = levelToStatus(profile?.apprentice_level);
   const union = UNION_CODE_TO_KEY[profile?.union_association] || "ftq_fipoe";
@@ -96,12 +100,12 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const regularHours = regMin / 60, ot150Hours = ot50 / 60, ot200Hours = ot100 / 60, returnNbHours = retNb / 60;
 
   const pay = {
-    regularHours, baseRate: base, premium: prem, premiumOnOvertime, ot150Hours, ot200Hours, returnNbHours,
+    regularHours, baseRate: base, premium: prem, ccqPremium, premiumOnOvertime, ot150Hours, ot200Hours, returnNbHours,
     km: totalKm, kmRate: Number(profile?.km_rate) || 0, taxableBenefit: 0,
   };
 
   const earnings = [];
-  const printed = printedPayLines({ regularHours, ot150Hours, ot200Hours, returnNbHours, baseRate: base, premium: prem, premiumOnOvertime });
+  const printed = printedPayLines({ regularHours, ot150Hours, ot200Hours, returnNbHours, baseRate: base, premium: prem, ccqPremium, premiumOnOvertime });
   const regular = printed.regular;
   const overtime = printed.overtime;
   const returnNoBenefit = printed.returnNoBenefit; // base rate, no premium, no social benefits
@@ -113,6 +117,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const levies = computeCcqLevies({
     hours: totalHours, hourlyWage: base, overtime150Hours: ot150Hours, overtime200Hours: ot200Hours,
     vacationHolidaySickRate: CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
+    ccqPremiumPay: printed.ccqPremiumPay,
   });
   const pensionRate = CCQ_ELECTRICIAN_IC_C3.levels[status]?.employeePensionRate ?? CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate;
   const ccqAmounts = computeCcqBenefits({
@@ -125,6 +130,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
     date: payWeekDate,
     prelevementCcq: levies.prelevementCcq,
     caisseEducationSyndicale: levies.caisseEducationSyndicale,
+    ccqPremiumPay: printed.ccqPremiumPay,
   });
   const unionDuesFederalAnnual = (ccqAmounts.federalDeduction || 0) * (PAY_PERIODS_PER_YEAR[frequency] || 52);
 
@@ -141,9 +147,10 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
     provinceOfEmployment: "QC",
     payPeriod: { frequency },
     employee: {
-      // No per-employee TD1 → basic personal amount (engine default). Preview.
-      federalTaxProfile: { td1ClaimAmount: undefined, additionalTax: 0, annualDeductions: unionDuesFederalAnnual },
-      quebecTaxProfile: { personalTaxCredits: undefined, additionalTax: 0 },
+      // TD1 / TP-1015.3 amounts from Paramètres (employee_tax_profiles); none on file →
+      // basic personal amount (engine default).
+      federalTaxProfile: { td1ClaimAmount: taxProfile?.td1ClaimAmount ?? undefined, additionalTax: Number(taxProfile?.federalAdditionalTax) || 0, annualDeductions: unionDuesFederalAnnual },
+      quebecTaxProfile: { personalTaxCredits: taxProfile?.personalTaxCredits ?? undefined, additionalTax: Number(taxProfile?.quebecAdditionalTax) || 0 },
     },
     employer: {
       annualPayrollEstimate: Number(employer.annualPayrollEstimate) || 0,

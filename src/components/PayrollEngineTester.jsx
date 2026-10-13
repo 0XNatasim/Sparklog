@@ -19,6 +19,7 @@ import { useT } from "@/lib/use-t";
 import { isSubcontractorRole } from "@/lib/roles";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 import { loadHolidayDates } from "@/lib/company-holidays";
+import { usePayrollSettings } from "@/lib/payroll-settings";
 
 const TAX_YEAR = 2026;
 
@@ -189,7 +190,7 @@ function Row({ label, value, strong, tone }) {
 export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
-  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, storage: 0, otherReimb: 0 });
+  const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ccqPremium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, storage: 0, otherReimb: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
@@ -197,7 +198,20 @@ export default function PayrollEngineTester({ messier = false }) {
   const [seedLocked, setSeedLocked] = useState(false); // opening entered once → read-only afterwards
   const [ledger, setLedger] = useState([]); // per-week closing snapshots: [{ periodEnd, periodStart, snapshot }]
   const [asOfDate, setAsOfDate] = useState("");
-  const [employer, setEmployer] = useState({ annualPayrollEstimate: 750000, fssCategory: "general", cnesstRate: 2.0, workforceSkillsFundApplicable: false });
+  // Employer inputs start from Paramètres › Paie (payroll_employer_settings); still editable here.
+  // cnesstRate is in $ per 100 $ (as on the CNESST notice); empty = requires_review.
+  const [employer, setEmployer] = useState({ annualPayrollEstimate: 0, fssCategory: "general", cnesstRate: "", workforceSkillsFundApplicable: false });
+  const payrollSettings = usePayrollSettings();
+  useEffect(() => {
+    if (!payrollSettings.loaded) return;
+    const e = payrollSettings.employer;
+    setEmployer({
+      annualPayrollEstimate: e.annualPayrollEstimate || 0,
+      fssCategory: e.fssCategory || "general",
+      cnesstRate: e.cnesstRate == null ? "" : Math.round(e.cnesstRate * 100 * 10000) / 10000,
+      workforceSkillsFundApplicable: Boolean(e.workforceSkillsFundApplicable),
+    });
+  }, [payrollSettings]);
   const [result, setResult] = useState(null);
   const [reimb, setReimb] = useState({ km: 0, phone: 0, storage: 0, other: 0, total: 0 });
   // CCQ benefit modelling (folded into the DAS bases via baseAdjustments). Rates
@@ -272,7 +286,7 @@ export default function PayrollEngineTester({ messier = false }) {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
         .order("full_name", { ascending: true });
       // Subcontractors record time but are never part of the company's DAS payroll run.
       if (!cancelled) setEmployees((data || []).filter((employee) => !isSubcontractorRole(employee.role)));
@@ -287,6 +301,14 @@ export default function PayrollEngineTester({ messier = false }) {
     setWeekOptions([]); setSelectedWeek(""); setStartFromEnd(""); setWeekEndOverride("");
     if (!id) return;
     const profile = employees.find((e) => e.id === id);
+    // TD1 / TP-1015.3 amounts saved in Paramètres › Paie (empty = basic personal amount).
+    const tax = payrollSettings.taxProfiles.get(id);
+    setEmp({
+      td1ClaimAmount: tax?.td1ClaimAmount ?? "",
+      personalTaxCredits: tax?.personalTaxCredits ?? "",
+      additionalFederal: tax?.federalAdditionalTax || 0,
+      additionalQuebec: tax?.quebecAdditionalTax || 0,
+    });
     if (profile?.hourly_rate != null) {
       // Base wage + team-leader premium kept separate: regular is paid at base +
       // premium; overtime is on the BASE rate only (per the CCQ stub) unless the employee
@@ -295,6 +317,7 @@ export default function PayrollEngineTester({ messier = false }) {
         ...s,
         baseRate: Number(profile.hourly_rate) || 0,
         premium: Number(profile.team_leader_premium) || 0,
+        ccqPremium: Number(profile.team_leader_premium_ccq) || 0,
         premiumOnOvertime: Boolean(profile.team_leader_premium_overtime),
         kmRate: Number(profile.km_rate) || 0,
         phone: weeklyPhoneAmount(profile),
@@ -637,7 +660,9 @@ export default function PayrollEngineTester({ messier = false }) {
   useEffect(() => {
     if (!ccq.enabled) return;
     const hours = (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0);
+    const ccqPremiumPay = printedPayLines({ ...pay, baseRate: Number(pay.baseRate) || 0, premium: Number(pay.premium) || 0, ccqPremium: Number(pay.ccqPremium) || 0 }).ccqPremiumPay;
     const levies = computeCcqLevies({
+      ccqPremiumPay,
       hours,
       hourlyWage: Number(pay.baseRate) || 0,
       overtime150Hours: Number(pay.ot150Hours) || 0,
@@ -649,7 +674,7 @@ export default function PayrollEngineTester({ messier = false }) {
     setCcq((s) => (testRatesOn
       ? { ...s, prelevementCcq: levies.prelevementCcq }
       : { ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
-  }, [pay.regularHours, pay.ot150Hours, pay.ot200Hours, pay.baseRate, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
+  }, [pay, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
 
   // Run the calculation (phone-data / other reimbursements come from typed fields).
   function runCalculate() {
@@ -659,7 +684,7 @@ export default function PayrollEngineTester({ messier = false }) {
     // Regular is paid at base + premium; overtime is on the base rate only (CCQ), plus the
     // premium majorée when pay.premiumOnOvertime is set.
     // Each stub line (units × rate) is rounded to the cent before adding — see printedPayLines.
-    const printed = printedPayLines({ ...pay, baseRate: base, premium: prem });
+    const printed = printedPayLines({ ...pay, baseRate: base, premium: prem, ccqPremium: Number(pay.ccqPremium) || 0 });
     const regular = printed.regular;
     const overtime = printed.overtime;
     // Return time carved out beyond 8h: paid at base rate (no premium). It is taxable
@@ -698,6 +723,7 @@ export default function PayrollEngineTester({ messier = false }) {
       const unionDate = selWeek?.start ? selWeek.start.format("YYYY-MM-DD") : (asOfDate || undefined);
       const benefits = computeCcqBenefits({
         hours: totalHours,
+        ccqPremiumPay: printed.ccqPremiumPay,
         date: unionDate,
         // Équipement de sécurité is a per-hour indemnity (not a social benefit), so it
         // is still paid on the return time carved out of the avantages-sociaux base.
@@ -980,6 +1006,7 @@ export default function PayrollEngineTester({ messier = false }) {
           <Field label={t("payroll.regularHours")} value={pay.regularHours} onChange={setP("regularHours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.baseRate")} value={pay.baseRate} onChange={setP("baseRate")} disabled={payLocked} />
           <Field label={t("payroll.premium")} value={pay.premium} onChange={setP("premium")} disabled={payLocked} />
+          <Field label={t("payroll.ccqPremium")} value={pay.ccqPremium} onChange={setP("ccqPremium")} disabled={payLocked} />
           <Field label={t("payroll.ot150Hours")} value={pay.ot150Hours} onChange={setP("ot150Hours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.ot200Hours")} value={pay.ot200Hours} onChange={setP("ot200Hours")} step="0.25" disabled={payLocked} />
           <Field label={t("payroll.returnNbHours")} value={pay.returnNbHours} onChange={setP("returnNbHours")} step="0.25" disabled={payLocked} />

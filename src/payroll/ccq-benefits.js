@@ -223,7 +223,9 @@ export function unionDuesRuleFor(union, date) {
 
 // Base for the 13 % indemnité de congés (and the prélèvement): the wage EARNED at the
 // regular + overtime rates — regular hours at the base rate plus overtime hours weighted
-// by their multiplier (1,5× / 2×) — EXCLUDING the team-leader premium. This matches the
+// by their multiplier (1,5× / 2×) — EXCLUDING the non-CCQ premium (team_leader_premium).
+// The CCQ team-leader premium (team_leader_premium_ccq) is added by the callers as
+// `ccqPremiumPay` (owner decision 2026-10-13: in the 13 % and the prélèvement). This matches the
 // employer's talon: e.g. 31 h + 2 h temps double = (31 + 2×2) × 50,79 = 1 777,65 $, so
 // the 13 % lands on the overtime premium too (not on straight hours × base rate).
 export function vacationableWage({ hours = 0, hourlyWage = 0, overtime150Hours = 0, overtime200Hours = 0 } = {}) {
@@ -246,12 +248,14 @@ export function computeCcqLevies({
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
   prelevementRate = CCQ_PRELEVEMENT_RATE,
   caisseEducationPerHour = CCQ_CAISSE_EDUCATION_PER_HOUR,
+  // CCQ team-leader premium paid this period (dollars): in the 13 % and prélèvement bases.
+  ccqPremiumPay = 0,
 } = {}) {
   const round2 = (x) => Math.round(x * 100) / 100;
   const h = Math.max(0, Number(hours) || 0);
   const wage = Number(hourlyWage) || 0;
-  // Prélèvement base = the vacationable wage (base + OT rates) + the 13 % indemnity.
-  const vacBase = vacationableWage({ hours: h, hourlyWage: wage, overtime150Hours, overtime200Hours });
+  // Prélèvement base = the vacationable wage (base + OT rates + CCQ premium) + the 13 % indemnity.
+  const vacBase = vacationableWage({ hours: h, hourlyWage: wage, overtime150Hours, overtime200Hours }) + (Number(ccqPremiumPay) || 0);
   const vacation = round2(vacBase * vacationHolidaySickRate);
   const prelevementCcq = round2(prelevementRate * (vacBase + vacation));
   // Caisse d'éducation syndicale = worked hours × 0,02 $ (sectoral ICI), same for every union.
@@ -333,6 +337,8 @@ export function computeCcqBenefits({
   // null = use the sourced formula.
   pensionDeductionPerHour = null,
   unionDuesOverride = null,
+  // CCQ team-leader premium paid this period (dollars): added to the 13 % base.
+  ccqPremiumPay = 0,
 } = {}) {
   const round2 = (x) => Math.round(x * 100) / 100; // to the cent
   const h = Math.max(0, Number(hours) || 0);
@@ -343,7 +349,7 @@ export function computeCcqBenefits({
   // Indemnité de congés (13 %): on the wage earned at base + overtime rates (regular
   // hours + OT weighted by 1,5× / 2×), premium excluded — matches the talon. With no
   // overtime this equals baseWage × 13 %.
-  const vacation = round2(vacationableWage({ hours: h, hourlyWage: wage, overtime150Hours, overtime200Hours }) * vacationHolidaySickRate);
+  const vacation = round2((vacationableWage({ hours: h, hourlyWage: wage, overtime150Hours, overtime200Hours }) + (Number(ccqPremiumPay) || 0)) * vacationHolidaySickRate);
   // Avantage imposable MÉDIC (assurance vie + maladie) — the CCQ taxable benefit.
   const taxableBenefit = round2(h * taxableBenefitPerHour);
   // Employee pension contribution — on wage + indemnity; reduces taxable income.

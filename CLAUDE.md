@@ -292,7 +292,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.102)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.103)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -314,21 +314,25 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (22.03), 13 % (19.05), salaires (annexe C), retraite 9 % / 4,5 % (27.05). Écarts → §6.2.
 - [x] **CCQ — avantages sociaux patronaux** : grille ACQ du 26 avril 2026, colonne (8) : compagnon
   8,875 $/h, apprentis **7,955 $/h** (corrigé par niveau en V2.4.101).
-- [x] **CCQ — prélèvement** : 0,75 % salarié + 0,75 % employeur sur le salaire brut (salaire + 13 %),
-  grille ACQ note 10. Reste : prime de chef d'équipe dans la base ou non (règlement CCQ).
+- [x] **CCQ — prélèvement** : 0,75 % salarié + 0,75 % employeur sur le salaire brut (salaire + prime de
+  chef d'équipe CCQ + 13 %), grille ACQ note 10. Deux primes depuis V2.4.103 (migration 0083) :
+  `team_leader_premium` = prime **hors CCQ** (hors 13 % et prélèvement, comme les talons) ;
+  `team_leader_premium_ccq` = prime de chef d'équipe **CCQ** (dans le 13 % et le prélèvement).
 - [x] **CNT 2026** : 0,06 %, maximum 103 000 $ (TP-1015.G §7) — valeurs du code confirmées ; le
   drapeau `unvalidated` de `rules/2026.js` peut passer à `false` avec la citation.
-- [ ] **FDRCMO** : seuil 2 M$ et 1 % confirmés (TP-1015.G §8) ; il manque la **masse salariale
-  réelle** de Messier pour savoir s'il s'applique.
-- [ ] **CNESST** : l'**avis de cotisation de Messier** (taux de l'unité de classification). Aucun défaut
-  possible : le calcul renvoie `requires_review` tant qu'il manque.
+- [ ] **FDRCMO** : seuil 2 M$ et 1 % confirmés (TP-1015.G §8). La **masse salariale** se saisit dans
+  Configuration › Paramètres › Paie (`payroll_employer_settings`, V2.4.103) — reste à la saisir.
+- [ ] **CNESST** : le **taux de l'avis de cotisation** (par 100 $) se saisit au même endroit — reste à le
+  saisir. Sans lui, le calcul renvoie `requires_review` (plus aucun taux deviné : l'ancien défaut de
+  2 % de `DEFAULT_EMPLOYER` est retiré).
 - [ ] **Cotisations syndicales** : confirmer pour chaque employé son association **et son local**
   (FIPOE / local 568 : formule électricien par local et période d'apprentissage) ; date de début exacte
   de l'ancienne règle SQC (seule la fin, 2026-06-27, est sourcée).
 
 **B. Informations par employé (formulaires)**
-- [ ] **TD1 (fédéral) et TP-1015.3 (Québec)** de chaque employé : montants de crédits personnels et
-  impôt additionnel demandé. Non stockés aujourd'hui ; le calcul prend les montants de base par défaut.
+- [ ] **TD1 (fédéral) et TP-1015.3 (Québec)** de chaque employé : les montants se saisissent dans
+  Paramètres › Paie (`employee_tax_profiles`, gestionnaires/propriétaire seulement, V2.4.103) et sont
+  utilisés par Talons, DAS et Calcul — reste à les saisir. Vide = montant personnel de base.
 - [ ] **Échelon / période d'apprentissage** et taux horaire confirmés contre le certificat CCQ
   (liste de contrôle « CCQ monthly-report » du README).
 

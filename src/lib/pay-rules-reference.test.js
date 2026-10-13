@@ -24,8 +24,19 @@ describe("pay rules reference sheet", () => {
 
   it("names every per-employee option the Time rules screen offers", () => {
     const options = payRulesReference("en").flatMap((g) => g.rows).map((r) => r.option).filter(Boolean);
-    for (const field of ["first_trip_unpaid", "return_with_benefits_to_8h", "overtime_first_hour_double", "team_leader_premium_overtime"]) {
+    for (const field of ["first_trip_unpaid", "return_with_benefits_to_8h", "overtime_first_hour_double", "team_leader_premium_overtime", "team_leader_premium_ccq"]) {
       expect(options).toContain(field);
     }
+  });
+
+  it("shows the employer values saved in Paramètres › Paie", () => {
+    const rows = (ctx) => Object.fromEntries(payRulesReference("fr", ctx).flatMap((g) => g.rows).map((r) => [r.id, r]));
+    const empty = rows({});
+    expect([empty.cnesst.status, empty.fdrcmo.status, empty.tax.status]).toEqual(["missing", "missing", "missing"]);
+    const filled = rows({ employerSettings: { annual_payroll_estimate: 900000, cnesst_rate_per_100: 5.63, cnesst_year: 2026 }, taxForms: { filled: 3, total: 3 } });
+    expect(filled.cnesst.status).toBe("source");
+    expect(filled.cnesst.value).toContain("5,63");
+    expect(filled.fdrcmo.detail).toContain("ne s'applique pas");
+    expect(filled.tax.status).toBe("source");
   });
 });

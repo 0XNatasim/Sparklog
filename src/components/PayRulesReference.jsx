@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { useLanguage } from "@/components/language-provider";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
 import { PAY_RULE_DOCS, PAY_RULE_STATUSES, payRulesReference } from "@/lib/pay-rules-reference";
+import { supabase } from "../supabaseClient";
+import { isSubcontractorRole } from "@/lib/roles";
 
 const STATUS_VARIANT = { source: "success", messier: "info", review: "warning", missing: "destructive" };
 
@@ -17,7 +19,25 @@ export default function PayRulesReference() {
   const { language } = useLanguage();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-  const groups = useMemo(() => payRulesReference(language), [language]);
+  // What Paramètres › Paie holds, so the employer rows show the real values (best effort).
+  const [context, setContext] = useState({});
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const [settings, forms, people] = await Promise.all([
+        supabase.from("payroll_employer_settings").select("*").maybeSingle(),
+        supabase.from("employee_tax_profiles").select("user_id, td1_claim_amount, tp1015_3_credits"),
+        supabase.from("profiles").select("id, role, is_paused"),
+      ]);
+      if (!active) return;
+      const employees = (people.data || []).filter((p) => !isSubcontractorRole(p.role) && !p.is_paused);
+      const ids = new Set(employees.map((p) => p.id));
+      const filled = (forms.data || []).filter((f) => ids.has(f.user_id) && (f.td1_claim_amount != null || f.tp1015_3_credits != null)).length;
+      setContext({ employerSettings: settings.data || null, taxForms: { filled, total: employees.length } });
+    })().catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const groups = useMemo(() => payRulesReference(language, context), [language, context]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();

@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.102).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.103).
 > Coche les cases au fur et à mesure.
 
 ## Où on en est
@@ -20,8 +20,7 @@ Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · �
 
 ## Étape 1 — Tes décisions 👤
 
-La convention collective a été lue le 13 octobre et tes décisions sont entrées dans l'app. Il ne reste
-qu'une petite question pour ton comptable (dernier point).
+La convention collective a été lue le 13 octobre et toutes tes décisions sont entrées dans l'app.
 
 - [x] **Temps de retour à l'entrepôt.** Réglé le 13 octobre. Le retour n'est jamais du temps sup.
   Par défaut, il est payé au taux simple, sans avantages sociaux. Si la case « Temps de retour avec
@@ -43,9 +42,10 @@ qu'une petite question pour ton comptable (dernier point).
 - [x] **Samedi, dimanche, fériés.** Si quelqu'un travaille ces jours-là (par la feuille d'urgence), l'app paie
   comme la convention : le samedi est tout en temps sup., le dimanche et les fériés sont à 2× dès la 1re heure.
 - [x] **Dîner.** Les employés l'enlèvent déjà de leurs heures. Rien à changer dans l'app.
-- [ ] **Prélèvement CCQ.** C'est réglé : 0,75 % pour l'employé + 0,75 % pour l'employeur, soit 1,5 % au
-  total. Une question reste : la prime de chef d'équipe entre-t-elle dans le calcul ? Ton comptable
-  peut répondre.
+- [x] **Prélèvement CCQ et primes.** 0,75 % pour l'employé + 0,75 % pour l'employeur. Il y a maintenant
+  **deux primes** par employé, dans **Règles de temps › Chef d'équipe** :
+  - la **prime hors CCQ** (l'ancienne prime, comme sur les talons) : hors 13 % et hors prélèvement ;
+  - la **prime de chef d'équipe CCQ** : comprise dans le 13 % et dans le prélèvement.
 
 ➡️ Quand tu as tranché, dis-le à Claude : il met le code et la documentation à jour.
 
@@ -61,14 +61,16 @@ l'ACQ, guide TP-1015.G et tableau CCQ. Le détail, article par article, est dans
   apprentis. Le taux des apprentis est corrigé dans l'app (V2.4.101).
 - [x] **Normes du travail (CNT) 2026** : 0,06 %, jusqu'à 103 000 $ par employé. C'est ce que l'app utilise.
 - [ ] **Masse salariale annuelle de Messier.** La cotisation FDRCMO (1 %) ne s'applique qu'au-delà de 2 M$.
-  *Où :* ton comptable.
-- [ ] **Avis de cotisation CNESST de Messier** (votre taux). Sans lui, ce calcul reste « à réviser ».
-  *Où :* ton dossier CNESST en ligne.
+  *Où la trouver :* ton comptable. *Où l'inscrire :* **Configuration › Paramètres › Paie — employeur**.
+- [ ] **Avis de cotisation CNESST de Messier** : le taux par 100 $ de masse salariale. Sans lui, ce calcul
+  reste « à réviser ». *Où le trouver :* ton dossier CNESST en ligne. *Où l'inscrire :* au même endroit.
 
 ## Étape 3 — Infos de chaque employé 👤
 
 - [ ] **Formulaires TD1 (fédéral) et TP-1015.3 (Québec)** remplis et signés par chaque employé. Ils
-  donnent les crédits d'impôt personnels. L'app ne les a pas encore et prend donc les montants de base.
+  donnent les crédits d'impôt personnels. *Où l'inscrire :* **Configuration › Paramètres › Paie — TD1 /
+  TP-1015.3 des employés**. Inscris seulement les montants, jamais le NAS ni une copie du formulaire.
+  Tant qu'un employé n'a rien, l'app prend le montant personnel de base.
 - [ ] **Syndicat et local** de chaque employé (par ex. FIPOE, local 568…).
 - [ ] **Niveau** (compagnon ou apprenti, et quelle période) et **taux horaire**, vérifiés sur la carte ou
   le certificat CCQ. La liste de contrôle à remplir est à la fin du `README.md`.
