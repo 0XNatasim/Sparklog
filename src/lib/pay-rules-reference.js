@@ -6,7 +6,7 @@
 //         "messier" — owner (interim payroll authority) decision, beyond or without a source;
 //         "review"  — value in use but still to confirm;
 //         "missing" — data the employer must still supply (the calculation stays requires_review).
-import { ENGINE_VERSION, MEAL_AFTER_DAILY_MINUTES, CONGES_INDEMNITY_RATES } from "./payroll-calculations";
+import { ENGINE_VERSION, MEAL_DOUBLE_TIME_MINUTES, CONGES_INDEMNITY_RATES } from "./payroll-calculations";
 import { DEFAULT_STORAGE_AMOUNT } from "./weekly-allowances";
 import {
   CCQ_ELECTRICIAN_IC_C3, CCQ_PRELEVEMENT_RATE, CCQ_CAISSE_EDUCATION_PER_HOUR,
@@ -90,8 +90,8 @@ export function payRulesReference(lang = "fr", context = {}) {
         { id: "premium-ccq", label: L("Prime de chef d'équipe CCQ", "CCQ team-leader premium"), value: L("Montant $/h par employé (8 % = 4,06 $ pour un compagnon)", "Per-employee $/h (8% = $4.06 for a journeyman)"),
           detail: L("Payée sur les heures normales et comprise dans le 13 % et dans le prélèvement CCQ (décision du 13 octobre 2026). Option cochée : aussi en heures sup., majorée ×1,5 / ×2 (22.01).", "Paid on regular hours and included in the 13% and the CCQ levy (decision of October 13, 2026). Option on: also on overtime, multiplied ×1.5 / ×2 (22.01)."),
           option: "team_leader_premium_ccq", optionText: L("Montant : Règles de temps › Chef d'équipe", "Amount: Time rules › Team leader"), status: "source", sources: [["convention", "22.01, 22.03 1)"]] },
-        { id: "meal", label: L("Souper", "Supper"), value: L(`30 $ quand la journée payée dépasse ${hours(MEAL_AFTER_DAILY_MINUTES)}`, `$30 when the paid day goes past ${hours(MEAL_AFTER_DAILY_MINUTES)}`),
-          detail: L("En semaine seulement, un par jour, reçu et approbation du gestionnaire. Le 2e repas (après 4 autres heures sup.) n'est pas codé.", "Weekdays only, one per day, receipt and manager approval. The 2nd meal (after 4 more OT hours) is not coded."), status: "source", sources: [["convention", "20.07 3) c) i."]] },
+        { id: "meal", label: L("Souper", "Supper"), value: L(`30 $ dès ${hours(MEAL_DOUBLE_TIME_MINUTES)} payées à temps double (2×) dans la journée`, `$30 once ${hours(MEAL_DOUBLE_TIME_MINUTES)} of the day are paid at double time (2×)`),
+          detail: L("Le temps de retour ne compte pas. La 1re heure sup. de la semaine étant à 1,5×, le jour où elle tombe il faut 11 h 15 de travail ; les autres jours, 10 h 15. En semaine seulement, un par jour, approbation du gestionnaire. Le 2e repas (après 4 autres heures sup.) n'est pas codé.", "Return time does not count. The week's first overtime hour is paid 1.5×, so on the day it falls 11 h 15 of work is needed; on other days 10 h 15. Weekdays only, one per day, manager approval. The 2nd meal (after 4 more OT hours) is not coded."), status: "messier", sources: [["convention", "20.07 3) c) i."]] },
         { id: "parking", label: L("Stationnement", "Parking"), value: L("Jusqu'à 20 $ par jour, sur reçu", "Up to $20 per day, with receipt"), status: "source", sources: [["convention", "23.02 3)"]] },
         { id: "km", label: L("Kilométrage", "Mileage"), value: L("0,65 $/km par défaut (taux par employé)", "$0.65/km by default (per-employee rate)"),
           detail: L("La convention fixe un minimum de 0,49 $/km.", "The agreement sets a $0.49/km minimum."), option: "km_rate", optionText: L("Taux km (Règles de temps)", "Km rate (Time rules)"), status: "messier", sources: [["convention", "23.05 1)"]] },

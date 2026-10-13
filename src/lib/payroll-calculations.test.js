@@ -205,11 +205,10 @@ describe("Saturday, Sunday and statutory holidays", () => {
   });
 });
 
-describe("isMealEligible (supper: past 10 h = more than 600 min, weekday only)", () => {
-  it("600 min (exactly 10 h) → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 600 })).toBe(false));
-  it("601 min on a weekday → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 601 })).toBe(true));
-  it("605 min (10 h 05, the first 5-minute step) → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 605 })).toBe(true));
-  it("never eligible on a Saturday", () => expect(isMealEligible({ jobDate: "2026-06-06", dailyWorkMinutes: 700 })).toBe(false));
+describe("isMealEligible (supper: at least 2 h 15 paid at double time, weekday only)", () => {
+  it("134 min at 2× → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", doubleTimeMinutes: 134 })).toBe(false));
+  it("135 min at 2× (2 h 15) → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", doubleTimeMinutes: 135 })).toBe(true));
+  it("never eligible on a Saturday", () => expect(isMealEligible({ jobDate: "2026-06-06", doubleTimeMinutes: 300 })).toBe(false));
 });
 
 describe("calculateCongesIndemnity (CCQ 13% = 6% vacation + 5.5% holidays + 1.5% sick)", () => {

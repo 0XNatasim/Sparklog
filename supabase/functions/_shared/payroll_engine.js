@@ -249,15 +249,27 @@ export function calculateDailyTotals(jobs, options) {
   return days;
 }
 
-// Supper (30 $): a weekday whose paid time goes PAST 10 h (owner decision 2026-10-13;
-// convention ICI 20.07 3) c) i.: overtime « consécutives à une journée de dix heures »).
-// `dailyWorkMinutes` is the day's PAID work: for an employee with the "first trip unpaid"
-// option, pass the span minus dayFirstTripUnpaidMinutes (the database twin is
-// reconcile_overtime_meal, migration 0082).
-export const MEAL_AFTER_DAILY_MINUTES = 600;
-export function isMealEligible({ jobDate, dailyWorkMinutes }) {
+// Supper (30 $), owner decision 2026-10-13 (revised the same day): due on a weekday once
+// the day has at least 2,25 h PAID AT DOUBLE TIME (2×). Return-to-warehouse time never
+// counts (it is never overtime). Double time depends on the week — its first overtime hour
+// is paid 1.5× — so classify the day with its whole payroll week (dayDoubleTimeMinutes).
+// The database twin (reconcile_overtime_meal, migration 0086) only withdraws a pending claim
+// when the day cannot reach it (work without return under 8 h + 2,25 h).
+export const MEAL_DOUBLE_TIME_MINUTES = 135;
+export function isMealEligible({ jobDate, doubleTimeMinutes }) {
   const weekday = dayOfWeek(jobDate);
-  return weekday !== null && weekday !== 0 && weekday !== 6 && dailyWorkMinutes > MEAL_AFTER_DAILY_MINUTES;
+  return weekday !== null && weekday !== 0 && weekday !== 6 && (Number(doubleTimeMinutes) || 0) >= MEAL_DOUBLE_TIME_MINUTES;
+}
+
+// Minutes paid at 2× on `jobDate`, classified together with the employee's other jobs of
+// the same payroll week (`weekJobs`, any order) and their overtime options.
+export function dayDoubleTimeMinutes(weekJobs, jobDate, options = {}) {
+  const date = String(jobDate || "").slice(0, 10);
+  let total = 0;
+  for (const entry of calculatePayrollEntries(weekJobs || [], options).values()) {
+    if (String(entry.job.job_date).slice(0, 10) === date) total += entry.overtime100Minutes;
+  }
+  return total;
 }
 
 export function roundHours(minutes) {

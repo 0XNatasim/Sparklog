@@ -22,7 +22,7 @@ Sources, filed in `docs/reference/`:
 |---|---|---|
 | 8 h/day, 40 h/week, Mon–Fri | CC 20.02 1), 2) | ✅ confirmed |
 | First OT hour of the **week** at 1.5×, then 2× | CC 21.02 a) | ✅ confirmed |
-| Meal 30 $ for an electrician, past 10 h | CC 20.07 3) c) i.: OT « consécutives à une journée de dix heures » | ✅ since V2.4.102 (> 600 paid min, migration 0082); 2nd meal « après quatre autres heures » not coded |
+| Meal 30 $ for an electrician | CC 20.07 3) c) i.: OT « consécutives à une journée de dix heures » | Messier rule since V2.4.110: ≥ 2 h 15 paid at 2× in the day, return excluded (migration 0086); 2nd meal « après quatre autres heures » not coded |
 | Team-leader premium 8 % (4,06 $ = 8 % × 50,79) | CC 22.03 1); 22.01: OT majoration applies to 22.03 premiums | ✅ rate; per-employee option `team_leader_premium_overtime` (V2.4.102) pays it majorée on OT; off = regular hours only (Messier stubs) |
 | 13 % indemnity (6 + 5,5 + 1,5), base includes OT | CC 19.05 1) | ✅ confirmed |
 | Wages 50,79 / 25,40 / 30,47 / 35,55 / 43,17 | CC annexe C, ACQ (1) | ✅ confirmed |
@@ -79,10 +79,17 @@ Sources, filed in `docs/reference/`:
   `src/lib/payroll-calculations.test.js`.
 
 ## SUPPER — meal eligibility
-- Eligible when a weekday's paid time goes **past 10 h (> 600 min)** — owner decision
-  2026-10-13, convention 20.07 3) c) i. (was ≥ 615 min / 10h15 until 2026-10-12;
-  `payroll_rules` SUPPER v1 → v2, migration 0082). Twins: `isMealEligible` and
-  `reconcile_overtime_meal`.
+- Eligible when a weekday has **at least 2 h 15 (135 min) paid at double time (2×)** — owner
+  decision 2026-10-13 (revised the same day; `payroll_rules` SUPPER v3, migration 0086).
+  **Return-to-warehouse time never counts** (it is never overtime). Because the week's first
+  overtime hour is paid 1.5×, that is 10 h 15 of work on most days and 11 h 15 on the day
+  that hour falls; with the « first OT hour at double » option, 10 h 15 is enough on any day.
+- History: v1 ≥ 615 paid min until 2026-10-12; v2 > 600 paid min (return included), replaced
+  the same day (empty range kept for the record).
+- App: `isMealEligible({ jobDate, doubleTimeMinutes })` + `dayDoubleTimeMinutes(weekJobs, …)`
+  (engine), `src/lib/meal-eligibility.js` classifies the day with its Sunday → Saturday week.
+- Database: `reconcile_overtime_meal` only withdraws a pending claim when the day cannot reach
+  it (work without return < 8 h + 2 h 15 = 615 min); it does not repeat the weekly split.
 - Weekdays only; no weekend work.
 
 ## HOLIDAY — statutory holidays & construction vacation
