@@ -128,7 +128,7 @@ export default function EmployeesPanel() {
       // NAS lives in the restricted vault; only privileged users can see who has one.
       // Fetch presence only (not the value) — the value is revealed on demand + audited.
       if (privileged) {
-        const { data: nasRows } = await supabase.from("employee_sensitive").select("user_id").not("nas", "is", null);
+        const { data: nasRows } = await supabase.rpc("nas_presence");
         setNasSet(new Set((nasRows || []).map((r) => r.user_id)));
       }
       // P-6: loading is READ-ONLY. Never write compensation as a side effect of a render.

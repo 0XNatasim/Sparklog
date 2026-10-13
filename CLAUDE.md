@@ -16,7 +16,12 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 - Export/approval columns trigger-protected (`0011:31-57`); paused accounts write-contained (`0018`).
 - `push_approved_batch` re-checks manager role server-side, does an **atomic claim** to prevent
   double-export, and returns a **typed per-job result** so the client never force-approves.
-- NAS/SIN live in the RLS-gated `employee_sensitive` vault (`0026`); privilege is role-based (`owner`).
+- NAS/SIN live in the `employee_sensitive` vault (`0026`), RPC-only since `0084`: no table policy or grant
+  for the browser; `reveal_nas` / `set_nas` / `nas_presence` / `export_ccq_nas` are owner-only and audited
+  (bulk export needs a written reason, is rate-limited to 5/h, and the CCQ screen shows only a mask).
+- Overtime proof is atomic (`0084`): `save_own_job_with_overtime_evidence` checks the uploaded file, then
+  saves the job, the proof row and the manager notification in one transaction; `save_own_job` honours the
+  "proof captured" flag only when a proof exists for that day.
 - Job submission is idempotent: a per-new-entry `submission_key` + the `jobs_user_submission_key_uniq`
   constraint; `save_own_job` resolves a reused key to the committed row before inserting, under the same
   per-employee lock as the submission validator, so a retry or concurrent double-tap returns one job.
@@ -133,27 +138,12 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   Edge Function; service-role maintenance continues to bypass RLS.
 - **Status:** ✅ resolved
 
-### S-2 — Privileged NAS access bypasses the audited reveal — MEDIUM (scoped) — PARTIAL
-- Privilege is now **role-based** (`owner`) and revocable (`is_privileged()`, migrations `0043`+). The
-  **residual** concern: a privileged (owner) account can `select * from employee_sensitive` directly from
-  the browser (`CcqJsonExport.jsx`) and bulk-read NAS **un-audited**, bypassing the per-reveal `reveal_nas`.
-- **Fix (remaining):** no direct vault SELECT in the browser; generate sensitive exports server-side under
-  a distinct permission; require a purpose/reason and audit each bulk access; mask + rate-limit.
-- **Status:** ☐ open (privilege model already role-based/revocable)
-
 ### S-6 — Evidence/OCR content controls — RESOLVED
 - Evidence is checked by magic bytes and size, decoded under a pixel budget, resized, and re-encoded as
   JPEG before Storage/OCR, stripping EXIF/GPS metadata. Storage independently enforces MIME and size.
 - OCR runs server-side with a timeout and stores only `processed` / `needs_review` / `failed`; extracted
   message text is not retained. Existing raw OCR text is purged by migration `0065`.
 - **Status:** ✅ resolved
-
-### S-3b / robustness — Non-atomic employee submission — MEDIUM
-- `EmployeeForm.jsx:449-474,634-712`: storage upload precedes the row insert; a mid-sequence failure orphans
-  the object or flags a job as having evidence with no metadata; manager notification insert is best-effort.
-- **Fix:** idempotent `submit_job` edge function doing job + claims + evidence + notification in one txn;
-  stage attachments; reconcile orphans.
-- **Status:** ☐ open
 
 ### Low-value / deprioritized
 - **Wildcard CORS** on the approval functions is low value (they validate bearer tokens). Prioritize
@@ -169,10 +159,8 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 |---|---|---|---|---|
 | Employee | Zero/equal times | ✅ Rejected by `trg_validate_job_submission` | Rejected | C-5 (done) |
 | Employee | Offline Save, then reload | Durable IndexedDB draft, with stale-edit conflict prompt | Durable on-device draft | C-8 (done) |
-| Employee | Dropped conn after upload | Orphaned object / flagged job w/o metadata | Atomic or queued | S-3b |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
 | Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | AbortController / request id |
-| Manager | Sensitive export | Owner can bulk-read NAS un-audited from the browser | Audited server-side export | S-2 |
 | Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
 
 **Also tracked (lower tier):**
@@ -292,7 +280,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.104)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.105)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -380,8 +368,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   le déduit du cumul employé × taux employeur / taux employé, plafonné ; utilisé par Talons, DAS et Calcul.
   Les retenues s'arrêtent aux maximums annuels (RRQ 74 600 $ puis 85 000 $, AE 68 900 $, RQAP 103 000 $)
   à condition que le cumul d'avant Sparklog soit saisi (`payroll_ytd`) et les semaines comptabilisées.
-- [ ] S-2 export NAS côté serveur et audité ; S-3b soumission atomique (preuve + job) ; P-12 rollback
-  d'export qui ré-estampille le taux ; P-5 agrégation des coûts côté serveur ; P-11 N+1 `getUserById`.
+- [ ] P-12 rollback d'export qui ré-estampille le taux ; P-5 agrégation des coûts côté serveur ; P-11 N+1
+  `getUserById`. (S-2 export NAS et S-3b preuve atomique : faits en V2.4.105, migration 0084.)
 - [ ] Filtres gestionnaire : annuler les requêtes qui se chevauchent (AbortController / id de requête) ;
   adaptateur API commun (401 → rafraîchir, 5xx → file d'attente).
 - [ ] Lot 6 restant : découper `EmployeeForm.jsx` / `EmployeesPanel.jsx` avec des tests de composant
