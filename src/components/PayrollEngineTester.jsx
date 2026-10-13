@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import { BEFORE_PRESET, afterPreset, presetKindForWeekStart } from "@/lib/rate-presets";
 import TalonCompare from "@/components/TalonCompare";
-import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
+import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import { withHoursCumulative } from "@/lib/talon-import-core";
@@ -621,7 +621,7 @@ export default function PayrollEngineTester({ messier = false }) {
       enabled: on,
       // Start from the current sourced values so only the differing ones need typing.
       safety: on && s.safety === "" ? String(CCQ_ELECTRICIAN_IC_C3.safetyEquipmentPerHour) : s.safety,
-      social: on && s.social === "" ? String(CCQ_ELECTRICIAN_IC_C3.employerSocialBenefitPerHour) : s.social,
+      social: on && s.social === "" ? String(employerSocialBenefitRateFor(ccq.status)) : s.social,
     }));
   }
   useEffect(() => { setCmp(null); }, [calcCtx]);

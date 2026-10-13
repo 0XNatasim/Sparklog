@@ -62,24 +62,29 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   // Source: stub D0033-0007 transaction line "Équipement de sécurité" @ 0,8000 $/h.
   safetyEquipmentPerHour: 0.80,
 
-  // Employer "avantages sociaux" contribution shown on the stub as an imputed gain then
-  // deducted back (a display wash — NOT cash, NOT in any tax base). Per worked hour.
-  // ⚠️ SEEDED from stub D0033-0007 (355,00 $ / 40 h = 8,875 $/h); source the exact CCQ
-  // employer avantages-sociaux rate before finalized use.
-  employerSocialBenefitPerHour: 8.875,
-
-  // Salaires C3 en vigueur le 26 avril 2026 + taux de cotisation retraite salariale.
+  // Salaires C3 en vigueur le 26 avril 2026, taux de cotisation retraite salariale, et
+  // cotisation patronale « avantages sociaux » par heure travaillée. Celle-ci est
+  // affichée au talon comme un gain imputé puis retirée (écriture nulle : ni argent,
+  // ni assiette fiscale). Source : ACQ, « Taux horaires suggérés de la main-d'œuvre »,
+  // 26 avril 2026 (docs/reference/acq-grilles-taux-ici-2026-04-26.pdf), ligne
+  // Électricien, colonne (8) Avantages sociaux : compagnon 8,875 $, apprentis 7,955 $.
   levels: {
-    journeyman:  { label: "Compagnon",  hourlyWage: 50.79, employeePensionRate: 0.09 },
-    apprentice1: { label: "Apprenti 1", hourlyWage: 25.40, employeePensionRate: 0.045 },
-    apprentice2: { label: "Apprenti 2", hourlyWage: 30.47, employeePensionRate: 0.045 },
-    apprentice3: { label: "Apprenti 3", hourlyWage: 35.55, employeePensionRate: 0.045 },
-    apprentice4: { label: "Apprenti 4", hourlyWage: 43.17, employeePensionRate: 0.045 },
+    journeyman:  { label: "Compagnon",  hourlyWage: 50.79, employeePensionRate: 0.09,  employerSocialBenefitPerHour: 8.875 },
+    apprentice1: { label: "Apprenti 1", hourlyWage: 25.40, employeePensionRate: 0.045, employerSocialBenefitPerHour: 7.955 },
+    apprentice2: { label: "Apprenti 2", hourlyWage: 30.47, employeePensionRate: 0.045, employerSocialBenefitPerHour: 7.955 },
+    apprentice3: { label: "Apprenti 3", hourlyWage: 35.55, employeePensionRate: 0.045, employerSocialBenefitPerHour: 7.955 },
+    apprentice4: { label: "Apprenti 4", hourlyWage: 43.17, employeePensionRate: 0.045, employerSocialBenefitPerHour: 7.955 },
   },
 };
 
 // Ordered level keys, for building a picker.
 export const CCQ_LEVELS = Object.keys(CCQ_ELECTRICIAN_IC_C3.levels);
+
+// Employer avantages-sociaux rate per worked hour for a level (unknown level → compagnon).
+export function employerSocialBenefitRateFor(level) {
+  const levels = CCQ_ELECTRICIAN_IC_C3.levels;
+  return (levels[level] ?? levels.journeyman).employerSocialBenefitPerHour;
+}
 
 // ── Union dues (cotisation syndicale) by union ─────────────────────────────────
 // A FEDERAL income-tax deduction (T4127 U1); a Québec credit (not a base deduction).
@@ -311,7 +316,8 @@ export function computeCcqBenefits({
   // NOT a social benefit, so it is still paid on return-to-warehouse time that is
   // otherwise carved out of the "avantages sociaux" (pension/MÉDIC/13%) base.
   safetyEquipmentHours = null,
-  employerSocialBenefitPerHour = CCQ_ELECTRICIAN_IC_C3.employerSocialBenefitPerHour,
+  // null = the sourced rate for `level` (compagnon and apprentis differ).
+  employerSocialBenefitPerHour = null,
   union = "ftq_fipoe",
   level = "journeyman",
   // Pay week (YYYY-MM-DD). Selects the dated union-dues rule in force that week; omit for
@@ -376,7 +382,8 @@ export function computeCcqBenefits({
   const safetyEquipment = round2(safetyHours * safetyEquipmentPerHour);
   // Employer avantages-sociaux contribution — imputed gain shown then reversed (a
   // display wash: not cash, not taxed). Used only for the gross-up presentation.
-  const employerSocialBenefit = round2(h * employerSocialBenefitPerHour);
+  const socialRate = employerSocialBenefitPerHour ?? employerSocialBenefitRateFor(level);
+  const employerSocialBenefit = round2(h * socialRate);
   const prelevement = Number(prelevementCcq) || 0;
   const caisse = Number(caisseEducationSyndicale) || 0;
 

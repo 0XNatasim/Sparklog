@@ -500,7 +500,7 @@ official tables before any dollar figure is trusted.
 | Regular / 150% / 200% hourly rates | CCQ rate sync (`ccq_rate_snapshots`) | |
 | Avantages sociaux ($/h) | CCQ rate sync | |
 | Congés & jours fériés (13 % = 6 % vac + 5.5 % fériés + 1.5 % maladie) | CCQ chèque-vacances — **confirmed** | |
-| Prélèvement CCQ (code: **0.75 %** employee share; 1.5 % = employee + employer?) — rate and base to confirm | CCQ | |
+| Prélèvement CCQ: **0.75 %** employee share + 0.75 % employer share (ACQ grid, 26 Apr 2026, note 10) — team-leader premium in/out of the base still to confirm | CCQ | |
 | Contribution sectorielle ($0.02/h) | CCQ | |
 | Fonds d'indemnisation ($0.02/h) | CCQ | |
 | Fonds de formation ($0.20/h) | CCQ | |

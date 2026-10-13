@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCcqBenefits, computeUnionDuesAsPrinted, computeUnionDues, unionDuesRuleFor, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeUnionDuesAsPrinted, computeUnionDues, unionDuesRuleFor, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 
 const c = (d) => Math.round(d * 100);
@@ -63,6 +63,20 @@ describe("computeCcqBenefits", () => {
     const statutory = 259.95 + 352.25 + 159.13 + 31.96 + 10.57;
     const net = wages + b.safetyEquipment - statutory - b.netWithholdings;
     expect(net).toBeCloseTo(1127.94, 1); // matches the stub's printed "Paie nette"
+  });
+
+  it("uses the employer avantages-sociaux rate of the level (ACQ grid, 26 avril 2026)", () => {
+    // Électricien, colonne (8) : compagnon 8,875 $/h, apprentis (périodes 1 à 4) 7,955 $/h.
+    expect(employerSocialBenefitRateFor("journeyman")).toBe(8.875);
+    for (const level of ["apprentice1", "apprentice2", "apprentice3", "apprentice4"]) {
+      expect(employerSocialBenefitRateFor(level)).toBe(7.955);
+    }
+    expect(employerSocialBenefitRateFor("unknown")).toBe(8.875); // repli : compagnon
+    const apprentice = computeCcqBenefits({ hours: 40, hourlyWage: 25.40, employeePensionRate: 0.045, level: "apprentice1" });
+    expect(apprentice.employerSocialBenefit).toBe(318.2); // 7,955 × 40
+    // An explicit rate (bench test rates) still wins over the level's rate.
+    const forced = computeCcqBenefits({ hours: 40, hourlyWage: 25.40, level: "apprentice1", employerSocialBenefitPerHour: 8.32 });
+    expect(forced.employerSocialBenefit).toBe(332.8);
   });
 
   it("maps benefits onto the right statutory bases (MÉDIC is not a tax deduction)", () => {
