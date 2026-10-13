@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { Printer } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculateDailyTotals, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
@@ -115,11 +116,12 @@ export default function RecordOfEmploymentTab() {
             .select("period_start, period_end, insurable_income_ei, gross_income, vacation_pay, vacances_ccq")
             .eq("user_id", selectedId)
             .order("period_end", { ascending: true }),
-          supabase
+          fetchAllRows(() => supabase
             .from("jobs")
-            .select("job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes")
+            .select("id, job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes")
             .eq("user_id", selectedId)
-            .order("job_date", { ascending: true }),
+            .order("job_date", { ascending: true })
+            .order("id")),
         ]);
         if (le) throw le;
         if (je) throw je;

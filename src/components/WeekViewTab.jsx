@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { Card, CardContent } from "@/components/ui/card";
 import { calculateDailyTotals, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
@@ -41,7 +42,7 @@ export default function WeekViewTab() {
         const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
         const [{ data: profs, error: pErr }, { data: jobs, error: jErr }] = await Promise.all([
           supabase.from("profiles").select("id, full_name, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name", { ascending: true }),
-          supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", since),
+          fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", since).order("id")),
         ]);
         if (pErr) throw pErr;
         if (jErr) throw jErr;

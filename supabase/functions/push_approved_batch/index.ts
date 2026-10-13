@@ -190,17 +190,23 @@ serve(async (req) => {
       }
     };
 
-    // Profiles + auth emails for the claimed jobs only.
+    // Profiles (with their email) for the claimed jobs only, in ONE query. The Auth Admin
+    // API is called only for a profile without an email (P-11: it used to be one
+    // getUserById call per employee on every batch).
     const userIds = [...new Set(claimedJobs.map((j) => j.user_id))];
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, phone, role, hourly_rate, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
+      .select("id, full_name, email, phone, role, hourly_rate, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
       .in("id", userIds);
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
     const emails = new Map<string, string>();
+    for (const p of profiles || []) {
+      if (p.email) emails.set(p.id, String(p.email).trim());
+    }
+    const missingEmail = userIds.filter((uid) => !emails.get(uid));
     await Promise.all(
-      userIds.map(async (uid) => {
+      missingEmail.map(async (uid) => {
         const res = await admin.auth.admin.getUserById(uid);
         emails.set(uid, res?.data?.user?.email || "");
       })

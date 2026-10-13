@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { Download } from "lucide-react";
 import { supabase } from "@/supabaseClient";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { buildCcqWeeklyRecords, missingCcqFields } from "@/lib/ccq-export";
 import { isNonCcqRole } from "@/lib/roles";
 import { withTimeout } from "@/lib/utils";
@@ -42,7 +43,7 @@ export default function CcqJsonExport() {
       try {
         const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }, { data: nasRows }] = await withTimeout(
           Promise.all([
-            supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }),
+            fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }).order("id")),
             supabase.from("profiles").select("id, full_name, email, role, work_region, wage_schedule, union_association, hourly_rate, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name"),
             // Presence only (no value): empty for a non-owner, whose export then lacks NAS.
             supabase.rpc("nas_presence"),
