@@ -232,12 +232,15 @@ export function calculateDailyTotals(jobs, options) {
   return days;
 }
 
+// Supper (30 $): a weekday whose paid time goes PAST 10 h (owner decision 2026-10-13;
+// convention ICI 20.07 3) c) i.: overtime « consécutives à une journée de dix heures »).
 // `dailyWorkMinutes` is the day's PAID work: for an employee with the "first trip unpaid"
 // option, pass the span minus dayFirstTripUnpaidMinutes (the database twin is
-// reconcile_overtime_meal, migration 0077).
+// reconcile_overtime_meal, migration 0082).
+export const MEAL_AFTER_DAILY_MINUTES = 600;
 export function isMealEligible({ jobDate, dailyWorkMinutes }) {
   const weekday = dayOfWeek(jobDate);
-  return weekday !== null && weekday !== 0 && weekday !== 6 && Math.max(0, dailyWorkMinutes - 480) >= 135;
+  return weekday !== null && weekday !== 0 && weekday !== 6 && dailyWorkMinutes > MEAL_AFTER_DAILY_MINUTES;
 }
 
 export function roundHours(minutes) {

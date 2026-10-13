@@ -82,6 +82,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const payWeekDate = weekDate || (jobs || []).reduce((min, j) => (j?.job_date && (!min || j.job_date < min) ? j.job_date : min), null) || undefined;
   const base = Number(profile?.hourly_rate) || 0;
   const prem = Number(profile?.team_leader_premium) || 0;
+  const premiumOnOvertime = Boolean(profile?.team_leader_premium_overtime);
   const status = levelToStatus(profile?.apprentice_level);
   const union = UNION_CODE_TO_KEY[profile?.union_association] || "ftq_fipoe";
 
@@ -95,12 +96,12 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const regularHours = regMin / 60, ot150Hours = ot50 / 60, ot200Hours = ot100 / 60, returnNbHours = retNb / 60;
 
   const pay = {
-    regularHours, baseRate: base, premium: prem, ot150Hours, ot200Hours, returnNbHours,
+    regularHours, baseRate: base, premium: prem, premiumOnOvertime, ot150Hours, ot200Hours, returnNbHours,
     km: totalKm, kmRate: Number(profile?.km_rate) || 0, taxableBenefit: 0,
   };
 
   const earnings = [];
-  const printed = printedPayLines({ regularHours, ot150Hours, ot200Hours, returnNbHours, baseRate: base, premium: prem });
+  const printed = printedPayLines({ regularHours, ot150Hours, ot200Hours, returnNbHours, baseRate: base, premium: prem, premiumOnOvertime });
   const regular = printed.regular;
   const overtime = printed.overtime;
   const returnNoBenefit = printed.returnNoBenefit; // base rate, no premium, no social benefits

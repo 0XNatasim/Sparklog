@@ -33,7 +33,7 @@ export default function TimeRulesManager() {
   async function load() {
     // Deadline, evidence retention and the CCQ calendar live in Réglage.
     const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, team_leader_premium_overtime, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
     ]);
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
@@ -230,6 +230,9 @@ export default function TimeRulesManager() {
                   // Subcontractors: return always at the simple rate, first OT hour always double.
                   { field: "return_with_benefits_to_8h", label: t("employees.returnWithBenefits"), hint: t("employees.returnWithBenefitsHint"), locked: fixed, lockedValue: false },
                   { field: "overtime_first_hour_double", label: t("employees.otFirstHourDouble"), hint: t("employees.otFirstHourDoubleHint"), locked: fixed, lockedValue: true },
+                  ...(Number(row.team_leader_premium) > 0
+                    ? [{ field: "team_leader_premium_overtime", label: t("employees.premiumOnOvertime"), hint: t("employees.premiumOnOvertimeHint"), locked: fixed, lockedValue: false }]
+                    : []),
                 ];
                 return (
                   <div key={row.id} className="rounded border bg-muted/30 px-3 py-2">

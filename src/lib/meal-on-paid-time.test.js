@@ -4,7 +4,12 @@ import { describe, expect, it } from "vitest";
 import { dailyOvertimeEvidenceRequirement } from "./job-submission";
 import { dayFirstTripUnpaidMinutes, isMealEligible } from "./payroll-calculations";
 
+// Current body of reconcile_overtime_meal (0082); its re-check trigger is still the 0077 one.
 const sql = readFileSync(fileURLToPath(new URL(
+  "../../supabase/migrations/20261013150000_0082_meal_after_10h_and_premium_overtime.sql",
+  import.meta.url
+)), "utf8");
+const triggerSql = readFileSync(fileURLToPath(new URL(
   "../../supabase/migrations/20261009170000_0077_meal_on_paid_time.sql",
   import.meta.url
 )), "utf8");
@@ -24,15 +29,15 @@ describe("supper eligibility on paid time", () => {
     expect(eligible("16:30", false)).toBe(true);
   });
 
-  it("with the option the 30-minute first trip no longer counts: 600 min, not eligible", () => {
+  it("with the option the 30-minute first trip no longer counts: exactly 600 min (10 h), not eligible", () => {
     expect(paid("16:30", true)).toBe(600);
     expect(eligible("16:30", true)).toBe(false);
   });
 
-  it("is eligible again at exactly 615 paid minutes, and not one minute before", () => {
-    expect(paid("16:45", true)).toBe(615);
-    expect(eligible("16:45", true)).toBe(true);
-    expect(eligible("16:44", true)).toBe(false);
+  it("is eligible as soon as paid time goes past 10 h (601 min), not at 10 h", () => {
+    expect(paid("16:31", true)).toBe(601);
+    expect(eligible("16:31", true)).toBe(true);
+    expect(eligible("16:35", true)).toBe(true);
   });
 
   it("never applies on a weekend whatever the paid time", () => {
@@ -44,10 +49,15 @@ describe("supper eligibility on paid time", () => {
   });
 });
 
-describe("migration 0077 database contract", () => {
-  it("deducts the unpaid first trip before the 135-minute overtime test", () => {
+describe("migrations 0077/0082 database contract", () => {
+  it("deducts the unpaid first trip before the past-10-h test", () => {
     expect(sql).toContain("p.first_trip_unpaid");
-    expect(sql).toContain("(daily_minutes - coalesce(unpaid_trip_minutes, 0) - 480) >= 135");
+    expect(sql).toContain("(daily_minutes - coalesce(unpaid_trip_minutes, 0)) > 600");
+  });
+
+  it("dates the rule change in payroll_rules (SUPPER v1 ends, v2 starts)", () => {
+    expect(sql).toContain("set effective_to = date '2026-10-12'");
+    expect(sql).toContain('"min_daily_worked_minutes":601');
   });
 
   it("mirrors the engine ordering and clamp", () => {
@@ -57,7 +67,7 @@ describe("migration 0077 database contract", () => {
   });
 
   it("re-checks when the first job's Arrivée changes and still only deletes unreviewed claims", () => {
-    expect(sql).toContain("after update of depart, arrivee, fin, return_time_minutes on public.jobs");
+    expect(triggerSql).toContain("after update of depart, arrivee, fin, return_time_minutes on public.jobs");
     expect(sql).toContain("m.reviewed_by is null");
     expect(sql).not.toContain("overtime_evidence");
   });

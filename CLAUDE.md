@@ -292,7 +292,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.101)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.102)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 
@@ -350,16 +350,17 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   avec avantages jusqu'à 8 h. Repas et preuve > 8 h comptent toujours le retour. Détail :
   `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
   (à supprimer dans une migration ultérieure).
-- [ ] **Prime de chef d'équipe en temps sup.** : 22.01 exclut les primes de 22.03 de la règle « majoration
-  avant prime » → la prime de chef est **majorée** en heures sup. Le moteur (`earnings.js`) la paie
-  seulement sur les heures normales. À confirmer contre un talon puis corriger.
-- [ ] **Repas** : 20.07 3) c) dit « heures supplémentaires consécutives à une journée de **dix** heures »
-  (le code exige 10 h 15) et prévoit un 2e repas « après quatre autres heures supplémentaires ».
-- [ ] **MÉDIC** : la convention (27.03 A) 2) passe la cotisation salariale à **0,86 $** le 26 avril 2026 ;
-  le code garde 0,68 $ (maintien CCQ noté dans `ccq-benefits.js`). Confirmer avec un talon récent / la CCQ.
+- [x] **Prime de chef d'équipe en temps sup.** — option par employé `team_leader_premium_overtime`
+  (V2.4.102, migration 0082, décochée par défaut) : prime majorée ×1,5 / ×2 sur les heures sup.
+  (`printedPayLines`, talon, coûts). Décochée = heures normales seulement, comme les talons Messier.
+- [x] **Repas** — dès que la journée payée dépasse **10 h** (> 600 min), V2.4.102, migration 0082
+  (`isMealEligible`, `reconcile_overtime_meal`, `payroll_rules` SUPPER v2). Le 2e repas « après quatre
+  autres heures supplémentaires » (20.07) n'est pas codé.
+- [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
+  2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.
 - [ ] **Samedi, dimanche, fériés** : samedi = temps sup. (21.01), dimanche et fériés à 2× dès la 1re heure
   (21.02 b). Le moteur n'a pas de règle par jour ; il compte sur le blocage de la saisie.
-- [ ] **Dîner** : 20.02 3) prévoit ½ h ou 1 h non payée. Vérifier que la saisie Départ→Fin l'exclut.
+- [x] **Dîner** — les employés l'enlèvent déjà de leur saisie (confirmé le 2026-10-13).
 - [ ] `docs/rules/2026-das-payroll.md` dit l'impôt du Québec « placeholder », alors que `rules/2026.js`
   le marque vérifié contre TP-1015.F (2026-01) ; les commentaires de `EI` disent encore `_PLACEHOLDER`
   alors qu'il est vérifié (T4127). Les vrais restants : CNT, FDRCMO, CNESST.

@@ -22,8 +22,8 @@ Sources, filed in `docs/reference/`:
 |---|---|---|
 | 8 h/day, 40 h/week, Mon–Fri | CC 20.02 1), 2) | ✅ confirmed |
 | First OT hour of the **week** at 1.5×, then 2× | CC 21.02 a) | ✅ confirmed |
-| Meal 30 $ for an electrician | CC 20.07 3) c) i. | ✅ amount; ⚠️ the text says OT « consécutives à une journée de dix heures » (10 h, not 10 h 15) and a 2nd meal « après quatre autres heures » |
-| Team-leader premium 8 % (4,06 $ = 8 % × 50,79) | CC 22.03 1) | ✅ rate; ❌ CC 22.01: OT majoration **does** apply to 22.03 premiums — the app pays the premium on regular hours only |
+| Meal 30 $ for an electrician, past 10 h | CC 20.07 3) c) i.: OT « consécutives à une journée de dix heures » | ✅ since V2.4.102 (> 600 paid min, migration 0082); 2nd meal « après quatre autres heures » not coded |
+| Team-leader premium 8 % (4,06 $ = 8 % × 50,79) | CC 22.03 1); 22.01: OT majoration applies to 22.03 premiums | ✅ rate; per-employee option `team_leader_premium_overtime` (V2.4.102) pays it majorée on OT; off = regular hours only (Messier stubs) |
 | 13 % indemnity (6 + 5,5 + 1,5), base includes OT | CC 19.05 1) | ✅ confirmed |
 | Wages 50,79 / 25,40 / 30,47 / 35,55 / 43,17 | CC annexe C, ACQ (1) | ✅ confirmed |
 | Pension 9 % compagnon / 4,5 % apprenti on wage + indemnity | CC 27.05 2) | ✅ (apprentice minimum 0,80 $/h not coded; never binding at current rates) |
@@ -33,7 +33,7 @@ Sources, filed in `docs/reference/`:
 | Prélèvement CCQ 0,75 % employee, on wage + 13 % | ACQ (10): employer **also** pays 0,75 % of « salaire brut » | ✅ the old « 1,5 % » = both shares; premium in/out of the base still unsourced |
 | CNT 0,06 %, max 103 000 $ | TP-1015.G §7 | ✅ confirmed |
 | FDRCMO 1 % above 2 M$ payroll | TP-1015.G §8 | ✅ confirmed |
-| MÉDIC employee 0,68 $/h | CC 27.03 A) 2): « augmentée à 0,86 $ à compter du 26 avril 2026 » | ⚠️ conflicts with the CCQ hold noted in `ccq-benefits.js`; confirm with the CCQ |
+| MÉDIC employee 0,68 $/h | CC 27.03 A) 2) schedules 0,86 $ from 2026-04-26, but annexe R lets the parties reduce it; CCQ notice « Conventions collectives : du nouveau pour le rapport mensuel de mai 2026 » (2026-04-20): CASIC decision keeps 0,68 $ salarié / 2,93 $ patronal **until 2027-04-24** | ✅ 0,68 $ correct until 2027-04-24; re-check before that date (convention: 1,06 $ from 2027-04-25) |
 | Return-to-warehouse time | CC 23.04 2) a), 23.15: requested travel after the normal day is « temps de transport », « payé au taux de salaire non majoré, sans avantages sociaux ni indemnité de congés » | ✅ since V2.4.101 (engine 2.2.0): never overtime; default without benefits; Messier bonus option keeps benefits up to 8h — see RETURN below |
 | No weekend / holiday work | CC 21.01, 21.02 b): Saturday is OT; Sunday/holidays 200 % from the first hour | ⚠️ the engine has no day-of-week rule; it relies on entry being blocked |
 
@@ -75,7 +75,10 @@ Sources, filed in `docs/reference/`:
   `src/lib/payroll-calculations.test.js`.
 
 ## SUPPER — meal eligibility
-- Eligible when a person works **≥ 615 min (10h15) in a weekday**.
+- Eligible when a weekday's paid time goes **past 10 h (> 600 min)** — owner decision
+  2026-10-13, convention 20.07 3) c) i. (was ≥ 615 min / 10h15 until 2026-10-12;
+  `payroll_rules` SUPPER v1 → v2, migration 0082). Twins: `isMealEligible` and
+  `reconcile_overtime_meal`.
 - Weekdays only; no weekend work.
 
 ## HOLIDAY — statutory holidays & construction vacation
@@ -112,8 +115,14 @@ Sources, filed in `docs/reference/`:
 - All employees, for now: **trade 220, sector C (commercial)**.
 
 ## TEAM_LEADER_PREMIUM — premium application
-- The per-employee team-leader premium ($/h) is added to the base hourly rate and paid
-  on **all hours** (regular and overtime).
+- The per-employee team-leader premium ($/h) is paid on **regular hours** at the flat rate
+  (Messier stubs: « Régulier à taux horaire »).
+- Option `team_leader_premium_overtime` (Règles de temps, unchecked by default, V2.4.102):
+  the premium is also paid on **overtime hours, majorée** like the wage (×1,5 / ×2) —
+  convention 22.01 excludes the 22.03 premiums from « majoration avant prime ».
+- The 13 % indemnity and the prélèvement base still exclude the premium.
+- Lunch (dîner): 20.02 3) ½ h or 1 h unpaid — employees already leave it out of their
+  Départ→Fin entries (owner confirmation 2026-10-13); nothing to deduct in the app.
 
 ## Pending / not yet specified (do not guess — `requires_review`)
 - CCQ primary-source citations (document + section + effective dates) for every rule above.

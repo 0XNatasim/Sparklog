@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.101).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.102).
 > Coche les cases au fur et à mesure.
 
 ## Où on en est
@@ -17,25 +17,27 @@ Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · �
 
 ## Étape 1 — Tes décisions 👤
 
-La convention collective a été lue le 13 octobre. Elle tranche certains points, mais quelques choix restent
-à faire. Pour chacun, l'article de la convention est indiqué.
+La convention collective a été lue le 13 octobre et tes décisions sont entrées dans l'app. Il ne reste
+qu'une petite question pour ton comptable (dernier point).
 
 - [x] **Temps de retour à l'entrepôt.** Réglé le 13 octobre. Le retour n'est jamais du temps sup.
   Par défaut, il est payé au taux simple, sans avantages sociaux. Si la case « Temps de retour avec
   avantages sociaux jusqu'à 8h » est cochée dans **Règles de temps**, il garde ses avantages tant que la
   journée ne dépasse pas 8 h. Au départ, la case n'est cochée pour personne : à toi de la cocher pour
   les employés concernés.
-- [ ] **Prime de chef d'équipe en temps sup.** Selon la convention (art. 22.01), la prime de chef d'équipe
-  est **aussi majorée** en heures sup. (1,5× ou 2×). L'app la paie seulement sur les heures normales.
-  Regarde un talon de chef d'équipe avec du temps sup. : la prime y est-elle majorée ?
-- [ ] **Repas.** Selon la convention (art. 20.07), le repas de 30 $ est dû pour les heures sup. après une
-  journée de **10 h**, et un 2e repas après 4 autres heures. L'app exige 10 h 15 et ne donne qu'un repas.
-  Quelle règle appliques-tu ?
-- [ ] **Assurance MÉDIC.** La convention fait passer la retenue de 0,68 $ à **0,86 $/h** le 26 avril 2026.
-  L'app retient 0,68 $, à cause d'un maintien annoncé par la CCQ. Regarde un talon récent : quel montant
-  y est retenu ?
-- [ ] **Dîner.** La convention prévoit ½ h ou 1 h de dîner non payée. Les employés l'enlèvent-ils déjà de
-  leurs heures dans l'app ?
+- [x] **Prime de chef d'équipe en temps sup.** Nouvelle case « Prime de chef d'équipe majorée en temps
+  sup. » dans **Règles de temps**. Elle n'apparaît que pour les employés qui ont une prime.
+  - Cochée : la prime est aussi payée sur les heures sup., majorée comme le salaire (1,5× ou 2×). C'est
+    ce que prévoit la convention (art. 22.01).
+  - Décochée (par défaut) : la prime est payée sur les heures normales seulement, comme sur les talons
+    actuels de Messier.
+- [x] **Repas.** Le souper de 30 $ est dû dès que la journée payée dépasse **10 h**. Avant, il fallait
+  10 h 15. Le 2e repas que prévoit la convention, après 4 autres heures sup., n'est pas dans l'app.
+- [x] **Assurance MÉDIC.** L'app a raison de retenir **0,68 $/h**. La convention prévoyait 0,86 $ à partir
+  du 26 avril 2026. Mais la CCQ a annoncé le 20 avril 2026 que le comité des avantages sociaux (CASIC)
+  garde 0,68 $ pour l'employé (et 2,93 $ pour l'employeur) **jusqu'au 24 avril 2027**. ⚠️ À revoir
+  avant cette date : la convention prévoit 1,06 $ ensuite.
+- [x] **Dîner.** Les employés l'enlèvent déjà de leurs heures. Rien à changer dans l'app.
 - [ ] **Prélèvement CCQ.** C'est réglé : 0,75 % pour l'employé + 0,75 % pour l'employeur, soit 1,5 % au
   total. Une question reste : la prime de chef d'équipe entre-t-elle dans le calcul ? Ton comptable
   peut répondre.

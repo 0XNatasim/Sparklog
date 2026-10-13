@@ -166,9 +166,10 @@ describe("return-to-warehouse time: never overtime, benefits only up to 8h when 
 });
 
 
-describe("isMealEligible (supper: >8h + 2h15 = 615 min, weekday only)", () => {
-  it("614 min → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 614 })).toBe(false));
-  it("615 min on a weekday → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 615 })).toBe(true));
+describe("isMealEligible (supper: past 10 h = more than 600 min, weekday only)", () => {
+  it("600 min (exactly 10 h) → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 600 })).toBe(false));
+  it("601 min on a weekday → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 601 })).toBe(true));
+  it("605 min (10 h 05, the first 5-minute step) → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 605 })).toBe(true));
   it("never eligible on a Saturday", () => expect(isMealEligible({ jobDate: "2026-06-06", dailyWorkMinutes: 700 })).toBe(false));
 });
 
