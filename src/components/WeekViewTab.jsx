@@ -9,6 +9,7 @@ import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { useHolidayDates } from "@/lib/company-holidays";
+import WeeklyReportButton from "@/components/WeeklyReportButton";
 
 const isNonEmptyOT = (ot) => String(ot || "").trim().length > 0;
 function fmtHM(hoursFloat) {
@@ -103,15 +104,18 @@ export default function WeekViewTab() {
     <div className="space-y-3">
       <Card>
         <CardContent className="p-4">
-          <label className="block text-xs sm:max-w-sm">
-            <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
-            <select value={selectedWeek} onChange={(e) => { setSelectedWeek(e.target.value); setOpenId(null); }} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
-              {weeks.map((w) => (
-                <option key={w.key} value={w.key}>{t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
-              ))}
-              {weeks.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <label className="block w-full text-xs sm:max-w-sm">
+              <span className="text-muted-foreground">{t("payroll.weekSelect")}</span>
+              <select value={selectedWeek} onChange={(e) => { setSelectedWeek(e.target.value); setOpenId(null); }} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
+                {weeks.map((w) => (
+                  <option key={w.key} value={w.key}>{t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM YYYY")}</option>
+                ))}
+                {weeks.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}
+              </select>
+            </label>
+            <WeeklyReportButton week={week} />
+          </div>
           {error && <div className="mt-3 text-xs text-destructive">{error}</div>}
           {loading && <div className="mt-3 text-xs text-muted-foreground">{t("common.working")}</div>}
         </CardContent>
