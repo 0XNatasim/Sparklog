@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { supabase } from "../supabaseClient";
+import { classifyApiError } from "./api-errors";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -69,17 +70,29 @@ export function refreshSessionOnce() {
 // Supabase free-tier cold start without surfacing an error to the user. The factory
 // is intentional: Supabase query builders/promises must be recreated for each
 // attempt. Only the final failure is thrown.
+//
+// A refusal by the server itself (validation, overlap, permission, conflict — see
+// classifyApiError) is thrown at once: retrying a deterministic error only delays the
+// message and re-runs the query. Session (401) and transient failures keep the
+// refresh-then-retry behaviour.
 export async function withRetry(makeQuery, ms, { retries = 2, backoffMs = 400, signal } = {}) {
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const result = await withTimeout(makeQuery(), ms);
-      if (result?.error) throw result.error;
+      if (result?.error) {
+        // Keep the HTTP status on the error so callers can classify it.
+        if (result.status && typeof result.error === "object" && result.error.status == null) {
+          try { result.error.status = result.status; } catch { /* frozen error object */ }
+        }
+        throw result.error;
+      }
       return result;
     } catch (e) {
       lastError = e;
       // A request replaced by a newer one (AbortController) is not retried.
       if (attempt === retries || signal?.aborted) break;
+      if (classifyApiError(e) === "permanent") break;
       if (attempt === 0) {
         await refreshSessionOnce();
       }

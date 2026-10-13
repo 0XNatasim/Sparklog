@@ -160,7 +160,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Employee | Zero/equal times | ✅ Rejected by `trg_validate_job_submission` | Rejected | C-5 (done) |
 | Employee | Offline Save, then reload | Durable IndexedDB draft, with stale-edit conflict prompt | Durable on-device draft | C-8 (done) |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
-| Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
 
 **Also tracked (lower tier):**
 - **C-8 offline drafts (done):** schema-versioned IndexedDB drafts are keyed by owner and job; edit drafts
@@ -275,7 +274,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.107)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.108)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -370,7 +369,11 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
   pas une requête annulée. Appliqué à Feuilles de temps (liste, compteurs, anomalies, « charger plus »),
   Journal et Journal employé. Reproduit puis corrigé dans Chromium (réponse lente d'un ancien filtre).
-- [ ] Adaptateur API commun (401 → rafraîchir, 5xx → file d'attente).
+- [x] Erreurs réseau / serveur (V2.4.108) : `src/lib/api-errors.js` (`classifyApiError` : auth / transient /
+  permanent / unknown). `withRetry` ne réessaie plus un refus du serveur (code SQL ou 4xx) ; 401 et pannes
+  passagères gardent rafraîchir-puis-réessayer. Fiche de temps : après une panne passagère, la fiche reste sur
+  l'appareil et est renvoyée seule (retour du réseau, ou 15 / 30 / 60 / 120 / 240 s), même clé de soumission,
+  arrêt si l'employé la modifie. Vérifié dans Chromium : coupure réseau, 503, refus (aucun réessai).
 - [ ] Lot 6 restant : découper `EmployeeForm.jsx` / `EmployeesPanel.jsx` avec des tests de composant
   (jsdom + testing-library à ajouter) ; corriger les ~63 avertissements ESLint écran par écran.
 - [ ] Optionnel : charger une seule langue de `i18n.js` (nécessite de retirer le repli anglais).

@@ -24,6 +24,7 @@ import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
 import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
+import { classifyApiError } from "@/lib/api-errors";
 import { submitSavedJob } from "@/lib/submit-job";
 import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
@@ -81,6 +82,9 @@ function formatReturnMinutes(minutes) {
 }
 
 
+// Delays (seconds) between automatic resends of a save that failed on a network/server outage.
+const AUTO_RESEND_DELAYS_S = [15, 30, 60, 120, 240];
+
 export default function EmployeeForm() {
   const { user, role } = useAuth();
   const isManager = isManagerRole(String(role || "").toLowerCase());
@@ -120,6 +124,8 @@ export default function EmployeeForm() {
   const parkingInputRef = useRef(null);
   const lastSaveErrorRef = useRef("");
   const lastSaveFailureRef = useRef(null); // raw error of the last failed save (offline vs refused)
+  // Automatic resend after a network / server outage: { minutes, km, mode, attempt, fieldsKey }.
+  const [autoResend, setAutoResend] = useState(null);
   const loadedReturnRef = useRef({ minutes: 0, km: 0 });
   const autoSubmitDoneRef = useRef(false);
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -678,7 +684,38 @@ export default function EmployeeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, loadingEdit, draftReady, editLoadFailed, locked, isViewMode]);
 
-  async function saveWithReturn(minutes, km, requestedMode = pendingSaveMode) {
+  const entryFieldsKey = [job_date, ot, depart, arrivee, fin, km_aller].join("|");
+  // The employee changed the entry since the failure: their next Save decides, nothing is resent.
+  const pendingResend = autoResend && autoResend.fieldsKey === entryFieldsKey ? autoResend : null;
+  useEffect(() => {
+    if (!pendingResend) return undefined;
+    let fired = false;
+    const fire = () => {
+      if (fired) return;
+      fired = true;
+      saveWithReturn(pendingResend.minutes, pendingResend.km, pendingResend.mode, pendingResend.attempt + 1);
+    };
+    window.addEventListener("online", fire);
+    // Offline: wait for the connection. Online (server outage): retry after a growing delay.
+    const timer = navigator.onLine === false ? null : setTimeout(fire, AUTO_RESEND_DELAYS_S[pendingResend.attempt] * 1000);
+    return () => { window.removeEventListener("online", fire); if (timer) clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingResend]);
+
+  // A save that failed on a network loss or a server outage (not a refusal) is resent by
+  // itself: the entry stays on the device and the RPC is idempotent (same submission key),
+  // so a resend can never create a second job. Stops when the employee edits the entry.
+  function scheduleAutoResend(error, minutes, km, mode, attempt) {
+    if (savingRef.current) return; // another save is running: it decides
+    if (classifyApiError(error) !== "transient" || attempt >= AUTO_RESEND_DELAYS_S.length) {
+      setAutoResend(null);
+      return;
+    }
+    setAutoResend({ minutes, km, mode, attempt, fieldsKey: entryFieldsKey });
+  }
+
+  async function saveWithReturn(minutes, km, requestedMode = pendingSaveMode, resendAttempt = 0) {
+    setAutoResend(null);
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
@@ -692,6 +729,7 @@ export default function EmployeeForm() {
       lastSaveErrorRef.current = message;
       setErr(isOfflineError(error) ? "" : message);
       setReturnSaveError(message);
+      scheduleAutoResend(error, minutes, km, requestedMode, resendAttempt);
       return;
     } finally {
       setReturnCheckBusy(false);
@@ -704,6 +742,7 @@ export default function EmployeeForm() {
     const saved = await saveJob(requestedMode, returnValues);
     if (!saved) {
       setReturnSaveError(lastSaveErrorRef.current || t("form.return.saveError"));
+      scheduleAutoResend(lastSaveFailureRef.current, minutes, km, requestedMode, resendAttempt);
       return;
     }
 
@@ -1145,6 +1184,11 @@ export default function EmployeeForm() {
             )}
           </div>
         )}
+        {pendingResend && (
+          <div className="rounded-md border border-info/40 bg-info/10 px-3 py-2 text-sm text-info" role="status">
+            {t("form.autoResend.pending", { attempt: pendingResend.attempt + 1, max: AUTO_RESEND_DELAYS_S.length })}
+          </div>
+        )}
         {managerEntryBy && (
           <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning" role="status">
             {t("form.managerEntry.banner", { name: managerEntryBy })}
@@ -1474,6 +1518,7 @@ export default function EmployeeForm() {
           {returnSaveError && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
               {returnSaveError}
+              {pendingResend && <p className="mt-1 text-xs text-info">{t("form.autoResend.pending", { attempt: pendingResend.attempt + 1, max: AUTO_RESEND_DELAYS_S.length })}</p>}
             </div>
           )}
           {returnStep === "last" && (
