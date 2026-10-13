@@ -203,6 +203,16 @@ describe("pay lines printed to the cent (stubs S35, S36)", () => {
     expect(on.overtime).toBe(Math.round((76.19 + 203.16 + 6.09 + 16.24) * 100) / 100);
     expect(on.regular).toBe(off.regular); // regular lines unchanged
   });
+  it("prints the CCQ team-leader premium on its own lines and returns it for the CCQ bases", () => {
+    const l = printedPayLines({ regularHours: 40, ot150Hours: 1, baseRate: 50.79, premium: 1, ccqPremium: 4.06 });
+    expect(l.regularCcqPremium).toBe(162.4);
+    expect(l.ot150CcqPremium).toBe(0); // regular hours only without the option
+    expect(l.ccqPremiumPay).toBe(162.4);
+    expect(l.regular).toBe(Math.round((2031.6 + 40 + 162.4) * 100) / 100);
+    const ot = printedPayLines({ regularHours: 40, ot150Hours: 1, baseRate: 50.79, ccqPremium: 4.06, premiumOnOvertime: true });
+    expect(ot.ot150CcqPremium).toBe(6.09);
+    expect(ot.ccqPremiumPay).toBe(168.49);
+  });
   it("temps et demi uses the rate printed to the cent (76,185 → 76,19)", () => {
     expect(printedPayLines({ ot150Hours: 2, baseRate: 50.79 }).ot150).toBe(152.38);
   });

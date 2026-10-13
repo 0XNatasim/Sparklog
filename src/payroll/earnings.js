@@ -76,10 +76,17 @@ export function printedLineAmount(units, rate) {
 // premium is also paid on overtime hours, majorée like the wage (×1,5 / ×2) — convention ICI
 // 22.01 excludes the 22.03 premiums from « majoration avant prime ». Off: the premium is paid on
 // regular hours only, as Messier's stubs print it.
-export function printedPayLines({ regularHours = 0, ot150Hours = 0, ot200Hours = 0, returnNbHours = 0, baseOnlyHours = 0, baseRate = 0, premium = 0, premiumOnOvertime = false } = {}) {
+// `premium` is the non-CCQ premium (team_leader_premium); `ccqPremium` the CCQ team-leader
+// premium (team_leader_premium_ccq), printed on its own lines and returned as `ccqPremiumPay`
+// so the CCQ layer can put it in the 13 % and prélèvement bases. `premiumOnOvertime` majore both.
+export function printedPayLines({ regularHours = 0, ot150Hours = 0, ot200Hours = 0, returnNbHours = 0, baseOnlyHours = 0, baseRate = 0, premium = 0, ccqPremium = 0, premiumOnOvertime = false } = {}) {
   const r2 = (x) => Math.round(x * 100) / 100;
   const base = Number(baseRate) || 0;
   const prem = Number(premium) || 0;
+  const ccq = Number(ccqPremium) || 0;
+  const regularCcqPremium = printedLineAmount(regularHours, ccq);
+  const ot150CcqPremium = premiumOnOvertime ? printedLineAmount(ot150Hours, r2(ccq * 1.5)) : 0;
+  const ot200CcqPremium = premiumOnOvertime ? printedLineAmount(ot200Hours, r2(ccq * 2)) : 0;
   const regularBase = printedLineAmount(regularHours, base);
   const regularPremium = printedLineAmount(regularHours, prem);
   const ot150 = printedLineAmount(ot150Hours, r2(base * 1.5));
@@ -92,7 +99,10 @@ export function printedPayLines({ regularHours = 0, ot150Hours = 0, ot200Hours =
   const baseOnly = printedLineAmount(baseOnlyHours, base);
   return {
     regularBase, regularPremium, ot150, ot200, ot150Premium, ot200Premium, returnNoBenefit, baseOnly,
-    regular: r2(regularBase + regularPremium), // « Salaire régulier fixe » + « Régulier à taux horaire »
-    overtime: r2(ot150 + ot200 + ot150Premium + ot200Premium),
+    regularCcqPremium, ot150CcqPremium, ot200CcqPremium,
+    ccqPremiumPay: r2(regularCcqPremium + ot150CcqPremium + ot200CcqPremium),
+    // « Salaire régulier fixe » + « Régulier à taux horaire » + prime CCQ
+    regular: r2(regularBase + regularPremium + regularCcqPremium),
+    overtime: r2(ot150 + ot200 + ot150Premium + ot200Premium + ot150CcqPremium + ot200CcqPremium),
   };
 }

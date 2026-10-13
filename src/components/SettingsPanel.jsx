@@ -8,10 +8,17 @@ import Fold from "@/components/ui/fold";
 import { ANOMALY_LIMITS, anomalyLimitsFromSettings } from "@/lib/job-anomalies";
 import { companyDate } from "@/lib/company-time";
 import { useT } from "@/lib/use-t";
+import PayrollSettings from "@/components/PayrollSettings";
 
-// Paramètres: company-wide editable parameters. Congés and Formulaires are their own pages.
+// Paramètres: company-wide editable parameters, plus the payroll parameters (employer settings,
+// employees' TD1 / TP-1015.3). Congés and Formulaires are their own pages.
 export default function SettingsPanel() {
-  return <GeneralSettings />;
+  return (
+    <div className="space-y-4">
+      <GeneralSettings />
+      <PayrollSettings />
+    </div>
+  );
 }
 
 function GeneralSettings() {

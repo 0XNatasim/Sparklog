@@ -30,7 +30,7 @@ Sources, filed in `docs/reference/`:
 | Employer avantages sociaux 8,875 $/h compagnon, **7,955 $/h apprentis** | ACQ (8) | ✅ per level since V2.4.101 |
 | Taxable benefit 3,377 $/h | CCQ-AI, code 220, C3 | ✅ confirmed |
 | Safety equipment 0,80 $/h | CC 25.05 3), ACQ (13) | ✅ confirmed |
-| Prélèvement CCQ 0,75 % employee, on wage + 13 % | ACQ (10): employer **also** pays 0,75 % of « salaire brut » | ✅ the old « 1,5 % » = both shares; premium in/out of the base still unsourced |
+| Prélèvement CCQ 0,75 % employee, on wage + CCQ team-leader premium + 13 % | ACQ (10): employer **also** pays 0,75 % of « salaire brut »; owner decision 2026-10-13 for the premium | ✅ the old « 1,5 % » = both shares; the non-CCQ premium stays out |
 | CNT 0,06 %, max 103 000 $ | TP-1015.G §7 | ✅ confirmed |
 | FDRCMO 1 % above 2 M$ payroll | TP-1015.G §8 | ✅ confirmed |
 | MÉDIC employee 0,68 $/h | CC 27.03 A) 2) schedules 0,86 $ from 2026-04-26, but annexe R lets the parties reduce it; CCQ notice « Conventions collectives : du nouveau pour le rapport mensuel de mai 2026 » (2026-04-20): CASIC decision keeps 0,68 $ salarié / 2,93 $ patronal **until 2027-04-24** | ✅ 0,68 $ correct until 2027-04-24; re-check before that date (convention: 1,06 $ from 2027-04-25) |
@@ -118,13 +118,17 @@ Sources, filed in `docs/reference/`:
 ## TRADE_SECTOR — classification default
 - All employees, for now: **trade 220, sector C (commercial)**.
 
-## TEAM_LEADER_PREMIUM — premium application
-- The per-employee team-leader premium ($/h) is paid on **regular hours** at the flat rate
-  (Messier stubs: « Régulier à taux horaire »).
-- Option `team_leader_premium_overtime` (Règles de temps, unchecked by default, V2.4.102):
-  the premium is also paid on **overtime hours, majorée** like the wage (×1,5 / ×2) —
-  convention 22.01 excludes the 22.03 premiums from « majoration avant prime ».
-- The 13 % indemnity and the prélèvement base still exclude the premium.
+## TEAM_LEADER_PREMIUM — premium application (owner decisions 2026-10-13)
+Two separate per-employee premiums ($/h, Règles de temps › Chef d'équipe):
+- **Non-CCQ premium** (`team_leader_premium`, e.g. 4,06 $/h on stub D0033-0007): paid on
+  regular hours at the flat rate (« Régulier à taux horaire »); **outside** the 13 % indemnity
+  and the CCQ prélèvement, as Messier's stubs print it.
+- **CCQ team-leader premium** (`team_leader_premium_ccq`, convention 22.03, V2.4.103): paid
+  on regular hours on its own line (« Prime chef d'équipe CCQ »); **included in the 13 %
+  indemnity and the 0,75 % CCQ prélèvement** bases.
+- Option `team_leader_premium_overtime` (unchecked by default): both premiums are also paid on
+  **overtime hours, majorées** like the wage (×1,5 / ×2) — convention 22.01.
+- Union dues and the pension contribution are unchanged (wage only) — not specified.
 - Lunch (dîner): 20.02 3) ½ h or 1 h unpaid — employees already leave it out of their
   Départ→Fin entries (owner confirmation 2026-10-13); nothing to deduct in the app.
 

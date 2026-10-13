@@ -28,12 +28,13 @@ export default function TimeRulesManager() {
 
   const [teamLeaderEmployee, setTeamLeaderEmployee] = useState("");
   const [teamLeaderPremium, setTeamLeaderPremium] = useState("");
+  const [teamLeaderCcqPremium, setTeamLeaderCcqPremium] = useState("");
   const [teamLeaderBusy, setTeamLeaderBusy] = useState(false);
 
   async function load() {
     // Deadline, evidence retention and the CCQ calendar live in Réglage.
     const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, team_leader_premium_overtime, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name"),
       supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
     ]);
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
@@ -107,19 +108,24 @@ export default function TimeRulesManager() {
     const e = employees.find((row) => row.id === id);
     const current = Number(e?.team_leader_premium) || 0;
     setTeamLeaderPremium(current > 0 ? String(current) : "");
+    const currentCcq = Number(e?.team_leader_premium_ccq) || 0;
+    setTeamLeaderCcqPremium(currentCcq > 0 ? String(currentCcq) : "");
   }
 
   async function saveTeamLeader() {
     if (!teamLeaderEmployee) { setMessage(t("teamLeader.selectEmployee")); return; }
     const premium = parseFloat(String(teamLeaderPremium).replace(",", ".")) || 0;
+    const ccqPremium = parseFloat(String(teamLeaderCcqPremium).replace(",", ".")) || 0;
+    if (premium < 0 || ccqPremium < 0) { setMessage(t("timeRules.payRules.invalidAmount")); return; }
     setTeamLeaderBusy(true);
-    const { error } = await supabase.from("profiles").update({ team_leader_premium: premium }).eq("id", teamLeaderEmployee);
+    const { error } = await supabase.from("profiles").update({ team_leader_premium: premium, team_leader_premium_ccq: ccqPremium }).eq("id", teamLeaderEmployee);
     if (error) {
       setMessage(error.message);
     } else {
       setMessage(t("teamLeader.saved"));
       setTeamLeaderEmployee("");
       setTeamLeaderPremium("");
+      setTeamLeaderCcqPremium("");
       await load();
     }
     setTeamLeaderBusy(false);
@@ -162,7 +168,7 @@ export default function TimeRulesManager() {
 
   async function removeTeamLeader(id) {
     setTeamLeaderBusy(true);
-    const { error } = await supabase.from("profiles").update({ team_leader_premium: 0 }).eq("id", id);
+    const { error } = await supabase.from("profiles").update({ team_leader_premium: 0, team_leader_premium_ccq: 0 }).eq("id", id);
     if (error) setMessage(error.message);
     else {
       setMessage(t("teamLeader.removed"));
@@ -171,7 +177,7 @@ export default function TimeRulesManager() {
     setTeamLeaderBusy(false);
   }
 
-  const teamLeaders = employees.filter((e) => Number(e.team_leader_premium) > 0);
+  const teamLeaders = employees.filter((e) => Number(e.team_leader_premium) > 0 || Number(e.team_leader_premium_ccq) > 0);
 
   return (
     <Card>
@@ -181,7 +187,7 @@ export default function TimeRulesManager() {
         <Fold icon={Unlock} title={t("timeRules.unlock")}>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">{t("timeRules.unlockHelp")}</p>
-            <div className="grid gap-2 sm:grid-cols-[1fr,auto,auto] sm:items-end">
+            <div className="grid gap-2 sm:grid-cols-[1fr,auto,auto,auto] sm:items-end">
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">{t("notifications.employee")}</span>
                 <Select value={unlockEmployee} onChange={(e) => setUnlockEmployee(e.target.value)}>
@@ -230,7 +236,7 @@ export default function TimeRulesManager() {
                   // Subcontractors: return always at the simple rate, first OT hour always double.
                   { field: "return_with_benefits_to_8h", label: t("employees.returnWithBenefits"), hint: t("employees.returnWithBenefitsHint"), locked: fixed, lockedValue: false },
                   { field: "overtime_first_hour_double", label: t("employees.otFirstHourDouble"), hint: t("employees.otFirstHourDoubleHint"), locked: fixed, lockedValue: true },
-                  ...(Number(row.team_leader_premium) > 0
+                  ...(Number(row.team_leader_premium) > 0 || Number(row.team_leader_premium_ccq) > 0
                     ? [{ field: "team_leader_premium_overtime", label: t("employees.premiumOnOvertime"), hint: t("employees.premiumOnOvertimeHint"), locked: fixed, lockedValue: false }]
                     : []),
                 ];
@@ -322,6 +328,20 @@ export default function TimeRulesManager() {
                   />
                 </div>
               </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground" title={t("teamLeader.premiumCcqHint")}>{t("teamLeader.premiumCcq")}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-muted-foreground">$</span>
+                  <Input
+                    inputMode="decimal"
+                    value={teamLeaderCcqPremium}
+                    onChange={(e) => setTeamLeaderCcqPremium(e.target.value)}
+                    placeholder="0.00"
+                    aria-label={t("teamLeader.premiumCcq")}
+                    className="w-24 text-right font-mono"
+                  />
+                </div>
+              </div>
               <Button type="button" disabled={teamLeaderBusy} onClick={saveTeamLeader}>{teamLeaderBusy ? t("common.working") : t("common.save")}</Button>
             </div>
 
@@ -333,7 +353,11 @@ export default function TimeRulesManager() {
                 <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
                   {teamLeaders.map((leader) => (
                     <div key={leader.id} className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-xs">
-                      <span><b>{leader.full_name || leader.email}</b> · +{Number(leader.team_leader_premium).toFixed(2)} $/h</span>
+                      <span>
+                        <b>{leader.full_name || leader.email}</b>
+                        {Number(leader.team_leader_premium) > 0 && <> · {t("teamLeader.premiumShort")} +{Number(leader.team_leader_premium).toFixed(2)} $/h</>}
+                        {Number(leader.team_leader_premium_ccq) > 0 && <> · {t("teamLeader.premiumCcqShort")} +{Number(leader.team_leader_premium_ccq).toFixed(2)} $/h</>}
+                      </span>
                       <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-destructive" disabled={teamLeaderBusy} onClick={() => removeTeamLeader(leader.id)}>{t("timeRules.remove")}</Button>
                     </div>
                   ))}
