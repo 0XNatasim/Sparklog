@@ -8,6 +8,7 @@ import { computeEmployeeWeekTalon, snapshotFromRow } from "@/payroll";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { isNonCcqRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
+import { useHolidayDates } from "@/lib/company-holidays";
 
 const n = (v) => Number(v) || 0;
 const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -31,6 +32,7 @@ const EMPTY = { hours: 0, gross: 0, federalTax: 0, quebecTax: 0, rrq: 0, ei: 0, 
 // month (DAS are remitted monthly), for all employees or one. Draft figures from the
 // unvalidated rule set; never a remittance filing.
 export default function DasTab({ messier = false }) {
+  const holidayDates = useHolidayDates();
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByEmp, setJobsByEmp] = useState(new Map());
@@ -130,7 +132,7 @@ export default function DasTab({ messier = false }) {
         if (!approved.length) continue;
         let talon = null;
         try {
-          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", includePhone: true, includeStorage: true, weekDate: w.start.format("YYYY-MM-DD"), messierMethod: messier });
+          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", includePhone: true, includeStorage: true, weekDate: w.start.format("YYYY-MM-DD"), holidayDates, messierMethod: messier });
         } catch { /* skip */ }
         if (!talon) continue;
         const emp = talon.result.employee, empr = talon.result.employer, das = talon.result.das;
@@ -147,7 +149,7 @@ export default function DasTab({ messier = false }) {
       out.push({ profile, pendingWeeks, countedWeeks, ...acc });
     }
     return out;
-  }, [scopeWeeks, employees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp]);
+  }, [scopeWeeks, employees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp, holidayDates]);
 
   const computed = rows.filter((r) => r.countedWeeks > 0);
   const blocked = rows.filter((r) => r.pendingWeeks > 0);

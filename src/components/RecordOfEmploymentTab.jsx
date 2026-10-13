@@ -8,6 +8,7 @@ import { calculateDailyTotals, overtimeOptionsFromProfile } from "@/lib/payroll-
 import { EMPLOYER } from "@/lib/paystub";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
+import { useHolidayDates } from "@/lib/company-holidays";
 
 // Weekly payroll → the ROE reports up to the last 53 pay periods (Service Canada rule for
 // a weekly pay period, both for Block 15A hours and Block 15C per-period earnings).
@@ -53,6 +54,7 @@ function insurableHoursInRange(jobs, start, end, otOptions) {
 // a preparation sheet the payroll admin transcribes into ROE Web (this is not the official form).
 export default function RecordOfEmploymentTab() {
   const t = useT();
+  const holidayDates = useHolidayDates();
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [reason, setReason] = useState("A");
@@ -139,7 +141,7 @@ export default function RecordOfEmploymentTab() {
   // The compiled ROE model: per-period rows (most recent first), totals, and key dates.
   const roe = useMemo(() => {
     if (!employee || (ledger.length === 0 && history.length === 0)) return null;
-    const otOptions = overtimeOptionsFromProfile(employee);
+    const otOptions = { ...overtimeOptionsFromProfile(employee), holidayDates };
     // Accounted SparkLog pay + imported prior-stub history, keyed by pay-period end (Saturday).
     const byEnd = new Map(ledger.map((r) => [r.period_end, r]));
     const histByEnd = new Map(history.map((r) => [r.period_end, r]));
@@ -188,7 +190,7 @@ export default function RecordOfEmploymentTab() {
     const vacationFinal = rows.length ? rows[0].vacation : 0;
 
     return { rows, totalHours, totalEarnings, vacationFinal, firstDay, lastDay, finalPeriodEnd };
-  }, [employee, ledger, jobs, history]);
+  }, [employee, ledger, jobs, history, holidayDates]);
 
   const reasonLabel = SEPARATION_REASONS.find((r) => r.code === reason)?.label || "";
 

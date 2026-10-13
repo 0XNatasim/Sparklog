@@ -360,8 +360,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   autres heures supplémentaires » (20.07) n'est pas codé.
 - [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
   2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.
-- [ ] **Samedi, dimanche, fériés** : samedi = temps sup. (21.01), dimanche et fériés à 2× dès la 1re heure
-  (21.02 b). Le moteur n'a pas de règle par jour ; il compte sur le blocage de la saisie.
+- [x] **Samedi, dimanche, fériés** — moteur 2.3.0 (V2.4.102) : samedi tout en temps sup. (heure à 1,5× de la
+  semaine si libre, puis 2×) ; dimanche et fériés (`company_holidays`, option `holidayDates`) à 2× dès la
+  1re heure, sans utiliser l'heure à 1,5×. Tous les appels (écrans, export CCQ, `classify_week`) passent
+  la liste des fériés (`src/lib/company-holidays.js`). La saisie employé reste bloquée ces jours-là.
 - [x] **Dîner** — les employés l'enlèvent déjà de leur saisie (confirmé le 2026-10-13).
 - [ ] `docs/rules/2026-das-payroll.md` dit l'impôt du Québec « placeholder », alors que `rules/2026.js`
   le marque vérifié contre TP-1015.F (2026-01) ; les commentaires de `EI` disent encore `_PLACEHOLDER`

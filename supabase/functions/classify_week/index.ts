@@ -70,7 +70,11 @@ serve(async (req) => {
     // double time (no 1.5x tier). Read the target employee's flag for the split.
     const { data: targetProfile } = await admin
       .from("profiles").select("role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").eq("id", employeeId).maybeSingle();
-    const result = computeWeek(jobs || [], overtimeOptionsFromProfile(targetProfile));
+    // Statutory holidays: work on those days is paid at 2× from the first hour (21.02 b).
+    const { data: holidayRows, error: holidayErr } = await admin.from("company_holidays").select("holiday_date");
+    if (holidayErr) return json({ ok: false, error: holidayErr.message }, 500);
+    const holidayDates = (holidayRows || []).map((row) => String(row.holiday_date).slice(0, 10));
+    const result = computeWeek(jobs || [], { ...overtimeOptionsFromProfile(targetProfile), holidayDates });
     return json({
       ok: true,
       source: "authority",

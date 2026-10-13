@@ -12,6 +12,7 @@ import CongesIndemnityManager from "@/components/CongesIndemnityManager";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
+import { loadHolidayDates } from "@/lib/company-holidays";
 
 const montrealToday = companyDate;
 
@@ -75,6 +76,7 @@ export default function CostingDashboard() {
     (async () => {
       setLoading(true);
       const { start, end } = range;
+      const holidayDates = await loadHolidayDates();
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
@@ -117,7 +119,7 @@ export default function CostingDashboard() {
         const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
 
         let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
-        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], overtimeOptionsFromProfile(profile));
+        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], { ...overtimeOptionsFromProfile(profile), holidayDates });
         entries.forEach((e) => {
           regMin += e.regularWorkMinutes;
           ot50Min += e.overtime50Minutes;

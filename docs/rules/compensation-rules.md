@@ -43,7 +43,11 @@ Sources, filed in `docs/reference/`:
   total.
 - **Rate split (weekly):** across a week's total overtime, the **first 60 minutes are at
   1.5×**, and **everything beyond that is at 2×**.
-- No weekend work, ever. Normal week = 40h (5 × 8h).
+- Normal week = 40h (5 × 8h, Monday–Friday). Employee entry is blocked on weekends and
+  holidays, but the engine (2.3.0, V2.4.102) pays them per convention 21.01 / 21.02 b):
+  **Saturday** — every minute is overtime (the week's 1.5× hour if unused, then 2×);
+  **Sunday and statutory holidays** (`company_holidays`) — 2× from the first hour, without
+  using the 1.5× hour. Return time on those days has no benefits.
 
 **Worked examples (golden cases):**
 | Input | Regular | @1.5× | @2× |

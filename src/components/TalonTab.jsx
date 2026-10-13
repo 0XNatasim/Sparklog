@@ -13,6 +13,7 @@ import PayStubPrint from "@/components/PayStubPrint";
 import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
 import { printLegacyTalon } from "@/lib/legacy-talon-render";
 import { useT } from "@/lib/use-t";
+import { useHolidayDates } from "@/lib/company-holidays";
 
 const isPending = (s) => s === "submitted" || s === "updated";
 const NB_WEEKS = 12;
@@ -28,6 +29,7 @@ function ccqWeekOf(dateStr) {
 // snapshot exists), outlined/amber for an APERÇU (fully approved but not yet comptabilisé,
 // recomputed live). Clicking opens the full talon (PayStubPrint). Rien n'est persisté ici.
 export default function TalonTab({ messier = false }) {
+  const holidayDates = useHolidayDates();
   const t = useT();
   const { role } = useAuth();
   const isOwner = isOwnerRole(role); // only the boss (owner) can mark a talon official
@@ -131,7 +133,7 @@ export default function TalonTab({ messier = false }) {
   function openTalon(profile, week, jobs) {
     try {
       const opening = openingFor(profile.id, week.start);
-      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
+      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier, holidayDates });
       // Reference is assigned at comptabilisation only; blank for an aperçu.
       const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
       const reference = formatTalonRef(ledgerRow?.talon_seq);
@@ -177,7 +179,7 @@ export default function TalonTab({ messier = false }) {
       if (st.kind !== "comptabilise" && st.kind !== "apercu") continue;
       try {
         const opening = openingFor(profile.id, week.start);
-        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier });
+        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier, holidayDates });
         const model = buildStubModel({ result: talon.result, ytd: opening, pay: talon.pay, reimb: talon.reimb, ccq: talon.ccqAmounts });
         if (!model) continue;
         const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);

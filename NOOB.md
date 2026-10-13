@@ -40,6 +40,8 @@ qu'une petite question pour ton comptable (dernier point).
   du 26 avril 2026. Mais la CCQ a annoncé le 20 avril 2026 que le comité des avantages sociaux (CASIC)
   garde 0,68 $ pour l'employé (et 2,93 $ pour l'employeur) **jusqu'au 24 avril 2027**. ⚠️ À revoir
   avant cette date : la convention prévoit 1,06 $ ensuite.
+- [x] **Samedi, dimanche, fériés.** Si quelqu'un travaille ces jours-là (par la feuille d'urgence), l'app paie
+  comme la convention : le samedi est tout en temps sup., le dimanche et les fériés sont à 2× dès la 1re heure.
 - [x] **Dîner.** Les employés l'enlèvent déjà de leurs heures. Rien à changer dans l'app.
 - [ ] **Prélèvement CCQ.** C'est réglé : 0,75 % pour l'employé + 0,75 % pour l'employeur, soit 1,5 % au
   total. Une question reste : la prime de chef d'équipe entre-t-elle dans le calcul ? Ton comptable

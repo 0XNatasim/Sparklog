@@ -7,6 +7,7 @@ import { calculateDailyTotals, overtimeOptionsFromProfile } from "@/lib/payroll-
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
+import { useHolidayDates } from "@/lib/company-holidays";
 
 const isNonEmptyOT = (ot) => String(ot || "").trim().length > 0;
 function fmtHM(hoursFloat) {
@@ -23,6 +24,7 @@ function ccqWeekOf(dateStr) {
 // employee "Semaine" tab), clickable to expand the day breakdown. Two columns.
 export default function WeekViewTab() {
   const t = useT();
+  const holidayDates = useHolidayDates();
   const [employees, setEmployees] = useState([]);
   const [jobsByEmp, setJobsByEmp] = useState(new Map());
   const [weeks, setWeeks] = useState([]);
@@ -75,7 +77,7 @@ export default function WeekViewTab() {
     for (const profile of employees) {
       const jobs = (jobsByEmp.get(profile.id) || []).filter((j) => ccqWeekOf(j.job_date).key === week.key);
       if (!jobs.length) continue;
-      const daily = calculateDailyTotals(jobs, overtimeOptionsFromProfile(profile));
+      const daily = calculateDailyTotals(jobs, { ...overtimeOptionsFromProfile(profile), holidayDates });
       const days = [...daily.entries()].map(([dayKey, d]) => ({
         dayKey,
         date: dayjs(dayKey),
@@ -94,7 +96,7 @@ export default function WeekViewTab() {
       out.push({ profile, days, ...acc, totalHours: acc.regularHours + acc.ot15 + acc.ot20 + acc.returnNb });
     }
     return out;
-  }, [week, employees, jobsByEmp]);
+  }, [week, employees, jobsByEmp, holidayDates]);
 
   return (
     <div className="space-y-3">

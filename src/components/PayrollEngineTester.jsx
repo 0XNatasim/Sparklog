@@ -18,6 +18,7 @@ import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 import { isSubcontractorRole } from "@/lib/roles";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
+import { loadHolidayDates } from "@/lib/company-holidays";
 
 const TAX_YEAR = 2026;
 
@@ -312,6 +313,7 @@ export default function PayrollEngineTester({ messier = false }) {
 
     // Build a week picker from the employee's recent jobs (last ~16 weeks).
     const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
+    const holidayDates = await loadHolidayDates();
     const { data: jobRows } = await supabase
       .from("jobs")
       .select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes")
@@ -324,7 +326,7 @@ export default function PayrollEngineTester({ messier = false }) {
     });
     const opts = [...byWeek.values()].map((w) => {
       let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, retNbMin = 0, km = 0;
-      calculatePayrollEntries(w.jobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messier }).forEach((e) => {
+      calculatePayrollEntries(w.jobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messier, holidayDates }).forEach((e) => {
         regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
         retMin += e.returnRegularMinutes; retNbMin += e.returnNoBenefitMinutes; km += e.totalKm;
       });

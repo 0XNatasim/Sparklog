@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.2.0";
+export const ENGINE_VERSION = "2.3.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -114,11 +114,24 @@ function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
 //    (returnNoBenefitMinutes).
 //  - returnWithBenefitsTo8h: return time is paid as regular time WITH benefits while the
 //    day's work + return stays within 8h; only the part beyond 8h is paid without benefits.
+//  Day of the week (convention ICI 21.01, 21.02 b); owner decision 2026-10-13):
+//  - Saturday: every worked minute is overtime (no regular hours); the week's first
+//    overtime hour still goes at 1.5× if it is unused, the rest at 2×.
+//  - Sunday and statutory holidays (`holidayDates`, YYYY-MM-DD from company_holidays):
+//    every worked minute at 2× from the first hour; it does not use the 1.5× hour.
+//  On those days return time keeps no benefits (there are no regular hours to fill).
 // `messierMethod` reproduces how Messier Connexion classified hours historically: the weekly
 // first hour of overtime that SparkLog pays at 1.5× (the "hors CCQ" tier) is instead counted
 // as REGULAR straight time. Double time (2×) is left exactly as-is. Used only by the parallel
 // "Façon Messier" comparison views — never by the authoritative export path.
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, messierMethod = false, firstTripUnpaid = false } = {}) {
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, messierMethod = false, firstTripUnpaid = false, holidayDates = [] } = {}) {
+  const holidays = new Set([...(holidayDates || [])].map((d) => String(d).slice(0, 10)));
+  // "regular" Monday–Friday; "saturday" all overtime; "double" Sunday / holiday at 2×.
+  const dayKind = (jobDate) => {
+    const day = dayOfWeek(jobDate);
+    if (day === 0 || holidays.has(String(jobDate).slice(0, 10))) return "double";
+    return day === 6 ? "saturday" : "regular";
+  };
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
   // Pre-pass: the day's WORK minutes (paid span minus return). With returnWithBenefitsTo8h,
   // the return time that fits under 8h once all of the day's work is counted keeps its
@@ -132,7 +145,9 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
   }
   const dayReturnBenefitRoom = new Map(); // job_date -> return minutes still payable with benefits
   if (returnWithBenefitsTo8h) {
-    for (const [date, work] of dayWorkTotal) dayReturnBenefitRoom.set(date, Math.max(0, 480 - work));
+    for (const [date, work] of dayWorkTotal) {
+      if (dayKind(date) === "regular") dayReturnBenefitRoom.set(date, Math.max(0, 480 - work));
+    }
   }
 
   // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
@@ -158,12 +173,13 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     if (returnWithBenefitMinutes) dayReturnBenefitRoom.set(job.job_date, returnBenefitRoom - returnWithBenefitMinutes);
     let returnNoBenefitMinutes = returnMinutes - returnWithBenefitMinutes;
 
-    const regularRoom = Math.max(0, 480 - priorDayWork);
+    const kind = dayKind(job.job_date);
+    const regularRoom = kind === "regular" ? Math.max(0, 480 - priorDayWork) : 0;
     const workRegularMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - workRegularMinutes;
     // Return time with benefits is paid as regular time; the pre-pass keeps it within 8h.
     let regularWorkMinutes = workRegularMinutes + returnWithBenefitMinutes;
-    const overtime50Room = firstOtHourDouble ? 0 : Math.max(0, 60 - priorWeekOvertime);
+    const overtime50Room = firstOtHourDouble || kind === "double" ? 0 : Math.max(0, 60 - priorWeekOvertime);
     let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     let overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
     // Façon Messier: the "hors CCQ" hours are the paid non-CCQ hours (the return-to-shop time
@@ -198,7 +214,8 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     });
     // Count Messier-converted non-CCQ minutes as day work so the 8h/day cap holds across jobs.
     dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes + messierConverted);
-    weekOvertimeMinutes.set(wk, priorWeekOvertime + overtimeWorkMinutes);
+    // Sunday/holiday double time does not use the week's 1.5× hour.
+    weekOvertimeMinutes.set(wk, priorWeekOvertime + (kind === "double" ? 0 : overtimeWorkMinutes));
     weekRegularMinutes.set(wk, priorWeekRegular + regularWorkMinutes);
   }
   return entries;
