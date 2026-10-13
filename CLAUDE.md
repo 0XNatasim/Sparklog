@@ -164,10 +164,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
 
 **Also tracked (lower tier):**
-- **P-12 export rollback re-rates pending jobs (open, pre-existing):** `revertClaim` in
-  `push_approved_batch` sets `status='submitted'`, which fires `jobs_stamp_rate_snapshot` (`0034`) and
-  overwrites the rate snapshot with the employee's *current* rate. → skip re-stamping on
-  `approved → submitted` (keep the snapshot taken at submission).
 - **C-8 offline drafts (done):** schema-versioned IndexedDB drafts are keyed by owner and job; edit drafts
   restore only when newer than the server copy and after explicit employee confirmation.
 
@@ -280,7 +276,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.105)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.106)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -368,8 +364,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   le déduit du cumul employé × taux employeur / taux employé, plafonné ; utilisé par Talons, DAS et Calcul.
   Les retenues s'arrêtent aux maximums annuels (RRQ 74 600 $ puis 85 000 $, AE 68 900 $, RQAP 103 000 $)
   à condition que le cumul d'avant Sparklog soit saisi (`payroll_ytd`) et les semaines comptabilisées.
-- [ ] P-12 rollback d'export qui ré-estampille le taux ; P-5 agrégation des coûts côté serveur ; P-11 N+1
-  `getUserById`. (S-2 export NAS et S-3b preuve atomique : faits en V2.4.105, migration 0084.)
+- [ ] P-5 agrégation des coûts côté serveur ; P-11 N+1 `getUserById`. (Faits : S-2 export NAS et S-3b
+  preuve atomique en V2.4.105, migration 0084 ; P-12 taux figé à la soumission en V2.4.106, migration 0085 —
+  une annulation d'export ou une écriture sur une fiche en attente ne recopie plus le taux actuel.)
 - [ ] Filtres gestionnaire : annuler les requêtes qui se chevauchent (AbortController / id de requête) ;
   adaptateur API commun (401 → rafraîchir, 5xx → file d'attente).
 - [ ] Lot 6 restant : découper `EmployeeForm.jsx` / `EmployeesPanel.jsx` avec des tests de composant
