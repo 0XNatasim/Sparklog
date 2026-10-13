@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { useHolidayDates } from "@/lib/company-holidays";
 
 export default function CcqJsonExport() {
+  const holidayDates = useHolidayDates();
   const t = useT();
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -59,9 +61,10 @@ export default function CcqJsonExport() {
     const profileMap = new Map(ccqProfiles.map((profile) => [profile.id, profile]));
     return buildCcqWeeklyRecords(
       jobs.filter((job) => (employeeId === "all" || job.user_id === employeeId) && profileMap.has(job.user_id)),
-      profileMap
+      profileMap,
+      { holidayDates }
     ).filter((record) => !month || record.semaineFinissantLe.startsWith(month));
-  }, [employeeId, jobs, month, ccqProfiles]);
+  }, [employeeId, jobs, month, ccqProfiles, holidayDates]);
 
   const incomplete = records.filter((record) => missingCcqFields(record).length > 0);
 

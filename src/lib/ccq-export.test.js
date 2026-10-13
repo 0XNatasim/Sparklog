@@ -22,16 +22,21 @@ describe("buildCcqWeeklyRecords", () => {
   const profiles = new Map([["u1", profile]]);
   const mkJob = (date, depart, fin) => ({ id: `${date}-${depart}`, user_id: "u1", job_date: date, depart, fin, return_time_minutes: 0, status: "approved" });
 
-  it("rolls weekly hours over 40 into 50% overtime", () => {
+  it("pays Saturday as overtime: the week's first hour at 1.5×, the rest at 2× (convention 21.01)", () => {
     // Mon..Sat, all in the week ending 2026-06-06; 8h each = 48h total.
     const days = ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05", "2026-06-06"];
     const jobs = days.map((d) => mkJob(d, "08:00", "16:00"));
     const [rec] = buildCcqWeeklyRecords(jobs, profiles);
     expect(rec.semaineFinissantLe).toBe("2026-06-06");
     expect(rec.heuresRegulieres).toBe(40);
-    expect(rec.heuresSup50).toBe(8);
-    expect(rec.heuresSup100).toBe(0);
+    expect(rec.heuresSup50).toBe(1);
+    expect(rec.heuresSup100).toBe(7);
     expect(rec.heuresTotal).toBe(48);
+  });
+
+  it("pays a statutory holiday at 2× from the first hour", () => {
+    const [rec] = buildCcqWeeklyRecords([mkJob("2026-06-01", "08:00", "16:00")], profiles, { holidayDates: ["2026-06-01"] });
+    expect([rec.heuresRegulieres, rec.heuresSup50, rec.heuresSup100]).toEqual([0, 0, 8]);
   });
 
   it("emits the corrected CCQ detail-line fields", () => {

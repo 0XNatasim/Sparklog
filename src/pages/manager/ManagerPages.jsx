@@ -32,6 +32,7 @@ const EmployeeActivityLog = lazyPanel(() => import("@/components/EmployeeActivit
 const InfraHealthCard = lazyPanel(() => import("@/components/InfraHealthCard"));
 const InventoryScreenshotsPanel = lazyPanel(() => import("@/components/InventoryScreenshotsPanel"));
 const EmergencyTimesheet = lazyPanel(() => import("@/components/EmergencyTimesheet"));
+const PayRulesReference = lazyPanel(() => import("@/components/PayRulesReference"));
 const ManagerDashboard = lazyPanel(() => import("@/pages/ManagerDashboard"));
 
 // #/manager → first page the user may open; old `?section=` links keep working.
@@ -78,6 +79,7 @@ export const CcqPage = () => <CcqRatesPanel />;
 export const DownloadsPage = () => <ManagerDownloads />;
 export const HealthPage = () => <InfraHealthCard />;
 export const EmergencyPage = () => <EmergencyTimesheet />;
+export const PayRulesPage = () => <PayRulesReference />;
 
 // ── Paie: Méthode (Messier / Référence) is a page-level choice kept in the URL ──
 const METHODS = ["messier", "book"];

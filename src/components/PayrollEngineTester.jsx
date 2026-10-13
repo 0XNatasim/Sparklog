@@ -18,6 +18,7 @@ import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
 import { isSubcontractorRole } from "@/lib/roles";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
+import { loadHolidayDates } from "@/lib/company-holidays";
 
 const TAX_YEAR = 2026;
 
@@ -271,7 +272,7 @@ export default function PayrollEngineTester({ messier = false }) {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
+        .select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
         .order("full_name", { ascending: true });
       // Subcontractors record time but are never part of the company's DAS payroll run.
       if (!cancelled) setEmployees((data || []).filter((employee) => !isSubcontractorRole(employee.role)));
@@ -288,11 +289,13 @@ export default function PayrollEngineTester({ messier = false }) {
     const profile = employees.find((e) => e.id === id);
     if (profile?.hourly_rate != null) {
       // Base wage + team-leader premium kept separate: regular is paid at base +
-      // premium, but overtime is computed on the BASE rate only (per the CCQ stub).
+      // premium; overtime is on the BASE rate only (per the CCQ stub) unless the employee
+      // has the « prime majorée en temps sup. » option.
       setPay((s) => ({
         ...s,
         baseRate: Number(profile.hourly_rate) || 0,
         premium: Number(profile.team_leader_premium) || 0,
+        premiumOnOvertime: Boolean(profile.team_leader_premium_overtime),
         kmRate: Number(profile.km_rate) || 0,
         phone: weeklyPhoneAmount(profile),
         storage: weeklyStorageAmount(profile),
@@ -310,6 +313,7 @@ export default function PayrollEngineTester({ messier = false }) {
 
     // Build a week picker from the employee's recent jobs (last ~16 weeks).
     const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
+    const holidayDates = await loadHolidayDates();
     const { data: jobRows } = await supabase
       .from("jobs")
       .select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes")
@@ -322,7 +326,7 @@ export default function PayrollEngineTester({ messier = false }) {
     });
     const opts = [...byWeek.values()].map((w) => {
       let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, retNbMin = 0, km = 0;
-      calculatePayrollEntries(w.jobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messier }).forEach((e) => {
+      calculatePayrollEntries(w.jobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messier, holidayDates }).forEach((e) => {
         regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
         retMin += e.returnRegularMinutes; retNbMin += e.returnNoBenefitMinutes; km += e.totalKm;
       });
@@ -652,7 +656,8 @@ export default function PayrollEngineTester({ messier = false }) {
     const earnings = [];
     const base = Number(pay.baseRate);
     const prem = Number(pay.premium);
-    // Regular is paid at base + premium; overtime is on the base rate only (CCQ).
+    // Regular is paid at base + premium; overtime is on the base rate only (CCQ), plus the
+    // premium majorée when pay.premiumOnOvertime is set.
     // Each stub line (units × rate) is rounded to the cent before adding — see printedPayLines.
     const printed = printedPayLines({ ...pay, baseRate: base, premium: prem });
     const regular = printed.regular;
@@ -1288,6 +1293,7 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
             const pct = (r) => `${(Number(r) * 100).toFixed(2).replace(/\.?0+$/, "")} %`;
             const base = Number(pay?.baseRate) || 0;
             const prem = Number(pay?.premium) || 0;
+            const otPrem = pay?.premiumOnOvertime ? prem : 0;
             const reg = Number(pay?.regularHours) || 0;
             const ot15 = Number(pay?.ot150Hours) || 0;
             const ot20 = Number(pay?.ot200Hours) || 0;
@@ -1301,8 +1307,8 @@ function Results({ result, reimb, ccq, pay, open, setOpen, t }) {
                 <div>
                   <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.detailEarnings")}</div>
                   {reg > 0 && <DetailRow label={t("payroll.regularHours")} formula={`${reg} h × ${money(base + prem)}`} value={money(reg * (base + prem))} tone="add" />}
-                  {ot15 > 0 && <DetailRow label={t("payroll.ot150Hours")} formula={`${ot15} h × ${money(base * 1.5)}`} value={money(ot15 * base * 1.5)} tone="add" />}
-                  {ot20 > 0 && <DetailRow label={t("payroll.ot200Hours")} formula={`${ot20} h × ${money(base * 2)}`} value={money(ot20 * base * 2)} tone="add" />}
+                  {ot15 > 0 && <DetailRow label={t("payroll.ot150Hours")} formula={`${ot15} h × ${money((base + otPrem) * 1.5)}`} value={money(ot15 * (base + otPrem) * 1.5)} tone="add" />}
+                  {ot20 > 0 && <DetailRow label={t("payroll.ot200Hours")} formula={`${ot20} h × ${money((base + otPrem) * 2)}`} value={money(ot20 * (base + otPrem) * 2)} tone="add" />}
                   {retNb > 0 && <DetailRow label={t("payroll.returnNbHours")} formula={`${retNb} h × ${money(base)}`} value={money(retNb * base)} tone="add" />}
                   {baseOnlyH > 0 && <DetailRow label={t("payroll.baseOnlyHours")} formula={`${baseOnlyH} h × ${money(base)}`} value={money(printedPayLines({ baseOnlyHours: baseOnlyH, baseRate: base }).baseOnly)} tone="add" />}
                   {tb > 0 && <DetailRow label={t("payroll.taxableBenefits")} value={money(tb)} tone="add" />}

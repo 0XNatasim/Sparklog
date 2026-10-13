@@ -17,6 +17,7 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { companyDate } from "@/lib/company-time";
 import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { useViewMode } from "@/contexts/ViewModeContext";
+import { useHolidayDates } from "@/lib/company-holidays";
 
 dayjs.extend(customParseFormat);
 dayjs.locale("en");
@@ -56,6 +57,7 @@ export default function Week() {
   const [jobs, setJobs] = useState([]);
   const [otFirstHourDouble, setOtFirstHourDouble] = useState(false);
   const [returnWithBenefitsTo8h, setReturnWithBenefitsTo8h] = useState(false);
+  const holidayDates = useHolidayDates();
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -103,7 +105,7 @@ export default function Week() {
   }, [effectiveUserId]);
 
   const { weekly, dailyByKey } = useMemo(() => {
-    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid });
+    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, holidayDates });
     const dailyMap = new Map([...calculatedDays].map(([dayKey, totals]) => [dayKey, {
       ...totals,
       date: parseJobDate(dayKey),
@@ -154,7 +156,7 @@ export default function Week() {
 
     weeklyArr.sort((a, b) => (a.start.isAfter(b.start) ? -1 : 1));
     return { weekly: weeklyArr, dailyByKey: dailyMap };
-  }, [jobs, otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid]);
+  }, [jobs, otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, holidayDates]);
 
   function toggleWeek(weekKey) {
     setOpenWeekKey((prev) => (prev === weekKey ? null : weekKey));

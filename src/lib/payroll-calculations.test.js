@@ -166,9 +166,49 @@ describe("return-to-warehouse time: never overtime, benefits only up to 8h when 
 });
 
 
-describe("isMealEligible (supper: >8h + 2h15 = 615 min, weekday only)", () => {
-  it("614 min → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 614 })).toBe(false));
-  it("615 min on a weekday → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 615 })).toBe(true));
+// Convention ICI 21.01 / 21.02 b) (owner decision 2026-10-13).
+describe("Saturday, Sunday and statutory holidays", () => {
+  const job = (id, date, fin, extra = {}) => ({ id, job_date: date, depart: "08:00", fin, return_time_minutes: 0, ...extra });
+  const split = (e) => [e.regularWorkMinutes, e.overtime50Minutes, e.overtime100Minutes];
+
+  it("Saturday: every minute is overtime, first hour of the week at 1.5×", () => {
+    const e = calculatePayrollEntries([job("s", "2026-06-06", "12:00")]).get("s"); // 4 h Saturday
+    expect(split(e)).toEqual([0, 60, 180]);
+  });
+
+  it("Saturday after a weekday that already used the 1.5× hour: all at 2×", () => {
+    const m = calculatePayrollEntries([job("m", "2026-06-01", "17:00"), job("s", "2026-06-06", "12:00")]);
+    expect(split(m.get("m"))).toEqual([480, 60, 0]);
+    expect(split(m.get("s"))).toEqual([0, 0, 240]);
+  });
+
+  it("Sunday: 2× from the first hour, and the week's 1.5× hour stays available", () => {
+    const m = calculatePayrollEntries([job("d", "2026-05-31", "12:00"), job("m", "2026-06-01", "17:00")]);
+    expect(split(m.get("d"))).toEqual([0, 0, 240]);
+    expect(split(m.get("m"))).toEqual([480, 60, 0]); // the Monday overtime still gets 1.5×
+  });
+
+  it("statutory holiday on a weekday: 2× from the first hour", () => {
+    const e = calculatePayrollEntries([job("h", "2026-06-24", "16:00")], { holidayDates: ["2026-06-24"] }).get("h");
+    expect(split(e)).toEqual([0, 0, 480]);
+  });
+
+  it("return time on a Saturday keeps no benefits and is never overtime", () => {
+    const e = calculatePayrollEntries([job("s", "2026-06-06", "13:00", { return_time_minutes: 60 })], { returnWithBenefitsTo8h: true }).get("s");
+    expect(split(e)).toEqual([0, 60, 180]);
+    expect(e.returnNoBenefitMinutes).toBe(60);
+  });
+
+  it("first OT hour double (subcontractor policy): Saturday all at 2×", () => {
+    const e = calculatePayrollEntries([job("s", "2026-06-06", "12:00")], { firstOtHourDouble: true }).get("s");
+    expect(split(e)).toEqual([0, 0, 240]);
+  });
+});
+
+describe("isMealEligible (supper: past 10 h = more than 600 min, weekday only)", () => {
+  it("600 min (exactly 10 h) → not eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 600 })).toBe(false));
+  it("601 min on a weekday → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 601 })).toBe(true));
+  it("605 min (10 h 05, the first 5-minute step) → eligible", () => expect(isMealEligible({ jobDate: "2026-06-01", dailyWorkMinutes: 605 })).toBe(true));
   it("never eligible on a Saturday", () => expect(isMealEligible({ jobDate: "2026-06-06", dailyWorkMinutes: 700 })).toBe(false));
 });
 

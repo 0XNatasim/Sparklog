@@ -11,6 +11,7 @@ import { useT } from "@/lib/use-t";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
+import { loadHolidayDates } from "@/lib/company-holidays";
 
 dayjs.extend(isoWeek);
 
@@ -63,8 +64,9 @@ export default function PeriodSummary({ mode = "week" }) {
     (async () => {
       setLoading(true);
       const { start, end } = range;
+      const holidayDates = await loadHolidayDates();
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
-        supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
+        supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         supabase.from("jobs").select("id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end),
         supabase.from("meal_claims").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
         supabase.from("parking_receipts").select("user_id, job_date, amount").gte("job_date", start).lte("job_date", end),
@@ -113,7 +115,7 @@ export default function PeriodSummary({ mode = "week" }) {
           const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
           let empLabor = 0, empLaborNoBenefit = 0, empPaidMin = 0;
-          calculatePayrollEntries(ujobs, overtimeOptionsFromProfile(profile)).forEach((e) => {
+          calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates }).forEach((e) => {
             workedMin += e.regularWorkMinutes + e.overtimeWorkMinutes;
             empPaidMin += e.regularWorkMinutes + e.returnRegularMinutes + e.returnNoBenefitMinutes + e.overtime50Minutes + e.overtime100Minutes;
             if (e.overtimeWorkMinutes > 0) otJobs += 1;
@@ -124,9 +126,12 @@ export default function PeriodSummary({ mode = "week" }) {
               // Subcontractor: simple rate ≤8h + return, negotiated double rate beyond 8h.
               empLabor += jobBase * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60) + subDoubleRate * (e.overtime100Minutes / 60);
             } else {
-              empLabor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60 + (e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
+              // Premium on overtime only with the « prime majorée en temps sup. » option.
+              const otPremium = profile?.team_leader_premium_overtime ? jobPremium : 0;
+              empLabor += (jobBase + jobPremium) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60)
+                + (jobBase + otPremium) * ((e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
             }
-            // Return time carved out beyond 8h: base rate, no premium, no social benefits.
+            // Return time without benefits: base rate, no premium, no social benefits.
             empLaborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
             kmCost += e.totalKm * jobKmRate;
           });

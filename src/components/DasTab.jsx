@@ -8,6 +8,7 @@ import { computeEmployeeWeekTalon, snapshotFromRow } from "@/payroll";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { isNonCcqRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
+import { useHolidayDates } from "@/lib/company-holidays";
 
 const n = (v) => Number(v) || 0;
 const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -31,6 +32,7 @@ const EMPTY = { hours: 0, gross: 0, federalTax: 0, quebecTax: 0, rrq: 0, ei: 0, 
 // month (DAS are remitted monthly), for all employees or one. Draft figures from the
 // unvalidated rule set; never a remittance filing.
 export default function DasTab({ messier = false }) {
+  const holidayDates = useHolidayDates();
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByEmp, setJobsByEmp] = useState(new Map());
@@ -51,7 +53,7 @@ export default function DasTab({ messier = false }) {
       try {
         const since = dayjs().subtract(14, "month").format("YYYY-MM-DD");
         const [{ data: profs, error: pErr }, { data: jobs, error: jErr }, { data: seeds }, { data: ledgers }] = await Promise.all([
-          supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name", { ascending: true }),
+          supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name", { ascending: true }),
           supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, status").gte("job_date", since),
           supabase.from("payroll_ytd").select("*").eq("tax_year", 2026),
           supabase.from("payroll_period_ledger").select("*").eq("tax_year", 2026).order("period_end", { ascending: true }),
@@ -130,7 +132,7 @@ export default function DasTab({ messier = false }) {
         if (!approved.length) continue;
         let talon = null;
         try {
-          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", includePhone: true, includeStorage: true, weekDate: w.start.format("YYYY-MM-DD"), messierMethod: messier });
+          talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", includePhone: true, includeStorage: true, weekDate: w.start.format("YYYY-MM-DD"), holidayDates, messierMethod: messier });
         } catch { /* skip */ }
         if (!talon) continue;
         const emp = talon.result.employee, empr = talon.result.employer, das = talon.result.das;
@@ -147,7 +149,7 @@ export default function DasTab({ messier = false }) {
       out.push({ profile, pendingWeeks, countedWeeks, ...acc });
     }
     return out;
-  }, [scopeWeeks, employees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp]);
+  }, [scopeWeeks, employees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp, holidayDates]);
 
   const computed = rows.filter((r) => r.countedWeeks > 0);
   const blocked = rows.filter((r) => r.pendingWeeks > 0);

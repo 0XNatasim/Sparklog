@@ -42,6 +42,7 @@ export function buildCalculTalon({ opening = {}, closing, result, ccq = null, re
   const lines = printedPayLines({
     regularHours: n(pay.regularHours), ot150Hours: n(pay.ot150Hours), ot200Hours: n(pay.ot200Hours),
     returnNbHours: n(pay.returnNbHours), baseOnlyHours: n(pay.baseOnlyHours), baseRate: base, premium: n(pay.premium),
+    premiumOnOvertime: Boolean(pay.premiumOnOvertime),
   });
   const phone = n(reimb.phone);
   const phoneUnits = phone > 0 && Math.abs(phone / 7 - Math.round(phone / 7)) < 1e-9 ? Math.round(phone / 7) : 1;
@@ -55,6 +56,8 @@ export function buildCalculTalon({ opening = {}, closing, result, ccq = null, re
     n(reimb.km) ? tx("Indemnité utilisation véhicule", n(pay.km), n(pay.kmRate), reimb.km) : null,
     n(reimb.other) ? tx("Autre revenu non imposable (à verser)", 1, n(reimb.other), reimb.other) : null,
     n(pay.premium) ? tx("Régulier à taux horaire", n(pay.regularHours), n(pay.premium), lines.regularPremium) : null,
+    lines.ot150Premium ? tx("Prime chef d'équipe — temps et demi", n(pay.ot150Hours), round2(n(pay.premium) * 1.5), lines.ot150Premium) : null,
+    lines.ot200Premium ? tx("Prime chef d'équipe — temps double", n(pay.ot200Hours), round2(n(pay.premium) * 2), lines.ot200Premium) : null,
     phone ? tx("Remboursement données cellulaire", phoneUnits, phoneUnits === 1 ? phone : 7, phone) : null,
     n(reimb.storage) ? tx("Entreposage", 1, n(reimb.storage), reimb.storage) : null,
     n(pay.baseOnlyHours) ? tx("Régulier à taux horaire", n(pay.baseOnlyHours), base, lines.baseOnly) : null,

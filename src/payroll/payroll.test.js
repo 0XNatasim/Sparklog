@@ -193,6 +193,16 @@ describe("pay lines printed to the cent (stubs S35, S36)", () => {
     expect(s15.ot200).toBe(181.44);
     expect(printedPayLines({ regularHours: 37.5, baseRate: 45.36, premium: 3 }).regular).toBe(1813.5);
   });
+  it("team-leader premium on overtime only with the option (convention 22.01)", () => {
+    const off = printedPayLines({ regularHours: 40, ot150Hours: 1, ot200Hours: 2, baseRate: 50.79, premium: 4.06 });
+    expect([off.ot150Premium, off.ot200Premium]).toEqual([0, 0]);
+    expect(off.overtime).toBe(76.19 + 203.16);
+    const on = printedPayLines({ regularHours: 40, ot150Hours: 1, ot200Hours: 2, baseRate: 50.79, premium: 4.06, premiumOnOvertime: true });
+    expect(on.ot150Premium).toBe(6.09); // 1 h × (4,06 × 1,5 = 6,09)
+    expect(on.ot200Premium).toBe(16.24); // 2 h × 8,12
+    expect(on.overtime).toBe(Math.round((76.19 + 203.16 + 6.09 + 16.24) * 100) / 100);
+    expect(on.regular).toBe(off.regular); // regular lines unchanged
+  });
   it("temps et demi uses the rate printed to the cent (76,185 → 76,19)", () => {
     expect(printedPayLines({ ot150Hours: 2, baseRate: 50.79 }).ot150).toBe(152.38);
   });
