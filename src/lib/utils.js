@@ -69,7 +69,7 @@ export function refreshSessionOnce() {
 // Supabase free-tier cold start without surfacing an error to the user. The factory
 // is intentional: Supabase query builders/promises must be recreated for each
 // attempt. Only the final failure is thrown.
-export async function withRetry(makeQuery, ms, { retries = 2, backoffMs = 400 } = {}) {
+export async function withRetry(makeQuery, ms, { retries = 2, backoffMs = 400, signal } = {}) {
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -78,7 +78,8 @@ export async function withRetry(makeQuery, ms, { retries = 2, backoffMs = 400 } 
       return result;
     } catch (e) {
       lastError = e;
-      if (attempt === retries) break;
+      // A request replaced by a newer one (AbortController) is not retried.
+      if (attempt === retries || signal?.aborted) break;
       if (attempt === 0) {
         await refreshSessionOnce();
       }

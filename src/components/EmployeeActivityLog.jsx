@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 import dayjs from "dayjs";
 import { CheckCircle2, FilePen, LogIn, MonitorSmartphone, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -62,7 +63,10 @@ export default function EmployeeActivityLog() {
 
   const employeeIds = useMemo(() => employees.map((e) => e.id), [employees]);
 
-  const fetchPage = useCallback(async (before) => {
+  // Latest filter wins (employee, type, period): an older answer never replaces a newer one.
+  const request = useLatestRequest();
+
+  const fetchPage = useCallback(async (before, signal) => {
     let query = supabase
       .from("employee_activity_log")
       .select("id, created_at, user_id, user_name, event, job_id, details")
@@ -72,21 +76,23 @@ export default function EmployeeActivityLog() {
     query = employee === "all" ? query.in("user_id", employeeIds) : query.eq("user_id", employee);
     if (TYPE_FILTERS[type]) query = query.in("event", TYPE_FILTERS[type]);
     if (before) query = query.lt("created_at", before);
-    return query;
+    return signal ? query.abortSignal(signal) : query;
   }, [employee, employeeIds, period, type]);
 
   const load = useCallback(async () => {
     if (employeeIds.length === 0) return;
+    const ticket = request.begin();
     setLoading(true);
     setError("");
-    const { data, error: loadError } = await fetchPage(null);
-    if (loadError) setError(loadError.message);
+    const { data, error: loadError } = await fetchPage(null, ticket.signal);
+    if (!ticket.isCurrent()) return;
+    if (loadError) { if (!isAbortError(loadError)) setError(loadError.message); }
     else {
       setRows(data || []);
       setHasMore((data || []).length === QUERY_BUDGETS.employeeActivityPage);
     }
     setLoading(false);
-  }, [employeeIds.length, fetchPage]);
+  }, [employeeIds.length, fetchPage, request]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -132,8 +138,10 @@ export default function EmployeeActivityLog() {
   async function loadMore() {
     const last = rows[rows.length - 1];
     if (!last) return;
+    const generation = request.generation();
     setLoading(true);
     const { data, error: loadError } = await fetchPage(last.created_at);
+    if (request.generation() !== generation) return; // filters changed meanwhile
     if (loadError) setError(loadError.message);
     else {
       setRows((current) => [...current, ...(data || [])]);

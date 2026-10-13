@@ -26,6 +26,7 @@ import JobCard, { fmtTimeHHmm } from "@/components/manager/JobCard";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
+import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 
 dayjs.extend(isoWeek);
 
@@ -139,7 +140,12 @@ export default function ManagerDashboard({ view = "timesheet" }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, notificationFilter]);
 
-  function buildJobsQuery() {
+  // Changing a filter while a load is in flight: the newer load aborts the older one and
+  // only the latest response is applied (list, meal flags, counts, "load more").
+  const jobsRequest = useLatestRequest();
+  const anomaliesRequest = useLatestRequest();
+
+  function buildJobsQuery(signal) {
     let q = supabase
       .from("jobs")
       .select("*")
@@ -151,14 +157,15 @@ export default function ManagerDashboard({ view = "timesheet" }) {
     // the other two columns are always empty.
     if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
     if (dayFilter) q = q.eq("job_date", dayFilter);
-    return q;
+    return signal ? q.abortSignal(signal) : q;
   }
 
-  async function loadCounts() {
+  async function loadCounts(ticket) {
     const { data } = await withRetry(() => supabase.rpc("manager_job_counts", {
       p_employee_id: employeeId === "all" ? null : employeeId,
       p_job_date: dayFilter || null,
-    }).single(), 12000);
+    }).abortSignal(ticket.signal).single(), 12000, { signal: ticket.signal });
+    if (!ticket.isCurrent()) return;
     setCounts({
       all: Number(data?.all_count) || 0,
       saved: Number(data?.saved_count) || 0,
@@ -170,13 +177,17 @@ export default function ManagerDashboard({ view = "timesheet" }) {
   // Anomalies across every submitted job (not just the loaded page), compared with the
   // approved jobs of the same employees and dates.
   async function loadAnomalies() {
+    // Every load() rescans; only the latest scan is kept and older ones are aborted.
+    const ticket = anomaliesRequest.begin();
+    const { signal } = ticket;
     try {
       const { data: submitted } = await withRetry(() => supabase
         .from("jobs")
         .select(ANOMALY_COLUMNS)
         .eq("status", "submitted")
         .order("job_date", { ascending: false })
-        .limit(QUERY_BUDGETS.anomalySubmittedJobs), 12000);
+        .limit(QUERY_BUDGETS.anomalySubmittedJobs)
+        .abortSignal(signal), 12000, { signal });
       const rows = submitted || [];
       const userIds = [...new Set(rows.map((row) => row.user_id))];
       const dates = [...new Set(rows.map((row) => row.job_date))];
@@ -187,15 +198,17 @@ export default function ManagerDashboard({ view = "timesheet" }) {
           .eq("status", "approved")
           .in("user_id", userIds)
           .in("job_date", dates)
-          .limit(QUERY_BUDGETS.anomalyApprovedPeers), 12000)
+          .limit(QUERY_BUDGETS.anomalyApprovedPeers)
+          .abortSignal(signal), 12000, { signal })
         : { data: [] };
       // select("*") so the scan keeps working with default limits if the threshold
       // columns are not deployed yet.
-      const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).maybeSingle();
+      const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).abortSignal(signal).maybeSingle();
       // Employees with "first trip unpaid" reach the 8 h overtime-proof threshold on paid time.
       const { data: tripUnpaid } = userIds.length
-        ? await supabase.from("profiles").select("id").eq("first_trip_unpaid", true).in("id", userIds)
+        ? await supabase.from("profiles").select("id").eq("first_trip_unpaid", true).in("id", userIds).abortSignal(signal)
         : { data: [] };
+      if (!ticket.isCurrent()) return;
       setAnomalies(detectJobAnomalies(
         [...rows, ...(approved || [])],
         anomalyLimitsFromSettings(settings),
@@ -203,11 +216,13 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       ));
       setAnomaliesFailed(false);
     } catch {
-      setAnomaliesFailed(true);
+      if (ticket.isCurrent()) setAnomaliesFailed(true);
     }
   }
 
   async function load() {
+    const ticket = jobsRequest.begin();
+    const { signal } = ticket;
     setErr(""); setInfo("");
     setLoading(true);
     loadAnomalies();
@@ -218,8 +233,9 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       let page = [];
       do {
         const result = await withRetry(
-          () => buildJobsQuery().range(pageStart, pageStart + PAGE_SIZE - 1),
-          12000
+          () => buildJobsQuery(signal).range(pageStart, pageStart + PAGE_SIZE - 1),
+          12000,
+          { signal }
         );
         page = result.data || [];
         jobRows.push(...page);
@@ -229,21 +245,26 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       // Only the meal indicators for the jobs actually on screen — no full-table scan.
       const jobIds = jobRows.map((j) => j.id);
       const { data: mealRows } = jobIds.length
-        ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", jobIds), 12000)
+        ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", jobIds).abortSignal(signal), 12000, { signal })
         : { data: [] };
 
+      if (!ticket.isCurrent()) return; // a newer filter took over
       setJobs(jobRows);
       setMealJobIds(new Set((mealRows || []).map((claim) => claim.job_id)));
       setHasMore(!loadEveryMatch && page.length === PAGE_SIZE);
-      await loadCounts();
+      await loadCounts(ticket);
     } catch (e) {
+      if (!ticket.isCurrent() || isAbortError(e)) return;
       setErr(e?.message || t("manager.errors.failedLoad"));
     } finally {
-      setLoading(false);
+      if (ticket.isCurrent()) setLoading(false);
     }
   }
 
   async function loadMore() {
+    // The next page belongs to the filters it was asked for: drop it if they changed meanwhile.
+    const generation = jobsRequest.generation();
+    const stale = () => jobsRequest.generation() !== generation;
     setLoadingMore(true);
     setErr("");
     try {
@@ -257,11 +278,12 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       const { data: mealRows } = pageIds.length
         ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", pageIds), 12000)
         : { data: [] };
+      if (stale()) return;
       setJobs((prev) => [...prev, ...(data || [])]);
       setMealJobIds((current) => new Set([...current, ...(mealRows || []).map((claim) => claim.job_id)]));
       setHasMore((data || []).length === PAGE_SIZE);
     } catch (e) {
-      setErr(e?.message || t("manager.errors.failedMore"));
+      if (!stale()) setErr(e?.message || t("manager.errors.failedMore"));
     } finally {
       setLoadingMore(false);
     }

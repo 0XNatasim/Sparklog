@@ -160,7 +160,6 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 | Employee | Zero/equal times | ✅ Rejected by `trg_validate_job_submission` | Rejected | C-5 (done) |
 | Employee | Offline Save, then reload | Durable IndexedDB draft, with stale-edit conflict prompt | Durable on-device draft | C-8 (done) |
 | Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
-| Manager | Filter while requests overlap | No cancellation; older response can overwrite | Latest-wins | AbortController / request id |
 | Both | 401/403/500 during autosave | Generic error; no typed recovery/queue | Refresh on 401, queue on 5xx | shared API adapter |
 
 **Also tracked (lower tier):**
@@ -276,7 +275,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.106)
+## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.107)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -367,8 +366,11 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [ ] P-5 agrégation des coûts côté serveur ; P-11 N+1 `getUserById`. (Faits : S-2 export NAS et S-3b
   preuve atomique en V2.4.105, migration 0084 ; P-12 taux figé à la soumission en V2.4.106, migration 0085 —
   une annulation d'export ou une écriture sur une fiche en attente ne recopie plus le taux actuel.)
-- [ ] Filtres gestionnaire : annuler les requêtes qui se chevauchent (AbortController / id de requête) ;
-  adaptateur API commun (401 → rafraîchir, 5xx → file d'attente).
+- [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
+  annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
+  pas une requête annulée. Appliqué à Feuilles de temps (liste, compteurs, anomalies, « charger plus »),
+  Journal et Journal employé. Reproduit puis corrigé dans Chromium (réponse lente d'un ancien filtre).
+- [ ] Adaptateur API commun (401 → rafraîchir, 5xx → file d'attente).
 - [ ] Lot 6 restant : découper `EmployeeForm.jsx` / `EmployeesPanel.jsx` avec des tests de composant
   (jsdom + testing-library à ajouter) ; corriger les ~63 avertissements ESLint écran par écran.
 - [ ] Optionnel : charger une seule langue de `i18n.js` (nécessite de retirer le repli anglais).
