@@ -408,6 +408,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   V2.4.125 : écran français étroit — étiquettes coupées sur deux lignes avec la valeur entre les deux
   (« Distance » / « parcourue (miles) », « Distance réelle » / « parcourue (km) ») : les distances sont repérées à partir
   du mot « Distance » (avec « (miles) » = champ miles, sinon distance réelle) ; date 2026-10-14 lue aussi.
+  V2.4.126 : capture coupée sous « Heure de début » — la date + l'heure juste au-dessus de « Heure de fin » servent
+  d'heure de début (jamais l'horloge du téléphone : une date doit précéder l'heure).
   Saisie à la main (sans capture) : Enregistrer ouvre d'abord « Fiche entrée à la main » (mieux avec la capture ;
   vérifier que Field Service est pareil à la fiche) avec « Prendre une capture » ou « Field Service est exact, enregistrer ».
 - [x] **Étoile rouge sur les fiches entrées à la main** (V2.4.123, migration 0090) : table `job_entry_sources`

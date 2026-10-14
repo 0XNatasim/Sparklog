@@ -162,3 +162,22 @@ describe("French Bilan tab, label wrapped before (miles)", () => {
     expect(workOrderIssues(parsed)).toEqual([]);
   });
 });
+
+// OT-200560 (2026-10-14): the screenshot starts just below the "Heure de début" label.
+describe("screenshot cut above the start-time label", () => {
+  const rest = ["Heure de fin*", "2026-10-14", "13:55", "Durée*", "3,98 heures", "Heure d'arrivée (info)", "2026-10-14", "10:20",
+    "Déplacement", "Distance parcourue (miles)", "-\t105,00\t+", "Distance réelle parcourue (km)", "105,00",
+    "Durée réelle du déplacement", "24 minutes"];
+
+  it("takes the date and time right above « Heure de fin » as the start", () => {
+    const parsed = parseExtractedText(["15 h 04", "OT-200560", "Notes et signature\tSoutien et suivis\tBilan", "2026-10-14", "09:56", ...rest].join("\n"));
+    expect(parsed).toEqual({ ot: "200560", job_date: "2026-10-14", depart: "09:56", fin: "13:55", arrivee: "10:20", km_aller: 105, miles_traveled: 105 });
+    expect(workOrderIssues(parsed)).toEqual([]);
+  });
+
+  it("never takes the phone clock when the start time is cut too", () => {
+    const parsed = parseExtractedText(["13:50", "OT-200560", "Bilan", ...rest].join("\n"));
+    expect(parsed.depart).toBeUndefined();
+    expect(workOrderIssues(parsed).map((i) => i.code)).toEqual(["depart"]);
+  });
+});
