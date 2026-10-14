@@ -325,7 +325,7 @@ function employeeHtml(emp) {
 
 const REPORT_STYLES = `
   * { box-sizing: border-box; }
-  @page { size: letter landscape; margin: 10mm; }
+  @page { margin: 10mm; }
   body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #111; margin: 0; padding: 16px; font-size: 11px; }
   h1 { font-size: 17px; margin: 0 0 2px; }
   h2 { font-size: 13px; margin: 0 0 6px; }
@@ -346,7 +346,11 @@ const REPORT_STYLES = `
   .strong { font-weight: 700; }
   .warn { color: #b45309; font-weight: 600; }
   tfoot td { font-weight: 700; border-top: 2px solid #999; background: #fafafa; }
-  .emp { font-size: 9.5px; line-height: 1.2; border: 1px solid #bbb; border-radius: 8px; padding: 5px 8px; margin-top: 6px; break-inside: avoid; page-break-inside: avoid; }
+  /* Employees follow one another (a card may continue on the next page) instead of each one jumping to a new
+     page when it does not fit: only the name + table header, a job row and the money block stay together. */
+  .emp { font-size: 9.5px; line-height: 1.2; border: 1px solid #bbb; border-radius: 8px; padding: 5px 8px; margin-top: 10px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .emp h2 { break-after: avoid; page-break-after: avoid; }
+  .emp tr, .emp .cols, .emp .note { break-inside: avoid; page-break-inside: avoid; }
   .cols { display: grid; grid-template-columns: 1.2fr 1.3fr 1fr; gap: 8px; margin-top: 4px; align-items: start; }
   .emp th, .emp td { padding-top: 1px; padding-bottom: 1px; }
   .emp h2 { font-size: 12px; margin-bottom: 3px; }
@@ -356,7 +360,8 @@ const REPORT_STYLES = `
   .kv tr.total td { font-weight: 700; border-top: 2px solid #999; background: #f3f4f6; }
   .note { color: #555; font-style: italic; margin: 6px 0 0; }
   .foot { margin-top: 12px; font-size: 9px; color: #666; border-top: 1px solid #ddd; padding-top: 6px; line-height: 1.5; }
-  .page-break { break-before: page; page-break-before: always; }
+  .detail-title { margin-top: 18px; break-after: avoid; page-break-after: avoid; }
+  .summary td:first-child { white-space: nowrap; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @media print { body { padding: 0; } }
 `;
@@ -410,7 +415,7 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
   </div>
 
   <h3>Sommaire par employé</h3>
-  <table>
+  <table class="summary">
     <thead><tr>
       <th>Employé</th><th class="num">Jobs</th><th class="num">Heures</th><th class="num">Temps sup.</th><th class="num">km</th>
       <th class="num">Brut</th><th class="num">Retenues</th><th class="num">Net</th>
@@ -432,8 +437,7 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
     </tr></tfoot>
   </table>
 
-  <div class="page-break"></div>
-  <h3>Détail par employé</h3>
+  <h3 class="detail-title">Détail par employé</h3>
   ${employees.map(employeeHtml).join("")}
 
   <div class="foot">
