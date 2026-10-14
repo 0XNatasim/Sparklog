@@ -85,8 +85,9 @@ Sources, filed in `docs/reference/`:
   more rounds up, so the counter stays within ±7 minutes and no minute is lost over time.
   Example: Monday 8 h 07 → 8 h 00 (counter −7, owed to the employee); Tuesday 7 h 53 + 7 = 8 h 00 →
   8 h 00 (counter 0); 8 h 08 → 8 h 15 (counter +7, paid more by the employer).
-- The minutes added or removed are the **end of the day's work**: overtime when the day is over 8 h,
-  regular time otherwise; declared return time is unchanged.
+- The minutes added or removed go to the day's **return time** when it has some (removed from the
+  return first, then from the end of the work if the return is shorter); without return, to the **end
+  of the day's work**: overtime when the day is over 8 h, regular time otherwise (owner, 2026-10-14).
 - From **2026-09-27 (CCQ week 41)**. Days that count for the counter: every job except drafts.
 - Engine 2.4.0: `DAY_ROUNDING`, `buildDayRounding`, option `rounding` of `calculatePayrollEntries`;
   counters loaded by `src/lib/day-rounding.js` for every pay screen (Calcul, Talons, DAS, Paie de la

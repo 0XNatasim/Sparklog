@@ -77,13 +77,35 @@ describe("calculatePayrollEntries with rounding", () => {
     expect(rounding.balanceAfter(TUE)).toBe(7);
   });
 
-  it("rounds the day's total with the return time in it; the return stays as declared", () => {
-    const jobs = [job("m", MON, "07:00", "15:37", { return_time_minutes: 30 })]; // 8h37 = 8h07 work + 30 return
+  it("with return time, the rounding goes to the return (8h37 with 30 min return → return 23 min)", () => {
+    const jobs = [job("m", MON, "07:00", "15:37", { return_time_minutes: 30 })]; // 8h07 work + 30 return
     const rounding = buildDayRounding(jobs);
     const day = calculateDailyTotals(jobs, { rounding }).get(MON);
     expect(day.totalPaidMinutes).toBe(510); // 8h30
-    expect(day.returnNoBenefitMinutes).toBe(30);
-    expect(day.regularWorkMinutes + day.overtime50Minutes + day.overtime100Minutes).toBe(480);
+    expect(day.returnNoBenefitMinutes).toBe(23);
+    expect(day.regularWorkMinutes).toBe(480);
+    expect(day.overtime50Minutes + day.overtime100Minutes).toBe(7); // the work is untouched
+    expect(day.roundingMinutes).toBe(-7);
+  });
+
+  it("adds rounding minutes to the return time too", () => {
+    const jobs = [job("m", MON, "07:00", "15:38", { return_time_minutes: 30 })]; // 8h38 → 8h45
+    const day = calculateDailyTotals(jobs, { rounding: buildDayRounding(jobs) }).get(MON);
+    expect(day.totalPaidMinutes).toBe(525);
+    expect(day.returnNoBenefitMinutes).toBe(37);
+    expect(day.overtime50Minutes + day.overtime100Minutes).toBe(8);
+  });
+
+  it("takes the rest from the end of the work when the return is shorter", () => {
+    // Tue: 7h53 owed 7 → … build a −14 case: counter +7 then 8h07 with a 5-minute return
+    const jobs = [job("m", MON, "07:00", "15:08"), job("t", TUE, "07:00", "15:07", { return_time_minutes: 5 })];
+    const rounding = buildDayRounding(jobs);
+    expect(rounding.balanceBefore(TUE)).toBe(7);
+    const tue = calculateDailyTotals(jobs, { rounding }).get(TUE);
+    // 8h07 − 7 = 8h00 → paid 8h00: −7 = 5 from the return, 2 from the work
+    expect(tue.totalPaidMinutes).toBe(480);
+    expect(tue.returnNoBenefitMinutes).toBe(0);
+    expect(tue.regularWorkMinutes + tue.overtime50Minutes + tue.overtime100Minutes).toBe(480);
   });
 
   it("changes nothing without the option (unrounded callers keep their numbers)", () => {

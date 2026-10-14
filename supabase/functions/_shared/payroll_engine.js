@@ -131,8 +131,10 @@ function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
 //   Mon 8h07 → 8h00, counter −7 (the employer owes 7 min) · Tue 7h53 → 7h53 + 7 = 8h00, counter 0
 //   8h08 → 8h15, counter +7 (the employer paid 7 min more).
 // Up to 7 minutes rounds down, 8 and more rounds up, so the counter stays within ±7 minutes.
-// The minutes added or removed are the END of the day's work: overtime when the day is over
-// 8 h, regular time otherwise. Applies from CCQ week 41 (2026-09-27).
+// The minutes added or removed go to the day's RETURN time when it has some (taken from it, then
+// from the end of the work if the return is shorter); without return, to the END of the day's
+// work: overtime when the day is over 8 h, regular time otherwise. Applies from CCQ week 41
+// (2026-09-27).
 export const DAY_ROUNDING = Object.freeze({ stepMinutes: 15, startDate: "2026-09-27" });
 
 export function roundToStep(minutes, stepMinutes = DAY_ROUNDING.stepMinutes) {
@@ -183,11 +185,12 @@ export function buildDayRounding(jobs, { firstTripUnpaid = false, startDate = DA
   });
 }
 
-// Rounding minutes per job for the days in `sortedJobs`: the day's delta, taken from (or added
-// to) the work of its LAST jobs. Map job.id → minutes (+/−).
+// Rounding minutes per job for the days in `sortedJobs`: the day's delta goes to its return time
+// first (latest job first), then to the end of its work. Returns { work, ret }: Maps job.id → +/−.
 function roundingAdjustments(sortedJobs, paidSpan, rounding) {
-  const adjust = new Map();
+  const adjust = { work: new Map(), ret: new Map() };
   if (!rounding) return adjust;
+  const add = (map, id, minutes) => map.set(id, (map.get(id) || 0) + minutes);
   const byDay = new Map();
   for (const job of sortedJobs) {
     if (String(job.job_date) < rounding.startDate || !job.depart || !job.fin) continue;
@@ -199,17 +202,23 @@ function roundingAdjustments(sortedJobs, paidSpan, rounding) {
     if (worked <= 0) continue;
     const paid = Math.max(0, roundToStep(worked - rounding.balanceBefore(date), rounding.stepMinutes));
     let delta = paid - worked;
+    const latestFirst = [...dayJobs].reverse();
+    const withReturn = latestFirst.find((job) => jobReturnMinutes(job, paidSpan(job)) > 0);
     if (delta > 0) {
-      const last = dayJobs[dayJobs.length - 1];
-      adjust.set(last.id, delta);
+      add(withReturn ? adjust.ret : adjust.work, (withReturn || latestFirst[0]).id, delta);
       continue;
     }
-    for (let i = dayJobs.length - 1; i >= 0 && delta < 0; i -= 1) {
-      const job = dayJobs[i];
+    for (const job of latestFirst) { // removing: the return time first…
+      if (delta >= 0) break;
+      const take = Math.min(jobReturnMinutes(job, paidSpan(job)), -delta);
+      if (take > 0) add(adjust.ret, job.id, -take);
+      delta += take;
+    }
+    for (const job of latestFirst) { // …then the end of the work
+      if (delta >= 0) break;
       const span = paidSpan(job);
-      const work = Math.max(0, span - jobReturnMinutes(job, span));
-      const take = Math.min(work, -delta);
-      if (take > 0) adjust.set(job.id, -take);
+      const take = Math.min(Math.max(0, span - jobReturnMinutes(job, span)), -delta);
+      if (take > 0) add(adjust.work, job.id, -take);
       delta += take;
     }
   }
@@ -235,7 +244,7 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
   const dayWorkTotal = new Map();
   for (const job of sorted) {
     const span = paidSpan(job);
-    dayWorkTotal.set(job.job_date, (dayWorkTotal.get(job.job_date) || 0) + span - jobReturnMinutes(job, span) + (roundingAdjust.get(job.id) || 0));
+    dayWorkTotal.set(job.job_date, (dayWorkTotal.get(job.job_date) || 0) + span - jobReturnMinutes(job, span) + (roundingAdjust.work.get(job.id) || 0));
   }
   const dayReturnBenefitRoom = new Map(); // job_date -> return minutes still payable with benefits
   if (returnWithBenefitsTo8h) {
@@ -259,10 +268,13 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const priorWeekOvertime = weekOvertimeMinutes.get(wk) || 0;
     const priorWeekRegular = weekRegularMinutes.get(wk) || 0;
 
-    const roundingMinutes = roundingAdjust.get(job.id) || 0;
+    const workRounding = roundingAdjust.work.get(job.id) || 0;
+    const returnRounding = roundingAdjust.ret.get(job.id) || 0;
+    const roundingMinutes = workRounding + returnRounding;
     const spanMinutes = paidSpan(job);
-    const returnMinutes = jobReturnMinutes(job, spanMinutes);
-    const workMinutes = spanMinutes - returnMinutes + roundingMinutes;
+    const declaredReturn = jobReturnMinutes(job, spanMinutes);
+    const workMinutes = spanMinutes - declaredReturn + workRounding;
+    const returnMinutes = declaredReturn + returnRounding;
     const returnBenefitRoom = dayReturnBenefitRoom.get(job.job_date) || 0;
     const returnWithBenefitMinutes = Math.min(returnMinutes, returnBenefitRoom);
     if (returnWithBenefitMinutes) dayReturnBenefitRoom.set(job.job_date, returnBenefitRoom - returnWithBenefitMinutes);

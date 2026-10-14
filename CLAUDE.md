@@ -349,7 +349,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   supplémentaires » (20.07) n'est pas codé.
 - [x] **Arrondi des journées** (V2.4.117, moteur 2.4.0, migration 0088) : chaque journée (travail + retour) payée au
   15 min le plus proche, compteur par employé jamais remis à zéro (`paid = round15(worked − compteur)`), ajustement
-  sur la fin de la journée (temps sup. au-delà de 8 h), depuis la semaine 41 (2026-09-27). Détail :
+  sur le temps de retour s'il y en a, sinon sur la fin du travail (temps sup. au-delà de 8 h), depuis la semaine 41. Détail :
   `docs/rules/compensation-rules.md` (DAY_ROUNDING). Pas appliqué à l'export Google Sheet (Apps Script).
 - [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
   2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.
