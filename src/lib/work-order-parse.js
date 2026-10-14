@@ -3,31 +3,36 @@
 // Field labels of the source work-order app, in its French and English variants (it can be
 // displayed in either language). A field's value is read only between its label and the next
 // label, so an empty field ("---") is never filled with a number from a later field.
+//
+// On a narrow phone, Field Service wraps the long labels on two lines and puts the value
+// between them, so the OCR text can read "Distance\t55,00\nparcourue (miles)" or
+// "Distance réelle\nparcourue (km)\t55,00". The distances are therefore found from the word
+// "Distance": what follows it up to the next label tells which one it is ("(miles)" or not) and
+// holds its value.
 const LABELS = {
-  depart: /(?:Heure\s+de\s+d[eé]but|Start\s*Time)/i,
-  fin: /(?:Heure\s+de\s+fin|End\s*Time)/i,
-  arrivee: /(?:Heure\s+d['’]?\s*arriv[eé]e|(?:Actual\s+)?Arrival\s*Time)/i,
-  // "Distance parcourue", "Distance réelle parcourue (km)", English "Distance travelled" — but not
-  // "Distance parcourue (miles)", the French label of Miles Traveled.
-  km: /Distance[^\n\d]*?(?:parcourue|travell?ed)(?!\s*\(\s*mil)(?:\s*\(\s*km\s*\))?/i,
-  // English "Miles Traveled", French "Distance parcourue (miles)".
-  miles: /(?:Miles\s*Travell?ed|Milles\s+parcourus|Distance\s+parcourue\s*\(\s*miles?\s*\))/i,
+  depart: /Heure\s+de\s+d[eé]but|Start\s*Time/gi,
+  fin: /Heure\s+de\s+fin|End\s*Time/gi,
+  arrivee: /Heure\s+d['’]?\s*arriv[eé]e|(?:Actual\s+)?Arrival\s*Time/gi,
+  distance: /\bDistance\b/gi,
+  // English "Miles Traveled" (the French screen says "Distance parcourue (miles)").
+  miles: /Miles\s*Travell?ed|Milles\s+parcourus/gi,
+  // Boundaries only.
+  other: /\bDur[eé]e\b|\bDuration\b|D[eé]placement|\bStatut\b|\bStatus\b/gi,
 };
-const OTHER_LABELS = [/\bDur[eé]e\b/i, /\bDuration\b/i, /D[eé]placement/i];
-const SEGMENT_MAX = 120;
+const SEGMENT_MAX = 160;
 
-// Text between a label and the next known label (at most SEGMENT_MAX characters), or null
-// when the label is not on the screenshot.
-function segmentAfter(text, labelRegex) {
-  const m = text.match(labelRegex);
-  if (!m) return null;
-  const from = m.index + m[0].length;
-  let rest = text.slice(from, from + SEGMENT_MAX);
-  for (const other of [...Object.values(LABELS), ...OTHER_LABELS]) {
-    const next = rest.match(other);
-    if (next) rest = rest.slice(0, next.index);
+// Every label occurrence with the text after it, up to the next label.
+function labelSegments(text) {
+  const found = [];
+  for (const [key, regex] of Object.entries(LABELS)) {
+    for (const m of text.matchAll(regex)) found.push({ key, start: m.index, end: m.index + m[0].length });
   }
-  return rest;
+  found.sort((a, b) => a.start - b.start || b.end - a.end);
+  const labels = found.filter((label, i) => !found.slice(0, i).some((prev) => label.start < prev.end)); // drop overlaps
+  return labels.map((label, i) => {
+    const next = labels[i + 1]?.start ?? text.length;
+    return { key: label.key, segment: text.slice(label.end, Math.min(next, label.end + SEGMENT_MAX)) };
+  });
 }
 
 const timeIn = (segment) => {
@@ -35,10 +40,15 @@ const timeIn = (segment) => {
   return t ? `${String(t[1]).padStart(2, "0")}:${t[2]}` : null;
 };
 
+// Field Service shows distances with decimals ("55,00"): prefer such a number, so a "+" or "-"
+// button misread as a digit is not taken for the value.
 const numberIn = (segment) => {
-  const n = segment?.match(/(\d+(?:[.,]\d+)?)/);
-  return n ? parseFloat(n[1].replace(",", ".")) : null;
+  const n = segment?.match(/\d+[.,]\d+/) || segment?.match(/\d+/);
+  return n ? parseFloat(n[0].replace(",", ".")) : null;
 };
+
+const MILES_WORD = /mile|\(\s*m/i;
+const REAL_WORD = /r[ée]e?l+e/i;
 
 export function parseExtractedText(text) {
   const out = {};
@@ -46,23 +56,31 @@ export function parseExtractedText(text) {
   const ot = text.match(/OT[\s\-_:]*(\d{4,8})/i);
   if (ot) out.ot = ot[1];
 
-  const dates = [...text.matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)];
-  if (dates.length) {
-    const [, dd, mm, yyyy] = dates[0];
-    out.job_date = `${yyyy}-${mm}-${dd}`;
-  }
+  // 15/10/2026 (English screen) or 2026-10-14 (French screen): the first one on the screen.
+  const date = text.match(/(\d{2})\/(\d{2})\/(\d{4})|(\d{4})-(\d{2})-(\d{2})/);
+  if (date) out.job_date = date[1] ? `${date[3]}-${date[2]}-${date[1]}` : `${date[4]}-${date[5]}-${date[6]}`;
+
+  const segments = labelSegments(text);
+  const first = (key) => segments.find((s) => s.key === key)?.segment ?? null;
 
   for (const field of ["depart", "fin", "arrivee"]) {
-    const value = timeIn(segmentAfter(text, LABELS[field]));
+    const value = timeIn(first(field));
     if (value) out[field] = value;
   }
 
-  const km = numberIn(segmentAfter(text, LABELS.km));
+  // "Distance …" is the miles field when "(miles)" follows it, otherwise the real distance (km);
+  // with two km candidates, the one saying "réelle" wins.
+  const distances = segments.filter((s) => s.key === "distance");
+  const milesDistance = distances.find((s) => MILES_WORD.test(s.segment));
+  const kmCandidates = distances.filter((s) => !MILES_WORD.test(s.segment));
+  const kmDistance = kmCandidates.find((s) => REAL_WORD.test(s.segment)) || kmCandidates[0];
+
+  const km = numberIn(kmDistance?.segment);
   if (km !== null) out.km_aller = Math.round(km);
 
-  // "Miles Traveled" / "Distance parcourue (miles)" (the value is in km despite the name): only used to check that it
-  // matches "Distance réelle parcourue (km)", never to fill the form.
-  const miles = numberIn(segmentAfter(text, LABELS.miles));
+  // "Miles Traveled" / "Distance parcourue (miles)" (the value is in km despite the name): only
+  // used to check that it matches "Distance réelle parcourue (km)", never to fill the form.
+  const miles = numberIn(first("miles") ?? milesDistance?.segment);
   if (miles !== null) out.miles_traveled = miles;
 
   return out;

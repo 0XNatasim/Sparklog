@@ -99,3 +99,48 @@ describe("French Field Service screen", () => {
     expect(workOrderIssues(parseExtractedText(french("30")))).toEqual([{ code: "kmMismatch", miles: 34.29, km: 30 }]);
   });
 });
+
+// Field Service "Bilan" tab in French on a narrow phone (OT-198700, 2026-10-14): long labels wrap on
+// two lines and the value sits between them, so the OCR can return the value on either line.
+describe("French Bilan tab with wrapped labels", () => {
+  const top = [
+    "OT-198700", "es et signature\tSoutien et suivis\tBilan",
+    "Statut de la\t*\tChargement...", "réservation",
+    "Heure de début\t*\t2026-10-14", "08:16",
+    "Heure de fin\t*\t2026-10-14", "10:31",
+    "Durée\t*\t2,25 heures",
+    "Heure d'arrivée\t2026-10-14", "(info)\t08:56",
+    "Déplacement",
+  ];
+  const tail = ["Durée réelle du\t40 minutes", "déplacement"];
+  const layouts = {
+    "value on the first label line": ["Distance\t-\t55,00\t+", "parcourue (miles)", "Distance réelle\t55,00", "parcourue (km)"],
+    "value on the second label line": ["Distance", "parcourue (miles)\t-\t55,00\t+", "Distance réelle", "parcourue (km)\t55,00"],
+    "value on its own line": ["Distance", "-\t55,00\t+", "parcourue (miles)", "Distance réelle", "55,00", "parcourue (km)"],
+  };
+
+  for (const [name, distanceLines] of Object.entries(layouts)) {
+    it(`reads every field (${name})`, () => {
+      const parsed = parseExtractedText([...top, ...distanceLines, ...tail].join("\n"));
+      expect(parsed).toEqual({
+        ot: "198700", job_date: "2026-10-14", depart: "08:16", fin: "10:31", arrivee: "08:56",
+        km_aller: 55, miles_traveled: 55,
+      });
+      expect(workOrderIssues(parsed)).toEqual([]);
+    });
+  }
+
+  it("still flags an empty real distance and different values", () => {
+    const empty = [...top, "Distance\t-\t55,00\t+", "parcourue (miles)", "Distance réelle\t---", "parcourue (km)", ...tail].join("\n");
+    expect(workOrderIssues(parseExtractedText(empty)).map((i) => i.code)).toEqual(["km"]);
+    const different = [...top, "Distance\t-\t55,00\t+", "parcourue (miles)", "Distance réelle\t24,00", "parcourue (km)", ...tail].join("\n");
+    expect(workOrderIssues(parseExtractedText(different))).toEqual([{ code: "kmMismatch", miles: 55, km: 24 }]);
+  });
+
+  it("never takes the trip duration (40 minutes) for a distance", () => {
+    const noDistances = [...top, "Distance", "parcourue (miles)", "Distance réelle", "parcourue (km)", ...tail].join("\n");
+    const parsed = parseExtractedText(noDistances);
+    expect(parsed.km_aller).toBeUndefined();
+    expect(parsed.miles_traveled).toBeUndefined();
+  });
+});
