@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-14 (V2.4.117).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-14 (V2.4.128).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -14,17 +14,24 @@
 
 Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · 💻 **Claude** (du code, sur demande)
 
+À savoir : la paie se compte toujours sur l'**année civile** (janvier à décembre), même si l'année financière de
+Messier commence le 1er novembre. Messier a démarré en **avril 2026** : pour 2026, tout part de la première paie
+d'avril.
+
 ---
 
 ## Étape 1 — Infos de l'employeur 👤
 
 À inscrire dans **Configuration › Paramètres › Paie — employeur**.
 
-- [ ] **Masse salariale annuelle de Messier.** La cotisation FDRCMO (1 %) ne s'applique qu'au-delà de 2 M$.
-  *Où la trouver :* ton comptable.
-- [ ] **Salaire maximum assurable CNESST 2026** : la CNESST ne cotise que jusqu'à ce montant par employé et
-  par année. Le taux de l'avis (3,17 $ par 100 $) est déjà inscrit ; ce plafond manque. *Où le trouver :*
-  page 2 de la décision de classification, ou le site de la CNESST. Le donner à Claude (voir étape 5).
+- [ ] **Masse salariale 2026 de Messier.** La cotisation FDRCMO (1 %) ne s'applique qu'au-delà de 2 M$.
+  Comme Messier a démarré en avril, 2026 ne compte qu'avril à décembre. D'après le relevé du 3e trimestre
+  (« Masse salariale RBQ », dans ton Drive), on serait **proche du seuil, probablement un peu en dessous**.
+  *À faire :* demander au comptable comment se compte une première année incomplète, puis inscrire le montant.
+- [ ] **CNESST : quel salaire est cotisé.** Le relevé du 3e trimestre montre que la CNESST (3,17 $ par 100 $)
+  ne porte que sur un « salaire admissible » ; le reste (« excédent ») n'est pas cotisé. L'app, elle, cotise
+  sur tout le salaire, donc le coût CNESST affiché est trop élevé. Il manque la règle exacte qui fixe cet
+  excédent. *Où la trouver :* ton comptable, ou donner à Claude quelques talons d'une même semaine (voir étape 5).
 
 ## Étape 2 — Infos de chaque employé 👤
 
@@ -34,9 +41,14 @@ Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · �
   Tant qu'un employé n'a rien, l'app prend le montant personnel de base.
 - [ ] **Cumul de l'année avant Sparklog** (salaire, RRQ, AE, RQAP, impôts déjà retenus). Sans lui, l'app
   croit que l'année commence à zéro et ne sait pas quand arrêter les retenues à leur maximum annuel
-  (RRQ à 74 600 $ puis 85 000 $ de salaire, AE à 68 900 $, RQAP à 103 000 $). *Où l'inscrire :*
-  **Paie › Calcul**, en tapant les montants ou en important le dernier talon PDF de l'employé.
-  Ensuite, **comptabiliser chaque semaine** pour que le cumul suive.
+  (RRQ à 74 600 $ puis 85 000 $ de salaire, AE à 68 900 $, RQAP à 103 000 $).
+  **Décidé :** importer le **talon de la semaine 42** (4 au 10 octobre) de chaque employé. Il a une colonne
+  « Cumulatif » avec tout le cumul de l'année. *Où :* **Gestion › Paie › Talons › « Importer d'anciens
+  talons »** → choisir l'employé → le PDF → vérifier l'aperçu → enregistrer. Faire aussi le tien (ton
+  historique s'arrête au 3 octobre).
+  Ensuite, Sparklog prend le relais à la **semaine 43** dans **Paie de la semaine** : **comptabiliser chaque
+  semaine** pour que le cumul suive. Si l'ancien système paie aussi la semaine 43, importer aussi ces talons-là
+  et commencer à la semaine 44.
 - [ ] **Syndicat et local** de chaque employé (par ex. FIPOE, local 568…).
 - [ ] **Niveau** (compagnon ou apprenti, et quelle période) et **taux horaire**, vérifiés sur la carte ou
   le certificat CCQ. La liste de contrôle à remplir est à la fin du `README.md`.
@@ -50,6 +62,8 @@ Qui fait quoi : 👤 **toi** · 🧾 **ton comptable / ta firme de paie** · �
   - une semaine avec la prime de chef d'équipe.
 - [ ] Refaire chaque paie dans l'app et comparer **au cent près** avec les calculateurs officiels gratuits :
   **WebRAS** (Revenu Québec) et **PDOC** (Agence du revenu du Canada).
+- Déjà dans ton Drive : tes talons des semaines 34 à 42 et le relevé du 3e trimestre de tous les employés
+  (impôts, RRQ, AE, RQAP, FSS, CNESST, CCQ…), utiles pour comparer.
 
 Aujourd'hui, un seul talon a été vérifié (un compagnon).
 
@@ -66,11 +80,11 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
 - [ ] **Changement d'heure de l'automne** : permettre au gestionnaire de choisir quelle « 2 h du matin »
   a été travaillée. Aujourd'hui, l'heure répétée est refusée.
-- [ ] **Plafond CNESST (trou du calcul)** : la cotisation CNESST (3,17 % du salaire) est calculée sur tout
-  le salaire, sans s'arrêter au salaire maximum assurable de l'année. Pour un employé qui dépasse ce
-  maximum (beaucoup de temps sup., par exemple), la cotisation de fin d'année est **trop élevée** dans
-  DAS, Calcul et Coûts. À corriger quand tu as le montant (étape 1) : arrêter la cotisation une fois le
-  maximum atteint, comme pour RRQ, AE et RQAP, avec le cumul de l'année.
+- [ ] **CNESST sur le salaire admissible (trou du calcul)** : l'app calcule la CNESST (3,17 %) sur tout le
+  salaire, alors que le vrai relevé ne la calcule que sur un « salaire admissible ». Le coût CNESST est donc
+  **trop élevé** dans DAS, Calcul et Coûts. À corriger dès que la règle de l'excédent est connue (étape 1).
+- [ ] **Import des talons en lot** (au besoin) : déposer tous les PDF de la semaine d'un coup, l'app reconnaît
+  l'employé par le nom inscrit sur le talon (au lieu de 30 imports un par un).
 - [ ] **Ménage du code** : découper les deux plus gros écrans (la fiche employé et la liste des employés)
   et corriger environ 60 avertissements du vérificateur de code. Il faudra d'abord ajouter des tests
   d'écran.
@@ -95,6 +109,12 @@ nouveau menu. Les autres pages s'ouvrent encore dans leur version actuelle. À f
 
 ## À surveiller 👤
 
+- [ ] **Remplissage automatique (capture Field Service)** : si un employé reste bloqué (« Enregistrement
+  bloqué »), il touche **(Détails) › Voir le texte lu sur la capture › Copier le texte** et te l'envoie ;
+  donne ce texte à Claude pour corriger la lecture. Bonne pratique : capture de l'onglet **Bilan** avec
+  « Heure de début » visible en haut et les deux distances (miles et km) en bas.
+- [ ] **Cotisation annuelle AECQ 2027** : 245 $ (avant : 240 $), plus taxes. Ajoutée automatiquement au rapport
+  mensuel CCQ d'**octobre 2026**. Rien à faire dans l'app.
 - [ ] **Assurance MÉDIC** : 0,68 $/h jusqu'au **24 avril 2027** (décision du CASIC). Avant cette date,
   vérifier le nouveau taux (la convention prévoit 1,06 $) et le dire à Claude.
 

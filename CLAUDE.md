@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-13, V2.4.110)
+## 6. À faire / à préciser (mis à jour 2026-10-14, V2.4.128)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -302,11 +302,17 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **CNT 2026** : 0,06 %, maximum 103 000 $ (TP-1015.G §7) — valeurs du code confirmées ; le
   drapeau `unvalidated` de `rules/2026.js` peut passer à `false` avec la citation.
 - [ ] **FDRCMO** : seuil 2 M$ et 1 % confirmés (TP-1015.G §8). La **masse salariale** se saisit dans
-  Configuration › Paramètres › Paie (`payroll_employer_settings`, V2.4.103) — reste à la saisir.
+  Configuration › Paramètres › Paie (`payroll_employer_settings.annual_payroll_estimate`, vide au 2026-10-14).
+  Messier Connexion n'existe que **depuis avril 2026** : la masse 2026 couvre avril à décembre. D'après le relevé
+  du 3e trimestre (Drive du propriétaire, « Masse salariale RBQ »), la projection avril-décembre est **proche du
+  seuil de 2 M$** (montants non reproduits ici : dépôt public). Le comptable doit confirmer comment compte une
+  première année partielle avant la saisie.
 - [ ] **CNESST** : taux de l'avis 2026 saisi (3,17 $/100 $, unité 80170, `payroll_employer_settings`,
-  2026-10-13). Reste : `calculateCnesst` (`src/payroll/employer/cnesst.js`) cotise sur tout le salaire, sans
-  **salaire maximum assurable** annuel ni cumul — cotisation trop élevée pour un employé au-delà du maximum.
-  Montant 2026 à fournir (ne pas deviner), puis plafonner avec le cumul comme RRQ/AE/RQAP.
+  2026-10-13). Le relevé du 3e trimestre montre que la prime porte sur le **« Salaire admissible CNESST »**,
+  pas sur tout le salaire : prime = 3,17 % × admissible, le reste est un « Excédent CNESST » non cotisé.
+  `calculateCnesst` (`src/payroll/employer/cnesst.js`) cotise encore sur tout le salaire → **coût trop élevé**.
+  Règle de l'excédent **à déterminer** (même des salaires annuels modestes en ont un : ressemble à un plafond
+  par paie, non confirmé) — ne pas deviner : la confirmer avec des talons hebdomadaires + le relevé, ou le comptable.
 - [ ] **Cotisations syndicales** : confirmer pour chaque employé son association **et son local**
   (FIPOE / local 568 : formule électricien par local et période d'apprentissage) ; date de début exacte
   de l'ancienne règle SQC (seule la fin, 2026-06-27, est sourcée).
@@ -315,6 +321,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [ ] **TD1 (fédéral) et TP-1015.3 (Québec)** de chaque employé : les montants se saisissent dans
   Paramètres › Paie (`employee_tax_profiles`, gestionnaires/propriétaire seulement, V2.4.103) et sont
   utilisés par Talons, DAS et Calcul — reste à les saisir. Vide = montant personnel de base.
+- [ ] **Cumul de l'année avant Sparklog (décidé le 2026-10-14)** : la paie suit l'**année civile** (l'exercice
+  financier au 1er novembre ne change rien aux DAS, RRQ, AE, RQAP, CNESST, FSS) et Messier a démarré en
+  **avril 2026**, donc les maximums partent de la première paie d'avril (par employeur). Méthode retenue :
+  importer le **talon de la semaine 42 (2026-10-04 → 10-10)** de chaque employé via Talons › « Importer d'anciens
+  talons » (`ImportLegacyStubsDialog` : colonne « Cumulatif » → ligne `payroll_period_ledger` au 2026-10-10).
+  `planPayrollWeek` part de cette ligne et n'exige pas les semaines d'avant : Sparklog prend le relais à la
+  **semaine 43** (ou 44 si l'ancien système paie aussi la 43 : importer alors ces talons). Seul le propriétaire
+  a déjà son historique (2026-04-04 → 10-03) ; ajouter aussi sa semaine 42. ~30 talons un par un : un import en
+  lot (employé reconnu par le nom du talon) est possible sur demande.
 - [ ] **Échelon / période d'apprentissage** et taux horaire confirmés contre le certificat CCQ
   (liste de contrôle « CCQ monthly-report » du README).
 
@@ -377,7 +392,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   en 2 semaines : dépassement imminent). `src/lib/fetch-all.js` (`fetchAllRows`) lit toutes les pages avec un
   tri stable ; vérifié dans Chromium (2 345 fiches → 3 pages, 2 345 h au total).
 - [x] **P-11** (V2.4.109) : `push_approved_batch` lit le courriel dans `profiles` (une requête) et n'appelle
-  l'API Auth que pour un profil sans courriel (vérifié : 32/32 identiques à auth.users). Fonction à redéployer.
+  l'API Auth que pour un profil sans courriel (vérifié : 32/32 identiques à auth.users). Redéployée le
+  2026-10-14 (version 30, avec `RETURN_WITH_BENEFITS` de V2.4.121 et `_shared/payroll_engine.js` 2.5.0).
+  `classify_week` (inutilisée par l'app) est encore sur le moteur 2.3.0 : à redéployer si on s'en sert.
 - [x] **Sommaire hebdomadaire imprimable** (V2.4.112) : Rapports › Semaine/mois › Vue semaine › « Imprimer le
   sommaire de la semaine ». `src/lib/weekly-report.js` (`buildWeeklyReport` / `buildWeeklyReportHtml`) : chaque job
   (n° OT, heures rég./1,5×/2×/retour s.a., km, statut), sommaire par employé, paie, coût employeur et DAS
@@ -435,6 +452,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 ---
 
 ## Notes on scope
+- **Documents de paie réels** (relevés trimestriels, talons) : le relevé « Masse salariale RBQ » contient le NAS de
+  chaque employé. Ne jamais en copier une valeur personnelle dans le dépôt (public) ; seuls des totaux anonymes.
 - No clock-in/out/break buttons exist; the employee flow is manual Départ/Arrivée/Fin entry, so the
   repetitive Save/Submit paths were audited in place of clock-button races.
 - Re-check line numbers before editing; the tree moves under active development.
