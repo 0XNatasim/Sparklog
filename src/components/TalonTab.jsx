@@ -16,6 +16,7 @@ import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
 import { printLegacyTalon } from "@/lib/legacy-talon-render";
 import { useT } from "@/lib/use-t";
 import { useHolidayDates } from "@/lib/company-holidays";
+import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { usePayrollSettings } from "@/lib/payroll-settings";
 
 const isPending = (s) => s === "submitted" || s === "updated";
@@ -41,6 +42,7 @@ export default function TalonTab({ messier = false }) {
   const [jobsByEmp, setJobsByEmp] = useState(new Map());
   const [seedByEmp, setSeedByEmp] = useState(new Map());
   const [ledgerByEmp, setLedgerByEmp] = useState(new Map());
+  const [roundingByEmp, setRoundingByEmp] = useState(new Map()); // day-rounding counters
   const [weeks, setWeeks] = useState([]); // [{key,start,end,weekNo}] newest first
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,11 +58,12 @@ export default function TalonTab({ messier = false }) {
       setLoading(true);
       try {
         const since = dayjs().subtract(NB_WEEKS + 2, "week").format("YYYY-MM-DD");
-        const [{ data: profs, error: pErr }, { data: jobs, error: jErr }, { data: seeds }, { data: ledgers }] = await Promise.all([
+        const [{ data: profs, error: pErr }, { data: jobs, error: jErr }, { data: seeds }, { data: ledgers }, rounding] = await Promise.all([
           supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name", { ascending: true }),
           fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, status").gte("job_date", since).order("id")),
           supabase.from("payroll_ytd").select("*").eq("tax_year", 2026),
           fetchAllRows(() => supabase.from("payroll_period_ledger").select("*").eq("tax_year", 2026).order("period_end", { ascending: true }).order("user_id")),
+          loadDayRounding(),
         ]);
         if (pErr) throw pErr;
         if (jErr) throw jErr;
@@ -85,6 +88,7 @@ export default function TalonTab({ messier = false }) {
         const lByE = new Map();
         (ledgers || []).forEach((r) => { if (!lByE.has(r.user_id)) lByE.set(r.user_id, []); lByE.get(r.user_id).push(r); });
         setLedgerByEmp(lByE);
+        setRoundingByEmp(rounding);
 
         // Weeks in the register (imported or validated stubs) always show, even without jobs.
         const recent = [...weekMap.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, NB_WEEKS);
@@ -137,7 +141,7 @@ export default function TalonTab({ messier = false }) {
   function openTalon(profile, week, jobs) {
     try {
       const opening = openingFor(profile.id, week.start);
-      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier, holidayDates, employer, taxProfile: taxProfiles.get(profile.id) });
+      const talon = computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier, holidayDates, employer, taxProfile: taxProfiles.get(profile.id), rounding: roundingFor(roundingByEmp, profile.id) });
       // Reference is assigned at comptabilisation only; blank for an aperçu.
       const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
       const reference = formatTalonRef(ledgerRow?.talon_seq);
@@ -185,7 +189,7 @@ export default function TalonTab({ messier = false }) {
       if (st.kind !== "comptabilise" && st.kind !== "apercu") continue;
       try {
         const opening = openingFor(profile.id, week.start);
-        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier, holidayDates, employer, taxProfile: taxProfiles.get(profile.id) });
+        const talon = computeEmployeeWeekTalon({ profile, jobs: st.jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true, weekDate: week.start.format("YYYY-MM-DD"), messierMethod: messier, holidayDates, employer, taxProfile: taxProfiles.get(profile.id), rounding: roundingFor(roundingByEmp, profile.id) });
         const model = buildStubModel({ result: talon.result, ytd: opening, pay: talon.pay, reimb: talon.reimb, ccq: talon.ccqAmounts });
         if (!model) continue;
         const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);

@@ -10,6 +10,7 @@ import { BEFORE_PRESET, afterPreset, presetKindForWeekStart } from "@/lib/rate-p
 import TalonCompare from "@/components/TalonCompare";
 import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef, engineYtdFromOpening } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import { withHoursCumulative } from "@/lib/talon-import-core";
 import { buildCalculTalon } from "@/lib/calcul-talon";
@@ -336,10 +337,15 @@ export default function PayrollEngineTester({ messier = false }) {
     // Build a week picker from the employee's recent jobs (last ~16 weeks).
     const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
     const holidayDates = await loadHolidayDates();
-    const { data: jobRows } = await supabase
-      .from("jobs")
-      .select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes")
-      .eq("user_id", id).gte("job_date", since).order("job_date", { ascending: false });
+    const [{ data: jobRows }, counters] = await Promise.all([
+      supabase
+        .from("jobs")
+        .select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes")
+        .eq("user_id", id).gte("job_date", since).order("job_date", { ascending: false }),
+      // Each day paid to the nearest 15 minutes, with the employee's running counter.
+      loadDayRounding({ userIds: [id], profiles: [{ id, first_trip_unpaid: Boolean(profile?.first_trip_unpaid) }] }),
+    ]);
+    const rounding = roundingFor(counters, id);
     const byWeek = new Map();
     (jobRows || []).forEach((j) => {
       const w = ccqWeek(j.job_date);
@@ -348,7 +354,7 @@ export default function PayrollEngineTester({ messier = false }) {
     });
     const opts = [...byWeek.values()].map((w) => {
       let regMin = 0, ot50 = 0, ot100 = 0, retMin = 0, retNbMin = 0, km = 0;
-      calculatePayrollEntries(w.jobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messier, holidayDates }).forEach((e) => {
+      calculatePayrollEntries(w.jobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messier, holidayDates, rounding }).forEach((e) => {
         regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
         retMin += e.returnRegularMinutes; retNbMin += e.returnNoBenefitMinutes; km += e.totalKm;
       });

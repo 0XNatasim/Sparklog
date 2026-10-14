@@ -6,6 +6,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculateDailyTotals, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { roundingByUser } from "@/lib/day-rounding";
 import { EMPLOYER } from "@/lib/paystub";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
@@ -118,7 +119,7 @@ export default function RecordOfEmploymentTab() {
             .order("period_end", { ascending: true }),
           fetchAllRows(() => supabase
             .from("jobs")
-            .select("id, job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes")
+            .select("id, user_id, job_date, status, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes")
             .eq("user_id", selectedId)
             .order("job_date", { ascending: true })
             .order("id")),
@@ -143,7 +144,9 @@ export default function RecordOfEmploymentTab() {
   // The compiled ROE model: per-period rows (most recent first), totals, and key dates.
   const roe = useMemo(() => {
     if (!employee || (ledger.length === 0 && history.length === 0)) return null;
-    const otOptions = { ...overtimeOptionsFromProfile(employee), holidayDates };
+    // Hours as paid: each day rounded to 15 minutes with the employee's counter.
+    const rounding = roundingByUser(jobs, [employee]).get(employee.id) || null;
+    const otOptions = { ...overtimeOptionsFromProfile(employee), holidayDates, rounding };
     // Accounted SparkLog pay + imported prior-stub history, keyed by pay-period end (Saturday).
     const byEnd = new Map(ledger.map((r) => [r.period_end, r]));
     const histByEnd = new Map(history.map((r) => [r.period_end, r]));
