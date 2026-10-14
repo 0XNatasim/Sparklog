@@ -136,7 +136,10 @@ export default function EmployeeForm() {
   const submissionKeyRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
-  const [workOrderWarnings, setWorkOrderWarnings] = useState([]);
+  // Problems found on the last Field Service screenshot (workOrderIssues). While any remain, the
+  // new entry cannot be saved: the employee fixes the work order and retakes the screenshot.
+  const [workOrderProblems, setWorkOrderProblems] = useState([]);
+  const [showWorkOrderCheck, setShowWorkOrderCheck] = useState(false);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
@@ -206,6 +209,7 @@ export default function EmployeeForm() {
     setParkingRequested(Boolean(draft.parkingRequested));
     setParkingAmount(draft.parkingAmount || "");
     setPendingSaveMode(draft.pendingSaveMode || "draft");
+    setWorkOrderProblems(Array.isArray(draft.workOrderProblems) ? draft.workOrderProblems : []);
     if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
     setDirty(true);
     setDraftRestored(true);
@@ -322,6 +326,8 @@ export default function EmployeeForm() {
     setHasParkingReceipt(false);
     setParkingFile(null);
     setParkingAmount("");
+    setWorkOrderProblems([]);
+    setShowWorkOrderCheck(false);
   }
 
   // A closed day also disables the date field, so this is the way back to today's job card.
@@ -363,12 +369,12 @@ export default function EmployeeForm() {
         submissionKey: submissionKeyRef.current,
         data: {
           job_date, ot, depart, arrivee, fin, km_aller,
-          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode,
+          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems,
         },
       }).catch((error) => console.warn("[draft] local save failed", error));
     }, 350);
     return () => window.clearTimeout(timeoutId);
-  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode]);
+  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
@@ -424,6 +430,7 @@ export default function EmployeeForm() {
   // Saving is the only action on this form: it first asks whether this is the last work
   // order of the day. Submitting the day happens at the end of that flow (or from History).
   function saveDraft() {
+    if (workOrderBlocked) { setShowWorkOrderCheck(true); return; }
     setPendingSaveMode("draft");
     setReturnMinutes(null);
     setReturnKm("");
@@ -1148,7 +1155,10 @@ export default function EmployeeForm() {
       if (d.km_aller !== null && d.km_aller !== undefined) setKmAller(String(d.km_aller));
       // A required value missing or empty on the screenshot (likely empty in Field Service too),
       // or Miles Traveled ≠ Distance réelle parcourue: tell the employee to fix the work order.
-      setWorkOrderWarnings(workOrderIssues(d));
+      // Blocks Save until a new screenshot shows a complete work order.
+      const problems = workOrderIssues(d);
+      setWorkOrderProblems(problems);
+      setShowWorkOrderCheck(problems.length > 0);
       // Auto-fill populated the form — mark dirty so Save appears
       setDirty(true);
 
@@ -1170,6 +1180,7 @@ export default function EmployeeForm() {
   // two fields are not required to complete the form for them.
   const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(fin)
     && (officeEmployee || (Boolean(arrivee) && String(km_aller).trim() !== "")) && parkingComplete;
+  const workOrderBlocked = !editId && workOrderProblems.length > 0;
 
   // Names of the required fields still empty, shown next to the disabled Save button.
   const missingFields = [
@@ -1409,13 +1420,18 @@ export default function EmployeeForm() {
             <div className="space-y-2 pt-3">
               {(dirty || editId) && !locked && (
                 <>
-                  <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs || !formComplete} onClick={saveDraft}>
+                  <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs || !formComplete || workOrderBlocked} onClick={saveDraft}>
                     {saving ? t("common.saving") : t("form.buttons.save")}
                   </Button>
                   {!formComplete && (
                     <p className="text-center text-xs font-medium text-warning" role="status">
                       {t("form.missing.hint", { fields: missingFields.join(", ") })}
                     </p>
+                  )}
+                  {workOrderBlocked && (
+                    <button type="button" className="block w-full text-center text-xs font-medium text-destructive underline-offset-2 hover:underline" role="status" onClick={() => setShowWorkOrderCheck(true)}>
+                      {t("form.workOrderCheck.blocked")}
+                    </button>
                   )}
                 </>
               )}
@@ -1771,7 +1787,7 @@ export default function EmployeeForm() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={workOrderWarnings.length > 0} onOpenChange={(open) => { if (!open) setWorkOrderWarnings([]); }}>
+      <Dialog open={showWorkOrderCheck && workOrderProblems.length > 0} onOpenChange={setShowWorkOrderCheck}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-warning">
@@ -1779,13 +1795,13 @@ export default function EmployeeForm() {
             </DialogTitle>
           </DialogHeader>
           <ul className="list-disc space-y-1 pl-5 text-sm">
-            {workOrderWarnings.map((issue) => (
+            {workOrderProblems.map((issue) => (
               <li key={issue.code}>{t(`form.workOrderCheck.${issue.code}`, { miles: String(issue.miles ?? "").replace(".", ","), km: issue.km ?? "" })}</li>
             ))}
           </ul>
           <p className="text-sm text-muted-foreground">{t("form.workOrderCheck.body")}</p>
           <DialogFooter>
-            <Button type="button" onClick={() => setWorkOrderWarnings([])}>{t("common.ok")}</Button>
+            <Button type="button" onClick={() => setShowWorkOrderCheck(false)}>{t("common.ok")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

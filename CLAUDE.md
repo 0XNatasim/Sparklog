@@ -403,7 +403,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Vérification de la capture Field Service** (V2.4.122) : au remplissage automatique, `workOrderIssues`
   (`src/lib/work-order-parse.js`) avertit l'employé si le # OT, l'heure de début / d'arrivée / de fin ou la
   « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » ≠ distance réelle
-  (km entiers). Une valeur vide n'est plus remplie par un nombre d'un champ plus bas. Avertissement seulement.
+  (km entiers). Une valeur vide n'est plus remplie par un nombre d'un champ plus bas. L'enregistrement de la
+  nouvelle fiche est **bloqué** tant qu'une nouvelle capture ne montre pas un ordre complet (gardé dans le brouillon local).
+  Pas de capture = pas de contrôle (saisie manuelle possible).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
