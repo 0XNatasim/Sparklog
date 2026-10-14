@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildDayRounding, calculateDailyTotals, calculatePayrollEntries, roundToStep } from "./payroll-calculations";
+import { DAY_ROUNDING, buildDayRounding, calculateDailyTotals, calculatePayrollEntries, roundToStep } from "./payroll-calculations";
 
 const job = (id, job_date, depart, fin, extra = {}) => ({ id, job_date, depart, arrivee: depart, fin, ...extra });
-// Mon 2026-10-05 … Fri 2026-10-09 (after the 2026-09-27 start)
+// Mon 2026-10-05 … Fri 2026-10-09 (after the 2026-10-04 start, CCQ week 42)
 const MON = "2026-10-05", TUE = "2026-10-06", WED = "2026-10-07";
 
 describe("roundToStep", () => {
@@ -46,8 +46,9 @@ describe("buildDayRounding — the owner's example", () => {
     expect(paid - worked).toBe(r.days.at(-1).balanceAfter);
   });
 
-  it("starts on 2026-09-27: earlier days are paid to the minute", () => {
-    const r = buildDayRounding([job("old", "2026-09-25", "07:00", "15:07"), job("m", MON, "07:00", "15:07")]);
+  it("starts on 2026-10-04 (week 42): earlier days are paid to the minute", () => {
+    expect(DAY_ROUNDING.startDate).toBe("2026-10-04");
+    const r = buildDayRounding([job("old", "2026-10-02", "07:00", "15:07"), job("m", MON, "07:00", "15:07")]);
     expect(r.days.map((d) => d.date)).toEqual([MON]);
   });
 });

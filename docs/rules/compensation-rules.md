@@ -68,6 +68,8 @@ Sources, filed in `docs/reference/`:
 - **Option `return_with_benefits_to_8h`** (Règles de temps, unchecked for everyone at
   rollout): Messier bonus — return time is paid as regular time **with** benefits while the
   day's work + return stays within 8h; the part beyond 8h is paid without benefits.
+  **Only for days from 2026-10-04 (CCQ week 42)** — owner decision 2026-10-14, when the option
+  was checked for every employee; earlier days keep the default (`RETURN_WITH_BENEFITS`, engine 2.5.0).
 - Work always takes the 8h first, whatever the job order. An unpaid first trip is removed
   before the 8h room is measured. Subcontractors: always the default.
 - The >8h overtime-proof threshold still counts return time; the supper never does (owner
@@ -88,8 +90,10 @@ Sources, filed in `docs/reference/`:
 - The minutes added or removed go to the day's **return time** when it has some (removed from the
   return first, then from the end of the work if the return is shorter); without return, to the **end
   of the day's work**: overtime when the day is over 8 h, regular time otherwise (owner, 2026-10-14).
-- From **2026-09-27 (CCQ week 41)**. Days that count for the counter: every job except drafts.
-- Engine 2.4.0: `DAY_ROUNDING`, `buildDayRounding`, option `rounding` of `calculatePayrollEntries`;
+- From **2026-10-04 (CCQ week 42)** — moved from week 41 by the owner on 2026-10-14 (engine 2.5.0);
+  earlier days are paid to the minute and the counter starts at 0 on 2026-10-04. Days that count for
+  the counter: every job except drafts.
+- Engine 2.4.0 (start date 2.5.0): `DAY_ROUNDING`, `buildDayRounding`, option `rounding` of `calculatePayrollEntries`;
   counters loaded by `src/lib/day-rounding.js` for every pay screen (Calcul, Talons, DAS, Paie de la
   semaine, Coûts, Semaine/mois, Vue semaine, RE, export CCQ, sommaire imprimable, page Semaine de
   l'employé). Not applied: overtime-proof threshold, supper threshold, anomalies (real minutes), the

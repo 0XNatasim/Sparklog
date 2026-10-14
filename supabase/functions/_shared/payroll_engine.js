@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.4.0";
+export const ENGINE_VERSION = "2.5.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -114,6 +114,7 @@ function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
 //    (returnNoBenefitMinutes).
 //  - returnWithBenefitsTo8h: return time is paid as regular time WITH benefits while the
 //    day's work + return stays within 8h; only the part beyond 8h is paid without benefits.
+//    Only for days on or after `returnWithBenefitsFrom` (RETURN_WITH_BENEFITS.startDate).
 //  Day of the week (convention ICI 21.01, 21.02 b); owner decision 2026-10-13):
 //  - Saturday: every worked minute is overtime (no regular hours); the week's first
 //    overtime hour still goes at 1.5× if it is unused, the rest at 2×.
@@ -133,9 +134,13 @@ function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
 // Up to 7 minutes rounds down, 8 and more rounds up, so the counter stays within ±7 minutes.
 // The minutes added or removed go to the day's RETURN time when it has some (taken from it, then
 // from the end of the work if the return is shorter); without return, to the END of the day's
-// work: overtime when the day is over 8 h, regular time otherwise. Applies from CCQ week 41
-// (2026-09-27).
-export const DAY_ROUNDING = Object.freeze({ stepMinutes: 15, startDate: "2026-09-27" });
+// work: overtime when the day is over 8 h, regular time otherwise. Applies from CCQ week 42
+// (2026-10-04, owner decision 2026-10-14; first set to week 41): earlier days are paid to the minute.
+export const DAY_ROUNDING = Object.freeze({ stepMinutes: 15, startDate: "2026-10-04" });
+
+// "Return with benefits up to 8 h" (returnWithBenefitsTo8h) applies to days from CCQ week 42
+// (2026-10-04, owner decision 2026-10-14). Earlier days keep the default: return without benefits.
+export const RETURN_WITH_BENEFITS = Object.freeze({ startDate: "2026-10-04" });
 
 export function roundToStep(minutes, stepMinutes = DAY_ROUNDING.stepMinutes) {
   const half = Math.floor((stepMinutes - 1) / 2);
@@ -225,7 +230,7 @@ function roundingAdjustments(sortedJobs, paidSpan, rounding) {
   return adjust;
 }
 
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null } = {}) {
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, returnWithBenefitsFrom = RETURN_WITH_BENEFITS.startDate, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null } = {}) {
   const holidays = new Set([...(holidayDates || [])].map((d) => String(d).slice(0, 10)));
   // "regular" Monday–Friday; "saturday" all overtime; "double" Sunday / holiday at 2×.
   const dayKind = (jobDate) => {
@@ -249,7 +254,7 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
   const dayReturnBenefitRoom = new Map(); // job_date -> return minutes still payable with benefits
   if (returnWithBenefitsTo8h) {
     for (const [date, work] of dayWorkTotal) {
-      if (dayKind(date) === "regular") dayReturnBenefitRoom.set(date, Math.max(0, 480 - work));
+      if (dayKind(date) === "regular" && String(date) >= String(returnWithBenefitsFrom || "")) dayReturnBenefitRoom.set(date, Math.max(0, 480 - work));
     }
   }
 

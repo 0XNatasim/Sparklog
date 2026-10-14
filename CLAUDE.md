@@ -335,7 +335,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Prélèvement CCQ 0,75 % vs 1,5 %** : tranché, 1,5 % = 0,75 % salarié + 0,75 % employeur.
 - [x] **Retour à l'entrepôt** — tranché le 2026-10-13, codé en V2.4.101 (moteur 2.2.0, migration 0081) :
   jamais de temps sup. ; par défaut sans avantages ; case `return_with_benefits_to_8h` (bonus Messier) =
-  avec avantages jusqu'à 8 h. La preuve > 8 h compte le retour ; le souper ne le compte jamais (V2.4.110). Détail :
+  avec avantages jusqu'à 8 h, cochée pour tous et en vigueur pour les journées depuis la **semaine 42 (2026-10-04)**
+  (V2.4.121, moteur 2.5.0, `RETURN_WITH_BENEFITS`, migration 0089). La preuve > 8 h compte le retour ; le souper ne le compte jamais (V2.4.110). Détail :
   `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
   (à supprimer dans une migration ultérieure).
 - [x] **Prime de chef d'équipe en temps sup.** — option par employé `team_leader_premium_overtime`
@@ -349,7 +350,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   supplémentaires » (20.07) n'est pas codé.
 - [x] **Arrondi des journées** (V2.4.117, moteur 2.4.0, migration 0088) : chaque journée (travail + retour) payée au
   15 min le plus proche, compteur par employé jamais remis à zéro (`paid = round15(worked − compteur)`), ajustement
-  sur le temps de retour s'il y en a, sinon sur la fin du travail (temps sup. au-delà de 8 h), depuis la semaine 41. Détail :
+  sur le temps de retour s'il y en a, sinon sur la fin du travail (temps sup. au-delà de 8 h), depuis la **semaine 42 (2026-10-04)** (déplacé de la
+  semaine 41 en V2.4.121, moteur 2.5.0, migration 0089 ; compteur à 0 le 2026-10-04). Détail :
   `docs/rules/compensation-rules.md` (DAY_ROUNDING). Pas appliqué à l'export Google Sheet (Apps Script).
 - [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
   2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.
