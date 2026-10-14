@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Printer, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { buildStubModel, buildStubHtml, EMPLOYER, payDateFor } from "@/lib/paystub";
+import { buildStubModel, buildStubHtml, EMPLOYER, payDateFor, stubUnit } from "@/lib/paystub";
+import { formatHM } from "@/lib/time";
 
 const n = (v) => Number(v) || 0;
 const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -61,7 +62,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     return (
       <tr className="border-b last:border-0">
         <td className="py-0.5">{r.label}</td>
-        <td className={`text-right font-mono ${tc}`}>{r.hours ? n(r.per).toFixed(2) : money(r.per)}</td>
+        <td className={`text-right font-mono ${tc}`}>{r.hours ? formatHM(r.per) : money(r.per)}</td>
         <td className={`text-right font-mono ${tc}`}>{r.hours ? n(r.cum).toFixed(2) : money(r.cum)}</td>
       </tr>
     );
@@ -172,7 +173,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                   {gains.map((r, i) => (
                     <tr key={i} className="border-b border-slate-100 last:border-0">
                       <td className="py-0.5">{r.label}</td>
-                      <td className="text-right font-mono">{r.unit === "" ? "" : n(r.unit).toFixed(2)}</td>
+                      <td className="text-right font-mono">{stubUnit(r)}</td>
                       <td className="text-right font-mono">{r.taux === "" ? "" : n(r.taux).toFixed(4)}</td>
                       <td className="text-right font-mono text-success">{money(r.montant)}</td>
                     </tr>

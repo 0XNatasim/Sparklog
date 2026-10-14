@@ -34,8 +34,8 @@ export function formatHours(hours) {
   return hours.toFixed(2);
 }
 
-// Duration in wall-clock style, e.g. 3.55h -> "3h33". Clearer than decimal hours
-// for a worked-time total (matches the Live Crew view).
+// Duration in wall-clock style, e.g. 3.55h -> "3h33", 8.75h -> "8h45". Every screen and printout
+// shows hours this way (never decimal), as the owner asked (2026-10-14).
 export function formatHM(hours) {
   const minutes = Math.max(0, Math.round((hours || 0) * 60));
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;

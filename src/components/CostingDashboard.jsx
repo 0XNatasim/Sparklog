@@ -14,6 +14,7 @@ import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 import { loadHolidayDates } from "@/lib/company-holidays";
+import { formatHM } from "@/lib/time";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 
 const montrealToday = companyDate;
@@ -277,8 +278,8 @@ export default function CostingDashboard() {
                           {r.isNonCcq && <span className="ml-2 text-xs font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
                           {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noLevel")})</span>}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-mono">{r.regHours.toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono">{r.otHours.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatHM(r.regHours)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatHM(r.otHours)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(r.labor)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(r.conges)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(r.contribTotal)}</td>
@@ -313,8 +314,8 @@ export default function CostingDashboard() {
                 <tfoot>
                   <tr className="border-t bg-muted/40 font-semibold">
                     <td className="px-3 py-2.5">{t("costing.totals")}</td>
-                    <td className="px-3 py-2.5 text-right font-mono">{totals.regHours.toFixed(2)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono">{totals.otHours.toFixed(2)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{formatHM(totals.regHours)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{formatHM(totals.otHours)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(totals.labor)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(totals.conges)}</td>
                     <td className="px-3 py-2.5 text-right font-mono">{money(totals.contribTotal)}</td>

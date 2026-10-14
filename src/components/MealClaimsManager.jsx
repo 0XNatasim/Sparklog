@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { useT } from "@/lib/use-t";
 import { statusBadgeVariant } from "@/lib/status";
-import { formatHours, hoursBetween } from "@/lib/time";
+import { formatHM, hoursBetween } from "@/lib/time";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { useSearchParams } from "react-router-dom";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
@@ -88,7 +88,7 @@ export default function MealClaimsManager() {
           <Badge variant={statusBadgeVariant(claim.status)} className="uppercase tracking-wide">{t(`meals.status.${claim.status}`)}</Badge>
         </div>
         <div className="flex flex-wrap gap-1.5 text-xs">
-          <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHours(total)}</b></span>
+          <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHM(total)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.km")}: <b>{kilometres}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">$<b>{Number(claim.amount).toFixed(0)}</b></span>
         </div>

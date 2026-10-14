@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { calculateDailyTotals, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { roundingByUser } from "@/lib/day-rounding";
+import { formatHM } from "@/lib/time";
 import { EMPLOYER } from "@/lib/paystub";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
@@ -33,7 +34,8 @@ const SEPARATION_REASONS = [
 ];
 
 const money = (n) => (Number(n) || 0).toLocaleString("fr-CA", { style: "currency", currency: "CAD" });
-const hrs = (n) => (Number(n) || 0).toFixed(2);
+// Hours as 8h45 (never decimal).
+const hrs = (n) => formatHM(Number(n) || 0);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // Insurable hours actually worked within [start, end] (inclusive), using the same engine
