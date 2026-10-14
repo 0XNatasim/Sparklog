@@ -63,6 +63,28 @@ describe("computeEmployeeWeekTalon premiums (owner decisions 2026-10-13)", () =>
   });
 });
 
+describe("talon (buildStubModel): « Prime » et « Prime CCQ » sur deux lignes", () => {
+  const stub = (p) => {
+    const w = computeEmployeeWeekTalon({ profile: p, jobs, weekDate: "2026-09-27" });
+    return { w, model: buildStubModel({ result: w.result, ytd: {}, pay: w.pay, reimb: w.reimb, ccq: w.ccqAmounts }) };
+  };
+  const line = (model, label) => model.gains.find((g) => g.label === label);
+
+  it("prime hors CCQ seule : une ligne « Prime », pas de « Prime CCQ »", () => {
+    const { model } = stub({ ...profile, team_leader_premium: 4.06 });
+    expect(line(model, "Prime")).toMatchObject({ unit: 8, taux: 4.06, montant: 32.48 });
+    expect(line(model, "Prime CCQ")).toBeUndefined();
+  });
+
+  it("les deux primes : chacune sa ligne, et les gains imprimés = brut payé", () => {
+    const { w, model } = stub({ ...profile, team_leader_premium: 1.5, team_leader_premium_ccq: 4.06 });
+    expect(line(model, "Prime")).toMatchObject({ unit: 8, taux: 1.5, montant: 12 });
+    expect(line(model, "Prime CCQ")).toMatchObject({ unit: 8, taux: 4.06, montant: 32.48 });
+    const wages = model.gains.filter((g) => /^(Salaire|Temps|Prime)/.test(g.label)).reduce((sum, g) => sum + g.montant, 0);
+    expect(wages).toBeCloseTo(w.result.gross.total, 2);
+  });
+});
+
 describe("computeEmployeeWeekTalon employer settings and tax forms", () => {
   it("uses the TD1 / TP-1015.3 amounts and extra tax from Paramètres", () => {
     const basic = computeEmployeeWeekTalon({ profile, jobs, weekDate: "2026-09-27" });

@@ -4,6 +4,8 @@
 // ⚠️ DRAFT: the DAS figures come from the unvalidated placeholder rule set. Never a
 // substitute for the official pay stub.
 
+import { printedPayLines } from "@/payroll/earnings";
+
 const n = (v) => Number(v) || 0;
 export const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -68,11 +70,27 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const gainsRRQ = cash + vac + imposable;
   const gainsAE = cash + vac;
 
+  // Two team-leader premiums, each on its own line (owner decisions 2026-10-13):
+  //   « Prime » — hors CCQ: outside the 13 % and the prélèvement (the employer stub's « Régulier à taux horaire »);
+  //   « Prime CCQ » — inside the 13 % (vacances CCQ) and the prélèvement.
+  // Overtime lines only when the employee's « prime sur le temps sup. » option is on.
+  const ccqPrem = n(pay.ccqPremium);
+  const lines = printedPayLines({
+    regularHours: regHrs, ot150Hours: n(pay.ot150Hours), ot200Hours: n(pay.ot200Hours),
+    baseRate: base, premium: prem, ccqPremium: ccqPrem, premiumOnOvertime: Boolean(pay.premiumOnOvertime),
+  });
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const premiumLine = (label, unit, taux, montant) => (montant ? { label, unit, taux, montant } : null);
   const gains = [
     { label: "Salaire régulier fixe", unit: regHrs, taux: base, montant: regHrs * base },
     { label: "Temps et demi", unit: n(pay.ot150Hours), taux: base * 1.5, montant: n(pay.ot150Hours) * base * 1.5 },
     { label: "Temps double", unit: n(pay.ot200Hours), taux: base * 2, montant: n(pay.ot200Hours) * base * 2 },
-    prem ? { label: "Prime chef d'équipe", unit: regHrs, taux: prem, montant: regHrs * prem } : null,
+    premiumLine("Prime", regHrs, prem, lines.regularPremium),
+    premiumLine("Prime — temps et demi", n(pay.ot150Hours), r2(prem * 1.5), lines.ot150Premium),
+    premiumLine("Prime — temps double", n(pay.ot200Hours), r2(prem * 2), lines.ot200Premium),
+    premiumLine("Prime CCQ", regHrs, ccqPrem, lines.regularCcqPremium),
+    premiumLine("Prime CCQ — temps et demi", n(pay.ot150Hours), r2(ccqPrem * 1.5), lines.ot150CcqPremium),
+    premiumLine("Prime CCQ — temps double", n(pay.ot200Hours), r2(ccqPrem * 2), lines.ot200CcqPremium),
     n(pay.baseOnlyHours) ? { label: "Régulier à taux horaire (taux de base)", unit: n(pay.baseOnlyHours), taux: base, montant: n(pay.baseOnlyHours) * base } : null,
     safety ? { label: "Équipement de sécurité", unit: hours, taux: safety / (hours || 1), montant: safety } : null,
     kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, taux: pay.kmRate, montant: kmReimb } : null,
