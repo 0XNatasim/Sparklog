@@ -7,9 +7,11 @@ const LABELS = {
   depart: /(?:Heure\s+de\s+d[eé]but|Start\s*Time)/i,
   fin: /(?:Heure\s+de\s+fin|End\s*Time)/i,
   arrivee: /(?:Heure\s+d['’]?\s*arriv[eé]e|(?:Actual\s+)?Arrival\s*Time)/i,
-  // "Distance parcourue", "Distance réelle parcourue (km)", English "Distance travelled".
-  km: /Distance[^\n\d]*?(?:parcourue|travell?ed)(?:\s*\(\s*km\s*\))?/i,
-  miles: /(?:Miles\s*Travell?ed|Milles\s+parcourus)/i,
+  // "Distance parcourue", "Distance réelle parcourue (km)", English "Distance travelled" — but not
+  // "Distance parcourue (miles)", the French label of Miles Traveled.
+  km: /Distance[^\n\d]*?(?:parcourue|travell?ed)(?!\s*\(\s*mil)(?:\s*\(\s*km\s*\))?/i,
+  // English "Miles Traveled", French "Distance parcourue (miles)".
+  miles: /(?:Miles\s*Travell?ed|Milles\s+parcourus|Distance\s+parcourue\s*\(\s*miles?\s*\))/i,
 };
 const OTHER_LABELS = [/\bDur[eé]e\b/i, /\bDuration\b/i, /D[eé]placement/i];
 const SEGMENT_MAX = 120;
@@ -58,7 +60,7 @@ export function parseExtractedText(text) {
   const km = numberIn(segmentAfter(text, LABELS.km));
   if (km !== null) out.km_aller = Math.round(km);
 
-  // "Miles Traveled" (the field's value is in km despite its name): only used to check that it
+  // "Miles Traveled" / "Distance parcourue (miles)" (the value is in km despite the name): only used to check that it
   // matches "Distance réelle parcourue (km)", never to fill the form.
   const miles = numberIn(segmentAfter(text, LABELS.miles));
   if (miles !== null) out.miles_traveled = miles;

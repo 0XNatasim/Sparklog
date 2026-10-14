@@ -402,7 +402,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
     auparavant ignorées ; `lib/talon-print.js` réunit talons conservés et aperçus dans un seul document.
 - [x] **Vérification de la capture Field Service** (V2.4.122) : au remplissage automatique, `workOrderIssues`
   (`src/lib/work-order-parse.js`) avertit l'employé si le # OT, l'heure de début / d'arrivée / de fin ou la
-  « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » ≠ distance réelle
+  « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » (FR : « Distance parcourue (miles) ») ≠ distance réelle
   (km entiers). Une valeur vide n'est plus remplie par un nombre d'un champ plus bas. L'enregistrement de la
   nouvelle fiche est **bloqué** tant qu'une nouvelle capture ne montre pas un ordre complet (gardé dans le brouillon local).
   Saisie à la main (sans capture) : Enregistrer ouvre d'abord « Fiche entrée à la main » (mieux avec la capture ;
