@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-13 (V2.4.111).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-14 (V2.4.117).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -74,6 +74,24 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 - [ ] **Ménage du code** : découper les deux plus gros écrans (la fiche employé et la liste des employés)
   et corriger environ 60 avertissements du vérificateur de code. Il faudra d'abord ajouter des tests
   d'écran.
+
+## Étape 6 — Gestion V3 : ce qu'il reste à convertir 💻
+
+La V3 (bouton **V2 | V3** en haut à droite de la Gestion) a déjà **À traiter**, **Paie de la semaine** et le
+nouveau menu. Les autres pages s'ouvrent encore dans leur version actuelle. À faire, dans cet ordre :
+
+- [ ] **Fiche employé unique** : une liste avec recherche, et une fiche à onglets (Identité, CCQ, Paie et options,
+  Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
+- [ ] **DAS de Téléchargements** : il calcule avec la méthode « Référence » alors que Paie › DAS utilise « Messier »
+  (deux totaux différents pour le même mois). Les aligner.
+- [ ] **Débloquer** : un seul endroit et des mots clairs — « rouvrir une journée » ou « retourner une job pour
+  correction » (aujourd'hui : 3 boutons qui se ressemblent).
+- [ ] **Reçus et preuves** : n'afficher par défaut que ce qui reste à traiter ; recherche par employé et par date.
+- [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
+- [ ] **Rapport CCQ** : proposer par défaut le mois qui vient de finir.
+- [ ] **Petits plus** : recherche dans les listes (Employés, Messages), « tout marquer comme lu » sur la cloche,
+  « jours sans saisie » visible dans Temps plutôt que dans Avancé.
+- [ ] **Fin** : quand tout est converti et testé, faire de la V3 la version par défaut, puis retirer la V2.
 
 ## À surveiller 👤
 

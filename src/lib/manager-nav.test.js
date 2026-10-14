@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
 import {
-  MANAGER_NAV, MANAGER_NAV_ITEMS, canOpenNavItem, findNavItem, firstAllowedPath, legacySectionTarget, visibleManagerNav,
+  MANAGER_NAV, MANAGER_NAV_ITEMS, MANAGER_NAV_V2_ITEMS, MANAGER_NAV_V3, canOpenNavItem, findNavItem, firstAllowedPath,
+  legacySectionTarget, visibleManagerNav,
 } from "./manager-nav";
 import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
 
-const ids = (role, adminSections) => visibleManagerNav(role, adminSections).flatMap((g) => g.items.map((i) => i.id));
+const ids = (role, adminSections, version = "v2") => visibleManagerNav(role, adminSections, version).flatMap((g) => g.items.map((i) => i.id));
 
 describe("manager navigation", () => {
   it("has unique ids and paths", () => {
@@ -13,15 +14,15 @@ describe("manager navigation", () => {
     expect(new Set(MANAGER_NAV_ITEMS.map((i) => i.path)).size).toBe(MANAGER_NAV_ITEMS.length);
   });
 
-  it("shows every page to the owner, starting on the live crew", () => {
-    expect(ids("owner", [])).toHaveLength(MANAGER_NAV_ITEMS.length);
+  it("shows every V2 page to the owner, starting on the live crew", () => {
+    expect(ids("owner", [])).toHaveLength(MANAGER_NAV_V2_ITEMS.length);
     expect(firstAllowedPath("owner", [])).toBe("live");
   });
 
   it("shows every page except the owner-only ones to a manager", () => {
     const ownerOnly = MANAGER_NAV_ITEMS.filter((item) => item.ownerOnly).map((item) => item.id);
     expect(ownerOnly).toEqual(["advanced-emergency"]);
-    expect(ids("manager", [])).toHaveLength(MANAGER_NAV_ITEMS.length - ownerOnly.length);
+    expect(ids("manager", [])).toHaveLength(MANAGER_NAV_V2_ITEMS.length - ownerOnly.length);
     for (const id of ownerOnly) expect(ids("manager", [])).not.toContain(id);
     expect(firstAllowedPath("manager", [])).toBe("live");
   });
@@ -86,6 +87,41 @@ describe("manager navigation", () => {
   it("finds items by path", () => {
     expect(findNavItem("/payroll/das/")?.id).toBe("payroll-das");
     expect(findNavItem("nope")).toBeNull();
+  });
+});
+
+describe("Gestion V3 menu", () => {
+  it("lists every page exactly once, the day's work first", () => {
+    const v3 = MANAGER_NAV_V3.flatMap((group) => group.items.map((item) => item.id));
+    expect(new Set(v3).size).toBe(v3.length);
+    expect([...v3].sort()).toEqual(MANAGER_NAV_ITEMS.map((item) => item.id).sort());
+    expect(firstAllowedPath("owner", [], "v3")).toBe("todo");
+    expect(firstAllowedPath("manager", [], "v3")).toBe("todo");
+  });
+
+  it("keeps each page's path and access rule (only the label may change)", () => {
+    const base = new Map(MANAGER_NAV_ITEMS.map((item) => [item.id, item]));
+    for (const item of MANAGER_NAV_V3.flatMap((group) => group.items)) {
+      expect(item.path, item.id).toBe(base.get(item.id).path);
+      expect(item.grant ?? null, item.id).toBe(base.get(item.id).grant ?? null);
+      expect(Boolean(item.ownerOnly), item.id).toBe(Boolean(base.get(item.id).ownerOnly));
+    }
+  });
+
+  it("gives a granted admin the same pages in V2 and V3, never the manager-only ones", () => {
+    for (const section of GRANTABLE_ADMIN_SECTIONS) {
+      expect(ids("admin", [section], "v3").sort(), section).toEqual(ids("admin", [section]).sort());
+    }
+    const menu = ids("admin", [...GRANTABLE_ADMIN_SECTIONS], "v3");
+    expect(menu).not.toContain("todo");
+    expect(menu).not.toContain("payroll-week");
+    expect(firstAllowedPath("admin", ["live"], "v3")).toBe("live");
+  });
+
+  it("names pages as the V3 menu shows them", () => {
+    expect(findNavItem("receipts", "v3")?.labelKey).toBe("mgr.nav3.receipts");
+    expect(findNavItem("receipts")?.labelKey).toBe("mgr.nav.receipts");
+    expect(findNavItem("payroll/week")?.id).toBe("payroll-week");
   });
 });
 

@@ -1,10 +1,10 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BadgeDollarSign, Banknote, BarChart3, CalendarClock, CalendarDays, CalendarOff, ChevronDown, ClipboardList,
-  Clock3, FilePlus2, FileText, Files, HeartPulse, History, LogOut, Megaphone, Menu, Moon, PanelLeftClose, PanelLeftOpen,
-  Percent, Radio, Receipt, ReceiptText, RefreshCw, ScrollText, Settings, ShieldCheck, SlidersHorizontal, Sun,
-  Unlock, UserCircle, Users, Wallet, X,
+  BadgeDollarSign, Banknote, BarChart3, BookOpen, CalendarCheck, CalendarClock, CalendarDays, CalendarOff, ChevronDown,
+  ClipboardList, Clock3, FilePlus2, FileText, Files, HeartPulse, History, ListChecks, LogOut, Megaphone, Menu, Moon, Package,
+  PanelLeftClose, PanelLeftOpen, Percent, Radio, Receipt, ReceiptText, RefreshCw, Scale, ScrollText, Settings, ShieldCheck,
+  SlidersHorizontal, Sun, Unlock, UserCircle, Users, Wallet, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, visibleManagerNav } from "@/lib/manager-nav";
+import { useManagerUiVersion } from "@/lib/manager-ui-version";
+import { isManagerRole } from "@/lib/roles";
 import NotificationsBell from "@/components/NotificationsBell";
 import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
@@ -28,6 +30,11 @@ const COMPANY_NAME = "Messier Connexion";
 const COLLAPSE_KEY = "sparklog.managerNavCollapsed";
 
 const ICONS = {
+  todo: ListChecks,
+  "payroll-week": CalendarCheck,
+  inventory: Package,
+  references: BookOpen,
+  "advanced-pay-rules": Scale,
   live: Radio,
   timesheets: Clock3,
   receipts: Receipt,
@@ -64,7 +71,11 @@ function readCollapsed() {
 function SidebarNav({ groups, collapsed, activePath, onNavigate }) {
   const t = useT();
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === activePath))?.id;
-  const [open, setOpen] = useState(() => new Set(activeGroup ? [activeGroup] : []));
+  // V3 groups say whether they start expanded; V2 opens only the current page's group.
+  const [open, setOpen] = useState(() => new Set([
+    ...groups.filter((group) => group.open).map((group) => group.id),
+    ...(activeGroup ? [activeGroup] : []),
+  ]));
 
   // Moving to another group (menu, link, deep link) opens it.
   useEffect(() => {
@@ -192,18 +203,46 @@ function AccountMenu() {
   );
 }
 
+// Gestion V2 / V3 switch (managers and owner). V3 = new menus and pages; V2 = the current Gestion.
+function VersionSwitch({ version, onChange }) {
+  const t = useT();
+  return (
+    <div role="radiogroup" aria-label={t("mgr.ui.label")} title={t("mgr.ui.label")} className="inline-flex shrink-0 rounded-md border bg-muted p-0.5">
+      {["v2", "v3"].map((value) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={version === value}
+          onClick={() => onChange(value)}
+          className={cn(
+            "min-h-9 rounded px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8",
+            version === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {value.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Gestion shell: grouped sidebar (rail or full) on desktop, drawer on phones, compact header.
 // Pages render in <Outlet/> at full width; forms cap their own width.
 export default function ManagerLayout() {
   const t = useT();
   const { role, adminSections } = useAuth();
   const location = useLocation();
-  const groups = useMemo(() => visibleManagerNav(role, adminSections), [role, adminSections]);
+  const navigate = useNavigate();
+  const canSwitch = isManagerRole(role);
+  const [storedVersion, setVersion] = useManagerUiVersion();
+  const version = canSwitch ? storedVersion : "v2";
+  const groups = useMemo(() => visibleManagerNav(role, adminSections, version), [role, adminSections, version]);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
-  const current = findNavItem(activePath);
+  const current = findNavItem(activePath, version);
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
@@ -219,6 +258,14 @@ export default function ManagerLayout() {
       try { window.localStorage.setItem(COLLAPSE_KEY, value ? "0" : "1"); } catch { /* storage unavailable */ }
       return !value;
     });
+  }
+
+  // Switching versions stays on the page when the new menu has it, else opens its landing page.
+  function switchVersion(next) {
+    if (next === version) return;
+    setVersion(next);
+    const inNewMenu = visibleManagerNav(role, adminSections, next).some((group) => group.items.some((item) => item.path === activePath));
+    if (!inNewMenu) navigate("/manager", { replace: true });
   }
 
   // Same ids as canAccessSection: an ungranted page by URL goes back to the landing page.
@@ -237,7 +284,7 @@ export default function ManagerLayout() {
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
-          <SidebarNav groups={groups} collapsed={collapsed} activePath={activePath} />
+          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} />
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -259,7 +306,7 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <SidebarNav groups={groups} collapsed={false} activePath={activePath} onNavigate={() => setDrawerOpen(false)} />
+              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} onNavigate={() => setDrawerOpen(false)} />
             </div>
           </div>
         )}
@@ -273,6 +320,7 @@ export default function ManagerLayout() {
               <div className="hidden truncate text-xs leading-none text-muted-foreground sm:block">{COMPANY_NAME}</div>
               <h1 className="truncate text-sm font-semibold leading-tight sm:text-base">{current ? t(current.labelKey) : t("nav.manager")}</h1>
             </div>
+            {canSwitch && <VersionSwitch version={version} onChange={switchVersion} />}
             <NotificationsBell />
             <EmployeeNotificationsBell />
             <AccountMenu />
