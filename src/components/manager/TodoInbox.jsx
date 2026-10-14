@@ -18,6 +18,8 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
 import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
 import { notifyBroadcastPush } from "@/lib/push";
+import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, return_time_minutes, overtime_evidence_captured, updated_at";
 const money = (value) => `${(Number(value) || 0).toLocaleString("fr-CA", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} $`;
@@ -79,7 +81,7 @@ export default function TodoInbox() {
         today, prevDay, anomalies, missing,
         truncated: submitted.length >= QUERY_BUDGETS.anomalySubmittedJobs,
         profiles: new Map(people.map((p) => [p.id, p])),
-        raw: { submitted, evidence: evidenceRes.data || [], meals: mealsRes.data || [], parking: parkingRes.data || [] },
+        raw: { submitted, peers: peersRes.data || [], evidence: evidenceRes.data || [], meals: mealsRes.data || [], parking: parkingRes.data || [] },
       });
     } catch (e) {
       setErr(e?.message || t("todo.failedLoad"));
@@ -273,6 +275,13 @@ export default function TodoInbox() {
     </span>
   );
 
+  // The supper check uses every job of that day (approved ones too), like the database does.
+  function mealCheck(day) {
+    const sameDay = (job) => job.user_id === day.userId && job.job_date === day.date;
+    const jobs = [...state.raw.submitted.filter(sameDay), ...state.raw.peers.filter(sameDay)];
+    return mealDayBreakdown(jobs, day.date, state.profiles.get(day.userId));
+  }
+
   // A plain render function (not a component) so rows are not remounted on every render.
   function renderDay(day, anomaly = false) {
     const proof = day.evidence.find((row) => row.storage_path);
@@ -289,12 +298,18 @@ export default function TodoInbox() {
             <div key={job.id} className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">OT {job.ot || "—"}</span>
               <span className="font-mono">{String(job.depart || "").slice(0, 5)} – {String(job.fin || "").slice(0, 5)}</span>
-              {Number(job.return_time_minutes) > 0 && <span>{t("todo.returnTime", { time: hm(job.return_time_minutes) })}</span>}
+              {Number(job.return_time_minutes) > 0 && <span>{t("todo.returnTime", { time: hm(job.return_time_minutes), km: Math.round(getKilometreBreakdown(job).returnKm) })}</span>}
             </div>
           ))}
           {anomaly && day.anomalies.map((a) => (
             <div key={a.key} className="flex items-start gap-1.5 text-sm text-warning"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{describeAnomaly(a)}</div>
           ))}
+          {day.meals.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">{t("meal.check.title")} : </span>
+              {mealBreakdownText(t, mealCheck(day), formatHM)} · {t("meal.check.threshold")}
+            </div>
+          )}
           {(proof || day.meals.length > 0 || day.parking.length > 0) && (
             <div className="flex flex-wrap gap-1.5 pt-0.5">
               {proof && (

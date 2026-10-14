@@ -27,6 +27,7 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
 import { isAbortError, useLatestRequest } from "@/lib/latest-request";
+import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 
 dayjs.extend(isoWeek);
 
@@ -81,6 +82,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
   const [visibleParkingReceipts, setVisibleParkingReceipts] = useState(new Set());
   const [parkingImageLoading, setParkingImageLoading] = useState("");
   const [notificationMealJobs, setNotificationMealJobs] = useState([]);
+  const [mealDayJobs, setMealDayJobs] = useState(new Map()); // `${user}|${date}` → that day's jobs (supper check)
   const [notificationMealsLoading, setNotificationMealsLoading] = useState(false);
 
   const [jobs, setJobs] = useState([]);
@@ -458,7 +460,20 @@ export default function ManagerDashboard({ view = "timesheet" }) {
         const { data: people } = missingProfileIds.length
           ? await withRetry(() => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds), 12000)
           : { data: [] };
+        // Every job of each supper's day: the check shows the day's work, return time and km.
+        const users = [...new Set(orderedRows.map((job) => job.user_id))];
+        const dates = [...new Set(orderedRows.map((job) => job.job_date))];
+        const { data: dayRows } = users.length
+          ? await withRetry(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour").in("user_id", users).in("job_date", dates), 12000)
+          : { data: [] };
+        const byDay = new Map();
+        for (const row of dayRows || []) {
+          const key = `${row.user_id}|${row.job_date}`;
+          if (!byDay.has(key)) byDay.set(key, []);
+          byDay.get(key).push(row);
+        }
         if (!cancelled) {
+          setMealDayJobs(byDay);
           setNotificationMealJobs(orderedRows);
           setProfiles((current) => new Map([...current, ...(people || []).map((person) => [person.id, person])]));
         }
@@ -970,6 +985,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
         <div className="flex flex-wrap gap-1.5 text-xs">
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.totalLabel")}: <b>{formatHM(totalHours)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.km")}: <b>{km}</b></span>
+          {Number(job.return_time_minutes) > 0 && <span className="rounded-full border bg-muted px-2 py-1">{t("manager.notifications.returnChip", { time: formatHM(Number(job.return_time_minutes) / 60), km: Math.round(getKilometreBreakdown(job).returnKm) })}</span>}
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.depart")}: <b>{fmtTimeHHmm(job.depart)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
@@ -978,6 +994,12 @@ export default function ManagerDashboard({ view = "timesheet" }) {
           {hasMeal ? <span className="rounded-full border border-success/30 bg-success/10 px-2 py-1">{t("manager.notifications.supper")}: <b>$30.00</b></span> : null}
           {job.status === "submitted" && <Button type="button" size="sm" className="ml-auto" disabled={actionLoadingId === job.id} onClick={() => approve(job.id)}>{actionLoadingId === job.id ? t("common.working") : t("manager.notifications.approveJob")}</Button>}
         </div>
+        {hasMeal && (
+          <div className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-xs">
+            <span className="font-semibold">{t("meal.check.title")} : </span>
+            {mealBreakdownText(t, mealDayBreakdown(mealDayJobs.get(`${job.user_id}|${job.job_date}`) || [job], job.job_date, employee), formatHM)} · {t("meal.check.threshold")}
+          </div>
+        )}
         {isParkingVisible && <div className="rounded-lg border p-3">{receipt?.imageUrl ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /> : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
         {isProofVisible && <div className="rounded-xl border bg-muted/30 p-2"><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>{evidence?.imageUrl ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" /> : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}</div>}
       </CardContent>

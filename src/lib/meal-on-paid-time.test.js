@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { dayFirstTripUnpaidMinutes, isMealEligible, MEAL_AFTER_DAILY_WORK_MINUTES } from "./payroll-calculations";
-import { mealDecision } from "./meal-eligibility";
+import { mealDayBreakdown, mealDecision } from "./meal-eligibility";
 
 // Current body of reconcile_overtime_meal (0086); its re-check trigger is still the 0077 one.
 const sql = readFileSync(fileURLToPath(new URL(
@@ -74,5 +74,26 @@ describe("migration 0086 database contract", () => {
     expect(triggerSql).toContain("after update of depart, arrivee, fin, return_time_minutes on public.jobs");
     expect(sql).toContain("m.reviewed_by is null");
     expect(sql).not.toContain("overtime_evidence");
+  });
+});
+
+describe("mealDayBreakdown — what the manager sees on a supper", () => {
+  // Martin, 2026-10-13: 06:59–12:20 and 12:21–18:15 with 1 h of return and 104 km of return.
+  const day = [
+    { id: "a", job_date: "2026-10-13", depart: "06:59", arrivee: "08:53", fin: "12:20", return_time_minutes: 0, km_total: 47, km_aller: 47, km_retour: 0 },
+    { id: "b", job_date: "2026-10-13", depart: "12:21", arrivee: "14:01", fin: "18:15", return_time_minutes: 60, km_total: 104, km_aller: 0, km_retour: 104 },
+  ];
+
+  it("shows presence, return time and kilometres, and the work that decides", () => {
+    expect(mealDayBreakdown(day, "2026-10-13", {})).toEqual({
+      presenceMinutes: 675, returnMinutes: 60, unpaidTripMinutes: 0, workMinutes: 615, totalKm: 151, returnKm: 104, eligible: true,
+    });
+  });
+
+  it("takes the unpaid first trip out too, for employees with that option", () => {
+    const b = mealDayBreakdown(day, "2026-10-13", { first_trip_unpaid: true });
+    expect(b.unpaidTripMinutes).toBe(114); // 06:59 → 08:53
+    expect(b.workMinutes).toBe(615 - 114);
+    expect(b.eligible).toBe(false);
   });
 });
