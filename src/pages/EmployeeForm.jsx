@@ -141,6 +141,9 @@ export default function EmployeeForm() {
   // new entry cannot be saved: the employee fixes the work order and retakes the screenshot.
   const [workOrderProblems, setWorkOrderProblems] = useState([]);
   const [showWorkOrderCheck, setShowWorkOrderCheck] = useState(false);
+  // Raw text of the last screenshot read, shown on demand in the check dialog so a misread can be
+  // reported exactly (kept in memory only, never saved).
+  const [lastOcrText, setLastOcrText] = useState("");
   // A new field entry typed by hand (no Field Service screenshot read): Save first reminds the
   // employee that the screenshot is better and that Field Service must match the entry.
   const [fromScreenshot, setFromScreenshot] = useState(false);
@@ -1165,6 +1168,7 @@ export default function EmployeeForm() {
       const text = await extractWorkOrderText(file);
 
       const d = parseExtractedText(text);
+      setLastOcrText(String(text || ""));
 
       if (d.job_date) setJobDate(String(d.job_date));
       if (d.ot) setOt(String(d.ot));
@@ -1820,6 +1824,15 @@ export default function EmployeeForm() {
             ))}
           </ul>
           <p className="text-sm text-muted-foreground">{t("form.workOrderCheck.body")}</p>
+          {lastOcrText && (
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none">{t("form.workOrderCheck.showText")}</summary>
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded border border-border bg-muted/40 p-2 font-mono">{lastOcrText}</pre>
+              <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => navigator.clipboard?.writeText(lastOcrText).catch(() => undefined)}>
+                {t("form.workOrderCheck.copyText")}
+              </Button>
+            </details>
+          )}
           <DialogFooter>
             <Button type="button" onClick={() => setShowWorkOrderCheck(false)}>{t("common.ok")}</Button>
           </DialogFooter>
