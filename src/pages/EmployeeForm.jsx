@@ -140,6 +140,10 @@ export default function EmployeeForm() {
   // new entry cannot be saved: the employee fixes the work order and retakes the screenshot.
   const [workOrderProblems, setWorkOrderProblems] = useState([]);
   const [showWorkOrderCheck, setShowWorkOrderCheck] = useState(false);
+  // A new field entry typed by hand (no Field Service screenshot read): Save first reminds the
+  // employee that the screenshot is better and that Field Service must match the entry.
+  const [fromScreenshot, setFromScreenshot] = useState(false);
+  const [showManualEntryCheck, setShowManualEntryCheck] = useState(false);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
@@ -210,6 +214,7 @@ export default function EmployeeForm() {
     setParkingAmount(draft.parkingAmount || "");
     setPendingSaveMode(draft.pendingSaveMode || "draft");
     setWorkOrderProblems(Array.isArray(draft.workOrderProblems) ? draft.workOrderProblems : []);
+    setFromScreenshot(Boolean(draft.fromScreenshot));
     if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
     setDirty(true);
     setDraftRestored(true);
@@ -328,6 +333,8 @@ export default function EmployeeForm() {
     setParkingAmount("");
     setWorkOrderProblems([]);
     setShowWorkOrderCheck(false);
+    setFromScreenshot(false);
+    setShowManualEntryCheck(false);
   }
 
   // A closed day also disables the date field, so this is the way back to today's job card.
@@ -369,12 +376,12 @@ export default function EmployeeForm() {
         submissionKey: submissionKeyRef.current,
         data: {
           job_date, ot, depart, arrivee, fin, km_aller,
-          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems,
+          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems, fromScreenshot,
         },
       }).catch((error) => console.warn("[draft] local save failed", error));
     }, 350);
     return () => window.clearTimeout(timeoutId);
-  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems]);
+  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems, fromScreenshot]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
@@ -431,6 +438,12 @@ export default function EmployeeForm() {
   // order of the day. Submitting the day happens at the end of that flow (or from History).
   function saveDraft() {
     if (workOrderBlocked) { setShowWorkOrderCheck(true); return; }
+    if (!editId && !officeEmployee && !fromScreenshot) { setShowManualEntryCheck(true); return; }
+    startSaveFlow();
+  }
+
+  function startSaveFlow() {
+    setShowManualEntryCheck(false);
     setPendingSaveMode("draft");
     setReturnMinutes(null);
     setReturnKm("");
@@ -1156,6 +1169,7 @@ export default function EmployeeForm() {
       // A required value missing or empty on the screenshot (likely empty in Field Service too),
       // or Miles Traveled ≠ Distance réelle parcourue: tell the employee to fix the work order.
       // Blocks Save until a new screenshot shows a complete work order.
+      setFromScreenshot(true);
       const problems = workOrderIssues(d);
       setWorkOrderProblems(problems);
       setShowWorkOrderCheck(problems.length > 0);
@@ -1802,6 +1816,22 @@ export default function EmployeeForm() {
           <p className="text-sm text-muted-foreground">{t("form.workOrderCheck.body")}</p>
           <DialogFooter>
             <Button type="button" onClick={() => setShowWorkOrderCheck(false)}>{t("common.ok")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showManualEntryCheck} onOpenChange={setShowManualEntryCheck}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-warning">
+              <TriangleAlert className="h-5 w-5" />{t("form.manualEntryCheck.title")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm">{t("form.manualEntryCheck.body")}</p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => { setShowManualEntryCheck(false); imageInputRef.current?.click(); }}>
+              <Camera className="mr-2 h-4 w-4" />{t("form.manualEntryCheck.useScreenshot")}
+            </Button>
+            <Button type="button" onClick={startSaveFlow}>{t("form.manualEntryCheck.continue")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
