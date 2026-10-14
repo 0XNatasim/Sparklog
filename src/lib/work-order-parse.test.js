@@ -74,3 +74,28 @@ describe("workOrderIssues", () => {
     expect(workOrderIssues({}).map((i) => i.code)).toEqual(["ot", "depart", "arrivee", "fin", "km"]);
   });
 });
+
+// French Field Service: "Distance parcourue (miles)" is Miles Traveled, never the real distance.
+describe("French Field Service screen", () => {
+  const french = (km) => [
+    "OT-194509", "Heure de début", "15/10/2026", "07:26", "Heure de fin", "15/10/2026", "11:26",
+    "Durée", "4 heures", "Heure d'arrivée", "07:50",
+    "Déplacement", "Distance parcourue (miles)", "-", "34,29", "+",
+    "Distance réelle parcourue (km)", km,
+  ].join("\n");
+
+  it("reads the miles field apart from the real distance", () => {
+    expect(parseExtractedText(french("34"))).toMatchObject({ arrivee: "07:50", km_aller: 34, miles_traveled: 34.29 });
+    expect(workOrderIssues(parseExtractedText(french("34")))).toEqual([]);
+  });
+
+  it("an empty real distance is not filled with the miles value", () => {
+    const parsed = parseExtractedText(french("---"));
+    expect(parsed.km_aller).toBeUndefined();
+    expect(workOrderIssues(parsed).map((i) => i.code)).toEqual(["km"]);
+  });
+
+  it("flags a different real distance", () => {
+    expect(workOrderIssues(parseExtractedText(french("30")))).toEqual([{ code: "kmMismatch", miles: 34.29, km: 30 }]);
+  });
+});
