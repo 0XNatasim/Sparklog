@@ -15,6 +15,17 @@ describe("buildClosing — « Temps double » on its own line (stub D0014-0008)"
   });
 });
 
+describe("buildClosing — « Temps double » rounded like the printed line (stub D0038-0009, S42)", () => {
+  // 38,5 h régulier (1 955,42 + 156,31) + 2,75 h temps double: 2,75 × 101,58 = 279,345 → 279,35.
+  const result = { gross: { cashTotal: 2391.08 }, ytdAfter: {} };
+  const pay = { regularHours: 38.5, ot150Hours: 0, ot200Hours: 2.75, baseRate: 50.79 };
+  it("adds 279,35 to « Temps double » and 2 111,73 to « Salaire régulier » (cumuls 1 514,04 / 47 077,89)", () => {
+    const c = buildClosing({ opening: { regularEarnings: 44966.16, doubleTime: 1234.69 }, result, ccq: null, reimb: null, pay });
+    expect(c.doubleTime).toBe(1514.04);
+    expect(c.regularEarnings).toBe(47077.89);
+  });
+});
+
 describe("buildClosing — base-rate-only hours count in the cumulative « Heures » (S39: 42 h)", () => {
   it("40 + 1,75 + 0,25 = 42", () => {
     const pay = { regularHours: 40, ot150Hours: 0, ot200Hours: 1.75, baseOnlyHours: 0.25, baseRate: 50.79 };

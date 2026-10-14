@@ -2,7 +2,7 @@
 // `result` = calculatePayroll output, `ccq` = computeCcqBenefits output (or null), `reimb` =
 // { km, phone, other } non-taxable reimbursements. All amounts are dollars.
 
-import { printedPayLines } from "../payroll/earnings";
+import { printedLineAmount, printedPayLines } from "../payroll/earnings";
 
 const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
 
@@ -41,8 +41,9 @@ export function buildClosing({ opening, result, ccq, reimb, pay }) {
   // Worked hours for the cumulative « Heures »: the base-rate-only hours count too (S39: 40 + 0,25 + 1,75 = 42).
   const hours = Number(pay.regularHours) + Number(pay.ot150Hours) + Number(pay.ot200Hours) + (Number(pay.baseOnlyHours) || 0);
   // The stubs list « Temps double » on its own line; « Salaire régulier » is the rest of the cash pay
-  // (temps et demi included).
-  const doubleTime = round2((Number(pay.ot200Hours) || 0) * (Number(pay.baseRate) || 0) * 2);
+  // (temps et demi included). Same cent rounding as the printed line: 2,75 h × 101,58 = 279,345 → 279,35
+  // (S42, D0038-0009), where the float product rounded to 279,34.
+  const doubleTime = printedLineAmount(Number(pay.ot200Hours) || 0, round2((Number(pay.baseRate) || 0) * 2));
   const closing = {
     ...opening, // untouched lines keep the opening baseline
     grossIncome: fromCents(a.grossIncome),
