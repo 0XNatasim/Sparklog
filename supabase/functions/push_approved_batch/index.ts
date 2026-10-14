@@ -6,6 +6,7 @@
 // for one ~3s round-trip regardless of batch size.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { RETURN_WITH_BENEFITS } from "../_shared/payroll_engine.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -244,8 +245,10 @@ serve(async (req) => {
         employee_ot_first_hour_double: Boolean(prof?.overtime_first_hour_double),
         // Return-to-warehouse time is never overtime. By default it is paid at the base rate
         // without social benefits; when true, it keeps its benefits while the day (work +
-        // return) stays within 8h. Subcontractors: always false.
-        employee_return_with_benefits_to_8h: prof?.role !== "subcontractor_1" && Boolean(prof?.return_with_benefits_to_8h),
+        // return) stays within 8h — only for days from RETURN_WITH_BENEFITS.startDate (week 42),
+        // like the payroll engine. Subcontractors: always false.
+        employee_return_with_benefits_to_8h: prof?.role !== "subcontractor_1" && Boolean(prof?.return_with_benefits_to_8h)
+          && String(j.job_date || "") >= RETURN_WITH_BENEFITS.startDate,
         // When true, Départ→Arrivée of the employee's first job of the day is unpaid travel.
         employee_first_trip_unpaid: Boolean(prof?.first_trip_unpaid),
         approved_at: approved_at_label,
