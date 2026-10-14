@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.3.0";
+export const ENGINE_VERSION = "2.4.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -124,7 +124,99 @@ function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
 // first hour of overtime that SparkLog pays at 1.5× (the "hors CCQ" tier) is instead counted
 // as REGULAR straight time. Double time (2×) is left exactly as-is. Used only by the parallel
 // "Façon Messier" comparison views — never by the authoritative export path.
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, messierMethod = false, firstTripUnpaid = false, holidayDates = [] } = {}) {
+// ── Day rounding (engine 2.4.0, owner decision 2026-10-14) ─────────────────────────────────
+// Each day's paid time (work + return, first unpaid trip removed) is paid to the nearest 15
+// minutes, and what rounding gave or took is carried to the next day in a running counter per
+// employee (never reset): paid = round15(worked − counter); counter += paid − worked.
+//   Mon 8h07 → 8h00, counter −7 (the employer owes 7 min) · Tue 7h53 → 7h53 + 7 = 8h00, counter 0
+//   8h08 → 8h15, counter +7 (the employer paid 7 min more).
+// Up to 7 minutes rounds down, 8 and more rounds up, so the counter stays within ±7 minutes.
+// The minutes added or removed are the END of the day's work: overtime when the day is over
+// 8 h, regular time otherwise. Applies from CCQ week 41 (2026-09-27).
+export const DAY_ROUNDING = Object.freeze({ stepMinutes: 15, startDate: "2026-09-27" });
+
+export function roundToStep(minutes, stepMinutes = DAY_ROUNDING.stepMinutes) {
+  const half = Math.floor((stepMinutes - 1) / 2);
+  return Math.floor((minutes + half) / stepMinutes) * stepMinutes;
+}
+
+// Paid minutes of each day before rounding: Départ→Fin spans (return included) minus the
+// unpaid first trip for employees with that option. Map job_date → minutes.
+export function dayPaidMinutes(jobs, { firstTripUnpaid = false } = {}) {
+  const sorted = [...(jobs || [])].filter((job) => job?.depart && job?.fin)
+    .sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
+  const unpaidTrip = firstTripUnpaid ? firstTripUnpaidMinutes(sorted) : new Map();
+  const days = new Map();
+  for (const job of sorted) {
+    days.set(job.job_date, (days.get(job.job_date) || 0) + minutesBetween(job.depart, job.fin) - (unpaidTrip.get(job.id) || 0));
+  }
+  return days;
+}
+
+// The employee's rounding counter, day by day, from the start date. `jobs` = every job that
+// counts (one employee). Returns { days: [{ date, worked, paid, delta, balanceBefore,
+// balanceAfter }], balanceBefore(date), balanceAfter(date) }.
+export function buildDayRounding(jobs, { firstTripUnpaid = false, startDate = DAY_ROUNDING.startDate, stepMinutes = DAY_ROUNDING.stepMinutes, openingBalance = 0 } = {}) {
+  const worked = dayPaidMinutes((jobs || []).filter((job) => String(job?.job_date || "") >= startDate), { firstTripUnpaid });
+  const days = [];
+  let balance = openingBalance;
+  for (const [date, minutes] of [...worked.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (minutes <= 0) continue;
+    const paid = Math.max(0, roundToStep(minutes - balance, stepMinutes));
+    const delta = paid - minutes;
+    days.push({ date, worked: minutes, paid, delta, balanceBefore: balance, balanceAfter: balance + delta });
+    balance += delta;
+  }
+  const lastBefore = (date) => {
+    let found = null;
+    for (const day of days) {
+      if (day.date < date) found = day; else break;
+    }
+    return found;
+  };
+  return Object.freeze({
+    startDate,
+    stepMinutes,
+    days,
+    balanceBefore: (date) => lastBefore(date)?.balanceAfter ?? openingBalance,
+    balanceAfter: (date) => days.find((day) => day.date === date)?.balanceAfter ?? lastBefore(date)?.balanceAfter ?? openingBalance,
+  });
+}
+
+// Rounding minutes per job for the days in `sortedJobs`: the day's delta, taken from (or added
+// to) the work of its LAST jobs. Map job.id → minutes (+/−).
+function roundingAdjustments(sortedJobs, paidSpan, rounding) {
+  const adjust = new Map();
+  if (!rounding) return adjust;
+  const byDay = new Map();
+  for (const job of sortedJobs) {
+    if (String(job.job_date) < rounding.startDate || !job.depart || !job.fin) continue;
+    if (!byDay.has(job.job_date)) byDay.set(job.job_date, []);
+    byDay.get(job.job_date).push(job);
+  }
+  for (const [date, dayJobs] of byDay) {
+    const worked = dayJobs.reduce((sum, job) => sum + paidSpan(job), 0);
+    if (worked <= 0) continue;
+    const paid = Math.max(0, roundToStep(worked - rounding.balanceBefore(date), rounding.stepMinutes));
+    let delta = paid - worked;
+    if (delta > 0) {
+      const last = dayJobs[dayJobs.length - 1];
+      adjust.set(last.id, delta);
+      continue;
+    }
+    for (let i = dayJobs.length - 1; i >= 0 && delta < 0; i -= 1) {
+      const job = dayJobs[i];
+      const span = paidSpan(job);
+      const work = Math.max(0, span - jobReturnMinutes(job, span));
+      const take = Math.min(work, -delta);
+      if (take > 0) adjust.set(job.id, -take);
+      delta += take;
+    }
+  }
+  return adjust;
+}
+
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null } = {}) {
   const holidays = new Set([...(holidayDates || [])].map((d) => String(d).slice(0, 10)));
   // "regular" Monday–Friday; "saturday" all overtime; "double" Sunday / holiday at 2×.
   const dayKind = (jobDate) => {
@@ -138,10 +230,12 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
   // benefits; work always takes the 8h first, whatever the job order.
   const unpaidTrip = firstTripUnpaid ? firstTripUnpaidMinutes(sorted) : new Map();
   const paidSpan = (job) => minutesBetween(job.depart, job.fin) - (unpaidTrip.get(job.id) || 0);
+  // `rounding` (buildDayRounding result): each day paid to the nearest 15 minutes, see above.
+  const roundingAdjust = roundingAdjustments(sorted, paidSpan, rounding);
   const dayWorkTotal = new Map();
   for (const job of sorted) {
     const span = paidSpan(job);
-    dayWorkTotal.set(job.job_date, (dayWorkTotal.get(job.job_date) || 0) + span - jobReturnMinutes(job, span));
+    dayWorkTotal.set(job.job_date, (dayWorkTotal.get(job.job_date) || 0) + span - jobReturnMinutes(job, span) + (roundingAdjust.get(job.id) || 0));
   }
   const dayReturnBenefitRoom = new Map(); // job_date -> return minutes still payable with benefits
   if (returnWithBenefitsTo8h) {
@@ -165,9 +259,10 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const priorWeekOvertime = weekOvertimeMinutes.get(wk) || 0;
     const priorWeekRegular = weekRegularMinutes.get(wk) || 0;
 
+    const roundingMinutes = roundingAdjust.get(job.id) || 0;
     const spanMinutes = paidSpan(job);
     const returnMinutes = jobReturnMinutes(job, spanMinutes);
-    const workMinutes = spanMinutes - returnMinutes;
+    const workMinutes = spanMinutes - returnMinutes + roundingMinutes;
     const returnBenefitRoom = dayReturnBenefitRoom.get(job.job_date) || 0;
     const returnWithBenefitMinutes = Math.min(returnMinutes, returnBenefitRoom);
     if (returnWithBenefitMinutes) dayReturnBenefitRoom.set(job.job_date, returnBenefitRoom - returnWithBenefitMinutes);
@@ -209,7 +304,8 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
       returnRegularMinutes,
       returnNoBenefitMinutes,
       regularPaidMinutes: regularWorkMinutes + returnRegularMinutes,
-      totalPaidMinutes: spanMinutes + returnRegularMinutes,
+      totalPaidMinutes: spanMinutes + returnRegularMinutes + roundingMinutes,
+      roundingMinutes,
       ...kilometres,
     });
     // Count Messier-converted non-CCQ minutes as day work so the 8h/day cap holds across jobs.
@@ -235,12 +331,13 @@ export function calculateDailyTotals(jobs, options) {
       returnRegularMinutes: 0,
       returnNoBenefitMinutes: 0,
       totalPaidMinutes: 0,
+      roundingMinutes: 0,
       clientKm: 0,
       returnKm: 0,
       totalKm: 0,
       jobCount: 0,
     };
-    for (const key of ["regularWorkMinutes", "overtime50Minutes", "overtime100Minutes", "overtimeWorkMinutes", "returnRegularMinutes", "returnNoBenefitMinutes", "totalPaidMinutes", "clientKm", "returnKm", "totalKm"]) {
+    for (const key of ["regularWorkMinutes", "overtime50Minutes", "overtime100Minutes", "overtimeWorkMinutes", "returnRegularMinutes", "returnNoBenefitMinutes", "totalPaidMinutes", "roundingMinutes", "clientKm", "returnKm", "totalKm"]) {
       day[key] += entry[key];
     }
     day.jobCount += 1;

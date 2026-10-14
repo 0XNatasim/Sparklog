@@ -52,6 +52,7 @@ function jobRows(jobs, entries) {
         ot100Minutes: n(e.overtime100Minutes),
         returnNoBenefitMinutes: n(e.returnNoBenefitMinutes),
         paidMinutes: n(e.regularWorkMinutes) + n(e.overtime50Minutes) + n(e.overtime100Minutes) + n(e.returnNoBenefitMinutes),
+        roundingMinutes: n(e.roundingMinutes),
         km: n(e.totalKm),
         status: job.status,
       };
@@ -59,10 +60,10 @@ function jobRows(jobs, entries) {
 }
 
 // One employee's CCQ pay for the week (null for non-CCQ roles, like the DAS screen).
-function employeePay({ profile, jobs, week, opening, holidayDates, employer, taxProfile, contributions, meals, parking }) {
+function employeePay({ profile, jobs, week, opening, holidayDates, employer, taxProfile, contributions, meals, parking, rounding }) {
   const talon = computeEmployeeWeekTalon({
     profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true,
-    weekDate: week.start, holidayDates, employer, taxProfile,
+    weekDate: week.start, holidayDates, employer, taxProfile, rounding,
   });
   const { result, ccqAmounts: ccq, reimb, hours } = talon;
   const totals = payTotals(result, ccq, reimb);
@@ -118,7 +119,7 @@ function employeePay({ profile, jobs, week, opening, holidayDates, employer, tax
 // YTD snapshot for that employee before the week (ledger or payroll_ytd seed).
 export function buildWeeklyReport({
   week, profiles = [], jobs = [], meals = [], parking = [], contributions = [], holidayDates = [],
-  employer = DEFAULT_EMPLOYER, taxProfiles = new Map(), openingFor = () => ({}),
+  employer = DEFAULT_EMPLOYER, taxProfiles = new Map(), openingFor = () => ({}), roundingFor = () => null,
 }) {
   const inWeek = (date) => date >= week.start && date <= week.end;
   const weekJobs = jobs.filter((j) => inWeek(j.job_date) && REPORT_JOB_STATUSES.includes(j.status));
@@ -140,7 +141,8 @@ export function buildWeeklyReport({
   for (const profile of sorted) {
     const ujobs = jobsByUser.get(profile.id);
     if (!ujobs?.length) continue;
-    const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates });
+    const rounding = roundingFor(profile.id);
+    const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates, rounding });
     const rows = jobRows(ujobs, entries);
     const nonCcq = isNonCcqRole(profile.role);
     // Supper is a CCQ allowance (PeriodSummary/Coûts count it for CCQ employees only).
@@ -152,13 +154,14 @@ export function buildWeeklyReport({
       ot100Minutes: sum(rows, "ot100Minutes"),
       returnNoBenefitMinutes: sum(rows, "returnNoBenefitMinutes"),
       paidMinutes: sum(rows, "paidMinutes"),
+      roundingMinutes: sum(rows, "roundingMinutes"),
       km: sum(rows, "km"),
     };
     let pay = null;
     if (!nonCcq) {
       pay = employeePay({
         profile, jobs: ujobs, week, opening: openingFor(profile.id) || {}, holidayDates, employer,
-        taxProfile: taxProfiles.get(profile.id), contributions, meals, parking: parkingAmount,
+        taxProfile: taxProfiles.get(profile.id), contributions, meals, parking: parkingAmount, rounding,
       });
     }
     employees.push({
@@ -173,6 +176,7 @@ export function buildWeeklyReport({
       meals,
       parking: parkingAmount,
       pendingJobs: rows.filter((r) => r.status !== "approved").length,
+      roundingBalance: rounding ? rounding.balanceAfter(week.end) : null,
       pay,
     });
   }
@@ -207,6 +211,10 @@ export const fmtHM = (minutes) => {
   const m = Math.round(n(minutes));
   if (!m) return "—";
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`;
+};
+const signedMinutes = (m) => {
+  const v = Math.round(n(m));
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v)} min`;
 };
 const fmtKm = (km) => (n(km) ? `${Math.round(n(km))}` : "—");
 const STATUS_LABEL = { approved: "approuvé", submitted: "soumis", updated: "modifié" };
@@ -310,6 +318,7 @@ function employeeHtml(emp) {
         <td></td>
       </tr></tfoot>
     </table>
+    ${emp.roundingBalance == null ? "" : `<p class="note">Arrondi au 15 min de la semaine : ${esc(signedMinutes(h.roundingMinutes))} · compteur à la fin de la semaine : ${esc(signedMinutes(emp.roundingBalance))} (+ = payé en plus, − = dû à l'employé).</p>`}
     ${money}
   </section>`;
 }

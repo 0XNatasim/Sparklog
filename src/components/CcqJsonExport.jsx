@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { Download } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { loadDayRounding } from "@/lib/day-rounding";
 import { buildCcqWeeklyRecords, missingCcqFields } from "@/lib/ccq-export";
 import { isNonCcqRole } from "@/lib/roles";
 import { withTimeout } from "@/lib/utils";
@@ -31,6 +32,7 @@ export default function CcqJsonExport() {
   const [exportError, setExportError] = useState("");
   const [jobs, setJobs] = useState([]);
   const [profiles, setProfiles] = useState([]);
+  const [roundingByUser, setRoundingByUser] = useState(new Map());
   const [employeeId, setEmployeeId] = useState("all");
   const [month, setMonth] = useState(dayjs().format("YYYY-MM"));
   const [loading, setLoading] = useState(true);
@@ -41,12 +43,13 @@ export default function CcqJsonExport() {
       setLoading(true);
       setError("");
       try {
-        const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }, { data: nasRows }] = await withTimeout(
+        const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }, { data: nasRows }, rounding] = await withTimeout(
           Promise.all([
             fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }).order("id")),
             supabase.from("profiles").select("id, full_name, email, role, work_region, wage_schedule, union_association, hourly_rate, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name"),
             // Presence only (no value): empty for a non-owner, whose export then lacks NAS.
             supabase.rpc("nas_presence"),
+            loadDayRounding(),
           ]),
           12000
         );
@@ -54,6 +57,7 @@ export default function CcqJsonExport() {
         if (profileError) throw profileError;
         const withNas = new Set((nasRows || []).map((r) => r.user_id));
         setJobs(jobRows || []);
+        setRoundingByUser(rounding);
         setProfiles((profileRows || []).map((p) => ({ ...p, nas_employee: withNas.has(p.id) ? NAS_MASK : null })));
       } catch (loadError) {
         setError(loadError?.message || t("manager.download.failedLoad"));
@@ -78,11 +82,11 @@ export default function CcqJsonExport() {
   const buildRecords = (profileList) => buildCcqWeeklyRecords(
     exportJobs,
     new Map(profileList.map((profile) => [profile.id, profile])),
-    { holidayDates }
+    { holidayDates, roundingByUser }
   ).filter((record) => !month || record.semaineFinissantLe.startsWith(month));
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const records = useMemo(() => buildRecords(ccqProfiles), [exportJobs, month, ccqProfiles, holidayDates]);
+  const records = useMemo(() => buildRecords(ccqProfiles), [exportJobs, month, ccqProfiles, holidayDates, roundingByUser]);
 
   const incomplete = records.filter((record) => missingCcqFields(record).length > 0);
 

@@ -7,6 +7,7 @@ import { snapshotFromRow } from "@/payroll";
 import { buildWeeklyReport, printWeeklyReport, REPORT_JOB_STATUSES } from "@/lib/weekly-report";
 import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/lib/payroll-settings";
 import { loadHolidayDates } from "@/lib/company-holidays";
+import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { useT } from "@/lib/use-t";
 
 const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
@@ -23,7 +24,7 @@ async function loadReport(week) {
   const end = week.end.format("YYYY-MM-DD");
   // DAS follow the pay date (the Thursday after the week), like the DAS screen.
   const taxYear = week.end.add(5, "day").year();
-  const [profiles, jobs, meals, parking, contributions, seeds, ledger, settingsRow, taxProfiles, holidayDates] = await Promise.all([
+  const [profiles, jobs, meals, parking, contributions, seeds, ledger, settingsRow, taxProfiles, holidayDates, rounding] = await Promise.all([
     supabase.from("profiles").select(PROFILE_COLUMNS).then(unwrap),
     fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, status").in("status", REPORT_JOB_STATUSES).gte("job_date", start).lte("job_date", end).order("id")).then(unwrap),
     fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end).order("id")).then(unwrap),
@@ -34,6 +35,7 @@ async function loadReport(week) {
     loadEmployerSettings(),
     loadTaxProfiles(),
     loadHolidayDates(),
+    loadDayRounding({ untilDate: end }),
   ]);
 
   // Opening balance = the last comptabilisé week before this one, else the year's seed.
@@ -47,6 +49,7 @@ async function loadReport(week) {
     employer: employerFromSettings(settingsRow),
     taxProfiles,
     openingFor: (userId) => snapshotFromRow(lastLedger.get(userId) || seedByUser.get(userId) || null),
+    roundingFor: (userId) => roundingFor(rounding, userId),
   });
 }
 

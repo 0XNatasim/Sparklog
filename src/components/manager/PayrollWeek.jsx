@@ -19,6 +19,7 @@ import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/l
 import { computeEmployeeWeekTalon, formatTalonRef, YTD_COLUMN_TO_KEY, YTD_CCQ_COLUMN_TO_KEY } from "@/payroll/employee-week";
 import { buildStubModel, defaultHeader } from "@/lib/paystub";
 import { openTalonsPrint } from "@/lib/talon-print";
+import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { TAX_YEAR, lastCompletedWeekEnd, planPayrollWeek, postPayrollWeek, weekBounds } from "@/lib/payroll-week";
 
 const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
@@ -73,7 +74,7 @@ export default function PayrollWeek({ messier = false }) {
   const load = useCallback(async () => {
     try {
       const { end } = weekBounds(weekEnd);
-      const [profiles, jobs, seeds, ledger, kept, settingsRow, taxProfiles, holidayDates] = await Promise.all([
+      const [profiles, jobs, seeds, ledger, kept, settingsRow, taxProfiles, holidayDates, rounding] = await Promise.all([
         supabase.from("profiles").select(PROFILE_COLUMNS).then(unwrap),
         fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, status, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", `${TAX_YEAR}-01-01`).lte("job_date", end).order("id")).then(unwrap),
         supabase.from("payroll_ytd").select("*").eq("tax_year", TAX_YEAR).then(unwrap),
@@ -82,6 +83,7 @@ export default function PayrollWeek({ messier = false }) {
         loadEmployerSettings(),
         loadTaxProfiles(),
         loadHolidayDates(),
+        loadDayRounding({ untilDate: end }),
       ]);
       const ledgerByUser = new Map();
       for (const row of ledger) {
@@ -90,7 +92,7 @@ export default function PayrollWeek({ messier = false }) {
       }
       setErr("");
       setData({
-        weekEnd: end, profiles, jobs, ledgerByUser, taxProfiles, holidayDates,
+        weekEnd: end, profiles, jobs, ledgerByUser, taxProfiles, holidayDates, rounding,
         seedByUser: new Map(seeds.map((row) => [row.user_id, row])),
         keptByUser: new Map(kept.filter((row) => row.imported_talon).map((row) => [row.user_id, row.imported_talon])),
         employer: employerFromSettings(settingsRow),
@@ -118,7 +120,7 @@ export default function PayrollWeek({ messier = false }) {
       compute: (profile, approved, opening) => computeEmployeeWeekTalon({
         profile, jobs: approved, opening, frequency: "weekly", includePhone: true, includeStorage: true,
         weekDate: start, messierMethod: messier, holidayDates: data.holidayDates, employer: data.employer,
-        taxProfile: data.taxProfiles.get(profile.id),
+        taxProfile: data.taxProfiles.get(profile.id), rounding: roundingFor(data.rounding, profile.id),
       }),
     });
   }, [data, weekEnd, messier]);

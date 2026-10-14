@@ -78,6 +78,22 @@ Sources, filed in `docs/reference/`:
 - Engine: `calculatePayrollEntries` (`payroll_engine.js` 2.2.0); tests in
   `src/lib/payroll-calculations.test.js`.
 
+## DAY_ROUNDING — each day paid to the nearest 15 minutes (owner decision 2026-10-14)
+- Each day's paid time (Départ→Fin spans, **return included**, unpaid first trip removed) is paid to
+  the nearest 15 minutes, and the difference is carried in a **counter per employee, never reset**:
+  `paid = round15(worked − counter)`, `counter += paid − worked`. Up to 7 minutes rounds down, 8 and
+  more rounds up, so the counter stays within ±7 minutes and no minute is lost over time.
+  Example: Monday 8 h 07 → 8 h 00 (counter −7, owed to the employee); Tuesday 7 h 53 + 7 = 8 h 00 →
+  8 h 00 (counter 0); 8 h 08 → 8 h 15 (counter +7, paid more by the employer).
+- The minutes added or removed are the **end of the day's work**: overtime when the day is over 8 h,
+  regular time otherwise; declared return time is unchanged.
+- From **2026-09-27 (CCQ week 41)**. Days that count for the counter: every job except drafts.
+- Engine 2.4.0: `DAY_ROUNDING`, `buildDayRounding`, option `rounding` of `calculatePayrollEntries`;
+  counters loaded by `src/lib/day-rounding.js` for every pay screen (Calcul, Talons, DAS, Paie de la
+  semaine, Coûts, Semaine/mois, Vue semaine, RE, export CCQ, sommaire imprimable, page Semaine de
+  l'employé). Not applied: overtime-proof threshold, supper threshold, anomalies (real minutes), the
+  Google Sheet export (computed by Apps Script) and the unused `classify_week` Edge Function.
+
 ## SUPPER — meal eligibility
 - Eligible on a weekday once the day has **2 h 15 of overtime — at 1.5× or 2×, both are work
   time** — i.e. **at least 10 h 15 (615 min) of paid work**. **Return-to-warehouse time never

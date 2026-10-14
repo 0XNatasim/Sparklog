@@ -14,6 +14,7 @@ import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 import { loadHolidayDates } from "@/lib/company-holidays";
+import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 
 const montrealToday = companyDate;
 
@@ -78,7 +79,7 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const holidayDates = await loadHolidayDates();
-      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }] = await Promise.all([
+      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }, rounding] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
         // 'saved' drafts and 'updated' un-reviewed edits). Claims: pending + approved
@@ -88,6 +89,7 @@ export default function CostingDashboard() {
         fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end).order("id")),
         supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }),
         supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle(),
+        loadDayRounding({ untilDate: end }),
       ]);
       if (cancelled) return;
 
@@ -120,7 +122,7 @@ export default function CostingDashboard() {
         const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
 
         let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
-        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], { ...overtimeOptionsFromProfile(profile), holidayDates });
+        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], { ...overtimeOptionsFromProfile(profile), holidayDates, rounding: roundingFor(rounding, userId) });
         entries.forEach((e) => {
           regMin += e.regularWorkMinutes;
           ot50Min += e.overtime50Minutes;

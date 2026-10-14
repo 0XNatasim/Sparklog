@@ -6,7 +6,7 @@
 //         "messier" — owner (interim payroll authority) decision, beyond or without a source;
 //         "review"  — value in use but still to confirm;
 //         "missing" — data the employer must still supply (the calculation stays requires_review).
-import { ENGINE_VERSION, MEAL_OVERTIME_MINUTES, MEAL_AFTER_DAILY_WORK_MINUTES, CONGES_INDEMNITY_RATES } from "./payroll-calculations";
+import { ENGINE_VERSION, MEAL_OVERTIME_MINUTES, MEAL_AFTER_DAILY_WORK_MINUTES, CONGES_INDEMNITY_RATES, DAY_ROUNDING } from "./payroll-calculations";
 import { DEFAULT_STORAGE_AMOUNT } from "./weekly-allowances";
 import {
   CCQ_ELECTRICIAN_IC_C3, CCQ_PRELEVEMENT_RATE, CCQ_CAISSE_EDUCATION_PER_HOUR,
@@ -71,6 +71,9 @@ export function payRulesReference(lang = "fr", context = {}) {
         { id: "return", label: L("Temps de retour à l'entrepôt", "Return-to-warehouse time"), value: L("Jamais du temps sup. ; taux simple sans avantages", "Never overtime; base rate without benefits"),
           detail: L("Option cochée (bonus Messier) : avec avantages tant que travail + retour ≤ 8 h ; le reste sans avantages.", "Option on (Messier bonus): with benefits while work + return ≤ 8 h; the rest without benefits."), option: "return_with_benefits_to_8h",
           optionText: L("« Temps de retour avec avantages sociaux jusqu'à 8h »", "“Return time with social benefits up to 8h”"), status: "messier", sources: [["convention", "23.04 2) a), 23.15"], ["rules", "RETURN"]] },
+        { id: "rounding", label: L("Arrondi des journées", "Day rounding"), value: L(`Au ${DAY_ROUNDING.stepMinutes} min le plus proche, avec un compteur par employé`, `To the nearest ${DAY_ROUNDING.stepMinutes} min, with a counter per employee`),
+          detail: L(`Chaque journée (travail + retour) est payée au ${DAY_ROUNDING.stepMinutes} min le plus proche ; la différence passe au compteur et se reporte à la journée suivante (jamais remis à zéro). Ex. : lundi 8 h 07 → 8 h 00 (compteur −7), mardi 7 h 53 → 8 h 00 (compteur 0) ; 8 h 08 → 8 h 15 (+7, payé en plus). Les minutes ajoutées ou enlevées sont la fin de la journée : temps sup. au-delà de 8 h. Depuis le ${DAY_ROUNDING.startDate} (semaine 41).`, `Each day (work + return) is paid to the nearest ${DAY_ROUNDING.stepMinutes} min; the difference goes to the counter and carries to the next day (never reset). E.g. Monday 8:07 → 8:00 (counter −7), Tuesday 7:53 → 8:00 (counter 0); 8:08 → 8:15 (+7, paid more). The minutes added or removed are the end of the day: overtime past 8 h. Since ${DAY_ROUNDING.startDate} (week 41).`),
+          status: "messier", sources: [] },
         { id: "lunch", label: L("Dîner", "Lunch"), value: L("½ h ou 1 h non payée", "½ h or 1 h unpaid"),
           detail: L("Les employés l'enlèvent déjà de leur saisie Départ → Fin.", "Employees already leave it out of their Départ → Fin entries."), status: "source", sources: [["convention", "20.02 3)"]] },
         { id: "subcontractor", label: L("Sous-traitants", "Subcontractors"), value: L("Taux simple jusqu'à 8 h, taux double négocié au-delà", "Simple rate up to 8 h, negotiated double rate beyond"),

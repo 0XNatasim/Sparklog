@@ -78,7 +78,9 @@ export function snapshotFromRow(row) {
 
 // Compute one employee's talon for a set of jobs (normally one CCQ week) on top of the
 // opening YTD balance. Returns everything PayStubPrint + the DAS tab need.
-export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, includeStorage = false, employer = DEFAULT_EMPLOYER, weekDate, messierMethod = false, holidayDates = [], taxProfile = null }) {
+// `rounding` = the employee's day-rounding counter (src/lib/day-rounding.js): each day paid to the
+// nearest 15 minutes. Omitted, minutes are paid as entered.
+export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, includeStorage = false, employer = DEFAULT_EMPLOYER, weekDate, messierMethod = false, holidayDates = [], taxProfile = null, rounding = null }) {
   // Pay-week date used to pick the dated union-dues rule. Explicit wins; else the
   // earliest job_date in the set (any day of a CCQ week resolves the same rule window).
   const payWeekDate = weekDate || (jobs || []).reduce((min, j) => (j?.job_date && (!min || j.job_date < min) ? j.job_date : min), null) || undefined;
@@ -90,7 +92,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const union = UNION_CODE_TO_KEY[profile?.union_association] || "ftq_fipoe";
 
   // Hours split — honours the employee's OT policies (first-hour-double, return-no-benefit).
-  const entries = calculatePayrollEntries(jobs || [], { ...overtimeOptionsFromProfile(profile), messierMethod, holidayDates });
+  const entries = calculatePayrollEntries(jobs || [], { ...overtimeOptionsFromProfile(profile), messierMethod, holidayDates, rounding });
   let regMin = 0, ot50 = 0, ot100 = 0, retNb = 0, totalKm = 0;
   for (const e of entries.values()) {
     regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
