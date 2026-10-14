@@ -3,7 +3,7 @@
 // table mode) and fall back to local tesseract.js, then pull the job fields out of the text.
 import { withTimeout } from "./utils";
 
-export { parseExtractedText } from "./work-order-parse";
+export { parseExtractedText, workOrderIssues } from "./work-order-parse";
 
 async function compressImage(file, maxEdge = 1600, quality = 0.7) {
   const url = URL.createObjectURL(file);

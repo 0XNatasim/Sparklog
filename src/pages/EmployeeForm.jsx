@@ -26,7 +26,7 @@ import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { classifyApiError } from "@/lib/api-errors";
 import { submitSavedJob } from "@/lib/submit-job";
-import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
+import { extractWorkOrderText, parseExtractedText, workOrderIssues } from "@/lib/work-order-ocr";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
 import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
@@ -136,7 +136,7 @@ export default function EmployeeForm() {
   const submissionKeyRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
-  const [kmMissingAlert, setKmMissingAlert] = useState(false);
+  const [workOrderWarnings, setWorkOrderWarnings] = useState([]);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
@@ -1145,13 +1145,10 @@ export default function EmployeeForm() {
       if (d.depart) setDepart(String(d.depart));
       if (d.arrivee) setArrivee(String(d.arrivee));
       if (d.fin) setFin(String(d.fin));
-      if (d.km_aller !== null && d.km_aller !== undefined) {
-        setKmAller(String(d.km_aller));
-      } else {
-        // No distance read from the screenshot — it's likely missing in Field
-        // Service too, so alert the employee to go check the work order.
-        setKmMissingAlert(true);
-      }
+      if (d.km_aller !== null && d.km_aller !== undefined) setKmAller(String(d.km_aller));
+      // A required value missing or empty on the screenshot (likely empty in Field Service too),
+      // or Miles Traveled ≠ Distance réelle parcourue: tell the employee to fix the work order.
+      setWorkOrderWarnings(workOrderIssues(d));
       // Auto-fill populated the form — mark dirty so Save appears
       setDirty(true);
 
@@ -1774,16 +1771,21 @@ export default function EmployeeForm() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={kmMissingAlert} onOpenChange={setKmMissingAlert}>
+      <Dialog open={workOrderWarnings.length > 0} onOpenChange={(open) => { if (!open) setWorkOrderWarnings([]); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-warning">
-              <TriangleAlert className="h-5 w-5" />{t("form.kmMissing.title")}
+              <TriangleAlert className="h-5 w-5" />{t("form.workOrderCheck.title")}
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">{t("form.kmMissing.body")}</p>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {workOrderWarnings.map((issue) => (
+              <li key={issue.code}>{t(`form.workOrderCheck.${issue.code}`, { miles: String(issue.miles ?? "").replace(".", ","), km: issue.km ?? "" })}</li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted-foreground">{t("form.workOrderCheck.body")}</p>
           <DialogFooter>
-            <Button type="button" onClick={() => setKmMissingAlert(false)}>{t("common.ok")}</Button>
+            <Button type="button" onClick={() => setWorkOrderWarnings([])}>{t("common.ok")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
