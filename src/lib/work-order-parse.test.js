@@ -144,3 +144,21 @@ describe("French Bilan tab with wrapped labels", () => {
     expect(parsed.miles_traveled).toBeUndefined();
   });
 });
+
+// OT-208681 (2026-10-14, iPhone): "Distance parcourue" / "(miles)" wraps after "parcourue" this time.
+describe("French Bilan tab, label wrapped before (miles)", () => {
+  const top = ["OT-208681", "Réservation", "Notes et signature\tSoutien et suivis\tBilan", "Statut de la\t*\tTerminé", "réservation",
+    "Heure de début\t*\t2026-10-14", "11:42", "Heure de fin\t*\t2026-10-14", "14:30", "Durée\t*\t2,8 heures",
+    "Heure d'arrivée (info)\t2026-10-14", "12:00", "Déplacement"];
+  const tail = ["Enregistrer\tEnregistrer et\tNouveau\tAutres", "fermer"];
+  const layouts = [
+    ["Distance parcourue\t-\t24,00\t+", "(miles)", "Distance réelle\t24,00", "parcourue (km)"],
+    ["Distance parcourue", "(miles)\t-\t24,00\t+", "Distance réelle", "parcourue (km)\t24,00"],
+    ["Distance parcourue", "-\t24,00\t+", "(miles)", "Distance réelle", "24,00", "parcourue (km)"],
+  ];
+  it.each(layouts.map((lines, i) => [i + 1, lines]))("layout %i", (_, lines) => {
+    const parsed = parseExtractedText([...top, ...lines, ...tail].join("\n"));
+    expect(parsed).toEqual({ ot: "208681", job_date: "2026-10-14", depart: "11:42", fin: "14:30", arrivee: "12:00", km_aller: 24, miles_traveled: 24 });
+    expect(workOrderIssues(parsed)).toEqual([]);
+  });
+});
