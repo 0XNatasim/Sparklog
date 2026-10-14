@@ -11,6 +11,7 @@ import TalonCompare from "@/components/TalonCompare";
 import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef, engineYtdFromOpening } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
+import { formatHM } from "@/lib/time";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import { withHoursCumulative } from "@/lib/talon-import-core";
 import { buildCalculTalon } from "@/lib/calcul-talon";
@@ -851,7 +852,7 @@ export default function PayrollEngineTester({ messier = false }) {
                   <option value="">{t("payroll.weekManual")}</option>
                   {weekOptions.map((w) => (
                     <option key={w.key} value={w.key}>
-                      {t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM")} · {(w.regularHours + w.ot150Hours + w.ot200Hours).toFixed(2)}h · {w.km.toFixed(0)}km
+                      {t("manager.weekShort")} {w.weekNo} · {w.start.format("DD MMM")}–{w.end.format("DD MMM")} · {formatHM(w.regularHours + w.ot150Hours + w.ot200Hours)} · {w.km.toFixed(0)}km
                     </option>
                   ))}
                   {weekOptions.length === 0 && <option value="" disabled>{t("payroll.weekNone")}</option>}

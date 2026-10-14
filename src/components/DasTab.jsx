@@ -10,6 +10,7 @@ import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-
 import { isNonCcqRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { useHolidayDates } from "@/lib/company-holidays";
+import { formatHM } from "@/lib/time";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { usePayrollSettings } from "@/lib/payroll-settings";
 
@@ -280,7 +281,7 @@ export default function DasTab({ messier = false }) {
                     {computed.map((r) => (
                       <tr key={r.profile.id} className="border-b last:border-0 hover:bg-muted/20">
                         <td className="px-3 py-2 font-medium">{r.profile.full_name}</td>
-                        <td className="px-3 py-2 text-right font-mono">{r.hours.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-mono">{formatHM(r.hours)}</td>
                         <td className="px-3 py-2 text-right font-mono">{money(r.gross)}</td>
                         <td className="px-3 py-2 text-right font-mono">{money(r.federalTax)}</td>
                         <td className="px-3 py-2 text-right font-mono">{money(r.quebecTax)}</td>
@@ -301,7 +302,7 @@ export default function DasTab({ messier = false }) {
                     <tfoot>
                       <tr className="border-t bg-primary/5 font-semibold">
                         <td className="px-3 py-2.5">{t("payroll.das.total")}</td>
-                        <td className="px-3 py-2.5 text-right font-mono">{totals.hours.toFixed(2)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatHM(totals.hours)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(totals.gross)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(totals.federalTax)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(totals.quebecTax)}</td>

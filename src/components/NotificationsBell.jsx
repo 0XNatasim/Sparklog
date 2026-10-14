@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
+import { formatHM } from "@/lib/time";
 
 const TIME_FIELDS = new Set(["depart", "arrivee", "fin"]);
 
@@ -111,8 +112,8 @@ export default function NotificationsBell() {
                 : notification.type === "ccq_renewal"
                   ? t("notifications.ccqRenewal", { date: notification.changes?.ccq_expiration || "" })
                 : notification.type === "overtime_job_edited"
-                  ? t("notifications.overtimeEdited", { hours: (notification.daily_minutes / 60).toFixed(2) })
-                  : t("notifications.overtime", { hours: (notification.daily_minutes / 60).toFixed(2) })}
+                  ? t("notifications.overtimeEdited", { hours: formatHM(notification.daily_minutes / 60) })
+                  : t("notifications.overtime", { hours: formatHM(notification.daily_minutes / 60) })}
             </div>
             {notification.type === "overtime_job_edited" && notification.changes && Object.keys(notification.changes).length > 0 && (
               <div className="mt-1.5 space-y-0.5 rounded-md border bg-muted/40 p-1.5 text-xs">

@@ -10,6 +10,7 @@ import { withRetry } from "@/lib/utils";
 import { EMPTY_YTD, YTD_STATUTORY, CCQ_CUMUL, snapshotToLedgerColumns, ledgerRowToSnapshot } from "@/lib/payroll-ledger-fields";
 import { chainHoursFromPrevious } from "@/lib/talon-import-core";
 import { legacyTalonSheet, legacyTalonDocument, printLegacyTalon } from "@/lib/legacy-talon-render";
+import { formatHM } from "@/lib/time";
 
 const money = (v) => `$${(Number(v) || 0).toFixed(2)}`;
 // CCQ week (Sun→Sat) start from the ending Saturday date string.
@@ -81,8 +82,8 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
       const n = (result.transactions?.length || 0) + (result.sommaire?.length || 0);
       const fix = result.hoursCorrection;
       setMsg(t("payroll.legacy.detected", { count: n })
-        + (fix ? ` ${t("payroll.legacy.hoursCorrected", { legacy: fix.legacyHours, paid: fix.paidHours })}` : "")
-        + (chained ? ` ${t("payroll.legacy.hoursChained", { previous: chained.previousHours, hours: chained.periodHours, total: chained.total, week: dayjs(previous.period_end).format("DD MMM") })}` : ""));
+        + (fix ? ` ${t("payroll.legacy.hoursCorrected", { legacy: formatHM(fix.legacyHours), paid: formatHM(fix.paidHours) })}` : "")
+        + (chained ? ` ${t("payroll.legacy.hoursChained", { previous: formatHM(chained.previousHours), hours: formatHM(chained.periodHours), total: formatHM(chained.total), week: dayjs(previous.period_end).format("DD MMM") })}` : ""));
     } catch (e2) {
       setErr(e2?.code === "no_text_layer" ? t("payroll.legacy.noText") : (e2?.message || t("payroll.legacy.failed")));
     } finally {
@@ -227,7 +228,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
                   </button>
                   <span className="flex items-center gap-3 font-mono text-xs">
                     <span>{money(r.insurable_income_ei)}</span>
-                    <span>{(Number(r.hours_ytd) || 0).toFixed(1)} h</span>
+                    <span>{formatHM(Number(r.hours_ytd) || 0)}</span>
                     {r.imported_talon && (
                       <button type="button" title={t("payroll.legacy.print")} onClick={() => printLegacyTalon(r.imported_talon, `${t("payroll.legacy.title")} — ${emp?.full_name || ""} — ${r.period_end}`)} className="rounded p-1 hover:bg-background">
                         <Printer className="h-3.5 w-3.5" />

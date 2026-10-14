@@ -4,6 +4,8 @@
 // ⚠️ DRAFT: the DAS figures come from the unvalidated placeholder rule set. Never a
 // substitute for the official pay stub.
 
+import { formatHM } from "./time";
+
 const n = (v) => Number(v) || 0;
 export const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -23,6 +25,12 @@ export function defaultHeader({ week, reference } = {}) {
     week: week?.weekNo ? String(week.weekNo) : "",
     ref: reference || "",
   };
+}
+
+// Units on a stub line: kilometres stay a number; every other unit is hours, shown as 8h45.
+export function stubUnit(row) {
+  if (row.unit === "" || row.unit == null) return "";
+  return row.unitKind === "km" ? n(row.unit).toFixed(2) : formatHM(row.unit);
 }
 
 export const groupLabel = { gain: "Gains", ded: "Retenues", base: "Bases cumulatives" };
@@ -75,7 +83,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
     prem ? { label: "Prime chef d'équipe", unit: regHrs, taux: prem, montant: regHrs * prem } : null,
     n(pay.baseOnlyHours) ? { label: "Régulier à taux horaire (taux de base)", unit: n(pay.baseOnlyHours), taux: base, montant: n(pay.baseOnlyHours) * base } : null,
     safety ? { label: "Équipement de sécurité", unit: hours, taux: safety / (hours || 1), montant: safety } : null,
-    kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, taux: pay.kmRate, montant: kmReimb } : null,
+    kmReimb ? { label: "Indemnité KM (utilisation véhicule)", unit: pay.km, unitKind: "km", taux: pay.kmRate, montant: kmReimb } : null,
     phoneReimb ? { label: "Remboursement données cellulaire", unit: "", taux: "", montant: phoneReimb } : null,
     storageReimb ? { label: "Entreposage", unit: "", taux: "", montant: storageReimb } : null,
     otherReimb ? { label: "Autre revenu non imposable", unit: "", taux: "", montant: otherReimb } : null,
@@ -174,15 +182,15 @@ export function stubSheetHtml({ model, hdr, employee, frequency, official = fals
   const infoRows = info.map(([k, v]) => `<div class="i"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("");
   const gainRows = model.gains.map((r) => `<tr>
       <td>${esc(r.label)}</td>
-      <td class="num">${r.unit === "" ? "" : n(r.unit).toFixed(2)}</td>
+      <td class="num">${stubUnit(r)}</td>
       <td class="num">${r.taux === "" ? "" : n(r.taux).toFixed(4)}</td>
       <td class="num add">${money(r.montant)}</td></tr>`).join("");
   const somTone = (grp) => grp === "gain" ? "add" : grp === "ded" ? "ded" : "";
   let lastGroup = null;
   const somRows = model.sommaire.map((r) => {
     const head = r.group !== lastGroup ? (lastGroup = r.group, `<tr class="grp"><td colspan="3">${groupLabel[r.group]}</td></tr>`) : "";
-    const per = r.hours ? n(r.per).toFixed(2) : money(r.per);
-    const cum = r.hours ? n(r.cum).toFixed(2) : money(r.cum);
+    const per = r.hours ? formatHM(r.per) : money(r.per);
+    const cum = r.hours ? formatHM(r.cum) : money(r.cum);
     const tc = r.hours ? "" : somTone(r.group);
     return `${head}<tr><td>${esc(r.label)}</td><td class="num ${tc}">${per}</td><td class="num ${tc}">${cum}</td></tr>`;
   }).join("");

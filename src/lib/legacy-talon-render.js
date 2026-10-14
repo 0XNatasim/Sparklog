@@ -2,11 +2,14 @@
 // Sommaire Période/Cumulatif), from the parsed record (see talon-import-core). Used for the
 // import preview and for reprinting a past talon. Standalone HTML (no Tailwind).
 import { EMPLOYER } from "@/lib/paystub";
+import { formatHM } from "@/lib/time";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (v) => (v == null || v === "" ? "" : `$${Number(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const num2 = (v) => (v == null || v === "" ? "" : Number(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const num4 = (v) => (v == null || v === "" ? "" : Number(v).toFixed(4));
+// Hours as 8h45, never decimal.
+const hm = (v) => (v == null || v === "" ? "" : formatHM(Number(v)));
 const isHours = (row) => row.key === "hoursYtd" || /heures/i.test(row.description || "");
 
 export const LEGACY_TALON_STYLES = `
@@ -52,13 +55,13 @@ export function legacyTalonSheet(data) {
   const h = data.header || {};
   const txRows = (data.transactions || []).map((r) => `<tr>
     <td>${esc(r.description)}</td>
-    <td class="num">${r.unite == null ? "" : num2(r.unite)}</td>
+    <td class="num">${r.unite == null ? "" : /km/i.test(r.description || "") ? num2(r.unite) : hm(r.unite)}</td>
     <td class="num">${r.taux == null ? "" : num4(r.taux)}</td>
     <td class="num">${money(r.montant)}</td></tr>`).join("");
   const somRows = (data.sommaire || []).map((r) => `<tr>
     <td>${esc(r.description)}</td>
-    <td class="num">${isHours(r) ? num2(r.periode) : money(r.periode)}</td>
-    <td class="num">${isHours(r) ? num2(r.cumulatif) : money(r.cumulatif)}</td></tr>`).join("");
+    <td class="num">${isHours(r) ? hm(r.periode) : money(r.periode)}</td>
+    <td class="num">${isHours(r) ? hm(r.cumulatif) : money(r.cumulatif)}</td></tr>`).join("");
 
   return `<div class="sheet">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
