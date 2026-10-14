@@ -6,7 +6,8 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { computeEmployeeWeekTalon, snapshotFromRow, formatTalonRef } from "@/payroll";
-import { buildStubModel, defaultHeader, openStubsPrint } from "@/lib/paystub";
+import { buildStubModel, defaultHeader } from "@/lib/paystub";
+import { openTalonsPrint } from "@/lib/talon-print";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { isOwnerRole, isNonCcqRole } from "@/lib/roles";
 import { useAuth } from "@/contexts/AuthContext";
@@ -179,6 +180,8 @@ export default function TalonTab({ messier = false }) {
     const items = [];
     for (const profile of rows) {
       const st = cellState(profile, week);
+      // A comptabilisé week keeps its talon in the ledger: print that one, as the cell does.
+      if (st.kind === "imported") { items.push({ kind: "kept", data: st.talon }); continue; }
       if (st.kind !== "comptabilise" && st.kind !== "apercu") continue;
       try {
         const opening = openingFor(profile.id, week.start);
@@ -187,11 +190,11 @@ export default function TalonTab({ messier = false }) {
         if (!model) continue;
         const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
         const hdr = defaultHeader({ week: { start: week.start, end: week.end, weekNo: week.weekNo }, reference: formatTalonRef(ledgerRow?.talon_seq) });
-        items.push({ model, hdr, employee: profile, frequency: "weekly", official: !!ledgerRow?.boss_approved });
+        items.push({ kind: "stub", model, hdr, employee: profile, frequency: "weekly", official: !!ledgerRow?.boss_approved });
       } catch { /* skip an employee that fails to compute */ }
     }
     if (!items.length) { setBatchMsg(t("payroll.talon.batchNone")); return; }
-    const ok = openStubsPrint(items, `${t("payroll.subtabs.talon")} — S${week.weekNo}`);
+    const ok = openTalonsPrint(items, `${t("payroll.subtabs.talon")} — S${week.weekNo}`);
     setBatchMsg(ok ? t("payroll.talon.batchDone", { count: items.length }) : t("payroll.talon.batchPopupBlocked"));
   }
 

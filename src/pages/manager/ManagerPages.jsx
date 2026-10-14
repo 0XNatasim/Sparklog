@@ -7,12 +7,14 @@ import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
 import { firstAllowedPath, legacySectionTarget } from "@/lib/manager-nav";
 import { isManagerRole } from "@/lib/roles";
+import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { lazyPanel } from "@/components/LazyLoading";
 
 // Each page loads on first visit, so employees never download manager code and a
 // manager only fetches the pages they open (each shows its own fallback meanwhile).
 const LiveCrew = lazyPanel(() => import("@/components/LiveCrew"));
 const TodoInbox = lazyPanel(() => import("@/components/manager/TodoInbox"));
+const PayrollWeek = lazyPanel(() => import("@/components/manager/PayrollWeek"));
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const CongesManager = lazyPanel(() => import("@/components/CongesManager"));
 const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
@@ -42,9 +44,10 @@ const ManagerDashboard = lazyPanel(() => import("@/pages/ManagerDashboard"));
 export function ManagerIndex() {
   const { role, adminSections } = useAuth();
   const { search } = useLocation();
+  const [version] = useManagerUiVersion();
   const legacy = legacySectionTarget(search);
   if (legacy) return <Navigate to={`/manager/${legacy}`} replace />;
-  const first = firstAllowedPath(role, adminSections);
+  const first = firstAllowedPath(role, adminSections, isManagerRole(role) ? version : "v2");
   return <Navigate to={first ? `/manager/${first}` : "/"} replace />;
 }
 
@@ -53,50 +56,23 @@ function Narrow({ children }) {
   return <div className="max-w-3xl">{children}</div>;
 }
 
-// Équipe en direct: V2 = the live board (current), V3 = « À traiter », the single page for the
-// day's approvals (managers only: approving and reviewing claims are manager RPCs). The choice
-// is kept in the URL (?v=3) and remembered on the device.
-const LIVE_VERSION_KEY = "sparklog.liveVersion";
-
-function storedLiveVersion() {
-  try { return localStorage.getItem(LIVE_VERSION_KEY) === "3" ? "3" : "2"; } catch { return "2"; }
-}
-
+// Picking an employee opens their timesheet for that day (filters travel in the URL).
 export function LivePage() {
-  const t = useT();
   const navigate = useNavigate();
-  const { role } = useAuth();
-  const [params, setParams] = useSearchParams();
-  const canUseV3 = isManagerRole(role);
-  const requested = params.get("v");
-  const version = canUseV3 ? (requested === "3" || requested === "2" ? requested : storedLiveVersion()) : "2";
-  function setVersion(value) {
-    try { localStorage.setItem(LIVE_VERSION_KEY, value); } catch { /* private mode: URL only */ }
-    const next = new URLSearchParams(params);
-    next.set("v", value);
-    setParams(next, { replace: true });
-  }
-  const board = (
+  return (
     <LiveCrew
       onSelectEmployee={(userId, date) => {
-        const query = new URLSearchParams({ emp: userId });
-        if (date) query.set("date", date);
-        navigate(`/manager/timesheets?${query}`);
+        const params = new URLSearchParams({ emp: userId });
+        if (date) params.set("date", date);
+        navigate(`/manager/timesheets?${params}`);
       }}
     />
   );
-  if (!canUseV3) return board;
-  return (
-    <Tabs value={version} onValueChange={setVersion} className="w-full">
-      <TabsList>
-        <TabsTrigger value="2">{t("todo.tabV2")}</TabsTrigger>
-        <TabsTrigger value="3">{t("todo.tabV3")}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="2" className="mt-3">{board}</TabsContent>
-      <TabsContent value="3" className="mt-3"><TodoInbox /></TabsContent>
-    </Tabs>
-  );
 }
+
+// Gestion V3 pages.
+export const TodoPage = () => <TodoInbox />;
+export const PayrollWeekPage = () => <PayrollPage Component={PayrollWeek} writes />;
 
 export const TimesheetsPage = () => <ManagerDashboard view="timesheet" />;
 export const ReceiptsPage = () => <ManagerDashboard view="receipts" />;

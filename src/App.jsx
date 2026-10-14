@@ -28,6 +28,8 @@ const FormsPage = managerPage("FormsPage");
 const HealthPage = managerPage("HealthPage");
 const PayRulesPage = managerPage("PayRulesPage");
 const LivePage = managerPage("LivePage");
+const TodoPage = managerPage("TodoPage");
+const PayrollWeekPage = managerPage("PayrollWeekPage");
 const ReferencesPage = managerPage("ReferencesPage");
 const ManagerIndex = managerPage("ManagerIndex");
 const MessagesPage = managerPage("MessagesPage");
@@ -148,6 +150,7 @@ export default function App() {
         >
           <Route index element={<ManagerIndex />} />
           <Route path="live" element={<LivePage />} />
+          <Route path="todo" element={<TodoPage />} />
           <Route path="timesheets" element={<TimesheetsPage />} />
           <Route path="receipts" element={<ReceiptsPage />} />
           <Route path="unlock-day" element={<UnlockDayPage />} />
@@ -156,6 +159,7 @@ export default function App() {
           <Route path="absences" element={<AbsencesPage />} />
           <Route path="forms" element={<FormsPage />} />
           <Route path="payroll" element={<Navigate to="calcul" replace />} />
+          <Route path="payroll/week" element={<PayrollWeekPage />} />
           <Route path="payroll/calcul" element={<PayrollCalculPage />} />
           <Route path="payroll/stubs" element={<PayrollStubsPage />} />
           <Route path="payroll/das" element={<PayrollDasPage />} />

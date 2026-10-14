@@ -379,14 +379,21 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `employer_contributions` déjà calculées par le moteur (RRQ, AE, RQAP, FSS, CNESST, avantages sociaux, équipement)
   ne sont pas recomptées. Jobs soumises/modifiées imprimées mais signalées non approuvées ; rôles hors CCQ sans paie
   (comme l'écran DAS). Aucun NAS ni adresse.
-- [x] **Équipe en direct › V3 « À traiter »** (V2.4.115, en essai à côté de la V2) : onglets V2 / V3 en haut de
-  la page (gestionnaire/propriétaire seulement, choix dans l'URL `?v=3` et mémorisé sur l'appareil).
-  `src/components/manager/TodoInbox.jsx` + `src/lib/todo-inbox.js` (`buildInbox`, testé) : jobs soumises groupées
-  par employé et par jour ; preuve de temps sup., souper et stationnement attachés à leur journée (Accepter /
-  Refuser — la révision des soupers n'avait plus d'écran) ; journées avec anomalie à part ; « Approuver la journée »,
-  « Approuver ses N journées », « Tout approuver sans anomalie » ; Retourner ; « Pas soumis » du dernier jour ouvrable
-  avec Rappeler (message + notification) et Débloquer. Mêmes appels serveur que Feuilles/Reçus (`push_approved_batch`,
-  `return_job_for_correction`, `review_meal_claim`, `review_parking_claim`) ; notifications marquées lues à l'approbation.
+- [x] **Gestion V3** (V2.4.115–116, à côté de la V2) : sélecteur **V2 | V3** dans l'en-tête de la Gestion
+  (gestionnaire/propriétaire, mémorisé sur l'appareil, `src/lib/manager-ui-version.js`). V3 = menu `MANAGER_NAV_V3`
+  (`src/lib/manager-nav.js`) : groupes ouverts par défaut, libellés simples, accueil sur « À traiter » ; mêmes pages,
+  mêmes chemins et mêmes droits que la V2 (test : un admin a les mêmes pages en V2 et V3). La V2 est inchangée.
+  - **À traiter** (`components/manager/TodoInbox.jsx`, `lib/todo-inbox.js`) : jobs soumises par employé et par jour,
+    preuve / souper / stationnement attachés (la révision des soupers n'avait plus d'écran), anomalies à part,
+    approuver la journée / l'employé / tout sans anomalie, retourner, rappeler et débloquer les non-soumis.
+  - **Paie de la semaine** (`components/manager/PayrollWeek.jsx`, `lib/payroll-week.js`) : semaine choisie une fois
+    (dernière semaine terminée par défaut, `?week=`), état par employé (prêt / comptabilisé / en attente / semaine
+    précédente à comptabiliser d'abord / semaine plus récente déjà comptabilisée), « Calculer et comptabiliser les N
+    prêts » = exactement l'écriture de Comptabiliser dans Calcul (`ledgerRowFor` : instantané de clôture, n° de talon,
+    talon conservé, un vrai talon importé n'est jamais remplacé), impression de tous les talons, approbation
+    officielle (propriétaire), DAS de la semaine + CSV, sommaire imprimable, lien rapport CCQ.
+  - **Talons** : « Imprimer / PDF » de la semaine inclut maintenant les semaines comptabilisées (talon conservé),
+    auparavant ignorées ; `lib/talon-print.js` réunit talons conservés et aperçus dans un seul document.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
