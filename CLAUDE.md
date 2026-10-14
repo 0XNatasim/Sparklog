@@ -407,6 +407,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   nouvelle fiche est **bloqué** tant qu'une nouvelle capture ne montre pas un ordre complet (gardé dans le brouillon local).
   Saisie à la main (sans capture) : Enregistrer ouvre d'abord « Fiche entrée à la main » (mieux avec la capture ;
   vérifier que Field Service est pareil à la fiche) avec « Prendre une capture » ou « Field Service est exact, enregistrer ».
+- [x] **Étoile rouge sur les fiches entrées à la main** (V2.4.123, migration 0090) : table `job_entry_sources`
+  (`screenshot` / `manual`, une ligne par nouvelle fiche, écrite par l'employé après l'enregistrement, lisible par qui
+  voit la job, ni modification ni suppression). `src/lib/entry-source.js` ; ★ rouge + légende dans Feuilles de temps
+  et À traiter. Pas de ligne (anciennes fiches, feuille d'urgence, écriture ratée) = pas d'étoile. Indicatif seulement.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

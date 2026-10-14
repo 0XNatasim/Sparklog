@@ -20,6 +20,8 @@ import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
 import { notifyBroadcastPush } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
+import { loadManualEntryJobIds } from "@/lib/entry-source";
+import ManualEntryStar from "@/components/ManualEntryStar";
 
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, return_time_minutes, overtime_evidence_captured, updated_at";
 const money = (value) => `${(Number(value) || 0).toLocaleString("fr-CA", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} $`;
@@ -59,13 +61,14 @@ export default function TodoInbox() {
       const ids = submitted.map((job) => job.id);
       const userIds = [...new Set(submitted.map((job) => job.user_id))];
       const dates = [...new Set(submitted.map((job) => job.job_date))];
-      const [peersRes, evidenceRes] = await Promise.all([
+      const [peersRes, evidenceRes, manualIds] = await Promise.all([
         ids.length
           ? withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "approved").in("user_id", userIds).in("job_date", dates).limit(QUERY_BUDGETS.anomalyApprovedPeers), 12000)
           : { data: [] },
         ids.length
           ? withRetry(() => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes").in("job_id", ids), 12000)
           : { data: [] },
+        loadManualEntryJobIds(supabase, ids),
       ]);
       const anomalies = detectJobAnomalies(
         [...submitted, ...(peersRes.data || [])],
@@ -80,6 +83,7 @@ export default function TodoInbox() {
       setState({
         today, prevDay, anomalies, missing,
         truncated: submitted.length >= QUERY_BUDGETS.anomalySubmittedJobs,
+        manualIds,
         profiles: new Map(people.map((p) => [p.id, p])),
         raw: { submitted, peers: peersRes.data || [], evidence: evidenceRes.data || [], meals: mealsRes.data || [], parking: parkingRes.data || [] },
       });
@@ -296,7 +300,7 @@ export default function TodoInbox() {
           </div>
           {day.jobs.map((job) => (
             <div key={job.id} className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">OT {job.ot || "—"}</span>
+              <span className="font-semibold text-foreground">{state.manualIds?.has(job.id) && <ManualEntryStar className="mr-1" />}OT {job.ot || "—"}</span>
               <span className="font-mono">{String(job.depart || "").slice(0, 5)} – {String(job.fin || "").slice(0, 5)}</span>
               {Number(job.return_time_minutes) > 0 && <span>{t("todo.returnTime", { time: hm(job.return_time_minutes), km: Math.round(getKilometreBreakdown(job).returnKm) })}</span>}
             </div>
@@ -377,6 +381,7 @@ export default function TodoInbox() {
 
       {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{err}</div>}
       {info && <div className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">{info}</div>}
+      {state?.manualIds?.size > 0 && <div className="text-xs text-muted-foreground"><ManualEntryStar className="mr-1" />{t("manager.manualEntryLegend")}</div>}
       {state?.truncated && <div className="text-xs text-muted-foreground">{t("todo.truncated", { count: QUERY_BUDGETS.anomalySubmittedJobs })}</div>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

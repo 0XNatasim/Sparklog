@@ -27,6 +27,7 @@ import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { classifyApiError } from "@/lib/api-errors";
 import { submitSavedJob } from "@/lib/submit-job";
 import { extractWorkOrderText, parseExtractedText, workOrderIssues } from "@/lib/work-order-ocr";
+import { ENTRY_SOURCES, recordEntrySource } from "@/lib/entry-source";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
 import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
@@ -583,6 +584,11 @@ export default function EmployeeForm() {
       if (!data?.id) throw new Error(t("form.errors.insertNoId"));
 
       const savedJobId = data.id;
+      // New field entry: remember whether it came from the Field Service screenshot or was typed
+      // by hand (red star for managers). Best effort, never delays or fails the save.
+      if (!editId && !officeEmployee) {
+        recordEntrySource(supabase, { jobId: savedJobId, userId: user.id, source: fromScreenshot ? ENTRY_SOURCES.screenshot : ENTRY_SOURCES.manual });
+      }
       setInfo(editId
         ? (nextStatus === "submitted" ? "form.toasts.submitted" : "form.toasts.updated")
         : (nextStatus === "submitted" ? "form.toasts.savedAndSubmitted" : "form.toasts.saved"));

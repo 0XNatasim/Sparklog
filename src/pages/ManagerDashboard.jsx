@@ -28,6 +28,8 @@ import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
 import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
+import { loadManualEntryJobIds } from "@/lib/entry-source";
+import ManualEntryStar from "@/components/ManualEntryStar";
 
 dayjs.extend(isoWeek);
 
@@ -87,6 +89,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
 
   const [jobs, setJobs] = useState([]);
   const [mealJobIds, setMealJobIds] = useState(new Set());
+  const [manualEntryIds, setManualEntryIds] = useState(new Set()); // jobs typed by hand (red star)
   const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -249,10 +252,12 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       const { data: mealRows } = jobIds.length
         ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", jobIds).abortSignal(signal), 12000, { signal })
         : { data: [] };
+      const manualIds = await loadManualEntryJobIds(supabase, jobIds, { signal });
 
       if (!ticket.isCurrent()) return; // a newer filter took over
       setJobs(jobRows);
       setMealJobIds(new Set((mealRows || []).map((claim) => claim.job_id)));
+      setManualEntryIds(manualIds);
       setHasMore(!loadEveryMatch && page.length === PAGE_SIZE);
       await loadCounts(ticket);
     } catch (e) {
@@ -280,9 +285,11 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       const { data: mealRows } = pageIds.length
         ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", pageIds), 12000)
         : { data: [] };
+      const manualIds = await loadManualEntryJobIds(supabase, pageIds);
       if (stale()) return;
       setJobs((prev) => [...prev, ...(data || [])]);
       setMealJobIds((current) => new Set([...current, ...(mealRows || []).map((claim) => claim.job_id)]));
+      setManualEntryIds((current) => new Set([...current, ...manualIds]));
       setHasMore((data || []).length === PAGE_SIZE);
     } catch (e) {
       if (!stale()) setErr(e?.message || t("manager.errors.failedMore"));
@@ -945,6 +952,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       dayOvertimeNoEvidence: overtimeDaysMissingEvidence.has(`${j.user_id}|${j.job_date}`),
       overtimeCaptured: overtimeMarkerIds.has(j.id),
       mealCaptured: mealJobIds.has(j.id),
+      manualEntry: manualEntryIds.has(j.id),
       focused: focusedJobId === j.id,
       focusedEvidence: focusedJobId === j.id ? focusedEvidence : null,
       busy: actionLoadingId === j.id,
@@ -1250,6 +1258,10 @@ export default function ManagerDashboard({ view = "timesheet" }) {
           <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             {info}
           </div>
+        )}
+
+        {!loading && manualEntryIds.size > 0 && (
+          <p className="text-xs text-muted-foreground"><ManualEntryStar className="mr-1" />{t("manager.manualEntryLegend")}</p>
         )}
 
         {!loading && employeeId !== "all" && split && (
