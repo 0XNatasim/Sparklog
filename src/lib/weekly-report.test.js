@@ -95,6 +95,12 @@ describe("buildWeeklyReportHtml", () => {
     expect(html).toContain("1 job(s) non approuvée(s)");
   });
 
+  it("lets employees follow one another instead of starting a new page for each", () => {
+    expect(html).not.toMatch(/break-before:\s*page/);
+    expect(html).not.toMatch(/size:\s*letter landscape/);
+    expect(html).not.toMatch(/\.emp \{[^}]*break-inside: avoid/);
+  });
+
   it("never prints NAS or addresses", () => {
     expect(html).not.toMatch(/NAS|adresse/i);
   });
