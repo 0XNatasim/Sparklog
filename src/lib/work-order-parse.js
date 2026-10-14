@@ -68,13 +68,14 @@ export function parseExtractedText(text) {
     if (value) out[field] = value;
   }
   // Screenshot cut just below "Heure de début": its date and time are still at the top, right
-  // above "Heure de fin". Taken only when a date sits directly above the time, so the phone's
-  // status-bar clock is never read as the start.
+  // above "Heure de fin". The time must come after a date (the phone's status-bar clock has none),
+  // with anything in between: the calendar and clock icons are read as stray characters.
   if (!out.depart) {
     const finAt = text.search(new RegExp(LABELS.fin.source, "i"));
-    const before = finAt > 0 ? text.slice(Math.max(0, finAt - 60), finAt) : "";
-    const t = before.match(/(?:\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})\s+([01]?\d|2[0-3])[:hH]([0-5]\d)[\s*]*$/);
-    if (t) out.depart = `${String(t[1]).padStart(2, "0")}:${t[2]}`;
+    const before = finAt > 0 ? text.slice(Math.max(0, finAt - 120), finAt) : "";
+    const lastDate = [...before.matchAll(/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}/g)].at(-1);
+    const value = lastDate ? timeIn(before.slice(lastDate.index + lastDate[0].length)) : null;
+    if (value) out.depart = value;
   }
 
   // "Distance …" is the miles field when "(miles)" follows it, otherwise the real distance (km);

@@ -181,3 +181,18 @@ describe("screenshot cut above the start-time label", () => {
     expect(workOrderIssues(parsed).map((i) => i.code)).toEqual(["depart"]);
   });
 });
+
+// The calendar and clock icons next to each value come back from the OCR as stray characters.
+describe("cut screenshot with icons read as characters", () => {
+  const rest = ["Heure de fin*", "2026-10-14 囲", "13:55 ©", "Durée*", "3,98 heures", "Heure d'arrivée (info)", "2026-10-14 囲", "10:20 ©",
+    "Déplacement", "Distance parcourue (miles)", "-\t105,00\t+", "Distance réelle parcourue (km)", "105,00", "Durée réelle du déplacement", "24 minutes"];
+  it.each([
+    ["2026-10-14 囲", "09:56 ©"],
+    ["2026-10-14\t[ill]", "09:56\t(L)"],
+    ["2026-10-14 EE", "O 09:56 O"],
+  ])("reads the start time (%s / %s)", (dateLine, timeLine) => {
+    const parsed = parseExtractedText(["15 h 04", "OT-200560", "Notes et signature Soutien et suivis Bilan", dateLine, timeLine, ...rest].join("\n"));
+    expect(parsed).toMatchObject({ depart: "09:56", fin: "13:55", arrivee: "10:20", km_aller: 105 });
+    expect(workOrderIssues(parsed)).toEqual([]);
+  });
+});
