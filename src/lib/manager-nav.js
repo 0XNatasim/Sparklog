@@ -48,7 +48,45 @@ export const MANAGER_NAV = Object.freeze([
   ] },
 ]);
 
-export const MANAGER_NAV_ITEMS = Object.freeze(MANAGER_NAV.flatMap((group) => group.items));
+// Pages that only exist in the V3 menu (« Gestion V3 », chosen in the header).
+const V3_ONLY_ITEMS = Object.freeze([
+  { id: "todo", path: "todo", grant: null, labelKey: "mgr.nav.todo" },
+  { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
+]);
+
+// The V2 menu's items (the current Gestion) and every page either menu can open.
+export const MANAGER_NAV_V2_ITEMS = Object.freeze(MANAGER_NAV.flatMap((group) => group.items));
+export const MANAGER_NAV_ITEMS = Object.freeze([...MANAGER_NAV_V2_ITEMS, ...V3_ONLY_ITEMS]);
+
+const byId = new Map(MANAGER_NAV_ITEMS.map((item) => [item.id, item]));
+// A V3 entry reuses a page (same id, path and access rule), optionally with a clearer label.
+const v3 = (id, labelKey) => (labelKey ? Object.freeze({ ...byId.get(id), labelKey }) : byId.get(id));
+
+// V3 menu: the day's work first (« À traiter »), the weekly payroll in one page, plain-word
+// labels, and the rarely used settings at the bottom. `open` = group expanded by default.
+export const MANAGER_NAV_V3 = Object.freeze([
+  { id: "today", labelKey: "mgr.group.today", open: true, items: [v3("todo"), v3("live")] },
+  { id: "time", labelKey: "mgr.group.time", open: true, items: [
+    v3("timesheets"), v3("receipts", "mgr.nav3.receipts"), v3("unlock-day"),
+  ] },
+  { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [
+    v3("payroll-week"), v3("payroll-stubs"), v3("payroll-das"), v3("payroll-calcul", "mgr.nav3.calcul"), v3("payroll-roe"),
+  ] },
+  { id: "team", labelKey: "mgr.group.team", open: true, items: [v3("employees"), v3("absences"), v3("inventory"), v3("messages")] },
+  { id: "reports", labelKey: "mgr.group.reports", open: true, items: [
+    v3("reports-period"), v3("reports-costs"), v3("reports-downloads"), v3("reports-ccq"),
+  ] },
+  { id: "config", labelKey: "mgr.group.config", open: false, items: [
+    v3("config-settings"), v3("config-rules", "mgr.nav3.rules"), v3("forms"), v3("references"),
+  ] },
+  { id: "advanced", labelKey: "mgr.group.advanced", open: false, items: [
+    v3("advanced-audit"), v3("advanced-pay-rules"), v3("advanced-health"), v3("advanced-emergency"),
+  ] },
+]);
+
+export function managerNavFor(version) {
+  return version === "v3" ? MANAGER_NAV_V3 : MANAGER_NAV;
+}
 
 // Same rule as canAccessSection: the menu and the route guard cannot disagree.
 export function canOpenNavItem(role, adminSections, item) {
@@ -56,20 +94,22 @@ export function canOpenNavItem(role, adminSections, item) {
   return item.grant ? canAccessSection(role, adminSections, item.grant) : isManagerRole(role);
 }
 
-export function visibleManagerNav(role, adminSections) {
-  return MANAGER_NAV
+export function visibleManagerNav(role, adminSections, version = "v2") {
+  return managerNavFor(version)
     .map((group) => ({ ...group, items: group.items.filter((item) => canOpenNavItem(role, adminSections, item)) }))
     .filter((group) => group.items.length > 0);
 }
 
-export function findNavItem(path) {
+// The page at `path`, with the label the given menu version shows for it.
+export function findNavItem(path, version = "v2") {
   const clean = String(path || "").replace(/^\/+|\/+$/g, "");
-  return MANAGER_NAV_ITEMS.find((item) => item.path === clean) || null;
+  const inMenu = managerNavFor(version).flatMap((group) => group.items).find((item) => item.path === clean);
+  return inMenu || MANAGER_NAV_ITEMS.find((item) => item.path === clean) || null;
 }
 
 // First page the user may open — the landing page for #/manager (Équipe en direct for managers).
-export function firstAllowedPath(role, adminSections) {
-  return visibleManagerNav(role, adminSections)[0]?.items[0]?.path || null;
+export function firstAllowedPath(role, adminSections, version = "v2") {
+  return visibleManagerNav(role, adminSections, version)[0]?.items[0]?.path || null;
 }
 
 // Old `/manager?section=…` links (bell notifications, bookmarks) → new route + query string.
