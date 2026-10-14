@@ -26,7 +26,7 @@ import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { classifyApiError } from "@/lib/api-errors";
 import { submitSavedJob } from "@/lib/submit-job";
-import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
+import { extractWorkOrderText, parseExtractedText, workOrderIssues } from "@/lib/work-order-ocr";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
 import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
@@ -136,7 +136,14 @@ export default function EmployeeForm() {
   const submissionKeyRef = useRef(null);
   const [showAutofillTip, setShowAutofillTip] = useState(false);
   const [autofillTipPage, setAutofillTipPage] = useState(1);
-  const [kmMissingAlert, setKmMissingAlert] = useState(false);
+  // Problems found on the last Field Service screenshot (workOrderIssues). While any remain, the
+  // new entry cannot be saved: the employee fixes the work order and retakes the screenshot.
+  const [workOrderProblems, setWorkOrderProblems] = useState([]);
+  const [showWorkOrderCheck, setShowWorkOrderCheck] = useState(false);
+  // A new field entry typed by hand (no Field Service screenshot read): Save first reminds the
+  // employee that the screenshot is better and that Field Service must match the entry.
+  const [fromScreenshot, setFromScreenshot] = useState(false);
+  const [showManualEntryCheck, setShowManualEntryCheck] = useState(false);
   const [returnStep, setReturnStep] = useState("closed");
   const [returnMinutes, setReturnMinutes] = useState(null);
   const [returnKm, setReturnKm] = useState("");
@@ -206,6 +213,8 @@ export default function EmployeeForm() {
     setParkingRequested(Boolean(draft.parkingRequested));
     setParkingAmount(draft.parkingAmount || "");
     setPendingSaveMode(draft.pendingSaveMode || "draft");
+    setWorkOrderProblems(Array.isArray(draft.workOrderProblems) ? draft.workOrderProblems : []);
+    setFromScreenshot(Boolean(draft.fromScreenshot));
     if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
     setDirty(true);
     setDraftRestored(true);
@@ -322,6 +331,10 @@ export default function EmployeeForm() {
     setHasParkingReceipt(false);
     setParkingFile(null);
     setParkingAmount("");
+    setWorkOrderProblems([]);
+    setShowWorkOrderCheck(false);
+    setFromScreenshot(false);
+    setShowManualEntryCheck(false);
   }
 
   // A closed day also disables the date field, so this is the way back to today's job card.
@@ -363,12 +376,12 @@ export default function EmployeeForm() {
         submissionKey: submissionKeyRef.current,
         data: {
           job_date, ot, depart, arrivee, fin, km_aller,
-          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode,
+          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems, fromScreenshot,
         },
       }).catch((error) => console.warn("[draft] local save failed", error));
     }, 350);
     return () => window.clearTimeout(timeoutId);
-  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode]);
+  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, workOrderProblems, fromScreenshot]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
@@ -424,6 +437,13 @@ export default function EmployeeForm() {
   // Saving is the only action on this form: it first asks whether this is the last work
   // order of the day. Submitting the day happens at the end of that flow (or from History).
   function saveDraft() {
+    if (workOrderBlocked) { setShowWorkOrderCheck(true); return; }
+    if (!editId && !officeEmployee && !fromScreenshot) { setShowManualEntryCheck(true); return; }
+    startSaveFlow();
+  }
+
+  function startSaveFlow() {
+    setShowManualEntryCheck(false);
     setPendingSaveMode("draft");
     setReturnMinutes(null);
     setReturnKm("");
@@ -1145,13 +1165,14 @@ export default function EmployeeForm() {
       if (d.depart) setDepart(String(d.depart));
       if (d.arrivee) setArrivee(String(d.arrivee));
       if (d.fin) setFin(String(d.fin));
-      if (d.km_aller !== null && d.km_aller !== undefined) {
-        setKmAller(String(d.km_aller));
-      } else {
-        // No distance read from the screenshot — it's likely missing in Field
-        // Service too, so alert the employee to go check the work order.
-        setKmMissingAlert(true);
-      }
+      if (d.km_aller !== null && d.km_aller !== undefined) setKmAller(String(d.km_aller));
+      // A required value missing or empty on the screenshot (likely empty in Field Service too),
+      // or Miles Traveled ≠ Distance réelle parcourue: tell the employee to fix the work order.
+      // Blocks Save until a new screenshot shows a complete work order.
+      setFromScreenshot(true);
+      const problems = workOrderIssues(d);
+      setWorkOrderProblems(problems);
+      setShowWorkOrderCheck(problems.length > 0);
       // Auto-fill populated the form — mark dirty so Save appears
       setDirty(true);
 
@@ -1173,6 +1194,7 @@ export default function EmployeeForm() {
   // two fields are not required to complete the form for them.
   const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(fin)
     && (officeEmployee || (Boolean(arrivee) && String(km_aller).trim() !== "")) && parkingComplete;
+  const workOrderBlocked = !editId && workOrderProblems.length > 0;
 
   // Names of the required fields still empty, shown next to the disabled Save button.
   const missingFields = [
@@ -1412,13 +1434,18 @@ export default function EmployeeForm() {
             <div className="space-y-2 pt-3">
               {(dirty || editId) && !locked && (
                 <>
-                  <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs || !formComplete} onClick={saveDraft}>
+                  <Button type="button" className="h-12 w-full text-base font-semibold" disabled={disableInputs || !formComplete || workOrderBlocked} onClick={saveDraft}>
                     {saving ? t("common.saving") : t("form.buttons.save")}
                   </Button>
                   {!formComplete && (
                     <p className="text-center text-xs font-medium text-warning" role="status">
                       {t("form.missing.hint", { fields: missingFields.join(", ") })}
                     </p>
+                  )}
+                  {workOrderBlocked && (
+                    <button type="button" className="block w-full text-center text-xs font-medium text-destructive underline-offset-2 hover:underline" role="status" onClick={() => setShowWorkOrderCheck(true)}>
+                      {t("form.workOrderCheck.blocked")}
+                    </button>
                   )}
                 </>
               )}
@@ -1774,16 +1801,37 @@ export default function EmployeeForm() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={kmMissingAlert} onOpenChange={setKmMissingAlert}>
+      <Dialog open={showWorkOrderCheck && workOrderProblems.length > 0} onOpenChange={setShowWorkOrderCheck}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-warning">
-              <TriangleAlert className="h-5 w-5" />{t("form.kmMissing.title")}
+              <TriangleAlert className="h-5 w-5" />{t("form.workOrderCheck.title")}
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">{t("form.kmMissing.body")}</p>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {workOrderProblems.map((issue) => (
+              <li key={issue.code}>{t(`form.workOrderCheck.${issue.code}`, { miles: String(issue.miles ?? "").replace(".", ","), km: issue.km ?? "" })}</li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted-foreground">{t("form.workOrderCheck.body")}</p>
           <DialogFooter>
-            <Button type="button" onClick={() => setKmMissingAlert(false)}>{t("common.ok")}</Button>
+            <Button type="button" onClick={() => setShowWorkOrderCheck(false)}>{t("common.ok")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showManualEntryCheck} onOpenChange={setShowManualEntryCheck}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-warning">
+              <TriangleAlert className="h-5 w-5" />{t("form.manualEntryCheck.title")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm">{t("form.manualEntryCheck.body")}</p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => { setShowManualEntryCheck(false); imageInputRef.current?.click(); }}>
+              <Camera className="mr-2 h-4 w-4" />{t("form.manualEntryCheck.useScreenshot")}
+            </Button>
+            <Button type="button" onClick={startSaveFlow}>{t("form.manualEntryCheck.continue")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
