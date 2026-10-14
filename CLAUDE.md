@@ -379,6 +379,14 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `employer_contributions` déjà calculées par le moteur (RRQ, AE, RQAP, FSS, CNESST, avantages sociaux, équipement)
   ne sont pas recomptées. Jobs soumises/modifiées imprimées mais signalées non approuvées ; rôles hors CCQ sans paie
   (comme l'écran DAS). Aucun NAS ni adresse.
+- [x] **Équipe en direct › V3 « À traiter »** (V2.4.115, en essai à côté de la V2) : onglets V2 / V3 en haut de
+  la page (gestionnaire/propriétaire seulement, choix dans l'URL `?v=3` et mémorisé sur l'appareil).
+  `src/components/manager/TodoInbox.jsx` + `src/lib/todo-inbox.js` (`buildInbox`, testé) : jobs soumises groupées
+  par employé et par jour ; preuve de temps sup., souper et stationnement attachés à leur journée (Accepter /
+  Refuser — la révision des soupers n'avait plus d'écran) ; journées avec anomalie à part ; « Approuver la journée »,
+  « Approuver ses N journées », « Tout approuver sans anomalie » ; Retourner ; « Pas soumis » du dernier jour ouvrable
+  avec Rappeler (message + notification) et Débloquer. Mêmes appels serveur que Feuilles/Reçus (`push_approved_batch`,
+  `return_job_for_correction`, `review_meal_claim`, `review_parking_claim`) ; notifications marquées lues à l'approbation.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
