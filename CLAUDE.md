@@ -405,6 +405,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » (FR : « Distance parcourue (miles) ») ≠ distance réelle
   (km entiers). Une valeur vide n'est plus remplie par un nombre d'un champ plus bas. L'enregistrement de la
   nouvelle fiche est **bloqué** tant qu'une nouvelle capture ne montre pas un ordre complet (gardé dans le brouillon local).
+  V2.4.125 : écran français étroit — étiquettes coupées sur deux lignes avec la valeur entre les deux
+  (« Distance » / « parcourue (miles) », « Distance réelle » / « parcourue (km) ») : les distances sont repérées à partir
+  du mot « Distance » (avec « (miles) » = champ miles, sinon distance réelle) ; date 2026-10-14 lue aussi.
   Saisie à la main (sans capture) : Enregistrer ouvre d'abord « Fiche entrée à la main » (mieux avec la capture ;
   vérifier que Field Service est pareil à la fiche) avec « Prendre une capture » ou « Field Service est exact, enregistrer ».
 - [x] **Étoile rouge sur les fiches entrées à la main** (V2.4.123, migration 0090) : table `job_entry_sources`
