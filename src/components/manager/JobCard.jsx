@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import ManualEntryStar from "@/components/ManualEntryStar";
 import { formatHM } from "@/lib/time";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
@@ -20,7 +21,7 @@ export function fmtTimeHHmm(t) {
 // One timesheet row of the manager dashboard. Memoized: it receives only primitives,
 // the row's own objects and stable callbacks, so approving, filtering or loading one
 // job no longer re-renders every card on the page (P-10).
-function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, focused, focusedEvidence, busy, onApprove, onUnlock }) {
+function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, manualEntry, focused, focusedEvidence, busy, onApprove, onUnlock }) {
   const t = useT();
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
 
@@ -41,7 +42,7 @@ function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCapt
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
             {/* OT + date */}
             <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
-              <span><span className="text-success">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
+              <span>{manualEntry && <ManualEntryStar className="mr-0.5" />}<span className="text-success">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
               <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeCaptured, meal_claim_captured: j.meal_claim_captured || mealCaptured }} />
               {dayOvertimeNoEvidence && (
                 <span
