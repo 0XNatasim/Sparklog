@@ -5,7 +5,7 @@ import {
   isNonCcqRole,
   isPrivileged,
 } from "./roles";
-import { MANAGER_NAV_ITEMS, canOpenNavItem } from "./manager-nav";
+import { MANAGER_NAV_ITEMS, canOpenNavItem, visibleTabs } from "./manager-nav";
 
 export const APPLICATION_ROLES = Object.freeze([
   "employee",
@@ -33,9 +33,19 @@ export function authorizationFor({ role, adminSections = [], paused = false }) {
     MANAGER_NAV_ITEMS.map((item) => [item.id, knownRole && canOpenNavItem(role, adminSections, item)])
   );
 
+  // Gestion V3 pages with tabs: each tab keeps the rule of the page it comes from; the page
+  // itself opens when at least one tab does (see `pages`).
+  const tabs = Object.fromEntries(
+    MANAGER_NAV_ITEMS.filter((item) => item.tabs).map((item) => {
+      const allowed = new Set(knownRole ? visibleTabs(item, role, adminSections).map((t) => t.key) : []);
+      return [item.id, Object.freeze(Object.fromEntries(item.tabs.map((t) => [t.key, allowed.has(t.key)])))];
+    })
+  );
+
   return Object.freeze({
     role,
     pages: Object.freeze(pages),
+    tabs: Object.freeze(tabs),
     paused: Boolean(paused),
     canLogOwnTime: knownRole && !paused,
     canManageAny: Object.values(sections).some(Boolean),

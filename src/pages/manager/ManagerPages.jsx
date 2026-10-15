@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Save } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
-import { firstAllowedPath, legacySectionTarget } from "@/lib/manager-nav";
+import { MANAGER_NAV_ITEMS, firstAllowedPath, legacySectionTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
 import { isManagerRole } from "@/lib/roles";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { lazyPanel } from "@/components/LazyLoading";
@@ -39,6 +39,7 @@ const InventoryScreenshotsPanel = lazyPanel(() => import("@/components/Inventory
 const EmergencyTimesheet = lazyPanel(() => import("@/components/EmergencyTimesheet"));
 const PayRulesReference = lazyPanel(() => import("@/components/PayRulesReference"));
 const ManagerDashboard = lazyPanel(() => import("@/pages/ManagerDashboard"));
+const CcqJsonExport = lazyPanel(() => import("@/components/CcqJsonExport"));
 
 // #/manager → first page the user may open; old `?section=` links keep working.
 export function ManagerIndex() {
@@ -222,3 +223,72 @@ export function AuditPage() {
     </Tabs>
   );
 }
+
+// ── Gestion V3: pages with tabs ─────────────────────────────────────────────
+// Each tab renders the V2 page it comes from, unchanged (same component, same props). The active
+// tab lives in the URL (?tab=); a tab this user may not open — or none at all — falls back to the
+// first allowed one, and a page with no allowed tab sends back to #/manager. Only the active tab
+// is mounted, so a tab loads its data only when it is opened.
+const v3Item = (id) => MANAGER_NAV_ITEMS.find((item) => item.id === id);
+
+function TabbedPage({ itemId, content }) {
+  const t = useT();
+  const { role, adminSections } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const item = v3Item(itemId);
+  const tabs = visibleTabs(item, role, adminSections);
+  const requested = params.get("tab");
+  const active = resolveTab(item, role, adminSections, requested);
+
+  // Put the tab actually shown in the URL (replace: Back does not step through the correction).
+  useEffect(() => {
+    if (!active || requested === active) return;
+    const next = new URLSearchParams(params);
+    next.set("tab", active);
+    setParams(next, { replace: true });
+  }, [active, requested, params, setParams]);
+
+  if (!active) return <Navigate to="/manager" replace />;
+
+  function select(key) {
+    const next = new URLSearchParams(params);
+    next.set("tab", key);
+    setParams(next);
+  }
+
+  const Content = content[active];
+  return (
+    <Tabs value={active} onValueChange={select} className="w-full">
+      {tabs.length > 1 && (
+        <TabsList className="h-auto max-w-full flex-wrap justify-start">
+          {tabs.map((tabItem) => <TabsTrigger key={tabItem.key} value={tabItem.key}>{t(tabItem.labelKey)}</TabsTrigger>)}
+        </TabsList>
+      )}
+      <div className={tabs.length > 1 ? "mt-3" : undefined}>{Content ? <Content /> : null}</div>
+    </Tabs>
+  );
+}
+
+const TODO_TABS = { todo: TodoPage, receipts: ReceiptsPage };
+const TIME_TABS = { timesheets: TimesheetsPage, unlock: UnlockDayPage };
+const PAY_HISTORY_TABS = { stubs: PayrollStubsPage, das: PayrollDasPage, roe: PayrollRoePage, calcul: PayrollCalculPage };
+const TEAM_TABS = { employees: EmployeesPage, absences: AbsencesPage };
+const REPORTS_TABS = {
+  costs: CostsPage,
+  week: () => <PeriodSummary mode="week" />,
+  month: () => <PeriodSummary mode="month" />,
+  grid: () => <WeekViewTab />,
+  // CCQ export only: the DAS (already in Historique paie) and the « bientôt » bank card are left out.
+  ccq: () => <CcqJsonExport />,
+};
+const CONFIG_TABS = {
+  settings: SettingsPage, "time-rules": RulesPage, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
+  forms: FormsPage, references: ReferencesPage,
+};
+
+export const TodoTabsPage = () => <TabbedPage itemId="todo" content={TODO_TABS} />;
+export const TimeHubPage = () => <TabbedPage itemId="v3-time" content={TIME_TABS} />;
+export const PayHistoryPage = () => <TabbedPage itemId="v3-pay-history" content={PAY_HISTORY_TABS} />;
+export const TeamHubPage = () => <TabbedPage itemId="v3-team" content={TEAM_TABS} />;
+export const ReportsHubPage = () => <TabbedPage itemId="v3-reports" content={REPORTS_TABS} />;
+export const ConfigHubPage = () => <TabbedPage itemId="v3-config" content={CONFIG_TABS} />;

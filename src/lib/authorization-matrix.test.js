@@ -59,6 +59,30 @@ describe("application authorization matrix", () => {
     }
   });
 
+  it("keeps each Gestion V3 tab on the rule of the page it comes from", () => {
+    const expected = {
+      todo: { todo: "manager", receipts: "notifications" },
+      "v3-time": { timesheets: "timesheet", unlock: "employees" },
+      "v3-team": { employees: "employees", absences: "manager" },
+      "v3-config": { settings: "manager", "time-rules": "employees", "ccq-rates": "manager", "pay-rules": "manager", forms: "forms", references: "manager" },
+      "v3-pay-history": { stubs: "manager", das: "manager", roe: "manager", calcul: "manager" },
+      "v3-reports": { costs: "manager", week: "manager", month: "manager", grid: "manager", ccq: "manager" },
+    };
+    for (const role of APPLICATION_ROLES) {
+      for (const grants of [[], ...GRANTABLE_ADMIN_SECTIONS.map((s) => [s])]) {
+        const permissions = authorizationFor({ role, adminSections: grants });
+        for (const [page, tabs] of Object.entries(expected)) {
+          for (const [key, rule] of Object.entries(tabs)) {
+            const manager = role === "manager" || role === "owner";
+            const allowed = manager || (role === "admin" && rule !== "manager" && grants.includes(rule));
+            expect(permissions.tabs[page][key], `${role}[${grants}] ${page}:${key}`).toBe(allowed);
+          }
+          expect(permissions.pages[page], `${role}[${grants}] ${page}`).toBe(Object.values(permissions.tabs[page]).some(Boolean));
+        }
+      }
+    }
+  });
+
   it("reserves the emergency timesheet for the owner role only", () => {
     for (const role of APPLICATION_ROLES) {
       const pages = authorizationFor({ role, adminSections: [...GRANTABLE_ADMIN_SECTIONS] }).pages;

@@ -48,41 +48,87 @@ export const MANAGER_NAV = Object.freeze([
   ] },
 ]);
 
+// ── Gestion V3 ──────────────────────────────────────────────────────────────
+// The V3 menu groups related V2 pages into pages with tabs, on NEW paths (v3/…). Every V2 path
+// stays routed to its V2 page, so notification links and bookmarks keep working in both versions.
+// A tab keeps the access rule of the page it comes from: `from` = that V2 page's id, or an inline
+// { grant, ownerOnly } rule. An entry with tabs opens when at least one of its tabs does.
+const tab = (key, from, labelKey) => Object.freeze({ key, from, labelKey });
+
 // Pages that only exist in the V3 menu (« Gestion V3 », chosen in the header).
 const V3_ONLY_ITEMS = Object.freeze([
-  { id: "todo", path: "todo", grant: null, labelKey: "mgr.nav.todo" },
+  { id: "todo", path: "todo", grant: null, labelKey: "mgr.nav.todo", tabs: [
+    Object.freeze({ key: "todo", grant: null, labelKey: "mgr.nav3.tab.toApprove" }),
+    tab("receipts", "receipts", "mgr.nav.receipts"),
+  ] },
   { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
-]);
+  { id: "v3-time", path: "v3/time", grant: null, labelKey: "mgr.nav.timesheets", tabs: [
+    tab("timesheets", "timesheets", "mgr.nav.timesheets"),
+    tab("unlock", "unlock-day", "mgr.nav3.tab.unlockDay"),
+  ] },
+  { id: "v3-pay-history", path: "v3/pay-history", grant: null, labelKey: "mgr.nav3.payHistory", tabs: [
+    tab("stubs", "payroll-stubs", "mgr.nav.stubs"),
+    tab("das", "payroll-das", "mgr.nav.das"),
+    tab("roe", "payroll-roe", "mgr.nav.roe"),
+    tab("calcul", "payroll-calcul", "mgr.nav3.tab.calcul"),
+  ] },
+  { id: "v3-team", path: "v3/team", grant: null, labelKey: "mgr.nav.employees", tabs: [
+    tab("employees", "employees", "mgr.nav.employees"),
+    tab("absences", "absences", "mgr.nav.absences"),
+  ] },
+  { id: "v3-reports", path: "v3/reports", grant: null, labelKey: "mgr.nav3.reports", tabs: [
+    tab("costs", "reports-costs", "mgr.nav.costs"),
+    tab("week", "reports-period", "mgr.nav3.tab.week"),
+    tab("month", "reports-period", "mgr.nav3.tab.month"),
+    tab("grid", "reports-period", "mgr.nav3.tab.grid"),
+    tab("ccq", "reports-downloads", "mgr.nav3.tab.ccqExport"),
+  ] },
+  { id: "v3-config", path: "v3/config", grant: null, labelKey: "mgr.nav3.config", tabs: [
+    tab("settings", "config-settings", "mgr.nav.settings"),
+    tab("time-rules", "config-rules", "mgr.nav.rules"),
+    tab("ccq-rates", "reports-ccq", "mgr.nav.ccq"),
+    tab("pay-rules", "advanced-pay-rules", "mgr.nav.payRules"),
+    tab("forms", "forms", "mgr.nav.forms"),
+    tab("references", "references", "mgr.nav.references"),
+  ] },
+].map((item) => Object.freeze({ ...item, ...(item.tabs ? { tabs: Object.freeze(item.tabs) } : {}) })));
 
 // The V2 menu's items (the current Gestion) and every page either menu can open.
 export const MANAGER_NAV_V2_ITEMS = Object.freeze(MANAGER_NAV.flatMap((group) => group.items));
 export const MANAGER_NAV_ITEMS = Object.freeze([...MANAGER_NAV_V2_ITEMS, ...V3_ONLY_ITEMS]);
 
 const byId = new Map(MANAGER_NAV_ITEMS.map((item) => [item.id, item]));
-// A V3 entry reuses a page (same id, path and access rule), optionally with a clearer label.
-const v3 = (id, labelKey) => (labelKey ? Object.freeze({ ...byId.get(id), labelKey }) : byId.get(id));
+const v3 = (id) => byId.get(id);
 
-// V3 menu: the day's work first (« À traiter »), the weekly payroll in one page, plain-word
-// labels, and the rarely used settings at the bottom. `open` = group expanded by default.
+// V3 menu: the day's work first (« Aujourd'hui »), the weekly payroll next; the rest closed.
+// `open` = group expanded by default (a one-entry group always shows its entry).
 export const MANAGER_NAV_V3 = Object.freeze([
   { id: "today", labelKey: "mgr.group.today", open: true, items: [v3("todo"), v3("live")] },
-  { id: "time", labelKey: "mgr.group.time", open: true, items: [
-    v3("timesheets"), v3("receipts", "mgr.nav3.receipts"), v3("unlock-day"),
-  ] },
-  { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [
-    v3("payroll-week"), v3("payroll-stubs"), v3("payroll-das"), v3("payroll-calcul", "mgr.nav3.calcul"), v3("payroll-roe"),
-  ] },
-  { id: "team", labelKey: "mgr.group.team", open: true, items: [v3("employees"), v3("absences"), v3("inventory"), v3("messages")] },
-  { id: "reports", labelKey: "mgr.group.reports", open: true, items: [
-    v3("reports-period"), v3("reports-costs"), v3("reports-downloads"), v3("reports-ccq"),
-  ] },
-  { id: "config", labelKey: "mgr.group.config", open: false, items: [
-    v3("config-settings"), v3("config-rules", "mgr.nav3.rules"), v3("forms"), v3("references"),
-  ] },
-  { id: "advanced", labelKey: "mgr.group.advanced", open: false, items: [
-    v3("advanced-audit"), v3("advanced-pay-rules"), v3("advanced-health"), v3("advanced-emergency"),
+  { id: "time", labelKey: "mgr.group.time", open: false, items: [v3("v3-time")] },
+  { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [v3("payroll-week"), v3("v3-pay-history")] },
+  { id: "team", labelKey: "mgr.group.team", open: false, items: [v3("v3-team"), v3("inventory"), v3("messages")] },
+  { id: "reports", labelKey: "mgr.group.reports", open: false, items: [v3("v3-reports")] },
+  { id: "config", labelKey: "mgr.group.config", open: false, items: [v3("v3-config")] },
+  { id: "advanced", labelKey: "mgr.nav3.group.admin", open: false, items: [
+    v3("advanced-audit"), v3("advanced-health"), v3("advanced-emergency"),
   ] },
 ]);
+
+// The access rule a tab carries: its source page, or its inline rule.
+function tabRule(t) {
+  return t.from ? byId.get(t.from) : t;
+}
+
+// Tabs of a V3 entry this user may open, in order.
+export function visibleTabs(item, role, adminSections) {
+  return (item?.tabs || []).filter((t) => canOpenNavItem(role, adminSections, tabRule(t)));
+}
+
+// The tab to show for `requested` (?tab=): it when allowed, else the first allowed one, else null.
+export function resolveTab(item, role, adminSections, requested) {
+  const allowed = visibleTabs(item, role, adminSections);
+  return (allowed.find((t) => t.key === requested) || allowed[0] || null)?.key ?? null;
+}
 
 export function managerNavFor(version) {
   return version === "v3" ? MANAGER_NAV_V3 : MANAGER_NAV;
@@ -90,6 +136,7 @@ export function managerNavFor(version) {
 
 // Same rule as canAccessSection: the menu and the route guard cannot disagree.
 export function canOpenNavItem(role, adminSections, item) {
+  if (item.tabs) return item.tabs.some((t) => canOpenNavItem(role, adminSections, tabRule(t)));
   if (item.ownerOnly) return isOwnerRole(role);
   return item.grant ? canAccessSection(role, adminSections, item.grant) : isManagerRole(role);
 }

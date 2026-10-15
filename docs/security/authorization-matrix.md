@@ -145,3 +145,27 @@ NAS/SIN is no longer on `profiles`. It lives in `public.employee_sensitive`:
   (`supabase start` / `db reset` in a GitHub Action) with minted JWTs and a clean +
   upgrade migration path, so the matrix is enforced on every PR. Header of the SQL file
   tracks this.
+
+## Pages de la Gestion (V2 / V3)
+
+Règle exécutable : `canOpenNavItem` / `visibleTabs` (`src/lib/manager-nav.js`), reprise par
+`authorizationFor().pages` et `.tabs` (`src/lib/authorization-matrix.js`) et testée dans
+`manager-nav.test.js` / `authorization-matrix.test.js`. Ce sont des contrôles d'interface : l'accès
+réel aux données reste celui des politiques RLS et des RPC ci-dessus.
+
+- **V2** (`MANAGER_NAV`, inchangée et figée par un test) : une page s'ouvre pour un gestionnaire ou le
+  propriétaire, ou pour un admin de bureau qui a le `grant` de la page (`live`, `timesheet`,
+  `notifications`, `employees`, `forms`). `ownerOnly` = propriétaire seulement (feuille d'urgence).
+- **V3** (`MANAGER_NAV_V3`) : certaines entrées sont des pages à onglets sur de nouveaux chemins
+  (`todo`, `v3/time`, `v3/pay-history`, `v3/team`, `v3/reports`, `v3/config`). **Chaque onglet garde la règle
+  de la page V2 d'où il vient** ; une entrée apparaît si au moins un onglet est permis ; un `?tab=` interdit
+  ou inconnu bascule sur le premier onglet permis ; sans onglet permis, retour à `#/manager`.
+
+| Page V3 | Onglet → page d'origine (règle) |
+|---|---|
+| À traiter (`todo`) | À approuver (gestionnaire) · Justificatifs → `receipts` (`notifications`) |
+| Feuilles de temps (`v3/time`) | Feuilles de temps → `timesheets` (`timesheet`) · Débloquer une journée → `unlock-day` (`employees`) |
+| Historique paie (`v3/pay-history`) | Talons · DAS · Relevé d'emploi · Calcul détaillé (gestionnaire) |
+| Employés (`v3/team`) | Employés → `employees` (`employees`) · Absences (gestionnaire) |
+| Rapports (`v3/reports`) | Coûts · Semaine · Mois · Par employé · Export CCQ (gestionnaire) |
+| Configuration (`v3/config`) | Paramètres · Taux CCQ · Règles de paie · Références (gestionnaire) · Règles de temps → `config/rules` (`employees`) · Formulaires → `forms` (`forms`) |
