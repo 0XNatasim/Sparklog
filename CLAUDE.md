@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.131)
+## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.132)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -437,6 +437,13 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
     officielle (propriétaire), DAS de la semaine + CSV, sommaire imprimable, lien rapport CCQ.
   - **Talons** : « Imprimer / PDF » de la semaine inclut maintenant les semaines comptabilisées (talon conservé),
     auparavant ignorées ; `lib/talon-print.js` réunit talons conservés et aperçus dans un seul document.
+- [x] **Gestion V3 — menu simplifié, V2 figée** (V2.4.132) : `MANAGER_NAV_V3` passe de 26 à 13 entrées. Pages à onglets
+  sur de nouveaux chemins (`todo`, `v3/time`, `v3/pay-history`, `v3/team`, `v3/reports`, `v3/config`) : `TabbedPage`
+  (`ManagerPages.jsx`, `?tab=`) rend chaque page V2 telle quelle ; chaque onglet garde la règle de sa page d'origine
+  (`tabs[].from`, `visibleTabs` / `resolveTab`, `authorizationFor().tabs`, `docs/security/authorization-matrix.md`).
+  `PayrollPage({ compact })` (V3) ; `V2_TO_V3` / `switchTarget` (changement de version) / `v3MenuPath` (surbrillance).
+  Verrous : `MANAGER_NAV` figé en littéral (`manager-nav.test.js`), routes V2 → même export → même rendu
+  (`manager-routes.test.js`). Toute évolution de menu se fait dans la V3 tant qu'elle n'est pas la version par défaut.
 - [x] **Vérification de la capture Field Service** (V2.4.122) : au remplissage automatique, `workOrderIssues`
   (`src/lib/work-order-parse.js`) avertit l'employé si le # OT, l'heure de début / d'arrivée / de fin ou la
   « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » (FR : « Distance parcourue (miles) ») ≠ distance réelle

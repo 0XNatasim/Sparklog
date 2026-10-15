@@ -2,9 +2,54 @@ import { describe, expect, it } from "vitest";
 import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
 import {
   MANAGER_NAV, MANAGER_NAV_ITEMS, MANAGER_NAV_V2_ITEMS, MANAGER_NAV_V3, canOpenNavItem, findNavItem, firstAllowedPath,
-  legacySectionTarget, visibleManagerNav,
+  V2_TO_V3, legacySectionTarget, resolveTab, switchTarget, v3MenuPath, visibleManagerNav, visibleTabs,
 } from "./manager-nav";
 import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
+
+// Frozen copy of the V2 menu (ids, paths, labels, grants, owner-only, order). The V2 must not
+// change: this literal is never edited to make a test pass.
+const V2_MENU_LOCK = [
+  { id: "today", labelKey: "mgr.group.today", items: [
+    { id: "live", path: "live", grant: "live", labelKey: "mgr.nav.live" },
+  ] },
+  { id: "time", labelKey: "mgr.group.time", items: [
+    { id: "timesheets", path: "timesheets", grant: "timesheet", labelKey: "mgr.nav.timesheets" },
+    { id: "receipts", path: "receipts", grant: "notifications", labelKey: "mgr.nav.receipts" },
+    { id: "unlock-day", path: "unlock-day", grant: "employees", labelKey: "mgr.nav.unlockDay" },
+  ] },
+  { id: "team", labelKey: "mgr.group.team", items: [
+    { id: "employees", path: "employees", grant: "employees", labelKey: "mgr.nav.employees" },
+    { id: "absences", path: "absences", grant: null, labelKey: "mgr.nav.absences" },
+    { id: "inventory", path: "inventory", grant: null, labelKey: "mgr.nav.inventory" },
+  ] },
+  { id: "payroll", labelKey: "mgr.group.payroll", items: [
+    { id: "payroll-calcul", path: "payroll/calcul", grant: null, labelKey: "mgr.nav.calcul" },
+    { id: "payroll-stubs", path: "payroll/stubs", grant: null, labelKey: "mgr.nav.stubs" },
+    { id: "payroll-das", path: "payroll/das", grant: null, labelKey: "mgr.nav.das" },
+    { id: "payroll-roe", path: "payroll/roe", grant: null, labelKey: "mgr.nav.roe" },
+  ] },
+  { id: "reports", labelKey: "mgr.group.reports", items: [
+    { id: "reports-costs", path: "reports/costs", grant: null, labelKey: "mgr.nav.costs" },
+    { id: "reports-period", path: "reports/period", grant: null, labelKey: "mgr.nav.period" },
+    { id: "reports-ccq", path: "reports/ccq", grant: null, labelKey: "mgr.nav.ccq" },
+    { id: "reports-downloads", path: "reports/downloads", grant: null, labelKey: "mgr.nav.downloads" },
+  ] },
+  { id: "messages", labelKey: "mgr.group.messages", items: [
+    { id: "messages", path: "messages", grant: "notifications", labelKey: "mgr.nav.messages" },
+  ] },
+  { id: "config", labelKey: "mgr.group.config", items: [
+    { id: "config-rules", path: "config/rules", grant: "employees", labelKey: "mgr.nav.rules" },
+    { id: "config-settings", path: "config/settings", grant: null, labelKey: "mgr.nav.settings" },
+    { id: "forms", path: "forms", grant: "forms", labelKey: "mgr.nav.forms" },
+    { id: "references", path: "config/references", grant: null, labelKey: "mgr.nav.references" },
+  ] },
+  { id: "advanced", labelKey: "mgr.group.advanced", items: [
+    { id: "advanced-audit", path: "advanced/audit", grant: null, labelKey: "mgr.nav.audit" },
+    { id: "advanced-health", path: "advanced/health", grant: null, labelKey: "mgr.nav.health" },
+    { id: "advanced-pay-rules", path: "advanced/pay-rules", grant: null, labelKey: "mgr.nav.payRules" },
+    { id: "advanced-emergency", path: "advanced/emergency", grant: null, ownerOnly: true, labelKey: "mgr.nav.emergency" },
+  ] },
+];
 
 const ids = (role, adminSections, version = "v2") => visibleManagerNav(role, adminSections, version).flatMap((g) => g.items.map((i) => i.id));
 
@@ -90,38 +135,137 @@ describe("manager navigation", () => {
   });
 });
 
+describe("V2 lock", () => {
+  it("keeps the V2 menu exactly as it was", () => {
+    expect(JSON.parse(JSON.stringify(MANAGER_NAV))).toEqual(V2_MENU_LOCK);
+    expect(MANAGER_NAV_V2_ITEMS.every((item) => !item.tabs)).toBe(true);
+  });
+});
+
+const ROLES = ["employee", "subcontractor_1", "manager", "owner"];
+const ADMIN_GRANTS = [[], ...GRANTABLE_ADMIN_SECTIONS.map((s) => [s]), [...GRANTABLE_ADMIN_SECTIONS]];
+const personas = [...ROLES.map((role) => [role, []]), ...ADMIN_GRANTS.map((grants) => ["admin", grants])];
+const v3Entries = MANAGER_NAV_V3.flatMap((group) => group.items);
+const sourceOf = (t) => (t.from ? MANAGER_NAV_ITEMS.find((item) => item.id === t.from) : t);
+
 describe("Gestion V3 menu", () => {
-  it("lists every page exactly once, the day's work first", () => {
-    const v3 = MANAGER_NAV_V3.flatMap((group) => group.items.map((item) => item.id));
-    expect(new Set(v3).size).toBe(v3.length);
-    expect([...v3].sort()).toEqual(MANAGER_NAV_ITEMS.map((item) => item.id).sort());
+  it("has 13 entries, each once, the day's work first", () => {
+    const entryIds = v3Entries.map((item) => item.id);
+    expect(entryIds).toHaveLength(13);
+    expect(new Set(entryIds).size).toBe(entryIds.length);
     expect(firstAllowedPath("owner", [], "v3")).toBe("todo");
     expect(firstAllowedPath("manager", [], "v3")).toBe("todo");
   });
 
-  it("keeps each page's path and access rule (only the label may change)", () => {
-    const base = new Map(MANAGER_NAV_ITEMS.map((item) => [item.id, item]));
-    for (const item of MANAGER_NAV_V3.flatMap((group) => group.items)) {
-      expect(item.path, item.id).toBe(base.get(item.id).path);
-      expect(item.grant ?? null, item.id).toBe(base.get(item.id).grant ?? null);
-      expect(Boolean(item.ownerOnly), item.id).toBe(Boolean(base.get(item.id).ownerOnly));
+  it("opens only Aujourd'hui and Paie by default", () => {
+    expect(MANAGER_NAV_V3.filter((group) => group.open).map((group) => group.id)).toEqual(["today", "payroll"]);
+  });
+
+  it("reaches every V2 page in V3, as an entry or as a tab, exactly once (reports-period as 3 views)", () => {
+    const reached = [
+      ...v3Entries.filter((item) => !item.tabs).map((item) => item.id),
+      ...v3Entries.flatMap((item) => (item.tabs || []).filter((t) => t.from).map((t) => t.from)),
+    ];
+    const unique = [...new Set(reached)];
+    expect(unique.sort()).toEqual(MANAGER_NAV_V2_ITEMS.map((item) => item.id).concat("payroll-week").sort());
+    expect(reached.filter((id) => id === "reports-period")).toHaveLength(3); // Semaine · Mois · Par employé
+    expect(reached.length - unique.length).toBe(2);
+  });
+
+  it("gives every tab the access rule of the page it comes from, for every role and grant", () => {
+    for (const [role, grants] of personas) {
+      for (const entry of v3Entries) {
+        for (const t of entry.tabs || []) {
+          const expected = canOpenNavItem(role, grants, sourceOf(t));
+          expect(visibleTabs(entry, role, grants).some((v) => v.key === t.key), `${role}[${grants}] ${entry.id}:${t.key}`).toBe(expected);
+        }
+        const anyTab = entry.tabs ? entry.tabs.some((t) => canOpenNavItem(role, grants, sourceOf(t))) : canOpenNavItem(role, grants, MANAGER_NAV_ITEMS.find((i) => i.id === entry.id));
+        expect(canOpenNavItem(role, grants, entry), `${role}[${grants}] ${entry.id}`).toBe(anyTab);
+      }
     }
   });
 
-  it("gives a granted admin the same pages in V2 and V3, never the manager-only ones", () => {
-    for (const section of GRANTABLE_ADMIN_SECTIONS) {
-      expect(ids("admin", [section], "v3").sort(), section).toEqual(ids("admin", [section]).sort());
+  it("lets a granted admin reach the same V2 pages in V3 (through entries or tabs), nothing more", () => {
+    const reachableV3 = (grants) => visibleManagerNav("admin", grants, "v3").flatMap((group) => group.items).flatMap((item) => (
+      item.tabs ? visibleTabs(item, "admin", grants).map((t) => t.from || `inline:${t.key}`) : [item.id]
+    ));
+    for (const grants of ADMIN_GRANTS) {
+      expect([...new Set(reachableV3(grants))].sort(), String(grants)).toEqual(ids("admin", grants).sort());
     }
-    const menu = ids("admin", [...GRANTABLE_ADMIN_SECTIONS], "v3");
-    expect(menu).not.toContain("todo");
-    expect(menu).not.toContain("payroll-week");
     expect(firstAllowedPath("admin", ["live"], "v3")).toBe("live");
+    expect(firstAllowedPath("admin", ["notifications"], "v3")).toBe("todo"); // its Justificatifs tab
+    expect(firstAllowedPath("admin", [], "v3")).toBeNull();
   });
 
-  it("names pages as the V3 menu shows them", () => {
-    expect(findNavItem("receipts", "v3")?.labelKey).toBe("mgr.nav3.receipts");
-    expect(findNavItem("receipts")?.labelKey).toBe("mgr.nav.receipts");
+  it("keeps the emergency timesheet owner-only and payroll, reports and settings manager-only", () => {
+    const all = [...GRANTABLE_ADMIN_SECTIONS];
+    expect(ids("admin", all, "v3")).not.toContain("advanced-emergency");
+    expect(ids("manager", [], "v3")).not.toContain("advanced-emergency");
+    expect(ids("owner", [], "v3")).toContain("advanced-emergency");
+    for (const id of ["payroll-week", "v3-pay-history", "v3-reports", "advanced-audit", "advanced-health"]) {
+      expect(ids("admin", all, "v3"), id).not.toContain(id);
+    }
+    expect(visibleTabs(MANAGER_NAV_ITEMS.find((i) => i.id === "v3-config"), "admin", all).map((t) => t.key)).toEqual(["time-rules", "forms"]);
+  });
+
+  it("falls back from a forbidden or unknown ?tab= to the first allowed tab, and to none without access", () => {
+    const config = MANAGER_NAV_ITEMS.find((i) => i.id === "v3-config");
+    expect(resolveTab(config, "manager", [], "references")).toBe("references");
+    expect(resolveTab(config, "manager", [], "nope")).toBe("settings");
+    expect(resolveTab(config, "admin", ["forms"], "settings")).toBe("forms");
+    expect(resolveTab(config, "admin", ["live"], "forms")).toBeNull();
+    const todo = MANAGER_NAV_ITEMS.find((i) => i.id === "todo");
+    expect(resolveTab(todo, "admin", ["notifications"], "todo")).toBe("receipts");
+    expect(resolveTab(todo, "employee", [], null)).toBeNull();
+  });
+
+  it("finds the V3 pages by path", () => {
+    expect(findNavItem("v3/pay-history", "v3")?.id).toBe("v3-pay-history");
     expect(findNavItem("payroll/week")?.id).toBe("payroll-week");
+  });
+});
+
+describe("switching between V2 and V3", () => {
+  const v3Paths = new Set(v3Entries.map((item) => item.path));
+
+  it("maps every V2 page to an existing V3 page and tab, or to the same shared path", () => {
+    for (const item of MANAGER_NAV_V2_ITEMS) {
+      const eq = V2_TO_V3[item.path];
+      if (eq) {
+        const page = v3Entries.find((entry) => entry.path === eq.path);
+        expect(page?.tabs?.some((t) => t.key === eq.tab && t.from === item.id), item.path).toBe(true);
+      } else {
+        expect(v3Paths.has(item.path), `${item.path} is in both menus`).toBe(true);
+      }
+    }
+  });
+
+  it("goes V2 → V3 → V2 back to the same page, keeping the query", () => {
+    for (const item of MANAGER_NAV_V2_ITEMS) {
+      const v3Target = switchTarget("v3", item.path, "?emp=abc&date=2026-10-14");
+      expect(v3Target, item.path).not.toBeNull();
+      expect(switchTarget("v2", ...v3Target.split("?"))).toBe(`${item.path}?emp=abc&date=2026-10-14`);
+    }
+    expect(switchTarget("v3", "payroll/stubs", "")).toBe("v3/pay-history?tab=stubs");
+    expect(switchTarget("v3", "config/references", "")).toBe("v3/config?tab=references");
+    expect(switchTarget("v3", "receipts", "?filter=meals&job=9")).toBe("todo?filter=meals&job=9&tab=receipts");
+    expect(switchTarget("v3", "reports/period", "?view=month")).toBe("v3/reports?tab=month");
+    expect(switchTarget("v2", "v3/reports", "?tab=grid")).toBe("reports/period?view=grid");
+    expect(switchTarget("v3", "/live/", "")).toBe("live");
+  });
+
+  it("lands on the other menu's home when a page has no equivalent", () => {
+    expect(switchTarget("v2", "todo", "?tab=todo")).toBeNull();
+    expect(switchTarget("v2", "payroll/week", "")).toBeNull();
+    expect(switchTarget("v2", "todo", "?tab=receipts")).toBe("receipts");
+    expect(switchTarget("v3", "nope", "")).toBeNull();
+  });
+
+  it("highlights, in V3, the entry that holds a V2 path opened from a link", () => {
+    expect(v3MenuPath("receipts")).toBe("todo");
+    expect(v3MenuPath("timesheets")).toBe("v3/time");
+    expect(v3MenuPath("live")).toBe("live");
+    for (const path of Object.values(V2_TO_V3).map((eq) => eq.path)) expect(v3Paths.has(path), path).toBe(true);
   });
 });
 
