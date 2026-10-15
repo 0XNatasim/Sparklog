@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
-import { Camera, CircleCheck, TriangleAlert } from "lucide-react";
+import { Camera, CircleCheck, Images, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -30,7 +30,7 @@ import { extractWorkOrderText, parseExtractedText, workOrderIssues } from "@/lib
 import { ENTRY_SOURCES, recordEntrySource } from "@/lib/entry-source";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
-import { INVENTORY_SLOTS, missingInventorySlots } from "@/lib/inventory-screenshots";
+import { INVENTORY_SLOTS, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
 import { fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -184,10 +184,12 @@ export default function EmployeeForm() {
   const endShiftDateRef = useRef(null);
   const inventoryInputRef = useRef(null);
   const inventorySlotRef = useRef(null);
+  const inventoryMultiInputRef = useRef(null);
   const daySubmitRef = useRef(false);
   const [inventoryRows, setInventoryRows] = useState([]);
   const [inventoryBusySlot, setInventoryBusySlot] = useState(null);
   const [inventoryError, setInventoryError] = useState("");
+  const [inventoryNotice, setInventoryNotice] = useState("");
   const [showInventoryExamples, setShowInventoryExamples] = useState(false);
   const [daySubmitBusy, setDaySubmitBusy] = useState(false);
   const [daySubmitError, setDaySubmitError] = useState("");
@@ -807,6 +809,7 @@ export default function EmployeeForm() {
       return;
     }
     setInventoryError("");
+    setInventoryNotice("");
     setDaySubmitError("");
     if (officeEmployee || !inventoryEnabled) {
       setReturnStep("dayDone");
@@ -832,8 +835,13 @@ export default function EmployeeForm() {
   }
 
   function pickInventorySlot(slot) {
+    setInventoryNotice("");
     inventorySlotRef.current = slot;
     inventoryInputRef.current?.click();
+  }
+
+  function pickInventoryFiles() {
+    inventoryMultiInputRef.current?.click();
   }
 
   async function handleInventoryFile(event) {
@@ -841,34 +849,60 @@ export default function EmployeeForm() {
     event.target.value = "";
     const slot = inventorySlotRef.current;
     if (!file || !slot || inventoryBusySlot) return;
-    setInventoryBusySlot(slot);
+    await uploadInventoryShots([{ slot, file }]);
+  }
+
+  // Several screenshots chosen at once are placed in their slots by planInventoryUploads.
+  async function handleInventoryFiles(event) {
+    const files = [...(event.target.files || [])];
+    event.target.value = "";
+    if (!files.length || inventoryBusySlot) return;
+    const { uploads, extra } = planInventoryUploads(files, inventoryRows);
+    setInventoryNotice(extra > 0 ? t("form.inventory.extraIgnored", { count: extra }) : "");
+    if (uploads.length) await uploadInventoryShots(uploads);
+  }
+
+  // Uploads one screenshot after the other; a failure does not stop the others.
+  async function uploadInventoryShots(uploads) {
+    setInventoryBusySlot(uploads[0].slot);
     setInventoryError("");
+    let retentionDays = 30;
     try {
-      let retentionDays = 30;
+      const { data } = await withTimeout(
+        supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).maybeSingle(),
+        8000
+      );
+      retentionDays = Number(data?.evidence_retention_days) || 30;
+    } catch { /* default retention applies */ }
+    const failed = [];
+    let lastError = null;
+    let rows = inventoryRows;
+    for (const { slot, file } of uploads) {
+      setInventoryBusySlot(slot);
       try {
-        const { data } = await withTimeout(
-          supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).maybeSingle(),
-          8000
-        );
-        retentionDays = Number(data?.evidence_retention_days) || 30;
-      } catch { /* default retention applies */ }
-      const previousPath = inventoryRows.find((row) => row.slot === slot)?.storage_path || null;
-      const path = await saveInventoryScreenshot(supabase, {
-        userId: user.id,
-        jobDate: endShiftDateRef.current,
-        slot,
-        file,
-        retentionDays,
-        previousPath,
-      });
-      setInventoryRows((rows) => [...rows.filter((row) => row.slot !== slot), { slot, storage_path: path }]);
-    } catch (error) {
-      console.error("[inventory] screenshot failed", error);
-      const failure = evidenceUploadFailure(error);
-      setInventoryError(`${t("form.inventory.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}`);
-    } finally {
-      setInventoryBusySlot(null);
+        const previousPath = rows.find((row) => row.slot === slot)?.storage_path || null;
+        const path = await saveInventoryScreenshot(supabase, {
+          userId: user.id,
+          jobDate: endShiftDateRef.current,
+          slot,
+          file,
+          retentionDays,
+          previousPath,
+        });
+        rows = [...rows.filter((row) => row.slot !== slot), { slot, storage_path: path }];
+        setInventoryRows(rows);
+      } catch (error) {
+        console.error("[inventory] screenshot failed", error);
+        failed.push(slot);
+        lastError = error;
+      }
     }
+    if (lastError) {
+      const failure = evidenceUploadFailure(lastError);
+      const which = uploads.length > 1 ? `${t("form.inventory.failedSlots", { slots: failed.join(", ") })} ` : "";
+      setInventoryError(`${which}${t("form.inventory.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}`);
+    }
+    setInventoryBusySlot(null);
   }
 
   // Submits every editable job of the end-of-shift day. Retrying is safe: only jobs still
@@ -1745,6 +1779,17 @@ export default function EmployeeForm() {
                     ))}
                   </div>
                 )}
+                <Button
+                  type="button"
+                  className="w-full"
+                  variant={missingInventorySlots(inventoryRows).length ? "default" : "outline"}
+                  disabled={Boolean(inventoryBusySlot)}
+                  onClick={pickInventoryFiles}
+                >
+                  <Images className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t("form.inventory.pickMany")}
+                </Button>
+                <p className="text-xs text-muted-foreground">{t("form.inventory.pickManyHint")}</p>
                 <ul className="space-y-2">
                   {INVENTORY_SLOTS.map((slot) => {
                     const done = inventoryRows.some((row) => row.slot === slot);
@@ -1755,15 +1800,17 @@ export default function EmployeeForm() {
                           {done && <CircleCheck className="h-5 w-5 text-success" aria-hidden="true" />}
                           {t("form.inventory.slot", { n: slot })}
                         </span>
-                        <Button type="button" size="sm" variant={done ? "outline" : "default"} disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(slot)}>
+                        <Button type="button" size="sm" variant="outline" disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(slot)}>
                           {busy ? t("form.inventory.uploading") : done ? t("form.inventory.replace") : t("form.inventory.capture")}
                         </Button>
                       </li>
                     );
                   })}
                 </ul>
+                {inventoryNotice && <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-warning" role="status">{inventoryNotice}</div>}
                 {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive" role="alert">{inventoryError}</div>}
                 <input ref={inventoryInputRef} type="file" accept="image/*" className="hidden" onChange={handleInventoryFile} />
+                <input ref={inventoryMultiInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleInventoryFiles} />
               </div>
               <DialogFooter>
                 <Button type="button" disabled={Boolean(inventoryBusySlot) || missingInventorySlots(inventoryRows).length > 0} onClick={() => setReturnStep("dayDone")}>

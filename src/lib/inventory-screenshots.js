@@ -26,3 +26,17 @@ export function inventoryDayBadge(jobDate, captureCount, enabled) {
   if (captureCount > 0) return "missing";
   return inventoryRequiredFor(jobDate) ? "missing" : null;
 }
+
+// Several screenshots picked at once: oldest first (screenshots are taken top to bottom of the
+// list; equal or unknown times keep the picker's order). A full set (3 or more files) fills slots
+// 1 to 3 in that order, replacing what was there; fewer files fill the missing slots in order.
+// Files beyond the available slots are returned in `extra`, never guessed into a filled slot.
+export function planInventoryUploads(files, rows) {
+  const ordered = [...(files || [])]
+    .map((file, index) => ({ file, index }))
+    .sort((a, b) => (Number(a.file?.lastModified) || 0) - (Number(b.file?.lastModified) || 0) || a.index - b.index)
+    .map(({ file }) => file);
+  const targets = ordered.length >= INVENTORY_SLOTS.length ? INVENTORY_SLOTS : missingInventorySlots(rows);
+  const uploads = targets.slice(0, ordered.length).map((slot, index) => ({ slot, file: ordered[index] }));
+  return { uploads, extra: ordered.length - uploads.length };
+}

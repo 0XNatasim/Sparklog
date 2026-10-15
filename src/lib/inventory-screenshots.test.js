@@ -7,6 +7,7 @@ import {
   inventoryRequiredFor,
   inventoryStoragePath,
   missingInventorySlots,
+  planInventoryUploads,
 } from "./inventory-screenshots";
 import { friendlyErrorMessage } from "./error-messages";
 
@@ -89,5 +90,37 @@ describe("0071 migration", () => {
   it("is reconciled and expired by the cleanup worker", () => {
     expect(sql).toContain("'inventory-screenshots'");
     expect(cleanup).toContain("inventory_screenshots");
+  });
+});
+
+describe("several inventory screenshots picked at once", () => {
+  const file = (name, lastModified) => ({ name, lastModified });
+  const plan = (files, rows = []) => {
+    const { uploads, extra } = planInventoryUploads(files, rows);
+    return { slots: uploads.map((u) => `${u.slot}:${u.file.name}`), extra };
+  };
+
+  it("fills slots 1 to 3 in the order the screenshots were taken", () => {
+    expect(plan([file("c", 30), file("a", 10), file("b", 20)])).toEqual({ slots: ["1:a", "2:b", "3:c"], extra: 0 });
+  });
+
+  it("keeps the picker's order when the times are equal or unknown", () => {
+    expect(plan([file("x", 5), file("y", 5), file("z")])).toEqual({ slots: ["1:z", "2:x", "3:y"], extra: 0 });
+    expect(plan([file("x"), file("y"), file("z")])).toEqual({ slots: ["1:x", "2:y", "3:z"], extra: 0 });
+  });
+
+  it("puts fewer files into the missing slots only", () => {
+    expect(plan([file("b", 2), file("a", 1)], [{ slot: 1 }])).toEqual({ slots: ["2:a", "3:b"], extra: 0 });
+    expect(plan([file("a", 1)], [{ slot: 1 }, { slot: 3 }])).toEqual({ slots: ["2:a"], extra: 0 });
+  });
+
+  it("never overwrites a filled slot with a partial pick", () => {
+    expect(plan([file("a", 1), file("b", 2)], [{ slot: 1 }, { slot: 2 }])).toEqual({ slots: ["3:a"], extra: 1 });
+    expect(plan([file("a", 1)], [{ slot: 1 }, { slot: 2 }, { slot: 3 }])).toEqual({ slots: [], extra: 1 });
+  });
+
+  it("a full set replaces all three; files beyond three are reported, not used", () => {
+    expect(plan([file("a", 1), file("b", 2), file("c", 3)], [{ slot: 2 }])).toEqual({ slots: ["1:a", "2:b", "3:c"], extra: 0 });
+    expect(plan([file("a", 1), file("b", 2), file("c", 3), file("d", 4)])).toEqual({ slots: ["1:a", "2:b", "3:c"], extra: 1 });
   });
 });

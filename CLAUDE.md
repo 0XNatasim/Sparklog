@@ -469,6 +469,13 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   vérification, pour diagnostiquer une mauvaise lecture (texte en mémoire seulement, jamais enregistré).
   Saisie à la main (sans capture) : Enregistrer ouvre d'abord « Fiche entrée à la main » (mieux avec la capture ;
   vérifier que Field Service est pareil à la fiche) avec « Prendre une capture » ou « Field Service est exact, enregistrer ».
+- [x] **Inventaire : plusieurs captures d'un coup** (V2.4.137) : bouton « Choisir les captures (plusieurs d'un coup) »
+  dans l'étape inventaire de fin de journée (`input multiple`). `planInventoryUploads` (`src/lib/inventory-screenshots.js`) :
+  ordre de prise (`lastModified`, sinon ordre du sélecteur) ; 3 fichiers ou plus = cases 1 à 3 (les remplace) ; moins =
+  cases manquantes seulement ; le surplus n'écrase jamais une case remplie (avis « Utilisez Remplacer »). Envoi un par un
+  avec `saveInventoryScreenshot` (lecture OCR et fusion inchangées) ; un échec n'arrête pas les autres. Les boutons
+  Ajouter / Remplacer par case restent. À faire si l'essai est concluant : même principe pour le stationnement (2-3 reçus
+  de parcomètre par job).
 - [x] **Étoile rouge sur les fiches entrées à la main** (V2.4.123, migration 0090) : table `job_entry_sources`
   (`screenshot` / `manual`, une ligne par nouvelle fiche, écrite par l'employé après l'enregistrement, lisible par qui
   voit la job, ni modification ni suppression). `src/lib/entry-source.js` ; ★ rouge + légende dans Feuilles de temps
