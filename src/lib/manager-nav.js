@@ -159,6 +159,72 @@ export function firstAllowedPath(role, adminSections, version = "v2") {
   return visibleManagerNav(role, adminSections, version)[0]?.items[0]?.path || null;
 }
 
+// ── V2 ↔ V3 equivalences (switching versions keeps the page) ─────────────────
+// V2 path → the V3 page and tab that show it. Paths both menus share (live, inventory, messages,
+// journal, état du service, feuille d'urgence) are not listed: they stay the same.
+export const V2_TO_V3 = Object.freeze({
+  timesheets: { path: "v3/time", tab: "timesheets" },
+  "unlock-day": { path: "v3/time", tab: "unlock" },
+  receipts: { path: "todo", tab: "receipts" },
+  employees: { path: "v3/team", tab: "employees" },
+  absences: { path: "v3/team", tab: "absences" },
+  "payroll/stubs": { path: "v3/pay-history", tab: "stubs" },
+  "payroll/das": { path: "v3/pay-history", tab: "das" },
+  "payroll/roe": { path: "v3/pay-history", tab: "roe" },
+  "payroll/calcul": { path: "v3/pay-history", tab: "calcul" },
+  "reports/costs": { path: "v3/reports", tab: "costs" },
+  "reports/period": { path: "v3/reports", tab: "week" }, // ?view=month|grid → that tab
+  "reports/downloads": { path: "v3/reports", tab: "ccq" },
+  "config/settings": { path: "v3/config", tab: "settings" },
+  "config/rules": { path: "v3/config", tab: "time-rules" },
+  "reports/ccq": { path: "v3/config", tab: "ccq-rates" },
+  "advanced/pay-rules": { path: "v3/config", tab: "pay-rules" },
+  forms: { path: "v3/config", tab: "forms" },
+  "config/references": { path: "v3/config", tab: "references" },
+});
+const PERIOD_VIEW_TABS = ["month", "grid"]; // Semaine / mois's ?view= values that are V3 tabs
+
+const cleanPath = (path) => String(path || "").replace(/^\/+|\/+$/g, "");
+const withQuery = (path, params) => {
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+};
+const inMenu = (version, path) => managerNavFor(version).some((group) => group.items.some((item) => item.path === path));
+
+// Where switching to `next` ("v2" | "v3") should land from `path` + `search`, keeping the other
+// query parameters (employee, day, filter, job, method…). null = no equivalent: the landing page.
+export function switchTarget(next, path, search = "") {
+  const clean = cleanPath(path);
+  const params = new URLSearchParams(search);
+  if (next === "v3") {
+    const eq = V2_TO_V3[clean];
+    if (!eq) return inMenu("v3", clean) ? withQuery(clean, params) : null;
+    let tabKey = eq.tab;
+    if (clean === "reports/period") {
+      if (PERIOD_VIEW_TABS.includes(params.get("view"))) tabKey = params.get("view");
+      params.delete("view");
+    }
+    params.set("tab", tabKey);
+    return withQuery(eq.path, params);
+  }
+  const page = MANAGER_NAV_ITEMS.find((item) => item.tabs && item.path === clean);
+  if (!page) return inMenu("v2", clean) ? withQuery(clean, params) : null;
+  const tabKey = page.tabs.some((t) => t.key === params.get("tab")) ? params.get("tab") : page.tabs[0].key;
+  params.delete("tab");
+  if (page.id === "v3-reports" && PERIOD_VIEW_TABS.includes(tabKey)) {
+    params.set("view", tabKey);
+    return withQuery("reports/period", params);
+  }
+  const v2 = Object.entries(V2_TO_V3).find(([, eq]) => eq.path === clean && eq.tab === tabKey)?.[0];
+  return v2 ? withQuery(v2, params) : null;
+}
+
+// In V3, a V2 path opened by a notification or a bookmark highlights the V3 entry that holds it.
+export function v3MenuPath(path) {
+  const clean = cleanPath(path);
+  return V2_TO_V3[clean]?.path || clean;
+}
+
 // Old `/manager?section=…` links (bell notifications, bookmarks) → new route + query string.
 const LEGACY_SECTIONS = {
   live: "live",

@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Save } from "lucide-react";
+import { Info, Save } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
@@ -73,7 +73,7 @@ export function LivePage() {
 
 // Gestion V3 pages.
 export const TodoPage = () => <TodoInbox />;
-export const PayrollWeekPage = () => <PayrollPage Component={PayrollWeek} writes />;
+export const PayrollWeekPage = () => <PayrollPage Component={PayrollWeek} writes compact />;
 
 export const TimesheetsPage = () => <ManagerDashboard view="timesheet" />;
 export const ReceiptsPage = () => <ManagerDashboard view="receipts" />;
@@ -137,7 +137,65 @@ function MethodNote({ method }) {
   );
 }
 
-function PayrollPage({ Component, writes = false }) {
+// Gestion V3: the same Méthode choice as a small control; its explanation (the banner the V2
+// shows) opens from an « i » button. Closes on Escape or a click outside.
+function CompactMethodBar({ method, onChange }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => { if (event.key === "Escape") setOpen(false); };
+    const onDown = (event) => { if (box.current && !box.current.contains(event.target)) setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+    };
+  }, [open]);
+  return (
+    <div ref={box} className="relative flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium text-muted-foreground">{t("mgr.payroll.method")}</span>
+      <div role="radiogroup" aria-label={t("mgr.payroll.method")} className="inline-flex rounded-md border bg-muted p-0.5">
+        {METHODS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={method === value}
+            onClick={() => onChange(value)}
+            className={cn(
+              "min-h-8 rounded px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              method === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t(value === "messier" ? "mgr.payroll.messier" : "mgr.payroll.book")}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={t("mgr.nav3.methodInfo")}
+        title={t("mgr.nav3.methodInfo")}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Info className="h-4 w-4" />
+      </button>
+      {open && (
+        <div role="dialog" aria-label={t("mgr.nav3.methodInfo")} className="absolute left-0 top-full z-20 mt-1 w-[min(28rem,calc(100vw-2rem))] rounded-lg bg-popover shadow-lg">
+          <MethodNote method={method} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// compact (Gestion V3 only): CompactMethodBar instead of the switch + banner. The default renders
+// exactly the V2 page.
+function PayrollPage({ Component, writes = false, compact = false }) {
   const t = useT();
   const [params, setParams] = useSearchParams();
   const method = METHODS.includes(params.get("method")) ? params.get("method") : "messier";
@@ -149,8 +207,12 @@ function PayrollPage({ Component, writes = false }) {
   }
   return (
     <div className="space-y-3">
-      <MethodSwitch method={method} onChange={setMethod} />
-      <MethodNote method={method} />
+      {compact ? <CompactMethodBar method={method} onChange={setMethod} /> : (
+        <>
+          <MethodSwitch method={method} onChange={setMethod} />
+          <MethodNote method={method} />
+        </>
+      )}
       {writes && (
         <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning">
           <Save className="mt-0.5 h-4 w-4 shrink-0" />
@@ -271,7 +333,13 @@ function TabbedPage({ itemId, content }) {
 
 const TODO_TABS = { todo: TodoPage, receipts: ReceiptsPage };
 const TIME_TABS = { timesheets: TimesheetsPage, unlock: UnlockDayPage };
-const PAY_HISTORY_TABS = { stubs: PayrollStubsPage, das: PayrollDasPage, roe: PayrollRoePage, calcul: PayrollCalculPage };
+// Same pages as V2 Paie, with the compact Méthode control; Calcul détaillé keeps the « writes » warning.
+const PAY_HISTORY_TABS = {
+  stubs: () => <PayrollPage Component={TalonTab} compact />,
+  das: () => <PayrollPage Component={DasTab} compact />,
+  roe: PayrollRoePage,
+  calcul: () => <PayrollPage Component={PayrollEngineTester} writes compact />,
+};
 const TEAM_TABS = { employees: EmployeesPage, absences: AbsencesPage };
 const REPORTS_TABS = {
   costs: CostsPage,

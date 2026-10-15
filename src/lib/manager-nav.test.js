@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
 import {
   MANAGER_NAV, MANAGER_NAV_ITEMS, MANAGER_NAV_V2_ITEMS, MANAGER_NAV_V3, canOpenNavItem, findNavItem, firstAllowedPath,
-  legacySectionTarget, resolveTab, visibleManagerNav, visibleTabs,
+  V2_TO_V3, legacySectionTarget, resolveTab, switchTarget, v3MenuPath, visibleManagerNav, visibleTabs,
 } from "./manager-nav";
 import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
 
@@ -222,6 +222,50 @@ describe("Gestion V3 menu", () => {
   it("finds the V3 pages by path", () => {
     expect(findNavItem("v3/pay-history", "v3")?.id).toBe("v3-pay-history");
     expect(findNavItem("payroll/week")?.id).toBe("payroll-week");
+  });
+});
+
+describe("switching between V2 and V3", () => {
+  const v3Paths = new Set(v3Entries.map((item) => item.path));
+
+  it("maps every V2 page to an existing V3 page and tab, or to the same shared path", () => {
+    for (const item of MANAGER_NAV_V2_ITEMS) {
+      const eq = V2_TO_V3[item.path];
+      if (eq) {
+        const page = v3Entries.find((entry) => entry.path === eq.path);
+        expect(page?.tabs?.some((t) => t.key === eq.tab && t.from === item.id), item.path).toBe(true);
+      } else {
+        expect(v3Paths.has(item.path), `${item.path} is in both menus`).toBe(true);
+      }
+    }
+  });
+
+  it("goes V2 → V3 → V2 back to the same page, keeping the query", () => {
+    for (const item of MANAGER_NAV_V2_ITEMS) {
+      const v3Target = switchTarget("v3", item.path, "?emp=abc&date=2026-10-14");
+      expect(v3Target, item.path).not.toBeNull();
+      expect(switchTarget("v2", ...v3Target.split("?"))).toBe(`${item.path}?emp=abc&date=2026-10-14`);
+    }
+    expect(switchTarget("v3", "payroll/stubs", "")).toBe("v3/pay-history?tab=stubs");
+    expect(switchTarget("v3", "config/references", "")).toBe("v3/config?tab=references");
+    expect(switchTarget("v3", "receipts", "?filter=meals&job=9")).toBe("todo?filter=meals&job=9&tab=receipts");
+    expect(switchTarget("v3", "reports/period", "?view=month")).toBe("v3/reports?tab=month");
+    expect(switchTarget("v2", "v3/reports", "?tab=grid")).toBe("reports/period?view=grid");
+    expect(switchTarget("v3", "/live/", "")).toBe("live");
+  });
+
+  it("lands on the other menu's home when a page has no equivalent", () => {
+    expect(switchTarget("v2", "todo", "?tab=todo")).toBeNull();
+    expect(switchTarget("v2", "payroll/week", "")).toBeNull();
+    expect(switchTarget("v2", "todo", "?tab=receipts")).toBe("receipts");
+    expect(switchTarget("v3", "nope", "")).toBeNull();
+  });
+
+  it("highlights, in V3, the entry that holds a V2 path opened from a link", () => {
+    expect(v3MenuPath("receipts")).toBe("todo");
+    expect(v3MenuPath("timesheets")).toBe("v3/time");
+    expect(v3MenuPath("live")).toBe("live");
+    for (const path of Object.values(V2_TO_V3).map((eq) => eq.path)) expect(v3Paths.has(path), path).toBe(true);
   });
 });
 

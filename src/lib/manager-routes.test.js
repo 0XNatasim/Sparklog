@@ -50,6 +50,9 @@ const V2_ROUTES = [
   ["advanced/emergency", "EmergencyPage", `export const EmergencyPage = () => <EmergencyTimesheet />;`],
 ];
 
+const METHOD_SWITCH_SHA = "7d604cef656cea81";
+const METHOD_NOTE_SHA = "3bbddcb126d408e5";
+
 describe("V2 routes lock", () => {
   it("routes every V2 menu path, and only those, through this table", () => {
     expect(V2_ROUTES.map(([path]) => path).sort()).toEqual(MANAGER_NAV_V2_ITEMS.map((item) => item.path).sort());
@@ -60,6 +63,16 @@ describe("V2 routes lock", () => {
     const def = definition(pages, page);
     if (typeof expected === "string") expect(def).toBe(expected);
     else expect(sha(def)).toBe(expected.sha256);
+  });
+
+  it("keeps the Méthode switch and banner the V2 payroll pages show, and their default rendering", () => {
+    for (const [name, hash] of [["MethodSwitch", METHOD_SWITCH_SHA], ["MethodNote", METHOD_NOTE_SHA]]) {
+      const start = pages.indexOf(`function ${name}(`);
+      expect(sha(pages.slice(start, pages.indexOf("\n}\n", start) + 2)), name).toBe(hash);
+    }
+    // The V3 compact bar only replaces them when `compact` is passed; it defaults to false.
+    expect(pages).toContain("function PayrollPage({ Component, writes = false, compact = false }) {");
+    expect(pages).toContain("{compact ? <CompactMethodBar method={method} onChange={setMethod} /> : (\n        <>\n          <MethodSwitch method={method} onChange={setMethod} />\n          <MethodNote method={method} />");
   });
 
   it("keeps the wrappers the V2 pages render through", () => {
