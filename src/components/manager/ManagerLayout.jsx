@@ -28,6 +28,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const COMPANY_NAME = "Messier Connexion";
 const COLLAPSE_KEY = "sparklog.managerNavCollapsed";
+const HIDDEN_KEY = "sparklog.managerNavHidden"; // desktop: menu folded away entirely
 
 const ICONS = {
   todo: ListChecks,
@@ -65,12 +66,16 @@ const ICONS = {
 
 const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
 
-function readCollapsed() {
+function readFlag(key) {
   try {
-    return window.localStorage.getItem(COLLAPSE_KEY) === "1";
+    return window.localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
+}
+
+function storeFlag(key, on) {
+  try { window.localStorage.setItem(key, on ? "1" : "0"); } catch { /* storage unavailable */ }
 }
 
 // highlightPath (V3 only): the menu entry that holds the open page when it is a V2 path.
@@ -245,7 +250,8 @@ export default function ManagerLayout() {
   const [storedVersion, setVersion] = useManagerUiVersion();
   const version = canSwitch ? storedVersion : "v2";
   const groups = useMemo(() => visibleManagerNav(role, adminSections, version), [role, adminSections, version]);
-  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [collapsed, setCollapsed] = useState(() => readFlag(COLLAPSE_KEY));
+  const [navHidden, setNavHidden] = useState(() => readFlag(HIDDEN_KEY));
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
@@ -263,7 +269,15 @@ export default function ManagerLayout() {
 
   function toggleCollapsed() {
     setCollapsed((value) => {
-      try { window.localStorage.setItem(COLLAPSE_KEY, value ? "0" : "1"); } catch { /* storage unavailable */ }
+      storeFlag(COLLAPSE_KEY, !value);
+      return !value;
+    });
+  }
+
+  // Header toggle (desktop): fold the whole menu away to give the page the full width, and back.
+  function toggleNavHidden() {
+    setNavHidden((value) => {
+      storeFlag(HIDDEN_KEY, !value);
       return !value;
     });
   }
@@ -288,7 +302,7 @@ export default function ManagerLayout() {
       <RegionOnboarding />
       <BroadcastPopup />
       <div className="flex min-h-screen">
-        <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r bg-card md:flex", collapsed ? "w-14" : "w-60")}>
+        <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r bg-card", !navHidden && "md:flex", collapsed ? "w-14" : "w-60")}>
           <div className={cn("flex h-12 shrink-0 items-center border-b px-3", collapsed && "justify-center px-0")}>
             <Link to="/manager" className="flex items-baseline gap-1 font-extrabold tracking-tight">
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
@@ -325,6 +339,17 @@ export default function ManagerLayout() {
           <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-background/90 px-2 backdrop-blur sm:px-4">
             <Button variant="ghost" size="sm" className="h-11 gap-1.5 px-2 md:hidden" onClick={() => setDrawerOpen(true)} aria-label={t("mgr.menu.open")}>
               <Menu className="h-4 w-4" />{t("mgr.menu.button")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="touch"
+              className="hidden shrink-0 md:inline-flex"
+              onClick={toggleNavHidden}
+              aria-expanded={!navHidden}
+              aria-label={t(navHidden ? "mgr.menu.show" : "mgr.menu.hide")}
+              title={t(navHidden ? "mgr.menu.show" : "mgr.menu.hide")}
+            >
+              {navHidden ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
             <div className="min-w-0 flex-1">
               <div className="hidden truncate text-xs leading-none text-muted-foreground sm:block">{COMPANY_NAME}</div>

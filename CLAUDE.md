@@ -444,6 +444,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `PayrollPage({ compact })` (V3) ; `V2_TO_V3` / `switchTarget` (changement de version) / `v3MenuPath` (surbrillance).
   Verrous : `MANAGER_NAV` figé en littéral (`manager-nav.test.js`), routes V2 → même export → même rendu
   (`manager-routes.test.js`). Toute évolution de menu se fait dans la V3 tant qu'elle n'est pas la version par défaut.
+- [x] **Menu de la Gestion repliable** (V2.4.133) : bouton en haut à gauche de l'en-tête (ordinateur seulement ; le
+  téléphone garde son tiroir) qui masque ou affiche tout le menu de gauche, mémorisé sur l'appareil
+  (`sparklog.managerNavHidden`, `ManagerLayout.jsx`). Le mode « rail » (« Réduire le menu ») reste.
 - [x] **Vérification de la capture Field Service** (V2.4.122) : au remplissage automatique, `workOrderIssues`
   (`src/lib/work-order-parse.js`) avertit l'employé si le # OT, l'heure de début / d'arrivée / de fin ou la
   « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » (FR : « Distance parcourue (miles) ») ≠ distance réelle
