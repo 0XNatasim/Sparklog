@@ -341,7 +341,7 @@ export default function TodoInbox() {
         <div className="flex flex-wrap gap-2">
           {anomaly && (
             <Button asChild size="sm" variant="outline">
-              <Link to={`/manager/timesheets?emp=${day.userId}&date=${day.date}`}>{t("todo.openDay")}</Link>
+              <Link to={`/manager/v3/time?tab=timesheets&emp=${day.userId}&date=${day.date}`}>{t("todo.openDay")}</Link>
             </Button>
           )}
           <Button type="button" size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => returnDay(day)}>{t("todo.returnDay")}</Button>
@@ -459,7 +459,7 @@ export default function TodoInbox() {
             {state && missing.length === 0 && <div className="text-sm text-muted-foreground">{t("todo.missingNone")}</div>}
             {missing.map((person) => (
               <div key={person.id} className="space-y-1.5 border-t pt-2">
-                <Link to={`/manager/timesheets?emp=${person.id}&date=${state.prevDay}`} className="font-semibold text-primary hover:underline">{person.name}</Link>
+                <Link to={`/manager/v3/time?tab=timesheets&emp=${person.id}&date=${state.prevDay}`} className="font-semibold text-primary hover:underline">{person.name}</Link>
                 <div className="text-xs text-muted-foreground">{t(person.hasJobs ? "todo.missingSaved" : "todo.missingNoJob")}</div>
                 <div className="flex flex-wrap gap-1.5">
                   <Button type="button" size="sm" variant="outline" disabled={Boolean(busy)} onClick={() => remind([person])}>{t("todo.remind")}</Button>
