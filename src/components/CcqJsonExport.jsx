@@ -21,7 +21,9 @@ import { useAuth } from "@/contexts/AuthContext";
 // audited and rate-limited. The browser never selects the vault table.
 const NAS_MASK = "•••••••••";
 
-export default function CcqJsonExport() {
+// defaultMonth: « YYYY-MM » to open on; otherwise the month that just ended (the report is
+// prepared once the month is over).
+export default function CcqJsonExport({ defaultMonth = "" }) {
   const holidayDates = useHolidayDates();
   const t = useT();
   const { user } = useAuth();
@@ -34,7 +36,7 @@ export default function CcqJsonExport() {
   const [profiles, setProfiles] = useState([]);
   const [roundingByUser, setRoundingByUser] = useState(new Map());
   const [employeeId, setEmployeeId] = useState("all");
-  const [month, setMonth] = useState(dayjs().format("YYYY-MM"));
+  const [month, setMonth] = useState(() => defaultMonth || dayjs().subtract(1, "month").format("YYYY-MM"));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 

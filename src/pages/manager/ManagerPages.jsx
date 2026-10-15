@@ -15,6 +15,7 @@ import { lazyPanel } from "@/components/LazyLoading";
 const LiveCrew = lazyPanel(() => import("@/components/LiveCrew"));
 const TodoInbox = lazyPanel(() => import("@/components/manager/TodoInbox"));
 const PayrollWeek = lazyPanel(() => import("@/components/manager/PayrollWeek"));
+const PayrollMonth = lazyPanel(() => import("@/components/manager/PayrollMonth"));
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const CongesManager = lazyPanel(() => import("@/components/CongesManager"));
 const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
@@ -73,6 +74,7 @@ export function LivePage() {
 // Gestion V3 pages.
 export const TodoPage = () => <TodoInbox />;
 export const PayrollWeekPage = () => <PayrollPage Component={PayrollWeek} writes />;
+export const PayrollMonthPage = () => <PayrollPage Component={PayrollMonth} />;
 
 export const TimesheetsPage = () => <ManagerDashboard view="timesheet" />;
 export const ReceiptsPage = () => <ManagerDashboard view="receipts" />;

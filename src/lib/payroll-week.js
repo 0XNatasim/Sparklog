@@ -38,14 +38,25 @@ export function weekBounds(end) {
 // One row per CCQ employee with jobs in the week.
 //   jobs: every job of these employees from the start of the tax year to the week's end.
 //   ledgerByUser: Map user → ledger rows; seedByUser: Map user → payroll_ytd row.
-//   compute(profile, approvedJobs, opening) → computeEmployeeWeekTalon(...) result.
-//   contributions: active employer_contributions rows; mealsByUser / parkingByUser: Map user → $
-//   of the week's supper and parking claims — for the employer cost (same as the printed summary).
+//   compute(profile, approvedJobs, opening, { start, end }) → computeEmployeeWeekTalon(...) result.
+//   contributions: active employer_contributions rows; meals / parking: supper and parking claim
+//   rows ({ user_id, job_date, amount }) — the week's ones count in the employer cost, as on the
+//   printed summary.
 export function planPayrollWeek({
   weekEnd, profiles = [], jobs = [], ledgerByUser = new Map(), seedByUser = new Map(), taxProfiles = new Map(), compute,
-  contributions = [], mealsByUser = new Map(), parkingByUser = new Map(),
+  contributions = [], meals = [], parking = [],
 }) {
   const { start, end } = weekBounds(weekEnd);
+  const claimsByUser = (rows) => {
+    const map = new Map();
+    for (const row of rows) {
+      if (row.job_date < start || row.job_date > end) continue;
+      map.set(row.user_id, n(map.get(row.user_id)) + n(row.amount));
+    }
+    return map;
+  };
+  const mealsByUser = claimsByUser(meals);
+  const parkingByUser = claimsByUser(parking);
   const byUser = new Map();
   for (const job of jobs) {
     if (!byUser.has(job.user_id)) byUser.set(job.user_id, []);
@@ -91,7 +102,7 @@ export function planPayrollWeek({
     let error = "";
     if (approved.length) {
       try {
-        talon = compute(profile, approved, opening);
+        talon = compute(profile, approved, opening, { start, end });
       } catch (e) {
         error = e?.message || String(e);
         if (state === "ready") state = "error";
@@ -132,7 +143,9 @@ export function planPayrollWeek({
     });
   }
   const sum = (key, list) => list.reduce((s, row) => s + n(row[key]), 0);
-  const counted = rows.filter((row) => row.talon && (row.state === "posted" || row.state === "ready"));
+  // Every employee's APPROVED work counts, whatever its posting state: while the pay is still
+  // run in the outside software, weeks are not comptabilisées here and the cost must still show.
+  const counted = rows.filter((row) => row.talon);
   return {
     start,
     end,
@@ -147,6 +160,11 @@ export function planPayrollWeek({
       net: sum("net", counted),
       employerCost: sum("employerCost", counted),
       hours: sum("hours", counted),
+      regularHours: sum("regularHours", counted),
+      ot150Hours: sum("ot150Hours", counted),
+      ot200Hours: sum("ot200Hours", counted),
+      returnNbHours: sum("returnNbHours", counted),
+      employees: counted.length,
     },
     counts: {
       employees: rows.length,
@@ -156,6 +174,67 @@ export function planPayrollWeek({
       blocked: rows.filter((row) => row.state.startsWith("blocked") || row.state === "error").length,
     },
   };
+}
+
+// Saturdays (CCQ week ends) of a calendar month « YYYY-MM » — the weeks of the CCQ monthly
+// report (a week belongs to the month its Saturday falls in).
+export function monthWeekEnds(month) {
+  const [y, m] = String(month).split("-").map(Number);
+  const ends = [];
+  const d = new Date(Date.UTC(y, m - 1, 1, 12));
+  while (d.getUTCDay() !== 6) d.setUTCDate(d.getUTCDate() + 1);
+  while (d.getUTCMonth() === m - 1) {
+    ends.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 7);
+  }
+  return ends;
+}
+
+const MONTH_FIELDS = ["regularHours", "ot150Hours", "ot200Hours", "returnNbHours", "hours", "km", "meals", "parking", "gross", "employerCost", "das", "net"];
+
+// « Paie et coûts › Mois »: the weeks of the month planned one by one (planPayrollWeek, the same
+// calculation as the week view and the talons), summed per employee. `args` = planPayrollWeek's
+// arguments without weekEnd. Each week opens from the last comptabilisé week before it.
+export function planPayrollMonth({ month, ...args }) {
+  const weekEnds = monthWeekEnds(month);
+  const weeks = weekEnds.map((weekEnd) => planPayrollWeek({ ...args, weekEnd }));
+  const byUser = new Map();
+  for (const week of weeks) {
+    for (const row of week.rows) {
+      if (!row.talon) continue;
+      if (!byUser.has(row.profile.id)) {
+        byUser.set(row.profile.id, { profile: row.profile, weeks: 0, pending: false, ...Object.fromEntries(MONTH_FIELDS.map((k) => [k, 0])) });
+      }
+      const acc = byUser.get(row.profile.id);
+      acc.weeks += 1;
+      acc.pending = acc.pending || row.state === "pending";
+      for (const k of MONTH_FIELDS) acc[k] += n(row[k]);
+    }
+  }
+  const rows = [...byUser.values()].sort((a, b) => String(a.profile.full_name || "").localeCompare(String(b.profile.full_name || ""), "fr"));
+  const totals = Object.fromEntries(MONTH_FIELDS.map((k) => [k, rows.reduce((s, row) => s + row[k], 0)]));
+  return {
+    month,
+    weekEnds,
+    rows,
+    totals: { ...totals, employees: rows.length },
+    pendingEmployees: rows.filter((row) => row.pending).length,
+  };
+}
+
+// Same CSV as the week (hours for the outside payroll software), for a whole month.
+export function payrollMonthCsv(plan, { header }) {
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const dec = (v) => (Number(v) || 0).toFixed(2);
+  const lines = [header.map(esc).join(",")];
+  for (const row of plan.rows) {
+    lines.push([
+      esc(row.profile.employee_number || ""), esc(row.profile.full_name || ""), String(row.weeks),
+      dec(row.regularHours), dec(row.ot150Hours), dec(row.ot200Hours), dec(row.returnNbHours), dec(row.hours),
+      dec(row.km), dec(row.meals), dec(row.parking), dec(row.gross), dec(row.employerCost),
+    ].join(","));
+  }
+  return "\uFEFF" + lines.join("\r\n");
 }
 
 // The ledger row « Comptabiliser » writes for one planned employee — the same columns and kept

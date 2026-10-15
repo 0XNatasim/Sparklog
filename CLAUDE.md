@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.131)
+## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.132)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -431,6 +431,14 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
     officielle (propriétaire), DAS de la semaine + CSV, sommaire imprimable, lien rapport CCQ.
   - **Talons** : « Imprimer / PDF » de la semaine inclut maintenant les semaines comptabilisées (talon conservé),
     auparavant ignorées ; `lib/talon-print.js` réunit talons conservés et aperçus dans un seul document.
+- [x] **Gestion V3 — 5 pages à onglets** (V2.4.132) : `MANAGER_NAV_V3` = 5 entrées `hub` (Feuilles de temps, Paie et
+  coûts, Équipe, Messages, Réglages) ; `ManagerLayout` affiche une entrée par hub (`HubNav`) et ses onglets visibles
+  (`HubTabs`, filtrés par droits comme le menu). Doublons retirés de la V3 (`V3_REPLACED` : Coûts, Semaine/mois →
+  `payroll/week` ; Téléchargements, DAS → `payroll/month`, jamais une page accordable à un admin). Nouvel onglet
+  **Mois** (`PayrollMonth.jsx`, `planPayrollMonth` : semaines dont le samedi tombe dans le mois, chacune calculée par
+  `planPayrollWeek`, additionnées ; rapport CCQ du mois et DAS par date de paie dans la même page). Chargement partagé
+  Semaine/Mois : `src/lib/payroll-data.js`. Les totaux de `planPayrollWeek` comptent tout le travail approuvé, quel
+  que soit l'état de comptabilisation (la paie se fait encore dans Dynacom). `CcqJsonExport` s'ouvre sur le mois fini.
 - [x] **Gestion V3 — routine réelle** (V2.4.131) : menu V3 réduit (ouverts : Au quotidien, Paie, Équipe ; le reste
   replié, `MANAGER_NAV_V3`). À traiter : recherche par nom (`matchesPerson`), file soumise lue du plus ancien au plus
   récent, budget `anomalySubmittedJobs` 400 / `anomalyApprovedPeers` 800, dernière date coupée par la limite écartée

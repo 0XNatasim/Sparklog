@@ -30,6 +30,7 @@ const PayRulesPage = managerPage("PayRulesPage");
 const LivePage = managerPage("LivePage");
 const TodoPage = managerPage("TodoPage");
 const PayrollWeekPage = managerPage("PayrollWeekPage");
+const PayrollMonthPage = managerPage("PayrollMonthPage");
 const ReferencesPage = managerPage("ReferencesPage");
 const ManagerIndex = managerPage("ManagerIndex");
 const MessagesPage = managerPage("MessagesPage");
@@ -160,6 +161,7 @@ export default function App() {
           <Route path="forms" element={<FormsPage />} />
           <Route path="payroll" element={<Navigate to="calcul" replace />} />
           <Route path="payroll/week" element={<PayrollWeekPage />} />
+          <Route path="payroll/month" element={<PayrollMonthPage />} />
           <Route path="payroll/calcul" element={<PayrollCalculPage />} />
           <Route path="payroll/stubs" element={<PayrollStubsPage />} />
           <Route path="payroll/das" element={<PayrollDasPage />} />

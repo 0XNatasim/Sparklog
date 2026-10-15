@@ -10,22 +10,15 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import WeeklyReportButton from "@/components/WeeklyReportButton";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
-import { fetchAllRows } from "@/lib/fetch-all";
 import { companyDate } from "@/lib/company-time";
 import { ccqWeekNumber } from "@/lib/ccq-week";
 import { isOwnerRole } from "@/lib/roles";
-import { loadHolidayDates } from "@/lib/company-holidays";
-import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/lib/payroll-settings";
-import { computeEmployeeWeekTalon, formatTalonRef, YTD_COLUMN_TO_KEY, YTD_CCQ_COLUMN_TO_KEY } from "@/payroll/employee-week";
+import { formatTalonRef } from "@/payroll/employee-week";
 import { buildStubModel, defaultHeader } from "@/lib/paystub";
 import { openTalonsPrint } from "@/lib/talon-print";
-import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
-import { TAX_YEAR, lastCompletedWeekEnd, payrollWeekCsv, planPayrollWeek, postPayrollWeek, weekBounds } from "@/lib/payroll-week";
+import { lastCompletedWeekEnd, payrollWeekCsv, planPayrollWeek, postPayrollWeek, weekBounds } from "@/lib/payroll-week";
+import { loadPayrollData, planArgs } from "@/lib/payroll-data";
 
-// Supper and parking claims count in the employer cost like on the printed summary.
-const CLAIM_STATUSES = ["pending", "approved"];
-const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
-const LEDGER_COLUMNS = ["user_id", "period_end", "period_start", "talon_seq", "boss_approved", ...[...YTD_COLUMN_TO_KEY, ...YTD_CCQ_COLUMN_TO_KEY].map(([, col]) => col)].join(", ");
 const WEEKS_BACK = 12;
 
 const money = (v) => `${(Number(v) || 0).toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
@@ -34,15 +27,6 @@ const hours = (v) => {
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
 };
 const hoursOrDash = (v) => (Number(v) ? hours(v) : "—");
-const sumByUser = (rows) => {
-  const map = new Map();
-  for (const row of rows) map.set(row.user_id, (map.get(row.user_id) || 0) + (Number(row.amount) || 0));
-  return map;
-};
-const unwrap = (res) => {
-  if (res.error) throw res.error;
-  return res.data || [];
-};
 
 const STATE_STYLE = {
   posted: "bg-info/15 text-info",
@@ -81,36 +65,10 @@ export default function PayrollWeek({ messier = false }) {
 
   const load = useCallback(async () => {
     try {
-      const { start: wStart, end } = weekBounds(weekEnd);
-      const [profiles, jobs, seeds, ledger, kept, settingsRow, taxProfiles, holidayDates, rounding, contributions, meals, parking] = await Promise.all([
-        supabase.from("profiles").select(PROFILE_COLUMNS).then(unwrap),
-        fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, status, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", `${TAX_YEAR}-01-01`).lte("job_date", end).order("id")).then(unwrap),
-        supabase.from("payroll_ytd").select("*").eq("tax_year", TAX_YEAR).then(unwrap),
-        fetchAllRows(() => supabase.from("payroll_period_ledger").select(LEDGER_COLUMNS).eq("tax_year", TAX_YEAR).order("period_end").order("user_id")).then(unwrap),
-        supabase.from("payroll_period_ledger").select("user_id, imported_talon").eq("tax_year", TAX_YEAR).eq("period_end", end).then(unwrap),
-        loadEmployerSettings(),
-        loadTaxProfiles(),
-        loadHolidayDates(),
-        loadDayRounding({ untilDate: end }),
-        supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }).then(unwrap),
-        fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").in("status", CLAIM_STATUSES).gte("job_date", wStart).lte("job_date", end).order("id")).then(unwrap),
-        fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, job_date, amount").in("status", CLAIM_STATUSES).gte("job_date", wStart).lte("job_date", end).order("id")).then(unwrap),
-      ]);
-      const ledgerByUser = new Map();
-      for (const row of ledger) {
-        if (!ledgerByUser.has(row.user_id)) ledgerByUser.set(row.user_id, []);
-        ledgerByUser.get(row.user_id).push(row);
-      }
+      const { start, end } = weekBounds(weekEnd);
+      const loaded = await loadPayrollData(supabase, { start, end, keptFor: end });
       setErr("");
-      setData({
-        weekEnd: end, profiles, jobs, ledgerByUser, taxProfiles, holidayDates, rounding,
-        seedByUser: new Map(seeds.map((row) => [row.user_id, row])),
-        keptByUser: new Map(kept.filter((row) => row.imported_talon).map((row) => [row.user_id, row.imported_talon])),
-        employer: employerFromSettings(settingsRow),
-        contributions,
-        mealsByUser: sumByUser(meals),
-        parkingByUser: sumByUser(parking),
-      });
+      setData({ ...loaded, weekEnd: end });
     } catch (e) {
       setErr(e?.message || t("payWeek.failedLoad"));
     } finally {
@@ -123,23 +81,7 @@ export default function PayrollWeek({ messier = false }) {
 
   const plan = useMemo(() => {
     if (!data || data.weekEnd !== weekEnd) return null;
-    const { start } = weekBounds(weekEnd);
-    return planPayrollWeek({
-      weekEnd,
-      profiles: data.profiles,
-      jobs: data.jobs,
-      ledgerByUser: data.ledgerByUser,
-      seedByUser: data.seedByUser,
-      taxProfiles: data.taxProfiles,
-      contributions: data.contributions,
-      mealsByUser: data.mealsByUser,
-      parkingByUser: data.parkingByUser,
-      compute: (profile, approved, opening) => computeEmployeeWeekTalon({
-        profile, jobs: approved, opening, frequency: "weekly", includePhone: true, includeStorage: true,
-        weekDate: start, messierMethod: messier, holidayDates: data.holidayDates, employer: data.employer,
-        taxProfile: data.taxProfiles.get(profile.id), rounding: roundingFor(data.rounding, profile.id),
-      }),
-    });
+    return planPayrollWeek({ weekEnd, ...planArgs(data, { messier }) });
   }, [data, weekEnd, messier]);
 
   function setWeek(value) {
@@ -228,7 +170,7 @@ export default function PayrollWeek({ messier = false }) {
   }
 
   function exportDasCsv() {
-    const rows = plan.rows.filter((row) => row.talon && (row.state === "posted" || row.state === "ready"));
+    const rows = plan.rows.filter((row) => row.talon); // the same employees as the totals
     const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const head = [t("payroll.employee"), t("payWeek.col.gross"), t("payWeek.col.deductions"), t("payWeek.col.net"), t("payroll.das.remArc"), t("payroll.das.remQc"), t("payWeek.col.das")];
     const line = (name, r) => [esc(name), ...[r.gross, r.deductions, r.net, r.dasArc, r.dasQuebec, r.das].map((v) => (Number(v) || 0).toFixed(2))].join(",");
@@ -308,7 +250,7 @@ export default function PayrollWeek({ messier = false }) {
             ))}
           </div>
           <p className="-mt-2 text-xs text-muted-foreground">
-            {t("payWeek.tile.note", { count: (counts.posted || 0) + (counts.ready || 0) })}
+            {t("payWeek.tile.note", { count: plan.totals.employees })}
             {pendingRows.length > 0 && <> {t("payWeek.tile.pending", { count: pendingRows.length })}</>}
           </p>
 
@@ -433,7 +375,7 @@ export default function PayrollWeek({ messier = false }) {
               <p className="text-xs text-muted-foreground">{t("payWeek.dasNote", { pay: dayjs(bounds.payDate).format("D MMMM") })}</p>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={exportDasCsv}><Download className="mr-1.5 h-4 w-4" />{t("payroll.das.exportCsv")}</Button>
-                <Button asChild variant="ghost" size="sm"><Link to="/manager/payroll/das">{t("payWeek.openDasMonth")}</Link></Button>
+                <Button asChild variant="ghost" size="sm"><Link to="/manager/payroll/month">{t("payWeek.openDasMonth")}</Link></Button>
               </div>
             </CardContent></Card>
 
@@ -443,7 +385,7 @@ export default function PayrollWeek({ messier = false }) {
               <WeeklyReportButton week={weekForReport} />
               <div className="space-y-2 border-t pt-3">
                 <p className="text-sm text-muted-foreground">{t("payWeek.ccqIntro")}</p>
-                <Button asChild variant="outline" size="sm"><Link to="/manager/reports/downloads">{t("payWeek.openCcq")}</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to="/manager/payroll/month">{t("payWeek.openCcq")}</Link></Button>
               </div>
             </CardContent></Card>
           </div>

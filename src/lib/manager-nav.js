@@ -52,6 +52,7 @@ export const MANAGER_NAV = Object.freeze([
 const V3_ONLY_ITEMS = Object.freeze([
   { id: "todo", path: "todo", grant: null, labelKey: "mgr.nav.todo" },
   { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
+  { id: "payroll-month", path: "payroll/month", grant: null, labelKey: "mgr.nav.payrollMonth" },
 ]);
 
 // The V2 menu's items (the current Gestion) and every page either menu can open.
@@ -62,27 +63,42 @@ const byId = new Map(MANAGER_NAV_ITEMS.map((item) => [item.id, item]));
 // A V3 entry reuses a page (same id, path and access rule), optionally with a clearer label.
 const v3 = (id, labelKey) => (labelKey ? Object.freeze({ ...byId.get(id), labelKey }) : byId.get(id));
 
-// V3 menu, built around the real routine with fewer visible entries: the timesheets every day
-// or two (« Au quotidien »), the pay and its employer cost on Monday (« Paie »), the team.
-// Every other page stays one click away in a group closed by default. `open` = expanded.
+// V3 menu: five entries, each a page with tabs (`hub`). Information shown in several V2 pages
+// lives in one place: hours, gross, employer cost and DAS come from the pay calculation in
+// « Paie et coûts › Semaine / Mois » only. A V3 entry opens its first tab the user may see.
 export const MANAGER_NAV_V3 = Object.freeze([
-  { id: "today", labelKey: "mgr.group3.daily", open: true, items: [v3("todo"), v3("timesheets"), v3("live")] },
-  { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [v3("payroll-week"), v3("reports-period")] },
-  { id: "team", labelKey: "mgr.group.team", open: true, items: [v3("employees"), v3("absences"), v3("messages"), v3("inventory")] },
-  { id: "time", labelKey: "mgr.group3.timeMore", open: false, items: [
+  { id: "time", hub: true, labelKey: "mgr.hub.time", items: [
+    v3("todo", "mgr.tab.todo"), v3("timesheets", "mgr.tab.timesheets"), v3("live", "mgr.tab.live"),
     v3("receipts", "mgr.nav3.receipts"), v3("unlock-day"),
   ] },
-  { id: "payroll-more", labelKey: "mgr.group3.payrollMore", open: false, items: [
-    v3("payroll-stubs"), v3("payroll-das"), v3("payroll-calcul", "mgr.nav3.calcul"), v3("payroll-roe"),
-    v3("reports-costs"), v3("reports-ccq"), v3("reports-downloads"),
+  { id: "pay", hub: true, labelKey: "mgr.hub.pay", items: [
+    v3("payroll-week", "mgr.tab.week"), v3("payroll-month", "mgr.tab.month"), v3("payroll-stubs"),
+    v3("payroll-calcul", "mgr.nav3.calcul"), v3("payroll-roe"),
   ] },
-  { id: "config", labelKey: "mgr.group.config", open: false, items: [
-    v3("config-settings"), v3("config-rules", "mgr.nav3.rules"), v3("forms"), v3("references"),
+  { id: "team", hub: true, labelKey: "mgr.hub.team", items: [
+    v3("employees"), v3("config-rules", "mgr.nav3.rules"), v3("absences"), v3("inventory"),
   ] },
-  { id: "advanced", labelKey: "mgr.group.advanced", open: false, items: [
-    v3("advanced-audit"), v3("advanced-pay-rules"), v3("advanced-health"), v3("advanced-emergency"),
+  { id: "messages", hub: true, labelKey: "mgr.group.messages", items: [v3("messages")] },
+  { id: "settings", hub: true, labelKey: "mgr.hub.settings", items: [
+    v3("config-settings"), v3("forms"), v3("references"), v3("reports-ccq", "mgr.tab.ccqRates"),
+    v3("advanced-pay-rules"), v3("advanced-audit"), v3("advanced-health"), v3("advanced-emergency"),
   ] },
 ]);
+
+// V2 pages the V3 menu does not keep because another tab shows the same figures, computed by
+// the pay calculation: opening one in V3 goes to its replacement.
+export const V3_REPLACED = Object.freeze({
+  "reports/costs": "payroll/week",
+  "reports/period": "payroll/week",
+  "reports/downloads": "payroll/month",
+  "payroll/das": "payroll/month",
+});
+
+// The visible V3 entry (with its visible tabs) that holds `path`, or null.
+export function hubOf(groups, path) {
+  const clean = String(path || "").replace(/^\/+|\/+$/g, "");
+  return groups.find((group) => group.items.some((item) => item.path === clean)) || null;
+}
 
 export function managerNavFor(version) {
   return version === "v3" ? MANAGER_NAV_V3 : MANAGER_NAV;

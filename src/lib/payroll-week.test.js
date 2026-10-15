@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lastCompletedWeekEnd, ledgerRowFor, payrollWeekCsv, planPayrollWeek, postPayrollWeek, weekBounds, weekEndOf } from "./payroll-week";
+import { lastCompletedWeekEnd, ledgerRowFor, monthWeekEnds, payrollMonthCsv, payrollWeekCsv, planPayrollMonth, planPayrollWeek, postPayrollWeek, weekBounds, weekEndOf } from "./payroll-week";
 import { computeEmployeeWeekTalon } from "@/payroll/employee-week";
 import { buildWeeklyReport } from "./weekly-report";
 
@@ -46,11 +46,13 @@ describe("planPayrollWeek", () => {
     expect(plan.rows.find((row) => row.profile.id === "c").noOpening).toBe(true);
   });
 
-  it("totals only posted and ready employees, from the Talon calculation", () => {
+  it("totals every employee's approved work, whatever its posting state, from the Talon calculation", () => {
     const a = plan.rows.find((row) => row.profile.id === "a");
-    const d = plan.rows.find((row) => row.profile.id === "d");
     expect(a.das).toBeCloseTo(a.talon.result.das.total, 6);
-    expect(plan.totals.das).toBeCloseTo(a.das + d.das, 6);
+    const withTalon = plan.rows.filter((row) => row.talon);
+    expect(withTalon.map((row) => row.state).sort()).toEqual(["blockedEarlier", "pending", "posted", "ready"]);
+    expect(plan.totals.das).toBeCloseTo(withTalon.reduce((s, row) => s + row.das, 0), 6);
+    expect(plan.totals.employees).toBe(4);
     expect(plan.counts).toEqual({ employees: 4, posted: 1, ready: 1, pending: 1, blocked: 1 });
   });
 
@@ -59,12 +61,14 @@ describe("planPayrollWeek", () => {
     const weekJobs = [job("a1", "a", "2026-10-05"), { ...job("a2", "a", "2026-10-06"), fin: "18:00" }];
     const withCost = planPayrollWeek({
       weekEnd: "2026-10-10", profiles: one, jobs: weekJobs, compute,
-      mealsByUser: new Map([["a", 30]]), parkingByUser: new Map([["a", 12]]),
+      meals: [{ user_id: "a", job_date: "2026-10-06", amount: 30 }, { user_id: "a", job_date: "2026-10-13", amount: 30 }],
+      parking: [{ user_id: "a", job_date: "2026-10-06", amount: 12 }],
     });
     const a = withCost.rows[0];
     expect(a.regularHours).toBe(16);
     expect(a.ot150Hours + a.ot200Hours).toBe(3);
     expect(a.km).toBe(40);
+    expect(a.meals).toBe(30); // the claim of the following week is not this week's cost
     const report = buildWeeklyReport({
       week: { start: "2026-10-04", end: "2026-10-10", weekNo: 42 }, profiles: one, jobs: weekJobs,
       meals: [{ user_id: "a", job_date: "2026-10-06", amount: 30 }], parking: [{ user_id: "a", job_date: "2026-10-06", amount: 12 }],
@@ -87,6 +91,43 @@ describe("planPayrollWeek", () => {
   it("refuses to post behind an already posted later week", () => {
     const later = planPayrollWeek({ weekEnd: "2026-10-10", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-05")], ledgerByUser: new Map([["a", [{ user_id: "a", period_end: "2026-10-17" }]]]), compute });
     expect(later.rows[0].state).toBe("blockedLater");
+  });
+});
+
+describe("planPayrollMonth", () => {
+  it("lists the CCQ weeks of a month by their Saturday", () => {
+    expect(monthWeekEnds("2026-10")).toEqual(["2026-10-03", "2026-10-10", "2026-10-17", "2026-10-24", "2026-10-31"]);
+    expect(monthWeekEnds("2026-11")).toEqual(["2026-11-07", "2026-11-14", "2026-11-21", "2026-11-28"]);
+  });
+
+  it("sums each employee's weeks, computed exactly as the week view", () => {
+    const profiles = [compagnon("a", "Alice"), compagnon("b", "Bruno")];
+    const jobs = [
+      job("a1", "a", "2026-10-05"), job("a2", "a", "2026-10-13"), { ...job("a3", "a", "2026-10-14"), fin: "18:00" },
+      job("b1", "b", "2026-10-06"), job("b2", "b", "2026-10-20", "submitted"),
+      job("x", "a", "2026-09-29"), // week ending 2026-10-03 belongs to October
+      job("y", "a", "2026-11-02"), // November: left out
+    ];
+    const month = planPayrollMonth({ month: "2026-10", profiles, jobs, compute });
+    const weeks = monthWeekEnds("2026-10").map((weekEnd) => planPayrollWeek({ weekEnd, profiles, jobs, compute }));
+    const alice = month.rows.find((row) => row.profile.id === "a");
+    const aliceWeeks = weeks.flatMap((w) => w.rows).filter((row) => row.profile.id === "a" && row.talon);
+    expect(alice.weeks).toBe(3);
+    expect(alice.gross).toBeCloseTo(aliceWeeks.reduce((s, row) => s + row.gross, 0), 6);
+    expect(alice.regularHours).toBe(32);
+    const bruno = month.rows.find((row) => row.profile.id === "b");
+    expect(bruno.weeks).toBe(1);
+    expect(month.totals.employerCost).toBeCloseTo(weeks.reduce((s, w) => s + w.totals.employerCost, 0), 6);
+    expect(month.totals.employees).toBe(2);
+    const csv = payrollMonthCsv(month, { header: Array.from({ length: 13 }, (_, i) => `c${i}`) }).replace(/^\uFEFF/, "").split("\r\n");
+    expect(csv).toHaveLength(3);
+    expect(csv[1].split(",")[2]).toBe("3");
+  });
+
+  it("flags an employee who still has days waiting in one of the weeks", () => {
+    const profiles = [compagnon("b", "Bruno")];
+    const jobs = [job("b1", "b", "2026-10-06"), job("b2", "b", "2026-10-07", "submitted")];
+    expect(planPayrollMonth({ month: "2026-10", profiles, jobs, compute }).pendingEmployees).toBe(1);
   });
 });
 

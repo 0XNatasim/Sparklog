@@ -98,16 +98,25 @@ La V3 (bouton **V2 | V3** en haut à droite de la Gestion) suit la routine réel
 restent faits dans **Dynacom** : Sparklog sert aux feuilles de temps et donne les heures à entrer dans Dynacom.
 Objectif : opérationnel pour **~50 employés** d'ici la fin octobre.
 
-Fait (V2.4.131) :
-- [x] **Menu plus court** : ouverts par défaut seulement « Au quotidien » (À traiter, Feuilles de temps, Équipe en
-  direct), « Paie » (Paie de la semaine, Semaine / mois) et « Équipe ». Le reste (Talons, DAS, Calcul, RE, Coûts,
-  CCQ, Téléchargements, Reçus, Rouvrir une journée, Configuration, Avancé) est replié, à un clic.
+Fait (V2.4.131–132) :
+- [x] **5 entrées au lieu de ~25**, chacune une page à onglets :
+  - **Feuilles de temps** : À approuver · Toutes les fiches · En direct · Reçus et preuves (historique) · Rouvrir une journée
+  - **Paie et coûts** : Semaine · Mois · Talons · Calcul d'un employé · Relevé d'emploi
+  - **Équipe** : Employés · Options de paie par employé · Absences · Inventaire
+  - **Messages**
+  - **Réglages** : Paramètres · Formulaires · Références · Taux CCQ · Règles de paie · Journal · Santé · Urgence
+- [x] **Une seule place pour chaque chiffre.** Heures, brut, coût employeur et DAS viennent tous du calcul de la paie,
+  dans **Paie et coûts › Semaine** et **› Mois** (le mois = la somme des semaines, calculées pareil). Les anciennes
+  pages qui refaisaient ces chiffres avec leur propre formule (**Coûts**, **Semaine / mois**, **Téléchargements**,
+  **DAS**) ne sont plus dans la V3 : leurs liens ouvrent Semaine ou Mois. Le **rapport mensuel CCQ** et les **DAS par
+  date de paie** sont dans l'onglet Mois, qui s'ouvre sur le mois qui vient de finir. La V2 garde tout, inchangé.
+- [x] **Coûts même sans comptabiliser** : tant que la paie se fait dans Dynacom, les semaines ne sont pas
+  comptabilisées dans Sparklog ; le coût, les heures et les DAS comptent quand même tout le travail approuvé.
 - [x] **À traiter pour 50 employés** : recherche par nom (sans accents), journées les plus **anciennes d'abord**,
   jusqu'à 400 jobs soumises d'un coup (avant : 200, les plus récentes). Une journée coupée par cette limite n'est
   jamais approuvée à moitié. « Tout approuver » ne touche que ce que la recherche affiche.
-- [x] **Paie de la semaine (lundi)** : heures **régulières / 1,5× / 2× / retour** et **coût employeur** par employé,
-  total de la semaine en haut (heures, brut, coût employeur, DAS), et bouton **« Heures pour le logiciel de paie
-  (CSV) »** à reporter dans Dynacom. Le coût employeur est le même chiffre que le sommaire imprimable.
+- [x] **Heures pour Dynacom** : bouton **« Heures pour le logiciel de paie (CSV) »** dans Semaine et Mois (heures
+  régulières / 1,5× / 2× / retour, km, souper, stationnement, brut, coût employeur par employé).
 - [x] **Mots clairs** : « Rouvrir la journée » (laisser un employé saisir un jour fermé) et « Retourner pour
   correction » (renvoyer une job soumise) remplacent Débloquer / Déverrouiller partout.
 
@@ -120,12 +129,12 @@ Fait (V2.4.131) :
   Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
 - [ ] **Reçus et preuves** : l'historique seulement (ce qui reste à traiter est déjà dans À traiter) ; recherche
   par employé et par date.
-- [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
-  Le coût de la semaine est déjà juste dans Paie de la semaine.
+- [ ] **Fusionner « À approuver » et « Toutes les fiches »** en un seul écran (filtre « à approuver » par défaut),
+  avec la **fiche employé unique** ci-dessus, il resterait alors 3 onglets dans Feuilles de temps et Équipe.
 - Quand Sparklog remplacera Dynacom :
-  - [ ] **DAS de Téléchargements** : il calcule avec la méthode « Référence » alors que Paie › DAS utilise
-    « Messier » (deux totaux différents pour le même mois). Les aligner.
-  - [ ] **Rapport CCQ** : proposer par défaut le mois qui vient de finir.
+  - [x] ~~DAS de Téléchargements en « Référence »~~ : en V3, les DAS du mois sont dans Paie et coûts › Mois et
+    suivent la méthode choisie en haut de la page (Messier par défaut).
+  - [x] **Rapport CCQ** : s'ouvre sur le mois qui vient de finir.
 - [ ] **Fin** : quand tout est converti et testé, retirer la V2.
 
 ## À surveiller 👤

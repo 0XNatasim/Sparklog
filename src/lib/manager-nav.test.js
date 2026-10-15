@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
 import {
-  MANAGER_NAV, MANAGER_NAV_ITEMS, MANAGER_NAV_V2_ITEMS, MANAGER_NAV_V3, canOpenNavItem, findNavItem, firstAllowedPath,
-  legacySectionTarget, visibleManagerNav,
+  MANAGER_NAV, MANAGER_NAV_ITEMS, MANAGER_NAV_V2_ITEMS, MANAGER_NAV_V3, V3_REPLACED, canOpenNavItem, findNavItem, firstAllowedPath,
+  hubOf, legacySectionTarget, visibleManagerNav,
 } from "./manager-nav";
 import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
 
@@ -91,12 +91,24 @@ describe("manager navigation", () => {
 });
 
 describe("Gestion V3 menu", () => {
-  it("lists every page exactly once, the day's work first", () => {
-    const v3 = MANAGER_NAV_V3.flatMap((group) => group.items.map((item) => item.id));
-    expect(new Set(v3).size).toBe(v3.length);
-    expect([...v3].sort()).toEqual(MANAGER_NAV_ITEMS.map((item) => item.id).sort());
+  const v3Ids = MANAGER_NAV_V3.flatMap((group) => group.items.map((item) => item.id));
+
+  it("has five entries, each a page with tabs, the day's work first", () => {
+    expect(MANAGER_NAV_V3.map((group) => group.id)).toEqual(["time", "pay", "team", "messages", "settings"]);
+    expect(MANAGER_NAV_V3.every((group) => group.hub)).toBe(true);
+    expect(new Set(v3Ids).size).toBe(v3Ids.length);
     expect(firstAllowedPath("owner", [], "v3")).toBe("todo");
     expect(firstAllowedPath("manager", [], "v3")).toBe("todo");
+  });
+
+  it("keeps every page once, except the duplicates replaced by the pay calculation", () => {
+    const replaced = Object.keys(V3_REPLACED).map((path) => MANAGER_NAV_ITEMS.find((item) => item.path === path).id);
+    expect(replaced.sort()).toEqual(["payroll-das", "reports-costs", "reports-downloads", "reports-period"]);
+    expect([...v3Ids, ...replaced].sort()).toEqual(MANAGER_NAV_ITEMS.map((item) => item.id).sort());
+    for (const target of Object.values(V3_REPLACED)) expect(v3Ids).toContain(findNavItem(target).id);
+    // Every figure has one V3 home: week and month of « Paie et coûts ».
+    expect(hubOf(MANAGER_NAV_V3, "payroll/week").id).toBe("pay");
+    expect(hubOf(MANAGER_NAV_V3, "payroll/month").id).toBe("pay");
   });
 
   it("keeps each page's path and access rule (only the label may change)", () => {
@@ -106,6 +118,10 @@ describe("Gestion V3 menu", () => {
       expect(item.grant ?? null, item.id).toBe(base.get(item.id).grant ?? null);
       expect(Boolean(item.ownerOnly), item.id).toBe(Boolean(base.get(item.id).ownerOnly));
     }
+  });
+
+  it("never replaces a page an office admin can be granted", () => {
+    for (const path of Object.keys(V3_REPLACED)) expect(findNavItem(path).grant ?? null, path).toBeNull();
   });
 
   it("gives a granted admin the same pages in V2 and V3, never the manager-only ones", () => {
@@ -118,18 +134,18 @@ describe("Gestion V3 menu", () => {
     expect(firstAllowedPath("admin", ["live"], "v3")).toBe("live");
   });
 
-  it("opens only the daily, Monday-pay and team groups; the rest is one click away", () => {
-    const open = MANAGER_NAV_V3.filter((group) => group.open);
-    expect(open.map((group) => group.id)).toEqual(["today", "payroll", "team"]);
-    const visible = open.flatMap((group) => group.items.map((item) => item.id));
-    expect(visible).toEqual(["todo", "timesheets", "live", "payroll-week", "reports-period", "employees", "absences", "messages", "inventory"]);
-    expect(visible.length).toBeLessThan(MANAGER_NAV_V2_ITEMS.length / 2);
+  it("shows only the tabs a user may open, and hides an entry with none", () => {
+    const admin = visibleManagerNav("admin", ["employees"], "v3");
+    expect(admin.map((group) => group.id)).toEqual(["time", "team"]);
+    expect(hubOf(admin, "unlock-day").items.map((item) => item.id)).toEqual(["unlock-day"]);
+    expect(hubOf(admin, "payroll/week")).toBeNull();
   });
 
   it("names pages as the V3 menu shows them", () => {
     expect(findNavItem("receipts", "v3")?.labelKey).toBe("mgr.nav3.receipts");
     expect(findNavItem("receipts")?.labelKey).toBe("mgr.nav.receipts");
     expect(findNavItem("payroll/week")?.id).toBe("payroll-week");
+    expect(findNavItem("payroll/month", "v3")?.labelKey).toBe("mgr.tab.month");
   });
 });
 

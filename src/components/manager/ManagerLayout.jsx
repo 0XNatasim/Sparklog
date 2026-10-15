@@ -14,7 +14,7 @@ import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { APP_VERSION } from "@/lib/version";
-import { canOpenNavItem, findNavItem, visibleManagerNav } from "@/lib/manager-nav";
+import { V3_REPLACED, canOpenNavItem, findNavItem, hubOf, visibleManagerNav } from "@/lib/manager-nav";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { isManagerRole } from "@/lib/roles";
 import NotificationsBell from "@/components/NotificationsBell";
@@ -32,6 +32,7 @@ const COLLAPSE_KEY = "sparklog.managerNavCollapsed";
 const ICONS = {
   todo: ListChecks,
   "payroll-week": CalendarCheck,
+  "payroll-month": CalendarDays,
   inventory: Package,
   references: BookOpen,
   "advanced-pay-rules": Scale,
@@ -58,7 +59,9 @@ const ICONS = {
   "advanced-emergency": FilePlus2,
 };
 
-const GROUP_ICONS = { payroll: Wallet, "payroll-more": Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
+const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
+// Gestion V3: one sidebar entry per page-with-tabs.
+const HUB_ICONS = { time: Clock3, pay: Wallet, team: Users, messages: Megaphone, settings: Settings };
 
 function readCollapsed() {
   try {
@@ -135,6 +138,63 @@ function SidebarNav({ groups, collapsed, activePath, onNavigate }) {
           </div>
         );
       })}
+    </nav>
+  );
+}
+
+// V3 sidebar: one entry per page; it opens the first tab this user may see.
+function HubNav({ hubs, collapsed, activePath, onNavigate }) {
+  const t = useT();
+  const active = hubOf(hubs, activePath)?.id;
+  return (
+    <nav aria-label={t("mgr.menu.label")} className="flex-1 space-y-1 overflow-y-auto p-2">
+      {hubs.map((hub) => {
+        const Icon = HUB_ICONS[hub.id] || Clock3;
+        const label = t(hub.labelKey);
+        const isActive = hub.id === active;
+        return (
+          <Link
+            key={hub.id}
+            to={`/manager/${hub.items[0].path}`}
+            onClick={onNavigate}
+            title={collapsed ? label : undefined}
+            aria-label={collapsed ? label : undefined}
+            aria-current={isActive ? "page" : undefined}
+            className={cn(
+              "flex min-h-11 items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-10",
+              collapsed && "justify-center",
+              isActive ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {!collapsed && <span className="truncate">{label}</span>}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+// V3: the tabs of the current page (only those this user may open), above its content.
+function HubTabs({ hub }) {
+  const t = useT();
+  if (!hub || hub.items.length < 2) return null;
+  return (
+    <nav aria-label={t("mgr.tabs.label")} className="-mx-2 mb-3 overflow-x-auto border-b px-2 sm:-mx-4 sm:px-4">
+      <div className="flex min-w-max gap-1">
+        {hub.items.map((item) => (
+          <NavLink
+            key={item.id}
+            to={`/manager/${item.path}`}
+            className={({ isActive }) => cn(
+              "-mb-px inline-flex min-h-11 items-center border-b-2 px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-10",
+              isActive ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t(item.labelKey)}
+          </NavLink>
+        ))}
+      </div>
     </nav>
   );
 }
@@ -243,6 +303,8 @@ export default function ManagerLayout() {
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
+  const v3 = version === "v3";
+  const hub = v3 ? hubOf(groups, activePath) : null;
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
@@ -270,6 +332,12 @@ export default function ManagerLayout() {
 
   // Same ids as canAccessSection: an ungranted page by URL goes back to the landing page.
   if (current && !canOpenNavItem(role, adminSections, current)) return <Navigate to="/manager" replace />;
+  // V3 keeps one place per figure: a page it replaced opens its replacement.
+  if (v3 && V3_REPLACED[activePath]) return <Navigate to={`/manager/${V3_REPLACED[activePath]}`} replace />;
+
+  const nav = (isCollapsed, onNavigate) => (v3
+    ? <HubNav hubs={groups} collapsed={isCollapsed} activePath={activePath} onNavigate={onNavigate} />
+    : <SidebarNav key={version} groups={groups} collapsed={isCollapsed} activePath={activePath} onNavigate={onNavigate} />);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -284,7 +352,7 @@ export default function ManagerLayout() {
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
-          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} />
+          {nav(collapsed)}
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -306,7 +374,7 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} onNavigate={() => setDrawerOpen(false)} />
+              {nav(false, () => setDrawerOpen(false))}
             </div>
           </div>
         )}
@@ -318,7 +386,7 @@ export default function ManagerLayout() {
             </Button>
             <div className="min-w-0 flex-1">
               <div className="hidden truncate text-xs leading-none text-muted-foreground sm:block">{COMPANY_NAME}</div>
-              <h1 className="truncate text-sm font-semibold leading-tight sm:text-base">{current ? t(current.labelKey) : t("nav.manager")}</h1>
+              <h1 className="truncate text-sm font-semibold leading-tight sm:text-base">{hub ? t(hub.labelKey) : current ? t(current.labelKey) : t("nav.manager")}</h1>
             </div>
             {canSwitch && <VersionSwitch version={version} onChange={switchVersion} />}
             <NotificationsBell />
@@ -326,6 +394,7 @@ export default function ManagerLayout() {
             <AccountMenu />
           </header>
           <main className="min-w-0 flex-1 px-2 py-3 sm:px-4 sm:py-4">
+            {v3 && <HubTabs hub={hub} />}
             {/* A crashing page keeps the sidebar, so the manager can move on. */}
             <ErrorBoundary resetKey={location.pathname}>
               <Suspense fallback={<PanelLoading />}>
