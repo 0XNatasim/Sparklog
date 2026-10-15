@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useT } from "@/lib/use-t";
 import { withRetry } from "@/lib/utils";
-import { EMPTY_YTD, YTD_STATUTORY, CCQ_CUMUL, snapshotToLedgerColumns, ledgerRowToSnapshot } from "@/lib/payroll-ledger-fields";
+import { EMPTY_YTD, YTD_STATUTORY, CCQ_CUMUL, ledgerRowToSnapshot } from "@/lib/payroll-ledger-fields";
 import { chainHoursFromPrevious } from "@/lib/talon-import-core";
 import { legacyTalonSheet, legacyTalonDocument, printLegacyTalon } from "@/lib/legacy-talon-render";
 import { formatHM } from "@/lib/time";
+import { ledgerPayloadFor } from "@/lib/talon-batch";
+import ImportStubsBatch from "@/components/ImportStubsBatch";
 
 const money = (v) => `$${(Number(v) || 0).toFixed(2)}`;
-// CCQ week (Sun→Sat) start from the ending Saturday date string.
-const weekStartFromEnd = (endStr) => dayjs(endStr).subtract(6, "day").format("YYYY-MM-DD");
 
 // Render the reconstructed talon in the ORIGINAL layout, isolated in an iframe so its
 // generic table/body CSS never bleeds into the app.
@@ -97,19 +97,8 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
     if (!selectedId || !snapshot || !periodEnd) { setErr(t("payroll.legacy.needDate")); return; }
     setSaving(true); setErr(""); setMsg("");
     try {
-      const period_end = dayjs(periodEnd).format("YYYY-MM-DD");
-      // Keep the parsed header's period aligned with the (possibly edited) end date.
-      const importedTalon = talon
-        ? { header: { ...talon.header, periodEnd: period_end, periodStart: weekStartFromEnd(period_end) }, transactions: talon.transactions || [], sommaire: talon.sommaire || [] }
-        : null;
-      const payload = {
-        user_id: selectedId,
-        tax_year: dayjs(period_end).year(),
-        period_end,
-        period_start: weekStartFromEnd(period_end),
-        ...snapshotToLedgerColumns(snapshot),
-        imported_talon: importedTalon,
-      };
+      // Same row as the batch import; the header's period follows the (possibly edited) end date.
+      const payload = ledgerPayloadFor({ userId: selectedId, talon, snapshot, periodEnd });
       await withRetry(() => supabase.from("payroll_period_ledger").upsert(payload, { onConflict: "user_id,period_end" }), 15000);
       setMsg(t("payroll.legacy.inserted", { date: payload.period_end }));
       resetParse();
@@ -143,6 +132,8 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
         <DialogHeader>
           <DialogTitle>{t("payroll.legacy.title")}</DialogTitle>
         </DialogHeader>
+
+        <ImportStubsBatch employees={employees} onSaved={onSaved} />
 
         <p className="text-xs text-muted-foreground">{t("payroll.legacy.hint")}</p>
 
