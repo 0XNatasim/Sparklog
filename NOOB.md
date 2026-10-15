@@ -101,7 +101,19 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 ## Étape 6 — Gestion V3 : ce qu'il reste à convertir 💻
 
 La V3 (bouton **V2 | V3** en haut à droite de la Gestion) a déjà **À traiter**, **Paie de la semaine** et le
-nouveau menu. Les autres pages s'ouvrent encore dans leur version actuelle. À faire, dans cet ordre :
+nouveau menu. **La V2 ne change pas** : tant que la V3 n'est pas la version par défaut, chaque changement de menu
+se fait seulement dans la V3 (un test fige le menu, les chemins et les pages de la V2).
+
+Fait (V2.4.132) — menu V3 simplifié, de 26 à 13 entrées :
+- [x] **Pages à onglets** : À traiter (À approuver · Justificatifs), Feuilles de temps (Feuilles de temps ·
+  Débloquer une journée), Historique paie (Talons · DAS · Relevé d'emploi · Calcul détaillé), Employés (Employés ·
+  Absences), Rapports (Coûts · Semaine · Mois · Par employé · Export CCQ), Configuration (Paramètres · Règles de
+  temps · Taux CCQ · Règles de paie · Formulaires · Références). Chaque onglet garde les droits de la page d'avant
+  (un admin de bureau voit seulement les onglets permis).
+- [x] Seuls **Aujourd'hui** et **Paie** sont ouverts au départ ; sélecteur Messier/Référence compact avec un « i ».
+- [x] Passer de V2 à V3 (et l'inverse) garde la page ; les liens de la cloche marchent dans les deux versions.
+
+À faire, dans cet ordre :
 
 - [ ] **Fiche employé unique** : une liste avec recherche, et une fiche à onglets (Identité, CCQ, Paie et options,
   Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
@@ -109,11 +121,13 @@ nouveau menu. Les autres pages s'ouvrent encore dans leur version actuelle. À f
   (deux totaux différents pour le même mois). Les aligner.
 - [ ] **Débloquer** : un seul endroit et des mots clairs — « rouvrir une journée » ou « retourner une job pour
   correction » (aujourd'hui : 3 boutons qui se ressemblent).
-- [ ] **Reçus et preuves** : n'afficher par défaut que ce qui reste à traiter ; recherche par employé et par date.
+- [ ] **Reçus et preuves** (onglet Justificatifs de À traiter en V3) : n'afficher par défaut que ce qui reste à
+  traiter ; recherche par employé et par date.
 - [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
 - [ ] **Rapport CCQ** : proposer par défaut le mois qui vient de finir.
 - [ ] **Petits plus** : recherche dans les listes (Employés, Messages), « tout marquer comme lu » sur la cloche,
-  « jours sans saisie » visible dans Temps plutôt que dans Avancé.
+  « jours sans saisie » visible dans Temps plutôt que dans Avancé, une seule cloche en V3, un compteur sur
+  « À traiter » (demande une petite requête de plus : à décider).
 - [ ] **Fin** : quand tout est converti et testé, faire de la V3 la version par défaut, puis retirer la V2.
 
 ## À surveiller 👤

@@ -14,7 +14,7 @@ import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { APP_VERSION } from "@/lib/version";
-import { canOpenNavItem, findNavItem, visibleManagerNav } from "@/lib/manager-nav";
+import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { isManagerRole } from "@/lib/roles";
 import NotificationsBell from "@/components/NotificationsBell";
@@ -32,6 +32,11 @@ const COLLAPSE_KEY = "sparklog.managerNavCollapsed";
 const ICONS = {
   todo: ListChecks,
   "payroll-week": CalendarCheck,
+  "v3-time": Clock3,
+  "v3-pay-history": History,
+  "v3-team": Users,
+  "v3-reports": BarChart3,
+  "v3-config": Settings,
   inventory: Package,
   references: BookOpen,
   "advanced-pay-rules": Scale,
@@ -68,9 +73,11 @@ function readCollapsed() {
   }
 }
 
-function SidebarNav({ groups, collapsed, activePath, onNavigate }) {
+// highlightPath (V3 only): the menu entry that holds the open page when it is a V2 path.
+function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }) {
   const t = useT();
-  const activeGroup = groups.find((group) => group.items.some((item) => item.path === activePath))?.id;
+  const menuPath = highlightPath || activePath;
+  const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
   // V3 groups say whether they start expanded; V2 opens only the current page's group.
   const [open, setOpen] = useState(() => new Set([
     ...groups.filter((group) => group.open).map((group) => group.id),
@@ -124,7 +131,7 @@ function SidebarNav({ groups, collapsed, activePath, onNavigate }) {
                     "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     collapsed && "justify-center",
                     !collapsed && !single && "ml-1",
-                    isActive ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
+                    isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -243,6 +250,7 @@ export default function ManagerLayout() {
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
+  const highlightPath = version === "v3" ? v3MenuPath(activePath) : undefined;
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
@@ -260,12 +268,14 @@ export default function ManagerLayout() {
     });
   }
 
-  // Switching versions stays on the page when the new menu has it, else opens its landing page.
+  // Switching versions opens the same page in the other menu (V2 path ↔ V3 page and tab, query
+  // kept) when it has one, else that menu's landing page.
   function switchVersion(next) {
     if (next === version) return;
     setVersion(next);
-    const inNewMenu = visibleManagerNav(role, adminSections, next).some((group) => group.items.some((item) => item.path === activePath));
-    if (!inNewMenu) navigate("/manager", { replace: true });
+    const target = switchTarget(next, activePath, location.search);
+    if (target === null) navigate("/manager", { replace: true });
+    else if (`/manager/${target}` !== `${location.pathname}${location.search}`) navigate(`/manager/${target}`, { replace: true });
   }
 
   // Same ids as canAccessSection: an ungranted page by URL goes back to the landing page.
@@ -284,7 +294,7 @@ export default function ManagerLayout() {
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
-          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} />
+          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} highlightPath={highlightPath} />
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -306,7 +316,7 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} onNavigate={() => setDrawerOpen(false)} />
+              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} highlightPath={highlightPath} onNavigate={() => setDrawerOpen(false)} />
             </div>
           </div>
         )}

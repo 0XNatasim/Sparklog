@@ -28,7 +28,12 @@ const FormsPage = managerPage("FormsPage");
 const HealthPage = managerPage("HealthPage");
 const PayRulesPage = managerPage("PayRulesPage");
 const LivePage = managerPage("LivePage");
-const TodoPage = managerPage("TodoPage");
+const TodoTabsPage = managerPage("TodoTabsPage");
+const TimeHubPage = managerPage("TimeHubPage");
+const PayHistoryPage = managerPage("PayHistoryPage");
+const TeamHubPage = managerPage("TeamHubPage");
+const ReportsHubPage = managerPage("ReportsHubPage");
+const ConfigHubPage = managerPage("ConfigHubPage");
 const PayrollWeekPage = managerPage("PayrollWeekPage");
 const ReferencesPage = managerPage("ReferencesPage");
 const ManagerIndex = managerPage("ManagerIndex");
@@ -150,7 +155,7 @@ export default function App() {
         >
           <Route index element={<ManagerIndex />} />
           <Route path="live" element={<LivePage />} />
-          <Route path="todo" element={<TodoPage />} />
+          <Route path="todo" element={<TodoTabsPage />} />
           <Route path="timesheets" element={<TimesheetsPage />} />
           <Route path="receipts" element={<ReceiptsPage />} />
           <Route path="unlock-day" element={<UnlockDayPage />} />
@@ -170,6 +175,12 @@ export default function App() {
           <Route path="reports/ccq" element={<CcqPage />} />
           <Route path="reports/downloads" element={<DownloadsPage />} />
           <Route path="messages" element={<MessagesPage />} />
+          {/* Gestion V3 pages with tabs (new paths; the V2 paths above are unchanged) */}
+          <Route path="v3/time" element={<TimeHubPage />} />
+          <Route path="v3/pay-history" element={<PayHistoryPage />} />
+          <Route path="v3/team" element={<TeamHubPage />} />
+          <Route path="v3/reports" element={<ReportsHubPage />} />
+          <Route path="v3/config" element={<ConfigHubPage />} />
           <Route path="config" element={<Navigate to="rules" replace />} />
           <Route path="config/rules" element={<RulesPage />} />
           <Route path="config/settings" element={<SettingsPage />} />

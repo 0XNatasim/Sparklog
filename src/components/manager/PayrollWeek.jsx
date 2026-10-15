@@ -371,7 +371,7 @@ export default function PayrollWeek({ messier = false }) {
               <p className="text-xs text-muted-foreground">{t("payWeek.dasNote", { pay: dayjs(bounds.payDate).format("D MMMM") })}</p>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={exportDasCsv}><Download className="mr-1.5 h-4 w-4" />{t("payroll.das.exportCsv")}</Button>
-                <Button asChild variant="ghost" size="sm"><Link to="/manager/payroll/das">{t("payWeek.openDasMonth")}</Link></Button>
+                <Button asChild variant="ghost" size="sm"><Link to="/manager/v3/pay-history?tab=das">{t("payWeek.openDasMonth")}</Link></Button>
               </div>
             </CardContent></Card>
 
@@ -381,7 +381,7 @@ export default function PayrollWeek({ messier = false }) {
               <WeeklyReportButton week={weekForReport} />
               <div className="space-y-2 border-t pt-3">
                 <p className="text-sm text-muted-foreground">{t("payWeek.ccqIntro")}</p>
-                <Button asChild variant="outline" size="sm"><Link to="/manager/reports/downloads">{t("payWeek.openCcq")}</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link to="/manager/v3/reports?tab=ccq">{t("payWeek.openCcq")}</Link></Button>
               </div>
             </CardContent></Card>
           </div>
