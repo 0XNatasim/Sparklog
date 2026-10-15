@@ -9,7 +9,7 @@ const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
 // The stub's « Vacances » line (record-only, not part of Gains): 4 % of each « Régulier à taux horaire » line,
 // rounded per line — premium line + base-rate-only line (S39: 6,50 + 0,51 = 7,01; S40: 6,50).
 const VACATION_RATE_ON_HOURLY_LINES = 0.04;
-function hourlyLinesVacation(pay) {
+export function hourlyLinesVacation(pay) {
   const lines = printedPayLines({
     regularHours: Number(pay.regularHours) || 0, baseRate: Number(pay.baseRate) || 0,
     premium: Number(pay.premium) || 0, baseOnlyHours: Number(pay.baseOnlyHours) || 0,

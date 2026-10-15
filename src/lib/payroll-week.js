@@ -5,7 +5,7 @@
 import { YTD_COLUMN_TO_KEY, YTD_CCQ_COLUMN_TO_KEY, formatTalonRef, snapshotFromRow } from "@/payroll/employee-week";
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import { buildCalculTalon } from "@/lib/calcul-talon";
-import { isNonCcqRole } from "@/lib/roles";
+import { isFixedPayWeek, isPayrollEmployee } from "@/lib/fixed-pay";
 
 export const TAX_YEAR = 2026; // same constant as Calcul / Talons / DAS
 const LEDGER_COLUMNS = [...YTD_COLUMN_TO_KEY, ...YTD_CCQ_COLUMN_TO_KEY];
@@ -17,6 +17,20 @@ function addDays(date, days) {
   const d = new Date(`${date}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+// Fixed-pay weeks (keyed by their Saturday) after `anchor` (the last posted week end or the opening's
+// as-of date; empty = from the start date) up to `lastEnd`.
+export function fixedPayWeeksBetween(taxProfile, anchor, lastEnd) {
+  if (!taxProfile?.fixedPayStart) return [];
+  let weekKey = weekEndOf(taxProfile.fixedPayStart);
+  if (anchor) {
+    const afterAnchor = weekEndOf(addDays(anchor, 1));
+    if (afterAnchor > weekKey) weekKey = afterAnchor;
+  }
+  const out = [];
+  for (; weekKey <= lastEnd; weekKey = addDays(weekKey, 7)) if (isFixedPayWeek(taxProfile, weekKey)) out.push(weekKey);
+  return out;
 }
 
 // CCQ week (Sunday → Saturday) of a date, keyed by its Saturday.
@@ -34,7 +48,7 @@ export function weekBounds(end) {
   return { start: addDays(end, -6), end, payDate: addDays(end, 5) };
 }
 
-// One row per CCQ employee with jobs in the week.
+// One row per payroll employee (CCQ trades + fixed weekly pay) with jobs in the week, or a fixed-pay week.
 //   jobs: every job of these employees from the start of the tax year to the week's end.
 //   ledgerByUser: Map user → ledger rows; seedByUser: Map user → payroll_ytd row.
 //   compute(profile, approvedJobs, opening) → computeEmployeeWeekTalon(...) result.
@@ -47,10 +61,13 @@ export function planPayrollWeek({ weekEnd, profiles = [], jobs = [], ledgerByUse
   }
   const rows = [];
   for (const profile of [...profiles].sort((a, b) => String(a.full_name || "").localeCompare(String(b.full_name || ""), "fr"))) {
-    if (isNonCcqRole(profile.role)) continue;
+    const taxProfile = taxProfiles.get(profile.id);
+    if (!isPayrollEmployee(profile, taxProfile)) continue;
     const all = byUser.get(profile.id) || [];
     const weekJobs = all.filter((job) => job.job_date >= start && job.job_date <= end);
-    if (!weekJobs.length) continue;
+    // Fixed weekly pay is due every week from its start date, whatever the jobs.
+    const fixed = isFixedPayWeek(taxProfile, end);
+    if (!weekJobs.length && !fixed) continue;
 
     const approved = weekJobs.filter((job) => job.status === "approved");
     const toApprove = weekJobs.filter((job) => PENDING.has(job.status)).length;
@@ -66,24 +83,24 @@ export function planPayrollWeek({ weekEnd, profiles = [], jobs = [], ledgerByUse
     // and a later posted week means this one can no longer be inserted behind it.
     const anchor = lastBefore?.period_end || seed?.as_of_date || "";
     const postedEnds = new Set(ledger.map((row) => row.period_end));
-    const earlierUnposted = [...new Set(all
+    const earlier = new Set(all
       .filter((job) => job.status === "approved" && job.job_date < start && (!anchor || job.job_date > anchor))
-      .map((job) => weekEndOf(job.job_date)))]
-      .filter((weekKey) => !postedEnds.has(weekKey))
-      .sort();
+      .map((job) => weekEndOf(job.job_date)));
+    if (fixed) for (const weekKey of fixedPayWeeksBetween(taxProfile, anchor, addDays(end, -7))) earlier.add(weekKey);
+    const earlierUnposted = [...earlier].filter((weekKey) => !postedEnds.has(weekKey)).sort();
     const laterPosted = ledger.some((row) => row.period_end > end);
 
     let state;
     if (posted) state = "posted";
-    else if (toApprove || notSubmitted) state = "pending";
-    else if (!approved.length) state = "empty";
+    else if (!fixed && (toApprove || notSubmitted)) state = "pending";
+    else if (!fixed && !approved.length) state = "empty";
     else if (earlierUnposted.length) state = "blockedEarlier";
     else if (laterPosted) state = "blockedLater";
     else state = "ready";
 
     let talon = null;
     let error = "";
-    if (approved.length) {
+    if (approved.length || fixed) {
       try {
         talon = compute(profile, approved, opening);
       } catch (e) {

@@ -14,6 +14,7 @@ import { printedPayLines } from "./earnings.js";
 import { engineYtdFromOpening } from "./ytd.js";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
+import { fixedWeeklyHours } from "@/lib/fixed-pay";
 
 // Cumulative talon reference. A single global counter (assigned at comptabilisation, in
 // comptabilisation order — the first ever is 1) rendered with a fixed batch prefix:
@@ -80,6 +81,9 @@ export function snapshotFromRow(row) {
 // opening YTD balance. Returns everything PayStubPrint + the DAS tab need.
 // `rounding` = the employee's day-rounding counter (src/lib/day-rounding.js): each day paid to the
 // nearest 15 minutes. Omitted, minutes are paid as entered.
+// Fixed weekly pay (taxProfile.fixedWeeklyHours, src/lib/fixed-pay.js): the week pays those hours at
+// the base rate, whatever the jobs (their km are still reimbursed), with no CCQ benefits or levies —
+// `ccqAmounts` is null. taxProfile.eiExempt: no EI premium.
 export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequency = "weekly", includePhone = false, includeStorage = false, employer = DEFAULT_EMPLOYER, weekDate, messierMethod = false, holidayDates = [], taxProfile = null, rounding = null }) {
   // Pay-week date used to pick the dated union-dues rule. Explicit wins; else the
   // earliest job_date in the set (any day of a CCQ week resolves the same rule window).
@@ -98,11 +102,13 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
     regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
     retNb += e.returnNoBenefitMinutes; totalKm += e.totalKm;
   }
+  const fixedHours = fixedWeeklyHours(taxProfile);
+  if (fixedHours) return computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includePhone, includeStorage, employer, taxProfile, opening });
   const regularHours = regMin / 60, ot150Hours = ot50 / 60, ot200Hours = ot100 / 60, returnNbHours = retNb / 60;
 
   const pay = {
     regularHours, baseRate: base, premium: prem, ccqPremium, premiumOnOvertime, ot150Hours, ot200Hours, returnNbHours,
-    km: totalKm, kmRate: Number(profile?.km_rate) || 0, taxableBenefit: 0,
+    km: totalKm, kmRate: Number(profile?.km_rate) || 0, taxableBenefit: 0, eiExempt: Boolean(taxProfile?.eiExempt),
   };
 
   const earnings = [];
@@ -143,7 +149,13 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const safety = ccqAmounts.safetyEquipment || 0;
   const reimb = { km: kmReimb, phone: phoneReimb, storage: storageReimb, safety, total: kmReimb + phoneReimb + storageReimb + safety };
 
-  const result = calculatePayroll({
+  const result = runEngine({ frequency, employer, taxProfile, earnings, opening, unionDuesFederalAnnual, baseAdjustments: ccqAmounts.baseAdjustments });
+
+  return { result, ccqAmounts, reimb, pay, hours: { regularHours, ot150Hours, ot200Hours, returnNbHours, totalKm, totalHours } };
+}
+
+function runEngine({ frequency, employer, taxProfile, earnings, opening, unionDuesFederalAnnual = 0, baseAdjustments }) {
+  return calculatePayroll({
     taxYear: 2026,
     provinceOfEmployment: "QC",
     payPeriod: { frequency },
@@ -152,6 +164,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
       // basic personal amount (engine default).
       federalTaxProfile: { td1ClaimAmount: taxProfile?.td1ClaimAmount ?? undefined, additionalTax: Number(taxProfile?.federalAdditionalTax) || 0, annualDeductions: unionDuesFederalAnnual },
       quebecTaxProfile: { personalTaxCredits: taxProfile?.personalTaxCredits ?? undefined, additionalTax: Number(taxProfile?.quebecAdditionalTax) || 0 },
+      eiExempt: Boolean(taxProfile?.eiExempt),
     },
     employer: {
       annualPayrollEstimate: Number(employer.annualPayrollEstimate) || 0,
@@ -160,9 +173,29 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
       workforceSkillsFundApplicable: employer.workforceSkillsFundApplicable,
     },
     earnings,
-    baseAdjustments: ccqAmounts.baseAdjustments,
+    baseAdjustments,
     ytd: engineYtdFromOpening(opening),
   });
+}
 
-  return { result, ccqAmounts, reimb, pay, hours: { regularHours, ot150Hours, ot200Hours, returnNbHours, totalKm, totalHours } };
+// Fixed weekly pay: one « Régulier à taux horaire » line (the hours at the base rate, `baseOnlyHours`,
+// so the stub's 4 % « Vacances » record line follows it), statutory deductions only (no CCQ layer).
+function computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includePhone, includeStorage, employer, taxProfile, opening }) {
+  const base = Number(profile?.hourly_rate) || 0;
+  const pay = {
+    regularHours: 0, baseOnlyHours: fixedHours, baseRate: base, premium: 0, ccqPremium: 0, premiumOnOvertime: false,
+    ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, km: totalKm, kmRate: Number(profile?.km_rate) || 0, taxableBenefit: 0,
+    fixedPay: true, eiExempt: Boolean(taxProfile?.eiExempt),
+  };
+  const amount = printedPayLines({ baseOnlyHours: fixedHours, baseRate: base }).baseOnly;
+  const earnings = amount ? [{ type: "regular", amount }] : [];
+  const kmReimb = pay.km * pay.kmRate;
+  const phoneReimb = includePhone ? weeklyPhoneAmount(profile) : 0;
+  const storageReimb = includeStorage ? weeklyStorageAmount(profile) : 0;
+  const reimb = { km: kmReimb, phone: phoneReimb, storage: storageReimb, safety: 0, total: kmReimb + phoneReimb + storageReimb };
+  const result = runEngine({ frequency, employer, taxProfile, earnings, opening });
+  return {
+    result, ccqAmounts: null, reimb, pay, fixedPay: true,
+    hours: { regularHours: fixedHours, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, totalKm, totalHours: fixedHours },
+  };
 }

@@ -4,7 +4,8 @@ import { DEFAULT_EMPLOYER } from "@/payroll/employee-week";
 import { WORKFORCE_FUND } from "@/payroll/rules/2026.js";
 
 // Employer payroll parameters (Paramètres › Paie, table payroll_employer_settings) and the
-// per-employee TD1 / TP-1015.3 amounts (employee_tax_profiles), shaped for the engine.
+// per-employee TD1 / TP-1015.3 amounts, fixed weekly pay and EI exemption (employee_tax_profiles),
+// shaped for the engine.
 
 // DB row → the engine's `employer` input. A missing CNESST rate stays undefined so the
 // calculation reports requires_review rather than guessing one.
@@ -30,6 +31,10 @@ export function taxProfileFromRow(row) {
     federalAdditionalTax: Number(row.federal_additional_tax) || 0,
     personalTaxCredits: num(row.tp1015_3_credits),
     quebecAdditionalTax: Number(row.quebec_additional_tax) || 0,
+    // Fixed weekly pay (migration 0091): hours paid every week from fixedPayStart, whatever the jobs.
+    fixedWeeklyHours: Number(row.fixed_weekly_hours) || 0,
+    fixedPayStart: row.fixed_pay_start || "",
+    eiExempt: Boolean(row.ei_exempt),
   };
 }
 

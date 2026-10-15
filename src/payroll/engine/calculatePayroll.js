@@ -74,6 +74,10 @@ export function calculatePayroll(input) {
     add("labourStandards", baseAdjustments.labourStandards);
   }
 
+  // Not insurable for EI (Employment Insurance Act 5(2)(b): controls more than 40 % of the voting
+  // shares): no EI premium, employee or employer. A per-employee flag set by a manager, never inferred.
+  if (employee.eiExempt) bases.ei = 0;
+
   // ── Employee statutory deductions ──
   const rrq = calculateRrq({ pensionableThisPeriod: bases.rrq, ytd, periodsPerYear, rules });
   const ei = calculateEi({ insurableThisPeriod: bases.ei, ytd, rules });

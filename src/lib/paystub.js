@@ -5,6 +5,7 @@
 // substitute for the official pay stub.
 
 import { formatHM } from "./time";
+import { hourlyLinesVacation } from "./payroll-closing";
 
 const n = (v) => Number(v) || 0;
 export const money = (v) => `$${n(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -44,7 +45,8 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const base = n(pay.baseRate);
   const prem = n(pay.premium);
   const regHrs = n(pay.regularHours);
-  const hours = regHrs + n(pay.ot150Hours) + n(pay.ot200Hours);
+  // Base-rate-only hours are worked hours too (same count as the cumulative « Heures », buildClosing).
+  const hours = regHrs + n(pay.ot150Hours) + n(pay.ot200Hours) + n(pay.baseOnlyHours);
 
   // ── CCQ period components (from computeCcqBenefits) ──
   const cash = n(g.total);
@@ -74,7 +76,8 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const netPlusReimb = net + kmReimb + phoneReimb + storageReimb + otherReimb;
 
   const gainsRRQ = cash + vac + imposable;
-  const gainsAE = cash + vac;
+  const gainsRQAP = cash + vac;
+  const gainsAE = pay.eiExempt ? 0 : gainsRQAP; // not insurable for EI (> 40 % of the voting shares)
 
   const gains = [
     { label: "Salaire régulier fixe", unit: regHrs, taux: base, montant: regHrs * base },
@@ -88,10 +91,13 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
     storageReimb ? { label: "Entreposage", unit: "", taux: "", montant: storageReimb } : null,
     otherReimb ? { label: "Autre revenu non imposable", unit: "", taux: "", montant: otherReimb } : null,
     n(pay.taxableBenefit) ? { label: "Autre avantage imposable", unit: "", taux: "", montant: n(pay.taxableBenefit) } : null,
-  ].filter((r) => r && (r.montant || r.label));
+  ].filter((r) => r && (r.montant || r.label) && !(pay.fixedPay && !r.montant));
 
   const line = (label, per, cum, group, opts = {}) => ({ label, per, cum, group, ...opts });
-  const sommaire = [
+  // Record-only « Vacances » line (4 % of the « Régulier à taux horaire » lines), shown for fixed pay
+  // as on stub D0038-0002.
+  const vacationRecord = pay.fixedPay ? hourlyLinesVacation(pay) : 0;
+  const allLines = [
     line("Salaire régulier", cash, n(ytd.regularEarnings) + cash, "gain"),
     line("Vacances CCQ", vac, n(ytd.vacancesCcq) + vac, "gain"),
     line("Avantage imposable add. CCQ", imposable, n(ytd.ccqTaxableBenefit) + imposable, "gain"),
@@ -110,9 +116,12 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
     line("Caisse d'éducation syndicale", caisse, n(ytd.unionEducationFund) + caisse, "ded"),
     line("Gains RRQ", gainsRRQ, n(ytd.pensionableIncomeRRQ) + gainsRRQ, "base"),
     line("Gains AE", gainsAE, n(ytd.insurableIncomeEI) + gainsAE, "base"),
-    line("Gains RQAP", gainsAE, n(ytd.insurableIncomeRQAP) + gainsAE, "base"),
+    line("Gains RQAP", gainsRQAP, n(ytd.insurableIncomeRQAP) + gainsRQAP, "base"),
     line("Heures travaillées", hours, n(ytd.hoursYtd) + hours, "base", { hours: true }),
-  ];
+    pay.fixedPay ? line("Vacances", vacationRecord, n(ytd.vacationPay) + vacationRecord, "base") : null,
+  ].filter(Boolean);
+  // Fixed pay has no CCQ layer: keep only the lines that ever moved (no empty CCQ / AE lines).
+  const sommaire = pay.fixedPay ? allLines.filter((l) => n(l.per) || n(l.cum)) : allLines;
 
   const rulesTag = `${result.meta?.rulesVersion?.quebec || "—"} / ${result.meta?.rulesVersion?.federal || "—"}`;
 

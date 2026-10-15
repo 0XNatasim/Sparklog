@@ -16,6 +16,8 @@ import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances"
 import { loadHolidayDates } from "@/lib/company-holidays";
 import { formatHM } from "@/lib/time";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
+import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/lib/payroll-settings";
+import { fixedPayWeekCost, fixedPayWeekEnds } from "@/lib/fixed-pay-cost";
 
 const montrealToday = companyDate;
 
@@ -80,6 +82,12 @@ export default function CostingDashboard() {
       setLoading(true);
       const { start, end } = range;
       const holidayDates = await loadHolidayDates();
+      // Fixed weekly pay (Paramètres › Paie) is costed from its settings; a failed load keeps the job-based estimate.
+      const [taxProfiles, employerRow] = await Promise.all([
+        loadTaxProfiles().catch(() => new Map()),
+        loadEmployerSettings().catch(() => null),
+      ]);
+      const employer = employerFromSettings(employerRow);
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }, rounding] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
@@ -107,7 +115,13 @@ export default function CostingDashboard() {
       const parkingByUser = new Map();
       (parking || []).forEach((p) => parkingByUser.set(p.user_id, (parkingByUser.get(p.user_id) || 0) + (Number(p.amount) || 0)));
 
-      const userIds = new Set([...jobsByUser.keys(), ...mealByUser.keys(), ...parkingByUser.keys()]);
+      // Fixed weekly pay: weeks of the range paid at the fixed hours, whatever the jobs.
+      const fixedWeeksByUser = new Map();
+      for (const [userId, taxProfile] of taxProfiles) {
+        const weeks = profileById.has(userId) ? fixedPayWeekEnds(taxProfile, start, end) : [];
+        if (weeks.length) fixedWeeksByUser.set(userId, weeks.length);
+      }
+      const userIds = new Set([...jobsByUser.keys(), ...mealByUser.keys(), ...parkingByUser.keys(), ...fixedWeeksByUser.keys()]);
       const result = [];
       userIds.forEach((userId) => {
         const profile = profileById.get(userId);
@@ -154,10 +168,22 @@ export default function CostingDashboard() {
           kmCost += e.totalKm * jobKmRate;
         });
 
-        const conges = isNonCcq ? 0 : calculateCongesIndemnity(labor, congesRates).total;
+        // Fixed weekly pay: the gross and the employer contributions of the talon calculation × the weeks
+        // of the range (the jobs' hours are not paid; their km are).
+        const fixedWeeks = fixedWeeksByUser.get(userId) || 0;
+        const fixed = fixedWeeks ? fixedPayWeekCost({ profile, taxProfile: taxProfiles.get(userId), employer }) : null;
+        if (fixed) {
+          labor = fixed.labor * fixedWeeks;
+          laborNoBenefit = 0;
+          regMin = fixed.hours * 60 * fixedWeeks;
+          ot50Min = 0; ot100Min = 0; returnMin = 0; returnNbMin = 0;
+        }
+        const conges = isNonCcq || fixed ? 0 : calculateCongesIndemnity(labor, congesRates).total;
         const paidHours = (regMin + returnMin + returnNbMin + ot50Min + ot100Min) / 60;
         // Employer contributions: per-hour rate for this employee's level × paid hours.
-        const contribLines = rateKey
+        const contribLines = fixed
+          ? fixed.contribLines.map((l) => ({ ...l, amount: l.amount * fixedWeeks }))
+          : rateKey
           ? contributions.map((c) => ({ code: c.code, label: c.label, amount: (Number(c[rateKey]) || 0) * paidHours })).filter((l) => l.amount !== 0)
           : [];
         const contribTotal = contribLines.reduce((s, l) => s + l.amount, 0);
@@ -167,7 +193,7 @@ export default function CostingDashboard() {
         const parkingCost = parkingByUser.get(userId) || 0;
         // Phone/data and storage are fixed weekly amounts — prorate by the number
         // of distinct CCQ weeks the employee actually worked in the range.
-        const weeksWorked = new Set((jobsByUser.get(userId) || []).map((j) => ccqWeekKey(j.job_date))).size;
+        const weeksWorked = fixed ? fixedWeeks : new Set((jobsByUser.get(userId) || []).map((j) => ccqWeekKey(j.job_date))).size;
         const phoneData = weeksWorked * weeklyPhoneAmount(profile);
         const storageCost = weeksWorked * weeklyStorageAmount(profile);
 
@@ -176,6 +202,7 @@ export default function CostingDashboard() {
           name: profile?.full_name || profile?.email || String(userId).slice(0, 8),
           hasRate: baseRate > 0,
           isNonCcq,
+          fixedPay: Boolean(fixed),
           hasLevel: Boolean(rateKey),
           premium,
           regHours: (regMin + returnMin) / 60,
@@ -275,7 +302,8 @@ export default function CostingDashboard() {
                           {r.name}
                           {r.premium > 0 && <span className="ml-2 text-xs font-normal text-primary">({t("costing.teamLeader")} +{money(r.premium)}/h)</span>}
                           {!r.hasRate && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noRate")})</span>}
-                          {r.isNonCcq && <span className="ml-2 text-xs font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
+                          {r.fixedPay && <span className="ml-2 text-xs font-normal text-info">({t("costing.fixedPay")})</span>}
+                          {r.isNonCcq && !r.fixedPay && <span className="ml-2 text-xs font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
                           {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noLevel")})</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono">{formatHM(r.regHours)}</td>

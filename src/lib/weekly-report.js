@@ -10,6 +10,7 @@ import { computeEmployeeWeekTalon, DEFAULT_EMPLOYER } from "@/payroll/employee-w
 import { payTotals } from "@/lib/payroll-closing";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { EMPLOYER } from "@/lib/paystub";
+import { fixedWeeklyHours, isFixedPayWeek } from "@/lib/fixed-pay";
 
 // Drafts ('saved') are not work yet. 'updated' and 'submitted' are printed but flagged as not
 // approved: their amounts can still change.
@@ -69,7 +70,8 @@ function employeePay({ profile, jobs, week, opening, holidayDates, employer, tax
   const totals = payTotals(result, ccq, reimb);
   const emp = result.employee, empr = result.employer, das = result.das;
 
-  const rateKey = LEVEL_RATE_KEY[profile?.apprentice_level] || null;
+  // Fixed weekly pay has no CCQ layer: no per-hour CCQ contributions either.
+  const rateKey = talon.fixedPay ? null : LEVEL_RATE_KEY[profile?.apprentice_level] || null;
   const otherCcq = rateKey
     ? contributions
       .filter((c) => !ENGINE_CONTRIBUTION_CODES.has(c.code))
@@ -139,8 +141,11 @@ export function buildWeeklyReport({
   const employees = [];
   const sorted = [...profiles].sort((a, b) => String(a.full_name || "").localeCompare(String(b.full_name || ""), "fr"));
   for (const profile of sorted) {
-    const ujobs = jobsByUser.get(profile.id);
-    if (!ujobs?.length) continue;
+    const ujobs = jobsByUser.get(profile.id) || [];
+    // Fixed weekly pay (Paramètres › Paie): paid every week from its start date, with or without jobs.
+    const taxProfile = taxProfiles.get(profile.id);
+    const fixedHours = isFixedPayWeek(taxProfile, week.end) ? fixedWeeklyHours(taxProfile) : 0;
+    if (!ujobs.length && !fixedHours) continue;
     const rounding = roundingFor(profile.id);
     const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates, rounding });
     const rows = jobRows(ujobs, entries);
@@ -157,11 +162,19 @@ export function buildWeeklyReport({
       roundingMinutes: sum(rows, "roundingMinutes"),
       km: sum(rows, "km"),
     };
+    // Fixed pay: the week pays the fixed hours (regular), not the jobs' time.
+    if (fixedHours) {
+      Object.assign(hours, { regularMinutes: fixedHours * 60, ot50Minutes: 0, ot100Minutes: 0, returnNoBenefitMinutes: 0, paidMinutes: fixedHours * 60, roundingMinutes: 0 });
+    }
+    // Heures CCQ = regular (return with benefits included) + 1.5× + 2×, as declared on the CCQ
+    // report. Hors CCQ = return-to-shop time without benefits; every hour of a non-CCQ role or of fixed pay.
+    hours.ccqMinutes = nonCcq || fixedHours ? 0 : hours.regularMinutes + hours.ot50Minutes + hours.ot100Minutes;
+    hours.nonCcqMinutes = hours.paidMinutes - hours.ccqMinutes;
     let pay = null;
-    if (!nonCcq) {
+    if (!nonCcq || fixedHours) {
       pay = employeePay({
-        profile, jobs: ujobs, week, opening: openingFor(profile.id) || {}, holidayDates, employer,
-        taxProfile: taxProfiles.get(profile.id), contributions, meals, parking: parkingAmount, rounding,
+        profile, jobs: fixedHours ? ujobs.filter((j) => j.status === "approved") : ujobs, week, opening: openingFor(profile.id) || {}, holidayDates, employer,
+        taxProfile, contributions, meals, parking: parkingAmount, rounding,
       });
     }
     employees.push({
@@ -171,6 +184,7 @@ export function buildWeeklyReport({
       level: profile.apprentice_level || "",
       role: profile.role,
       category: isSubcontractorRole(profile.role) ? "subcontractor" : nonCcq ? "nonCcq" : "ccq",
+      fixedHours,
       jobs: rows,
       hours,
       meals,
@@ -186,6 +200,8 @@ export function buildWeeklyReport({
     employees: employees.length,
     jobs: sum(employees, (e) => e.jobs.length),
     paidMinutes: sum(employees, (e) => e.hours.paidMinutes),
+    ccqMinutes: sum(employees, (e) => e.hours.ccqMinutes),
+    nonCcqMinutes: sum(employees, (e) => e.hours.nonCcqMinutes),
     ot50Minutes: sum(employees, (e) => e.hours.ot50Minutes),
     ot100Minutes: sum(employees, (e) => e.hours.ot100Minutes),
     km: sum(employees, (e) => e.hours.km),
@@ -318,7 +334,8 @@ function employeeHtml(emp) {
         <td></td>
       </tr></tfoot>
     </table>
-    ${emp.roundingBalance == null ? "" : `<p class="note">Arrondi au 15 min de la semaine : ${esc(signedMinutes(h.roundingMinutes))} · compteur à la fin de la semaine : ${esc(signedMinutes(emp.roundingBalance))} (+ = payé en plus, − = dû à l'employé).</p>`}
+    ${emp.fixedHours ? `<p class="note">Paie fixe : ${esc(fmtHM(emp.fixedHours * 60))} par semaine au taux horaire, avec ou sans job (sans avantages CCQ) — les heures des jobs ne sont pas payées, leurs km oui.</p>` : ""}
+    ${emp.roundingBalance == null || emp.fixedHours ? "" : `<p class="note">Arrondi au 15 min de la semaine : ${esc(signedMinutes(h.roundingMinutes))} · compteur à la fin de la semaine : ${esc(signedMinutes(emp.roundingBalance))} (+ = payé en plus, − = dû à l'employé).</p>`}
     ${money}
   </section>`;
 }
@@ -375,7 +392,9 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
     <tr>
       <td>${esc(e.name)}${e.pendingJobs ? ' <span class="warn">*</span>' : ""}</td>
       <td class="num">${e.jobs.length}</td>
-      <td class="num">${fmtHM(e.hours.paidMinutes)}</td>
+      <td class="num strong">${fmtHM(e.hours.paidMinutes)}</td>
+      <td class="num">${fmtHM(e.hours.ccqMinutes)}</td>
+      <td class="num">${fmtHM(e.hours.nonCcqMinutes)}</td>
       <td class="num">${fmtHM(e.hours.ot50Minutes + e.hours.ot100Minutes)}</td>
       <td class="num">${fmtKm(e.hours.km)}</td>
       <td class="num">${e.pay ? fmtMoney(e.pay.salary) : "—"}</td>
@@ -403,7 +422,9 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
   <div class="stats">
     ${stat("Employés", totals.employees)}
     ${stat("Jobs", totals.jobs)}
-    ${stat("Heures payées", fmtHM(totals.paidMinutes))}
+    ${stat("Total heures", fmtHM(totals.paidMinutes))}
+    ${stat("Heures CCQ", fmtHM(totals.ccqMinutes))}
+    ${stat("Heures hors CCQ", fmtHM(totals.nonCcqMinutes))}
     ${stat("Temps sup. (1,5× + 2×)", fmtHM(totals.ot50Minutes + totals.ot100Minutes))}
     ${stat("Kilomètres", fmtKm(totals.km))}
     ${stat("Salaires bruts", fmtMoney(totals.salary))}
@@ -417,7 +438,7 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
   <h3>Sommaire par employé</h3>
   <table class="summary">
     <thead><tr>
-      <th>Employé</th><th class="num">Jobs</th><th class="num">Heures</th><th class="num">Temps sup.</th><th class="num">km</th>
+      <th>Employé</th><th class="num">Jobs</th><th class="num">Total heures</th><th class="num">Heures CCQ</th><th class="num">Hors CCQ</th><th class="num">Temps sup.</th><th class="num">km</th>
       <th class="num">Brut</th><th class="num">Retenues</th><th class="num">Net</th>
       <th class="num">DAS ARC</th><th class="num">DAS QC</th><th class="num">Coût employeur</th>
     </tr></thead>
@@ -426,6 +447,8 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td>Total</td>
       <td class="num">${totals.jobs}</td>
       <td class="num">${fmtHM(totals.paidMinutes)}</td>
+      <td class="num">${fmtHM(totals.ccqMinutes)}</td>
+      <td class="num">${fmtHM(totals.nonCcqMinutes)}</td>
       <td class="num">${fmtHM(totals.ot50Minutes + totals.ot100Minutes)}</td>
       <td class="num">${fmtKm(totals.km)}</td>
       <td class="num">${fmtMoney(totals.salary)}</td>
@@ -441,6 +464,8 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
   ${employees.map(employeeHtml).join("")}
 
   <div class="foot">
+    Sommaire : Total heures = Heures CCQ + Hors CCQ · Heures CCQ = régulier + 1,5× + 2× (comme le rapport CCQ ; le temps sup.
+    en fait partie) · Hors CCQ = retour à l'entrepôt sans avantages, ou toutes les heures d'un rôle hors CCQ.
     Heures : Rég. = régulier (retour avec avantages inclus) · 1,5× / 2× = temps supplémentaire · Retour s.a. = temps de retour
     sans avantages · Total = temps payé. Les montants viennent du même calcul que les écrans Talons et DAS (taux du profil
     de l'employé, cumul de l'année comptabilisé). Coût employeur = salaire brut + 13 % CCQ + avantages sociaux CCQ + cotisations

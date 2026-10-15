@@ -48,9 +48,10 @@ export function buildCalculTalon({ opening = {}, closing, result, ccq = null, re
   const phoneUnits = phone > 0 && Math.abs(phone / 7 - Math.round(phone / 7)) < 1e-9 ? Math.round(phone / 7) : 1;
   const tx = (description, unite, taux, montant) => ({ description, unite, taux, montant: round2(montant) });
   const transactions = [
-    tx("Salaire régulier fixe", n(pay.regularHours), base, lines.regularBase),
-    tx("Temps et demi", n(pay.ot150Hours) || null, round2(base * 1.5), lines.ot150),
-    tx("Temps double", n(pay.ot200Hours) || null, round2(base * 2), lines.ot200),
+    // Fixed weekly pay prints its hours on a single « Régulier à taux horaire » line (stub D0038-0002).
+    pay.fixedPay ? null : tx("Salaire régulier fixe", n(pay.regularHours), base, lines.regularBase),
+    pay.fixedPay ? null : tx("Temps et demi", n(pay.ot150Hours) || null, round2(base * 1.5), lines.ot150),
+    pay.fixedPay ? null : tx("Temps double", n(pay.ot200Hours) || null, round2(base * 2), lines.ot200),
     n(pay.returnNbHours) ? tx("Temps de retour (sans avantages)", n(pay.returnNbHours), base, lines.returnNoBenefit) : null,
     ccq && n(ccq.safetyEquipment) ? tx("Équipement de sécurité", null, 0.8, ccq.safetyEquipment) : null,
     n(reimb.km) ? tx("Indemnité utilisation véhicule", n(pay.km), n(pay.kmRate), reimb.km) : null,
@@ -73,6 +74,9 @@ export function buildCalculTalon({ opening = {}, closing, result, ccq = null, re
     const periode = delta(stateKey);
     // The employer prints the optional lines (vacation line, other income, caisse…) only when they move.
     if (!periode && ["vacationPay", "otherIncome", "unionEducationFund", "doubleTime", "kmIndemnity"].includes(key)) continue;
+    // Fixed pay (no CCQ layer): only the lines that ever moved, and no « Heures AE » when not insurable.
+    if (pay.fixedPay && !periode && !n(closing[stateKey])) continue;
+    if (pay.fixedPay && key === "hoursAe" && !n(closing.insurableIncomeEI)) continue;
     sommaire.push({ key: key === "hoursAe" ? null : key, description, periode, cumulatif: round2(closing[stateKey]) });
   }
 

@@ -59,6 +59,34 @@ describe("planPayrollWeek", () => {
   });
 });
 
+describe("planPayrollWeek — fixed weekly pay (owner)", () => {
+  const owner = { id: "k", full_name: "Karine Messier", role: "owner", hourly_rate: 51 };
+  const taxProfiles = new Map([["k", { fixedWeeklyHours: 40, fixedPayStart: "2026-09-27", eiExempt: true }]]);
+  const fixedCompute = (profile, jobs, opening) => computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: "2026-10-04", taxProfile: taxProfiles.get(profile.id) });
+  const plan = (ledger = [], weekEnd = "2026-10-10", seed = null) => planPayrollWeek({
+    weekEnd, profiles: [owner], jobs: [], taxProfiles, compute: fixedCompute,
+    ledgerByUser: new Map([["k", ledger]]), seedByUser: seed ? new Map([["k", seed]]) : new Map(),
+  });
+
+  it("is ready without any job once the earlier fixed-pay weeks are posted, and pays 2 040 $ without EI", () => {
+    const row = plan([{ user_id: "k", period_end: "2026-10-03" }]).rows[0];
+    expect(row.state).toBe("ready");
+    expect(row.gross).toBe(2040);
+    expect(row.talon.result.employee.ei).toBe(0);
+    expect(row.hours).toBe(40);
+  });
+
+  it("asks to post the earlier fixed-pay weeks first (from the start date or the opening)", () => {
+    expect(plan().rows[0]).toMatchObject({ state: "blockedEarlier", earlierUnposted: ["2026-10-03"] });
+    expect(plan([], "2026-10-10", { as_of_date: "2026-10-03" }).rows[0].state).toBe("ready");
+  });
+
+  it("leaves out the weeks before the start date, and an owner without fixed pay", () => {
+    expect(plan([], "2026-09-26").rows).toEqual([]);
+    expect(planPayrollWeek({ weekEnd: "2026-10-10", profiles: [owner], jobs: [job("k1", "k", "2026-10-05")], compute }).rows).toEqual([]);
+  });
+});
+
 describe("posting", () => {
   const plan = planPayrollWeek({ weekEnd: "2026-10-10", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-05")], compute });
   const row = plan.ready[0];

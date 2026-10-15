@@ -79,3 +79,72 @@ describe("computeEmployeeWeekTalon employer settings and tax forms", () => {
     expect(talon.result.requiresReview).toBe(true);
   });
 });
+
+// Stub D0038-0002 (Karine Messier, Présidente, week of 2026-10-04 → 2026-10-10): fixed pay
+// « Régulier à taux horaire 40,00 × 51,0000 », no AE (owner > 40 % of the shares), no CCQ lines.
+describe("fixed weekly pay (owner stub D0038-0002)", () => {
+  const owner = { id: "k", full_name: "Karine Messier", role: "owner", hourly_rate: 51 };
+  const taxProfile = { fixedWeeklyHours: 40, fixedPayStart: "2026-01-04", eiExempt: true };
+  // Opening = cumulative − period, as printed on the stub.
+  const opening = {
+    grossIncome: 55080, regularEarnings: 55080, hoursYtd: 1080, vacationPay: 2203.2,
+    federalTax: 6342.57, quebecTax: 7432.56, rrqEmployee: 3355.56, rqapEmployee: 236.79,
+    pensionableIncomeRRQ: 55080, insurableIncomeRQAP: 55080, labourStandardsIncome: 55080,
+  };
+  const employer = { annualPayrollEstimate: 0, fssCategory: "general", cnesstRate: 0.0317, workforceSkillsFundApplicable: false };
+  const talon = computeEmployeeWeekTalon({ profile: owner, jobs: [], opening, weekDate: "2026-10-04", taxProfile, employer, includePhone: true, includeStorage: true });
+
+  it("pays the fixed hours with no job, and every deduction to the cent", () => {
+    expect(talon.fixedPay).toBe(true);
+    expect(talon.ccqAmounts).toBeNull();
+    expect(talon.result.gross.total).toBe(2040);
+    const e = talon.result.employee;
+    expect(e.federalTax).toBe(234.91);
+    expect(e.quebecTax).toBe(275.28);
+    expect(e.rrq.total).toBe(124.28);
+    expect(e.ei).toBe(0);
+    expect(e.rqap).toBe(8.77);
+    expect(e.totalDeductions).toBe(643.24);
+    expect(payTotals(talon.result, talon.ccqAmounts, talon.reimb).netPlusReimb).toBeCloseTo(1396.76, 2);
+    expect(talon.result.employer.ei).toBe(0);
+  });
+
+  it("advances the stub's cumulatives (Salaire régulier, Heures, Vacances, RRQ, RQAP)", () => {
+    const closing = buildClosing({ opening, result: talon.result, ccq: talon.ccqAmounts, reimb: talon.reimb, pay: talon.pay });
+    expect(closing).toMatchObject({
+      grossIncome: 57120, regularEarnings: 57120, hoursYtd: 1120, vacationPay: 2284.8,
+      federalTax: 6577.48, quebecTax: 7707.84, rrqEmployee: 3479.84, rqapEmployee: 245.56, vacancesCcq: 0,
+    });
+  });
+
+  it("ignores the hours of any job entered that week but still reimburses its km", () => {
+    const withJob = computeEmployeeWeekTalon({ profile: { ...owner, km_rate: 0.65 }, jobs: [{ ...jobs[0], job_date: "2026-10-05" }], opening, weekDate: "2026-10-04", taxProfile, employer });
+    expect(withJob.result.gross.total).toBe(2040);
+    expect(withJob.reimb.km).toBeCloseTo(6.5, 6);
+  });
+
+  it("EI exemption alone: a job-paid employee pays no EI premium", () => {
+    const paid = computeEmployeeWeekTalon({ profile, jobs, weekDate: "2026-09-27", taxProfile: { eiExempt: true } });
+    expect(paid.result.employee.ei).toBe(0);
+    expect(paid.result.employer.ei).toBe(0);
+    expect(computeEmployeeWeekTalon({ profile, jobs, weekDate: "2026-09-27" }).result.employee.ei).toBeGreaterThan(0);
+  });
+});
+
+describe("fixed weekly pay — printed stub", () => {
+  const owner = { id: "k", full_name: "Karine Messier", role: "owner", hourly_rate: 51, employee_number: "01" };
+  const taxProfile = { fixedWeeklyHours: 40, fixedPayStart: "2026-01-04", eiExempt: true };
+  const opening = { grossIncome: 55080, regularEarnings: 55080, hoursYtd: 1080, vacationPay: 2203.2, federalTax: 6342.57, quebecTax: 7432.56, rrqEmployee: 3355.56, rqapEmployee: 236.79, pensionableIncomeRRQ: 55080, insurableIncomeRQAP: 55080, labourStandardsIncome: 55080 };
+  const talon = computeEmployeeWeekTalon({ profile: owner, jobs: [], opening, weekDate: "2026-10-04", taxProfile });
+
+  it("aperçu: one « Régulier à taux horaire » line, Vacances 81,60, no CCQ or AE line", () => {
+    const model = buildStubModel({ result: talon.result, ytd: opening, pay: talon.pay, reimb: talon.reimb, ccq: talon.ccqAmounts });
+    expect(model.gains.map((g) => [g.label, g.unit, g.montant])).toEqual([["Régulier à taux horaire (taux de base)", 40, 2040]]);
+    const byLabel = Object.fromEntries(model.sommaire.map((l) => [l.label, l]));
+    expect(byLabel.Vacances.per).toBeCloseTo(81.6, 2);
+    expect(byLabel.Vacances.cum).toBeCloseTo(2284.8, 2);
+    expect(byLabel["Heures travaillées"]).toMatchObject({ per: 40, cum: 1120 });
+    expect(Object.keys(byLabel).some((l) => /CCQ|MÉDIC|syndical|AE/.test(l))).toBe(false);
+    expect(model.netPlusReimb).toBeCloseTo(1396.76, 2);
+  });
+});

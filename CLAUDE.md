@@ -462,6 +462,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`screenshot` / `manual`, une ligne par nouvelle fiche, écrite par l'employé après l'enregistrement, lisible par qui
   voit la job, ni modification ni suppression). `src/lib/entry-source.js` ; ★ rouge + légende dans Feuilles de temps
   et À traiter. Pas de ligne (anciennes fiches, feuille d'urgence, écriture ratée) = pas d'étoile. Indicatif seulement.
+- [x] **Paie fixe et exclusion de l'AE** (V2.4.133, migration 0091) : Paramètres › Paie › par employé, « Paie fixe :
+  heures / semaine » + date de début, et case « Exclu de l'AE » (Loi sur l'AE 5(2)b), > 40 % des actions). La
+  propriétaire (Karine) reçoit 40 h × 51 $ chaque semaine sans job, une ligne « Régulier à taux horaire », sans CCQ ni AE :
+  talon D0038-0002 reproduit au centime (`employee-week.test.js`). Présente dans Talons, DAS, Calcul, Paie de la semaine,
+  Coûts, Semaine/mois et le sommaire imprimé (`src/lib/fixed-pay.js`, `fixed-pay-cost.js`). Hors rapport CCQ.
+  Reste : saisir son cumul d'ouverture (`payroll_ytd`) et confirmer si sa paie est cotisable à la CNESST.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

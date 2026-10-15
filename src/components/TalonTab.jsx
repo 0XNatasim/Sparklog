@@ -9,7 +9,8 @@ import { computeEmployeeWeekTalon, snapshotFromRow, formatTalonRef } from "@/pay
 import { buildStubModel, defaultHeader } from "@/lib/paystub";
 import { openTalonsPrint } from "@/lib/talon-print";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
-import { isOwnerRole, isNonCcqRole } from "@/lib/roles";
+import { isOwnerRole, isSubcontractorRole } from "@/lib/roles";
+import { isFixedPayWeek, isPayrollEmployee } from "@/lib/fixed-pay";
 import { useAuth } from "@/contexts/AuthContext";
 import PayStubPrint from "@/components/PayStubPrint";
 import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
@@ -68,9 +69,10 @@ export default function TalonTab({ messier = false }) {
         if (pErr) throw pErr;
         if (jErr) throw jErr;
         if (cancelled) return;
-        // Talons are a CCQ payroll artifact — subcontractors (billed by the trade) and other
-        // non-CCQ roles never get one.
-        setEmployees((profs || []).filter((e) => !isNonCcqRole(e.role)));
+        // Talons are a CCQ payroll artifact — subcontractors (billed by the trade) never get one, and
+        // other non-CCQ roles only with a fixed weekly pay (`payrollEmployees` below, once the
+        // tax profiles are loaded).
+        setEmployees((profs || []).filter((e) => !isSubcontractorRole(e.role)));
 
         const jByE = new Map();
         const weekMap = new Map();
@@ -110,9 +112,12 @@ export default function TalonTab({ messier = false }) {
     return () => { cancelled = true; };
   }, [reloadKey]);
 
-  // Employees that have at least one job in the window, in roster order.
-  const rows = useMemo(() => employees.filter((e) => (jobsByEmp.get(e.id) || []).length > 0
-    || (ledgerByEmp.get(e.id) || []).some((r) => r.imported_talon)), [employees, jobsByEmp, ledgerByEmp]);
+  // Employees in the payroll run (CCQ trades + fixed weekly pay, src/lib/fixed-pay.js) that have a job,
+  // a kept talon or a fixed-pay week in the window, in roster order.
+  const payrollEmployees = useMemo(() => employees.filter((e) => isPayrollEmployee(e, taxProfiles.get(e.id))), [employees, taxProfiles]);
+  const rows = useMemo(() => payrollEmployees.filter((e) => (jobsByEmp.get(e.id) || []).length > 0
+    || (ledgerByEmp.get(e.id) || []).some((r) => r.imported_talon)
+    || weeks.some((w) => isFixedPayWeek(taxProfiles.get(e.id), w.key))), [payrollEmployees, jobsByEmp, ledgerByEmp, weeks, taxProfiles]);
 
   // Opening balance for an employee at a week start (latest ledger ending before, else seed).
   function openingFor(userId, weekStart) {
@@ -128,6 +133,13 @@ export default function TalonTab({ messier = false }) {
     // A stub kept in the register (imported or validated against the real one) is shown as is.
     const kept = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key && r.imported_talon);
     if (kept) return { kind: "imported", talon: kept.imported_talon };
+    // Fixed weekly pay: a talon every week from the start date, whatever the jobs (their km count once approved).
+    if (isFixedPayWeek(taxProfiles.get(profile.id), week.key)) {
+      const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
+      const approved = jobs.filter((j) => j.status === "approved");
+      if (ledgerRow) return { kind: ledgerRow.boss_approved ? "official" : "comptabilise", jobs: approved };
+      return { kind: "apercu", jobs: approved };
+    }
     if (!jobs.length) return { kind: "none" };
     const pending = jobs.filter((j) => isPending(j.status)).length;
     const approved = jobs.filter((j) => j.status === "approved");
@@ -265,7 +277,7 @@ export default function TalonTab({ messier = false }) {
       <ImportLegacyStubsDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        employees={employees}
+        employees={payrollEmployees}
         onSaved={() => setReloadKey((k) => k + 1)}
       />
 

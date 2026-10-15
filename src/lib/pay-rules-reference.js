@@ -24,6 +24,7 @@ export const PAY_RULE_DOCS = {
   tp1015f: { label: "Revenu Québec — TP-1015.F (2026-01)", url: `${REPO}tests/TP-1015.F(2026-01).pdf` },
   t4127: { label: "ARC — T4127 (janvier 2026)", url: `${REPO}tests/t4127-01-26f.pdf` },
   rules: { label: "docs/rules/compensation-rules.md", url: `${REPO}docs/rules/compensation-rules.md` },
+  eiAct: { label: "Loi sur l'assurance-emploi (L.C. 1996, ch. 23)", url: "https://laws-lois.justice.gc.ca/fra/lois/e-5.6/" },
 };
 
 export const PAY_RULE_STATUSES = ["source", "messier", "review", "missing"];
@@ -89,6 +90,9 @@ export function payRulesReference(lang = "fr", context = {}) {
         { id: "wage", label: L("Taux horaire électricien (C3)", "Electrician hourly rate (C3)"),
           value: `${L("Compagnon", "Journeyman")} ${money(lv.journeyman.hourlyWage)} · ${apprentices.map((k, i) => `${L("P", "P")}${i + 1} ${money(lv[k].hourlyWage)}`).join(" · ")}`,
           detail: L(`En vigueur du ${c3.effectiveFrom} au ${c3.effectiveTo}. Le taux de chaque employé est dans sa fiche.`, `In force ${c3.effectiveFrom} to ${c3.effectiveTo}. Each employee's rate is on their profile.`), status: "source", sources: [["convention", "annexe C"], ["acq", "col. (1)"]] },
+        { id: "fixed-pay", label: L("Paie fixe hebdomadaire", "Fixed weekly pay"), value: L("Heures fixes × taux horaire chaque semaine, avec ou sans job", "Fixed hours × hourly rate every week, with or without jobs"),
+          detail: L("Une ligne « Régulier à taux horaire », sans avantages CCQ ni 13 % ; les km des jobs restent remboursés. Talon de référence D0038-0002 (40 h × 51 $).", "One « Régulier à taux horaire » line, no CCQ benefits or 13%; the jobs' km are still reimbursed. Reference stub D0038-0002 (40 h × $51)."),
+          option: "fixed_weekly_hours", optionText: L("Heures et date de début (Paramètres › Paie)", "Hours and start date (Settings › Payroll)"), status: "messier", sources: [] },
         { id: "premium", label: L("Prime hors CCQ", "Non-CCQ premium"), value: L("Montant $/h par employé (ex. 4,06 $)", "Per-employee $/h (e.g. $4.06)"),
           detail: L("Payée sur les heures normales ; hors 13 % et hors prélèvement CCQ, comme sur les talons Messier. Option cochée : aussi en heures sup., majorée ×1,5 / ×2.", "Paid on regular hours; outside the 13% and the CCQ levy, as on Messier's stubs. Option on: also on overtime, multiplied ×1.5 / ×2."),
           option: "team_leader_premium_overtime", optionText: L("Montant : Règles de temps › Chef d'équipe · « Primes majorées en temps sup. »", "Amount: Time rules › Team leader · “Premiums on overtime”"), status: "messier", sources: [["rules", ""]] },
@@ -136,6 +140,9 @@ export function payRulesReference(lang = "fr", context = {}) {
       rows: [
         { id: "rrq", label: "RRQ", value: L(`${pct(RRQ.tier1.employeeRate)} jusqu'à ${money(RRQ.ympe, 0)} (exemption ${money(RRQ.basicExemption, 0)})`, `${pct(RRQ.tier1.employeeRate)} up to ${money(RRQ.ympe, 0)} (exemption ${money(RRQ.basicExemption, 0)})`), detail: L("Même taux pour l'employeur ; 2e volet à 4 %.", "Same employer rate; second tier at 4%."), status: "source", sources: [["tp1015f", ""]] },
         { id: "ei", label: L("Assurance-emploi", "Employment insurance"), value: L(`${pct(EI.employeeRate)} salarié (max ${money(EI.maxInsurableEarnings, 0)}) · ${pct(EI.employerRate)} employeur`, `${pct(EI.employeeRate)} employee (max ${money(EI.maxInsurableEarnings, 0)}) · ${pct(EI.employerRate)} employer`), status: "source", sources: [["t4127", ""]] },
+        { id: "ei-exempt", label: L("Exclusion de l'AE", "EI exclusion"), value: L("Aucune cotisation AE (salarié et employeur) si la case est cochée", "No EI premium (employee and employer) when ticked"),
+          detail: L("Pour une personne qui contrôle plus de 40 % des actions avec droit de vote de l'entreprise. Jamais déduit automatiquement.", "For a person who controls more than 40% of the corporation's voting shares. Never inferred."),
+          option: "ei_exempt", optionText: L("Case « Exclu de l'AE » (Paramètres › Paie)", "“Not insurable for EI” box (Settings › Payroll)"), status: "source", sources: [["eiAct", "5(2)b)"]] },
         { id: "rqap", label: "RQAP", value: L(`${pct(RQAP.employeeRate, 3)} salarié · ${pct(RQAP.employerRate, 3)} employeur (max ${money(RQAP.maxInsurableEarnings, 0)})`, `${pct(RQAP.employeeRate, 3)} employee · ${pct(RQAP.employerRate, 3)} employer (max ${money(RQAP.maxInsurableEarnings, 0)})`), status: "source", sources: [["tp1015f", ""]] },
         { id: "tax", label: L("Impôt fédéral et du Québec", "Federal and Québec income tax"), value: L("Tables 2026 (T4127, TP-1015.F)", "2026 tables (T4127, TP-1015.F)"),
           detail: L(`TD1 / TP-1015.3 saisis pour ${taxForms.filled} employé(s) sur ${taxForms.total} ; les autres prennent le montant personnel de base. ${where}`, `TD1 / TP-1015.3 entered for ${taxForms.filled} of ${taxForms.total} employee(s); the others get the basic personal amount. ${where}`),

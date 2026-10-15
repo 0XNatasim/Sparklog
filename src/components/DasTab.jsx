@@ -7,7 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { computeEmployeeWeekTalon, snapshotFromRow } from "@/payroll";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
-import { isNonCcqRole } from "@/lib/roles";
+import { isSubcontractorRole } from "@/lib/roles";
+import { isFixedPayWeek, isPayrollEmployee } from "@/lib/fixed-pay";
 import { useT } from "@/lib/use-t";
 import { useHolidayDates } from "@/lib/company-holidays";
 import { formatHM } from "@/lib/time";
@@ -68,9 +69,10 @@ export default function DasTab({ messier = false }) {
         if (pErr) throw pErr;
         if (jErr) throw jErr;
         if (cancelled) return;
-        // DAS are CCQ source deductions — subcontractors (billed by the trade, we receive
-        // their invoice) and other non-CCQ roles are not remitted here.
-        setEmployees((profs || []).filter((e) => !isNonCcqRole(e.role)));
+        // DAS are source deductions of the payroll run — subcontractors (billed by the trade, we
+        // receive their invoice) are never remitted here; other non-CCQ roles only with a fixed
+        // weekly pay (isPayrollEmployee, once the tax profiles are loaded).
+        setEmployees((profs || []).filter((e) => !isSubcontractorRole(e.role)));
 
         const jByE = new Map();
         const weeks = new Map();
@@ -123,21 +125,25 @@ export default function DasTab({ messier = false }) {
     return snapshotFromRow(before[0] || seedByEmp.get(userId) || null);
   }
 
+  const payrollEmployees = useMemo(() => employees.filter((e) => isPayrollEmployee(e, taxProfiles.get(e.id))), [employees, taxProfiles]);
+
   // One row per employee, summing the DAS over every fully-approved CCQ week in scope.
   const rows = useMemo(() => {
-    const targets = selectedEmp ? employees.filter((e) => e.id === selectedEmp) : employees;
+    const targets = selectedEmp ? payrollEmployees.filter((e) => e.id === selectedEmp) : payrollEmployees;
     const out = [];
     for (const profile of targets) {
       const acc = { ...EMPTY };
       let anyJobs = false, pendingWeeks = 0, countedWeeks = 0;
       for (const w of scopeWeeks) {
         const jobs = (jobsByEmp.get(profile.id) || []).filter((j) => ccqWeekOf(j.job_date).key === w.key);
-        if (!jobs.length) continue;
+        // Fixed weekly pay: due every week from its start date, whatever the jobs.
+        const fixed = isFixedPayWeek(taxProfiles.get(profile.id), w.key);
+        if (!jobs.length && !fixed) continue;
         anyJobs = true;
         const pending = jobs.filter((j) => isPending(j.status)).length;
         const approved = jobs.filter((j) => j.status === "approved");
-        if (pending > 0) { pendingWeeks += 1; continue; }
-        if (!approved.length) continue;
+        if (!fixed && pending > 0) { pendingWeeks += 1; continue; }
+        if (!fixed && !approved.length) continue;
         let talon = null;
         try {
           talon = computeEmployeeWeekTalon({ profile, jobs: approved, opening: openingFor(profile.id, w.start), frequency: "weekly", includePhone: true, includeStorage: true, weekDate: w.start.format("YYYY-MM-DD"), holidayDates, employer, taxProfile: taxProfiles.get(profile.id), rounding: roundingFor(roundingByEmp, profile.id), messierMethod: messier });
@@ -157,7 +163,7 @@ export default function DasTab({ messier = false }) {
       out.push({ profile, pendingWeeks, countedWeeks, ...acc });
     }
     return out;
-  }, [scopeWeeks, employees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp, holidayDates, employer, taxProfiles, roundingByEmp]);
+  }, [scopeWeeks, payrollEmployees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp, holidayDates, employer, taxProfiles, roundingByEmp]);
 
   const computed = rows.filter((r) => r.countedWeeks > 0);
   const blocked = rows.filter((r) => r.pendingWeeks > 0);
@@ -233,7 +239,7 @@ export default function DasTab({ messier = false }) {
               <span className="text-muted-foreground">{t("payroll.employee")}</span>
               <select value={selectedEmp} onChange={(e) => setSelectedEmp(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm">
                 <option value="">{t("payroll.das.allEmployees")}</option>
-                {employees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
+                {payrollEmployees.map((e) => <option key={e.id} value={e.id}>{e.full_name || e.id}</option>)}
               </select>
             </label>
 

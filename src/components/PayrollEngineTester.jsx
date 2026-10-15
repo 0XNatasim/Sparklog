@@ -22,6 +22,7 @@ import { isSubcontractorRole } from "@/lib/roles";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 import { loadHolidayDates } from "@/lib/company-holidays";
 import { usePayrollSettings } from "@/lib/payroll-settings";
+import { fixedWeeklyHours, isFixedPayWeek } from "@/lib/fixed-pay";
 
 const TAX_YEAR = 2026;
 
@@ -192,7 +193,7 @@ export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
   const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ccqPremium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, storage: 0, otherReimb: 0 });
-  const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0 });
+  const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0, eiExempt: false });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
   const [seedDate, setSeedDate] = useState(""); // as-of date of the seed
@@ -309,7 +310,13 @@ export default function PayrollEngineTester({ messier = false }) {
       personalTaxCredits: tax?.personalTaxCredits ?? "",
       additionalFederal: tax?.federalAdditionalTax || 0,
       additionalQuebec: tax?.quebecAdditionalTax || 0,
+      eiExempt: Boolean(tax?.eiExempt), // not insurable for EI (Paramètres › Paie)
     });
+    // Fixed weekly pay (Paramètres › Paie): the weeks pay these hours on one « Régulier à taux horaire »
+    // line, with no CCQ layer.
+    const fixedHours = fixedWeeklyHours(tax);
+    // pay.eiExempt drives the stub's « Gains AE »; pay.fixedPay is set per week (handleSelectWeek).
+    setPay((s) => ({ ...s, eiExempt: Boolean(tax?.eiExempt), fixedPay: false }));
     if (profile?.hourly_rate != null) {
       // Base wage + team-leader premium kept separate: regular is paid at base +
       // premium; overtime is on the BASE rate only (per the CCQ stub) unless the employee
@@ -331,6 +338,7 @@ export default function PayrollEngineTester({ messier = false }) {
     const lvl = Number(profile?.apprentice_level);
     setCcq((s) => ({
       ...s,
+      enabled: !fixedHours,
       status: lvl >= 1 && lvl <= 4 ? `apprentice${lvl}` : "journeyman",
       union: UNION_CODE_TO_KEY[profile?.union_association] || "ftq_fipoe",
     }));
@@ -359,11 +367,24 @@ export default function PayrollEngineTester({ messier = false }) {
         regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
         retMin += e.returnRegularMinutes; retNbMin += e.returnNoBenefitMinutes; km += e.totalKm;
       });
+      if (fixedHours && isFixedPayWeek(tax, w.key)) {
+        return { key: w.key, start: w.start, end: w.end, weekNo: ccqWeekNumber(w.end), regularHours: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: fixedHours, km, fixedPay: true };
+      }
       return {
         key: w.key, start: w.start, end: w.end, weekNo: ccqWeekNumber(w.end),
         regularHours: (regMin + retMin) / 60, ot150Hours: ot50 / 60, ot200Hours: ot100 / 60, returnNbHours: retNbMin / 60, km,
       };
-    }).sort((a, b) => (a.key < b.key ? 1 : -1));
+    });
+    // Fixed-pay weeks without any job (every week from the start date up to the last one that is over).
+    if (fixedHours) {
+      const lastEnd = ccqWeek(dayjs().format("YYYY-MM-DD")).end.subtract(7, "day");
+      for (let end = lastEnd; !end.isBefore(dayjs(since)); end = end.subtract(7, "day")) {
+        const key = end.format("YYYY-MM-DD");
+        if (!isFixedPayWeek(tax, key) || opts.some((o) => o.key === key)) continue;
+        opts.push({ key, start: end.subtract(6, "day"), end, weekNo: ccqWeekNumber(end), regularHours: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: fixedHours, km: 0, fixedPay: true });
+      }
+    }
+    opts.sort((a, b) => (a.key < b.key ? 1 : -1));
     setWeekOptions(opts);
     setResult(null); setCalcCtx(null); setSelectedWeek(""); // stale for the new employee
 
@@ -518,7 +539,7 @@ export default function PayrollEngineTester({ messier = false }) {
     if (!w) return;
     const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
     setFrequency("weekly");
-    setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), returnNbHours: r2(w.returnNbHours), baseOnlyHours: 0, km: r2(w.km) }));
+    setPay((s) => ({ ...s, regularHours: r2(w.regularHours), ot150Hours: r2(w.ot150Hours), ot200Hours: r2(w.ot200Hours), returnNbHours: r2(w.returnNbHours), baseOnlyHours: r2(w.baseOnlyHours), km: r2(w.km), fixedPay: Boolean(w.fixedPay) }));
     const opening = openingForWeekStart(w.start);
     setYtd(opening.snapshot);
     setAsOfDate(opening.date);
@@ -783,6 +804,7 @@ export default function PayrollEngineTester({ messier = false }) {
           personalTaxCredits: emp.personalTaxCredits === "" ? undefined : Number(emp.personalTaxCredits),
           additionalTax: Number(emp.additionalQuebec) || 0,
         },
+        eiExempt: Boolean(emp.eiExempt),
       },
       employer: {
         annualPayrollEstimate: Number(employer.annualPayrollEstimate) || 0,
@@ -980,6 +1002,10 @@ export default function PayrollEngineTester({ messier = false }) {
           <Field label={t("payroll.qcCredits")} value={emp.personalTaxCredits} onChange={setE("personalTaxCredits")} step="1" />
           <Field label={t("payroll.extraFederal")} value={emp.additionalFederal} onChange={setE("additionalFederal")} />
           <Field label={t("payroll.extraQuebec")} value={emp.additionalQuebec} onChange={setE("additionalQuebec")} />
+          <label title={t("payrollSettings.eiExemptHelp")} className="flex items-center gap-2 self-end text-xs">
+            <input type="checkbox" checked={Boolean(emp.eiExempt)} onChange={(e) => { const on = e.target.checked; setEmp((s) => ({ ...s, eiExempt: on })); setPay((s) => ({ ...s, eiExempt: on })); setResult(null); setCalcCtx(null); }} />
+            <span>{t("payrollSettings.eiExempt")}</span>
+          </label>
         </div>
       </Collapsible>
 

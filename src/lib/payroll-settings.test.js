@@ -16,7 +16,9 @@ describe("payroll settings → engine inputs", () => {
 
   it("maps the TD1 / TP-1015.3 amounts; an empty claim means the basic amount", () => {
     expect(taxProfileFromRow({ td1_claim_amount: "18000", federal_additional_tax: "25", tp1015_3_credits: null, quebec_additional_tax: "0" }))
-      .toEqual({ td1ClaimAmount: 18000, federalAdditionalTax: 25, personalTaxCredits: undefined, quebecAdditionalTax: 0 });
+      .toEqual({ td1ClaimAmount: 18000, federalAdditionalTax: 25, personalTaxCredits: undefined, quebecAdditionalTax: 0, fixedWeeklyHours: 0, fixedPayStart: "", eiExempt: false });
+    expect(taxProfileFromRow({ fixed_weekly_hours: "40.00", fixed_pay_start: "2026-10-04", ei_exempt: true }))
+      .toMatchObject({ fixedWeeklyHours: 40, fixedPayStart: "2026-10-04", eiExempt: true });
     expect(taxProfileFromRow(null)).toBeNull();
   });
 });
