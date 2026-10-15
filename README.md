@@ -41,19 +41,35 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
-The Manager workspace is a sidebar (a drawer on phones); every page has its own URL
-(`#/manager/…`) and only the pages a manager is allowed to open are listed:
+The Manager workspace is a sidebar (a drawer on phones; on desktop it can be shrunk to an icon rail or hidden
+entirely with the toggle at the top left of the header); every page has its own URL (`#/manager/…`) and only the
+pages a manager is allowed to open are listed. Managers and the owner switch between two menus with the **V2 | V3**
+selector in the header (remembered per device); office admins always see V2.
+
+**V3** (13 entries; pages with tabs keep each tab's original access rule, the active tab is in `?tab=`):
+
+| Group | Entries [tabs] |
+|---|---|
+| **Today** (open) | To do [To approve · Receipts & proofs] · Live crew |
+| **Time** | Timesheets [Timesheets · Unlock a day] — employee name first on each card, « Entered by hand » ★ filter |
+| **Payroll** (open) | Weekly payroll · Payroll history [Pay stubs · DAS · Record of employment · Detailed calculation] |
+| **Team** | Employees [Employees · Time off] · Inventory · Communications |
+| **Reports** | Reports [Costs · Week · Month · By employee (grid) · CCQ export] |
+| **Configuration** | Configuration [Settings · Time rules · CCQ rates · Pay rules · Forms · References] |
+| **Admin** | Activity log · Service status · Emergency timesheet (owner only) |
+
+**V2** (the classic menu, frozen by tests until V3 becomes the default):
 
 | Group | Pages |
 |---|---|
 | **Today** | Live crew (who is working today; pauses polling while the tab is hidden) |
-| **Time** | Timesheets (review, filter, unlock, approve one job or a whole week before export; CCQ weeks run Sunday→Saturday) · Receipts & proofs (overtime screenshots, suppers, parking) |
+| **Time** | Timesheets (review, filter, unlock, approve one job or a whole week before export; CCQ weeks run Sunday→Saturday) · Receipts & proofs (overtime screenshots, suppers, parking) · Unlock day |
 | **Team** | Employees (CCQ metadata, rates, options, roles, pause) · Time off · Inventory |
 | **Payroll** | Calculation (DAS test bench) · Pay stubs · DAS · Record of employment (preparation worksheet) |
 | **Reports** | Costs (employer cost estimate) · Week / month · CCQ rates · Downloads (CCQ export) |
 | **Communications** | Announcements |
 | **Configuration** | Time rules · Settings · Forms · References |
-| **Advanced** | Activity log · Service status · Emergency timesheet (owner only) |
+| **Advanced** | Activity log · Service status · Pay rules · Emergency timesheet (owner only) |
 
 Managers can also broadcast announcements, synchronize CCQ rates, view the app as any employee, and force a manual refresh from the header (useful in installed PWA/App mode).
 
@@ -296,9 +312,16 @@ Rules are recorded as data in the `public.payroll_rules` table and documented in
 - **Overtime.** Regular hours are capped at 8 h/day; time worked past 8 h in a day is
   overtime. The **first hour of overtime in the week** is paid at 1.5×; all further
   overtime that week is at 2×. The 1.5× allowance is **weekly, not per day**.
-- **Holidays & weekends.** Employees never work weekends. Statutory holidays and the CCQ
-  construction vacation weeks are non-working (job entry is blocked via
-  `company_holidays`). The CCQ **leave indemnity — 13 % of weekly gross wages** (6 %
+- **Saturday, Sunday, holidays.** Saturday is all overtime (the week's 1.5× hour if still
+  unused, then 2×); Sunday and statutory holidays are 2× from the first hour. Statutory
+  holidays and the CCQ construction vacation weeks block employee job entry (`company_holidays`).
+- **Day rounding** (from week 42, 2026-10-04). Each day (work + return) is paid to the
+  nearest 15 minutes, with a per-employee running counter so the rounding never drifts
+  (`docs/rules/compensation-rules.md`, DAY_ROUNDING).
+- **Fixed weekly pay and EI exemption.** An employee can be paid fixed hours every week at
+  their hourly rate, with or without jobs, and/or be exempt from EI (> 40 % of the voting
+  shares) — Settings › Payroll, per employee. Used for the owner (40 h × $51, stub D0038-0002).
+- **Leave indemnity.** The CCQ **leave indemnity — 13 % of weekly gross wages** (6 %
   vacation + 5.5 % statutory holidays + 1.5 % sick) — is paid by the employer *on top of*
   wages and shown as an employer cost in the costing dashboard; it is **not** deducted
   from the worker.
@@ -313,7 +336,7 @@ Rules are recorded as data in the `public.payroll_rules` table and documented in
   at wages + km/parking only — no indemnity, contributions, or meal allowance.
 - Job kilometres from image autofill or manual entry are the **total shown on the work order**. If an employee records a return to storage, the return kilometres are subtracted from that total to produce the client leg; they are never added a second time.
 - Return-to-storage time is inside the day's paid span but is **never overtime** and does not count toward the 8 h (Messier rule, 2026-10-13). By default it is paid at the base rate **without social benefits**. For employees with **"Return time with social benefits up to 8h"** (Time rules), it keeps its benefits while work + return stays within 8 h; only the part beyond is paid without benefits. Subcontractors: always the base rate. The meal and >8 h overtime-proof thresholds still count it.
-- A weekday supper claim becomes available as soon as the paid day goes past 10 h. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
+- A supper claim becomes available after **2 h 15 of overtime, i.e. 10 h 15 of work** in the day; return-to-shop time (and an unpaid first trip) never counts. It is fixed at $30, limited to one per employee/day, requires a receipt and manager approval, and the manager classifies it as an expense reimbursement or taxable payroll benefit.
 - Parking is enabled per employee, requires an amount and receipt, and is capped at $20 per employee/day.
 - Employee job entry uses `America/Toronto`. The full configured deadline minute is accepted (the default `23:59` blocks at midnight); CCQ construction vacations and statutory holidays are installed automatically by dated migrations, and managers can unlock a specific employee/date.
 - Birth dates and CCQ card expiration dates are stored as full dates and maintained by managers.
@@ -404,11 +427,11 @@ specialist sign-off (per the payroll-rule gate). Money is computed in integer ce
 
 Hours classification is in production. The **dollar amounts** stay an estimate until:
 
-1. **Official sources are cited** — ICI collective agreement articles (8 h/day, overtime
-   order and rates, supper, team-leader premium, return travel, mileage); the CCQ employer
-   social-benefit rate; the CCQ levy rate and base; CNT and FDRCMO 2026 figures.
-2. **Company documents are provided** — Messier's CNESST assessment notice (rate), annual
-   payroll total (FDRCMO threshold).
+1. **Remaining rules are confirmed** — the ICI collective agreement, the CCQ benefit and levy
+   rates and the CNT figures are received and cited (`docs/rules/compensation-rules.md`); still
+   open: which wages the CNESST premium applies to (the "admissible" wage), union locals.
+2. **Company figures are entered** — the CNESST rate is entered; the 2026 payroll total
+   (FDRCMO threshold and FSS rate) is still to be entered.
 3. **Employee forms are recorded** — each employee's TD1 and TP-1015.3 (personal credits),
    union and local, apprenticeship period.
 4. **3–5 real pay stubs reproduce to the cent** in WebRAS and PDOC (apprentice, overtime,
