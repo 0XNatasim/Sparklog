@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-14 (V2.4.128).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-14 (V2.4.129).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -44,8 +44,8 @@ d'avril.
   (RRQ à 74 600 $ puis 85 000 $ de salaire, AE à 68 900 $, RQAP à 103 000 $).
   **Décidé :** importer le **talon de la semaine 42** (4 au 10 octobre) de chaque employé. Il a une colonne
   « Cumulatif » avec tout le cumul de l'année. *Où :* **Gestion › Paie › Talons › « Importer d'anciens
-  talons »** → choisir l'employé → le PDF → vérifier l'aperçu → enregistrer. Faire aussi le tien (ton
-  historique s'arrête au 3 octobre).
+  talons » › « Plusieurs talons d'un coup »** → choisir tous les PDF → vérifier l'employé reconnu sur chaque
+  ligne → « Enregistrer les N talons prêts ». Inclure le tien (ton historique s'arrête au 3 octobre).
   Ensuite, Sparklog prend le relais à la **semaine 43** dans **Paie de la semaine** : **comptabiliser chaque
   semaine** pour que le cumul suive. Si l'ancien système paie aussi la semaine 43, importer aussi ces talons-là
   et commencer à la semaine 44.
@@ -83,8 +83,6 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 - [ ] **CNESST sur le salaire admissible (trou du calcul)** : l'app calcule la CNESST (3,17 %) sur tout le
   salaire, alors que le vrai relevé ne la calcule que sur un « salaire admissible ». Le coût CNESST est donc
   **trop élevé** dans DAS, Calcul et Coûts. À corriger dès que la règle de l'excédent est connue (étape 1).
-- [ ] **Import des talons en lot** (au besoin) : déposer tous les PDF de la semaine d'un coup, l'app reconnaît
-  l'employé par le nom inscrit sur le talon (au lieu de 30 imports un par un).
 - [ ] **Ménage du code** : découper les deux plus gros écrans (la fiche employé et la liste des employés)
   et corriger environ 60 avertissements du vérificateur de code. Il faudra d'abord ajouter des tests
   d'écran.

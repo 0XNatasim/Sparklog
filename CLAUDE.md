@@ -328,8 +328,11 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   talons » (`ImportLegacyStubsDialog` : colonne « Cumulatif » → ligne `payroll_period_ledger` au 2026-10-10).
   `planPayrollWeek` part de cette ligne et n'exige pas les semaines d'avant : Sparklog prend le relais à la
   **semaine 43** (ou 44 si l'ancien système paie aussi la 43 : importer alors ces talons). Seul le propriétaire
-  a déjà son historique (2026-04-04 → 10-03) ; ajouter aussi sa semaine 42. ~30 talons un par un : un import en
-  lot (employé reconnu par le nom du talon) est possible sur demande.
+  a déjà son historique (2026-04-04 → 10-03) ; ajouter aussi sa semaine 42. **Import en lot** (V2.4.129) : même
+  fenêtre, « Plusieurs talons d'un coup » (`ImportStubsBatch.jsx`, `src/lib/talon-batch.js`) — tous les PDF d'un coup,
+  employé reconnu par le **nom** du talon (« Simon B. » ↔ « Simon Bellerive » ; n° d'employé seulement en dernier
+  recours, signalé ; jamais le n° CCQ, qui est celui de l'employeur), modifiable, même ligne que l'import unitaire,
+  semaines enregistrées dans l'ordre. Vérifié dans Chromium avec deux vrais talons (sem. 41 et 42).
 - [ ] **Échelon / période d'apprentissage** et taux horaire confirmés contre le certificat CCQ
   (liste de contrôle « CCQ monthly-report » du README).
 
