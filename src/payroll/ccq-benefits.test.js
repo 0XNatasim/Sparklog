@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCcqBenefits, computeUnionDuesAsPrinted, computeUnionDues, unionDuesRuleFor, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeUnionDuesAsPrinted, computeUnionDues, unionDuesRuleFor, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, medicRatesOn } from "./ccq-benefits.js";
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 
 const c = (d) => Math.round(d * 100);
@@ -377,5 +377,22 @@ describe("pension printed per hour to the mill (stubs S19–S25 + D0033-0007)", 
   });
   it("a stated per-hour pension is rounded to the mill too (4,338 × 31,5 h = 136,65)", () => {
     expect(computeCcqBenefits({ hours: 31.5, hourlyWage: 45.36, pensionDeductionPerHour: 4.338 }).pensionDeduction).toBe(136.65);
+  });
+});
+
+describe("MÉDIC rate by pay week (CASIC freeze, then the agreement on 2027-04-25)", () => {
+  it("is 0,68 $ salarié / 2,93 $ patronal until 2027-04-24", () => {
+    expect(medicRatesOn("2026-10-11")).toMatchObject({ employeePerHour: 0.68, employerPerHour: 2.93 });
+    expect(medicRatesOn("2027-04-24")).toMatchObject({ employeePerHour: 0.68, employerPerHour: 2.93 });
+  });
+  it("becomes 1,06 $ / 3,31 $ from the week of 2027-04-25", () => {
+    expect(medicRatesOn("2027-04-25")).toMatchObject({ employeePerHour: 1.06, employerPerHour: 3.31 });
+    expect(medicRatesOn("2028-01-02").employeePerHour).toBe(1.06);
+  });
+  it("the withholding follows the pay week unless a rate is given", () => {
+    const med = (date, extra = {}) => computeCcqBenefits({ hours: 40, hourlyWage: 50.79, date, ...extra }).medicWithholding;
+    expect(med("2027-04-18")).toBe(29.65); // 40 × 0,68 = 27,20 + 9 % 2,45
+    expect(med("2027-04-25")).toBe(46.22); // 40 × 1,06 = 42,40 + 9 % 3,82
+    expect(med("2027-04-25", { medicEmployeePerHour: 0.68 })).toBe(29.65);
   });
 });

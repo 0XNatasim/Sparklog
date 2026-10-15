@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-14, V2.4.128)
+## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.130)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -306,13 +306,20 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   Messier Connexion n'existe que **depuis avril 2026** : la masse 2026 couvre avril à décembre. D'après le relevé
   du 3e trimestre (Drive du propriétaire, « Masse salariale RBQ »), la projection avril-décembre est **proche du
   seuil de 2 M$** (montants non reproduits ici : dépôt public). Le comptable doit confirmer comment compte une
-  première année partielle avant la saisie.
+  première année partielle avant la saisie. Lus le 2026-10-15 (Drive) : Loi D-8.3 (art. 3 : masse d'une **année
+  civile** ; art. 12 : les cotisations au fonds de formation de la CCQ, 0,20 $/h, ACQ (12), **comptent comme
+  dépenses de formation admissibles** si la CCQ atteste des déboursés ; art. 11 : excédent reporté) et le
+  Sommaire 1 RLZ-1.S (lignes 71-75, 79.1-79.5 : cotisation = 1 % × masse − dépenses admissibles). Ni la loi ni
+  le formulaire ne réduisent le seuil pour une première année partielle ; le guide RLZ-1.S.G et le règlement
+  D-8.3, r. 4 restent à lire (site de Revenu Québec inaccessible depuis l'environnement de Claude).
 - [ ] **CNESST** : taux de l'avis 2026 saisi (3,17 $/100 $, unité 80170, `payroll_employer_settings`,
   2026-10-13). Le relevé du 3e trimestre montre que la prime porte sur le **« Salaire admissible CNESST »**,
   pas sur tout le salaire : prime = 3,17 % × admissible, le reste est un « Excédent CNESST » non cotisé.
   `calculateCnesst` (`src/payroll/employer/cnesst.js`) cotise encore sur tout le salaire → **coût trop élevé**.
   Règle de l'excédent **à déterminer** (même des salaires annuels modestes en ont un : ressemble à un plafond
   par paie, non confirmé) — ne pas deviner : la confirmer avec des talons hebdomadaires + le relevé, ou le comptable.
+  Indice : la grille ACQ, note (16), donne un **maximum assurable de 103 000 $ par année par salarié** ; hypothèse à
+  vérifier : plafond par paie de 103 000 $ / 52 = 1 980,77 $ par semaine.
 - [ ] **Cotisations syndicales** : confirmer pour chaque employé son association **et son local**
   (FIPOE / local 568 : formule électricien par local et période d'apprentissage) ; date de début exacte
   de l'ancienne règle SQC (seule la fin, 2026-06-27, est sourcée).
@@ -371,8 +378,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   sur le temps de retour s'il y en a, sinon sur la fin du travail (temps sup. au-delà de 8 h), depuis la **semaine 42 (2026-10-04)** (déplacé de la
   semaine 41 en V2.4.121, moteur 2.5.0, migration 0089 ; compteur à 0 le 2026-10-04). Détail :
   `docs/rules/compensation-rules.md` (DAY_ROUNDING). Pas appliqué à l'export Google Sheet (Apps Script).
-- [x] **MÉDIC** — 0,68 $ confirmé : avis CCQ du 2026-04-20 (décision du CASIC) maintient 0,68 $ salarié /
-  2,93 $ patronal jusqu'au **2027-04-24**, malgré le 0,86 $ de 27.03 A) 2). À revoir avant cette date.
+- [x] **MÉDIC** — avis CCQ du 2026-04-20 (décision du CASIC) : 0,68 $ salarié / 2,93 $ patronal jusqu'au
+  **2027-04-24** (la convention prévoyait 0,86 $ / 3,11 $). Daté depuis V2.4.130 (`MEDIC_RATES` / `medicRatesOn`,
+  `src/payroll/ccq-benefits.js`) : **1,06 $ / 3,31 $ dès la semaine du 2027-04-25** (convention ; date CCQ, la
+  FIPOE écrit le 30 avril). Taxe de 9 % sur les deux parts ; seule la part salariale est retenue, la part patronale
+  est déjà dans l'avantage social patronal ACQ (8). À confirmer avec la CCQ avant cette date (gel prolongé ?) ;
+  l'annexe C3 entière (salaires, ACQ (8), avantage imposable) change aussi à cette date : nouvelle grille à fournir.
 - [x] **Samedi, dimanche, fériés** — moteur 2.3.0 (V2.4.102) : samedi tout en temps sup. (heure à 1,5× de la
   semaine si libre, puis 2×) ; dimanche et fériés (`company_holidays`, option `holidayDates`) à 2× dès la
   1re heure, sans utiliser l'heure à 1,5×. Tous les appels (écrans, export CCQ, `classify_week`) passent
