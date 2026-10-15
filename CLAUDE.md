@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.130)
+## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.131)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -309,9 +309,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   première année partielle avant la saisie. Lus le 2026-10-15 (Drive) : Loi D-8.3 (art. 3 : masse d'une **année
   civile** ; art. 12 : les cotisations au fonds de formation de la CCQ, 0,20 $/h, ACQ (12), **comptent comme
   dépenses de formation admissibles** si la CCQ atteste des déboursés ; art. 11 : excédent reporté) et le
-  Sommaire 1 RLZ-1.S (lignes 71-75, 79.1-79.5 : cotisation = 1 % × masse − dépenses admissibles). Ni la loi ni
-  le formulaire ne réduisent le seuil pour une première année partielle ; le guide RLZ-1.S.G et le règlement
-  D-8.3, r. 4 restent à lire (site de Revenu Québec inaccessible depuis l'environnement de Claude).
+  Sommaire 1 RLZ-1.S (lignes 71-75, 79.1-79.5 : cotisation = 1 % × masse − dépenses admissibles). **Guide RLZ-1.S.G
+  (2025-10), lu le 2026-10-15** : la masse de la ligne 71 = total de la **case A des relevés 1** de l'année (§5.7),
+  **sans prorata** pour une première année partielle (rien sur un début d'activités, un nombre de jours ou un seuil
+  réduit) ; donc la masse 2026 = vrai total avril-décembre. Sous 2 M$ : ligne 75 = 0. Ligne 79.1 : si l'année
+  dépasse 2 M$ et pas la précédente, les dépenses de formation de l'année précédente sont reportables. Exemption :
+  certificat de qualité des initiatives de formation (CPMT). Employeurs associés : seulement pour le taux du FSS
+  (lignes 50.1-50.2), pas pour le FDRCMO. Le guide ne parle pas du fonds de formation CCQ (c'est D-8.3 art. 12).
+  FSS : même formule que `rules/2026.js` (1,2662 % + 0,3838 % × masse ÷ 1 M$ entre 1 et 7,8 M$), sans prorata.
+  Reste au comptable : sociétés associées au 31 décembre ? Guide 2025 : revoir celui de 2026 à sa sortie.
 - [ ] **CNESST** : taux de l'avis 2026 saisi (3,17 $/100 $, unité 80170, `payroll_employer_settings`,
   2026-10-13). Le relevé du 3e trimestre montre que la prime porte sur le **« Salaire admissible CNESST »**,
   pas sur tout le salaire : prime = 3,17 % × admissible, le reste est un « Excédent CNESST » non cotisé.

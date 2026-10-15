@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-15 (V2.4.130).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-15 (V2.4.131).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -27,7 +27,14 @@ d'avril.
 - [ ] **Masse salariale 2026 de Messier.** La cotisation FDRCMO (1 %) ne s'applique qu'au-delà de 2 M$.
   Comme Messier a démarré en avril, 2026 ne compte qu'avril à décembre. D'après le relevé du 3e trimestre
   (« Masse salariale RBQ », dans ton Drive), on serait **proche du seuil, probablement un peu en dessous**.
-  *À faire :* demander au comptable comment se compte une première année incomplète, puis inscrire le montant.
+  **Réponse du guide du Sommaire 1 (RLZ-1.S.G, dans ton Drive) :** pas de règle spéciale pour une première année
+  incomplète. On prend le **vrai total d'avril à décembre**, sans le ramener sur 12 mois. Ce total est celui de la
+  **case A des relevés 1** (salaire brut imposable, avec le 13 % et les avantages imposables), pas juste heures × taux.
+  Sous 2 M$ en 2026 : aucune cotisation FDRCMO pour 2026 (inscrire « 0 » à la ligne 75). Si 2027 dépasse 2 M$, les
+  dépenses de formation de 2026 peuvent être reportées sur 2027 (ligne 79.1).
+  *À faire :* inscrire ce total prévu dans **Paramètres › Paie** (il sert aussi au taux du FSS : environ 2 % à 2 M$,
+  1,65 % sous 1 M$). Demander au comptable seulement si Messier est **associé à d'autres entreprises** au
+  31 décembre : leurs masses s'additionnent alors pour le taux du FSS (pas pour le FDRCMO).
   Bonne nouvelle lue dans la loi (D-8.3, art. 12, dans ton Drive) : les cotisations que Messier verse déjà au
   **fonds de formation de la CCQ** (0,20 $ par heure) **comptent comme dépenses de formation**. Même au-dessus de
   2 M$, on ne paie que la différence entre 1 % de la masse et ces dépenses (Sommaire 1, lignes 71 à 75).
