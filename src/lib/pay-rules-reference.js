@@ -9,7 +9,7 @@
 import { ENGINE_VERSION, MEAL_OVERTIME_MINUTES, MEAL_AFTER_DAILY_WORK_MINUTES, CONGES_INDEMNITY_RATES, DAY_ROUNDING, RETURN_WITH_BENEFITS } from "./payroll-calculations";
 import { DEFAULT_STORAGE_AMOUNT } from "./weekly-allowances";
 import {
-  CCQ_ELECTRICIAN_IC_C3, CCQ_PRELEVEMENT_RATE, CCQ_CAISSE_EDUCATION_PER_HOUR,
+  CCQ_ELECTRICIAN_IC_C3, CCQ_PRELEVEMENT_RATE, CCQ_CAISSE_EDUCATION_PER_HOUR, MEDIC_RATES, medicRatesOn,
 } from "../payroll/ccq-benefits.js";
 import { RULE_VERSION, RRQ, EI, RQAP, FSS, LABOUR_STANDARDS, WORKFORCE_FUND } from "../payroll/rules/2026.js";
 
@@ -44,6 +44,8 @@ export function payRulesReference(lang = "fr", context = {}) {
   const L = (frText, enText) => (fr ? frText : enText);
   const { money, pct, hours } = formatters(lang);
   const c3 = CCQ_ELECTRICIAN_IC_C3;
+  const medicNow = medicRatesOn();
+  const [medicFirst, medicNext] = MEDIC_RATES;
   const lv = c3.levels;
   const apprentices = ["apprentice1", "apprentice2", "apprentice3", "apprentice4"];
   const ccqTax = c3.medicProvincialTaxRate;
@@ -112,8 +114,10 @@ export function payRulesReference(lang = "fr", context = {}) {
           detail: L("6 % vacances + 5,5 % fériés + 1,5 % maladie, sur le salaire gagné (temps sup. compris, prime exclue). Payée par l'employeur à la CCQ.", "6% vacation + 5.5% holidays + 1.5% sick leave, on wages earned (overtime included, premium excluded). Paid by the employer to the CCQ."), status: "source", sources: [["convention", "19.05 1)"], ["acq", "col. (2)"]] },
         { id: "pension", label: L("Cotisation salariale retraite", "Employee pension contribution"), value: L(`${pct(lv.journeyman.employeePensionRate, 1)} compagnon · ${pct(lv.apprentice1.employeePensionRate, 1)} apprenti`, `${pct(lv.journeyman.employeePensionRate, 1)} journeyman · ${pct(lv.apprentice1.employeePensionRate, 1)} apprentice`),
           detail: L("Sur le salaire + 13 %. Déductible de l'impôt du Québec. Minimum apprenti de 0,80 $/h non codé (jamais atteint aux taux actuels).", "On wage + 13%. Deductible from Québec tax. Apprentice $0.80/h minimum not coded (never binding at current rates)."), status: "source", sources: [["convention", "27.05 2)"]] },
-        { id: "medic", label: L("Assurance MÉDIC (retenue)", "MÉDIC insurance (withheld)"), value: L(`${money(c3.medicEmployeePerHour)} /h + taxe ${pct(ccqTax, 0)}`, `${money(c3.medicEmployeePerHour)} /h + ${pct(ccqTax, 0)} tax`),
-          detail: L("Maintenu à 0,68 $ par le CASIC jusqu'au 24 avril 2027 (la convention prévoyait 0,86 $). À revoir avant cette date.", "Held at $0.68 by the CASIC until April 24, 2027 (the agreement scheduled $0.86). Review before that date."), status: "source", sources: [["ccqMay2026", ""], ["convention", "27.03 A) 2), annexe R"]] },
+        { id: "medic", label: L("Assurance MÉDIC (retenue)", "MÉDIC insurance (withheld)"), value: L(`${money(medicNow.employeePerHour)} /h + taxe ${pct(ccqTax, 0)}`, `${money(medicNow.employeePerHour)} /h + ${pct(ccqTax, 0)} tax`),
+          detail: L(`Part salariale ${money(medicFirst.employeePerHour)} /h et part patronale ${money(medicFirst.employerPerHour)} /h, maintenues jusqu'au 24 avril 2027 (décision du CASIC ; la convention prévoyait 0,86 $ / 3,11 $). À partir du 25 avril 2027, la convention prévoit ${money(medicNext.employeePerHour)} (salariale) et ${money(medicNext.employerPerHour)} (patronale) : l'app change de taux automatiquement à cette date. Confirmer auprès de la CCQ avant cette date que le gel n'est pas prolongé. La taxe de 9 % s'ajoute aux deux parts ; la part patronale est déjà comprise dans les avantages sociaux patronaux.`,
+            `Employee ${money(medicFirst.employeePerHour)}/h and employer ${money(medicFirst.employerPerHour)}/h, held until April 24, 2027 (CASIC decision; the agreement scheduled $0.86 / $3.11). From April 25, 2027 the agreement sets ${money(medicNext.employeePerHour)} (employee) and ${money(medicNext.employerPerHour)} (employer): the app switches rate automatically on that date. Confirm with the CCQ before then that the freeze is not extended. The 9% tax applies to both parts; the employer part is already inside the employer social benefits.`),
+          status: "source", sources: [["ccqMay2026", ""], ["convention", "27.03 A) 2), annexe R"]] },
         { id: "taxable", label: L("Avantage imposable MÉDIC", "MÉDIC taxable benefit"), value: L(`${money(c3.taxableBenefitPerHour, 3)} /h`, `${money(c3.taxableBenefitPerHour, 3)} /h`),
           detail: L("Imposable au Québec et cotisable RRQ ; exclu de la retenue fédérale (T4A).", "Québec-taxable and RRQ-pensionable; excluded from federal withholding (T4A)."), status: "source", sources: [["ccqTaxable", L("code 220, C3", "code 220, C3")]] },
         { id: "employer-benefits", label: L("Avantages sociaux patronaux", "Employer social benefits"), value: L(`${money(lv.journeyman.employerSocialBenefitPerHour, 3)} /h compagnon · ${money(lv.apprentice1.employerSocialBenefitPerHour, 3)} /h apprenti`, `${money(lv.journeyman.employerSocialBenefitPerHour, 3)} /h journeyman · ${money(lv.apprentice1.employerSocialBenefitPerHour, 3)} /h apprentice`),

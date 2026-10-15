@@ -54,7 +54,8 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   taxableBenefitPerHour: 3.377,
   // Indemnité de congés annuels + fériés + maladie (6 + 5,5 + 1,5 %).
   vacationHolidaySickRate: 0.13,
-  // MÉDIC Construction employee premium + Québec insurance tax (net withholding).
+  // MÉDIC Construction employee premium + Québec insurance tax (net withholding). The rate
+  // in force for this annex window (0,68 $/h); dated rates are in MEDIC_RATES below.
   medicEmployeePerHour: 0.68,
   medicProvincialTaxRate: 0.09,
 
@@ -297,6 +298,28 @@ export function computeUnionDuesAsPrinted({ union = "ftq_fipoe", level = "journe
   return computeUnionDues({ union, level, hourlyWage: declaredHourlyWage, hours, date });
 }
 
+// MÉDIC Construction premiums per worked hour, by pay-week date (CCQ week, Sunday). Both are
+// before the 9 % Québec tax on insurance premiums. Only the employee part is withheld from pay; the
+// employer part is already inside the ACQ grid's "avantages sociaux" (column (8)), not added again.
+//   • 2026-04-26 → 2027-04-24: 0,68 $ salarié / 2,93 $ patronal — CCQ notice of 2026-04-20 (CASIC
+//     decision) keeping the old rates, although the agreement scheduled 0,86 $ / 3,11 $.
+//   • from 2027-04-25: 1,06 $ / 3,31 $ — collective agreement ICI 2025-2029, 27.03 A) 2) (CCQ date;
+//     FIPOE writes April 30). Confirm with the CCQ before that date that the freeze is not extended.
+export const MEDIC_RATES = Object.freeze([
+  Object.freeze({ effectiveFrom: "2026-04-26", effectiveTo: "2027-04-24", employeePerHour: 0.68, employerPerHour: 2.93, source: "CCQ 2026-04-20 (CASIC)" }),
+  Object.freeze({ effectiveFrom: "2027-04-25", effectiveTo: null, employeePerHour: 1.06, employerPerHour: 3.31, source: "Convention ICI 2025-2029, 27.03 A) 2)" }),
+]);
+
+// Today's date in Montréal (YYYY-MM-DD), for callers that give no pay week.
+const montrealToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+// The MÉDIC rates in force on `date` (YYYY-MM-DD, the pay week); no date = today. A date before
+// the first window takes the first one (older stubs are reproduced with explicit test rates).
+export function medicRatesOn(date) {
+  const d = String(date || montrealToday()).slice(0, 10);
+  return MEDIC_RATES.find((r) => d >= r.effectiveFrom && (!r.effectiveTo || d <= r.effectiveTo)) || MEDIC_RATES[0];
+}
+
 // Compute the CCQ benefit amounts, engine base adjustments and net withholdings
 // for one period. Dollar amounts (the engine converts to cents).
 //   hours              — total worked hours (regular + overtime hours)
@@ -312,7 +335,8 @@ export function computeCcqBenefits({
   employeePensionRate = CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate,
   taxableBenefitPerHour = CCQ_ELECTRICIAN_IC_C3.taxableBenefitPerHour,
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
-  medicEmployeePerHour = CCQ_ELECTRICIAN_IC_C3.medicEmployeePerHour,
+  // null = the dated rate in force for `date` (MEDIC_RATES).
+  medicEmployeePerHour = null,
   medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
   safetyEquipmentPerHour = CCQ_ELECTRICIAN_IC_C3.safetyEquipmentPerHour,
   // Hours the safety-equipment allowance is paid on. Defaults to `hours`, but the
@@ -324,8 +348,8 @@ export function computeCcqBenefits({
   employerSocialBenefitPerHour = null,
   union = "ftq_fipoe",
   level = "journeyman",
-  // Pay week (YYYY-MM-DD). Selects the dated union-dues rule in force that week; omit for
-  // the current rule. Only the per-union cotisation syndicale is dated so far.
+  // Pay week (YYYY-MM-DD). Selects the dated union-dues rule and the MÉDIC rate in force that
+  // week; omit for the current ones.
   date,
   // Union/professional withholdings that are ALSO federal U1 deductions but whose CCQ
   // rate/base isn't yet sourced — passed as period amounts (Québec credit, not a base
@@ -373,7 +397,8 @@ export function computeCcqBenefits({
   // MÉDIC premium + provincial insurance tax — net withholding, NOT a tax deduction.
   // Printed per component, each rounded to the cent: premium 37,5 h × 0,68 = 25,50 and tax
   // 25,50 × 9 % = 2,295 → 2,30 (stub S17: 25,50 + 2,30 = 27,80, not 27,795).
-  const medicPremiumCents = Math.round(h * medicEmployeePerHour * 100);
+  const medicRate = medicEmployeePerHour == null ? medicRatesOn(date).employeePerHour : Number(medicEmployeePerHour) || 0;
+  const medicPremiumCents = Math.round(h * medicRate * 100);
   const medicTaxCents = Math.round((medicPremiumCents * Math.round(medicProvincialTaxRate * 1e4)) / 1e4);
   const medicWithholding = (medicPremiumCents + medicTaxCents) / 100;
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax

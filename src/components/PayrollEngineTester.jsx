@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import { BEFORE_PRESET, afterPreset, presetKindForWeekStart } from "@/lib/rate-presets";
 import TalonCompare from "@/components/TalonCompare";
-import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef, engineYtdFromOpening } from "@/payroll";
+import { printedPayLines, computeUnionDuesAsPrinted, calculatePayroll, RULE_VERSION, computeCcqBenefits, computeCcqLevies, medicRatesOn, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, CCQ_LEVELS, CCQ_UNIONS, CCQ_UNION_KEYS, PAY_PERIODS_PER_YEAR, formatTalonRef, engineYtdFromOpening } from "@/payroll";
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { formatHM } from "@/lib/time";
@@ -740,7 +740,8 @@ export default function PayrollEngineTester({ messier = false }) {
         employeePensionRate: pensionRate,
         taxableBenefitPerHour: Number(ccq.imposablePerHour) || 0,
         vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
-        medicEmployeePerHour: Number(ccq.medicPerHour) || 0,
+        // Test rates: the stated MÉDIC rate; otherwise the dated rate in force that week.
+        medicEmployeePerHour: testRatesOn ? (Number(ccq.medicPerHour) || 0) : null,
         medicProvincialTaxRate: (Number(ccq.medicTaxPct) || 0) / 100,
         union: ccq.union,
         level: ccq.status,
@@ -1058,7 +1059,7 @@ export default function PayrollEngineTester({ messier = false }) {
               </label>
               <Field label={t("payroll.ccqVacationRate")} value={ccq.vacationRatePct} onChange={setC("vacationRatePct")} suffix="%" disabled={!testRatesOn} />
               <Field label={t("payroll.ccqImposable")} value={ccq.imposablePerHour} onChange={setC("imposablePerHour")} step="0.001" disabled={!testRatesOn} />
-              <Field label={t("payroll.ccqMedic")} value={ccq.medicPerHour} onChange={setC("medicPerHour")} step="0.01" disabled={!testRatesOn} />
+              <Field label={t("payroll.ccqMedic")} value={testRatesOn ? ccq.medicPerHour : medicRatesOn(weekOptions.find((o) => o.key === selectedWeek)?.start?.format("YYYY-MM-DD") || asOfDate || undefined).employeePerHour} onChange={setC("medicPerHour")} step="0.01" disabled={!testRatesOn} />
               <Field label={t("payroll.ccqMedicTax")} value={ccq.medicTaxPct} onChange={setC("medicTaxPct")} suffix="%" disabled={!testRatesOn} />
               <Field label={t("payroll.ccqPrelevement")} value={ccq.prelevementCcq} onChange={setC("prelevementCcq")} step="0.01" disabled={!testRatesOn} />
               <Field label={t("payroll.ccqCaisse")} value={ccq.caisseEducation} onChange={setC("caisseEducation")} step="0.01" disabled={!testRatesOn} />

@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-14 (V2.4.129).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-15 (V2.4.130).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -28,10 +28,14 @@ d'avril.
   Comme Messier a démarré en avril, 2026 ne compte qu'avril à décembre. D'après le relevé du 3e trimestre
   (« Masse salariale RBQ », dans ton Drive), on serait **proche du seuil, probablement un peu en dessous**.
   *À faire :* demander au comptable comment se compte une première année incomplète, puis inscrire le montant.
+  Bonne nouvelle lue dans la loi (D-8.3, art. 12, dans ton Drive) : les cotisations que Messier verse déjà au
+  **fonds de formation de la CCQ** (0,20 $ par heure) **comptent comme dépenses de formation**. Même au-dessus de
+  2 M$, on ne paie que la différence entre 1 % de la masse et ces dépenses (Sommaire 1, lignes 71 à 75).
 - [ ] **CNESST : quel salaire est cotisé.** Le relevé du 3e trimestre montre que la CNESST (3,17 $ par 100 $)
   ne porte que sur un « salaire admissible » ; le reste (« excédent ») n'est pas cotisé. L'app, elle, cotise
   sur tout le salaire, donc le coût CNESST affiché est trop élevé. Il manque la règle exacte qui fixe cet
-  excédent. *Où la trouver :* ton comptable, ou donner à Claude quelques talons d'une même semaine (voir étape 5).
+  excédent. Indice : la grille ACQ dit que le maximum assurable CNESST est de **103 000 $ par année** par
+  employé (peut-être appliqué par paie : 1 980,77 $ par semaine, à vérifier). *Où la trouver :* ton comptable, ou donner à Claude quelques talons d'une même semaine (voir étape 5).
 
 ## Étape 2 — Infos de chaque employé 👤
 
@@ -113,8 +117,12 @@ nouveau menu. Les autres pages s'ouvrent encore dans leur version actuelle. À f
   « Heure de début » visible en haut et les deux distances (miles et km) en bas.
 - [ ] **Cotisation annuelle AECQ 2027** : 245 $ (avant : 240 $), plus taxes. Ajoutée automatiquement au rapport
   mensuel CCQ d'**octobre 2026**. Rien à faire dans l'app.
-- [ ] **Assurance MÉDIC** : 0,68 $/h jusqu'au **24 avril 2027** (décision du CASIC). Avant cette date,
-  vérifier le nouveau taux (la convention prévoit 1,06 $) et le dire à Claude.
+- [ ] **Assurance MÉDIC** : part salariale **0,68 $/h** et part patronale **2,93 $/h**, maintenues jusqu'au
+  **24 avril 2027** (décision du CASIC). À partir du **25 avril 2027**, la convention prévoit **1,06 $** (salariale)
+  et **3,31 $** (patronale). Confirmer auprès de la CCQ avant cette date que le gel n'est pas prolongé.
+  La taxe provinciale de 9 % s'ajoute aux deux parts. L'app passe **toute seule** à 1,06 $ dès la semaine du
+  25 avril 2027 ; si le gel est prolongé, le dire à Claude. À cette date, toute la grille de salaires CCQ change
+  aussi : fournir la nouvelle grille ACQ.
 
 ## Comment demander à Claude
 
