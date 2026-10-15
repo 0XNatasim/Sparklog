@@ -28,7 +28,7 @@ import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
 import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
-import { loadManualEntryJobIds } from "@/lib/entry-source";
+import { loadManualEntryJobIds, onlyManualEntries } from "@/lib/entry-source";
 import ManualEntryStar from "@/components/ManualEntryStar";
 
 dayjs.extend(isoWeek);
@@ -62,7 +62,10 @@ const NOTIFICATION_FILTERS = ["overtime", "meals", "parking"];
 //   view="timesheet" → Feuilles  (#/manager/timesheets)
 //   view="receipts"  → Justificatifs (#/manager/receipts)
 // Employee, status and day live in the URL so a timesheet view can be bookmarked or shared.
-export default function ManagerDashboard({ view = "timesheet" }) {
+// Gestion V3 › Feuilles de temps only (both off = the V2 page, unchanged):
+//   nameFirst — job cards show the employee's name first (JobCard);
+//   manualFilter — a « ★ Entrées à la main » toggle that keeps only the jobs typed by hand.
+export default function ManagerDashboard({ view = "timesheet", nameFirst = false, manualFilter = false }) {
   const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -108,6 +111,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
   const [dayFilter, setDayFilter] = useState(/^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") || "") ? searchParams.get("date") : "");
   // Phone only: which of the three status piles is shown when one employee is selected.
   const [mobileStatus, setMobileStatus] = useState("submitted");
+  const [manualOnly, setManualOnly] = useState(manualFilter && searchParams.get("manual") === "1");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
   const [yesterdaySnapshotOpen, setYesterdaySnapshotOpen] = useState(false);
@@ -133,9 +137,10 @@ export default function ManagerDashboard({ view = "timesheet" }) {
     put("emp", employeeId, "all");
     put("status", statusFilter, "all");
     put("date", dayFilter, "");
+    if (manualFilter) put("manual", manualOnly ? "1" : "", "");
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, employeeId, statusFilter, dayFilter]);
+  }, [view, employeeId, statusFilter, dayFilter, manualOnly]);
 
   useEffect(() => {
     if (view !== "receipts") return;
@@ -600,11 +605,13 @@ export default function ManagerDashboard({ view = "timesheet" }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return jobs;
+    // « Entrées à la main » (V3): only the starred jobs among those loaded — no extra request.
+    const shown = onlyManualEntries(jobs, manualEntryIds, manualOnly);
+    if (!q) return shown;
     // Text search is OT (work-order number) only — employee, status and date each have
     // their own dedicated filter above.
-    return jobs.filter((j) => String(j.ot || "").toLowerCase().includes(q));
-  }, [jobs, search]);
+    return shown.filter((j) => String(j.ot || "").toLowerCase().includes(q));
+  }, [jobs, search, manualOnly, manualEntryIds]);
 
   // "All employees" timesheet ordering. Approved jobs sink to the bottom as a
   // whole block; within each block the list reads by day (newest first), then
@@ -958,6 +965,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       busy: actionLoadingId === j.id,
       onApprove: approveStable,
       onUnlock: unlockStable,
+      nameFirst,
     };
   }
 
@@ -1053,6 +1061,19 @@ export default function ManagerDashboard({ view = "timesheet" }) {
               <span className="rounded-full border bg-muted px-2.5 py-0.5 text-xs">
                 {t("manager.counts.approved")}: <b>{counts.approved}</b>
               </span>
+              {manualFilter && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={manualOnly ? "default" : "outline"}
+                  aria-pressed={manualOnly}
+                  onClick={() => setManualOnly((value) => !value)}
+                  title={t("manager.manualOnly.hint")}
+                >
+                  <span className={cn("mr-1.5 font-bold", manualOnly ? "text-primary-foreground" : "text-destructive")} aria-hidden="true">★</span>
+                  {t("manager.manualOnly.button")}
+                </Button>
+              )}
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <Button type="button" size="sm" variant="outline" onClick={() => setWeekSnapshotOpen(true)}>
                   <Radio className="mr-1.5 h-4 w-4" />{t("live.week.open")}
@@ -1262,6 +1283,11 @@ export default function ManagerDashboard({ view = "timesheet" }) {
 
         {!loading && manualEntryIds.size > 0 && (
           <p className="text-xs text-muted-foreground"><ManualEntryStar className="mr-1" />{t("manager.manualEntryLegend")}</p>
+        )}
+        {!loading && manualOnly && (
+          <p className="text-xs text-muted-foreground">
+            {t(employeeId === "all" && !dayFilter ? "manager.manualOnly.partial" : "manager.manualOnly.active")}
+          </p>
         )}
 
         {!loading && employeeId !== "all" && split && (

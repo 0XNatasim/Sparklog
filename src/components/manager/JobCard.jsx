@@ -21,7 +21,10 @@ export function fmtTimeHHmm(t) {
 // One timesheet row of the manager dashboard. Memoized: it receives only primitives,
 // the row's own objects and stable callbacks, so approving, filtering or loading one
 // job no longer re-renders every card on the page (P-10).
-function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, manualEntry, focused, focusedEvidence, busy, onApprove, onUnlock }) {
+// nameFirst (Gestion V3): the employee's full name heads the card with the OT number and the
+// date under it, in a fixed-width column the pills and buttons cannot squeeze. Without it, the
+// V2 card, unchanged.
+function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, manualEntry, focused, focusedEvidence, busy, onApprove, onUnlock, nameFirst = false }) {
   const t = useT();
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
 
@@ -35,57 +38,88 @@ function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCapt
     const updatedLabel = j.updated_at ? dayjs(j.updated_at).format("DD MMM HH:mm") : "—";
     const canApprove = j.status === "submitted";
 
+    // OT number, date, capture icons and the overtime-proof warning (both layouts).
+    const otAndDate = (
+      <>
+        <span>{manualEntry && <ManualEntryStar className="mr-0.5" />}<span className="text-success">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
+        <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeCaptured, meal_claim_captured: j.meal_claim_captured || mealCaptured }} />
+        {dayOvertimeNoEvidence && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning"
+            title={t("manager.overtimeNoEvidenceHint")}
+          >
+            <TriangleAlert className="h-3 w-3" />{t("manager.overtimeNoEvidence")}
+          </span>
+        )}
+      </>
+    );
+
     return (
       <Card id={`job-${j.id}`} className={cn(shaded && "bg-slate-100 dark:bg-slate-800/70", jobCodeTintClass(j.ot), focused && "ring-2 ring-destructive")}>
         <CardContent className="p-3">
           {/* Mobile: stacked. Desktop: single-row inline list. */}
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-3">
-            {/* OT + date */}
-            <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
-              <span>{manualEntry && <ManualEntryStar className="mr-0.5" />}<span className="text-success">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
-              <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeCaptured, meal_claim_captured: j.meal_claim_captured || mealCaptured }} />
-              {dayOvertimeNoEvidence && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning"
-                  title={t("manager.overtimeNoEvidenceHint")}
-                >
-                  <TriangleAlert className="h-3 w-3" />{t("manager.overtimeNoEvidence")}
-                </span>
-              )}
-            </div>
+            {nameFirst ? (
+              <div className="min-w-0 space-y-0.5 md:w-72 md:shrink-0">
+                <div className="truncate text-sm font-semibold" title={employeeName}>{employeeName}</div>
+                <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold">{otAndDate}</div>
+                {(employee?.phone || employee?.email) && (
+                  <div className="truncate text-xs text-muted-foreground">
+                    {employee?.phone && (
+                      <a href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {employee.phone}
+                      </a>
+                    )}
+                    {employee?.phone && employee?.email && " • "}
+                    {employee?.email && (
+                      <a href={`mailto:${employee.email}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {employee.email}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* OT + date */}
+                <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold md:w-44 md:shrink-0">
+                  {otAndDate}
+                </div>
 
-            {/* Employee · phone · email — one line, no labels.
-                Phone is a tel: link, email is a mailto: link. */}
-            <div
-              className="text-xs text-muted-foreground md:min-w-0 md:flex-1 md:truncate"
-              title={[employee?.phone, employee?.email].filter(Boolean).join(" • ")}
-            >
-              <span className="font-semibold text-foreground">{employeeName}</span>
-              {employee?.phone ? (
-                <>
-                  {" • "}
-                  <a
-                    href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}
-                    className="text-primary hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {employee.phone}
-                  </a>
-                </>
-              ) : null}
-              {employee?.email ? (
-                <>
-                  {" • "}
-                  <a
-                    href={`mailto:${employee.email}`}
-                    className="text-primary hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {employee.email}
-                  </a>
-                </>
-              ) : null}
-            </div>
+                {/* Employee · phone · email — one line, no labels.
+                    Phone is a tel: link, email is a mailto: link. */}
+                <div
+                  className="text-xs text-muted-foreground md:min-w-0 md:flex-1 md:truncate"
+                  title={[employee?.phone, employee?.email].filter(Boolean).join(" • ")}
+                >
+                  <span className="font-semibold text-foreground">{employeeName}</span>
+                  {employee?.phone ? (
+                    <>
+                      {" • "}
+                      <a
+                        href={`tel:${String(employee.phone).replace(/[^+\d]/g, "")}`}
+                        className="text-primary hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {employee.phone}
+                      </a>
+                    </>
+                  ) : null}
+                  {employee?.email ? (
+                    <>
+                      {" • "}
+                      <a
+                        href={`mailto:${employee.email}`}
+                        className="text-primary hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {employee.email}
+                      </a>
+                    </>
+                  ) : null}
+                </div>
+              </>
+            )}
 
             {/* Metric pills */}
             <div className="flex flex-wrap gap-1.5">
