@@ -125,3 +125,31 @@ describe("buildWeeklyReportHtml", () => {
     expect(html).not.toMatch(/NAS|adresse/i);
   });
 });
+
+describe("fixed weekly pay (owner)", () => {
+  const owner = { id: "k", full_name: "Karine Messier", role: "owner", hourly_rate: 51 };
+  const taxProfiles = new Map([["k", { fixedWeeklyHours: 40, fixedPayStart: "2026-09-01", eiExempt: true }]]);
+  const r = buildWeeklyReport({ week, profiles: [alice, owner], jobs: jobs.filter((j) => j.user_id === "a"), contributions, employer, taxProfiles });
+  const k = r.employees.find((e) => e.id === "k");
+
+  it("is listed without any job, paid 40 h × 51 $ with no EI and no CCQ contribution", () => {
+    expect(k.jobs).toEqual([]);
+    expect(k.pay.salary).toBe(2040);
+    expect(k.pay.deductions.ei).toBe(0);
+    expect(k.pay.deductions.ccq).toBe(0);
+    expect(k.pay.vacation).toBe(0);
+    expect(k.pay.employer.otherCcq).toEqual([]);
+    expect(k.pay.employer.ccqBenefits).toBe(0);
+  });
+
+  it("counts the 40 h as hors CCQ hours and adds the pay to the totals", () => {
+    expect(k.hours).toMatchObject({ paidMinutes: 2400, ccqMinutes: 0, nonCcqMinutes: 2400 });
+    expect(r.totals.salary).toBeCloseTo(byId.get("a").pay.salary + 2040, 6);
+    expect(buildWeeklyReportHtml(r)).toContain("Paie fixe : 40h00 par semaine");
+  });
+
+  it("is left out before its start date", () => {
+    const before = buildWeeklyReport({ week, profiles: [owner], jobs: [], taxProfiles: new Map([["k", { fixedWeeklyHours: 40, fixedPayStart: "2026-10-04" }]]) });
+    expect(before.employees).toEqual([]);
+  });
+});

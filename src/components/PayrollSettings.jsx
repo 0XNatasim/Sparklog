@@ -137,7 +137,7 @@ function TaxFormsSection({ t }) {
 
   const load = useCallback(async () => {
     const [{ data: people, error: pErr }, { data: forms, error: fErr }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, is_paused").order("full_name", { ascending: true }),
+      supabase.from("profiles").select("id, full_name, email, role, is_paused, hourly_rate").order("full_name", { ascending: true }),
       supabase.from("employee_tax_profiles").select("*"),
     ]);
     if (pErr || fErr) { setMessage((pErr || fErr).message); return; }
@@ -155,6 +155,10 @@ function TaxFormsSection({ t }) {
           tp1015_3_credits: asText(f.tp1015_3_credits),
           quebec_additional_tax: asText(f.quebec_additional_tax && Number(f.quebec_additional_tax) ? f.quebec_additional_tax : ""),
           forms_received_on: f.forms_received_on || "",
+          hourly_rate: Number(p.hourly_rate) || 0,
+          fixed_weekly_hours: asText(f.fixed_weekly_hours),
+          fixed_pay_start: f.fixed_pay_start || "",
+          ei_exempt: Boolean(f.ei_exempt),
         };
       }));
   }, []);
@@ -165,7 +169,12 @@ function TaxFormsSection({ t }) {
 
   async function saveRow(row) {
     const values = Object.fromEntries(TAX_FIELDS.map(({ key }) => [key, parseAmount(row[key])]));
-    if (Object.values(values).some((v) => Number.isNaN(v))) { setMessage(t("payrollSettings.invalid")); return; }
+    const fixedHours = parseAmount(row.fixed_weekly_hours);
+    if (Object.values(values).some((v) => Number.isNaN(v)) || Number.isNaN(fixedHours) || (fixedHours != null && (fixedHours <= 0 || fixedHours > 80))) {
+      setMessage(t("payrollSettings.invalid"));
+      return;
+    }
+    if (fixedHours && !row.fixed_pay_start) { setMessage(t("payrollSettings.fixedStartRequired")); return; }
     setSavingId(row.id);
     const { data: auth } = await supabase.auth.getUser();
     const { error } = await supabase.from("employee_tax_profiles").upsert({
@@ -175,6 +184,9 @@ function TaxFormsSection({ t }) {
       tp1015_3_credits: values.tp1015_3_credits,
       quebec_additional_tax: values.quebec_additional_tax ?? 0,
       forms_received_on: row.forms_received_on || null,
+      fixed_weekly_hours: fixedHours,
+      fixed_pay_start: fixedHours ? row.fixed_pay_start : null,
+      ei_exempt: row.ei_exempt,
       updated_at: new Date().toISOString(),
       updated_by: auth?.user?.id || null,
     }, { onConflict: "user_id" });
@@ -203,6 +215,7 @@ function TaxFormsSection({ t }) {
                   <Input type="date" value={row.forms_received_on} onChange={(e) => setField(row.id, "forms_received_on", e.target.value)} className="h-11 sm:h-10" />
                 </label>
               </div>
+              <FixedPayFields t={t} row={row} setField={setField} />
               <Button type="button" size="sm" className="h-11 sm:h-9" disabled={savingId === row.id} onClick={() => saveRow(row)}>
                 {savingId === row.id ? t("common.working") : t("common.save")}
               </Button>
@@ -211,5 +224,38 @@ function TaxFormsSection({ t }) {
         </div>
       </div>
     </Fold>
+  );
+}
+
+// Fixed weekly pay (hours × hourly rate every week, whatever the jobs) and the EI exemption
+// (migration 0091). Read by computeEmployeeWeekTalon through the tax profile.
+function FixedPayFields({ t, row, setField }) {
+  const hours = parseAmount(row.fixed_weekly_hours);
+  const fmt = (v) => Number(v).toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (
+    <div className="space-y-2 rounded border bg-background p-2">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <label className="space-y-1">
+          <span className="text-xs text-muted-foreground">{t("payrollSettings.fixedHours")}</span>
+          <Input inputMode="decimal" value={row.fixed_weekly_hours} onChange={(e) => setField(row.id, "fixed_weekly_hours", e.target.value)} placeholder="—" className="h-11 font-mono sm:h-10" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs text-muted-foreground">{t("payrollSettings.fixedStart")}</span>
+          <Input type="date" value={row.fixed_pay_start} disabled={!hours} onChange={(e) => setField(row.id, "fixed_pay_start", e.target.value)} className="h-11 sm:h-10" />
+        </label>
+        <label title={t("payrollSettings.eiExemptHelp")} className="col-span-2 flex cursor-pointer items-center gap-2 self-end rounded border px-2 py-2 text-xs">
+          <input type="checkbox" checked={row.ei_exempt} onChange={(e) => setField(row.id, "ei_exempt", e.target.checked)} className="h-5 w-5 shrink-0 rounded border-input accent-primary" />
+          <span>{t("payrollSettings.eiExempt")}</span>
+        </label>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {hours > 0
+          ? (row.hourly_rate > 0
+            ? t("payrollSettings.fixedPreview", { hours: fmt(hours), rate: fmt(row.hourly_rate), amount: fmt(hours * row.hourly_rate) })
+            : <span className="text-warning">{t("payrollSettings.fixedNoRate")}</span>)
+          : t("payrollSettings.fixedHoursHelp")}
+        {row.ei_exempt ? <> · {t("payrollSettings.eiExemptHelp")}</> : null}
+      </p>
+    </div>
   );
 }

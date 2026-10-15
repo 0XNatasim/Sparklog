@@ -10,6 +10,7 @@ import { computeEmployeeWeekTalon, DEFAULT_EMPLOYER } from "@/payroll/employee-w
 import { payTotals } from "@/lib/payroll-closing";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { EMPLOYER } from "@/lib/paystub";
+import { fixedWeeklyHours, isFixedPayWeek } from "@/lib/fixed-pay";
 
 // Drafts ('saved') are not work yet. 'updated' and 'submitted' are printed but flagged as not
 // approved: their amounts can still change.
@@ -69,7 +70,8 @@ function employeePay({ profile, jobs, week, opening, holidayDates, employer, tax
   const totals = payTotals(result, ccq, reimb);
   const emp = result.employee, empr = result.employer, das = result.das;
 
-  const rateKey = LEVEL_RATE_KEY[profile?.apprentice_level] || null;
+  // Fixed weekly pay has no CCQ layer: no per-hour CCQ contributions either.
+  const rateKey = talon.fixedPay ? null : LEVEL_RATE_KEY[profile?.apprentice_level] || null;
   const otherCcq = rateKey
     ? contributions
       .filter((c) => !ENGINE_CONTRIBUTION_CODES.has(c.code))
@@ -139,8 +141,11 @@ export function buildWeeklyReport({
   const employees = [];
   const sorted = [...profiles].sort((a, b) => String(a.full_name || "").localeCompare(String(b.full_name || ""), "fr"));
   for (const profile of sorted) {
-    const ujobs = jobsByUser.get(profile.id);
-    if (!ujobs?.length) continue;
+    const ujobs = jobsByUser.get(profile.id) || [];
+    // Fixed weekly pay (Paramètres › Paie): paid every week from its start date, with or without jobs.
+    const taxProfile = taxProfiles.get(profile.id);
+    const fixedHours = isFixedPayWeek(taxProfile, week.end) ? fixedWeeklyHours(taxProfile) : 0;
+    if (!ujobs.length && !fixedHours) continue;
     const rounding = roundingFor(profile.id);
     const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates, rounding });
     const rows = jobRows(ujobs, entries);
@@ -157,15 +162,19 @@ export function buildWeeklyReport({
       roundingMinutes: sum(rows, "roundingMinutes"),
       km: sum(rows, "km"),
     };
+    // Fixed pay: the week pays the fixed hours (regular), not the jobs' time.
+    if (fixedHours) {
+      Object.assign(hours, { regularMinutes: fixedHours * 60, ot50Minutes: 0, ot100Minutes: 0, returnNoBenefitMinutes: 0, paidMinutes: fixedHours * 60, roundingMinutes: 0 });
+    }
     // Heures CCQ = regular (return with benefits included) + 1.5× + 2×, as declared on the CCQ
-    // report. Hors CCQ = return-to-shop time without benefits; every hour of a non-CCQ role.
-    hours.ccqMinutes = nonCcq ? 0 : hours.regularMinutes + hours.ot50Minutes + hours.ot100Minutes;
+    // report. Hors CCQ = return-to-shop time without benefits; every hour of a non-CCQ role or of fixed pay.
+    hours.ccqMinutes = nonCcq || fixedHours ? 0 : hours.regularMinutes + hours.ot50Minutes + hours.ot100Minutes;
     hours.nonCcqMinutes = hours.paidMinutes - hours.ccqMinutes;
     let pay = null;
-    if (!nonCcq) {
+    if (!nonCcq || fixedHours) {
       pay = employeePay({
-        profile, jobs: ujobs, week, opening: openingFor(profile.id) || {}, holidayDates, employer,
-        taxProfile: taxProfiles.get(profile.id), contributions, meals, parking: parkingAmount, rounding,
+        profile, jobs: fixedHours ? ujobs.filter((j) => j.status === "approved") : ujobs, week, opening: openingFor(profile.id) || {}, holidayDates, employer,
+        taxProfile, contributions, meals, parking: parkingAmount, rounding,
       });
     }
     employees.push({
@@ -175,6 +184,7 @@ export function buildWeeklyReport({
       level: profile.apprentice_level || "",
       role: profile.role,
       category: isSubcontractorRole(profile.role) ? "subcontractor" : nonCcq ? "nonCcq" : "ccq",
+      fixedHours,
       jobs: rows,
       hours,
       meals,
@@ -324,7 +334,8 @@ function employeeHtml(emp) {
         <td></td>
       </tr></tfoot>
     </table>
-    ${emp.roundingBalance == null ? "" : `<p class="note">Arrondi au 15 min de la semaine : ${esc(signedMinutes(h.roundingMinutes))} · compteur à la fin de la semaine : ${esc(signedMinutes(emp.roundingBalance))} (+ = payé en plus, − = dû à l'employé).</p>`}
+    ${emp.fixedHours ? `<p class="note">Paie fixe : ${esc(fmtHM(emp.fixedHours * 60))} par semaine au taux horaire, avec ou sans job (sans avantages CCQ) — les heures des jobs ne sont pas payées, leurs km oui.</p>` : ""}
+    ${emp.roundingBalance == null || emp.fixedHours ? "" : `<p class="note">Arrondi au 15 min de la semaine : ${esc(signedMinutes(h.roundingMinutes))} · compteur à la fin de la semaine : ${esc(signedMinutes(emp.roundingBalance))} (+ = payé en plus, − = dû à l'employé).</p>`}
     ${money}
   </section>`;
 }

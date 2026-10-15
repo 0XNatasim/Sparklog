@@ -160,6 +160,25 @@ Two separate per-employee premiums ($/h, Règles de temps › Chef d'équipe):
 - Lunch (dîner): 20.02 3) ½ h or 1 h unpaid — employees already leave it out of their
   Départ→Fin entries (owner confirmation 2026-10-13); nothing to deduct in the app.
 
+## FIXED_WEEKLY_PAY — owner's fixed pay and EI exclusion (owner decision 2026-10-15, V2.4.132)
+The owner (Karine Messier, Présidente) is paid the same pay every week without entering jobs.
+Reference stub **D0038-0002** (week 2026-10-04 → 2026-10-10): « Régulier à taux horaire »
+40,00 h × 51,0000 = 2 040,00 $; federal tax 234,91, Québec tax 275,28, RRQ 124,28, RQAP 8,77,
+**no AE**; net 1 396,76 $; record-only « Vacances » 81,60 (4 % of the line). Reproduced to the
+cent by `src/payroll/employee-week.test.js`.
+- Per employee, Paramètres › Paie (`employee_tax_profiles`, migration 0091): `fixed_weekly_hours`
+  and `fixed_pay_start`. Every CCQ week from the week holding the start date pays those hours at
+  `profiles.hourly_rate` on one « Régulier à taux horaire » line, whatever the jobs (the jobs' km
+  are still reimbursed). No CCQ benefits, 13 % indemnity, CCQ withholdings or per-hour CCQ
+  employer contributions. Statutory deductions and employer contributions as for any employee.
+- `ei_exempt`: not insurable for EI — **Employment Insurance Act, s. 5(2)(b)** (a person who
+  controls more than 40 % of the corporation's voting shares). No EI premium, employee or
+  employer; « Gains AE » is 0 on the stub. Ticked by a manager, never inferred.
+- Shown in Talons, DAS, Calcul, Paie de la semaine (comptabiliser), Coûts, Semaine/mois and the
+  printed weekly summary. Not in the CCQ monthly report (non-CCQ role).
+- Open: whether the owner's pay is assessable by the CNESST (to confirm with the CNESST notice);
+  until then the company CNESST rate applies to it like any employee.
+
 ## Pending / not yet specified (do not guess — `requires_review`)
 - CCQ primary-source citations (document + section + effective dates) for every rule above.
 - Statutory holidays, vacation pay, and any premium other than team-leader.

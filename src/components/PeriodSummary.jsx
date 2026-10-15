@@ -13,6 +13,8 @@ import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 import { loadHolidayDates } from "@/lib/company-holidays";
+import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/lib/payroll-settings";
+import { fixedPayWeekCost, fixedPayWeekEnds } from "@/lib/fixed-pay-cost";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 
 dayjs.extend(isoWeek);
@@ -67,6 +69,12 @@ export default function PeriodSummary({ mode = "week" }) {
       setLoading(true);
       const { start, end } = range;
       const holidayDates = await loadHolidayDates();
+      // Fixed weekly pay (Paramètres › Paie) is costed from its settings; a failed load keeps the job-based estimate.
+      const [taxProfiles, employerRow] = await Promise.all([
+        loadTaxProfiles().catch(() => new Map()),
+        loadEmployerSettings().catch(() => null),
+      ]);
+      const employer = employerFromSettings(employerRow);
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }, rounding] = await Promise.all([
         supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end).order("id")),
@@ -85,7 +93,7 @@ export default function PeriodSummary({ mode = "week" }) {
       const buckets = new Map();
       const bucket = (dateStr) => {
         const p = periodFor(mode, dateStr);
-        if (!buckets.has(p.key)) buckets.set(p.key, { ...p, jobs: [], meals: 0, parking: 0 });
+        if (!buckets.has(p.key)) buckets.set(p.key, { ...p, jobs: [], meals: 0, parking: 0, fixedWeeks: new Map() });
         return buckets.get(p.key);
       };
       (jobs || []).forEach((j) => bucket(j.job_date).jobs.push(j));
@@ -94,10 +102,23 @@ export default function PeriodSummary({ mode = "week" }) {
         if (!isNonCcqRole(prof?.role)) bucket(m.job_date).meals += Number(m.amount) || 0; // CCQ supper only
       });
       (parking || []).forEach((p) => { bucket(p.job_date).parking += Number(p.amount) || 0; });
+      // Fixed weekly pay: each paid week (keyed by its Saturday) lands in its period, whatever the jobs.
+      for (const [uid, taxProfile] of taxProfiles) {
+        if (!profileById.has(uid)) continue;
+        for (const weekEnd of fixedPayWeekEnds(taxProfile, start, end)) {
+          const b = bucket(weekEnd);
+          b.fixedWeeks.set(uid, (b.fixedWeeks.get(uid) || 0) + 1);
+        }
+      }
+      const fixedCostByUser = new Map();
+      const fixedCost = (uid) => {
+        if (!fixedCostByUser.has(uid)) fixedCostByUser.set(uid, fixedPayWeekCost({ profile: profileById.get(uid), taxProfile: taxProfiles.get(uid), employer }));
+        return fixedCostByUser.get(uid);
+      };
 
       const result = [];
       for (const b of buckets.values()) {
-        if (b.jobs.length === 0) continue;
+        if (b.jobs.length === 0 && b.fixedWeeks.size === 0) continue;
         const byUser = new Map();
         b.jobs.forEach((j) => {
           if (!byUser.has(j.user_id)) byUser.set(j.user_id, []);
@@ -105,8 +126,25 @@ export default function PeriodSummary({ mode = "week" }) {
         });
 
         let labor = 0, conges = 0, contribTotal = 0, kmCost = 0, workedMin = 0, otJobs = 0, phoneData = 0, storage = 0;
+        // Fixed weekly pay: gross + employer contributions of the talon calculation × the weeks of this
+        // period; the employee's jobs (below) only add their km.
+        for (const [uid, weeks] of b.fixedWeeks) {
+          const cost = fixedCost(uid);
+          const profile = profileById.get(uid);
+          labor += cost.labor * weeks;
+          contribTotal += cost.contribTotal * weeks;
+          workedMin += cost.hours * 60 * weeks;
+          phoneData += weeks * weeklyPhoneAmount(profile);
+          storage += weeks * weeklyStorageAmount(profile);
+        }
         for (const [uid, ujobs] of byUser) {
           const profile = profileById.get(uid);
+          if (b.fixedWeeks.has(uid)) {
+            calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates }).forEach((e) => {
+              kmCost += e.totalKm * (Number(e.job?.km_rate_snapshot ?? profile?.km_rate) || 0);
+            });
+            continue;
+          }
           const isNonCcq = isNonCcqRole(profile?.role);
           const isSub = isSubcontractorRole(profile?.role);
           const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
@@ -155,7 +193,7 @@ export default function PeriodSummary({ mode = "week" }) {
           title,
           start: b.start,
           end: b.end,
-          activeEmployees: byUser.size,
+          activeEmployees: new Set([...byUser.keys(), ...b.fixedWeeks.keys()]).size,
           totalHours: workedMin / 60,
           otJobs,
           jobJobs: b.jobs.filter((j) => jobCodeKind(j.ot) === "project").length,

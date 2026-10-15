@@ -47,3 +47,21 @@ describe("buildCalculTalon — talon gardé depuis Calcul (S40)", () => {
     expect(talon.header.paieNette).toBe("1,626.15");
   });
 });
+
+describe("buildCalculTalon — paie fixe (talon D0038-0002, Karine Messier)", () => {
+  it("prints one « Régulier à taux horaire » line and only the Sommaire lines of the real stub", async () => {
+    const { computeEmployeeWeekTalon } = await import("@/payroll/employee-week");
+    const { buildClosing } = await import("./payroll-closing");
+    const opening = { grossIncome: 55080, regularEarnings: 55080, hoursYtd: 1080, vacationPay: 2203.2, federalTax: 6342.57, quebecTax: 7432.56, rrqEmployee: 3355.56, rqapEmployee: 236.79, pensionableIncomeRRQ: 55080, insurableIncomeRQAP: 55080, labourStandardsIncome: 55080 };
+    const t = computeEmployeeWeekTalon({ profile: { hourly_rate: 51 }, jobs: [], opening, weekDate: "2026-10-04", taxProfile: { fixedWeeklyHours: 40, fixedPayStart: "2026-01-04", eiExempt: true } });
+    const closing = buildClosing({ opening, result: t.result, ccq: t.ccqAmounts, reimb: t.reimb, pay: t.pay });
+    const stub = buildCalculTalon({ opening, closing, result: t.result, ccq: t.ccqAmounts, reimb: t.reimb, pay: t.pay, employee: { full_name: "Karine Messier" } });
+    expect(stub.transactions).toEqual([{ description: "Régulier à taux horaire", unite: 40, taux: 51, montant: 2040 }]);
+    expect(Object.fromEntries(stub.sommaire.map((l) => [l.description, [l.periode, l.cumulatif]]))).toEqual({
+      "Salaire régulier": [2040, 57120], Vacances: [81.6, 2284.8], Heures: [40, 1120], "Impôt Québec": [275.28, 7707.84],
+      "Impôt Fédéral": [234.91, 6577.48], "Contr. au RRQ": [124.28, 3479.84], "Gains RRQ": [2040, 57120],
+      "Gains RQAP": [2040, 57120], "Contr. au RQAP": [8.77, 245.56],
+    });
+    expect(stub.header).toMatchObject({ gains: "2,040.00", retenues: "643.24", paieNette: "1,396.76" });
+  });
+});
