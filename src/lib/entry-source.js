@@ -37,3 +37,10 @@ export async function loadManualEntryJobIds(client, jobIds, { signal } = {}) {
   }
   return manual;
 }
+
+// « Entrées à la main » filter of the timesheets: only the jobs typed by hand (red star), among
+// the jobs already loaded. Off → the list unchanged.
+export function onlyManualEntries(jobs, manualIds, enabled) {
+  if (!enabled) return jobs;
+  return (jobs || []).filter((job) => manualIds?.has(job.id));
+}
