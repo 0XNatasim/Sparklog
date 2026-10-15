@@ -20,8 +20,10 @@ import { computeEmployeeWeekTalon, formatTalonRef, YTD_COLUMN_TO_KEY, YTD_CCQ_CO
 import { buildStubModel, defaultHeader } from "@/lib/paystub";
 import { openTalonsPrint } from "@/lib/talon-print";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
-import { TAX_YEAR, lastCompletedWeekEnd, planPayrollWeek, postPayrollWeek, weekBounds } from "@/lib/payroll-week";
+import { TAX_YEAR, lastCompletedWeekEnd, payrollWeekCsv, planPayrollWeek, postPayrollWeek, weekBounds } from "@/lib/payroll-week";
 
+// Supper and parking claims count in the employer cost like on the printed summary.
+const CLAIM_STATUSES = ["pending", "approved"];
 const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
 const LEDGER_COLUMNS = ["user_id", "period_end", "period_start", "talon_seq", "boss_approved", ...[...YTD_COLUMN_TO_KEY, ...YTD_CCQ_COLUMN_TO_KEY].map(([, col]) => col)].join(", ");
 const WEEKS_BACK = 12;
@@ -30,6 +32,12 @@ const money = (v) => `${(Number(v) || 0).toLocaleString("fr-CA", { minimumFracti
 const hours = (v) => {
   const m = Math.round((Number(v) || 0) * 60);
   return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
+};
+const hoursOrDash = (v) => (Number(v) ? hours(v) : "—");
+const sumByUser = (rows) => {
+  const map = new Map();
+  for (const row of rows) map.set(row.user_id, (map.get(row.user_id) || 0) + (Number(row.amount) || 0));
+  return map;
 };
 const unwrap = (res) => {
   if (res.error) throw res.error;
@@ -73,8 +81,8 @@ export default function PayrollWeek({ messier = false }) {
 
   const load = useCallback(async () => {
     try {
-      const { end } = weekBounds(weekEnd);
-      const [profiles, jobs, seeds, ledger, kept, settingsRow, taxProfiles, holidayDates, rounding] = await Promise.all([
+      const { start: wStart, end } = weekBounds(weekEnd);
+      const [profiles, jobs, seeds, ledger, kept, settingsRow, taxProfiles, holidayDates, rounding, contributions, meals, parking] = await Promise.all([
         supabase.from("profiles").select(PROFILE_COLUMNS).then(unwrap),
         fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, status, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", `${TAX_YEAR}-01-01`).lte("job_date", end).order("id")).then(unwrap),
         supabase.from("payroll_ytd").select("*").eq("tax_year", TAX_YEAR).then(unwrap),
@@ -84,6 +92,9 @@ export default function PayrollWeek({ messier = false }) {
         loadTaxProfiles(),
         loadHolidayDates(),
         loadDayRounding({ untilDate: end }),
+        supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }).then(unwrap),
+        fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").in("status", CLAIM_STATUSES).gte("job_date", wStart).lte("job_date", end).order("id")).then(unwrap),
+        fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, job_date, amount").in("status", CLAIM_STATUSES).gte("job_date", wStart).lte("job_date", end).order("id")).then(unwrap),
       ]);
       const ledgerByUser = new Map();
       for (const row of ledger) {
@@ -96,6 +107,9 @@ export default function PayrollWeek({ messier = false }) {
         seedByUser: new Map(seeds.map((row) => [row.user_id, row])),
         keptByUser: new Map(kept.filter((row) => row.imported_talon).map((row) => [row.user_id, row.imported_talon])),
         employer: employerFromSettings(settingsRow),
+        contributions,
+        mealsByUser: sumByUser(meals),
+        parkingByUser: sumByUser(parking),
       });
     } catch (e) {
       setErr(e?.message || t("payWeek.failedLoad"));
@@ -117,6 +131,9 @@ export default function PayrollWeek({ messier = false }) {
       ledgerByUser: data.ledgerByUser,
       seedByUser: data.seedByUser,
       taxProfiles: data.taxProfiles,
+      contributions: data.contributions,
+      mealsByUser: data.mealsByUser,
+      parkingByUser: data.parkingByUser,
       compute: (profile, approved, opening) => computeEmployeeWeekTalon({
         profile, jobs: approved, opening, frequency: "weekly", includePhone: true, includeStorage: true,
         weekDate: start, messierMethod: messier, holidayDates: data.holidayDates, employer: data.employer,
@@ -189,19 +206,34 @@ export default function PayrollWeek({ messier = false }) {
     }
   }
 
+  function download(content, filename) {
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Hours by rate per employee, to enter in the outside payroll software.
+  function exportHoursCsv() {
+    const header = [
+      t("payWeek.csv.employeeNumber"), t("payroll.employee"), t("payWeek.col.state"),
+      t("payWeek.csv.regular"), t("payWeek.csv.ot150"), t("payWeek.csv.ot200"), t("payWeek.csv.return"), t("payWeek.csv.total"),
+      t("payWeek.csv.km"), t("payWeek.csv.meals"), t("payWeek.csv.parking"), t("payWeek.col.gross"), t("payWeek.col.cost"),
+    ];
+    const stateLabel = (row) => t(`payWeek.state.${row.state}`, { week: row.earlierUnposted[0] ? ccqWeekNumber(dayjs(row.earlierUnposted[0])) : "" });
+    download(payrollWeekCsv(plan, { header, stateLabel }), `Heures_semaine_${weekNo}_${weekEnd}.csv`);
+  }
+
   function exportDasCsv() {
     const rows = plan.rows.filter((row) => row.talon && (row.state === "posted" || row.state === "ready"));
     const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const head = [t("payroll.employee"), t("payWeek.col.gross"), t("payWeek.col.deductions"), t("payWeek.col.net"), t("payroll.das.remArc"), t("payroll.das.remQc"), t("payWeek.col.das")];
     const line = (name, r) => [esc(name), ...[r.gross, r.deductions, r.net, r.dasArc, r.dasQuebec, r.das].map((v) => (Number(v) || 0).toFixed(2))].join(",");
     const lines = [head.map(esc).join(","), ...rows.map((r) => line(r.profile.full_name, r)), line(t("payroll.das.total"), plan.totals)];
-    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `DAS_semaine_${weekNo}_${weekEnd}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    download("﻿" + lines.join("\r\n"), `DAS_semaine_${weekNo}_${weekEnd}.csv`);
   }
 
   const counts = plan?.counts;
@@ -261,6 +293,25 @@ export default function PayrollWeek({ messier = false }) {
             ))}
           </ol>
 
+          {/* The week at a glance: what it costs the company (approved work only). */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: t("payWeek.tile.hours"), value: hours(plan.totals.hours) },
+              { label: t("payWeek.tile.gross"), value: money(plan.totals.gross) },
+              { label: t("payWeek.tile.cost"), value: money(plan.totals.employerCost), strong: true },
+              { label: t("payWeek.tile.das"), value: money(plan.totals.das) },
+            ].map((tile) => (
+              <Card key={tile.label} className={cn(tile.strong && "border-primary/40")}><CardContent className="p-4">
+                <div className="text-xs font-semibold text-muted-foreground">{tile.label}</div>
+                <div className={cn("mt-1 font-mono text-xl", tile.strong && "font-bold text-primary")}>{tile.value}</div>
+              </CardContent></Card>
+            ))}
+          </div>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            {t("payWeek.tile.note", { count: (counts.posted || 0) + (counts.ready || 0) })}
+            {pendingRows.length > 0 && <> {t("payWeek.tile.pending", { count: pendingRows.length })}</>}
+          </p>
+
           {/* 1 — Approvals */}
           <Card><CardContent className="space-y-2 p-4">
             <h3 className="font-semibold">1 · {t("payWeek.step.approvals")}</h3>
@@ -287,18 +338,26 @@ export default function PayrollWeek({ messier = false }) {
           <Card><CardContent className="space-y-3 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold">2 · {t("payWeek.step.calc")}</h3>
-              <Button type="button" className="h-auto min-h-10 whitespace-normal py-2" disabled={!counts.ready || Boolean(busy)} onClick={postReady}>
-                {busy === "post" ? t("common.working") : counts.ready ? t("payWeek.postReady", { count: counts.ready }) : t("payWeek.nothingToPost")}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="h-auto min-h-10 whitespace-normal py-2" disabled={!plan.rows.some((row) => row.talon)} onClick={exportHoursCsv}>
+                  <Download className="mr-1.5 h-4 w-4" /> {t("payWeek.exportHours")}
+                </Button>
+                <Button type="button" className="h-auto min-h-10 whitespace-normal py-2" disabled={!counts.ready || Boolean(busy)} onClick={postReady}>
+                  {busy === "post" ? t("common.working") : counts.ready ? t("payWeek.postReady", { count: counts.ready }) : t("payWeek.nothingToPost")}
+                </Button>
+              </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase text-muted-foreground">
                     <th className="px-2 py-2 font-medium">{t("payroll.employee")}</th>
-                    <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.hours")}</th>
+                    <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.regular")}</th>
+                    <th className="px-2 py-2 text-right font-medium">1,5×</th>
+                    <th className="px-2 py-2 text-right font-medium">2×</th>
+                    <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.return")}</th>
                     <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.gross")}</th>
-                    <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.deductions")}</th>
+                    <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.cost")}</th>
                     <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.net")}</th>
                     <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.das")}</th>
                     <th className="px-2 py-2 font-medium">{t("payWeek.col.state")}</th>
@@ -308,11 +367,14 @@ export default function PayrollWeek({ messier = false }) {
                   {plan.rows.map((row) => (
                     <tr key={row.profile.id} className="border-b last:border-0">
                       <td className="px-2 py-2 font-medium">{row.profile.full_name}</td>
-                      <td className="px-2 py-2 text-right font-mono">{row.talon ? hours(row.hours) : "—"}</td>
-                      <td className="px-2 py-2 text-right font-mono">{row.talon ? money(row.gross) : "—"}</td>
-                      <td className="px-2 py-2 text-right font-mono">{row.talon ? money(row.deductions) : "—"}</td>
-                      <td className="px-2 py-2 text-right font-mono">{row.talon ? money(row.net) : "—"}</td>
-                      <td className="px-2 py-2 text-right font-mono">{row.talon ? money(row.das) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{row.talon ? hoursOrDash(row.regularHours) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{row.talon ? hoursOrDash(row.ot150Hours) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{row.talon ? hoursOrDash(row.ot200Hours) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{row.talon ? hoursOrDash(row.returnNbHours) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{row.talon ? money(row.gross) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-semibold">{row.talon ? money(row.employerCost) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{row.talon ? money(row.net) : "—"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{row.talon ? money(row.das) : "—"}</td>
                       <td className="px-2 py-2">
                         <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold", STATE_STYLE[row.state])}>
                           {t(`payWeek.state.${row.state}`, { week: row.earlierUnposted[0] ? ccqWeekNumber(dayjs(row.earlierUnposted[0])) : "" })}
@@ -332,17 +394,17 @@ export default function PayrollWeek({ messier = false }) {
                 <tfoot>
                   <tr className="border-t font-semibold">
                     <td className="px-2 py-2">{t("payroll.das.total")}</td>
-                    <td />
-                    <td className="px-2 py-2 text-right font-mono">{money(plan.totals.gross)}</td>
-                    <td className="px-2 py-2 text-right font-mono">{money(plan.totals.deductions)}</td>
-                    <td className="px-2 py-2 text-right font-mono">{money(plan.totals.net)}</td>
-                    <td className="px-2 py-2 text-right font-mono">{money(plan.totals.das)}</td>
+                    <td colSpan={4} className="whitespace-nowrap px-2 py-2 text-right font-mono">{hours(plan.totals.hours)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{money(plan.totals.gross)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{money(plan.totals.employerCost)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{money(plan.totals.net)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-mono">{money(plan.totals.das)}</td>
                     <td />
                   </tr>
                 </tfoot>
               </table>
             </div>
-            <p className="text-xs text-muted-foreground">{t("payWeek.calcNote")}</p>
+            <p className="text-xs text-muted-foreground">{t("payWeek.calcNote")} {t("payWeek.costNote")}</p>
           </CardContent></Card>
 
           <div className="grid gap-3 lg:grid-cols-3">

@@ -8,7 +8,7 @@ import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 
-// Temps › Débloquer journée: let one employee enter or edit a closed day (job_entry_unlocks).
+// Temps › Rouvrir une journée: let one employee enter or edit a closed day (job_entry_unlocks).
 export default function UnlockDayManager() {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();

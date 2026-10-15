@@ -62,19 +62,19 @@ const byId = new Map(MANAGER_NAV_ITEMS.map((item) => [item.id, item]));
 // A V3 entry reuses a page (same id, path and access rule), optionally with a clearer label.
 const v3 = (id, labelKey) => (labelKey ? Object.freeze({ ...byId.get(id), labelKey }) : byId.get(id));
 
-// V3 menu: the day's work first (« À traiter »), the weekly payroll in one page, plain-word
-// labels, and the rarely used settings at the bottom. `open` = group expanded by default.
+// V3 menu, built around the real routine with fewer visible entries: the timesheets every day
+// or two (« Au quotidien »), the pay and its employer cost on Monday (« Paie »), the team.
+// Every other page stays one click away in a group closed by default. `open` = expanded.
 export const MANAGER_NAV_V3 = Object.freeze([
-  { id: "today", labelKey: "mgr.group.today", open: true, items: [v3("todo"), v3("live")] },
-  { id: "time", labelKey: "mgr.group.time", open: true, items: [
-    v3("timesheets"), v3("receipts", "mgr.nav3.receipts"), v3("unlock-day"),
+  { id: "today", labelKey: "mgr.group3.daily", open: true, items: [v3("todo"), v3("timesheets"), v3("live")] },
+  { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [v3("payroll-week"), v3("reports-period")] },
+  { id: "team", labelKey: "mgr.group.team", open: true, items: [v3("employees"), v3("absences"), v3("messages"), v3("inventory")] },
+  { id: "time", labelKey: "mgr.group3.timeMore", open: false, items: [
+    v3("receipts", "mgr.nav3.receipts"), v3("unlock-day"),
   ] },
-  { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [
-    v3("payroll-week"), v3("payroll-stubs"), v3("payroll-das"), v3("payroll-calcul", "mgr.nav3.calcul"), v3("payroll-roe"),
-  ] },
-  { id: "team", labelKey: "mgr.group.team", open: true, items: [v3("employees"), v3("absences"), v3("inventory"), v3("messages")] },
-  { id: "reports", labelKey: "mgr.group.reports", open: true, items: [
-    v3("reports-period"), v3("reports-costs"), v3("reports-downloads"), v3("reports-ccq"),
+  { id: "payroll-more", labelKey: "mgr.group3.payrollMore", open: false, items: [
+    v3("payroll-stubs"), v3("payroll-das"), v3("payroll-calcul", "mgr.nav3.calcul"), v3("payroll-roe"),
+    v3("reports-costs"), v3("reports-ccq"), v3("reports-downloads"),
   ] },
   { id: "config", labelKey: "mgr.group.config", open: false, items: [
     v3("config-settings"), v3("config-rules", "mgr.nav3.rules"), v3("forms"), v3("references"),

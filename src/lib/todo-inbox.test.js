@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalOutcome, buildInbox, previousWorkday } from "./todo-inbox";
+import { approvalOutcome, buildInbox, completeDaysOnly, matchesPerson, previousWorkday } from "./todo-inbox";
 
 const job = (id, user_id, job_date, depart, fin, extra = {}) => ({ id, user_id, job_date, depart, fin, status: "submitted", ot: id, km_total: 10, ...extra });
 const profiles = new Map([["a", { id: "a", full_name: "Alice" }], ["b", { id: "b", full_name: "Bruno" }]]);
@@ -58,5 +58,32 @@ describe("approvalOutcome", () => {
   it("falls back to counts for older deployments", () => {
     expect(approvalOutcome({ ok: true, exported: 2 }, ["a", "b"])).toEqual({ approved: ["a", "b"], stale: [] });
     expect(approvalOutcome({ ok: true, exported: 1 }, ["a", "b"])).toEqual({ approved: [], stale: ["a", "b"] });
+  });
+});
+
+describe("completeDaysOnly", () => {
+  const jobs = [
+    { id: 1, job_date: "2026-10-13" }, { id: 2, job_date: "2026-10-14" }, { id: 3, job_date: "2026-10-14" },
+  ];
+  it("keeps the whole queue when nothing was cut", () => {
+    expect(completeDaysOnly(jobs, false)).toBe(jobs);
+  });
+  it("drops the last date read when the budget cut the list (it may be partial)", () => {
+    expect(completeDaysOnly(jobs, true).map((job) => job.id)).toEqual([1]);
+  });
+  it("keeps a single cut date rather than showing nothing", () => {
+    const sameDay = jobs.slice(1);
+    expect(completeDaysOnly(sameDay, true)).toBe(sameDay);
+  });
+});
+
+describe("matchesPerson", () => {
+  it("matches the name or e-mail without accents or case", () => {
+    const p = { full_name: "Hélène Côté", email: "hcote@example.com" };
+    expect(matchesPerson(p, "")).toBe(true);
+    expect(matchesPerson(p, "helene")).toBe(true);
+    expect(matchesPerson(p, "COTE")).toBe(true);
+    expect(matchesPerson(p, "hcote@")).toBe(true);
+    expect(matchesPerson(p, "simon")).toBe(false);
   });
 });

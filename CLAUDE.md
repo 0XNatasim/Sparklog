@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.130)
+## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.131)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -431,6 +431,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
     officielle (propriétaire), DAS de la semaine + CSV, sommaire imprimable, lien rapport CCQ.
   - **Talons** : « Imprimer / PDF » de la semaine inclut maintenant les semaines comptabilisées (talon conservé),
     auparavant ignorées ; `lib/talon-print.js` réunit talons conservés et aperçus dans un seul document.
+- [x] **Gestion V3 — routine réelle** (V2.4.131) : menu V3 réduit (ouverts : Au quotidien, Paie, Équipe ; le reste
+  replié, `MANAGER_NAV_V3`). À traiter : recherche par nom (`matchesPerson`), file soumise lue du plus ancien au plus
+  récent, budget `anomalySubmittedJobs` 400 / `anomalyApprovedPeers` 800, dernière date coupée par la limite écartée
+  (`completeDaysOnly`). Paie de la semaine : heures rég./1,5×/2×/retour, coût employeur (`weekEmployerCost`, partagé
+  avec le sommaire imprimable) et CSV « heures pour le logiciel de paie » (`payrollWeekCsv`) pour Dynacom, utilisé en
+  parallèle pendant les tests. Libellés « Rouvrir la journée » / « Retourner pour correction ». Suite : `NOOB.md` étape 6.
 - [x] **Vérification de la capture Field Service** (V2.4.122) : au remplissage automatique, `workOrderIssues`
   (`src/lib/work-order-parse.js`) avertit l'employé si le # OT, l'heure de début / d'arrivée / de fin ou la
   « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » (FR : « Distance parcourue (miles) ») ≠ distance réelle

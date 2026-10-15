@@ -59,16 +59,13 @@ function jobRows(jobs, entries) {
     });
 }
 
-// One employee's CCQ pay for the week (null for non-CCQ roles, like the DAS screen).
-function employeePay({ profile, jobs, week, opening, holidayDates, employer, taxProfile, contributions, meals, parking, rounding }) {
-  const talon = computeEmployeeWeekTalon({
-    profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true,
-    weekDate: week.start, holidayDates, employer, taxProfile, rounding,
-  });
+// What one week of an employee costs the company, from a computeEmployeeWeekTalon result:
+// salary + 13 % + statutory employer contributions + CCQ employer benefits + the other per-hour
+// CCQ rates of employer_contributions + every reimbursement (km, phone, storage, safety, supper,
+// parking). Shared by the printable summary and « Paie de la semaine » so both show one number.
+export function weekEmployerCost({ talon, profile, contributions = [], meals = 0, parking = 0 }) {
   const { result, ccqAmounts: ccq, reimb, hours } = talon;
-  const totals = payTotals(result, ccq, reimb);
-  const emp = result.employee, empr = result.employer, das = result.das;
-
+  const empr = result.employer;
   const rateKey = LEVEL_RATE_KEY[profile?.apprentice_level] || null;
   const otherCcq = rateKey
     ? contributions
@@ -76,21 +73,11 @@ function employeePay({ profile, jobs, week, opening, holidayDates, employer, tax
       .map((c) => ({ code: c.code, label: c.label, rate: n(c[rateKey]), amount: round2(n(c[rateKey]) * hours.totalHours) }))
       .filter((c) => c.amount)
     : [];
-
   const salary = n(result.gross?.total);
   const vacation = n(ccq?.vacation);
-  const ccqWithheld = n(ccq?.netWithholdings);
-  const deductions = {
-    federalTax: n(emp.federalTax),
-    quebecTax: n(emp.quebecTax),
-    rrq: n(emp.rrq?.total),
-    ei: n(emp.ei),
-    rqap: n(emp.rqap),
-    ccq: ccqWithheld, // retraite, MÉDIC, cotisation syndicale, prélèvement, caisse d'éducation
-  };
   const reimbursements = {
     km: n(reimb.km), phone: n(reimb.phone), storage: n(reimb.storage), safety: n(reimb.safety),
-    meals, parking,
+    meals: n(meals), parking: n(parking),
   };
   const reimbursementTotal = sum(Object.values(reimbursements), (v) => v);
   const statutory = {
@@ -100,16 +87,45 @@ function employeePay({ profile, jobs, week, opening, holidayDates, employer, tax
   const statutoryTotal = sum(Object.values(statutory), (v) => v);
   const ccqBenefits = n(ccq?.employerSocialBenefit);
   const otherCcqTotal = sum(otherCcq, "amount");
-  const employerCost = salary + vacation + statutoryTotal + ccqBenefits + otherCcqTotal + reimbursementTotal;
+  return {
+    salary, vacation, reimbursements, reimbursementTotal,
+    statutory, statutoryTotal, ccqBenefits, otherCcq, otherCcqTotal,
+    total: salary + vacation + statutoryTotal + ccqBenefits + otherCcqTotal + reimbursementTotal,
+  };
+}
+
+// One employee's CCQ pay for the week (null for non-CCQ roles, like the DAS screen).
+function employeePay({ profile, jobs, week, opening, holidayDates, employer, taxProfile, contributions, meals, parking, rounding }) {
+  const talon = computeEmployeeWeekTalon({
+    profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true,
+    weekDate: week.start, holidayDates, employer, taxProfile, rounding,
+  });
+  const { result, ccqAmounts: ccq, reimb } = talon;
+  const totals = payTotals(result, ccq, reimb);
+  const emp = result.employee, das = result.das;
+  const cost = weekEmployerCost({ talon, profile, contributions, meals, parking });
+
+  const ccqWithheld = n(ccq?.netWithholdings);
+  const deductions = {
+    federalTax: n(emp.federalTax),
+    quebecTax: n(emp.quebecTax),
+    rrq: n(emp.rrq?.total),
+    ei: n(emp.ei),
+    rqap: n(emp.rqap),
+    ccq: ccqWithheld, // retraite, MÉDIC, cotisation syndicale, prélèvement, caisse d'éducation
+  };
 
   return {
-    salary, vacation,
+    salary: cost.salary, vacation: cost.vacation,
     deductions, totalDeductions: sum(Object.values(deductions), (v) => v),
     // Net deposited = pay − deductions (+ safety allowance) + km, phone, storage. Supper and parking
     // are reimbursed apart from the stub.
     net: totals.netPlusReimb,
-    reimbursements, reimbursementTotal,
-    employer: { statutory, statutoryTotal, ccqBenefits, otherCcq, otherCcqTotal, total: employerCost },
+    reimbursements: cost.reimbursements, reimbursementTotal: cost.reimbursementTotal,
+    employer: {
+      statutory: cost.statutory, statutoryTotal: cost.statutoryTotal, ccqBenefits: cost.ccqBenefits,
+      otherCcq: cost.otherCcq, otherCcqTotal: cost.otherCcqTotal, total: cost.total,
+    },
     das: { arc: n(das.arc), quebec: n(das.quebec), total: n(das.total) },
     reviewReasons: result.reviewReasons || [],
   };

@@ -15,8 +15,12 @@ describe("query budgets", () => {
     expect(QUERY_BUDGETS.reviewQueue).toBeLessThanOrEqual(100);
     expect(QUERY_BUDGETS.employeeHistoryPage).toBeLessThanOrEqual(100);
     expect(QUERY_BUDGETS.employeeWeekLookbackWeeks).toBeLessThanOrEqual(12);
-    expect(QUERY_BUDGETS.anomalySubmittedJobs).toBeLessThanOrEqual(200);
-    expect(QUERY_BUDGETS.anomalyApprovedPeers).toBeLessThanOrEqual(400);
+    expect(QUERY_BUDGETS.anomalySubmittedJobs).toBeLessThanOrEqual(400);
+    // One approval batch (push_approved_batch accepts at most 500 job ids) covers the whole queue.
+    expect(QUERY_BUDGETS.anomalySubmittedJobs).toBeLessThanOrEqual(500);
+    expect(QUERY_BUDGETS.anomalyApprovedPeers).toBeLessThanOrEqual(800);
+    // Supabase returns at most 1 000 rows per request.
+    expect(QUERY_BUDGETS.anomalyApprovedPeers).toBeLessThan(1000);
     expect(QUERY_BUDGETS.employeeActivityPage).toBeLessThanOrEqual(200);
   });
 

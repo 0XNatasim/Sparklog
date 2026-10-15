@@ -58,7 +58,7 @@ const ICONS = {
   "advanced-emergency": FilePlus2,
 };
 
-const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
+const GROUP_ICONS = { payroll: Wallet, "payroll-more": Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
 
 function readCollapsed() {
   try {

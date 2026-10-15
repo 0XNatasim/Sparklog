@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, CheckCheck, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCheck, RefreshCw, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useT } from "@/lib/use-t";
@@ -16,7 +17,7 @@ import { isOffOn } from "@/lib/timeoff";
 import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
-import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
+import { approvalOutcome, buildInbox, completeDaysOnly, matchesPerson, previousWorkday } from "@/lib/todo-inbox";
 import { notifyBroadcastPush } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
@@ -40,6 +41,7 @@ export default function TodoInbox() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [image, setImage] = useState(null); // { title, url }
+  const [query, setQuery] = useState("");
 
   // No state is set before the first await, so the effect below never renders twice in a row.
   const load = useCallback(async () => {
@@ -47,7 +49,7 @@ export default function TodoInbox() {
       const today = companyDate();
       const prevDay = previousWorkday(today);
       const [submittedRes, peopleRes, mealsRes, parkingRes, settingsRes, timeOffRes, prevJobsRes] = await Promise.all([
-        withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").order("job_date", { ascending: false }).limit(QUERY_BUDGETS.anomalySubmittedJobs), 12000),
+        withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").order("job_date", { ascending: true }).order("id").limit(QUERY_BUDGETS.anomalySubmittedJobs), 12000),
         withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, apprentice_level, first_trip_unpaid"), 12000),
         withRetry(() => supabase.from("meal_claims").select("id, job_id, user_id, job_date, amount, status").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         withRetry(() => supabase.from("parking_receipts").select("job_id, user_id, job_date, amount, status, storage_path").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
@@ -56,7 +58,9 @@ export default function TodoInbox() {
         supabase.from("jobs").select("user_id, status").eq("job_date", prevDay),
       ]);
       for (const res of [submittedRes, peopleRes, mealsRes, parkingRes]) if (res.error) throw res.error;
-      const submitted = submittedRes.data || [];
+      // Oldest first: when the queue is longer than the budget, the oldest days are handled first.
+      const truncated = (submittedRes.data || []).length >= QUERY_BUDGETS.anomalySubmittedJobs;
+      const submitted = completeDaysOnly(submittedRes.data || [], truncated);
       const people = peopleRes.data || [];
       const ids = submitted.map((job) => job.id);
       const userIds = [...new Set(submitted.map((job) => job.user_id))];
@@ -82,7 +86,7 @@ export default function TodoInbox() {
       setErr("");
       setState({
         today, prevDay, anomalies, missing,
-        truncated: submitted.length >= QUERY_BUDGETS.anomalySubmittedJobs,
+        truncated,
         manualIds,
         profiles: new Map(people.map((p) => [p.id, p])),
         raw: { submitted, peers: peersRes.data || [], evidence: evidenceRes.data || [], meals: mealsRes.data || [], parking: parkingRes.data || [] },
@@ -114,6 +118,22 @@ export default function TodoInbox() {
       parking: state.raw.parking,
     });
   }, [state]);
+
+  // Search by employee: narrows every list, and the bulk approval to what is shown.
+  const view = useMemo(() => {
+    if (!inbox || !state) return null;
+    const shown = (userId) => matchesPerson(state.profiles.get(userId), query);
+    const employees = inbox.employees.filter((emp) => shown(emp.id));
+    const cleanDays = employees.reduce((count, emp) => count + emp.days.length, 0);
+    return {
+      employees,
+      anomalyDays: inbox.anomalyDays.filter((day) => shown(day.userId)),
+      orphanClaims: inbox.orphanClaims.filter((claim) => shown(claim.user_id)),
+      missing: state.missing.filter((person) => shown(person.id)),
+      cleanDays,
+      cleanJobIds: employees.flatMap((emp) => emp.days.flatMap((day) => day.jobs.map((job) => job.id))),
+    };
+  }, [inbox, state, query]);
 
   const nameOf = (userId) => {
     const p = state?.profiles.get(userId);
@@ -198,7 +218,7 @@ export default function TodoInbox() {
   }
 
   function approveAllClean() {
-    return approve("all", inbox.cleanJobIds, t("todo.confirm.approveAll", { count: inbox.stats.cleanDays, jobs: inbox.cleanJobIds.length }));
+    return approve("all", view.cleanJobIds, t("todo.confirm.approveAll", { count: view.cleanDays, jobs: view.cleanJobIds.length }));
   }
 
   async function returnDay(day) {
@@ -354,7 +374,7 @@ export default function TodoInbox() {
   }
 
   const stats = inbox?.stats;
-  const missing = state?.missing || [];
+  const missing = view?.missing || [];
 
   return (
     <div className="space-y-4">
@@ -372,12 +392,18 @@ export default function TodoInbox() {
           {missing.length > 0 && (
             <Button type="button" variant="outline" disabled={Boolean(busy)} onClick={() => remind(missing)}>{t("todo.remindAll", { count: missing.length })}</Button>
           )}
-          <Button type="button" disabled={!stats?.cleanDays || Boolean(busy)} onClick={approveAllClean}>
+          <Button type="button" disabled={!view?.cleanDays || Boolean(busy)} onClick={approveAllClean}>
             <CheckCheck className="mr-1.5 h-4 w-4" />
-            {busy === "all" ? t("common.working") : t("todo.approveAllClean", { count: stats?.cleanDays || 0 })}
+            {busy === "all" ? t("common.working") : t("todo.approveAllClean", { count: view?.cleanDays || 0 })}
           </Button>
         </div>
       </div>
+
+      <label className="relative block max-w-md">
+        <span className="sr-only">{t("todo.search")}</span>
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("todo.search")} className="pl-9" />
+      </label>
 
       {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{err}</div>}
       {info && <div className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">{info}</div>}
@@ -389,7 +415,7 @@ export default function TodoInbox() {
           { label: t("todo.stats.days"), value: stats?.days ?? "—", cls: "" },
           { label: t("todo.stats.claims"), value: stats?.pendingClaims ?? "—", cls: "" },
           { label: t("todo.stats.anomalies"), value: stats?.anomalyDays ?? "—", cls: stats?.anomalyDays ? "text-warning" : "" },
-          { label: t("todo.stats.missing", { date: state ? dayjs(state.prevDay).format("ddd D") : "" }), value: state ? missing.length : "—", cls: missing.length ? "text-destructive" : "" },
+          { label: t("todo.stats.missing", { date: state ? dayjs(state.prevDay).format("ddd D") : "" }), value: state ? state.missing.length : "—", cls: state?.missing.length ? "text-destructive" : "" },
         ].map((tile) => (
           <Card key={tile.label}><CardContent className="p-4">
             <div className="text-xs font-semibold text-muted-foreground">{tile.label}</div>
@@ -400,11 +426,11 @@ export default function TodoInbox() {
 
       {loading && !state && <div className="text-sm text-muted-foreground">{t("common.working")}</div>}
 
-      {inbox && inbox.anomalyDays.length > 0 && (
+      {view && view.anomalyDays.length > 0 && (
         <section className="overflow-hidden rounded-xl border border-warning/40 bg-warning/10">
           <h3 className="px-4 pb-1 pt-3 text-sm font-semibold text-warning">{t("todo.anomaliesTitle")}</h3>
           <div className="m-3 mt-2 overflow-hidden rounded-lg border bg-card">
-            {inbox.anomalyDays.map((day) => renderDay(day, true))}
+            {view.anomalyDays.map((day) => renderDay(day, true))}
           </div>
         </section>
       )}
@@ -415,10 +441,10 @@ export default function TodoInbox() {
             <h3 className="text-lg font-semibold">{t("todo.daysTitle")}</h3>
             <span className="text-xs text-muted-foreground">{t("todo.daysHint")}</span>
           </div>
-          {inbox && inbox.employees.length === 0 && inbox.anomalyDays.length === 0 && (
-            <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("todo.empty")}</CardContent></Card>
+          {view && view.employees.length === 0 && view.anomalyDays.length === 0 && (
+            <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t(query ? "todo.noMatch" : "todo.empty")}</CardContent></Card>
           )}
-          {inbox?.employees.map((emp) => (
+          {view?.employees.map((emp) => (
             <Card key={emp.id} className="overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
                 <div className="font-semibold">{emp.name}</div>
@@ -432,10 +458,10 @@ export default function TodoInbox() {
             </Card>
           ))}
 
-          {inbox && inbox.orphanClaims.length > 0 && (
+          {view && view.orphanClaims.length > 0 && (
             <Card><CardContent className="space-y-2 p-4">
               <h3 className="text-sm font-semibold">{t("todo.orphanTitle")}</h3>
-              {inbox.orphanClaims.map((claim) => (
+              {view.orphanClaims.map((claim) => (
                 <div key={`${claim.kind}:${claim.id || claim.job_id}`} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-sm first:border-t-0 first:pt-0">
                   <span><b>{nameOf(claim.user_id)}</b> · {dayjs(claim.job_date).format("ddd D MMM")}</span>
                   {claim.kind === "meal"

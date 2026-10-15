@@ -93,21 +93,40 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
 ## Étape 6 — Gestion V3 : ce qu'il reste à convertir 💻
 
-La V3 (bouton **V2 | V3** en haut à droite de la Gestion) a déjà **À traiter**, **Paie de la semaine** et le
-nouveau menu. Les autres pages s'ouvrent encore dans leur version actuelle. À faire, dans cet ordre :
+La V3 (bouton **V2 | V3** en haut à droite de la Gestion) suit la routine réelle : les **feuilles de temps aux 1 ou
+2 jours**, la **paie le lundi**, le **coût employeur** d'un coup d'œil. Pendant les tests, la paie, les DAS et la CCQ
+restent faits dans **Dynacom** : Sparklog sert aux feuilles de temps et donne les heures à entrer dans Dynacom.
+Objectif : opérationnel pour **~50 employés** d'ici la fin octobre.
 
+Fait (V2.4.131) :
+- [x] **Menu plus court** : ouverts par défaut seulement « Au quotidien » (À traiter, Feuilles de temps, Équipe en
+  direct), « Paie » (Paie de la semaine, Semaine / mois) et « Équipe ». Le reste (Talons, DAS, Calcul, RE, Coûts,
+  CCQ, Téléchargements, Reçus, Rouvrir une journée, Configuration, Avancé) est replié, à un clic.
+- [x] **À traiter pour 50 employés** : recherche par nom (sans accents), journées les plus **anciennes d'abord**,
+  jusqu'à 400 jobs soumises d'un coup (avant : 200, les plus récentes). Une journée coupée par cette limite n'est
+  jamais approuvée à moitié. « Tout approuver » ne touche que ce que la recherche affiche.
+- [x] **Paie de la semaine (lundi)** : heures **régulières / 1,5× / 2× / retour** et **coût employeur** par employé,
+  total de la semaine en haut (heures, brut, coût employeur, DAS), et bouton **« Heures pour le logiciel de paie
+  (CSV) »** à reporter dans Dynacom. Le coût employeur est le même chiffre que le sommaire imprimable.
+- [x] **Mots clairs** : « Rouvrir la journée » (laisser un employé saisir un jour fermé) et « Retourner pour
+  correction » (renvoyer une job soumise) remplacent Débloquer / Déverrouiller partout.
+
+À faire, dans cet ordre (le plus utile pour les 2 prochaines semaines d'abord) :
+- [ ] **Faire de la V3 la version par défaut** pour les gestionnaires, une fois testée quelques jours sur les vraies
+  feuilles de temps (la V2 reste accessible par le bouton).
+- [ ] **Petits plus du quotidien** : « tout marquer comme lu » sur la cloche, « jours sans saisie » (plusieurs jours,
+  pas seulement la veille) dans À traiter plutôt que dans Avancé, recherche dans Employés et Messages.
 - [ ] **Fiche employé unique** : une liste avec recherche, et une fiche à onglets (Identité, CCQ, Paie et options,
   Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
-- [ ] **DAS de Téléchargements** : il calcule avec la méthode « Référence » alors que Paie › DAS utilise « Messier »
-  (deux totaux différents pour le même mois). Les aligner.
-- [ ] **Débloquer** : un seul endroit et des mots clairs — « rouvrir une journée » ou « retourner une job pour
-  correction » (aujourd'hui : 3 boutons qui se ressemblent).
-- [ ] **Reçus et preuves** : n'afficher par défaut que ce qui reste à traiter ; recherche par employé et par date.
+- [ ] **Reçus et preuves** : l'historique seulement (ce qui reste à traiter est déjà dans À traiter) ; recherche
+  par employé et par date.
 - [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
-- [ ] **Rapport CCQ** : proposer par défaut le mois qui vient de finir.
-- [ ] **Petits plus** : recherche dans les listes (Employés, Messages), « tout marquer comme lu » sur la cloche,
-  « jours sans saisie » visible dans Temps plutôt que dans Avancé.
-- [ ] **Fin** : quand tout est converti et testé, faire de la V3 la version par défaut, puis retirer la V2.
+  Le coût de la semaine est déjà juste dans Paie de la semaine.
+- Quand Sparklog remplacera Dynacom :
+  - [ ] **DAS de Téléchargements** : il calcule avec la méthode « Référence » alors que Paie › DAS utilise
+    « Messier » (deux totaux différents pour le même mois). Les aligner.
+  - [ ] **Rapport CCQ** : proposer par défaut le mois qui vient de finir.
+- [ ] **Fin** : quand tout est converti et testé, retirer la V2.
 
 ## À surveiller 👤
 

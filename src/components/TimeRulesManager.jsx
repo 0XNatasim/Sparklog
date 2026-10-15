@@ -24,7 +24,7 @@ export default function TimeRulesManager() {
 
   async function load() {
     // Deadline, evidence retention and the CCQ calendar live in Réglage.
-    // Day unlocks live in Temps › Débloquer journée (UnlockDayManager).
+    // Day unlocks live in Temps › Rouvrir une journée (UnlockDayManager).
     const { data: employeeRows } = await supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name");
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
     setPayRuleRows((employeeRows || []).filter((employee) => !isManagerRole(employee.role)));

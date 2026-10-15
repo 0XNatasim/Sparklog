@@ -6,6 +6,7 @@ import { YTD_COLUMN_TO_KEY, YTD_CCQ_COLUMN_TO_KEY, formatTalonRef, snapshotFromR
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import { buildCalculTalon } from "@/lib/calcul-talon";
 import { isNonCcqRole } from "@/lib/roles";
+import { weekEmployerCost } from "@/lib/weekly-report";
 
 export const TAX_YEAR = 2026; // same constant as Calcul / Talons / DAS
 const LEDGER_COLUMNS = [...YTD_COLUMN_TO_KEY, ...YTD_CCQ_COLUMN_TO_KEY];
@@ -38,7 +39,12 @@ export function weekBounds(end) {
 //   jobs: every job of these employees from the start of the tax year to the week's end.
 //   ledgerByUser: Map user → ledger rows; seedByUser: Map user → payroll_ytd row.
 //   compute(profile, approvedJobs, opening) → computeEmployeeWeekTalon(...) result.
-export function planPayrollWeek({ weekEnd, profiles = [], jobs = [], ledgerByUser = new Map(), seedByUser = new Map(), taxProfiles = new Map(), compute }) {
+//   contributions: active employer_contributions rows; mealsByUser / parkingByUser: Map user → $
+//   of the week's supper and parking claims — for the employer cost (same as the printed summary).
+export function planPayrollWeek({
+  weekEnd, profiles = [], jobs = [], ledgerByUser = new Map(), seedByUser = new Map(), taxProfiles = new Map(), compute,
+  contributions = [], mealsByUser = new Map(), parkingByUser = new Map(),
+}) {
   const { start, end } = weekBounds(weekEnd);
   const byUser = new Map();
   for (const job of jobs) {
@@ -92,6 +98,9 @@ export function planPayrollWeek({ weekEnd, profiles = [], jobs = [], ledgerByUse
       }
     }
     const result = talon?.result;
+    const meals = n(mealsByUser.get(profile.id));
+    const parking = n(parkingByUser.get(profile.id));
+    const cost = talon ? weekEmployerCost({ talon, profile, contributions, meals, parking }) : null;
     rows.push({
       profile,
       state,
@@ -105,6 +114,14 @@ export function planPayrollWeek({ weekEnd, profiles = [], jobs = [], ledgerByUse
       noOpening: !lastBefore && !seed,
       noTaxProfile: !taxProfiles.get(profile.id),
       hours: n(talon?.hours?.totalHours) + n(talon?.hours?.returnNbHours),
+      regularHours: n(talon?.hours?.regularHours),
+      ot150Hours: n(talon?.hours?.ot150Hours),
+      ot200Hours: n(talon?.hours?.ot200Hours),
+      returnNbHours: n(talon?.hours?.returnNbHours),
+      km: n(talon?.hours?.totalKm),
+      meals,
+      parking,
+      employerCost: n(cost?.total),
       gross: n(result?.gross?.total),
       deductions: n(result?.employee?.totalDeductions) + n(talon?.ccqAmounts?.netWithholdings),
       dasArc: n(result?.das?.arc),
@@ -128,6 +145,8 @@ export function planPayrollWeek({ weekEnd, profiles = [], jobs = [], ledgerByUse
       dasQuebec: sum("dasQuebec", counted),
       das: sum("das", counted),
       net: sum("net", counted),
+      employerCost: sum("employerCost", counted),
+      hours: sum("hours", counted),
     },
     counts: {
       employees: rows.length,
@@ -194,4 +213,23 @@ export async function postPayrollWeek(supabase, rows, { weekEnd, weekNo }) {
     }
   }
   return { posted, failed };
+}
+
+// Hours of the week per employee, to enter in the outside payroll software (Dynacom) while it
+// is still used: decimal hours by rate, km, supper, parking, then Sparklog's gross and employer
+// cost for comparison. Every employee with approved work is listed; `state` says whether some of
+// their week is still waiting. `header` = translated column titles (13), `stateLabel(row)` → text.
+export function payrollWeekCsv(plan, { header, stateLabel = (row) => row.state }) {
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const dec = (v) => (Number(v) || 0).toFixed(2);
+  const rows = plan.rows.filter((row) => row.talon);
+  const lines = [header.map(esc).join(",")];
+  for (const row of rows) {
+    lines.push([
+      esc(row.profile.employee_number || ""), esc(row.profile.full_name || ""), esc(stateLabel(row)),
+      dec(row.regularHours), dec(row.ot150Hours), dec(row.ot200Hours), dec(row.returnNbHours), dec(row.hours),
+      dec(row.km), dec(row.meals), dec(row.parking), dec(row.gross), dec(row.employerCost),
+    ].join(","));
+  }
+  return "﻿" + lines.join("\r\n");
 }

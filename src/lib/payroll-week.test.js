@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { lastCompletedWeekEnd, ledgerRowFor, planPayrollWeek, postPayrollWeek, weekBounds, weekEndOf } from "./payroll-week";
+import { lastCompletedWeekEnd, ledgerRowFor, payrollWeekCsv, planPayrollWeek, postPayrollWeek, weekBounds, weekEndOf } from "./payroll-week";
 import { computeEmployeeWeekTalon } from "@/payroll/employee-week";
+import { buildWeeklyReport } from "./weekly-report";
 
 const compagnon = (id, full_name) => ({ id, full_name, role: "employee", hourly_rate: 50.79, km_rate: 0.65, apprentice_level: "compagnon", union_association: "FTQ" });
 const job = (id, user_id, job_date, status = "approved") => ({ id, user_id, job_date, status, depart: "07:00", arrivee: "07:00", fin: "15:00", km_total: 20 });
@@ -51,6 +52,36 @@ describe("planPayrollWeek", () => {
     expect(a.das).toBeCloseTo(a.talon.result.das.total, 6);
     expect(plan.totals.das).toBeCloseTo(a.das + d.das, 6);
     expect(plan.counts).toEqual({ employees: 4, posted: 1, ready: 1, pending: 1, blocked: 1 });
+  });
+
+  it("splits the hours and gives the employer cost of the printed summary", () => {
+    const one = [compagnon("a", "Alice")];
+    const weekJobs = [job("a1", "a", "2026-10-05"), { ...job("a2", "a", "2026-10-06"), fin: "18:00" }];
+    const withCost = planPayrollWeek({
+      weekEnd: "2026-10-10", profiles: one, jobs: weekJobs, compute,
+      mealsByUser: new Map([["a", 30]]), parkingByUser: new Map([["a", 12]]),
+    });
+    const a = withCost.rows[0];
+    expect(a.regularHours).toBe(16);
+    expect(a.ot150Hours + a.ot200Hours).toBe(3);
+    expect(a.km).toBe(40);
+    const report = buildWeeklyReport({
+      week: { start: "2026-10-04", end: "2026-10-10", weekNo: 42 }, profiles: one, jobs: weekJobs,
+      meals: [{ user_id: "a", job_date: "2026-10-06", amount: 30 }], parking: [{ user_id: "a", job_date: "2026-10-06", amount: 12 }],
+    });
+    expect(a.employerCost).toBeGreaterThan(a.gross);
+    expect(a.employerCost).toBeCloseTo(report.employees[0].pay.employer.total, 2);
+    expect(withCost.totals.employerCost).toBeCloseTo(a.employerCost, 6);
+  });
+
+  it("exports the hours for the outside payroll software, one line per employee with approved work", () => {
+    const csv = payrollWeekCsv(plan, { header: Array.from({ length: 13 }, (_, i) => `c${i}`) });
+    const lines = csv.replace(/^\uFEFF/, "").split("\r\n");
+    expect(lines).toHaveLength(1 + plan.rows.filter((row) => row.talon).length);
+    const alice = lines.find((line) => line.includes('"Alice"')).split(",");
+    expect(alice[2]).toBe('"ready"');
+    expect(alice[3]).toBe("16.00");
+    expect(alice).toHaveLength(13);
   });
 
   it("refuses to post behind an already posted later week", () => {

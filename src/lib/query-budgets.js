@@ -5,8 +5,9 @@ export const QUERY_BUDGETS = Object.freeze({
   reviewQueue: 100,
   employeeHistoryPage: 100,
   employeeWeekLookbackWeeks: 12,
-  anomalySubmittedJobs: 200,
-  anomalyApprovedPeers: 400,
+  // « À traiter » every 1–2 days for ~50 employees (≈ 3 jobs a day each) ≈ 300 submitted jobs.
+  anomalySubmittedJobs: 400,
+  anomalyApprovedPeers: 800,
   employeeActivityPage: 200,
   inventoryPeople: 500,
   inventoryRows: 600,

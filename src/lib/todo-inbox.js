@@ -94,6 +94,27 @@ function sumBy(list, fn) {
   return list.reduce((sum, item) => sum + fn(item), 0);
 }
 
+// The submitted queue is read oldest first, up to a budget. When the budget cut the list, the
+// last date read may be incomplete (some of its jobs were not returned): leave that date out so
+// « Approuver la journée » never approves part of a day. Keeps everything when nothing was cut.
+export function completeDaysOnly(jobs, truncated) {
+  if (!truncated || !jobs.length) return jobs;
+  const lastDate = jobs.reduce((max, job) => (job.job_date > max ? job.job_date : max), "");
+  const kept = jobs.filter((job) => job.job_date < lastDate);
+  return kept.length ? kept : jobs;
+}
+
+// Employee search on « À traiter »: accent- and case-insensitive match on the name or e-mail.
+export function normalizeSearch(text) {
+  return String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+export function matchesPerson(profile, query) {
+  const q = normalizeSearch(query);
+  if (!q) return true;
+  return normalizeSearch(`${profile?.full_name || ""} ${profile?.email || ""}`).includes(q);
+}
+
 // The last weekday before `date` (YYYY-MM-DD): Monday looks back to Friday.
 export function previousWorkday(date) {
   const d = new Date(`${date}T12:00:00Z`);

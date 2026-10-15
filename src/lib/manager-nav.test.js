@@ -118,6 +118,14 @@ describe("Gestion V3 menu", () => {
     expect(firstAllowedPath("admin", ["live"], "v3")).toBe("live");
   });
 
+  it("opens only the daily, Monday-pay and team groups; the rest is one click away", () => {
+    const open = MANAGER_NAV_V3.filter((group) => group.open);
+    expect(open.map((group) => group.id)).toEqual(["today", "payroll", "team"]);
+    const visible = open.flatMap((group) => group.items.map((item) => item.id));
+    expect(visible).toEqual(["todo", "timesheets", "live", "payroll-week", "reports-period", "employees", "absences", "messages", "inventory"]);
+    expect(visible.length).toBeLessThan(MANAGER_NAV_V2_ITEMS.length / 2);
+  });
+
   it("names pages as the V3 menu shows them", () => {
     expect(findNavItem("receipts", "v3")?.labelKey).toBe("mgr.nav3.receipts");
     expect(findNavItem("receipts")?.labelKey).toBe("mgr.nav.receipts");
