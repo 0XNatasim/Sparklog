@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   INVENTORY_REQUIRED_FROM,
+  inventoryCaptured,
   inventoryDayBadge,
   inventoryRequiredFor,
   inventoryStoragePath,
@@ -27,10 +28,16 @@ describe("inventory screenshot rules", () => {
     expect(inventoryRequiredFor("2026-10-09", { officeEmployee: true })).toBe(false);
   });
 
-  it("shows a green check once the 3 captures are sent, a red X when a required day lacks them", () => {
+  it("shows a green check once the inventory is sent (2 captures are enough), a red X without any", () => {
     expect(inventoryDayBadge("2026-10-08", 3, true)).toBe("done");
-    expect(inventoryDayBadge("2026-10-08", 2, true)).toBe("missing");
+    expect(inventoryDayBadge("2026-10-08", 2, true)).toBe("done");
     expect(inventoryDayBadge("2026-10-08", 0, true)).toBe("missing");
+  });
+
+  it("lets the day be submitted once at least one capture is saved", () => {
+    expect(inventoryCaptured([])).toBe(false);
+    expect(inventoryCaptured(null)).toBe(false);
+    expect(inventoryCaptured([{ slot: 1 }, { slot: 2 }])).toBe(true);
   });
 
   it("stays silent for employees without the option and for pre-rollout days", () => {
@@ -122,5 +129,21 @@ describe("several inventory screenshots picked at once", () => {
   it("a full set replaces all three; files beyond three are reported, not used", () => {
     expect(plan([file("a", 1), file("b", 2), file("c", 3)], [{ slot: 2 }])).toEqual({ slots: ["1:a", "2:b", "3:c"], extra: 0 });
     expect(plan([file("a", 1), file("b", 2), file("c", 3), file("d", 4)])).toEqual({ slots: ["1:a", "2:b", "3:c"], extra: 1 });
+  });
+});
+
+const atLeastOne = readFileSync(fileURLToPath(new URL(
+  "../../supabase/migrations/20261015233613_0092_inventory_at_least_one_screenshot.sql",
+  import.meta.url
+)), "utf8");
+
+describe("0092 inventory gate", () => {
+  it("requires at least one screenshot instead of three, keeping the rest of the validator", () => {
+    expect(atLeastOne).toContain("and not exists (select 1 from public.inventory_screenshots s");
+    expect(atLeastOne).not.toContain(") < 3 then");
+    expect(atLeastOne).toContain(`new.job_date >= date '${INVENTORY_REQUIRED_FROM}'`);
+    for (const keyword of ["inventory_screenshots_required", "overtime_evidence_required", "overlapping_job_interval", "return_time_exceeds_job_interval", "invalid_job_kilometres", "coalesce(unpaid_trip_minutes, 0) > 480"]) {
+      expect(atLeastOne).toContain(keyword);
+    }
   });
 });

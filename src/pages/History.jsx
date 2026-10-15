@@ -21,7 +21,7 @@ import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
 import { submitSavedJob } from "@/lib/submit-job";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
-import { inventoryDayBadge, inventoryRequiredFor, missingInventorySlots } from "@/lib/inventory-screenshots";
+import { inventoryCaptured, inventoryDayBadge, inventoryRequiredFor } from "@/lib/inventory-screenshots";
 import InventoryPhotosDialog from "@/components/InventoryPhotosDialog";
 import { fetchInventorySlots } from "@/lib/inventory-upload";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -243,8 +243,8 @@ export default function History() {
   const submitExistingJob = (job, confirmManagerEntry = false) =>
     submitSavedJob(supabase, job, { confirmManagerEntry: confirmManagerEntry && isPendingManagerEntry(job) });
 
-  // The day must carry its three end-of-shift inventory screenshots before any job is submitted
-  // (the database enforces the same rule). Missing ones are collected from the work form.
+  // The day must carry its end-of-shift inventory screenshots (at least one) before any job is
+  // submitted (the database enforces the same rule). Missing ones are collected from the work form.
   async function inventoryMissingForDay(jobDate) {
     if (isAdminEmployee(role) || !inventoryRequiredFor(jobDate)) return false;
     const { data: profile, error: profileError } = await withTimeout(
@@ -253,7 +253,7 @@ export default function History() {
     );
     if (profileError) throw profileError;
     if (!profile?.inventory_screenshots_enabled) return false;
-    return missingInventorySlots(await fetchInventorySlots(supabase, user.id, jobDate)).length > 0;
+    return !inventoryCaptured(await fetchInventorySlots(supabase, user.id, jobDate));
   }
 
   async function deleteJob(jobId) {

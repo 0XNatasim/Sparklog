@@ -1,4 +1,5 @@
-// End-of-shift Field Service inventory: three screenshots per employee per work day.
+// End-of-shift Field Service inventory: one to three screenshots per employee per work day,
+// as many as the phone needs to show the whole list (what counts is the list's line count).
 // Keep INVENTORY_REQUIRED_FROM in sync with the 0071 migration (the database enforces it).
 export const INVENTORY_SLOTS = [1, 2, 3];
 export const INVENTORY_BUCKET = "inventory-screenshots";
@@ -12,18 +13,22 @@ export function inventoryStoragePath(userId, jobDate, slot, objectId) {
   return `${userId}/${jobDate}/inventory-${slot}-${objectId}.jpg`;
 }
 
+// The day can be submitted once at least one inventory screenshot is saved (the 0092 gate).
+export function inventoryCaptured(rows) {
+  return (rows || []).length > 0;
+}
+
 export function missingInventorySlots(rows) {
   const present = new Set((rows || []).map((row) => Number(row.slot)));
   return INVENTORY_SLOTS.filter((slot) => !present.has(slot));
 }
 
-// Badge shown beside each day of the employee's History: "done" (all three captures sent),
-// "missing" (a required day without all of them), or null (nothing to show: option off, or a
-// day from before the rollout with no captures).
+// Badge shown beside each day of the employee's History: "done" (inventory sent), "missing"
+// (a required day without any capture), or null (nothing to show: option off, or a day from
+// before the rollout with no captures).
 export function inventoryDayBadge(jobDate, captureCount, enabled) {
-  if (captureCount >= INVENTORY_SLOTS.length) return "done";
+  if (captureCount > 0) return "done";
   if (!enabled) return null;
-  if (captureCount > 0) return "missing";
   return inventoryRequiredFor(jobDate) ? "missing" : null;
 }
 

@@ -30,8 +30,8 @@ import { extractWorkOrderText, parseExtractedText, workOrderIssues } from "@/lib
 import { ENTRY_SOURCES, recordEntrySource } from "@/lib/entry-source";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
-import { INVENTORY_SLOTS, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
-import { fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
+import { INVENTORY_SLOTS, inventoryCaptured, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
+import { fetchInventoryReading, fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import {
@@ -190,6 +190,9 @@ export default function EmployeeForm() {
   const [inventoryBusySlot, setInventoryBusySlot] = useState(null);
   const [inventoryError, setInventoryError] = useState("");
   const [inventoryNotice, setInventoryNotice] = useState("");
+  // Lines read from the day's screenshots against the app's "N de N" total ({ state, count, expected }).
+  const [inventoryReading, setInventoryReading] = useState(null);
+  const [inventoryReadingTick, setInventoryReadingTick] = useState(0);
   const [showInventoryExamples, setShowInventoryExamples] = useState(false);
   const [daySubmitBusy, setDaySubmitBusy] = useState(false);
   const [daySubmitError, setDaySubmitError] = useState("");
@@ -810,6 +813,7 @@ export default function EmployeeForm() {
     }
     setInventoryError("");
     setInventoryNotice("");
+    setInventoryReading(null);
     setDaySubmitError("");
     if (officeEmployee || !inventoryEnabled) {
       setReturnStep("dayDone");
@@ -903,7 +907,35 @@ export default function EmployeeForm() {
       setInventoryError(`${which}${t("form.inventory.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}`);
     }
     setInventoryBusySlot(null);
+    setInventoryReadingTick((tick) => tick + 1);
   }
+
+  // While the inventory step is open, show how many lines were read from the screenshots. The
+  // reading runs on the server for a few seconds after each upload: poll a bounded number of times.
+  const hasInventoryShots = inventoryRows.length > 0;
+  useEffect(() => {
+    const jobDate = endShiftDateRef.current;
+    if (returnStep !== "inventory" || !user?.id || !jobDate || !hasInventoryShots) return undefined;
+    let cancelled = false;
+    let timer = null;
+    let tries = 0;
+    const poll = async () => {
+      try {
+        const reading = await fetchInventoryReading(supabase, user.id, jobDate);
+        if (cancelled) return;
+        setInventoryReading(reading);
+        tries += 1;
+        if (reading.state === "reading" && tries < 20) timer = window.setTimeout(poll, 4000);
+      } catch {
+        if (!cancelled) setInventoryReading(null);
+      }
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [returnStep, user?.id, hasInventoryShots, inventoryReadingTick]);
 
   // Submits every editable job of the end-of-shift day. Retrying is safe: only jobs still
   // saved/updated are sent, and each goes through the idempotent save_own_job RPC.
@@ -1782,7 +1814,7 @@ export default function EmployeeForm() {
                 <Button
                   type="button"
                   className="w-full"
-                  variant={missingInventorySlots(inventoryRows).length ? "default" : "outline"}
+                  variant={inventoryCaptured(inventoryRows) ? "outline" : "default"}
                   disabled={Boolean(inventoryBusySlot)}
                   onClick={pickInventoryFiles}
                 >
@@ -1807,13 +1839,16 @@ export default function EmployeeForm() {
                     );
                   })}
                 </ul>
+                {hasInventoryShots && inventoryReading && (
+                  <InventoryReadingNote reading={inventoryReading} t={t} />
+                )}
                 {inventoryNotice && <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-warning" role="status">{inventoryNotice}</div>}
                 {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive" role="alert">{inventoryError}</div>}
                 <input ref={inventoryInputRef} type="file" accept="image/*" className="hidden" onChange={handleInventoryFile} />
                 <input ref={inventoryMultiInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleInventoryFiles} />
               </div>
               <DialogFooter>
-                <Button type="button" disabled={Boolean(inventoryBusySlot) || missingInventorySlots(inventoryRows).length > 0} onClick={() => setReturnStep("dayDone")}>
+                <Button type="button" disabled={Boolean(inventoryBusySlot) || !inventoryCaptured(inventoryRows)} onClick={() => setReturnStep("dayDone")}>
                   {t("form.inventory.continue")}
                 </Button>
               </DialogFooter>
@@ -1904,4 +1939,28 @@ export default function EmployeeForm() {
       {confirmDialog}
     </AppShell>
   );
+}
+
+// Result of the automatic reading of the inventory screenshots, shown to the employee: the list
+// is complete when the lines read match the app's own "N de N" total. Informative only.
+function InventoryReadingNote({ reading, t }) {
+  if (reading.state === "reading") {
+    return <p className="text-muted-foreground" role="status">{t("form.inventory.readingNow")}</p>;
+  }
+  if (reading.state === "ok") {
+    return (
+      <p className="flex items-center gap-2 rounded-md border border-success/40 bg-success/10 p-3 text-success" role="status">
+        <CircleCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+        {t("form.inventory.readingComplete", { count: reading.count, expected: reading.expected })}
+      </p>
+    );
+  }
+  if (reading.expected && reading.count < reading.expected) {
+    return (
+      <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-warning" role="status">
+        {t("form.inventory.readingShort", { count: reading.count, expected: reading.expected })}
+      </p>
+    );
+  }
+  return <p className="text-muted-foreground" role="status">{t("form.inventory.readingUnverified")}</p>;
 }
