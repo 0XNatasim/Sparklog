@@ -62,7 +62,8 @@ const NOTIFICATION_FILTERS = ["overtime", "meals", "parking"];
 //   view="timesheet" → Feuilles  (#/manager/timesheets)
 //   view="receipts"  → Justificatifs (#/manager/receipts)
 // Employee, status and day live in the URL so a timesheet view can be bookmarked or shared.
-export default function ManagerDashboard({ view = "timesheet" }) {
+// nameFirst (Gestion V3 › Feuilles de temps): job cards show the employee's name first (JobCard).
+export default function ManagerDashboard({ view = "timesheet", nameFirst = false }) {
   const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -958,6 +959,7 @@ export default function ManagerDashboard({ view = "timesheet" }) {
       busy: actionLoadingId === j.id,
       onApprove: approveStable,
       onUnlock: unlockStable,
+      nameFirst,
     };
   }
 

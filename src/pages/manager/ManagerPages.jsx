@@ -332,7 +332,8 @@ function TabbedPage({ itemId, content }) {
 }
 
 const TODO_TABS = { todo: TodoPage, receipts: ReceiptsPage };
-const TIME_TABS = { timesheets: TimesheetsPage, unlock: UnlockDayPage };
+// V3 timesheets: same page, cards with the employee's name first (the V2 page is unchanged).
+const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst />, unlock: UnlockDayPage };
 // Same pages as V2 Paie, with the compact Méthode control; Calcul détaillé keeps the « writes » warning.
 const PAY_HISTORY_TABS = {
   stubs: () => <PayrollPage Component={TalonTab} compact />,

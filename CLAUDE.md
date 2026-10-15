@@ -447,6 +447,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Menu de la Gestion repliable** (V2.4.133) : bouton en haut à gauche de l'en-tête (ordinateur seulement ; le
   téléphone garde son tiroir) qui masque ou affiche tout le menu de gauche, mémorisé sur l'appareil
   (`sparklog.managerNavHidden`, `ManagerLayout.jsx`). Le mode « rail » (« Réduire le menu ») reste.
+- [x] **Feuilles de temps V3 : nom de l'employé en premier** (V2.4.134) : `JobCard({ nameFirst })`, passé par
+  `ManagerDashboard({ nameFirst })` depuis l'onglet V3 seulement — nom complet en tête de carte, « OT • date » et
+  téléphone / courriel dessous, dans une colonne fixe (le nom n'est plus réduit à une lettre sur un écran étroit).
+  La carte V2 est inchangée (capture identique à `main`).
 - [x] **Vérification de la capture Field Service** (V2.4.122) : au remplissage automatique, `workOrderIssues`
   (`src/lib/work-order-parse.js`) avertit l'employé si le # OT, l'heure de début / d'arrivée / de fin ou la
   « Distance réelle parcourue (km) » est vide (« --- ») ou absente, ou si « Miles Traveled » (FR : « Distance parcourue (miles) ») ≠ distance réelle
