@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-15 (V2.4.131).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-15 (V2.4.136).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -43,6 +43,8 @@ d'avril.
   sur tout le salaire, donc le coût CNESST affiché est trop élevé. Il manque la règle exacte qui fixe cet
   excédent. Indice : la grille ACQ dit que le maximum assurable CNESST est de **103 000 $ par année** par
   employé (peut-être appliqué par paie : 1 980,77 $ par semaine, à vérifier). *Où la trouver :* ton comptable, ou donner à Claude quelques talons d'une même semaine (voir étape 5).
+  Demander aussi au comptable si la **paie de Karine** (propriétaire, plus de 40 % des actions) est cotisable à la
+  CNESST : aujourd'hui l'app la cotise comme les autres.
 
 ## Étape 2 — Infos de chaque employé 👤
 
@@ -57,6 +59,10 @@ d'avril.
   « Cumulatif » avec tout le cumul de l'année. *Où :* **Gestion › Paie › Talons › « Importer d'anciens
   talons » › « Plusieurs talons d'un coup »** → choisir tous les PDF → vérifier l'employé reconnu sur chaque
   ligne → « Enregistrer les N talons prêts ». Inclure le tien (ton historique s'arrête au 3 octobre).
+  ✅ **Karine : fait** (2026-10-15) — sa semaine 42 (talon D0038-0002) est dans le registre avec tous ses cumuls,
+  et sa **paie fixe** est réglée : 40 h × 51 $ par semaine depuis le 4 octobre, **exclue de l'AE**. L'app refait sa
+  semaine 43 au centime près (643,24 $ de retenues, 1 396,76 $ net). Si tu veux aussi son coût dans les rapports
+  d'avril à septembre, change « Paie fixe depuis le » pour le 2026-04-05 (Configuration › Paramètres › TD1 / TP-1015.3).
   Ensuite, Sparklog prend le relais à la **semaine 43** dans **Paie de la semaine** : **comptabiliser chaque
   semaine** pour que le cumul suive. Si l'ancien système paie aussi la semaine 43, importer aussi ces talons-là
   et commencer à la semaine 44.
@@ -104,7 +110,7 @@ La V3 (bouton **V2 | V3** en haut à droite de la Gestion) a déjà **À traiter
 nouveau menu. **La V2 ne change pas** : tant que la V3 n'est pas la version par défaut, chaque changement de menu
 se fait seulement dans la V3 (un test fige le menu, les chemins et les pages de la V2).
 
-Fait (V2.4.132) — menu V3 simplifié, de 26 à 13 entrées :
+Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 - [x] **Pages à onglets** : À traiter (À approuver · Justificatifs), Feuilles de temps (Feuilles de temps ·
   Débloquer une journée), Historique paie (Talons · DAS · Relevé d'emploi · Calcul détaillé), Employés (Employés ·
   Absences), Rapports (Coûts · Semaine · Mois · Par employé · Export CCQ), Configuration (Paramètres · Règles de
@@ -112,15 +118,21 @@ Fait (V2.4.132) — menu V3 simplifié, de 26 à 13 entrées :
   (un admin de bureau voit seulement les onglets permis).
 - [x] Seuls **Aujourd'hui** et **Paie** sont ouverts au départ ; sélecteur Messier/Référence compact avec un « i ».
 - [x] Passer de V2 à V3 (et l'inverse) garde la page ; les liens de la cloche marchent dans les deux versions.
+- [x] **Rapports › Export CCQ** remplace Téléchargements en V3 : plus de DAS en double (la DAS est seulement dans
+  Historique paie › DAS, avec la méthode choisie en haut de la page).
+- [x] **Menu de gauche repliable** (V2 et V3, ordinateur) : petit bouton en haut à gauche de l'en-tête.
+- [x] **Feuilles de temps (V3)** : le nom de l'employé est en premier sur chaque carte (avec n° d'OT et date
+  dessous), et le bouton **« ★ Entrées à la main »** n'affiche que les fiches entrées sans la capture Field Service.
 
 À faire, dans cet ordre :
 
 - [ ] **Fiche employé unique** : une liste avec recherche, et une fiche à onglets (Identité, CCQ, Paie et options,
   Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
-- [ ] **DAS de Téléchargements** : il calcule avec la méthode « Référence » alors que Paie › DAS utilise « Messier »
-  (deux totaux différents pour le même mois). Les aligner.
-- [ ] **Débloquer** : un seul endroit et des mots clairs — « rouvrir une journée » ou « retourner une job pour
-  correction » (aujourd'hui : 3 boutons qui se ressemblent).
+- [ ] **DAS de Téléchargements (V2 seulement)** : il calcule avec la méthode « Référence » alors que Paie › DAS
+  utilise « Messier ». Réglé en V3 (pas de DAS dans l'export) ; disparaîtra avec la V2.
+- [ ] **Débloquer** : des mots clairs — « rouvrir une journée » ou « retourner une job pour correction ». En V3, le
+  déblocage d'un jour précis est déjà un seul onglet (Feuilles de temps › Débloquer une journée), mais le bouton
+  « Déverrouiller » des cartes garde son ancien nom.
 - [ ] **Reçus et preuves** (onglet Justificatifs de À traiter en V3) : n'afficher par défaut que ce qui reste à
   traiter ; recherche par employé et par date.
 - [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
