@@ -1,6 +1,7 @@
 import { prepareEvidenceImage, evidenceUploadFailure } from "./evidence-file";
 import { refreshSessionOnce, withTimeout } from "./utils";
 import { INVENTORY_BUCKET, inventoryStoragePath } from "./inventory-screenshots";
+import { effectiveOcrStatus, summarizeInventoryDay } from "./inventory-items";
 
 export async function fetchInventorySlots(client, userId, jobDate) {
   const { data, error } = await withTimeout(
@@ -61,6 +62,23 @@ export function requestInventoryReading(client, { jobDate, slot, userId = null }
   ).then(({ error }) => {
     if (error) console.warn("[inventory] reading request failed", error);
   }).catch((error) => console.warn("[inventory] reading request failed", error));
+}
+
+// The employee's own reading of the day's list: how many lines (equipment) were read from the
+// screenshots against the app's own "N de N" total. { state, count, expected } as on the manager page.
+export async function fetchInventoryReading(client, userId, jobDate) {
+  const [shotsResult, itemsResult] = await Promise.all([
+    withTimeout(client.from("inventory_screenshots").select("slot, ocr_status, list_total, created_at")
+      .eq("user_id", userId).eq("job_date", jobDate), 10000),
+    withTimeout(client.from("inventory_items").select("slot, code, name, quantity")
+      .eq("user_id", userId).eq("job_date", jobDate).limit(1000), 10000),
+  ]);
+  if (shotsResult.error) throw shotsResult.error;
+  if (itemsResult.error) throw itemsResult.error;
+  const now = Date.now();
+  const shots = (shotsResult.data || []).map((shot) => ({ ...shot, ocr_status: effectiveOcrStatus(shot, now) }));
+  const { state, count, expected } = summarizeInventoryDay(shots, itemsResult.data || []);
+  return { state, count, expected };
 }
 
 // Manager action: removes the files, the written list and the rows of one screenshot (slot) or

@@ -1,5 +1,5 @@
-// Pure helpers behind the manager Inventory page: merge the rows read from the three
-// overlapping screenshots into one list, and summarize an employee's day.
+// Pure helpers behind the manager Inventory page: merge the rows read from the overlapping
+// screenshots (one to three) into one list, and summarize an employee's day.
 
 // Screenshots overlap (the last rows of one are the first of the next), so the same code can
 // come from several slots. Keep one row per code: the latest capture's quantity, the longest name.
@@ -28,16 +28,16 @@ export function effectiveOcrStatus(shot, now = Date.now(), requestedAt = 0) {
   return now - since > INVENTORY_READING_TIMEOUT_MS ? "failed" : "pending";
 }
 
-// state: missing (no capture) · partial (<3 captures) · reading (OCR running) · ok (list matches
-// the app's own total) · review (list read but unverified) · photos (nothing readable).
-export const INVENTORY_STATE_ORDER = ["missing", "partial", "photos", "review", "reading", "ok"];
+// state: missing (no capture) · reading (OCR running) · ok (list matches the app's own total)
+// · review (list read but unverified, or fewer lines than the total) · photos (nothing readable).
+// The number of screenshots does not matter: two captures often show the whole list.
+export const INVENTORY_STATE_ORDER = ["missing", "photos", "review", "reading", "ok"];
 
-export function summarizeInventoryDay(shots, rows, slotCount = 3) {
+export function summarizeInventoryDay(shots, rows) {
   const items = mergeInventoryItems(rows);
   const expected = Math.max(0, ...(shots || []).map((shot) => Number(shot.list_total) || 0)) || null;
   let state;
   if (!shots?.length) state = "missing";
-  else if (shots.length < slotCount) state = "partial";
   else if (shots.some((shot) => shot.ocr_status === "pending")) state = "reading";
   else if (!items.length) state = "photos";
   // The list is complete when the merged readings match the total the app itself shows ("N de N"),
@@ -75,7 +75,7 @@ export function compareInventory(todayItems, previousItems, { todayComplete = fa
 
 // Crew-wide inventory: each employee's merged list for the day, summed per equipment code.
 // `holders` is how many employees have a quantity above 0. `unverified` names the employees whose
-// list is missing, partial, still being read, unreadable or not matched to the app's total, so the
+// list is missing, still being read, unreadable or not matched to the app's total, so the
 // totals are never mistaken for complete when they are not.
 export function sumCrewInventory(entries) {
   const byCode = new Map();

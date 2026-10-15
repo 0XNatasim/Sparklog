@@ -20,7 +20,6 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
 const CHIP_CLASS = {
   missing: "border-destructive/40 bg-destructive/10 text-destructive",
-  partial: "border-destructive/40 bg-destructive/10 text-destructive",
   photos: "border-warning/40 bg-warning/10 text-warning",
   review: "border-warning/40 bg-warning/10 text-warning",
   reading: "text-muted-foreground",
@@ -162,7 +161,6 @@ export default function InventoryScreenshotsPanel() {
 
   function chipLabel(entry) {
     if (entry.state === "missing") return t("mgr.inventory.state.missing");
-    if (entry.state === "partial") return t("mgr.inventory.state.partial", { count: entry.captures });
     if (entry.state === "photos") return t("mgr.inventory.state.photos");
     if (entry.state === "reading") return t("mgr.inventory.state.reading");
     if (entry.state === "review") return t("mgr.inventory.state.review", { count: entry.count });
@@ -253,7 +251,7 @@ export default function InventoryScreenshotsPanel() {
               <DialogHeader>
                 <DialogTitle>{open.name} · {dayjs(date).format("YYYY-MM-DD")}</DialogTitle>
               </DialogHeader>
-              <Tabs defaultValue={open.state === "photos" || open.state === "partial" ? "photos" : "list"} key={`${open.person.id}-${date}`}>
+              <Tabs defaultValue={open.state === "photos" ? "photos" : "list"} key={`${open.person.id}-${date}`}>
                 <TabsList>
                   <TabsTrigger value="list">{t("mgr.inventory.tabList")}</TabsTrigger>
                   <TabsTrigger value="photos">{t("mgr.inventory.tabPhotos", { count: open.captures })}</TabsTrigger>
@@ -268,7 +266,6 @@ export default function InventoryScreenshotsPanel() {
                       {open.expected ? t("mgr.inventory.mismatch", { count: open.count, expected: open.expected }) : t("mgr.inventory.unverified")}
                     </p>
                   )}
-                  {open.state === "partial" && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{t("mgr.inventory.partialNote", { count: open.captures })}</p>}
                   {open.items.length > 0 && (
                     <>
                       <div className="flex flex-wrap items-center justify-between gap-2">

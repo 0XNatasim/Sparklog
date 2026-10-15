@@ -91,9 +91,9 @@ describe("summarizeInventoryDay", () => {
   const shot = (slot, extra = {}) => ({ slot, ocr_status: "processed", list_total: 17, ...extra });
   const rows = (count) => Array.from({ length: count }, (_, i) => ({ code: `EQ${String(i).padStart(6, "0")}`, name: `Item ${i}`, quantity: 1, slot: 1 }));
 
-  it("flags a missing, partial, unreadable, unverified and complete day", () => {
+  it("flags a missing, unreadable, unverified and complete day", () => {
     expect(summarizeInventoryDay([], []).state).toBe("missing");
-    expect(summarizeInventoryDay([shot(1), shot(2)], rows(14)).state).toBe("partial");
+    expect(summarizeInventoryDay([shot(1), shot(2)], rows(14))).toMatchObject({ state: "review", count: 14, expected: 17 });
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "pending" })], rows(17)).state).toBe("reading");
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "failed" })], []).state).toBe("photos");
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3)], rows(15)).state).toBe("review");
@@ -102,6 +102,11 @@ describe("summarizeInventoryDay", () => {
 
   it("calls a list complete when it matches the app's total, even if a screenshot had an unreadable fragment", () => {
     expect(summarizeInventoryDay([shot(1), shot(2, { ocr_status: "needs_review" }), shot(3, { ocr_status: "needs_review" })], rows(17)).state).toBe("ok");
+  });
+
+  it("judges the list by its line count, not by the number of screenshots", () => {
+    expect(summarizeInventoryDay([shot(1), shot(2)], rows(17))).toMatchObject({ state: "ok", captures: 2 });
+    expect(summarizeInventoryDay([shot(1)], rows(17))).toMatchObject({ state: "ok", captures: 1 });
   });
 
   it("never calls a list complete when it does not match the app's total", () => {
