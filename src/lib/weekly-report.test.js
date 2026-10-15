@@ -82,6 +82,26 @@ describe("buildWeeklyReport", () => {
   });
 });
 
+describe("CCQ / non-CCQ hours", () => {
+  it("splits Total heures into Heures CCQ (reg. + 1.5× + 2×) and Hors CCQ (return without benefits)", () => {
+    const r = buildWeeklyReport({
+      week, profiles: [alice, office], contributions, employer,
+      // 07:00 → 17:00 with 60 min of return to the shop: 9 h work + 1 h return without benefits.
+      jobs: [job("r1", "a", "2026-09-28", "1234", "07:00", "17:00", 30, "approved", { return_time_minutes: 60 }),
+        job("o1", "o", "2026-09-29", "AD-1", "08:00", "16:00", 0)],
+    });
+    const [a, o] = r.employees;
+    expect(a.hours).toMatchObject({ paidMinutes: 600, ccqMinutes: 540, nonCcqMinutes: 60, returnNoBenefitMinutes: 60 });
+    expect(a.hours.ccqMinutes).toBe(a.hours.regularMinutes + a.hours.ot50Minutes + a.hours.ot100Minutes);
+    // A non-CCQ role has no CCQ hours.
+    expect(o.hours).toMatchObject({ paidMinutes: 480, ccqMinutes: 0, nonCcqMinutes: 480 });
+    expect(r.totals).toMatchObject({ paidMinutes: 1080, ccqMinutes: 540, nonCcqMinutes: 540 });
+    const html = buildWeeklyReportHtml(r);
+    expect(html).toContain("<th class=\"num\">Heures CCQ</th><th class=\"num\">Hors CCQ</th>");
+    expect(html).toContain("Total heures");
+  });
+});
+
 describe("buildWeeklyReportHtml", () => {
   const html = buildWeeklyReportHtml(report, { generatedAt: new Date("2026-10-13T12:00:00") });
 
