@@ -478,8 +478,16 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`validate_job_submission_contract`, 0092 ; `inventoryCaptured`) ; « Continuer » s'active dès une capture ; l'employé voit
   « Liste complète : N lignes sur N » ou « X lignes lues sur N » (`fetchInventoryReading`, lecture OCR existante, au plus
   20 lectures espacées de 4 s, indicatif). Gestion › Inventaire : plus d'état « partiel » au nombre de photos, la liste est
-  complète quand les lignes lues = « N de N ». Historique : badge vert dès une capture. À faire si l'essai est concluant :
-  même principe pour le stationnement (2-3 reçus de parcomètre par job).
+  complète quand les lignes lues = « N de N ». Historique : badge vert dès une capture.
+- [ ] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095 **pas encore appliquée** :
+  à appliquer avant de fusionner, puis renommer le fichier à la version enregistrée). Toujours **une** demande par job
+  (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,
+  les autres dans `extra_storage_paths` (≤ 9, total 10). Fiche : « Choisir les reçus (plusieurs d'un coup) », puis
+  « Ajouter des reçus » / « Remplacer tous les reçus » tant que la demande est en attente (`src/lib/parking-receipts.js` :
+  `orderPickedFiles`, `mergeParkingPaths`, `parkingReceiptPaths`). Trigger `validate_parking_receipt_paths` : chaque photo
+  dans le dossier de l'employé, sans doublon ; `find_orphaned_evidence_objects` compte les photos supplémentaires.
+  Justificatifs et À traiter montrent toutes les photos ; la suppression d'une job (Historique) les efface toutes.
+  Avant : choisir un 2e reçu remplaçait le 1er, devenu orphelin (3 reçus effacés par le ménage du 2026-10-16).
 - [x] **Étoile rouge sur les fiches entrées à la main** (V2.4.123, migration 0090) : table `job_entry_sources`
   (`screenshot` / `manual`, une ligne par nouvelle fiche, écrite par l'employé après l'enregistrement, lisible par qui
   voit la job, ni modification ni suppression). `src/lib/entry-source.js` ; ★ rouge + légende dans Feuilles de temps

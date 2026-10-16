@@ -21,6 +21,7 @@ import { notifyBroadcastPush } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 import { loadManualEntryJobIds } from "@/lib/entry-source";
+import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import ManualEntryStar from "@/components/ManualEntryStar";
 
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, return_time_minutes, overtime_evidence_captured, updated_at";
@@ -39,7 +40,7 @@ export default function TodoInbox() {
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
-  const [image, setImage] = useState(null); // { title, url }
+  const [image, setImage] = useState(null); // { title, urls }
 
   // No state is set before the first await, so the effect below never renders twice in a row.
   const load = useCallback(async () => {
@@ -50,7 +51,7 @@ export default function TodoInbox() {
         withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").order("job_date", { ascending: false }).limit(QUERY_BUDGETS.anomalySubmittedJobs), 12000),
         withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, apprentice_level, first_trip_unpaid"), 12000),
         withRetry(() => supabase.from("meal_claims").select("id, job_id, user_id, job_date, amount, status").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
-        withRetry(() => supabase.from("parking_receipts").select("job_id, user_id, job_date, amount, status, storage_path").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
+        withRetry(() => supabase.from("parking_receipts").select("job_id, user_id, job_date, amount, status, storage_path, extra_storage_paths").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         supabase.from("company_time_settings").select("*").eq("id", true).maybeSingle(),
         supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", prevDay).or(`end_date.gte.${prevDay},end_date.is.null`),
         supabase.from("jobs").select("user_id, status").eq("job_date", prevDay),
@@ -235,11 +236,21 @@ export default function TodoInbox() {
     });
   }
 
-  async function showImage(bucket, path, title) {
-    if (!path) return;
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 600);
-    if (error || !data?.signedUrl) { setErr(error?.message || t("manager.overtime.imageUnavailable")); return; }
-    setImage({ title, url: data.signedUrl });
+  const parkingLabel = (receipt) => {
+    const count = parkingReceiptPaths(receipt).length;
+    return count > 1
+      ? t("todo.parkingMany", { amount: money(receipt.amount), count })
+      : t("todo.parking", { amount: money(receipt.amount) });
+  };
+
+  // One picture or several (the parcomètre receipts of one parking claim).
+  async function showImage(bucket, pathOrPaths, title) {
+    const paths = (Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths]).filter(Boolean);
+    if (!paths.length) return;
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrls(paths, 600);
+    const urls = (data || []).map((row) => row?.signedUrl).filter(Boolean);
+    if (error || !urls.length) { setErr(error?.message || t("manager.overtime.imageUnavailable")); return; }
+    setImage({ title, urls });
   }
 
   async function remind(people) {
@@ -330,8 +341,8 @@ export default function TodoInbox() {
               }))}
               {day.parking.map((receipt) => claimChip({
                 key: `p:${receipt.job_id}`,
-                label: t("todo.parking", { amount: money(receipt.amount) }),
-                onView: receipt.storage_path ? () => showImage("parking-receipts", receipt.storage_path, t("todo.parking", { amount: money(receipt.amount) })) : null,
+                label: parkingLabel(receipt),
+                onView: receipt.storage_path ? () => showImage(PARKING_BUCKET, parkingReceiptPaths(receipt), parkingLabel(receipt)) : null,
                 onAccept: () => reviewParking(receipt, "approved"),
                 onReject: () => reviewParking(receipt, "rejected"),
               }))}
@@ -442,8 +453,8 @@ export default function TodoInbox() {
                     ? claimChip({ key: claim.id, label: t("todo.meal", { amount: money(claim.amount) }), onAccept: () => reviewMeal(claim, "approved"), onReject: () => reviewMeal(claim, "rejected") })
                     : claimChip({
                       key: claim.job_id,
-                      label: t("todo.parking", { amount: money(claim.amount) }),
-                      onView: claim.storage_path ? () => showImage("parking-receipts", claim.storage_path, t("todo.parking", { amount: money(claim.amount) })) : null,
+                      label: parkingLabel(claim),
+                      onView: claim.storage_path ? () => showImage(PARKING_BUCKET, parkingReceiptPaths(claim), parkingLabel(claim)) : null,
                       onAccept: () => reviewParking(claim, "approved"),
                       onReject: () => reviewParking(claim, "rejected"),
                     })}
@@ -474,7 +485,7 @@ export default function TodoInbox() {
       <Dialog open={Boolean(image)} onOpenChange={(open) => { if (!open) setImage(null); }}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>{image?.title}</DialogTitle></DialogHeader>
-          {image?.url && <img src={image.url} alt={image.title} className="w-full rounded-md border" />}
+          {image?.urls?.map((url) => <img key={url} src={url} alt={image.title} className="w-full rounded-md border" />)}
         </DialogContent>
       </Dialog>
     </div>
