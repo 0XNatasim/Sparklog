@@ -479,8 +479,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   « Liste complète : N lignes sur N » ou « X lignes lues sur N » (`fetchInventoryReading`, lecture OCR existante, au plus
   20 lectures espacées de 4 s, indicatif). Gestion › Inventaire : plus d'état « partiel » au nombre de photos, la liste est
   complète quand les lignes lues = « N de N ». Historique : badge vert dès une capture.
-- [ ] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095 **pas encore appliquée** :
-  à appliquer avant de fusionner, puis renommer le fichier à la version enregistrée). Toujours **une** demande par job
+- [x] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095, appliquée par l'intégration
+  Supabase à la fusion dans `main`, sous la version du nom de fichier). Toujours **une** demande par job
   (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,
   les autres dans `extra_storage_paths` (≤ 9, total 10). Fiche : « Choisir les reçus (plusieurs d'un coup) », puis
   « Ajouter des reçus » / « Remplacer tous les reçus » tant que la demande est en attente (`src/lib/parking-receipts.js` :
