@@ -484,6 +484,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`screenshot` / `manual`, une ligne par nouvelle fiche, écrite par l'employé après l'enregistrement, lisible par qui
   voit la job, ni modification ni suppression). `src/lib/entry-source.js` ; ★ rouge + légende dans Feuilles de temps
   et À traiter. Pas de ligne (anciennes fiches, feuille d'urgence, écriture ratée) = pas d'étoile. Indicatif seulement.
+- [x] **Export Google Sheet : colonnes trouvées par leur en-tête** (V2.4.138) : `apps-script-doPost.js` écrivait chaque
+  valeur à une position fixe (A Date, B Employé, C Courriel…) ; l'en-tête de « Data » avait été déplacé/renommé et le
+  script déployé ne correspondait plus au dépôt (lignes de Simon et d'Abdoul dans deux ordres différents), donc « Stats »
+  (qui lit par en-tête) lisait le téléphone comme « Départ » et la fin comme « KM » → 0h00 dans Sem42. Nouveau `doPost` :
+  chaque valeur sous son en-tête (`COLUMNS`, accents/casse ignorés), en-tête manquant ajouté à la fin, colonnes perso
+  laissées tranquilles ; testé hors ligne (feuille vide, colonnes mélangées, doublon, 1er trajet non payé). « Data »
+  réparée le 2026-10-16 (19 lignes réalignées, valeurs vérifiées contre `jobs`). **À faire par le propriétaire :** coller
+  le nouveau `doPost` dans Apps Script puis Déployer › Gérer les déploiements › Nouvelle version (sinon l'ancien code
+  écrit encore aux mauvaises positions).
 - [x] **Exclusion du RRQ** (V2.4.138, migration 0093) : case « Exclu du RRQ » dans Paramètres › Paie
   (`employee_tax_profiles.rrq_exempt`), jumelle de « Exclu de l'AE » : `calculatePayroll` met `bases.rrq = 0` (aucune
   cotisation, salarié ni employeur), talon « Gains RRQ » à 0, case aussi dans Calcul ; fiche des règles (`rrq-exempt`,
