@@ -6,6 +6,7 @@ import {
   inventoryCaptured,
   inventoryDayBadge,
   inventoryRequiredFor,
+  inventoryCandidates,
   inventoryStoragePath,
   missingInventorySlots,
   planInventoryUploads,
@@ -145,5 +146,19 @@ describe("0092 inventory gate", () => {
     for (const keyword of ["inventory_screenshots_required", "overtime_evidence_required", "overlapping_job_interval", "return_time_exceeds_job_interval", "invalid_job_kilometres", "coalesce(unpaid_trip_minutes, 0) > 480"]) {
       expect(atLeastOne).toContain(keyword);
     }
+  });
+});
+
+describe("inventoryCandidates (Inventaire › Qui fait l'inventaire)", () => {
+  it("lists active field employees by name, without office admins or paused accounts", () => {
+    const people = [
+      { id: "z", full_name: "Zoé", role: "employee" },
+      { id: "a", full_name: "Alex", role: "subcontractor_1" },
+      { id: "o", full_name: "Bureau", role: "admin" },
+      { id: "p", full_name: "Parti", role: "employee", is_paused: true },
+      { id: "m", full_name: "Marc", role: "manager" },
+    ];
+    expect(inventoryCandidates(people).map((p) => p.id)).toEqual(["a", "m", "z"]);
+    expect(inventoryCandidates(null)).toEqual([]);
   });
 });

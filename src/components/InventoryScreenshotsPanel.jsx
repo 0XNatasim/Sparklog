@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { ChevronLeft, ChevronRight, RefreshCw, Trash2, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListChecks, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { cn, withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { INVENTORY_BUCKET, INVENTORY_SLOTS } from "@/lib/inventory-screenshots";
+import { INVENTORY_BUCKET, INVENTORY_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
 import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay, sumCrewInventory } from "@/lib/inventory-items";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -42,6 +42,10 @@ export default function InventoryScreenshotsPanel() {
   // Comparison with the employee's previous inventory day: { personId, date, status, data }.
   const [compare, setCompare] = useState(null);
   const [crewOpen, setCrewOpen] = useState(false);
+  // « Qui fait l'inventaire » : the per-employee opt-in (profiles.inventory_screenshots_enabled, 0072).
+  const [whoOpen, setWhoOpen] = useState(false);
+  const [whoBusy, setWhoBusy] = useState("");
+  const [whoErr, setWhoErr] = useState("");
   const [rereadBusy, setRereadBusy] = useState(false);
   const [requestedAt, setRequestedAt] = useState({});
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -57,7 +61,7 @@ export default function InventoryScreenshotsPanel() {
     try {
       const [peopleResult, shotsResult, itemsResult] = await Promise.all([
         withTimeout(
-          supabase.from("profiles").select("id, full_name, email, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
+          supabase.from("profiles").select("id, full_name, email, role, is_paused, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
           12000
         ),
         withTimeout(
@@ -110,6 +114,23 @@ export default function InventoryScreenshotsPanel() {
   }, [pending, load, shots]);
 
   const open = entries.find((entry) => entry.person.id === openId) || null;
+  const candidates = useMemo(() => inventoryCandidates(people), [people]);
+  const enabledCount = candidates.filter((p) => p.inventory_screenshots_enabled).length;
+
+  // Turns the inventory step on or off for one employee; the list updates at once and goes back if
+  // the save fails.
+  async function setInventoryRequired(person, enabled) {
+    setWhoErr("");
+    setWhoBusy(person.id);
+    const apply = (value) => setPeople((current) => current.map((p) => (p.id === person.id ? { ...p, inventory_screenshots_enabled: value } : p)));
+    apply(enabled);
+    const { error } = await supabase.from("profiles").update({ inventory_screenshots_enabled: enabled }).eq("id", person.id);
+    if (error) {
+      apply(!enabled);
+      setWhoErr(friendlyErrorMessage(error, t, "mgr.inventory.whoFailed"));
+    }
+    setWhoBusy("");
+  }
 
   // Photos are signed only for the card being opened.
   useEffect(() => {
@@ -207,6 +228,9 @@ export default function InventoryScreenshotsPanel() {
           <Button type="button" variant="ghost" size="sm" disabled={date === companyDate()} onClick={() => setDate(companyDate())}>{t("mgr.inventory.today")}</Button>
           <div className="ml-auto flex items-center gap-3">
             {entries.length > 0 && <span className="text-sm text-muted-foreground">{t("mgr.inventory.received", { received, total: entries.length })}</span>}
+            <Button type="button" variant="outline" size="sm" onClick={() => setWhoOpen(true)}>
+              <ListChecks className="mr-1 h-4 w-4" />{t("mgr.inventory.who")}
+            </Button>
             <Button type="button" variant="outline" size="sm" disabled={crew.counted === 0} onClick={() => setCrewOpen(true)}>
               <Users className="mr-1 h-4 w-4" />{t("mgr.inventory.crew")}
             </Button>
@@ -396,6 +420,29 @@ export default function InventoryScreenshotsPanel() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={whoOpen} onOpenChange={(value) => { setWhoOpen(value); if (!value) setWhoErr(""); }}>
+        <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("mgr.inventory.whoTitle")}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t("mgr.inventory.whoHint", { count: enabledCount, total: candidates.length })}</p>
+          {whoErr && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{whoErr}</div>}
+          <div className="divide-y rounded-md border">
+            {candidates.map((person) => (
+              <label key={person.id} className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5">
+                <span className="text-sm font-medium">{person.full_name || person.email || person.id}</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(person.inventory_screenshots_enabled)}
+                  disabled={whoBusy === person.id}
+                  onChange={(event) => setInventoryRequired(person, event.target.checked)}
+                  className="h-5 w-5 rounded border-input accent-primary"
+                />
+              </label>
+            ))}
           </div>
         </DialogContent>
       </Dialog>

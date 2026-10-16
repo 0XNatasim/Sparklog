@@ -45,3 +45,11 @@ export function planInventoryUploads(files, rows) {
   const uploads = targets.slice(0, ordered.length).map((slot, index) => ({ slot, file: ordered[index] }));
   return { uploads, extra: ordered.length - uploads.length };
 }
+
+// People a manager can ask to send the inventory (Inventaire › « Qui fait l'inventaire ») : active
+// accounts that work in the field (not office « admin » employees, who never get the step), by name.
+export function inventoryCandidates(people) {
+  return (people || [])
+    .filter((p) => p && !p.is_paused && p.role !== "admin")
+    .sort((a, b) => String(a.full_name || a.email || "").localeCompare(String(b.full_name || b.email || ""), "fr-CA"));
+}
