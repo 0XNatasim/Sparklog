@@ -5,6 +5,7 @@ import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { formatTimeOff, categoryLabel, matchesRecurrence, TIME_OFF_CATEGORIES, DEFAULT_CATEGORY, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
 import { companyDate } from "@/lib/company-time";
 
@@ -14,6 +15,7 @@ import { companyDate } from "@/lib/company-time";
 // dedicated Congés section, so both read/write the same employee_time_off table and agree.
 export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const [mode, setMode] = useState("range"); // 'range' | 'hours' | 'recurring'
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [draft, setDraft] = useState({ from: "", to: "", date: "", start: "", end: "", weekdays: [], until: "" });
@@ -58,6 +60,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
   }
 
   async function remove(id) {
+    if (!(await confirm(t("confirm.deleteTimeOff")))) return;
     const { error } = await supabase.from("employee_time_off").delete().eq("id", id);
     if (error) { setErr(error.message); return; }
     onChanged?.();
@@ -99,6 +102,7 @@ export default function TimeOffControls({ employeeId, rows = [], onChanged }) {
 
   return (
     <div>
+      {confirmDialog}
       {rows.length > 0 && (
         <div className="mb-3 space-y-1.5">
           {rows.map((row) => (

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { formatTimeOff, categoryLabel, matchesRecurrence, TIME_OFF_CATEGORIES, TIME_OFF_COLUMNS, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
 import TimeOffControls from "@/components/TimeOffControls";
 
@@ -105,6 +106,7 @@ function TimeOffEditForm({ row, onSaved, onCancel }) {
 // stay in sync both ways. Categories are informational (no pay effect).
 export default function CongesManager() {
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const [employees, setEmployees] = useState([]);
   const [rows, setRows] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -148,6 +150,7 @@ export default function CongesManager() {
   }, [loadRows]);
 
   async function remove(id) {
+    if (!(await confirm(t("confirm.deleteTimeOff")))) return;
     const { error: e } = await supabase.from("employee_time_off").delete().eq("id", id);
     if (e) { setError(e.message); return; }
     await loadRows();
@@ -186,6 +189,7 @@ export default function CongesManager() {
   return (
     <div className="space-y-3">
       {/* Add / manage for one employee — first. */}
+        {confirmDialog}
       <Card>
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold"><Plus className="h-4 w-4 text-primary" />{t("conges.addTitle")}</div>
