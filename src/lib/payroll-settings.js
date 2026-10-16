@@ -35,6 +35,7 @@ export function taxProfileFromRow(row) {
     fixedWeeklyHours: Number(row.fixed_weekly_hours) || 0,
     fixedPayStart: row.fixed_pay_start || "",
     eiExempt: Boolean(row.ei_exempt),
+    rrqExempt: Boolean(row.rrq_exempt),
   };
 }
 

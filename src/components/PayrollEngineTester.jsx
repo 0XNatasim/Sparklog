@@ -193,7 +193,7 @@ export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
   const [frequency, setFrequency] = useState("weekly");
   const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ccqPremium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, storage: 0, otherReimb: 0 });
-  const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0, eiExempt: false });
+  const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0, eiExempt: false, rrqExempt: false });
   const [ytd, setYtd] = useState({ ...EMPTY_YTD }); // ACTIVE opening balance for the selected week
   const [seed, setSeed] = useState({ ...EMPTY_YTD }); // pre-SparkLog opening (payroll_ytd), fallback opening
   const [seedDate, setSeedDate] = useState(""); // as-of date of the seed
@@ -311,12 +311,13 @@ export default function PayrollEngineTester({ messier = false }) {
       additionalFederal: tax?.federalAdditionalTax || 0,
       additionalQuebec: tax?.quebecAdditionalTax || 0,
       eiExempt: Boolean(tax?.eiExempt), // not insurable for EI (Paramètres › Paie)
+      rrqExempt: Boolean(tax?.rrqExempt), // not contributing to the RRQ (Paramètres › Paie)
     });
     // Fixed weekly pay (Paramètres › Paie): the weeks pay these hours on one « Régulier à taux horaire »
     // line, with no CCQ layer.
     const fixedHours = fixedWeeklyHours(tax);
     // pay.eiExempt drives the stub's « Gains AE »; pay.fixedPay is set per week (handleSelectWeek).
-    setPay((s) => ({ ...s, eiExempt: Boolean(tax?.eiExempt), fixedPay: false }));
+    setPay((s) => ({ ...s, eiExempt: Boolean(tax?.eiExempt), rrqExempt: Boolean(tax?.rrqExempt), fixedPay: false }));
     if (profile?.hourly_rate != null) {
       // Base wage + team-leader premium kept separate: regular is paid at base +
       // premium; overtime is on the BASE rate only (per the CCQ stub) unless the employee
@@ -805,6 +806,7 @@ export default function PayrollEngineTester({ messier = false }) {
           additionalTax: Number(emp.additionalQuebec) || 0,
         },
         eiExempt: Boolean(emp.eiExempt),
+        rrqExempt: Boolean(emp.rrqExempt),
       },
       employer: {
         annualPayrollEstimate: Number(employer.annualPayrollEstimate) || 0,
@@ -1005,6 +1007,10 @@ export default function PayrollEngineTester({ messier = false }) {
           <label title={t("payrollSettings.eiExemptHelp")} className="flex items-center gap-2 self-end text-xs">
             <input type="checkbox" checked={Boolean(emp.eiExempt)} onChange={(e) => { const on = e.target.checked; setEmp((s) => ({ ...s, eiExempt: on })); setPay((s) => ({ ...s, eiExempt: on })); setResult(null); setCalcCtx(null); }} />
             <span>{t("payrollSettings.eiExempt")}</span>
+          </label>
+          <label title={t("payrollSettings.rrqExemptHelp")} className="flex items-center gap-2 self-end text-xs">
+            <input type="checkbox" checked={Boolean(emp.rrqExempt)} onChange={(e) => { const on = e.target.checked; setEmp((s) => ({ ...s, rrqExempt: on })); setPay((s) => ({ ...s, rrqExempt: on })); setResult(null); setCalcCtx(null); }} />
+            <span>{t("payrollSettings.rrqExempt")}</span>
           </label>
         </div>
       </Collapsible>

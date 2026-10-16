@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-15 (V2.4.136).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-16 (V2.4.138).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -52,20 +52,21 @@ d'avril.
   donnent les crédits d'impôt personnels. *Où l'inscrire :* **Configuration › Paramètres › Paie — TD1 /
   TP-1015.3 des employés**. Inscris seulement les montants, jamais le NAS ni une copie du formulaire.
   Tant qu'un employé n'a rien, l'app prend le montant personnel de base.
-- [ ] **Cumul de l'année avant Sparklog** (salaire, RRQ, AE, RQAP, impôts déjà retenus). Sans lui, l'app
-  croit que l'année commence à zéro et ne sait pas quand arrêter les retenues à leur maximum annuel
-  (RRQ à 74 600 $ puis 85 000 $ de salaire, AE à 68 900 $, RQAP à 103 000 $).
-  **Décidé :** importer le **talon de la semaine 42** (4 au 10 octobre) de chaque employé. Il a une colonne
-  « Cumulatif » avec tout le cumul de l'année. *Où :* **Gestion › Paie › Talons › « Importer d'anciens
-  talons » › « Plusieurs talons d'un coup »** → choisir tous les PDF → vérifier l'employé reconnu sur chaque
-  ligne → « Enregistrer les N talons prêts ». Inclure le tien (ton historique s'arrête au 3 octobre).
-  ✅ **Karine : fait** (2026-10-15) — sa semaine 42 (talon D0038-0002) est dans le registre avec tous ses cumuls,
-  et sa **paie fixe** est réglée : 40 h × 51 $ par semaine depuis le 4 octobre, **exclue de l'AE**. L'app refait sa
-  semaine 43 au centime près (643,24 $ de retenues, 1 396,76 $ net). Si tu veux aussi son coût dans les rapports
-  d'avril à septembre, change « Paie fixe depuis le » pour le 2026-04-05 (Configuration › Paramètres › TD1 / TP-1015.3).
-  Ensuite, Sparklog prend le relais à la **semaine 43** dans **Paie de la semaine** : **comptabiliser chaque
-  semaine** pour que le cumul suive. Si l'ancien système paie aussi la semaine 43, importer aussi ces talons-là
-  et commencer à la semaine 44.
+- [x] **Cumul de l'année avant Sparklog** — ✅ **fait pour tous** (2026-10-16), à partir du « Cumulatif des
+  employés » de Dynacom (29 mars → semaine 42) : une ligne par employé au 10 octobre dans le registre de paie,
+  avec salaire, RRQ, AE, RQAP, impôts, CCQ, etc. 35 employés, totaux identiques au PDF au centime près. Les
+  5 anciens employés qui n'avaient pas de compte ont maintenant un profil **inactif** (sans connexion possible)
+  pour garder leurs cumuls. Sparklog prend le relais à la **semaine 43** dans **Paie de la semaine** :
+  **comptabiliser chaque semaine** pour que le cumul suive.
+  - Karine : paie fixe 40 h × 51 $ par semaine depuis le 4 octobre, **exclue de l'AE** (si tu veux son coût
+    d'avril à septembre dans les rapports, change « Paie fixe depuis le » pour le 2026-04-05).
+  - **Exclu du RRQ** (nouvelle case, Configuration › Paramètres › Paie) : cochée pour l'employé à qui Dynacom ne
+    retient aucun RRQ. À cocher aussi pour tout autre employé qui a cessé de cotiser (garder la preuve au dossier).
+  - Si Dynacom met à jour les cumuls (par exemple le RRQ d'avant avril, comme pour un employé cette semaine),
+    me redonner le nouveau « Cumulatif des employés » : je remplace les lignes du 10 octobre.
+  - Heures cumulées : pour 4 chefs d'équipe, Dynacom compte aussi les lignes de prime comme des heures. Ça ne
+    touche que la ligne « Heures » des talons et le relevé d'emploi, pas les montants. Pour les corriger, importer
+    leur talon de la semaine 42 (l'import corrige les heures).
 - [ ] **Syndicat et local** de chaque employé (par ex. FIPOE, local 568…).
 - [ ] **Niveau** (compagnon ou apprenti, et quelle période) et **taux horaire**, vérifiés sur la carte ou
   le certificat CCQ. La liste de contrôle à remplir est à la fin du `README.md`.

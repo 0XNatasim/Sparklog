@@ -159,6 +159,7 @@ function TaxFormsSection({ t }) {
           fixed_weekly_hours: asText(f.fixed_weekly_hours),
           fixed_pay_start: f.fixed_pay_start || "",
           ei_exempt: Boolean(f.ei_exempt),
+          rrq_exempt: Boolean(f.rrq_exempt),
         };
       }));
   }, []);
@@ -187,6 +188,7 @@ function TaxFormsSection({ t }) {
       fixed_weekly_hours: fixedHours,
       fixed_pay_start: fixedHours ? row.fixed_pay_start : null,
       ei_exempt: row.ei_exempt,
+      rrq_exempt: row.rrq_exempt,
       updated_at: new Date().toISOString(),
       updated_by: auth?.user?.id || null,
     }, { onConflict: "user_id" });
@@ -247,6 +249,10 @@ function FixedPayFields({ t, row, setField }) {
           <input type="checkbox" checked={row.ei_exempt} onChange={(e) => setField(row.id, "ei_exempt", e.target.checked)} className="h-5 w-5 shrink-0 rounded border-input accent-primary" />
           <span>{t("payrollSettings.eiExempt")}</span>
         </label>
+        <label title={t("payrollSettings.rrqExemptHelp")} className="col-span-2 flex cursor-pointer items-center gap-2 self-end rounded border px-2 py-2 text-xs">
+          <input type="checkbox" checked={row.rrq_exempt} onChange={(e) => setField(row.id, "rrq_exempt", e.target.checked)} className="h-5 w-5 shrink-0 rounded border-input accent-primary" />
+          <span>{t("payrollSettings.rrqExempt")}</span>
+        </label>
       </div>
       <p className="text-xs text-muted-foreground">
         {hours > 0
@@ -255,6 +261,7 @@ function FixedPayFields({ t, row, setField }) {
             : <span className="text-warning">{t("payrollSettings.fixedNoRate")}</span>)
           : t("payrollSettings.fixedHoursHelp")}
         {row.ei_exempt ? <> · {t("payrollSettings.eiExemptHelp")}</> : null}
+        {row.rrq_exempt ? <> · {t("payrollSettings.rrqExemptHelp")}</> : null}
       </p>
     </div>
   );

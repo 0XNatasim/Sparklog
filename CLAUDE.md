@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-15, V2.4.137)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.138)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -334,21 +334,19 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [ ] **TD1 (fédéral) et TP-1015.3 (Québec)** de chaque employé : les montants se saisissent dans
   Paramètres › Paie (`employee_tax_profiles`, gestionnaires/propriétaire seulement, V2.4.103) et sont
   utilisés par Talons, DAS et Calcul — reste à les saisir. Vide = montant personnel de base.
-- [ ] **Cumul de l'année avant Sparklog (décidé le 2026-10-14)** : la paie suit l'**année civile** (l'exercice
-  financier au 1er novembre ne change rien aux DAS, RRQ, AE, RQAP, CNESST, FSS) et Messier a démarré en
-  **avril 2026**, donc les maximums partent de la première paie d'avril (par employeur). Méthode retenue :
-  importer le **talon de la semaine 42 (2026-10-04 → 10-10)** de chaque employé via Talons › « Importer d'anciens
-  talons » (`ImportLegacyStubsDialog` : colonne « Cumulatif » → ligne `payroll_period_ledger` au 2026-10-10).
-  `planPayrollWeek` part de cette ligne et n'exige pas les semaines d'avant : Sparklog prend le relais à la
-  **semaine 43** (ou 44 si l'ancien système paie aussi la 43 : importer alors ces talons). Seul le propriétaire
-  a déjà son historique (2026-04-04 → 10-03) ; ajouter aussi sa semaine 42. **Karine Messier (propriétaire) : fait le
-  2026-10-15** — ligne `payroll_period_ledger` au 2026-10-10 avec les cumuls et le talon D0038-0002 (`imported_talon`),
-  écrite par SQL dans la même forme que `ledgerPayloadFor` ; sa semaine 43 recalculée par le moteur donne 643,24 $ de
-  retenues / 1 396,76 $ net, identiques au talon. **Import en lot** (V2.4.129) : même
-  fenêtre, « Plusieurs talons d'un coup » (`ImportStubsBatch.jsx`, `src/lib/talon-batch.js`) — tous les PDF d'un coup,
-  employé reconnu par le **nom** du talon (« Simon B. » ↔ « Simon Bellerive » ; n° d'employé seulement en dernier
-  recours, signalé ; jamais le n° CCQ, qui est celui de l'employeur), modifiable, même ligne que l'import unitaire,
-  semaines enregistrées dans l'ordre. Vérifié dans Chromium avec deux vrais talons (sem. 41 et 42).
+- [x] **Cumul de l'année avant Sparklog** — fait le 2026-10-16 pour tous. Source : « Cumulatif des employés » de
+  Dynacom du 2026-03-29 au 2026-10-17 (imprimé le 2026-10-15, Drive du propriétaire ; contient les NAS, jamais copié
+  ici), qui couvre jusqu'à la **semaine 42** (chiffres identiques au talon D0038-0002 de la propriétaire et au talon de
+  la semaine 41 d'un employé + une semaine). Une ligne `payroll_period_ledger` au **2026-10-10** par employé (35), écrite
+  par SQL : mêmes colonnes que l'import de talon (`talon-import-core.js`), brut et normes du travail = « Gains RQAP »,
+  `imported_talon` nul. Chaque colonne des 35 personnes = le grand total du PDF au centime. 5 anciens employés sans
+  compte : `auth.users` sans mot de passe (`ancien.<nom>@messier-connexion.invalid`) → profil `is_paused`,
+  `show_on_boards = false`. Exceptions : l'employé qui avait déjà une suite de cumuls (semaines 14 à 41) garde ses heures
+  corrigées (882,75 h + 41,25 h approuvées en semaine 42) et un brut enchaîné ; ailleurs « Heures » = Dynacom, gonflées
+  pour 4 chefs d'équipe (lignes de prime comptées comme heures) → seulement la ligne Heures des talons et le RE.
+  `planPayrollWeek` part de cette ligne : Sparklog prend le relais à la **semaine 43**. Si Dynacom met à jour les cumuls
+  (RRQ d'avant avril ajouté pour un employé le 2026-10-16, « probablement pour tous cette semaine »), réimporter le
+  nouveau PDF en remplaçant les lignes du 10-10. L'import de talons (unitaire ou en lot, V2.4.129) reste disponible.
 - [ ] **Échelon / période d'apprentissage** et taux horaire confirmés contre le certificat CCQ
   (liste de contrôle « CCQ monthly-report » du README).
 
@@ -486,6 +484,20 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`screenshot` / `manual`, une ligne par nouvelle fiche, écrite par l'employé après l'enregistrement, lisible par qui
   voit la job, ni modification ni suppression). `src/lib/entry-source.js` ; ★ rouge + légende dans Feuilles de temps
   et À traiter. Pas de ligne (anciennes fiches, feuille d'urgence, écriture ratée) = pas d'étoile. Indicatif seulement.
+- [x] **Export Google Sheet : colonnes trouvées par leur en-tête** (V2.4.138) : `apps-script-doPost.js` écrivait chaque
+  valeur à une position fixe (A Date, B Employé, C Courriel…) ; l'en-tête de « Data » avait été déplacé/renommé et le
+  script déployé ne correspondait plus au dépôt (lignes de Simon et d'Abdoul dans deux ordres différents), donc « Stats »
+  (qui lit par en-tête) lisait le téléphone comme « Départ » et la fin comme « KM » → 0h00 dans Sem42. Nouveau `doPost` :
+  chaque valeur sous son en-tête (`COLUMNS`, accents/casse ignorés), en-tête manquant ajouté à la fin, colonnes perso
+  laissées tranquilles ; testé hors ligne (feuille vide, colonnes mélangées, doublon, 1er trajet non payé). « Data »
+  réparée le 2026-10-16 (19 lignes réalignées, valeurs vérifiées contre `jobs`). **À faire par le propriétaire :** coller
+  le nouveau `doPost` dans Apps Script puis Déployer › Gérer les déploiements › Nouvelle version (sinon l'ancien code
+  écrit encore aux mauvaises positions).
+- [x] **Exclusion du RRQ** (V2.4.138, migration 0093) : case « Exclu du RRQ » dans Paramètres › Paie
+  (`employee_tax_profiles.rrq_exempt`), jumelle de « Exclu de l'AE » : `calculatePayroll` met `bases.rrq = 0` (aucune
+  cotisation, salarié ni employeur), talon « Gains RRQ » à 0, case aussi dans Calcul ; fiche des règles (`rrq-exempt`,
+  à confirmer). Cochée en production pour l'employé à qui Dynacom ne retient aucun RRQ (0 $ de gains et de cotisation
+  RRQ au cumul). Jamais déduite automatiquement ; garder la preuve du choix (65-69 ans avec rente, etc.).
 - [x] **Paie fixe et exclusion de l'AE** (V2.4.133, migration 0091) : Paramètres › Paie › par employé, « Paie fixe :
   heures / semaine » + date de début, et case « Exclu de l'AE » (Loi sur l'AE 5(2)b), > 40 % des actions). La
   propriétaire (Karine) reçoit 40 h × 51 $ chaque semaine sans job, une ligne « Régulier à taux horaire », sans CCQ ni AE :
