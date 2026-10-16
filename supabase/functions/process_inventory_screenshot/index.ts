@@ -13,13 +13,19 @@ function json(data: unknown, status = 200) {
 
 type Target = { userId: string; jobDate: string; slot: number };
 
+// Slots 1-3: equipment list screenshots; slot 4: « Produits défectueux » picture (migration 0097).
+const DEFECTIVE_SLOT = 4;
+
 // Reads one inventory screenshot with OCR, stores the equipment rows it contains and
-// classifies the result. Only the parsed rows (code, name, quantity) are kept, never the
+// classifies the result. Only the parsed rows (code, name, quantity, section) are kept, never the
 // raw OCR text. Safe to run again: the slot's rows are replaced.
+// Slots 1-3 are the equipment list (rows under « Produits défectueux », if the capture reaches that
+// title, are stored with section "defective"). Slot 4 is the defective-products picture (0097):
+// only rows under that title count, so a slot 4 picture without the title stores nothing.
 async function processScreenshot(admin: ReturnType<typeof createClient>, target: Target) {
   const { userId, jobDate, slot } = target;
-  const setStatus = (ocr_status: string, list_total: number | null = null) =>
-    admin.from("inventory_screenshots").update({ ocr_status, list_total })
+  const setStatus = (ocr_status: string, list_total: number | null = null, defective_total: number | null = null) =>
+    admin.from("inventory_screenshots").update({ ocr_status, list_total, defective_total })
       .eq("user_id", userId).eq("job_date", jobDate).eq("slot", slot);
   try {
     const { data: shot, error: shotError } = await admin
@@ -50,22 +56,29 @@ async function processScreenshot(admin: ReturnType<typeof createClient>, target:
     }
     const text = (result?.ParsedResults || []).map((item: { ParsedText?: string }) => item?.ParsedText || "").join("\n");
     const parsed = parseInventoryText(text);
+    const defectiveSlot = slot === DEFECTIVE_SLOT;
+    const rows = defectiveSlot ? parsed.items.filter((item) => item.section === "defective") : parsed.items;
 
     // Replace this slot's rows (a retake or a re-run must not leave stale equipment behind).
     const { error: clearError } = await admin.from("inventory_items").delete()
       .eq("user_id", userId).eq("job_date", jobDate).eq("slot", slot);
     if (clearError) throw clearError;
-    if (parsed.items.length) {
-      const unique = new Map(parsed.items.map((item) => [item.code, item]));
+    if (rows.length) {
+      const unique = new Map(rows.map((item) => [`${item.section}:${item.code}`, item]));
       const { error: insertError } = await admin.from("inventory_items").insert(
         [...unique.values()].map((item) => ({
-          user_id: userId, job_date: jobDate, slot, code: item.code, name: item.name,
+          user_id: userId, job_date: jobDate, slot, section: item.section, code: item.code, name: item.name,
           quantity: item.quantity, expires_at: shot.expires_at,
         })),
       );
       if (insertError) throw insertError;
     }
-    const { error: updateError } = await setStatus(parsed.items.length > 0 && parsed.unparsed === 0 ? "processed" : "needs_review", parsed.total);
+    const readable = rows.length > 0 && parsed.unparsed === 0 && (!defectiveSlot || parsed.defectiveHeader);
+    const { error: updateError } = await setStatus(
+      readable ? "processed" : "needs_review",
+      defectiveSlot ? null : parsed.total,
+      parsed.defectiveTotal,
+    );
     if (updateError) throw updateError;
   } catch (error) {
     console.error("[process_inventory_screenshot]", error);
@@ -90,8 +103,8 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const jobDate = String(body?.job_date || "");
   const slot = Number(body?.slot);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || !Number.isInteger(slot) || slot < 1 || slot > 3) {
-    return json({ ok: false, error: "job_date and slot (1-3) are required" }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || !Number.isInteger(slot) || slot < 1 || slot > DEFECTIVE_SLOT) {
+    return json({ ok: false, error: "job_date and slot (1-4) are required" }, 400);
   }
 
   // Employees process their own screenshots; managers may re-run any employee's reading.
@@ -107,7 +120,7 @@ Deno.serve(async (req) => {
   const { data: shot } = await admin.from("inventory_screenshots").select("slot")
     .eq("user_id", userId).eq("job_date", jobDate).eq("slot", slot).maybeSingle();
   if (!shot) return json({ ok: false, error: "Screenshot not found" }, 404);
-  await admin.from("inventory_screenshots").update({ ocr_status: "pending", list_total: null })
+  await admin.from("inventory_screenshots").update({ ocr_status: "pending", list_total: null, defective_total: null })
     .eq("user_id", userId).eq("job_date", jobDate).eq("slot", slot);
 
   EdgeRuntime.waitUntil(processScreenshot(admin, { userId, jobDate, slot }));

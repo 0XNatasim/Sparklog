@@ -35,8 +35,9 @@ Deno.serve(async (req) => {
   const userId = typeof body?.user_id === "string" ? body.user_id : "";
   const jobDate = String(body?.job_date || "");
   const slot = body?.slot === undefined || body?.slot === null ? null : Number(body.slot);
-  if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || (slot !== null && (!Number.isInteger(slot) || slot < 1 || slot > 3))) {
-    return json({ ok: false, error: "user_id, job_date and an optional slot (1-3) are required" }, 400);
+  if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || (slot !== null && (!Number.isInteger(slot) || slot < 1 || slot > 4))) {
+    // Slots 1-3: equipment list; 4: « Produits défectueux » picture (0097).
+    return json({ ok: false, error: "user_id, job_date and an optional slot (1-4) are required" }, 400);
   }
 
   const admin = createClient(supabaseUrl, serviceRole);

@@ -3,7 +3,7 @@ import { supabase } from "../supabaseClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
-import { INVENTORY_BUCKET, INVENTORY_SLOTS } from "@/lib/inventory-screenshots";
+import { DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS } from "@/lib/inventory-screenshots";
 import { fetchInventorySlots } from "@/lib/inventory-upload";
 
 // The employee's own view of the end-of-shift inventory screenshots of one day, so they can
@@ -47,9 +47,10 @@ export default function InventoryPhotosDialog({ date, userId, onClose }) {
         {!error && photos === null && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
         {photos && (
           <div className="grid gap-3 sm:grid-cols-3">
-            {INVENTORY_SLOTS.map((slot) => photos[slot] ? (
+            {/* The defective-products picture (slot 4) is shown only when it was sent. */}
+            {INVENTORY_PHOTO_SLOTS.filter((slot) => slot !== DEFECTIVE_SLOT || slot in photos).map((slot) => photos[slot] ? (
               <a key={slot} href={photos[slot]} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <img src={photos[slot]} alt={t("history.inventory.shotAlt", { n: slot })} loading="lazy" className="max-h-96 w-full object-contain" />
+                <img src={photos[slot]} alt={slot === DEFECTIVE_SLOT ? t("form.inventory.defectiveSlot") : t("history.inventory.shotAlt", { n: slot })} loading="lazy" className="max-h-96 w-full object-contain" />
               </a>
             ) : (
               <div key={slot} className="flex h-32 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">

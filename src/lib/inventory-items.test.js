@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { sumCrewInventory, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { sumCrewDefective, sumCrewInventory, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { inventoryCaptured, inventoryStepComplete } from "./inventory-screenshots";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
@@ -59,13 +60,13 @@ describe("parseInventoryText", () => {
   it("reads one row per equipment code with its quantity, in either OCR layout", () => {
     const first = parseInventoryText(SHOT_1);
     expect(first.items).toHaveLength(7);
-    expect(first.items[2]).toEqual({ code: "EQ000026", name: "Contrôleur chauffe-eau Hilo", quantity: 19 });
+    expect(first.items[2]).toEqual({ code: "EQ000026", name: "Contrôleur chauffe-eau Hilo", quantity: 19, section: "inventory" });
     expect(first.total).toBe(17);
     expect(first.unparsed).toBe(0);
 
     const second = parseInventoryText(SHOT_2);
     expect(second.items).toHaveLength(7);
-    expect(second.items[4]).toEqual({ code: "EQ000047", name: "Sinope - 4000W", quantity: 10 });
+    expect(second.items[4]).toEqual({ code: "EQ000047", name: "Sinope - 4000W", quantity: 10, section: "inventory" });
   });
 
   it("keeps digits in a name apart from the quantity and repairs OCR letter/digit mix-ups", () => {
@@ -77,13 +78,52 @@ describe("parseInventoryText", () => {
 
   it("counts rows without a quantity as unparsed and ignores text with no code", () => {
     expect(parseInventoryText("EQ000001 Calypso").unparsed).toBe(1);
-    expect(parseInventoryText("nothing here")).toEqual({ items: [], total: null, unparsed: 0 });
+    expect(parseInventoryText("nothing here")).toEqual({ items: [], total: null, defectiveTotal: null, defectiveHeader: false, unparsed: 0 });
   });
 
   it("rebuilds the full 17-item list from the three overlapping screenshots", () => {
     const rows = [SHOT_1, SHOT_2, SHOT_3].flatMap((text, index) =>
       parseInventoryText(text).items.map((item) => ({ ...item, slot: index + 1 })));
     expect(mergeInventoryItems(rows)).toHaveLength(17);
+  });
+});
+
+// End of the list and the « Produits défectueux » section, as on an English-language phone
+// ("1 - 15 of 17"): the same codes appear in both lists with other quantities.
+const SHOT_DEFECTIVE = `E- EQ000050 ··· Sonde - Calypso 0,00
+E- EQ000031 ··· Sonde pour CEE 8,00
+ABC 1 - 15 of 17
+Produits défectueux
+E- EQ000040 ··· Thermostat intelligent Hilo 3600… 1,00
+E- EQ000016 ··· Thermostat intelligent Hilo 4000… 2,00
+ABC 1 - 2 of 2`;
+
+describe("parseInventoryText — « Produits défectueux »", () => {
+  it("keeps the rows under the title apart, with their own pager", () => {
+    const parsed = parseInventoryText(SHOT_DEFECTIVE);
+    expect(parsed.total).toBe(17);
+    expect(parsed.defectiveTotal).toBe(2);
+    expect(parsed.defectiveHeader).toBe(true);
+    expect(parsed.unparsed).toBe(0);
+    expect(parsed.items.filter((item) => item.section === "inventory").map((item) => [item.code, item.quantity]))
+      .toEqual([["EQ000050", 0], ["EQ000031", 8]]);
+    expect(parsed.items.filter((item) => item.section === "defective").map((item) => [item.code, item.quantity]))
+      .toEqual([["EQ000040", 1], ["EQ000016", 2]]);
+  });
+
+  it("reads the title without its accent, and a list with no title has no defective rows", () => {
+    expect(parseInventoryText("Produits defectueux\nEQ000040 Hilo 1,00").items[0].section).toBe("defective");
+    expect(parseInventoryText(SHOT_3).items.every((item) => item.section === "inventory")).toBe(true);
+    expect(parseInventoryText(SHOT_3).defectiveTotal).toBeNull();
+  });
+
+  it("never lets a defective quantity replace the list's quantity of the same code", () => {
+    const rows = [SHOT_3, SHOT_DEFECTIVE].flatMap((text, index) =>
+      parseInventoryText(text).items.map((item) => ({ ...item, slot: index === 0 ? 1 : 4 })));
+    const day = summarizeInventoryDay([{ slot: 1, ocr_status: "processed", list_total: 17 }, { slot: 4, ocr_status: "processed", defective_total: 2 }], rows);
+    expect(day.items.find((item) => item.code === "EQ000016").quantity).toBe(84);
+    expect(day.defective).toMatchObject({ state: "ok", count: 2, expected: 2, picture: true });
+    expect(day.defective.items.find((item) => item.code === "EQ000016").quantity).toBe(2);
   });
 });
 
@@ -113,6 +153,51 @@ describe("summarizeInventoryDay", () => {
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3, { ocr_status: "needs_review" })], rows(16)).state).toBe("review");
     expect(summarizeInventoryDay([shot(1), shot(2), shot(3)], rows(18)).state).toBe("review");
     expect(summarizeInventoryDay([shot(1, { list_total: null }), shot(2, { list_total: null }), shot(3, { list_total: null })], rows(17)).state).toBe("review");
+  });
+});
+
+describe("defective products of the day", () => {
+  const shot = (slot, extra = {}) => ({ slot, ocr_status: "processed", list_total: 17, ...extra });
+  const row = (code, section, slot = 1) => ({ code, name: code, quantity: 1, slot, section });
+
+  it("leaves the list state to slots 1-3 and reads slot 4 apart", () => {
+    const day = summarizeInventoryDay([shot(1), shot(4, { ocr_status: "pending", list_total: null })], [row("EQ000001", "inventory")]);
+    expect(day.captures).toBe(1);
+    expect(day.state).not.toBe("reading");
+    expect(day.defective.state).toBe("reading");
+    expect(summarizeInventoryDay([shot(4, { list_total: null })], []).state).toBe("missing");
+  });
+
+  it("says none, unreadable or unverified", () => {
+    expect(summarizeInventoryDay([shot(1)], [row("EQ000001", "inventory")]).defective).toMatchObject({ state: "none", count: 0 });
+    expect(summarizeInventoryDay([shot(1), shot(4, { ocr_status: "needs_review" })], []).defective.state).toBe("photos");
+    expect(summarizeInventoryDay([shot(1)], [row("EQ000002", "defective")]).defective).toMatchObject({ state: "review", count: 1, picture: false });
+  });
+
+  it("treats older rows without a section as the equipment list", () => {
+    expect(summarizeInventoryDay([shot(1)], [{ code: "EQ000001", name: "A", quantity: 1, slot: 1 }]).count).toBe(1);
+  });
+
+  it("only counts the list screenshots toward submission, and asks the question", () => {
+    expect(inventoryCaptured([{ slot: 4 }])).toBe(false);
+    expect(inventoryCaptured([{ slot: 2 }])).toBe(true);
+    expect(inventoryStepComplete([{ slot: 1 }], null)).toBe(false);
+    expect(inventoryStepComplete([{ slot: 1 }], "no")).toBe(true);
+    expect(inventoryStepComplete([{ slot: 1 }], "yes")).toBe(false);
+    expect(inventoryStepComplete([{ slot: 1 }, { slot: 4 }], "yes")).toBe(true);
+    expect(inventoryStepComplete([{ slot: 4 }], "yes")).toBe(false);
+  });
+
+  it("sums the crew's defective products, without flagging employees who have none", () => {
+    const entry = (name, state, items) => ({ name, defective: { state, items } });
+    const { rows, counted, unverified } = sumCrewDefective([
+      entry("A", "ok", [{ code: "EQ000016", name: "Hilo", quantity: 2 }]),
+      entry("B", "none", []),
+      entry("C", "review", [{ code: "EQ000016", name: "Hilo", quantity: 1 }]),
+    ]);
+    expect(rows).toEqual([{ code: "EQ000016", name: "Hilo", total: 3, holders: 2 }]);
+    expect(counted).toBe(2);
+    expect(unverified).toEqual(["C"]);
   });
 });
 
@@ -189,6 +274,24 @@ describe("InventoryScreenshotsPanel", () => {
     // open card and cleared the photos continuously.
     expect(panel).not.toMatch(/\[[^\]]*\bt\b[^\]]*\]\s*\)/);
     expect(panel).toContain("tRef.current");
+  });
+});
+
+describe("0097 migration (defective products)", () => {
+  const sql = read("../../supabase/migrations/20261016170000_0097_inventory_defective_products.sql");
+  it("adds slot 4 and the section, unique per section, and keeps the gate on slots 1-3", () => {
+    expect(sql).toContain("check (slot between 1 and 4)");
+    expect(sql).toContain("check (section in ('inventory', 'defective'))");
+    expect(sql).toContain("unique (user_id, job_date, slot, section, code)");
+    expect(sql).toContain("s.job_date = new.job_date and s.slot between 1 and 3");
+    expect(sql).toContain("revoke all on function public.validate_job_submission_contract() from public, anon, authenticated;");
+  });
+  it("is matched by the reading function: slot 4 keeps only rows under the title", () => {
+    const fn = read("../../supabase/functions/process_inventory_screenshot/index.ts");
+    expect(fn).toContain("const DEFECTIVE_SLOT = 4;");
+    expect(fn).toContain('item.section === "defective"');
+    expect(fn).toContain("section: item.section");
+    expect(read("../../supabase/functions/delete_inventory_screenshots/index.ts")).toContain("slot > 4");
   });
 });
 
