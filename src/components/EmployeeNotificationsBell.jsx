@@ -4,6 +4,7 @@ import { Bell } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { SESSION_RESUMED_EVENT, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import BroadcastAttachments from "@/components/BroadcastAttachments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { isManagerRole } from "@/lib/roles";
@@ -21,7 +22,6 @@ export default function EmployeeNotificationsBell() {
   const t = useT();
   const [items, setItems] = useState([]);
   const [opened, setOpened] = useState(null);
-  const [imageUrl, setImageUrl] = useState("");
   const channelRef = useRef(null);
   const enabled = Boolean(user?.id) && !isManagerRole(role);
 
@@ -29,7 +29,7 @@ export default function EmployeeNotificationsBell() {
     if (!enabled) return;
     const { data } = await supabase
       .from("broadcast_recipients")
-      .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path)")
+      .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments)")
       .eq("employee_id", user.id);
     const rows = (data || [])
       .filter((row) => row.manager_broadcasts)
@@ -60,16 +60,6 @@ export default function EmployeeNotificationsBell() {
       }
     };
   }, [enabled, load, user?.id]);
-
-  const path = opened?.manager_broadcasts?.image_path;
-  useEffect(() => {
-    if (!path) { setImageUrl(""); return undefined; }
-    let cancelled = false;
-    supabase.storage.from("broadcast-images").createSignedUrl(path, 3600).then(({ data }) => {
-      if (!cancelled) setImageUrl(data?.signedUrl || "");
-    });
-    return () => { cancelled = true; };
-  }, [path]);
 
   const unread = items.filter((item) => !item.acknowledged_at).length;
 
@@ -128,7 +118,7 @@ export default function EmployeeNotificationsBell() {
           </DialogHeader>
           <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
             {opened?.manager_broadcasts?.body && <p className="whitespace-pre-wrap text-sm">{opened.manager_broadcasts.body}</p>}
-            {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer"><img src={imageUrl} alt="" className="max-h-72 w-full rounded-md border object-contain" /></a>}
+            {opened && <BroadcastAttachments broadcast={opened.manager_broadcasts} />}
             {opened && <p className="text-xs text-muted-foreground">{dayjs(opened.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</p>}
           </div>
           <DialogFooter className="shrink-0 border-t pt-3">

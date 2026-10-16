@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { ArrowDown, ArrowUp, Bell, BookmarkPlus, Check, ChevronDown, Image as ImageIcon, Paperclip, RotateCcw, Send, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, BookmarkPlus, Check, ChevronDown, FileText, Image as ImageIcon, Paperclip, RotateCcw, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { useT } from "@/lib/use-t";
 import { notifyBroadcastPush } from "@/lib/push";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { compressImage } from "@/lib/ocr";
+import BroadcastAttachments from "@/components/BroadcastAttachments";
+import { BROADCAST_BUCKET, MAX_BROADCAST_ATTACHMENTS, addPickedFiles, attachmentStoragePath, broadcastAttachmentColumns, broadcastAttachments, isPdfFile } from "@/lib/broadcast-attachments";
 import { addTemplate, loadTemplates, moveTemplate, removeTemplate, resolveTemplates, saveTemplates } from "@/lib/broadcast-templates";
 
 // Ready-made messages a manager can click to fill the message box (recipients are
@@ -71,24 +73,6 @@ Sans cette capture, le temps supplémentaire ne peut pas être approuvé. Appuye
 • Stationnement payé ➜ cocher « Stationnement » et joindre la photo du reçu, avec le montant.
 • Vérifier vos km avant de soumettre.`,
 ];
-// Signed thumbnail for a sent broadcast's screenshot (private bucket).
-function BroadcastImage({ path }) {
-  const [url, setUrl] = useState("");
-  useEffect(() => {
-    let alive = true;
-    supabase.storage.from("broadcast-images").createSignedUrl(path, 3600).then(({ data }) => {
-      if (alive) setUrl(data?.signedUrl || "");
-    });
-    return () => { alive = false; };
-  }, [path]);
-  if (!url) return null;
-  return (
-    <a href={url} target="_blank" rel="noreferrer" className="block w-fit">
-      <img src={url} alt="" className="max-h-48 rounded-md border object-contain" />
-    </a>
-  );
-}
-
 export default function BroadcastManager() {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -96,8 +80,8 @@ export default function BroadcastManager() {
 
   const [employees, setEmployees] = useState([]);
   const [body, setBody] = useState("");
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState("");
+  // Pictures and PDFs to send with the message (migration 0096), each with its preview URL.
+  const [files, setFiles] = useState([]); // [{ file, preview }]
   const [audience, setAudience] = useState("selected");
   const [templates, setTemplates] = useState(() => loadTemplates(BUILT_IN_TEMPLATES));
   const [selected, setSelected] = useState(new Set());
@@ -118,46 +102,72 @@ export default function BroadcastManager() {
     setEmployees((data || []).filter((employee) => !employee.is_paused));
   }
 
-  function setPickedImage(file) {
-    if (!file || !file.type?.startsWith("image/")) return;
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+  function addFiles(picked) {
+    const list = [...(picked || [])];
+    if (!list.length) return;
+    const { files: kept, skipped } = addPickedFiles(files.map((f) => f.file), list);
+    setMessage(skipped ? t("broadcast.filesSkipped", { count: skipped, max: MAX_BROADCAST_ATTACHMENTS }) : "");
+    setFiles(kept.map((file) => files.find((f) => f.file === file)
+      || { file, preview: isPdfFile(file) ? "" : URL.createObjectURL(file) }));
   }
 
-  function pickImage(event) {
-    const file = event.target.files?.[0];
+  function pickFiles(event) {
+    const picked = [...(event.target.files || [])];
     event.target.value = "";
-    setPickedImage(file);
+    addFiles(picked);
   }
 
-  // Paste a screenshot straight into the message box (Ctrl+V / right-click paste).
+  // Paste screenshots straight into the message box (Ctrl+V / right-click paste).
   function handlePaste(event) {
-    const items = event.clipboardData?.items || [];
-    for (const item of items) {
-      if (item.type?.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) { event.preventDefault(); setPickedImage(file); }
-        return;
-      }
-    }
+    const pasted = [...(event.clipboardData?.items || [])]
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    if (pasted.length) { event.preventDefault(); addFiles(pasted); }
   }
 
-  // Drag an image file onto the message box.
+  // Drag pictures or PDFs onto the message box.
   function handleDrop(event) {
-    const file = [...(event.dataTransfer?.files || [])].find((f) => f.type?.startsWith("image/"));
-    if (file) { event.preventDefault(); setPickedImage(file); }
+    const dropped = [...(event.dataTransfer?.files || [])];
+    if (dropped.length) { event.preventDefault(); addFiles(dropped); }
   }
 
-  function clearImage() {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageFile(null);
-    setImagePreview("");
+  function removeFile(index) {
+    setFiles((current) => {
+      const gone = current[index];
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      return current.filter((_, i) => i !== index);
+    });
+  }
+
+  function clearFiles() {
+    files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
+    setFiles([]);
+  }
+
+  // Uploads every chosen file (pictures compressed to JPEG, PDFs as they are). On a failure the files
+  // already sent are removed so nothing is left behind.
+  async function uploadFiles() {
+    const attachments = [];
+    try {
+      for (const { file } of files) {
+        const pdf = isPdfFile(file);
+        const path = attachmentStoragePath(pdf ? "pdf" : "image", crypto.randomUUID());
+        const blob = pdf ? file : await compressImage(file);
+        const { error } = await supabase.storage.from(BROADCAST_BUCKET).upload(path, blob, { contentType: pdf ? "application/pdf" : "image/jpeg", upsert: false });
+        if (error) throw error;
+        attachments.push({ path, kind: pdf ? "pdf" : "image", name: pdf ? String(file.name || "").slice(0, 120) : "" });
+      }
+      return attachments;
+    } catch (e) {
+      if (attachments.length) await supabase.storage.from(BROADCAST_BUCKET).remove(attachments.map((a) => a.path)).catch(() => undefined);
+      throw e;
+    }
   }
 
   async function loadLog() {
     const [{ data: rows }, { data: recips }] = await Promise.all([
-      supabase.from("manager_broadcasts").select("id, body, audience, image_path, created_at").order("created_at", { ascending: false }),
+      supabase.from("manager_broadcasts").select("id, body, audience, image_path, attachments, created_at").order("created_at", { ascending: false }),
       supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at"),
     ]);
     setBroadcasts(rows || []);
@@ -219,24 +229,17 @@ export default function BroadcastManager() {
 
   async function send() {
     setMessage("");
-    if (!body.trim() && !imageFile) { setMessage(t("broadcast.needMessage")); return; }
+    if (!body.trim() && files.length === 0) { setMessage(t("broadcast.needMessage")); return; }
     const targetIds = audience === "all" ? employees.map((e) => e.id) : [...selected];
     if (targetIds.length === 0) { setMessage(t("broadcast.needEmployees")); return; }
 
     setSending(true);
     try {
-      let imagePath = null;
-      if (imageFile) {
-        const blob = await compressImage(imageFile);
-        const path = `${crypto.randomUUID()}.jpg`;
-        const { error: upErr } = await supabase.storage.from("broadcast-images").upload(path, blob, { contentType: "image/jpeg", upsert: false });
-        if (upErr) throw upErr;
-        imagePath = path;
-      }
+      const attachments = await uploadFiles();
 
       const { data: created, error: insertError } = await supabase
         .from("manager_broadcasts")
-        .insert({ sender_id: user?.id, body: body.trim(), audience, image_path: imagePath })
+        .insert({ sender_id: user?.id, body: body.trim(), audience, ...broadcastAttachmentColumns(attachments) })
         .select("id")
         .single();
       if (insertError) throw insertError;
@@ -247,7 +250,7 @@ export default function BroadcastManager() {
       notifyBroadcastPush(created.id); // phone push, best-effort (not awaited)
 
       setBody("");
-      clearImage();
+      clearFiles();
       setSelected(new Set());
       setAudience("selected");
       setMessage(t("broadcast.sent"));
@@ -289,7 +292,7 @@ export default function BroadcastManager() {
 
       const { data: created, error: insertError } = await supabase
         .from("manager_broadcasts")
-        .insert({ sender_id: user?.id, body: b.body, audience: b.audience, image_path: b.image_path || null })
+        .insert({ sender_id: user?.id, body: b.body, audience: b.audience, ...broadcastAttachmentColumns(broadcastAttachments(b)) })
         .select("id")
         .single();
       if (insertError) throw insertError;
@@ -397,15 +400,27 @@ export default function BroadcastManager() {
 
           <div className="space-y-2">
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent">
-              <Paperclip className="h-4 w-4" />{t("broadcast.attachImage")}
-              <input type="file" accept="image/*" onChange={pickImage} className="hidden" />
+              <Paperclip className="h-4 w-4" />{t("broadcast.attachFiles")}
+              <input type="file" accept="image/*,application/pdf,.pdf" multiple onChange={pickFiles} className="hidden" />
             </label>
-            {imagePreview && (
-              <div className="relative w-fit">
-                <img src={imagePreview} alt="" className="max-h-40 rounded-md border object-contain" />
-                <button type="button" onClick={clearImage} className="absolute -right-2 -top-2 rounded-full border bg-background p-0.5 shadow" aria-label={t("broadcast.removeImage")}>
-                  <X className="h-3.5 w-3.5" />
-                </button>
+            <div className="text-xs text-muted-foreground">{t("broadcast.attachHint", { max: MAX_BROADCAST_ATTACHMENTS })}</div>
+            {files.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {files.map(({ file, preview }, index) => (
+                  <div key={`${file.name}-${file.lastModified}-${index}`} className="relative w-fit">
+                    {preview
+                      ? <img src={preview} alt="" className="h-24 max-w-[10rem] rounded-md border object-contain" />
+                      : (
+                        <div className="flex h-24 w-40 flex-col items-center justify-center gap-1 rounded-md border px-2 text-center text-xs">
+                          <FileText className="h-6 w-6 text-destructive" aria-hidden="true" />
+                          <span className="w-full truncate">{file.name || "PDF"}</span>
+                        </div>
+                      )}
+                    <button type="button" onClick={() => removeFile(index)} className="absolute -right-2 -top-2 rounded-full border bg-background p-0.5 shadow" aria-label={t("broadcast.removeFile")}>
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -439,7 +454,8 @@ export default function BroadcastManager() {
                     <div className="min-w-0 flex-1">
                       <div className={`text-sm font-medium ${isOpen ? "whitespace-pre-wrap break-words" : "truncate"}`}>{b.body}</div>
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                        {b.image_path && <ImageIcon className="h-3.5 w-3.5" />}
+                        {broadcastAttachments(b).some((a) => a.kind !== "pdf") && <ImageIcon className="h-3.5 w-3.5" />}
+                        {broadcastAttachments(b).some((a) => a.kind === "pdf") && <FileText className="h-3.5 w-3.5" />}
                         {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
                       </div>
                     </div>
@@ -477,7 +493,7 @@ export default function BroadcastManager() {
                 </div>
                 {isOpen && (
                   <div className="border-t p-3">
-                    {b.image_path && <div className="mb-3"><BroadcastImage path={b.image_path} /></div>}
+                    {broadcastAttachments(b).length > 0 && <div className="mb-3 max-w-md"><BroadcastAttachments broadcast={b} imageClassName="max-h-48 w-auto" /></div>}
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("broadcast.recipients")}</div>
                     <div className="max-h-56 space-y-1 overflow-y-auto">
                       {recips.map((r) => (

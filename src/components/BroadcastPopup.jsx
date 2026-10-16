@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { BROADCASTS_REFRESH_EVENT } from "@/components/EmployeeNotificationsBell";
 import { Button } from "@/components/ui/button";
+import BroadcastAttachments from "@/components/BroadcastAttachments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 // Shows unacknowledged manager broadcasts to the signed-in user, one at a time.
@@ -22,7 +23,7 @@ export default function BroadcastPopup() {
     const load = async () => {
       const { data } = await supabase
         .from("broadcast_recipients")
-        .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path)")
+        .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments)")
         .eq("employee_id", user.id)
         .is("acknowledged_at", null);
       if (cancelled) return;
@@ -41,18 +42,7 @@ export default function BroadcastPopup() {
   }, [user?.id]);
 
   const [dismissed, setDismissed] = useState(false);
-  const [imageUrl, setImageUrl] = useState("");
   const current = queue[0];
-
-  useEffect(() => {
-    const path = current?.manager_broadcasts?.image_path;
-    if (!path) { setImageUrl(""); return; }
-    let cancelled = false;
-    supabase.storage.from("broadcast-images").createSignedUrl(path, 3600).then(({ data }) => {
-      if (!cancelled) setImageUrl(data?.signedUrl || "");
-    });
-    return () => { cancelled = true; };
-  }, [current?.broadcast_id]);
 
   async function acknowledge() {
     if (!current || !user?.id) return;
@@ -78,7 +68,7 @@ export default function BroadcastPopup() {
         </DialogHeader>
         <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
           {current.manager_broadcasts.body && <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>}
-          {imageUrl && <a href={imageUrl} target="_blank" rel="noopener noreferrer"><img src={imageUrl} alt="" className="max-h-72 w-full rounded-md border object-contain" /></a>}
+          <BroadcastAttachments broadcast={current.manager_broadcasts} />
           <p className="text-xs text-muted-foreground">{dayjs(current.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</p>
         </div>
         <DialogFooter className="shrink-0 border-t pt-3">
