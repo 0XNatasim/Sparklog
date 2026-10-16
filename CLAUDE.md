@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.145)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.146)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -491,6 +491,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   complète quand les lignes lues = « N de N ». Historique : badge vert dès une capture. V2.4.145 : bouton « Qui fait
   l'inventaire » dans Gestion › Inventaire (liste à cocher des employés actifs hors bureau, `inventoryCandidates`),
   même case `profiles.inventory_screenshots_enabled` que la fiche Employés, enregistrée à chaque clic.
+- [x] **Inventaire : produits défectueux** (V2.4.146, migration 0097, appliquée par l'intégration Supabase à la fusion ;
+  fonctions `process_inventory_screenshot` et `delete_inventory_screenshots` à redéployer). Après les captures de la liste,
+  l'employé répond à « Y a-t-il des produits défectueux dans Field Service ? » ; « Oui » exige une capture de la section
+  (case 4, `DEFECTIVE_SLOT`) avant « Continuer » (`inventoryStepComplete`). La lecture (`parse.ts`) sépare les lignes sous
+  le titre « Produits défectueux » (`inventory_items.section = 'defective'`, total « N de N » de la section dans
+  `inventory_screenshots.defective_total`) ; la case 4 ne garde que ces lignes. Elles ne comptent jamais dans la liste
+  (`summarizeInventoryDay` → `defective`) ; Gestion › Inventaire : pastille « N défectueux », tableau à part, photo, total
+  d'équipe (`sumCrewDefective`). Le pied « 1 - 15 of 17 » (téléphone en anglais) est lu aussi. Seules les cases 1 à 3
+  satisfont la soumission (0092 → 0097). La réponse « Non » n'est pas enregistrée.
 - [x] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095, appliquée par l'intégration
   Supabase à la fusion dans `main`, sous la version du nom de fichier). Toujours **une** demande par job
   (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,

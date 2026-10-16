@@ -1,5 +1,6 @@
 // Pure helpers behind the manager Inventory page: merge the rows read from the overlapping
 // screenshots (one to three) into one list, and summarize an employee's day.
+import { DEFECTIVE_SLOT } from "./inventory-screenshots";
 
 // Screenshots overlap (the last rows of one are the first of the next), so the same code can
 // come from several slots. Keep one row per code: the latest capture's quantity, the longest name.
@@ -28,23 +29,47 @@ export function effectiveOcrStatus(shot, now = Date.now(), requestedAt = 0) {
   return now - since > INVENTORY_READING_TIMEOUT_MS ? "failed" : "pending";
 }
 
+// Rows read under Field Service's « Produits défectueux » title (0097) are kept apart from the
+// equipment list: they never count toward the list's "N de N" total. Older rows have no section.
+export const isDefectiveRow = (row) => row?.section === "defective";
+
 // state: missing (no capture) · reading (OCR running) · ok (list matches the app's own total)
 // · review (list read but unverified, or fewer lines than the total) · photos (nothing readable).
 // The number of screenshots does not matter: two captures often show the whole list.
+// Only slots 1 to 3 are list screenshots; slot 4 is the defective-products picture (see `defective`).
 export const INVENTORY_STATE_ORDER = ["missing", "photos", "review", "reading", "ok"];
 
 export function summarizeInventoryDay(shots, rows) {
-  const items = mergeInventoryItems(rows);
-  const expected = Math.max(0, ...(shots || []).map((shot) => Number(shot.list_total) || 0)) || null;
+  const listShots = (shots || []).filter((shot) => Number(shot.slot) !== DEFECTIVE_SLOT);
+  const items = mergeInventoryItems((rows || []).filter((row) => !isDefectiveRow(row)));
+  const expected = Math.max(0, ...listShots.map((shot) => Number(shot.list_total) || 0)) || null;
   let state;
-  if (!shots?.length) state = "missing";
-  else if (shots.some((shot) => shot.ocr_status === "pending")) state = "reading";
+  if (!listShots.length) state = "missing";
+  else if (listShots.some((shot) => shot.ocr_status === "pending")) state = "reading";
   else if (!items.length) state = "photos";
   // The list is complete when the merged readings match the total the app itself shows ("N de N"),
   // even if a screenshot also held a fragment that could not be parsed.
   else if (expected !== null && items.length === expected) state = "ok";
   else state = "review";
-  return { state, items, count: items.length, expected, captures: shots?.length || 0 };
+  return {
+    state, items, count: items.length, expected, captures: listShots.length,
+    defective: summarizeDefective(shots, rows),
+  };
+}
+
+// Defective products of the day: rows read under « Produits défectueux » on any screenshot (the
+// slot 4 picture, or a list screenshot that reached that title), merged by code.
+// state: none (no picture, nothing read) · reading · photos (picture sent, nothing readable)
+// · ok (matches the section's own "N de N") · review (read, but unverified or short).
+export function summarizeDefective(shots, rows) {
+  const items = mergeInventoryItems((rows || []).filter(isDefectiveRow));
+  const picture = (shots || []).find((shot) => Number(shot.slot) === DEFECTIVE_SLOT) || null;
+  const expected = Math.max(0, ...(shots || []).map((shot) => Number(shot.defective_total) || 0)) || null;
+  let state;
+  if (picture?.ocr_status === "pending") state = "reading";
+  else if (items.length) state = expected !== null && items.length === expected ? "ok" : "review";
+  else state = picture ? "photos" : "none";
+  return { state, items, count: items.length, expected, picture: Boolean(picture) };
 }
 
 const round2 = (value) => Math.round(value * 100) / 100;
@@ -96,4 +121,14 @@ export function sumCrewInventory(entries) {
   }
   const rows = [...byCode.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
   return { rows, counted, unverified };
+}
+
+// Crew-wide defective products: the same sum over each employee's defective list. An employee
+// with none to declare is not "unverified"; one whose picture is unread or unmatched is.
+export function sumCrewDefective(entries) {
+  return sumCrewInventory((entries || []).map((entry) => ({
+    name: entry.name,
+    state: ["ok", "none"].includes(entry.defective?.state) ? "ok" : "review",
+    items: entry.defective?.items || [],
+  })));
 }

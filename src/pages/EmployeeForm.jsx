@@ -31,7 +31,7 @@ import { ENTRY_SOURCES, recordEntrySource } from "@/lib/entry-source";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
 import { MAX_PARKING_PICTURES, PARKING_BUCKET, mergeParkingPaths, orderPickedFiles, parkingReceiptPaths, parkingStoragePath } from "@/lib/parking-receipts";
-import { INVENTORY_SLOTS, inventoryCaptured, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
+import { DEFECTIVE_SLOT, INVENTORY_SLOTS, defectiveCaptured, inventoryCaptured, inventoryStepComplete, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
 import { fetchInventoryReading, fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -199,6 +199,8 @@ export default function EmployeeForm() {
   // Lines read from the day's screenshots against the app's "N de N" total ({ state, count, expected }).
   const [inventoryReading, setInventoryReading] = useState(null);
   const [inventoryReadingTick, setInventoryReadingTick] = useState(0);
+  // Answer to « Produits défectueux ? » after the list screenshots: null (not answered), "yes", "no".
+  const [defectiveAnswer, setDefectiveAnswer] = useState(null);
   const [showInventoryExamples, setShowInventoryExamples] = useState(false);
   const [daySubmitBusy, setDaySubmitBusy] = useState(false);
   const [daySubmitError, setDaySubmitError] = useState("");
@@ -861,6 +863,7 @@ export default function EmployeeForm() {
     setInventoryError("");
     setInventoryNotice("");
     setInventoryReading(null);
+    setDefectiveAnswer(null);
     setDaySubmitError("");
     if (officeEmployee || !inventoryEnabled) {
       setReturnStep("dayDone");
@@ -869,7 +872,9 @@ export default function EmployeeForm() {
     try {
       const rows = await fetchInventorySlots(supabase, user.id, endShiftDateRef.current);
       setInventoryRows(rows);
-      setReturnStep(missingInventorySlots(rows).length ? "inventory" : "dayDone");
+      setDefectiveAnswer(defectiveCaptured(rows) ? "yes" : null);
+      // The step stays open until every list slot and the defective-products question are done.
+      setReturnStep(missingInventorySlots(rows).length || !defectiveCaptured(rows) ? "inventory" : "dayDone");
     } catch (error) {
       setInventoryRows([]);
       setInventoryError(friendlyErrorMessage(error, t, "form.errors.failedLoad"));
@@ -972,7 +977,7 @@ export default function EmployeeForm() {
         if (cancelled) return;
         setInventoryReading(reading);
         tries += 1;
-        if (reading.state === "reading" && tries < 20) timer = window.setTimeout(poll, 4000);
+        if ((reading.state === "reading" || reading.defective?.state === "reading") && tries < 20) timer = window.setTimeout(poll, 4000);
       } catch {
         if (!cancelled) setInventoryReading(null);
       }
@@ -1916,8 +1921,39 @@ export default function EmployeeForm() {
                     );
                   })}
                 </ul>
-                {hasInventoryShots && inventoryReading && (
+                {inventoryCaptured(inventoryRows) && inventoryReading && (
                   <InventoryReadingNote reading={inventoryReading} t={t} />
+                )}
+                {inventoryCaptured(inventoryRows) && (
+                  <div className="space-y-2 rounded-md border p-3">
+                    <p className="font-medium">{t("form.inventory.defectiveQuestion")}</p>
+                    <p className="text-xs text-muted-foreground">{t("form.inventory.defectiveHint")}</p>
+                    <div className="grid grid-cols-2 gap-2" role="group" aria-label={t("form.inventory.defectiveQuestion")}>
+                      <Button type="button" variant={defectiveAnswer === "yes" ? "default" : "outline"} aria-pressed={defectiveAnswer === "yes"} disabled={Boolean(inventoryBusySlot)} onClick={() => setDefectiveAnswer("yes")}>
+                        {t("form.inventory.defectiveYes")}
+                      </Button>
+                      <Button type="button" variant={defectiveAnswer === "no" ? "default" : "outline"} aria-pressed={defectiveAnswer === "no"} disabled={Boolean(inventoryBusySlot)} onClick={() => setDefectiveAnswer("no")}>
+                        {t("form.inventory.defectiveNo")}
+                      </Button>
+                    </div>
+                    {defectiveAnswer === "yes" && (
+                      <>
+                        <p className="text-xs text-muted-foreground">{t("form.inventory.defectivePhotoHint")}</p>
+                        <div className="flex items-center justify-between gap-2 rounded-md border p-2">
+                          <span className="flex items-center gap-2 font-medium">
+                            {defectiveCaptured(inventoryRows) && <CircleCheck className="h-5 w-5 text-success" aria-hidden="true" />}
+                            {t("form.inventory.defectiveSlot")}
+                          </span>
+                          <Button type="button" size="sm" variant={defectiveCaptured(inventoryRows) ? "outline" : "default"} disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(DEFECTIVE_SLOT)}>
+                            {inventoryBusySlot === DEFECTIVE_SLOT ? t("form.inventory.uploading") : defectiveCaptured(inventoryRows) ? t("form.inventory.replace") : t("form.inventory.capture")}
+                          </Button>
+                        </div>
+                        {defectiveCaptured(inventoryRows) && inventoryReading?.defective && (
+                          <DefectiveReadingNote reading={inventoryReading.defective} t={t} />
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
                 {inventoryNotice && <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-warning" role="status">{inventoryNotice}</div>}
                 {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive" role="alert">{inventoryError}</div>}
@@ -1925,7 +1961,7 @@ export default function EmployeeForm() {
                 <input ref={inventoryMultiInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleInventoryFiles} />
               </div>
               <DialogFooter>
-                <Button type="button" disabled={Boolean(inventoryBusySlot) || !inventoryCaptured(inventoryRows)} onClick={() => setReturnStep("dayDone")}>
+                <Button type="button" disabled={Boolean(inventoryBusySlot) || !inventoryStepComplete(inventoryRows, defectiveAnswer)} onClick={() => setReturnStep("dayDone")}>
                   {t("form.inventory.continue")}
                 </Button>
               </DialogFooter>
@@ -2020,6 +2056,24 @@ export default function EmployeeForm() {
 
 // Result of the automatic reading of the inventory screenshots, shown to the employee: the list
 // is complete when the lines read match the app's own "N de N" total. Informative only.
+// What was read under « Produits défectueux » on the slot 4 picture (indicative, like the list).
+function DefectiveReadingNote({ reading, t }) {
+  if (reading.state === "reading") {
+    return <p className="text-xs text-muted-foreground" role="status">{t("form.inventory.readingNow")}</p>;
+  }
+  if (reading.count > 0) {
+    const complete = reading.state === "ok";
+    return (
+      <p className={complete ? "text-xs text-success" : "text-xs text-warning"} role="status">
+        {complete
+          ? t("form.inventory.defectiveReadComplete", { count: reading.count, expected: reading.expected })
+          : t("form.inventory.defectiveRead", { count: reading.count })}
+      </p>
+    );
+  }
+  return <p className="text-xs text-warning" role="status">{t("form.inventory.defectiveUnreadable")}</p>;
+}
+
 function InventoryReadingNote({ reading, t }) {
   if (reading.state === "reading") {
     return <p className="text-muted-foreground" role="status">{t("form.inventory.readingNow")}</p>;

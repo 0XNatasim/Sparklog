@@ -39,7 +39,7 @@ export async function saveInventoryScreenshot(client, { userId, jobDate, slot, f
   const expiresAt = new Date(Date.now() + Math.min(365, Math.max(1, retentionDays)) * 86400000).toISOString();
   const { error } = await withTimeout(
     client.from("inventory_screenshots")
-      .upsert({ user_id: userId, job_date: jobDate, slot, storage_path: path, expires_at: expiresAt, ocr_status: "pending", list_total: null }, { onConflict: "user_id,job_date,slot" }),
+      .upsert({ user_id: userId, job_date: jobDate, slot, storage_path: path, expires_at: expiresAt, ocr_status: "pending", list_total: null, defective_total: null }, { onConflict: "user_id,job_date,slot" }),
     12000
   );
   if (error) {
@@ -65,20 +65,21 @@ export function requestInventoryReading(client, { jobDate, slot, userId = null }
 }
 
 // The employee's own reading of the day's list: how many lines (equipment) were read from the
-// screenshots against the app's own "N de N" total. { state, count, expected } as on the manager page.
+// screenshots against the app's own "N de N" total. { state, count, expected } as on the manager
+// page, plus the defective products read under « Produits défectueux » ({ state, count, expected }).
 export async function fetchInventoryReading(client, userId, jobDate) {
   const [shotsResult, itemsResult] = await Promise.all([
-    withTimeout(client.from("inventory_screenshots").select("slot, ocr_status, list_total, created_at")
+    withTimeout(client.from("inventory_screenshots").select("slot, ocr_status, list_total, defective_total, created_at")
       .eq("user_id", userId).eq("job_date", jobDate), 10000),
-    withTimeout(client.from("inventory_items").select("slot, code, name, quantity")
+    withTimeout(client.from("inventory_items").select("slot, section, code, name, quantity")
       .eq("user_id", userId).eq("job_date", jobDate).limit(1000), 10000),
   ]);
   if (shotsResult.error) throw shotsResult.error;
   if (itemsResult.error) throw itemsResult.error;
   const now = Date.now();
   const shots = (shotsResult.data || []).map((shot) => ({ ...shot, ocr_status: effectiveOcrStatus(shot, now) }));
-  const { state, count, expected } = summarizeInventoryDay(shots, itemsResult.data || []);
-  return { state, count, expected };
+  const { state, count, expected, defective } = summarizeInventoryDay(shots, itemsResult.data || []);
+  return { state, count, expected, defective: { state: defective.state, count: defective.count, expected: defective.expected } };
 }
 
 // Manager action: removes the files, the written list and the rows of one screenshot (slot) or
@@ -97,7 +98,7 @@ export async function deleteInventoryScreenshots(client, { userId, jobDate, slot
 // reading status (needed to know whether that list is complete). null when there is none.
 export async function fetchPreviousInventory(client, { userId, beforeDate }) {
   const { data: latest, error: latestError } = await withTimeout(
-    client.from("inventory_items").select("job_date").eq("user_id", userId).lt("job_date", beforeDate)
+    client.from("inventory_items").select("job_date").eq("user_id", userId).eq("section", "inventory").lt("job_date", beforeDate)
       .order("job_date", { ascending: false }).limit(1),
     12000
   );
@@ -105,8 +106,8 @@ export async function fetchPreviousInventory(client, { userId, beforeDate }) {
   const date = latest?.[0]?.job_date;
   if (!date) return null;
   const [itemsResult, shotsResult] = await Promise.all([
-    withTimeout(client.from("inventory_items").select("slot, code, name, quantity").eq("user_id", userId).eq("job_date", date).limit(1000), 12000),
-    withTimeout(client.from("inventory_screenshots").select("slot, ocr_status, list_total, created_at").eq("user_id", userId).eq("job_date", date), 12000),
+    withTimeout(client.from("inventory_items").select("slot, section, code, name, quantity").eq("user_id", userId).eq("job_date", date).limit(1000), 12000),
+    withTimeout(client.from("inventory_screenshots").select("slot, ocr_status, list_total, defective_total, created_at").eq("user_id", userId).eq("job_date", date), 12000),
   ]);
   if (itemsResult.error) throw itemsResult.error;
   if (shotsResult.error) throw shotsResult.error;

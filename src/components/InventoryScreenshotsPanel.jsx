@@ -12,8 +12,8 @@ import { cn, withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { INVENTORY_BUCKET, INVENTORY_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
-import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay, sumCrewInventory } from "@/lib/inventory-items";
+import { DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
+import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, summarizeInventoryDay, sumCrewDefective, sumCrewInventory } from "@/lib/inventory-items";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -65,12 +65,12 @@ export default function InventoryScreenshotsPanel() {
           12000
         ),
         withTimeout(
-          supabase.from("inventory_screenshots").select("user_id, slot, storage_path, ocr_status, list_total, created_at")
+          supabase.from("inventory_screenshots").select("user_id, slot, storage_path, ocr_status, list_total, defective_total, created_at")
             .eq("job_date", date).order("slot").limit(QUERY_BUDGETS.inventoryRows),
           12000
         ),
         withTimeout(
-          supabase.from("inventory_items").select("user_id, slot, code, name, quantity")
+          supabase.from("inventory_items").select("user_id, slot, section, code, name, quantity")
             .eq("job_date", date).limit(QUERY_BUDGETS.inventoryItems),
           12000
         ),
@@ -176,6 +176,8 @@ export default function InventoryScreenshotsPanel() {
 
   const crew = useMemo(() => sumCrewInventory(entries), [entries]);
   const crewRows = crew.rows.filter((row) => !(hideZero && row.total === 0));
+  // Defective products (« Produits défectueux », 0097) are summed apart and never mixed into the list.
+  const crewDefective = useMemo(() => sumCrewDefective(entries), [entries]);
 
   const received = entries.filter((entry) => entry.state !== "missing").length;
   const shiftDay = (days) => setDate((current) => dayjs(current).add(days, "day").format("YYYY-MM-DD"));
@@ -205,7 +207,7 @@ export default function InventoryScreenshotsPanel() {
   const comparison = useMemo(() => {
     if (!open || compare?.status !== "ready" || compare.personId !== open.person.id) return null;
     const previousSummary = summarizeInventoryDay(compare.previous.shots, compare.previous.items);
-    const rows = compareInventory(open.items, mergeInventoryItems(compare.previous.items), {
+    const rows = compareInventory(open.items, previousSummary.items, {
       todayComplete: open.state === "ok",
       previousComplete: previousSummary.state === "ok",
     });
@@ -231,7 +233,7 @@ export default function InventoryScreenshotsPanel() {
             <Button type="button" variant="outline" size="sm" onClick={() => setWhoOpen(true)}>
               <ListChecks className="mr-1 h-4 w-4" />{t("mgr.inventory.who")}
             </Button>
-            <Button type="button" variant="outline" size="sm" disabled={crew.counted === 0} onClick={() => setCrewOpen(true)}>
+            <Button type="button" variant="outline" size="sm" disabled={crew.counted === 0 && crewDefective.counted === 0} onClick={() => setCrewOpen(true)}>
               <Users className="mr-1 h-4 w-4" />{t("mgr.inventory.crew")}
             </Button>
             <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
@@ -258,7 +260,10 @@ export default function InventoryScreenshotsPanel() {
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
               >
                 <span className="font-medium">{entry.name}</span>
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center justify-end gap-2">
+                  {entry.defective.count > 0 && (
+                    <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-destructive">{t("mgr.inventory.defectiveChip", { count: entry.defective.count })}</Badge>
+                  )}
                   <Badge variant="outline" className={CHIP_CLASS[entry.state]}>{chipLabel(entry)}</Badge>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 </span>
@@ -278,7 +283,7 @@ export default function InventoryScreenshotsPanel() {
               <Tabs defaultValue={open.state === "photos" ? "photos" : "list"} key={`${open.person.id}-${date}`}>
                 <TabsList>
                   <TabsTrigger value="list">{t("mgr.inventory.tabList")}</TabsTrigger>
-                  <TabsTrigger value="photos">{t("mgr.inventory.tabPhotos", { count: open.captures })}</TabsTrigger>
+                  <TabsTrigger value="photos">{t("mgr.inventory.tabPhotos", { count: open.shots.length })}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="list" className="space-y-3">
@@ -338,7 +343,8 @@ export default function InventoryScreenshotsPanel() {
                       </div>
                     </>
                   )}
-                  {open.captures > 0 && open.state !== "reading" && (
+                  <DefectiveList defective={open.defective} t={t} fmtQty={fmtQty} />
+                  {open.shots.length > 0 && open.state !== "reading" && (
                     <Button type="button" variant="outline" size="sm" disabled={rereadBusy} onClick={rereadAll}>
                       <RefreshCw className={cn("mr-1 h-4 w-4", rereadBusy && "animate-spin")} />
                       {t("mgr.inventory.reread")}
@@ -348,20 +354,24 @@ export default function InventoryScreenshotsPanel() {
 
                 <TabsContent value="photos">
                   <div className="grid gap-3 sm:grid-cols-3">
-                    {INVENTORY_SLOTS.map((slot) => {
+                    {INVENTORY_PHOTO_SLOTS.map((slot) => {
                       const url = photos[open.person.id]?.[slot];
                       const sent = open.shots.some((shot) => shot.slot === slot);
+                      const defectiveShot = slot === DEFECTIVE_SLOT;
+                      // The defective-products tile only appears when that picture was sent.
+                      if (defectiveShot && !sent) return null;
                       return (
                         <div key={slot} className="space-y-2">
                           {url ? (
                             <a href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                              <img src={url} alt={t("mgr.inventory.shotAlt", { n: slot, name: open.name })} loading="lazy" className="max-h-96 w-full object-contain" />
+                              <img src={url} alt={defectiveShot ? t("mgr.inventory.defectiveShotAlt", { name: open.name }) : t("mgr.inventory.shotAlt", { n: slot, name: open.name })} loading="lazy" className="max-h-96 w-full object-contain" />
                             </a>
                           ) : (
                             <div className="flex h-32 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
                               {sent ? t("mgr.inventory.unavailable") : t("form.inventory.slot", { n: slot })}
                             </div>
                           )}
+                          {defectiveShot && <p className="text-xs font-medium text-destructive">{t("mgr.inventory.defectiveTitle")}</p>}
                           {sent && (
                             <Button type="button" variant="outline" size="sm" className="w-full text-destructive hover:text-destructive" disabled={deleteBusy} onClick={() => removeShots(slot)}>
                               <Trash2 className="mr-1 h-4 w-4" />{t("mgr.inventory.delete")}
@@ -371,7 +381,7 @@ export default function InventoryScreenshotsPanel() {
                       );
                     })}
                   </div>
-                  {open.captures > 1 && (
+                  {open.shots.length > 1 && (
                     <Button type="button" variant="outline" size="sm" className="mt-3 text-destructive hover:text-destructive" disabled={deleteBusy} onClick={() => removeShots(null)}>
                       <Trash2 className="mr-1 h-4 w-4" />{t("mgr.inventory.deleteAll")}
                     </Button>
@@ -420,6 +430,36 @@ export default function InventoryScreenshotsPanel() {
                 </tbody>
               </table>
             </div>
+            {crewDefective.rows.length > 0 && (
+              <div className="space-y-2">
+                <span className="text-sm font-medium text-destructive">{t("mgr.inventory.crewDefective", { count: crewDefective.counted })}</span>
+                {crewDefective.unverified.length > 0 && (
+                  <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+                    {t("mgr.inventory.crewDefectiveUnverified", { names: crewDefective.unverified.join(", ") })}
+                  </p>
+                )}
+                <div className="overflow-hidden rounded-md border border-destructive/30">
+                  <table className="w-full text-sm">
+                    <thead className="bg-destructive/10 text-left text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colTotal")}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colHolders")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {crewDefective.rows.map((row) => (
+                        <tr key={row.code}>
+                          <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{row.code}</div></td>
+                          <td className="px-3 py-2 text-right font-medium tabular-nums">{Number(row.total).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{row.holders}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -447,6 +487,46 @@ export default function InventoryScreenshotsPanel() {
         </DialogContent>
       </Dialog>
       {confirmDialog}
+    </div>
+  );
+}
+
+// The employee's defective products of the day (rows read under « Produits défectueux »), apart
+// from the equipment list. Nothing is shown when there is no picture and nothing was read.
+function DefectiveList({ defective, t, fmtQty }) {
+  if (defective.state === "none") return null;
+  return (
+    <div className="space-y-2">
+      <span className="text-sm font-medium text-destructive">
+        {defective.count > 0 ? t("mgr.inventory.defectiveCount", { count: defective.count }) : t("mgr.inventory.defectiveTitle")}
+      </span>
+      {defective.state === "reading" && <p className="text-sm text-muted-foreground">{t("mgr.inventory.defectiveReading")}</p>}
+      {defective.state === "photos" && <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{t("mgr.inventory.defectiveUnreadable")}</p>}
+      {defective.state === "review" && (
+        <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+          {defective.expected ? t("mgr.inventory.defectiveMismatch", { count: defective.count, expected: defective.expected }) : t("mgr.inventory.defectiveUnverified")}
+        </p>
+      )}
+      {defective.items.length > 0 && (
+        <div className="overflow-hidden rounded-md border border-destructive/30">
+          <table className="w-full text-sm">
+            <thead className="bg-destructive/10 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th>
+                <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colQty")}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {defective.items.map((item) => (
+                <tr key={item.code}>
+                  <td className="px-3 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.code}</div></td>
+                  <td className="px-3 py-2 text-right tabular-nums">{fmtQty(Number(item.quantity))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

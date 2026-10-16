@@ -2,6 +2,10 @@
 // as many as the phone needs to show the whole list (what counts is the list's line count).
 // Keep INVENTORY_REQUIRED_FROM in sync with the 0071 migration (the database enforces it).
 export const INVENTORY_SLOTS = [1, 2, 3];
+// After the list, the employee is asked whether Field Service shows « Produits défectueux »; if so,
+// a picture of that section goes in slot 4 (0097). Only rows under that title are counted there.
+export const DEFECTIVE_SLOT = 4;
+export const INVENTORY_PHOTO_SLOTS = [...INVENTORY_SLOTS, DEFECTIVE_SLOT];
 export const INVENTORY_BUCKET = "inventory-screenshots";
 export const INVENTORY_REQUIRED_FROM = "2026-10-08";
 
@@ -13,9 +17,22 @@ export function inventoryStoragePath(userId, jobDate, slot, objectId) {
   return `${userId}/${jobDate}/inventory-${slot}-${objectId}.jpg`;
 }
 
-// The day can be submitted once at least one inventory screenshot is saved (the 0092 gate).
+// The day can be submitted once at least one inventory screenshot is saved (the 0092 gate, slots
+// 1 to 3 since 0097: the defective-products picture alone does not count).
 export function inventoryCaptured(rows) {
-  return (rows || []).length > 0;
+  return (rows || []).some((row) => INVENTORY_SLOTS.includes(Number(row.slot)));
+}
+
+export function defectiveCaptured(rows) {
+  return (rows || []).some((row) => Number(row.slot) === DEFECTIVE_SLOT);
+}
+
+// End-of-shift inventory step: « Continuer » needs at least one list screenshot and an answer to
+// « Produits défectueux ? » — « Non », or « Oui » with the defective-products picture sent.
+export function inventoryStepComplete(rows, defectiveAnswer) {
+  if (!inventoryCaptured(rows)) return false;
+  if (defectiveAnswer === "no") return true;
+  return defectiveAnswer === "yes" && defectiveCaptured(rows);
 }
 
 export function missingInventorySlots(rows) {

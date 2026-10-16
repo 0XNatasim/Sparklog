@@ -167,7 +167,7 @@ export default function History() {
     const dates = jobs.map((job) => job.job_date).sort();
     withTimeout(
       supabase.from("inventory_screenshots").select("job_date, slot")
-        .eq("user_id", effectiveUserId).gte("job_date", dates[0]).lte("job_date", dates[dates.length - 1])
+        .eq("user_id", effectiveUserId).lte("slot", 3).gte("job_date", dates[0]).lte("job_date", dates[dates.length - 1])
         .limit(QUERY_BUDGETS.inventoryRows),
       12000
     ).then(({ data, error }) => {
