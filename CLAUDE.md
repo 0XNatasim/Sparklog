@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.141)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.142)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -371,6 +371,14 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (V2.4.121, moteur 2.5.0, `RETURN_WITH_BENEFITS`, migration 0089). La preuve > 8 h compte le retour ; le souper ne le compte jamais (V2.4.110). Détail :
   `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
   (à supprimer dans une migration ultérieure).
+- [x] **Méthode « Messier » (aperçu Talons / DAS / Paie de la semaine, par défaut)** — corrigée le 2026-10-16 (V2.4.142,
+  moteur 2.5.1) : le retour sans avantages CCQ devient du régulier CCQ **jusqu'à 8 h dans la journée** (le travail
+  d'abord, puis le retour qui garde déjà ses avantages), et non plus jusqu'à 40 h dans la semaine ; jamais samedi /
+  dimanche / férié. Trouvé avec Anthony, semaine 42 : jeudi 8 h 30 de travail + 2 h de retour → l'ancienne règle
+  convertissait les 2 h (talon 1 724,75 $), la nouvelle les laisse sans avantages comme Dynacom (1 737,88 $ ; réel
+  1 736,44 $, écart de 1,44 $ encore à expliquer avec le vrai talon). Corrige aussi un effet de bord : le retour converti
+  d'une 1re job poussait le travail d'une job suivante en temps sup. `src/lib/messier-method.test.js`. Les fonctions
+  Edge n'utilisent pas cette méthode (aucun redéploiement).
 - [x] **Prime de chef d'équipe en temps sup.** — option par employé `team_leader_premium_overtime`
   (V2.4.102, migration 0082, décochée par défaut) : prime majorée ×1,5 / ×2 sur les heures sup.
   (`printedPayLines`, talon, coûts). Décochée = heures normales seulement, comme les talons Messier.
