@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.139)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.140)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -507,14 +507,19 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   42, celle du talon importé ; 2026-04-05 si on veut son coût d'avril à septembre dans les rapports), `ei_exempt` vrai ;
   TD1 / TP-1015.3 vides (montant de base, qui reproduit l'impôt du talon). Reste : confirmer si sa paie est cotisable à
   la CNESST.
-- [ ] **Capacité à 60 employés** (mesuré le 2026-10-16, détail dans NOOB.md « Limites de l'app ») : 29 actifs ≈ 410
-  jobs/sem. ; base 21 Mo, Storage 26 Mo, Supabase Pro + compute Small (90 connexions). Trois points ouverts :
-  (1) **À traiter** charge 200 jobs soumises, plus récentes d'abord (`TodoInbox.jsx`, `QUERY_BUDGETS.anomalySubmittedJobs`)
-  → à 60 employés ≈ 170 jobs/jour, les plus vieilles cachées : passer à ≈ 600, plus vieilles d'abord ;
-  (2) `cleanup_overtime_evidence` n'est planifié nulle part (`cron.job` n'a que `ccq-daily-sync` et
-  `ccq-card-renewals`) → la rétention de 30 jours n'est pas appliquée ; (3) `ccq-daily-sync` renvoie 401 chaque jour
-  (`Bearer YOUR_SERVICE_ROLE_KEY` laissé dans la tâche). Google Sheet : 200 onglets max, un « SemXX » par semaine →
-  nouveau fichier chaque année. OCR.space gratuit : 25 000/mois, ≈ 500/jour par IP, 1 Mo ; vérifier `OCR_SPACE_API_KEY`.
+- [x] **Capacité à 60 employés** (mesuré le 2026-10-16, détail dans NOOB.md « Limites de l'app ») : 29 actifs ≈ 410
+  jobs/sem. ; base 21 Mo, Storage 26 Mo, Supabase Pro + compute Small (90 connexions). Trois points corrigés en
+  V2.4.140 : (1) **À traiter** charge 600 jobs soumises, **plus vieilles d'abord** (`QUERY_BUDGETS.todoSubmittedJobs`,
+  pairs approuvés `todoApprovedPeers` 800, `.in()` des preuves découpé par `inListChunk` 150 ; `anomalySubmittedJobs`
+  reste à 200 pour Feuilles de temps) ; (2)-(3) migration 0094 : `cron_secret` aléatoire dans Vault,
+  `invoke_scheduled_function(fn)` (pg_net, anon JWT + en-tête `x-cron-secret`, URL et anon dans Vault
+  `sparklog_project_url` / `sparklog_anon_key`, posés hors dépôt), `verify_cron_secret` (service_role seulement) ;
+  `ccq_rates_daily_sync` et `cleanup_overtime_evidence` acceptent la clé service_role **ou** ce secret (redéployées
+  v16 / v17). Tâches : `ccq-daily-sync` 09:00 UTC (testée : 200, 5 grilles) et `cleanup-evidence-daily` 08:17 UTC
+  (401 vérifié sans secret ; 1re exécution la nuit du 2026-10-16 : 24 fichiers sans fiche — 21 preuves, 3 reçus de
+  stationnement — seront effacés, rien n'expire avant le 2026-10-27). Encore ouvert : Google Sheet (200 onglets max,
+  un « SemXX » par semaine → nouveau fichier chaque année) ; OCR.space gratuit (25 000/mois, ≈ 500/jour par IP,
+  1 Mo) : vérifier `OCR_SPACE_API_KEY`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

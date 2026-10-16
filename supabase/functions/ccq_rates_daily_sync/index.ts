@@ -4,7 +4,8 @@
 // Pre-populates ccq_rate_snapshots for all sector/skill combinations
 // so the Testing tab always has fresh data without a manual sync.
 //
-// Auth: caller must pass the SUPABASE_SERVICE_ROLE_KEY as Bearer token.
+// Auth: the SUPABASE_SERVICE_ROLE_KEY as Bearer token (manual run), or the x-cron-secret
+// header checked against Vault (pg_cron, migration 0094).
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -34,14 +35,19 @@ serve(async (req) => {
     const supabaseUrl   = Deno.env.get("SUPABASE_URL")             ?? "";
     const serviceRole   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-    // Only callable with the service role key
+    // Only callable with the service role key or the scheduler's secret
     const authHeader = req.headers.get("authorization") ?? "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-    if (!serviceRole || token !== serviceRole) {
-      return json({ ok: false, error: "Unauthorized" }, 401);
-    }
+    if (!serviceRole) return json({ ok: false, error: "Unauthorized" }, 401);
 
     const admin       = createClient(supabaseUrl, serviceRole);
+    if (token !== serviceRole) {
+      const cronSecret = req.headers.get("x-cron-secret") ?? "";
+      const { data: allowed } = cronSecret
+        ? await admin.rpc("verify_cron_secret", { p_secret: cronSecret })
+        : { data: false };
+      if (allowed !== true) return json({ ok: false, error: "Unauthorized" }, 401);
+    }
     const today       = new Date().toISOString().slice(0, 10);
     const ttlCutoff   = new Date(Date.now() - 23 * 3_600_000).toISOString(); // 23h TTL for daily runs
 
