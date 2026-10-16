@@ -167,10 +167,10 @@ Mesuré le **16 octobre 2026**, avec **29 employés actifs** : ils font **enviro
 **En bref :** à 60 employés, la base de données, le stockage des images et les comptes ont **beaucoup de
 marge**. Les vraies limites sont :
 
-- la liste « À traiter » (200 jobs) ;
+- la liste « À traiter » (600 jobs, plus vieilles d'abord) ;
 - la Google Sheet (un fichier par année) ;
 - la clé de lecture automatique (OCR) ;
-- trois tâches automatiques à régler (voir « À corriger », plus bas).
+- les deux tâches automatiques (ménage des images, taux CCQ) : réglées le 16 octobre (V2.4.140).
 
 ### Base de données et serveur (Supabase, forfait **Pro**, serveur « Small »)
 
@@ -194,8 +194,8 @@ Le forfait Pro coûte environ 25 $ US par mois, plus le serveur Small (environ 1
 
 | Écran | Limite | À 60 employés |
 |---|---|---|
-| **À traiter** (jobs soumises) | **200 jobs**, les **plus récentes d'abord** ; au-delà, l'écran affiche « liste tronquée » | ⚠️ **La limite qui compte.** 60 employés soumettent ≈ 170 jobs par jour. Si tu approuves aux 2 jours (≈ 340), les plus vieilles restent cachées tant que les récentes ne sont pas approuvées. **À corriger avant 60 employés** (passer à ≈ 600 et montrer les plus vieilles d'abord). |
-| Vérification des anomalies (À traiter) | 400 jobs déjà approuvées comparées | correct |
+| **À traiter** (jobs soumises) | **600 jobs**, les **plus vieilles d'abord** (V2.4.140) ; au-delà, l'écran le dit | 60 employés soumettent ≈ 170 jobs par jour : **3 jours et demi** d'attente tiennent. Au-delà, les plus récentes apparaissent dès que les vieilles sont approuvées. |
+| Vérification des anomalies (À traiter) | 800 jobs déjà approuvées comparées | correct |
 | Feuilles de temps | 50 par page + « Charger plus » ; tout si on choisit un employé ou une journée | correct |
 | Justificatifs (preuves, soupers, stationnement) | 100 derniers de chaque sorte | correct pour 2–3 jours ; plus vieux = choisir un employé |
 | Inventaire (une journée) | 500 employés, 600 captures, 3 000 lignes lues | correct (≈ 180 captures et ≈ 1 400 lignes par jour) |
@@ -246,13 +246,14 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
 
 ### À corriger avant de passer à 60 employés 💻
 
-- [ ] **À traiter** : passer de 200 à ≈ 600 jobs et montrer les **plus vieilles d'abord**.
-- [ ] **Ménage automatique des images** (preuves et inventaire de plus de 30 jours) : la fonction existe
-  (`cleanup_overtime_evidence`), mais **rien ne la lance**. Les premières images arrivent à 30 jours vers le
-  27 octobre. Sans elle, elles restent (≈ 3,5 Go par année, encore loin des 100 Go).
-- [ ] **Synchronisation quotidienne des taux CCQ** (tâche « ccq-daily-sync ») : elle **échoue chaque jour**
-  (erreur 401, clé manquante dans la tâche planifiée). Les taux saisis dans l'app restent bons, mais la mise à
-  jour automatique ne se fait pas.
+- [x] **À traiter** : 600 jobs, **plus vieilles d'abord** (V2.4.140).
+- [x] **Ménage automatique des images** (`cleanup_overtime_evidence`) : lancé **chaque nuit à 4 h 17**
+  (3 h 17 en hiver), tâche « cleanup-evidence-daily » (V2.4.140, migration 0094). Il efface les preuves et
+  captures d'inventaire de plus de 30 jours (les premières vers le 27 octobre) et les images qu'aucune fiche
+  n'utilise (envoi raté ou photo remplacée, plus vieilles que 2 heures).
+- [x] **Synchronisation quotidienne des taux CCQ** (« ccq-daily-sync », 5 h chaque matin, 4 h en hiver) : réparée
+  (V2.4.140). Testée le 16 octobre : réponse 200, les 5 grilles électricien récupérées. Les tâches utilisent
+  un secret gardé dans le coffre de Supabase (Vault), jamais dans le code.
 - [ ] **Google Sheet** : prévoir un nouveau fichier en janvier 2027.
 - [ ] **Vérifier** la clé OCR et le forfait Vercel (voir plus haut).
 
