@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.147)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.148)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -507,6 +507,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `src/lib/confirm-actions.test.js` vérifie chaque gestionnaire (`await confirm(` avant l'écriture). Le 2026-10-16, un
   stationnement refusé par erreur (4,32 $, 16 oct.) a été remis « en attente » par SQL, avec une ligne
   `parking_review_reset` au Journal.
+- [x] **Soupers / stationnements refusés hors des rapports** (V2.4.148) : Rapports › Semaine/mois (`PeriodSummary`)
+  additionnait aussi les demandes refusées ; Coûts et le sommaire imprimé ne gardaient déjà que « en attente » et
+  « accepté ». Les trois lisent maintenant `COUNTED_CLAIM_STATUSES` (`src/lib/claim-status.js`, test `claim-status.test.js`).
+  Talons, DAS et l'export Google ne contiennent ni souper ni stationnement.
 - [x] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095, appliquée par l'intégration
   Supabase à la fusion dans `main`, sous la version du nom de fichier). Toujours **une** demande par job
   (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,

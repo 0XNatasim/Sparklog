@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { COUNTED_CLAIM_STATUSES } from "@/lib/claim-status";
 import { Card, CardContent } from "@/components/ui/card";
 import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { jobCodeKind } from "@/lib/job-code";
@@ -78,8 +79,8 @@ export default function PeriodSummary({ mode = "week" }) {
       const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }, rounding] = await Promise.all([
         supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end).order("id")),
-        fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").gte("job_date", start).lte("job_date", end).order("id")),
-        fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, job_date, amount").gte("job_date", start).lte("job_date", end).order("id")),
+        fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
+        fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, job_date, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
         supabase.from("employer_contributions").select("*").eq("active", true),
         supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle(),
         loadDayRounding({ untilDate: end }),
