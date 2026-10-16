@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.142)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.143)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -496,6 +496,13 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   dans le dossier de l'employé, sans doublon ; `find_orphaned_evidence_objects` compte les photos supplémentaires.
   Justificatifs et À traiter montrent toutes les photos ; la suppression d'une job (Historique) les efface toutes.
   Avant : choisir un 2e reçu remplaçait le 1er, devenu orphelin (3 reçus effacés par le ménage du 2026-10-16).
+- [x] **Communications : plusieurs photos et des PDF par message** (V2.4.143, migration 0096, appliquée par l'intégration
+  Supabase à la fusion) : `manager_broadcasts.attachments` = `[{path, kind: image|pdf, name}]` (≤ 10, contrainte), anciens
+  messages repris depuis `image_path` ; `image_path` garde la 1re photo pour une app pas encore mise à jour. Bouton
+  « Joindre des photos ou des PDF » (`multiple`, coller/glisser plusieurs captures), retrait fichier par fichier ; photos
+  compressées en JPEG, PDF tels quels (≤ 10 Mo) ; un envoi raté retire les fichiers déjà envoyés. Bucket `broadcast-images` :
+  JPEG/PNG/WebP/PDF seulement, 10 Mo par fichier. Affichage commun `components/BroadcastAttachments.jsx` (fenêtre, cloche,
+  journal de la Gestion ; PDF = lien « Ouvrir »). Renvoyer un message garde ses pièces jointes. `src/lib/broadcast-attachments.js`.
 - [x] **Étoile rouge sur les fiches entrées à la main** (V2.4.123, migration 0090) : table `job_entry_sources`
   (`screenshot` / `manual`, une ligne par nouvelle fiche, écrite par l'employé après l'enregistrement, lisible par qui
   voit la job, ni modification ni suppression). `src/lib/entry-source.js` ; ★ rouge + légende dans Feuilles de temps
