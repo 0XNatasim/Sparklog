@@ -7,11 +7,18 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   const authorization = req.headers.get("authorization") || "";
-  if (!supabaseUrl || !serviceRole || authorization !== `Bearer ${serviceRole}`) {
-    return json({ ok: false, error: "Unauthorized" }, 401);
+  if (!supabaseUrl || !serviceRole) return json({ ok: false, error: "Unauthorized" }, 401);
+  const admin = createClient(supabaseUrl, serviceRole);
+  // Manual run: service-role Bearer. Scheduled run (pg_cron, migration 0094): x-cron-secret
+  // checked against Vault.
+  if (authorization !== `Bearer ${serviceRole}`) {
+    const cronSecret = req.headers.get("x-cron-secret") || "";
+    const { data: allowed } = cronSecret
+      ? await admin.rpc("verify_cron_secret", { p_secret: cronSecret })
+      : { data: false };
+    if (allowed !== true) return json({ ok: false, error: "Unauthorized" }, 401);
   }
 
-  const admin = createClient(supabaseUrl, serviceRole);
   const failures: Array<{ phase: string; detail: string }> = [];
   let expiredDeleted = 0;
   let orphanedDeleted = 0;

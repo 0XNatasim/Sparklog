@@ -7,6 +7,12 @@ export const QUERY_BUDGETS = Object.freeze({
   employeeWeekLookbackWeeks: 12,
   anomalySubmittedJobs: 200,
   anomalyApprovedPeers: 400,
+  // « À traiter » : every submitted job waiting for approval, oldest first (≈ 170 a day at
+  // 60 employees, so a few days of backlog still fit). Separate from the timesheet anomaly scan.
+  todoSubmittedJobs: 600,
+  todoApprovedPeers: 800,
+  // ids per `.in(...)` request, keeps the PostgREST URL short
+  inListChunk: 150,
   employeeActivityPage: 200,
   inventoryPeople: 500,
   inventoryRows: 600,

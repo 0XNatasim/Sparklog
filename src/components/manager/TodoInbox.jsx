@@ -24,6 +24,17 @@ import { loadManualEntryJobIds } from "@/lib/entry-source";
 import ManualEntryStar from "@/components/ManualEntryStar";
 
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, return_time_minutes, overtime_evidence_captured, updated_at";
+
+// `.in(...)` over hundreds of job ids, split so each request URL stays short.
+async function selectInChunks(ids, query) {
+  const data = [];
+  for (let i = 0; i < ids.length; i += QUERY_BUDGETS.inListChunk) {
+    const res = await withRetry(() => query(ids.slice(i, i + QUERY_BUDGETS.inListChunk)), 12000);
+    if (res.error) return { data, error: res.error };
+    data.push(...(res.data || []));
+  }
+  return { data };
+}
 const money = (value) => `${(Number(value) || 0).toLocaleString("fr-CA", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} $`;
 const hm = (minutes) => formatHM((Number(minutes) || 0) / 60);
 
@@ -47,7 +58,7 @@ export default function TodoInbox() {
       const today = companyDate();
       const prevDay = previousWorkday(today);
       const [submittedRes, peopleRes, mealsRes, parkingRes, settingsRes, timeOffRes, prevJobsRes] = await Promise.all([
-        withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").order("job_date", { ascending: false }).limit(QUERY_BUDGETS.anomalySubmittedJobs), 12000),
+        withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").order("job_date", { ascending: true }).order("id").limit(QUERY_BUDGETS.todoSubmittedJobs), 12000),
         withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, apprentice_level, first_trip_unpaid"), 12000),
         withRetry(() => supabase.from("meal_claims").select("id, job_id, user_id, job_date, amount, status").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         withRetry(() => supabase.from("parking_receipts").select("job_id, user_id, job_date, amount, status, storage_path").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
@@ -63,10 +74,10 @@ export default function TodoInbox() {
       const dates = [...new Set(submitted.map((job) => job.job_date))];
       const [peersRes, evidenceRes, manualIds] = await Promise.all([
         ids.length
-          ? withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "approved").in("user_id", userIds).in("job_date", dates).limit(QUERY_BUDGETS.anomalyApprovedPeers), 12000)
+          ? withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "approved").in("user_id", userIds).in("job_date", dates).limit(QUERY_BUDGETS.todoApprovedPeers), 12000)
           : { data: [] },
         ids.length
-          ? withRetry(() => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes").in("job_id", ids), 12000)
+          ? selectInChunks(ids, (part) => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes").in("job_id", part))
           : { data: [] },
         loadManualEntryJobIds(supabase, ids),
       ]);
@@ -82,7 +93,7 @@ export default function TodoInbox() {
       setErr("");
       setState({
         today, prevDay, anomalies, missing,
-        truncated: submitted.length >= QUERY_BUDGETS.anomalySubmittedJobs,
+        truncated: submitted.length >= QUERY_BUDGETS.todoSubmittedJobs,
         manualIds,
         profiles: new Map(people.map((p) => [p.id, p])),
         raw: { submitted, peers: peersRes.data || [], evidence: evidenceRes.data || [], meals: mealsRes.data || [], parking: parkingRes.data || [] },
@@ -382,7 +393,7 @@ export default function TodoInbox() {
       {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{err}</div>}
       {info && <div className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">{info}</div>}
       {state?.manualIds?.size > 0 && <div className="text-xs text-muted-foreground"><ManualEntryStar className="mr-1" />{t("manager.manualEntryLegend")}</div>}
-      {state?.truncated && <div className="text-xs text-muted-foreground">{t("todo.truncated", { count: QUERY_BUDGETS.anomalySubmittedJobs })}</div>}
+      {state?.truncated && <div className="text-xs text-muted-foreground">{t("todo.truncated", { count: QUERY_BUDGETS.todoSubmittedJobs })}</div>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[

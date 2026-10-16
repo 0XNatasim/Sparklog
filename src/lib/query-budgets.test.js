@@ -17,6 +17,10 @@ describe("query budgets", () => {
     expect(QUERY_BUDGETS.employeeWeekLookbackWeeks).toBeLessThanOrEqual(12);
     expect(QUERY_BUDGETS.anomalySubmittedJobs).toBeLessThanOrEqual(200);
     expect(QUERY_BUDGETS.anomalyApprovedPeers).toBeLessThanOrEqual(400);
+    expect(QUERY_BUDGETS.todoSubmittedJobs).toBeGreaterThanOrEqual(500);
+    expect(QUERY_BUDGETS.todoSubmittedJobs).toBeLessThanOrEqual(1000);
+    expect(QUERY_BUDGETS.todoApprovedPeers).toBeLessThanOrEqual(1000);
+    expect(QUERY_BUDGETS.inListChunk).toBeLessThanOrEqual(200);
     expect(QUERY_BUDGETS.employeeActivityPage).toBeLessThanOrEqual(200);
   });
 
