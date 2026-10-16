@@ -30,6 +30,7 @@ import { extractWorkOrderText, parseExtractedText, workOrderIssues } from "@/lib
 import { ENTRY_SOURCES, recordEntrySource } from "@/lib/entry-source";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
+import { MAX_PARKING_PICTURES, PARKING_BUCKET, mergeParkingPaths, orderPickedFiles, parkingReceiptPaths, parkingStoragePath } from "@/lib/parking-receipts";
 import { INVENTORY_SLOTS, inventoryCaptured, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
 import { fetchInventoryReading, fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
@@ -123,6 +124,7 @@ export default function EmployeeForm() {
   const imageInputRef = useRef(null);
   const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
+  const parkingModeRef = useRef("replace");
   const lastSaveErrorRef = useRef("");
   const lastSaveFailureRef = useRef(null); // raw error of the last failed save (offline vs refused)
   // Automatic resend after a network / server outage: { minutes, km, mode, attempt, fieldsKey }.
@@ -163,7 +165,11 @@ export default function EmployeeForm() {
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
   const [parkingRequested, setParkingRequested] = useState(false);
-  const [parkingFile, setParkingFile] = useState(null);
+  // Parcomètre pictures picked but not saved yet (several at once, migration 0095), and whether they
+  // are added to the saved ones or replace them.
+  const [parkingFiles, setParkingFiles] = useState([]);
+  const [parkingFilesMode, setParkingFilesMode] = useState("add");
+  const [parkingSaved, setParkingSaved] = useState({ count: 0, status: "pending" });
   const [parkingAmount, setParkingAmount] = useState("");
   const [hasParkingReceipt, setHasParkingReceipt] = useState(false);
   const [parkingReceiptsEnabled, setParkingReceiptsEnabled] = useState(false);
@@ -276,17 +282,19 @@ export default function EmployeeForm() {
       };
       setParkingRequested(Boolean(data.parking_receipt_captured));
       setHasParkingReceipt(Boolean(data.parking_receipt_captured));
-      setParkingFile(null);
+      setParkingFiles([]);
 
       setKmAller(kilometreFieldValue(data));
       if (data.parking_receipt_captured) {
         const { data: parkingReceipt } = await withTimeout(
-          supabase.from("parking_receipts").select("amount").eq("job_id", data.id).maybeSingle(),
+          supabase.from("parking_receipts").select("amount, status, storage_path, extra_storage_paths").eq("job_id", data.id).maybeSingle(),
           10000
         );
         setParkingAmount(parkingReceipt?.amount == null ? "" : String(parkingReceipt.amount));
+        setParkingSaved({ count: parkingReceiptPaths(parkingReceipt).length, status: parkingReceipt?.status || "pending" });
       } else {
         setParkingAmount("");
+        setParkingSaved({ count: 0, status: "pending" });
       }
 
       const s = (data.status || "saved").trim();
@@ -338,7 +346,9 @@ export default function EmployeeForm() {
     setHasOvertimeEvidence(false);
     setParkingRequested(false);
     setHasParkingReceipt(false);
-    setParkingFile(null);
+    setParkingFiles([]);
+    setParkingFilesMode("add");
+    setParkingSaved({ count: 0, status: "pending" });
     setParkingAmount("");
     setWorkOrderProblems([]);
     setShowWorkOrderCheck(false);
@@ -406,7 +416,7 @@ export default function EmployeeForm() {
       setParkingReceiptsEnabled(enabled);
       if (!enabled) {
         setParkingRequested(false);
-        setParkingFile(null);
+        setParkingFiles([]);
       }
     });
   }, [effectiveUserId]);
@@ -489,7 +499,7 @@ export default function EmployeeForm() {
       setErr(t("form.parking.amountRequired"));
       return false;
     }
-    if (parkingRequested && !parkingFile && !hasParkingReceipt) {
+    if (parkingRequested && parkingFiles.length === 0 && !hasParkingReceipt) {
       setErr(t("form.parking.receiptRequired"));
       parkingInputRef.current?.click();
       return false;
@@ -606,10 +616,12 @@ export default function EmployeeForm() {
       setWarning(overlapWarning || "");
 
       if (!editId && !returnValues) navigate(`/form?edit=${savedJobId}`, { replace: true });
-      if (parkingRequested && parkingFile) {
-        await uploadParkingReceipt(savedJobId, parkingFile, parkingAmountNumber);
+      if (parkingRequested && parkingFiles.length > 0) {
+        const count = await uploadParkingReceipt(savedJobId, parkingFiles, parkingAmountNumber, parkingFilesMode);
         setHasParkingReceipt(true);
-        setParkingFile(null);
+        setParkingSaved({ count, status: "pending" });
+        setParkingFiles([]);
+        setParkingFilesMode("add");
       }
       await deleteDraft({ userId: effectiveUserId, editId }).catch(() => undefined);
       return savedJobId;
@@ -652,30 +664,55 @@ export default function EmployeeForm() {
     }
   }
 
-  async function uploadParkingReceipt(jobId, file, amount) {
-    const receiptId = crypto.randomUUID();
-    const storagePath = `${user.id}/${job_date}/${receiptId}.jpg`;
-    const image = await prepareEvidenceImage(file);
-    // Every call is timed out so a bad connection surfaces a retryable error instead of
-    // freezing the save button forever.
-    const { error: uploadError } = await withTimeout(
-      supabase.storage.from("parking-receipts").upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
-      20000
-    );
-    if (uploadError) throw uploadError;
+  // Uploads every picked parcomètre picture, then writes the ONE claim row of the job (total amount,
+  // first picture + extras). "add" keeps the pictures already saved. Returns the number of pictures.
+  async function uploadParkingReceipt(jobId, files, amount, mode = "add") {
+    const uploaded = [];
+    const removeUploaded = () => (uploaded.length
+      ? supabase.storage.from(PARKING_BUCKET).remove(uploaded).catch(() => undefined)
+      : Promise.resolve());
+    let paths;
+    try {
+      // Every call is timed out so a bad connection surfaces a retryable error instead of
+      // freezing the save button forever.
+      for (const file of orderPickedFiles(files)) {
+        const storagePath = parkingStoragePath(user.id, job_date, crypto.randomUUID());
+        const image = await prepareEvidenceImage(file);
+        const { error: uploadError } = await withTimeout(
+          supabase.storage.from(PARKING_BUCKET).upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
+          20000
+        );
+        if (uploadError) throw uploadError;
+        uploaded.push(storagePath);
+      }
+      let existing = [];
+      if (mode === "add") {
+        const { data: current, error: currentError } = await withTimeout(
+          supabase.from("parking_receipts").select("storage_path, extra_storage_paths").eq("job_id", jobId).maybeSingle(),
+          10000
+        );
+        if (currentError) throw currentError;
+        existing = parkingReceiptPaths(current);
+      }
+      paths = mergeParkingPaths(existing, uploaded, mode);
+      if (!paths) throw new Error(t("form.parking.tooMany", { max: MAX_PARKING_PICTURES }));
+    } catch (error) {
+      await removeUploaded();
+      throw error;
+    }
 
     const { data: savedReceipt, error: receiptError } = await withTimeout(
       supabase.from("parking_receipts").upsert({
         job_id: jobId,
         user_id: user.id,
         job_date,
-        storage_path: storagePath,
+        ...paths,
         amount,
       }, { onConflict: "job_id" }).select("id").single(),
       12000
     );
     if (receiptError) {
-      await supabase.storage.from("parking-receipts").remove([storagePath]).catch(() => undefined);
+      await removeUploaded();
       throw receiptError;
     }
     const { error: notificationError } = await withTimeout(
@@ -689,16 +726,24 @@ export default function EmployeeForm() {
       12000
     );
     if (notificationError) throw notificationError;
+    return 1 + paths.extra_storage_paths.length;
   }
 
-  function handleParkingReceipt(event) {
-    const file = event.target.files?.[0];
+  function handleParkingReceipt(event, mode) {
+    const files = [...(event.target.files || [])];
     event.target.value = "";
-    if (!file) {
+    if (files.length === 0) {
       if (!hasParkingReceipt) setParkingRequested(false);
       return;
     }
-    setParkingFile(file);
+    const total = (mode === "add" ? parkingSaved.count : 0) + files.length;
+    if (total > MAX_PARKING_PICTURES) {
+      setErr(t("form.parking.tooMany", { max: MAX_PARKING_PICTURES }));
+      return;
+    }
+    setErr("");
+    setParkingFiles(files);
+    setParkingFilesMode(mode);
     setParkingRequested(true);
     setDirty(true);
   }
@@ -799,7 +844,9 @@ export default function EmployeeForm() {
       setDirty(false);
       setInfo("");
       setParkingRequested(false);
-      setParkingFile(null);
+      setParkingFiles([]);
+      setParkingFilesMode("add");
+      setParkingSaved({ count: 0, status: "pending" });
       setHasParkingReceipt(false);
     }
   }
@@ -1175,11 +1222,13 @@ export default function EmployeeForm() {
           console.error("[overtime evidence] Atomic job + proof save failed", { jobId, reason: lastSaveErrorRef.current });
           throw new Error(lastSaveErrorRef.current || t("form.evidence.jobSaveFailed"));
         }
-      } else if (parkingRequested && parkingFile) {
+      } else if (parkingRequested && parkingFiles.length > 0) {
         try {
-          await uploadParkingReceipt(savedJobId, parkingFile, normalizeNumber(parkingAmount));
+          const count = await uploadParkingReceipt(savedJobId, parkingFiles, normalizeNumber(parkingAmount), parkingFilesMode);
           setHasParkingReceipt(true);
-          setParkingFile(null);
+          setParkingSaved({ count, status: "pending" });
+          setParkingFiles([]);
+          setParkingFilesMode("add");
         } catch (error) {
           console.error("[overtime evidence] Parking receipt retry failed", { savedJobId, error });
           throw new Error(error?.message || t("form.evidence.jobSaveFailed"), { cause: error });
@@ -1265,7 +1314,7 @@ export default function EmployeeForm() {
 
   // Save/Submit only appear once every field is filled — including parking
   // (amount + receipt) when the parking box is checked.
-  const parkingComplete = !parkingRequested || (normalizeNumber(parkingAmount) > 0 && (Boolean(parkingFile) || hasParkingReceipt));
+  const parkingComplete = !parkingRequested || (normalizeNumber(parkingAmount) > 0 && (parkingFiles.length > 0 || hasParkingReceipt));
   // Office (administration) timesheets have no Arrivée and no kilometres, so those
   // two fields are not required to complete the form for them.
   const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(fin)
@@ -1466,7 +1515,7 @@ export default function EmployeeForm() {
                     disabled={disableInputs || hasParkingReceipt}
                     onChange={(event) => {
                       if (event.target.checked) { setParkingRequested(true); setDirty(true); }
-                      else { setParkingRequested(false); setParkingFile(null); setDirty(true); }
+                      else { setParkingRequested(false); setParkingFiles([]); setDirty(true); }
                     }}
                     className="h-5 w-5 rounded border-input accent-primary"
                   />
@@ -1474,38 +1523,66 @@ export default function EmployeeForm() {
               )}
             </div>
 
-            {parkingReceiptsEnabled && parkingRequested && (
-              <div className="space-y-2 rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">
-                  {parkingFile?.name || (hasParkingReceipt ? t("form.parking.receiptSaved") : t("form.parking.description"))}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
-                    <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || hasParkingReceipt} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
+            {parkingReceiptsEnabled && parkingRequested && (() => {
+              // A reviewed claim is final: no more pictures and no amount change (RLS: pending only).
+              const parkingLocked = hasParkingReceipt && parkingSaved.status !== "pending";
+              const pickParking = (mode) => { parkingModeRef.current = mode; parkingInputRef.current?.click(); };
+              const missingPicture = normalizeNumber(parkingAmount) > 0 && parkingFiles.length === 0 && !hasParkingReceipt;
+              return (
+                <div className="space-y-2 rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">
+                    {parkingFiles.length > 0
+                      ? t(parkingFilesMode === "add" && hasParkingReceipt ? "form.parking.pickedAdded" : hasParkingReceipt ? "form.parking.pickedReplacing" : "form.parking.picked", { count: parkingFiles.length, saved: parkingSaved.count })
+                      : hasParkingReceipt
+                        ? t("form.parking.savedCount", { count: Math.max(1, parkingSaved.count) })
+                        : t("form.parking.description")}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className={`w-fit ${normalizeNumber(parkingAmount) > 0 && !parkingFile && !hasParkingReceipt ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
-                      disabled={disableInputs}
-                      onClick={() => parkingInputRef.current?.click()}
-                    >
-                      {parkingFile || hasParkingReceipt ? t("form.parking.replaceReceipt") : t("form.parking.chooseReceipt")}
-                    </Button>
-                    {hasParkingReceipt && (
-                      <span className="inline-flex items-center gap-1 text-sm font-medium text-success" title={t("form.parking.receiptSaved")}>
-                        <CircleCheck className="h-5 w-5" aria-hidden="true" />
-                        <span className="sr-only">{t("form.parking.receiptSaved")}</span>
-                      </span>
-                    )}
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
+                      <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || parkingLocked || (hasParkingReceipt && parkingFiles.length === 0)} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!hasParkingReceipt && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={`w-fit ${missingPicture ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
+                          disabled={disableInputs}
+                          onClick={() => pickParking("replace")}
+                        >
+                          {t(parkingFiles.length > 0 ? "form.parking.chooseAgain" : "form.parking.chooseReceipts")}
+                        </Button>
+                      )}
+                      {hasParkingReceipt && !parkingLocked && (
+                        <>
+                          <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => pickParking("add")}>
+                            {t("form.parking.addReceipts")}
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" className="w-fit" disabled={disableInputs} onClick={() => pickParking("replace")}>
+                            {t("form.parking.replaceReceipts")}
+                          </Button>
+                        </>
+                      )}
+                      {hasParkingReceipt && parkingFiles.length > 0 && (
+                        <Button type="button" size="sm" variant="ghost" className="w-fit" disabled={disableInputs} onClick={() => { setParkingFiles([]); setParkingFilesMode("add"); }}>
+                          {t("common.cancel")}
+                        </Button>
+                      )}
+                      {hasParkingReceipt && (
+                        <span className="inline-flex items-center gap-1 text-sm font-medium text-success" title={t("form.parking.receiptSaved")}>
+                          <CircleCheck className="h-5 w-5" aria-hidden="true" />
+                          <span className="sr-only">{t("form.parking.receiptSaved")}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {parkingFiles.length > 0 && <div className="text-xs text-muted-foreground">{t("form.parking.amountHint")}</div>}
+                  <input ref={parkingInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => handleParkingReceipt(event, parkingModeRef.current)} />
                 </div>
-                <input ref={parkingInputRef} type="file" accept="image/*" className="hidden" onChange={handleParkingReceipt} />
-              </div>
-            )}
+              );
+            })()}
 
             <div className="space-y-2 pt-3">
               {(dirty || editId) && !locked && (

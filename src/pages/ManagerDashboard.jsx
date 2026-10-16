@@ -29,6 +29,7 @@ import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-bud
 import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 import { loadManualEntryJobIds, onlyManualEntries } from "@/lib/entry-source";
+import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import ManualEntryStar from "@/components/ManualEntryStar";
 
 dayjs.extend(isoWeek);
@@ -414,7 +415,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       setErr("");
       try {
         const { data: receiptRows, error: receiptError } = await withRetry(
-          () => supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, amount, status, created_at").order("created_at", { ascending: false }).limit(QUERY_BUDGETS.reviewQueue),
+          () => supabase.from("parking_receipts").select("job_id, user_id, job_date, storage_path, extra_storage_paths, amount, status, created_at").order("created_at", { ascending: false }).limit(QUERY_BUDGETS.reviewQueue),
           12000
         );
         if (receiptError) throw receiptError;
@@ -573,12 +574,14 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       return;
     }
     const receipt = parkingReceipts.get(jobId);
-    if (receipt?.storage_path && !receipt.imageUrl) {
+    const paths = parkingReceiptPaths(receipt);
+    if (paths.length > 0 && !receipt.imageUrls) {
       setParkingImageLoading(jobId);
-      const { data } = await supabase.storage.from("parking-receipts").createSignedUrl(receipt.storage_path, 600);
+      // Every parcomètre picture of the claim (migration 0095), in the order taken.
+      const { data } = await supabase.storage.from(PARKING_BUCKET).createSignedUrls(paths, 600);
       setParkingReceipts((current) => {
         const next = new Map(current);
-        next.set(jobId, { ...receipt, imageUrl: data?.signedUrl || "" });
+        next.set(jobId, { ...receipt, imageUrls: (data || []).map((row) => row?.signedUrl || "") });
         return next;
       });
       setParkingImageLoading("");
@@ -1006,7 +1009,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.arrival")}: <b>{fmtTimeHHmm(job.arrivee)}</b></span>
           <span className="rounded-full border bg-muted px-2 py-1">{t("history.end")}: <b>{fmtTimeHHmm(job.fin)}</b></span>
           {evidence?.daily_minutes ? <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-1">{t("manager.overtime.dailyTotal")}: <b>{formatHM(evidence.daily_minutes / 60)}</b></span> : null}
-          {receipt ? <span className="rounded-full border border-info/30 bg-info/10 px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt.amount || 0).toFixed(2)}</b></span> : null}
+          {receipt ? <span className="rounded-full border border-info/30 bg-info/10 px-2 py-1">{t("manager.parking.amount")}: <b>${Number(receipt.amount || 0).toFixed(2)}</b>{parkingReceiptPaths(receipt).length > 1 ? ` · ${t("manager.parking.pictures", { count: parkingReceiptPaths(receipt).length })}` : ""}</span> : null}
           {hasMeal ? <span className="rounded-full border border-success/30 bg-success/10 px-2 py-1">{t("manager.notifications.supper")}: <b>$30.00</b></span> : null}
           {job.status === "submitted" && <Button type="button" size="sm" className="ml-auto" disabled={actionLoadingId === job.id} onClick={() => approve(job.id)}>{actionLoadingId === job.id ? t("common.working") : t("manager.notifications.approveJob")}</Button>}
         </div>
@@ -1016,7 +1019,9 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
             {mealBreakdownText(t, mealDayBreakdown(mealDayJobs.get(`${job.user_id}|${job.job_date}`) || [job], job.job_date, employee), formatHM)} · {t("meal.check.threshold")}
           </div>
         )}
-        {isParkingVisible && <div className="rounded-lg border p-3">{receipt?.imageUrl ? <img src={receipt.imageUrl} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /> : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
+        {isParkingVisible && <div className="space-y-3 rounded-lg border p-3">{receipt?.imageUrls?.some(Boolean) ? receipt.imageUrls.map((url, index) => url
+          ? <div key={url}>{receipt.imageUrls.length > 1 && <div className="mb-1 text-xs font-semibold text-muted-foreground">{t("manager.parking.pictureOf", { n: index + 1, total: receipt.imageUrls.length })}</div>}<img src={url} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /></div>
+          : <p key={`missing-${index}`} className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>) : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
         {isProofVisible && <div className="rounded-xl border bg-muted/30 p-2"><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>{evidence?.imageUrl ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" /> : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}</div>}
       </CardContent>
     </Card>;

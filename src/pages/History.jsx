@@ -27,6 +27,7 @@ import { fetchInventorySlots } from "@/lib/inventory-upload";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
+import { parkingReceiptPaths } from "@/lib/parking-receipts";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 dayjs.locale("en");
@@ -266,7 +267,7 @@ export default function History() {
       // cascade away on delete, but the storage files must be removed explicitly.
       const [{ data: evidence }, { data: parking }] = await Promise.all([
         supabase.from("overtime_evidence").select("storage_path").eq("job_id", jobId),
-        supabase.from("parking_receipts").select("storage_path").eq("job_id", jobId),
+        supabase.from("parking_receipts").select("storage_path, extra_storage_paths").eq("job_id", jobId),
       ]);
       const { error } = await supabase.from("jobs").delete().eq("id", jobId);
       if (error) throw error;
@@ -274,7 +275,7 @@ export default function History() {
       // a storage hiccup must not report the delete as failed).
       try {
         const evPaths = (evidence || []).map((r) => r.storage_path).filter(Boolean);
-        const pkPaths = (parking || []).map((r) => r.storage_path).filter(Boolean);
+        const pkPaths = (parking || []).flatMap(parkingReceiptPaths);
         if (evPaths.length) await supabase.storage.from("overtime-evidence").remove(evPaths);
         if (pkPaths.length) await supabase.storage.from("parking-receipts").remove(pkPaths);
       } catch { /* orphaned files are harmless */ }
