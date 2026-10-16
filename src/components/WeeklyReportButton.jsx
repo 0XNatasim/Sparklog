@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Printer } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { COUNTED_CLAIM_STATUSES } from "@/lib/claim-status";
 import { Button } from "@/components/ui/button";
 import { snapshotFromRow } from "@/payroll";
 import { buildWeeklyReport, printWeeklyReport, REPORT_JOB_STATUSES } from "@/lib/weekly-report";
@@ -27,8 +28,8 @@ async function loadReport(week) {
   const [profiles, jobs, meals, parking, contributions, seeds, ledger, settingsRow, taxProfiles, holidayDates, rounding] = await Promise.all([
     supabase.from("profiles").select(PROFILE_COLUMNS).then(unwrap),
     fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, status").in("status", REPORT_JOB_STATUSES).gte("job_date", start).lte("job_date", end).order("id")).then(unwrap),
-    fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end).order("id")).then(unwrap),
-    fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, job_date, amount").in("status", ["pending", "approved"]).gte("job_date", start).lte("job_date", end).order("id")).then(unwrap),
+    fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")).then(unwrap),
+    fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, job_date, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")).then(unwrap),
     supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }).then(unwrap),
     supabase.from("payroll_ytd").select("*").eq("tax_year", taxYear).then(unwrap),
     fetchAllRows(() => supabase.from("payroll_period_ledger").select("*").eq("tax_year", taxYear).lt("period_end", start).order("period_end", { ascending: true }).order("user_id")).then(unwrap),
