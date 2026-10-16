@@ -17,6 +17,7 @@ import PayStubPrint from "@/components/PayStubPrint";
 import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
 import { printLegacyTalon } from "@/lib/legacy-talon-render";
 import { useT } from "@/lib/use-t";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useHolidayDates } from "@/lib/company-holidays";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { usePayrollSettings } from "@/lib/payroll-settings";
@@ -38,6 +39,7 @@ export default function TalonTab({ messier = false }) {
   const holidayDates = useHolidayDates();
   const { employer, taxProfiles } = usePayrollSettings();
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const { role } = useAuth();
   const isOwner = isOwnerRole(role); // only the boss (owner) can mark a talon official
   const [employees, setEmployees] = useState([]);
@@ -175,6 +177,7 @@ export default function TalonTab({ messier = false }) {
   async function toggleOfficial(next) {
     if (!stub) return;
     const { profile, weekKey } = stub;
+    if (!(await confirm(t(next ? "confirm.talonOfficial" : "confirm.talonUnofficial", { name: profile.full_name || "", week: weekKey })))) return;
     setStub((s) => (s ? { ...s, official: next } : s)); // optimistic
     const { error: rpcErr } = await supabase.rpc("set_talon_boss_approval", { p_user_id: profile.id, p_period_end: weekKey, p_approved: next });
     if (rpcErr) {
@@ -260,6 +263,7 @@ export default function TalonTab({ messier = false }) {
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-info/30 bg-info/10 p-3 text-xs text-info">
+        {confirmDialog}
         <div className="flex items-start gap-2">
           <FileText className="mt-0.5 h-4 w-4 shrink-0" />
           <div><b>{t("payroll.talon.title")}</b> {t("payroll.talon.matrixIntro")}</div>

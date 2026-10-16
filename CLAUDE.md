@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.146)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.147)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -500,6 +500,13 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`summarizeInventoryDay` → `defective`) ; Gestion › Inventaire : pastille « N défectueux », tableau à part, photo, total
   d'équipe (`sumCrewDefective`). Le pied « 1 - 15 of 17 » (téléphone en anglais) est lu aussi. Seules les cases 1 à 3
   satisfont la soumission (0092 → 0097). La réponse « Non » n'est pas enregistrée.
+- [x] **Confirmation avant approuver / refuser / supprimer** (V2.4.147) : toute décision passe par `useConfirmDialog`
+  (« Oui / Non ») avec le nom, la date et le montant : approbation d'une fiche ou d'une journée (même sans anomalie),
+  accepter / refuser un souper ou un stationnement (À traiter, Feuilles de temps, Soupers ; un refus ne s'annule pas dans
+  l'app), retirer un déblocage, supprimer une absence, talon officiel, Comptabiliser / Garder la semaine (Calcul).
+  `src/lib/confirm-actions.test.js` vérifie chaque gestionnaire (`await confirm(` avant l'écriture). Le 2026-10-16, un
+  stationnement refusé par erreur (4,32 $, 16 oct.) a été remis « en attente » par SQL, avec une ligne
+  `parking_review_reset` au Journal.
 - [x] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095, appliquée par l'intégration
   Supabase à la fusion dans `main`, sous la version du nom de fichier). Toujours **une** demande par job
   (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,

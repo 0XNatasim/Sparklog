@@ -196,11 +196,12 @@ export default function TodoInbox() {
     });
   }
 
+  // Every approval asks first (V2.4.147); a day with an anomaly lists it in the question.
   function approveDay(day) {
     const hits = anomaliesForJobs(state.anomalies, day.jobs.map((job) => job.id));
     const question = hits.length
       ? t("todo.confirm.approveAnomaly", { list: hits.map((a) => `• ${describeAnomaly(a)}`).join("\n") })
-      : "";
+      : t("todo.confirm.approveDay", { name: nameOf(day.userId), date: dayjs(day.date).format("ddd D MMM"), count: day.jobs.length });
     return approve(`day:${day.key}`, day.jobs.map((job) => job.id), question);
   }
 
@@ -227,7 +228,17 @@ export default function TodoInbox() {
     });
   }
 
-  function reviewMeal(claim, decision) {
+  // Accepting or refusing a claim asks first: a refusal cannot be undone from the app.
+  async function confirmClaim(kind, claim, decision) {
+    return confirm(t(`confirm.${decision === "approved" ? "accept" : "reject"}${kind}`, {
+      name: nameOf(claim.user_id),
+      date: dayjs(claim.job_date).format("ddd D MMM"),
+      amount: money(claim.amount),
+    }));
+  }
+
+  async function reviewMeal(claim, decision) {
+    if (!(await confirmClaim("Meal", claim, decision))) return;
     return run(`meal:${claim.id}`, async () => {
       const { error } = await withRetry(() => supabase.rpc("review_meal_claim", {
         p_claim_id: claim.id,
@@ -239,7 +250,8 @@ export default function TodoInbox() {
     });
   }
 
-  function reviewParking(receipt, decision) {
+  async function reviewParking(receipt, decision) {
+    if (!(await confirmClaim("Parking", receipt, decision))) return;
     return run(`parking:${receipt.job_id}`, async () => {
       const { error } = await withRetry(() => supabase.rpc("review_parking_claim", { p_job_id: receipt.job_id, p_decision: decision }), 12000);
       if (error) throw error;

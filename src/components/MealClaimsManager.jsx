@@ -12,6 +12,7 @@ import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { useSearchParams } from "react-router-dom";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { withRetry } from "@/lib/utils";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 export default function MealClaimsManager() {
   const t = useT();
@@ -23,6 +24,7 @@ export default function MealClaimsManager() {
   const [treatments, setTreatments] = useState({});
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
+  const [confirm, confirmDialog] = useConfirmDialog();
 
   async function load() {
     const { data } = await supabase.from("meal_claims").select("*").order("created_at", { ascending: false });
@@ -43,7 +45,15 @@ export default function MealClaimsManager() {
     requestAnimationFrame(() => document.getElementById(`meal-job-${focusedJobId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
   }, [focusedJobId, jobs]);
 
+  // Accepting or refusing asks first: a refusal cannot be undone from the app.
   async function review(claim, status) {
+    const person = profiles.get(claim.user_id);
+    const ok = await confirm(t(status === "approved" ? "confirm.acceptMeal" : "confirm.rejectMeal", {
+      name: person?.full_name || person?.email || "",
+      date: claim.job_date ? dayjs(claim.job_date).format("ddd D MMM") : "",
+      amount: `${Number(claim.amount || 0).toLocaleString("fr-CA", { maximumFractionDigits: 2 })} $`,
+    }));
+    if (!ok) return;
     setError("");
     setBusyId(claim.id);
     try {
@@ -111,5 +121,6 @@ export default function MealClaimsManager() {
       </CardContent></Card>;
     })}
     {!claims.length && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("meals.empty")}</CardContent></Card>}
+    {confirmDialog}
   </div>;
 }

@@ -76,7 +76,9 @@ export default function UnlockDayManager() {
       : t("timeRules.reopenSubmittedDone", { count: submitted.length });
   }
 
-  async function removeUnlock(id) {
+  async function removeUnlock(row) {
+    if (!(await confirm(t("confirm.removeUnlock", { name: employeeName(row.user_id), date: row.job_date })))) return;
+    const { id } = row;
     setBusy(true);
     const { error } = await supabase.from("job_entry_unlocks").delete().eq("id", id);
     if (error) setMessage(error.message);
@@ -118,7 +120,7 @@ export default function UnlockDayManager() {
               {unlocks.map((row) => (
                 <div key={row.id} className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-xs">
                   <span><b>{row.job_date}</b> · {employeeName(row.user_id)}</span>
-                  <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-destructive" disabled={busy} onClick={() => removeUnlock(row.id)}>{t("timeRules.remove")}</Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-destructive" disabled={busy} onClick={() => removeUnlock(row)}>{t("timeRules.remove")}</Button>
                 </div>
               ))}
             </div>

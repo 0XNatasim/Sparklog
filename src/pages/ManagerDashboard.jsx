@@ -520,7 +520,16 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     }
   }
 
+  // Accepting or refusing asks first: a refusal cannot be undone from the app.
   async function reviewParking(jobId, status) {
+    const receipt = parkingReceipts.get(jobId);
+    const who = profiles.get(receipt?.user_id);
+    const ok = await confirm(t(status === "approved" ? "confirm.acceptParking" : "confirm.rejectParking", {
+      name: who?.full_name || who?.email || "",
+      date: receipt?.job_date ? dayjs(receipt.job_date).format("ddd D MMM") : "",
+      amount: `${Number(receipt?.amount || 0).toLocaleString("fr-CA", { maximumFractionDigits: 2 })} $`,
+    }));
+    if (!ok) return;
     setActionLoadingId(`parking:${jobId}`);
     setErr("");
     try {
@@ -764,9 +773,17 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     }
   }
 
+  // Every approval asks first (V2.4.147); an anomaly is added to the question.
   async function approve(jobId) {
     const warning = anomalyWarning([jobId]);
-    if (warning && !(await confirm(warning))) return;
+    const target = [...jobs, ...overtimeJobs, ...parkingJobs, ...notificationMealJobs].find((x) => x.id === jobId);
+    const who = profiles.get(target?.user_id);
+    const question = t("confirm.approveJob", {
+      name: who?.full_name || who?.email || "",
+      date: target?.job_date ? dayjs(target.job_date).format("ddd D MMM") : "",
+      ot: target?.ot || "",
+    });
+    if (!(await confirm(warning ? `${question}\n\n${warning}` : question))) return;
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
     try {

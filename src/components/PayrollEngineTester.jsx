@@ -18,6 +18,7 @@ import { buildCalculTalon } from "@/lib/calcul-talon";
 import { payDateFor } from "@/lib/paystub";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { isSubcontractorRole } from "@/lib/roles";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 import { loadHolidayDates } from "@/lib/company-holidays";
@@ -191,6 +192,7 @@ function Row({ label, value, strong, tone }) {
 // golden rule). Everything shown is a test-bench estimate, never finalized pay.
 export default function PayrollEngineTester({ messier = false }) {
   const t = useT();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const [frequency, setFrequency] = useState("weekly");
   const [pay, setPay] = useState({ regularHours: 40, baseRate: 45.36, premium: 0, ccqPremium: 0, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, km: 0, kmRate: 0, taxableBenefit: 0, phone: 0, storage: 0, otherReimb: 0 });
   const [emp, setEmp] = useState({ td1ClaimAmount: "", personalTaxCredits: "", additionalFederal: 0, additionalQuebec: 0, eiExempt: false, rrqExempt: false });
@@ -485,6 +487,14 @@ export default function PayrollEngineTester({ messier = false }) {
   // never includes this week), so re-posting the same week replaces its row instead of
   // compounding. Requires a selected week (the ledger is keyed by the period-ending
   // Saturday). `silent` skips messages (used by the print hook).
+  // The « Comptabiliser » button asks first; the print hook (opt-in) stays silent.
+  async function confirmPostPayroll() {
+    const name = employees.find((e) => e.id === selectedId)?.full_name || "";
+    const week = weekOptions.find((o) => o.key === selectedWeek)?.end?.format("YYYY-MM-DD") || "";
+    if (!(await confirm(t("confirm.postPayroll", { name, week })))) return;
+    await postPayroll();
+  }
+
   async function postPayroll({ silent = false } = {}) {
     if (!selectedId || !result || !result.employee || !calcCtx) {
       if (!silent) setSaveState({ status: "error", message: t("payroll.postNoResult") });
@@ -587,6 +597,8 @@ export default function PayrollEngineTester({ messier = false }) {
     if (!cmp?.acceptable || !result?.employee || !calcCtx || !selectedId) return;
     // Never file a stub under another week: the stub's own period must be the one calculated.
     if (stubWeekMismatch) return;
+    const name = employees.find((e) => e.id === selectedId)?.full_name || "";
+    if (!(await confirm(t("confirm.keepWeek", { name, week: calcCtx.periodEnd })))) return;
     setKeeping(true);
     try {
       const periodEnd = calcCtx.periodEnd;
@@ -844,6 +856,7 @@ export default function PayrollEngineTester({ messier = false }) {
 
   return (
     <div className="space-y-3">
+      {confirmDialog}
       {/* ── Boundary banner (ADR 0001 / payroll-rule gate) ── */}
       <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
         <div className="flex items-start gap-2">
@@ -1131,7 +1144,7 @@ export default function PayrollEngineTester({ messier = false }) {
               <Printer className="mr-2 h-4 w-4" /> {t("payroll.printStub")}
             </Button>
             {selectedId && (
-              <Button variant="outline" onClick={() => postPayroll()} disabled={saveState.status === "saving"} className="w-full border-warning bg-warning/10 font-semibold text-warning hover:bg-warning/20 sm:w-auto">
+              <Button variant="outline" onClick={confirmPostPayroll} disabled={saveState.status === "saving"} className="w-full border-warning bg-warning/10 font-semibold text-warning hover:bg-warning/20 sm:w-auto">
                 <Save className="mr-2 h-4 w-4" /> {t("payroll.post")}
               </Button>
             )}

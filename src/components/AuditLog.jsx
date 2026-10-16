@@ -23,6 +23,7 @@ const ACTION_META = {
   manager_entry_reminded: { icon: BellRing, tone: "text-warning" },
   meal_reviewed: { icon: Utensils, tone: "text-primary" },
   parking_reviewed: { icon: SquareParking, tone: "text-primary" },
+  parking_review_reset: { icon: SquareParking, tone: "text-warning" },
   nas_reveal: { icon: Eye, tone: "text-warning" },
   nas_update: { icon: KeyRound, tone: "text-warning" },
   nas_bulk_export: { icon: FileDown, tone: "text-destructive" },
@@ -72,6 +73,7 @@ export default function AuditLog() {
       case "manager_entry_reminded": return t("audit.desc.managerEntryReminded", { name: target, date: d.job_date || "—" });
       case "meal_reviewed": return t("audit.desc.mealReviewed", { name: target, status: d.status || "—" });
       case "parking_reviewed": return t("audit.desc.parkingReviewed", { name: target, status: d.status || "—" });
+      case "parking_review_reset": return t("audit.desc.parkingReviewReset", { name: target, date: d.job_date || "—" });
       case "nas_reveal": return t("audit.desc.nasReveal", { name: target });
       case "nas_update": return t(d.cleared ? "audit.desc.nasCleared" : "audit.desc.nasUpdate", { name: target });
       case "nas_bulk_export": return t("audit.desc.nasBulkExport", { count: d.returned ?? 0, reason: d.reason || "—" });
