@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.138)
+## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.139)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -507,6 +507,14 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   42, celle du talon importé ; 2026-04-05 si on veut son coût d'avril à septembre dans les rapports), `ei_exempt` vrai ;
   TD1 / TP-1015.3 vides (montant de base, qui reproduit l'impôt du talon). Reste : confirmer si sa paie est cotisable à
   la CNESST.
+- [ ] **Capacité à 60 employés** (mesuré le 2026-10-16, détail dans NOOB.md « Limites de l'app ») : 29 actifs ≈ 410
+  jobs/sem. ; base 21 Mo, Storage 26 Mo, Supabase Pro + compute Small (90 connexions). Trois points ouverts :
+  (1) **À traiter** charge 200 jobs soumises, plus récentes d'abord (`TodoInbox.jsx`, `QUERY_BUDGETS.anomalySubmittedJobs`)
+  → à 60 employés ≈ 170 jobs/jour, les plus vieilles cachées : passer à ≈ 600, plus vieilles d'abord ;
+  (2) `cleanup_overtime_evidence` n'est planifié nulle part (`cron.job` n'a que `ccq-daily-sync` et
+  `ccq-card-renewals`) → la rétention de 30 jours n'est pas appliquée ; (3) `ccq-daily-sync` renvoie 401 chaque jour
+  (`Bearer YOUR_SERVICE_ROLE_KEY` laissé dans la tâche). Google Sheet : 200 onglets max, un « SemXX » par semaine →
+  nouveau fichier chaque année. OCR.space gratuit : 25 000/mois, ≈ 500/jour par IP, 1 Mo ; vérifier `OCR_SPACE_API_KEY`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

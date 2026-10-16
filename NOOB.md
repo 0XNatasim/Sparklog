@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-16 (V2.4.138).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-16 (V2.4.139).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -157,6 +157,104 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   La taxe provinciale de 9 % s'ajoute aux deux parts. L'app passe **toute seule** à 1,06 $ dès la semaine du
   25 avril 2027 ; si le gel est prolongé, le dire à Claude. À cette date, toute la grille de salaires CCQ change
   aussi : fournir la nouvelle grille ACQ.
+
+## Limites de l'app (capacité) 📏
+
+Mesuré le **16 octobre 2026**, avec **29 employés actifs** : ils font **environ 410 jobs par semaine**, soit
+3 jobs par jour par employé. À **60 employés**, compte environ **850 jobs par semaine**, **170 par jour** et
+**44 000 par année**.
+
+**En bref :** à 60 employés, la base de données, le stockage des images et les comptes ont **beaucoup de
+marge**. Les vraies limites sont :
+
+- la liste « À traiter » (200 jobs) ;
+- la Google Sheet (un fichier par année) ;
+- la clé de lecture automatique (OCR) ;
+- trois tâches automatiques à régler (voir « À corriger », plus bas).
+
+### Base de données et serveur (Supabase, forfait **Pro**, serveur « Small »)
+
+| Quoi | Inclus / limite | Aujourd'hui | À 60 employés |
+|---|---|---|---|
+| Taille de la base | 8 Go inclus (puis 0,125 $ US/Go) ; recommandé jusqu'à 50 Go sur ce serveur | **21 Mo** | ≈ +100 Mo par année : **aucun souci** |
+| Images (preuves, inventaire, stationnement, cartes CCQ) | 100 Go inclus | **26 Mo** (195 fichiers) | ≈ 3,5 Go par année si rien n'est effacé, ≈ 0,5 Go si le ménage automatique roule : **aucun souci** |
+| Taille d'une image | 10 Mo max à l'envoi | l'app la réduit à ≈ 80–100 Ko | — |
+| Données téléchargées (sortantes) | 250 Go par mois | faible | **aucun souci** |
+| Comptes qui se connectent | 100 000 par mois | 37 profils | **aucun souci** |
+| Fonctions serveur (OCR, export, notifications) | 2 millions d'appels par mois | quelques milliers | **aucun souci** |
+| Connexions en direct (temps réel) | 500 en même temps | < 40 | **aucun souci** |
+| Connexions à la base | 90 directes / 400 par le pool | — | **aucun souci** |
+| Lecture/écriture du disque | rafales limitées sur un petit serveur | un ralentissement est déjà arrivé, corrigé depuis | **à surveiller** : Gestion › Avancé › État du service |
+| Sauvegardes | 1 par jour, gardées **7 jours** (pas de retour à la minute près) | — | une erreur remarquée après 7 jours ne peut plus être annulée par une sauvegarde |
+
+Le forfait Pro coûte environ 25 $ US par mois, plus le serveur Small (environ 15 $ US) moins un crédit de
+10 $ US. Au-delà des quotas, Supabase facture l'excédent ; rien n'en approche.
+
+### Écrans de l'app (combien de lignes chaque écran charge)
+
+| Écran | Limite | À 60 employés |
+|---|---|---|
+| **À traiter** (jobs soumises) | **200 jobs**, les **plus récentes d'abord** ; au-delà, l'écran affiche « liste tronquée » | ⚠️ **La limite qui compte.** 60 employés soumettent ≈ 170 jobs par jour. Si tu approuves aux 2 jours (≈ 340), les plus vieilles restent cachées tant que les récentes ne sont pas approuvées. **À corriger avant 60 employés** (passer à ≈ 600 et montrer les plus vieilles d'abord). |
+| Vérification des anomalies (À traiter) | 400 jobs déjà approuvées comparées | correct |
+| Feuilles de temps | 50 par page + « Charger plus » ; tout si on choisit un employé ou une journée | correct |
+| Justificatifs (preuves, soupers, stationnement) | 100 derniers de chaque sorte | correct pour 2–3 jours ; plus vieux = choisir un employé |
+| Inventaire (une journée) | 500 employés, 600 captures, 3 000 lignes lues | correct (≈ 180 captures et ≈ 1 400 lignes par jour) |
+| Historique de l'employé | 100 jobs par page | correct |
+| Rapports, Talons, DAS, Coûts, export CCQ | aucune limite : toutes les pages sont lues, 1 000 lignes à la fois | correct, mais **plus lent** sur de longues périodes (DAS sur 14 mois ≈ 50 000 jobs : quelques secondes de plus) |
+| Feuille d'urgence | 200 employés | correct |
+
+### Google Sheet (export des jobs approuvées)
+
+| Quoi | Limite | À 60 employés |
+|---|---|---|
+| Cellules par fichier | **10 millions**, cellules vides comprises | « Data » ≈ 660 000 cellules par année, plus les onglets « SemXX » |
+| Onglets par fichier | **200** | un onglet « SemXX » par semaine, jamais effacé : ≈ **52 par année**, donc le plafond arrive en ≈ **3 ans et demi** |
+| Durée d'un script (compte Gmail) | 6 minutes par exécution | « Stats » relit toute la feuille ; plus elle grossit, plus c'est long |
+| Temps total des déclencheurs | ≈ **90 minutes par jour** (compte Gmail) | « Stats » se refait aux 15 minutes s'il y a du nouveau ; avec 40 000+ lignes, ça peut manquer de temps |
+| Appels externes | ≈ 20 000 par jour | correct |
+
+👉 **Conseil :** commencer **un nouveau fichier Google Sheet chaque année**, ou archiver « Data » en janvier. La
+paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils lisent la base de Sparklog.
+
+### Lecture automatique des captures (OCR.space)
+
+| Quoi | Limite (clé gratuite) | À 60 employés |
+|---|---|---|
+| Lectures par mois | 25 000 | ≈ 4 000 à 5 000 (inventaire 2–3 par jour par employé, plus les preuves de temps sup.) : correct |
+| Lectures par jour | ≈ 500 par adresse internet | ≈ 180–250 par jour : correct, mais la même adresse peut être partagée avec d'autres |
+| Taille d'une image | 1 Mo | l'app envoie ≈ 80–100 Ko : correct |
+
+- Si aucune clé n'est enregistrée, l'app utilise la clé de démonstration publique « helloworld », **très
+  limitée**. **À vérifier** dans Supabase › Edge Functions › Secrets : `OCR_SPACE_API_KEY` doit exister.
+- Si la limite est atteinte, rien ne se perd : la photo est gardée, la liste reste « à vérifier » et un
+  gestionnaire peut relancer la lecture. Une clé payante (300 000 lectures par mois) règle le problème.
+
+### Site web (Vercel)
+
+| Quoi | Limite | À 60 employés |
+|---|---|---|
+| Bande passante | 100 Go par mois (forfait gratuit « Hobby ») | l'app fait ≈ 2 Mo par appareil, une fois : correct |
+| Usage commercial | **interdit** sur le forfait gratuit « Hobby » | **à vérifier** : si le compte Vercel est en Hobby, passer à **Pro** (≈ 20 $ US par mois) pour une entreprise |
+
+### Autres points
+
+- **Courriels envoyés par l'app** (mot de passe oublié, invitations) : le service de courriel inclus de Supabase
+  est **très limité** (quelques courriels par heure). La création d'employé et la réinitialisation par un
+  gestionnaire n'envoient pas de courriel, donc pas de problème. Pour que « mot de passe oublié » marche
+  pour tout le monde, il faudrait configurer un service de courriel (SMTP).
+- **Téléphones** : les brouillons hors ligne restent sur l'appareil 30 jours. L'app installée prend ≈ 2 Mo.
+
+### À corriger avant de passer à 60 employés 💻
+
+- [ ] **À traiter** : passer de 200 à ≈ 600 jobs et montrer les **plus vieilles d'abord**.
+- [ ] **Ménage automatique des images** (preuves et inventaire de plus de 30 jours) : la fonction existe
+  (`cleanup_overtime_evidence`), mais **rien ne la lance**. Les premières images arrivent à 30 jours vers le
+  27 octobre. Sans elle, elles restent (≈ 3,5 Go par année, encore loin des 100 Go).
+- [ ] **Synchronisation quotidienne des taux CCQ** (tâche « ccq-daily-sync ») : elle **échoue chaque jour**
+  (erreur 401, clé manquante dans la tâche planifiée). Les taux saisis dans l'app restent bons, mais la mise à
+  jour automatique ne se fait pas.
+- [ ] **Google Sheet** : prévoir un nouveau fichier en janvier 2027.
+- [ ] **Vérifier** la clé OCR et le forfait Vercel (voir plus haut).
 
 ## Comment demander à Claude
 
