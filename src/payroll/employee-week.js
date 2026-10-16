@@ -109,6 +109,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const pay = {
     regularHours, baseRate: base, premium: prem, ccqPremium, premiumOnOvertime, ot150Hours, ot200Hours, returnNbHours,
     km: totalKm, kmRate: Number(profile?.km_rate) || 0, taxableBenefit: 0, eiExempt: Boolean(taxProfile?.eiExempt),
+    rrqExempt: Boolean(taxProfile?.rrqExempt),
   };
 
   const earnings = [];
@@ -165,6 +166,7 @@ function runEngine({ frequency, employer, taxProfile, earnings, opening, unionDu
       federalTaxProfile: { td1ClaimAmount: taxProfile?.td1ClaimAmount ?? undefined, additionalTax: Number(taxProfile?.federalAdditionalTax) || 0, annualDeductions: unionDuesFederalAnnual },
       quebecTaxProfile: { personalTaxCredits: taxProfile?.personalTaxCredits ?? undefined, additionalTax: Number(taxProfile?.quebecAdditionalTax) || 0 },
       eiExempt: Boolean(taxProfile?.eiExempt),
+      rrqExempt: Boolean(taxProfile?.rrqExempt),
     },
     employer: {
       annualPayrollEstimate: Number(employer.annualPayrollEstimate) || 0,
@@ -185,7 +187,7 @@ function computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includeP
   const pay = {
     regularHours: 0, baseOnlyHours: fixedHours, baseRate: base, premium: 0, ccqPremium: 0, premiumOnOvertime: false,
     ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, km: totalKm, kmRate: Number(profile?.km_rate) || 0, taxableBenefit: 0,
-    fixedPay: true, eiExempt: Boolean(taxProfile?.eiExempt),
+    fixedPay: true, eiExempt: Boolean(taxProfile?.eiExempt), rrqExempt: Boolean(taxProfile?.rrqExempt),
   };
   const amount = printedPayLines({ baseOnlyHours: fixedHours, baseRate: base }).baseOnly;
   const earnings = amount ? [{ type: "regular", amount }] : [];

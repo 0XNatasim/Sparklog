@@ -77,6 +77,10 @@ export function calculatePayroll(input) {
   // Not insurable for EI (Employment Insurance Act 5(2)(b): controls more than 40 % of the voting
   // shares): no EI premium, employee or employer. A per-employee flag set by a manager, never inferred.
   if (employee.eiExempt) bases.ei = 0;
+  // Not contributing to the RRQ (e.g. a worker aged 65 to 69 who receives the RRQ retirement pension
+  // and filed the stop-contributing choice with Revenu Québec): no RRQ, employee or employer. A
+  // per-employee flag set by a manager from the payroll records, never inferred.
+  if (employee.rrqExempt) bases.rrq = 0;
 
   // ── Employee statutory deductions ──
   const rrq = calculateRrq({ pensionableThisPeriod: bases.rrq, ytd, periodsPerYear, rules });

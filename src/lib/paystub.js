@@ -75,7 +75,7 @@ export function buildStubModel({ result, ytd = {}, pay = {}, reimb = {}, ccq: cc
   const net = grossUp - totalRetenues;
   const netPlusReimb = net + kmReimb + phoneReimb + storageReimb + otherReimb;
 
-  const gainsRRQ = cash + vac + imposable;
+  const gainsRRQ = pay.rrqExempt ? 0 : cash + vac + imposable; // not contributing to the RRQ
   const gainsRQAP = cash + vac;
   const gainsAE = pay.eiExempt ? 0 : gainsRQAP; // not insurable for EI (> 40 % of the voting shares)
 

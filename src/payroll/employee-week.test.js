@@ -129,6 +129,17 @@ describe("fixed weekly pay (owner stub D0038-0002)", () => {
     expect(paid.result.employer.ei).toBe(0);
     expect(computeEmployeeWeekTalon({ profile, jobs, weekDate: "2026-09-27" }).result.employee.ei).toBeGreaterThan(0);
   });
+
+  it("RRQ exemption: no RRQ, employee or employer; EI, RQAP and the taxable base are unchanged", () => {
+    const regular = computeEmployeeWeekTalon({ profile, jobs, weekDate: "2026-09-27" });
+    const exempt = computeEmployeeWeekTalon({ profile, jobs, weekDate: "2026-09-27", taxProfile: { rrqExempt: true } });
+    expect(regular.result.employee.rrq.total).toBeGreaterThan(0);
+    expect(exempt.result.employee.rrq.total).toBe(0);
+    expect(exempt.result.employer.rrq).toBe(0);
+    expect(exempt.result.employee.ei).toBe(regular.result.employee.ei);
+    expect(exempt.result.employee.rqap).toBe(regular.result.employee.rqap);
+    expect(exempt.pay.rrqExempt).toBe(true);
+  });
 });
 
 describe("fixed weekly pay — printed stub", () => {
