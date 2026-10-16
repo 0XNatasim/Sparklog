@@ -11,6 +11,7 @@ import { openTalonsPrint } from "@/lib/talon-print";
 import { weekEndingSaturdayD, weekStartSundayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { isOwnerRole, isSubcontractorRole } from "@/lib/roles";
 import { isFixedPayWeek, isPayrollEmployee } from "@/lib/fixed-pay";
+import { isDynacomOnlyWeek } from "@/lib/payroll-opening";
 import { useAuth } from "@/contexts/AuthContext";
 import PayStubPrint from "@/components/PayStubPrint";
 import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
@@ -141,6 +142,9 @@ export default function TalonTab({ messier = false }) {
       return { kind: "apercu", jobs: approved };
     }
     if (!jobs.length) return { kind: "none" };
+    // A week Dynacom paid (before the imported cumulative): no talon from the jobs, its cumulatives would
+    // start from zero. Kept stubs (above) and fixed pay still show.
+    if (isDynacomOnlyWeek(week.key)) return { kind: "none" };
     const pending = jobs.filter((j) => isPending(j.status)).length;
     const approved = jobs.filter((j) => j.status === "approved");
     const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
