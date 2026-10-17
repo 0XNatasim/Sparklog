@@ -17,6 +17,7 @@ import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
 import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
+import { loadHolidayDates } from "@/lib/company-holidays";
 import { notifyBroadcastPush } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
@@ -57,7 +58,8 @@ export default function TodoInbox() {
   const load = useCallback(async () => {
     try {
       const today = companyDate();
-      const prevDay = previousWorkday(today);
+      // A holiday is not a work day: the day after Thanksgiving looks back to the Friday before.
+      const prevDay = previousWorkday(today, await loadHolidayDates());
       const [submittedRes, peopleRes, mealsRes, parkingRes, settingsRes, timeOffRes, prevJobsRes] = await Promise.all([
         withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").order("job_date", { ascending: true }).order("id").limit(QUERY_BUDGETS.todoSubmittedJobs), 12000),
         withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, apprentice_level, first_trip_unpaid"), 12000),

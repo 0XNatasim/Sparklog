@@ -5,7 +5,8 @@ import { supabase } from "../supabaseClient";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { COUNTED_CLAIM_STATUSES } from "@/lib/claim-status";
 import { Card, CardContent } from "@/components/ui/card";
-import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { congesOverWeeks } from "@/payroll/employee-week";
 import { jobCodeKind } from "@/lib/job-code";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import { formatHM } from "@/lib/time";
@@ -76,19 +77,17 @@ export default function PeriodSummary({ mode = "week" }) {
         loadEmployerSettings().catch(() => null),
       ]);
       const employer = employerFromSettings(employerRow);
-      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }, rounding] = await Promise.all([
+      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, rounding] = await Promise.all([
         supabase.from("profiles").select("id, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").gte("job_date", start).lte("job_date", end).order("id")),
         fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, job_date, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
         fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, job_date, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
         supabase.from("employer_contributions").select("*").eq("active", true),
-        supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle(),
         loadDayRounding({ untilDate: end }),
       ]);
       if (cancelled) return;
 
       const contributions = contribRows || [];
-      const congesRates = congesRatesFromRow(congesRow);
       const profileById = new Map((people || []).map((p) => [p.id, p]));
 
       const buckets = new Map();
@@ -157,7 +156,8 @@ export default function PeriodSummary({ mode = "week" }) {
           const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
 
           let empLabor = 0, empLaborNoBenefit = 0, empPaidMin = 0;
-          calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates, rounding: roundingFor(rounding, uid) }).forEach((e) => {
+          // Hours as on the talons (Messier method, the payroll default).
+          calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), messierMethod: true, holidayDates, rounding: roundingFor(rounding, uid) }).forEach((e) => {
             workedMin += e.regularWorkMinutes + e.overtimeWorkMinutes;
             empPaidMin += e.regularWorkMinutes + e.returnRegularMinutes + e.returnNoBenefitMinutes + e.overtime50Minutes + e.overtime100Minutes;
             if (e.overtimeWorkMinutes > 0) otJobs += 1;
@@ -180,7 +180,8 @@ export default function PeriodSummary({ mode = "week" }) {
             kmCost += e.totalKm * jobKmRate;
           });
           labor += empLabor + empLaborNoBenefit;
-          conges += isNonCcq ? 0 : calculateCongesIndemnity(empLabor, congesRates).total;
+          // 13 % congés (convention 19.05): the talon's own weekly amount, summed over the CCQ weeks.
+          conges += isNonCcq ? 0 : congesOverWeeks({ profile, jobs: ujobs, holidayDates, rounding: roundingFor(rounding, uid) });
           if (rateKey) {
             const perHour = contributions.reduce((s, c) => s + (Number(c[rateKey]) || 0), 0);
             contribTotal += perHour * (empPaidMin / 60);

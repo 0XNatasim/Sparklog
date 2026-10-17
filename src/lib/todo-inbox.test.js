@@ -47,6 +47,14 @@ describe("previousWorkday", () => {
     expect(previousWorkday("2026-10-12")).toBe("2026-10-09"); // Monday → Friday
     expect(previousWorkday("2026-10-11")).toBe("2026-10-09"); // Sunday → Friday
   });
+
+  it("skips a CCQ holiday like a weekend", () => {
+    // Thanksgiving 2026-10-12 (convention ICI 19.04): Tuesday looks back to the Friday before.
+    expect(previousWorkday("2026-10-13", ["2026-10-12"])).toBe("2026-10-09");
+    // Construction vacation and Christmas: the first day back looks past the whole shutdown.
+    const winter = ["2026-12-21", "2026-12-22", "2026-12-23", "2026-12-24", "2026-12-25", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01"];
+    expect(previousWorkday("2027-01-04", winter)).toBe("2026-12-18");
+  });
 });
 
 describe("approvalOutcome", () => {
