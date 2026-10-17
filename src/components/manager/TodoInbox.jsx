@@ -18,6 +18,7 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
 import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
+import { DYNACOM_CUMULATIVE_END } from "@/lib/payroll-opening";
 import { notifyBroadcastPush } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
@@ -61,7 +62,8 @@ export default function TodoInbox() {
       // A holiday is not a work day: the day after Thanksgiving looks back to the Friday before.
       const prevDay = previousWorkday(today, await loadHolidayDates());
       const [submittedRes, peopleRes, mealsRes, parkingRes, settingsRes, timeOffRes, prevJobsRes] = await Promise.all([
-        withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").order("job_date", { ascending: true }).order("id").limit(QUERY_BUDGETS.todoSubmittedJobs), 12000),
+        // Weeks paid by Dynacom (up to the imported cumulative, end of week 42) are closed: their jobs are not listed.
+        withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").gt("job_date", DYNACOM_CUMULATIVE_END).order("job_date", { ascending: true }).order("id").limit(QUERY_BUDGETS.todoSubmittedJobs), 12000),
         withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, apprentice_level, first_trip_unpaid"), 12000),
         withRetry(() => supabase.from("meal_claims").select("id, job_id, user_id, job_date, amount, status").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         withRetry(() => supabase.from("parking_receipts").select("job_id, user_id, job_date, amount, status, storage_path, extra_storage_paths").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
@@ -419,6 +421,7 @@ export default function TodoInbox() {
       {info && <div className="rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">{info}</div>}
       {state?.manualIds?.size > 0 && <div className="text-xs text-muted-foreground"><ManualEntryStar className="mr-1" />{t("manager.manualEntryLegend")}</div>}
       {state?.truncated && <div className="text-xs text-muted-foreground">{t("todo.truncated", { count: QUERY_BUDGETS.todoSubmittedJobs })}</div>}
+      <div className="text-xs text-muted-foreground">{t("todo.closedWeeks", { date: DYNACOM_CUMULATIVE_END })}</div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[

@@ -103,9 +103,10 @@ Sources, filed in `docs/reference/`:
 - The minutes added or removed go to the day's **return time** when it has some (removed from the
   return first, then from the end of the work if the return is shorter); without return, to the **end
   of the day's work**: overtime when the day is over 8 h, regular time otherwise (owner, 2026-10-14).
-- From **2026-10-04 (CCQ week 42)** — moved from week 41 by the owner on 2026-10-14 (engine 2.5.0);
-  earlier days are paid to the minute and the counter starts at 0 on 2026-10-04. Days that count for
-  the counter: every job except drafts.
+- From **2026-10-11 (CCQ week 43)**, the first week paid by Sparklog — moved by the owner on 2026-10-17
+  (engine 2.6.1, migration 0100; before: week 41, then week 42 from 2026-10-14, engine 2.5.0). Earlier days
+  are paid to the minute and the counter starts at 0 on 2026-10-11, so a week-42 timesheet (paid by
+  Dynacom) cannot carry minutes into week 43. Days that count for the counter: every job except drafts.
 - Engine 2.4.0 (start date 2.5.0): `DAY_ROUNDING`, `buildDayRounding`, option `rounding` of `calculatePayrollEntries`;
   counters loaded by `src/lib/day-rounding.js` for every pay screen (Calcul, Talons, DAS, Paie de la
   semaine, Coûts, Semaine/mois, Vue semaine, RE, export CCQ, sommaire imprimable, page Semaine de
