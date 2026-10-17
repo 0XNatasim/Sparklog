@@ -8,3 +8,11 @@ export const DYNACOM_CUMULATIVE_END = "2026-10-10";
 export function isDynacomOnlyWeek(weekEnd) {
   return Boolean(weekEnd) && String(weekEnd).slice(0, 10) < DYNACOM_CUMULATIVE_END;
 }
+
+// True for a week Sparklog must never post (« Comptabiliser ») : every week up to and including week 42,
+// whose closing IS the Dynacom cumulative row. Posting it would replace that row with a computed one that
+// starts from zero. Only real talons (imported, or validated against the real one) may still be kept for
+// those weeks. The database enforces the same date (migration 0099, protect_dynacom_cumulative).
+export function isClosedBeforeSparklog(weekEnd) {
+  return Boolean(weekEnd) && String(weekEnd).slice(0, 10) <= DYNACOM_CUMULATIVE_END;
+}

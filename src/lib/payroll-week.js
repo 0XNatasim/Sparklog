@@ -6,6 +6,7 @@ import { YTD_COLUMN_TO_KEY, YTD_CCQ_COLUMN_TO_KEY, formatTalonRef, snapshotFromR
 import { buildClosing, payTotals } from "@/lib/payroll-closing";
 import { buildCalculTalon } from "@/lib/calcul-talon";
 import { isFixedPayWeek, isPayrollEmployee } from "@/lib/fixed-pay";
+import { isClosedBeforeSparklog } from "@/lib/payroll-opening";
 
 export const TAX_YEAR = 2026; // same constant as Calcul / Talons / DAS
 const LEDGER_COLUMNS = [...YTD_COLUMN_TO_KEY, ...YTD_CCQ_COLUMN_TO_KEY];
@@ -92,6 +93,8 @@ export function planPayrollWeek({ weekEnd, profiles = [], jobs = [], ledgerByUse
 
     let state;
     if (posted) state = "posted";
+    // Week 42 and before: paid by Dynacom, closed by its cumulative row — never posted here.
+    else if (isClosedBeforeSparklog(end)) state = "closed";
     else if (!fixed && (toApprove || notSubmitted)) state = "pending";
     else if (!fixed && !approved.length) state = "empty";
     else if (earlierUnposted.length) state = "blockedEarlier";

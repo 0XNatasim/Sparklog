@@ -5,6 +5,7 @@ const CODE_MESSAGES = [
   [/overlapping_job_interval/i, "form.errors.overlappingInterval"],
   [/overtime_evidence_required/i, "form.errors.overtimeEvidenceRequired"],
   [/inventory_screenshots_required/i, "form.errors.inventoryRequired"],
+  [/dynacom_cumulative_locked/i, "payroll.postClosedWeek"],
   [/return_time_exceeds_job_interval|return_exceeds_interval/i, "form.errors.returnExceedsInterval"],
   [/invalid_job_kilometres|invalid_kilometres/i, "form.errors.invalidKilometres"],
   [/invalid_job_interval|invalid_job_contract|invalid_interval/i, "form.errors.invalidInterval"],
