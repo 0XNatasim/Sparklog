@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import PayStubPrint from "@/components/PayStubPrint";
 import ImportLegacyStubsDialog from "@/components/ImportLegacyStubsDialog";
 import { printLegacyTalon } from "@/lib/legacy-talon-render";
+import { dynacomCumulativeTalon, isDynacomCumulativeRow } from "@/lib/dynacom-cumulative-talon";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useHolidayDates } from "@/lib/company-holidays";
@@ -95,11 +96,11 @@ export default function TalonTab({ messier = false }) {
         setLedgerByEmp(lByE);
         setRoundingByEmp(rounding);
 
-        // Weeks in the register (imported or validated stubs) always show, even without jobs.
+        // Weeks in the register (imported or validated stubs, the Dynacom cumulative) always show, even without jobs.
         const recent = [...weekMap.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, NB_WEEKS);
         const all = new Map(recent.map((w) => [w.key, w]));
         (ledgers || []).forEach((r) => {
-          if (!r.imported_talon || !r.period_end || all.has(r.period_end)) return;
+          if (!(r.imported_talon || isDynacomCumulativeRow(r)) || !r.period_end || all.has(r.period_end)) return;
           const end = dayjs(r.period_end);
           all.set(r.period_end, { key: r.period_end, start: weekStartSundayD(r.period_end), end, weekNo: ccqWeekNumber(end) });
         });
@@ -119,7 +120,7 @@ export default function TalonTab({ messier = false }) {
   // a kept talon or a fixed-pay week in the window, in roster order.
   const payrollEmployees = useMemo(() => employees.filter((e) => isPayrollEmployee(e, taxProfiles.get(e.id))), [employees, taxProfiles]);
   const rows = useMemo(() => payrollEmployees.filter((e) => (jobsByEmp.get(e.id) || []).length > 0
-    || (ledgerByEmp.get(e.id) || []).some((r) => r.imported_talon)
+    || (ledgerByEmp.get(e.id) || []).some((r) => r.imported_talon || isDynacomCumulativeRow(r))
     || weeks.some((w) => isFixedPayWeek(taxProfiles.get(e.id), w.key))), [payrollEmployees, jobsByEmp, ledgerByEmp, weeks, taxProfiles]);
 
   // Opening balance for an employee at a week start (latest ledger ending before, else seed).
@@ -136,6 +137,9 @@ export default function TalonTab({ messier = false }) {
     // A stub kept in the register (imported or validated against the real one) is shown as is.
     const kept = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key && r.imported_talon);
     if (kept) return { kind: "imported", talon: kept.imported_talon };
+    // The Dynacom cumulative (end of week 42) is not a talon: shown like a kept one, Cumulatif column only.
+    const cumulative = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key && isDynacomCumulativeRow(r));
+    if (cumulative) return { kind: "imported", cumulative: true, talon: dynacomCumulativeTalon(cumulative, { profile, week }) };
     // Fixed weekly pay: a talon every week from the start date, whatever the jobs (their km count once approved).
     if (isFixedPayWeek(taxProfiles.get(profile.id), week.key)) {
       const ledgerRow = (ledgerByEmp.get(profile.id) || []).find((r) => r.period_end === week.key);
@@ -231,7 +235,7 @@ export default function TalonTab({ messier = false }) {
         <button
           type="button"
           onClick={() => printLegacyTalon(st.talon, `${t("payroll.subtabs.talon")} — S${week.weekNo} — ${profile.full_name || ""}`)}
-          title={t("payroll.talon.cell.imported")}
+          title={t(st.cumulative ? "payroll.talon.cell.dynacomCumulative" : "payroll.talon.cell.imported")}
           className="mx-auto flex h-9 w-9 items-center sm:h-7 sm:w-7 justify-center rounded-md text-info transition-colors hover:bg-info/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <FileText className="h-4 w-4" strokeWidth={2.2} />

@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.151)
+## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.152)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -346,7 +346,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   pour 4 chefs d'équipe (lignes de prime comptées comme heures) → seulement la ligne Heures des talons et le RE.
   `planPayrollWeek` part de cette ligne : Sparklog prend le relais à la **semaine 43**. Talons (V2.4.144) : plus de talon
   calculé (gris) pour les semaines payées par Dynacom avant le 2026-10-10 (`isDynacomOnlyWeek`, `src/lib/payroll-opening.js`),
-  leurs cumulatifs partaient de zéro ; les talons importés (Simon B.) et la paie fixe (Karine) restent. Si Dynacom met à jour les cumuls
+  leurs cumulatifs partaient de zéro ; les talons importés (Simon B.) et la paie fixe (Karine) restent. V2.4.152 : la ligne
+  du 2026-10-10 s'ouvre en semaine 42 avec l'icône « talon validé / importé » (`dynacom-cumulative-talon.js`, construit dans le
+  navigateur, rien n'est écrit) : ce n'est pas un talon, seulement la colonne Cumulatif. Si Dynacom met à jour les cumuls
   (RRQ d'avant avril ajouté pour un employé le 2026-10-16, « probablement pour tous cette semaine »), réimporter le
   nouveau PDF en remplaçant les lignes du 10-10. L'import de talons (unitaire ou en lot, V2.4.129) reste disponible.
 - [ ] **Échelon / période d'apprentissage** et taux horaire confirmés contre le certificat CCQ
