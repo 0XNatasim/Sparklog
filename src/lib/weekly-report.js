@@ -61,10 +61,10 @@ function jobRows(jobs, entries) {
 }
 
 // One employee's CCQ pay for the week (null for non-CCQ roles, like the DAS screen).
-function employeePay({ profile, jobs, week, opening, holidayDates, employer, taxProfile, contributions, meals, parking, rounding }) {
+function employeePay({ profile, jobs, week, opening, holidayDates, employer, taxProfile, contributions, meals, parking, rounding, messierMethod }) {
   const talon = computeEmployeeWeekTalon({
     profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true,
-    weekDate: week.start, holidayDates, employer, taxProfile, rounding,
+    weekDate: week.start, holidayDates, employer, taxProfile, rounding, messierMethod,
   });
   const { result, ccqAmounts: ccq, reimb, hours } = talon;
   const totals = payTotals(result, ccq, reimb);
@@ -122,6 +122,8 @@ function employeePay({ profile, jobs, week, opening, holidayDates, employer, tax
 export function buildWeeklyReport({
   week, profiles = [], jobs = [], meals = [], parking = [], contributions = [], holidayDates = [],
   employer = DEFAULT_EMPLOYER, taxProfiles = new Map(), openingFor = () => ({}), roundingFor = () => null,
+  // Same hours as the talons: the Messier method is the payroll default (Talons, DAS, Paie de la semaine).
+  messierMethod = true,
 }) {
   const inWeek = (date) => date >= week.start && date <= week.end;
   const weekJobs = jobs.filter((j) => inWeek(j.job_date) && REPORT_JOB_STATUSES.includes(j.status));
@@ -147,7 +149,7 @@ export function buildWeeklyReport({
     const fixedHours = isFixedPayWeek(taxProfile, week.end) ? fixedWeeklyHours(taxProfile) : 0;
     if (!ujobs.length && !fixedHours) continue;
     const rounding = roundingFor(profile.id);
-    const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), holidayDates, rounding });
+    const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), messierMethod, holidayDates, rounding });
     const rows = jobRows(ujobs, entries);
     const nonCcq = isNonCcqRole(profile.role);
     // Supper is a CCQ allowance (PeriodSummary/Coûts count it for CCQ employees only).
@@ -174,7 +176,7 @@ export function buildWeeklyReport({
     if (!nonCcq || fixedHours) {
       pay = employeePay({
         profile, jobs: fixedHours ? ujobs.filter((j) => j.status === "approved") : ujobs, week, opening: openingFor(profile.id) || {}, holidayDates, employer,
-        taxProfile, contributions, meals, parking: parkingAmount, rounding,
+        taxProfile, contributions, meals, parking: parkingAmount, rounding, messierMethod,
       });
     }
     employees.push({

@@ -94,13 +94,9 @@ function sumBy(list, fn) {
   return list.reduce((sum, item) => sum + fn(item), 0);
 }
 
-// The last weekday before `date` (YYYY-MM-DD): Monday looks back to Friday.
-export function previousWorkday(date) {
-  const d = new Date(`${date}T12:00:00Z`);
-  do d.setUTCDate(d.getUTCDate() - 1);
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
-  return d.toISOString().slice(0, 10);
-}
+// The last work day before `date` (YYYY-MM-DD): Monday looks back to Friday, and a CCQ
+// holiday (company_holidays) is skipped like a weekend. Kept here for existing imports.
+export { previousWorkday } from "./workdays";
 
 // push_approved_batch's per-job results → how many were approved and which ones changed
 // under the manager (edited since, already claimed…) and must be looked at again.

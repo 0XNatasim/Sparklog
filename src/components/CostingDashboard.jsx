@@ -6,7 +6,8 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { COUNTED_CLAIM_STATUSES } from "@/lib/claim-status";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayrollEntries, calculateCongesIndemnity, congesRatesFromRow, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { congesOverWeeks } from "@/payroll/employee-week";
 import { weekStartSundayD, weekEndingSaturdayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
@@ -89,7 +90,7 @@ export default function CostingDashboard() {
         loadEmployerSettings().catch(() => null),
       ]);
       const employer = employerFromSettings(employerRow);
-      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, { data: congesRow }, rounding] = await Promise.all([
+      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, rounding] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
         // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
         // 'saved' drafts and 'updated' un-reviewed edits). Claims: pending + approved
@@ -98,13 +99,11 @@ export default function CostingDashboard() {
         fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
         fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
         supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }),
-        supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle(),
         loadDayRounding({ untilDate: end }),
       ]);
       if (cancelled) return;
 
       const contributions = contribRows || [];
-      const congesRates = congesRatesFromRow(congesRow);
       const profileById = new Map((people || []).map((p) => [p.id, p]));
       const jobsByUser = new Map();
       (jobs || []).forEach((job) => {
@@ -138,7 +137,8 @@ export default function CostingDashboard() {
         const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
 
         let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
-        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], { ...overtimeOptionsFromProfile(profile), holidayDates, rounding: roundingFor(rounding, userId) });
+        // Hours as on the talons (Messier method, the payroll default) so every figure matches them.
+        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], { ...overtimeOptionsFromProfile(profile), messierMethod: true, holidayDates, rounding: roundingFor(rounding, userId) });
         entries.forEach((e) => {
           regMin += e.regularWorkMinutes;
           ot50Min += e.overtime50Minutes;
@@ -179,7 +179,8 @@ export default function CostingDashboard() {
           regMin = fixed.hours * 60 * fixedWeeks;
           ot50Min = 0; ot100Min = 0; returnMin = 0; returnNbMin = 0;
         }
-        const conges = isNonCcq || fixed ? 0 : calculateCongesIndemnity(labor, congesRates).total;
+        // 13 % congés (convention 19.05): the talon's own weekly amount, summed over the CCQ weeks.
+        const conges = isNonCcq || fixed ? 0 : congesOverWeeks({ profile, jobs: jobsByUser.get(userId) || [], holidayDates, rounding: roundingFor(rounding, userId) });
         const paidHours = (regMin + returnMin + returnNbMin + ot50Min + ot100Min) / 60;
         // Employer contributions: per-hour rate for this employee's level × paid hours.
         const contribLines = fixed

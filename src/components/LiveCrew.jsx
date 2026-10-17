@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { hoursBetween, formatHM } from "@/lib/time";
 import { cn, withTimeout } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
+import { loadHolidayDates } from "@/lib/company-holidays";
+import { isNonWorkday } from "@/lib/workdays";
 import { isOffOn, isExceptionOn } from "@/lib/timeoff";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
@@ -41,11 +43,12 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
     setTodayDate(today);
     const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
     setYesterdayDate(yesterday);
-    const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }] = await Promise.all([
+    const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }, holidays] = await Promise.all([
       supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards").order("full_name"),
       supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at, overtime_evidence_captured").eq("job_date", today),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
       supabase.from("jobs").select("user_id, status").eq("job_date", yesterday),
+      loadHolidayDates(),
     ]);
     // Off for the FULL day — a full-day range or a weekly recurrence (e.g. never Fridays).
     // A partial-hours congé (start_time set) still leaves them on the board. Owners, admins,
@@ -67,7 +70,8 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
       jobUserIds: new Set((jobs || []).map((job) => job.user_id)),
       offUserIds: offToday,
     });
-    setNotSubmittedList(
+    // Nothing was due on a weekend or a CCQ holiday (company_holidays): nobody is "not submitted".
+    setNotSubmittedList(isNonWorkday(yesterday, holidays) ? [] :
       notSubmittedYesterday(people, { yesterdayJobs: yJobs || [], offUserIds: offYesterday })
         .map((p) => ({ id: p.id, name: p.full_name || p.email || p.id }))
     );

@@ -118,6 +118,15 @@ Sources, filed in `docs/reference/`:
   (treated like weekends). The app already **blocks job entry** on `company_holidays`
   dates, and that calendar is populated from the CCQ calendar through 2029.
 - Source: CCQ dates congés/vacances + FAQ fériés (see links in `payroll_rules`).
+- **Not paid on the week's pay stub** (convention ICI 2025-2029, art. 19.04-19.05, read
+  2026-10-17): a « jour férié chômé » is paid through the **5,5 %** share of the 13 %
+  indemnity credited every week and remitted to the CCQ, which pays it to the employee at the
+  end of November and June. No wage line is added for the holiday; work on it (never entered)
+  would be 2× from the first hour (21.02 b). The 30 h week « lorsque survient un jour férié
+  chômé » (20.02 5) c) i.) applies to compressed schedules only, which Messier does not use.
+- Every fixed date of 19.04 1) b) and 3) for 2026-2028 is written by migration 0098
+  (`src/lib/company-holidays.test.js`). Screens never flag a missing time-sheet on those days
+  (`src/lib/workdays.js`: Équipe en direct week view and « pas soumis hier », À traiter).
 
 ## HOLIDAY_INDEMNITY — indemnité de congés ✅ approved
 - **13% of the gross salary earned each week**, split:

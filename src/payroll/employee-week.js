@@ -8,11 +8,11 @@
 // Import the engine modules directly, not through ./index.js: index.js re-exports this
 // file, and the cycle breaks chunk ordering once pages are code-split.
 import { calculatePayroll } from "./engine/calculatePayroll.js";
-import { computeCcqBenefits, computeCcqLevies, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeCcqLevies, vacationableWage, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { PAY_PERIODS_PER_YEAR } from "./rules/2026.js";
 import { printedPayLines } from "./earnings.js";
 import { engineYtdFromOpening } from "./ytd.js";
-import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
+import { calculatePayrollEntries, overtimeOptionsFromProfile, CONGES_INDEMNITY_RATES } from "@/lib/payroll-calculations";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
 import { fixedWeeklyHours } from "@/lib/fixed-pay";
 
@@ -75,6 +75,56 @@ export function snapshotFromRow(row) {
   const snap = {};
   for (const [key, col] of [...YTD_COLUMN_TO_KEY, ...YTD_CCQ_COLUMN_TO_KEY]) snap[key] = Number(row?.[col]) || 0;
   return snap;
+}
+
+// Indemnité de congés annuels obligatoires, de jours fériés chômés et de congés de maladie
+// (convention ICI 19.05 1) : 13 % = 6 % + 5,5 % + 1,5 %) for ONE CCQ week of one employee,
+// computed exactly like the talon (computeEmployeeWeekTalon → computeCcqBenefits): base = the
+// CCQ wage earned at the base rate (regular hours, overtime at 1,5× / 2×) + the CCQ team-leader
+// premium paid; never the non-CCQ premium, return time without benefits, km or allowances.
+// Coûts, Semaine/mois and the printed summary use it so their 13 % equals the talons' to the
+// cent. Fixed weekly pay and non-CCQ roles have no indemnity (the callers skip them).
+export function weekCongesIndemnity({ profile, jobs, messierMethod = false, holidayDates = [], rounding = null }) {
+  const base = Number(profile?.hourly_rate) || 0;
+  const entries = calculatePayrollEntries(jobs || [], { ...overtimeOptionsFromProfile(profile), messierMethod, holidayDates, rounding });
+  let regMin = 0, ot50 = 0, ot100 = 0;
+  for (const e of entries.values()) {
+    regMin += e.regularWorkMinutes; ot50 += e.overtime50Minutes; ot100 += e.overtime100Minutes;
+  }
+  const regularHours = regMin / 60, ot150Hours = ot50 / 60, ot200Hours = ot100 / 60;
+  const printed = printedPayLines({
+    regularHours, ot150Hours, ot200Hours, baseRate: base,
+    premium: Number(profile?.team_leader_premium) || 0,
+    ccqPremium: Number(profile?.team_leader_premium_ccq) || 0,
+    premiumOnOvertime: Boolean(profile?.team_leader_premium_overtime),
+  });
+  const wageBase = vacationableWage({ hours: regularHours + ot150Hours + ot200Hours, hourlyWage: base, overtime150Hours: ot150Hours, overtime200Hours: ot200Hours })
+    + printed.ccqPremiumPay;
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const total = r2(wageBase * CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate);
+  const vacation = r2(wageBase * CONGES_INDEMNITY_RATES.vacation);
+  const statutoryHolidays = r2(wageBase * CONGES_INDEMNITY_RATES.statutoryHolidays);
+  // The three parts always add up to the talon's 13 % (the cent of rounding goes to sick leave).
+  return { base: r2(wageBase), total, vacation, statutoryHolidays, sick: r2(total - vacation - statutoryHolidays) };
+}
+
+// The 13 % of any set of jobs (Coûts, Semaine/mois): one talon-identical amount per CCQ week
+// (Sunday → Saturday; the overtime split and the rounding are weekly), added up. Messier method,
+// the payroll default, like the talons.
+export function congesOverWeeks({ profile, jobs, holidayDates = [], rounding = null, messierMethod = true }) {
+  const byWeek = new Map();
+  for (const job of jobs || []) {
+    const d = new Date(`${job.job_date}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + ((6 - d.getUTCDay() + 7) % 7));
+    const key = d.toISOString().slice(0, 10);
+    if (!byWeek.has(key)) byWeek.set(key, []);
+    byWeek.get(key).push(job);
+  }
+  let total = 0;
+  for (const weekJobs of byWeek.values()) {
+    total += weekCongesIndemnity({ profile, jobs: weekJobs, messierMethod, holidayDates, rounding }).total;
+  }
+  return Math.round(total * 100) / 100;
 }
 
 // Compute one employee's talon for a set of jobs (normally one CCQ week) on top of the

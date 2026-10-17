@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-16, V2.4.148)
+## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.149)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -511,6 +511,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   additionnait aussi les demandes refusées ; Coûts et le sommaire imprimé ne gardaient déjà que « en attente » et
   « accepté ». Les trois lisent maintenant `COUNTED_CLAIM_STATUSES` (`src/lib/claim-status.js`, test `claim-status.test.js`).
   Talons, DAS et l'export Google ne contiennent ni souper ni stationnement.
+- [x] **Fériés et 13 % congés exacts partout** (V2.4.149, migration 0098) : un férié n'est pas payé sur le talon ; il
+  l'est par la part de **5,5 %** du 13 % (convention 19.04-19.05 : 6 % congés + 5,5 % fériés + 1,5 % maladie), remise à la
+  CCQ. Les écrans le traitent comme une fin de semaine (`src/lib/workdays.js`) : Équipe en direct › semaine (« Férié »,
+  plus de « Rien d'entré »), « N'a pas soumis hier » et À traiter (`previousWorkday` saute les fériés). Migration 0098 :
+  toutes les dates fixes 2026-2028 de la convention (manquaient 3 et 6 avril, 18 mai, 24 juin, 3 juillet 2026 et 2-3 janvier).
+  13 % : Coûts et Semaine/mois le calculaient sur la main-d'œuvre **avec la prime de chef d'équipe hors CCQ** et sans la
+  méthode Messier ; ils utilisent maintenant `congesOverWeeks` / `weekCongesIndemnity` (`src/payroll/employee-week.js`),
+  identique au talon au centin (test `conges-indemnity.test.js`, 36 cas). Le sommaire imprimé suit aussi la méthode
+  Messier (par défaut des talons). Cumulatifs : le registre reprend le 13 % du talon (`vacancesCcq`), inchangé.
 - [x] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095, appliquée par l'intégration
   Supabase à la fusion dans `main`, sous la version du nom de fichier). Toujours **une** demande par job
   (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,

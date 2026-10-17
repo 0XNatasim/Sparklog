@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { hoursBetween, formatHM } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { isOffOn } from "@/lib/timeoff";
+import { useHolidayDates } from "@/lib/company-holidays";
 import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { weekStartSundayD } from "@/lib/ccq-week";
@@ -21,6 +22,9 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   const [error, setError] = useState("");
 
   const today = companyDate();
+  // CCQ non-worked days (jours fériés chômés, construction vacation): nobody is expected to work.
+  const holidayDates = useHolidayDates();
+  const holidays = useMemo(() => new Set(holidayDates), [holidayDates]);
   // weekOffset: 0 = current week, -1 = last week (Sunday → Saturday).
   const weekStart = addCalendarDays(weekStartSundayD(today).format("YYYY-MM-DD"), weekOffset * 7);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addCalendarDays(weekStart, i)), [weekStart]);
@@ -59,16 +63,18 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
           job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
         ) || 0), 0);
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
-        return { date, hours, off, ...weekCellSummary(dayJobs) };
+        return { date, hours, off, holiday: holidays.has(date), ...weekCellSummary(dayJobs) };
       });
       return { employee, cells, total: cells.reduce((sum, c) => sum + c.hours, 0) };
     }).sort((a, b) => (a.employee.full_name || a.employee.email || "").localeCompare(b.employee.full_name || b.employee.email || ""));
-  }, [people, jobs, timeOff, days]);
+  }, [people, jobs, timeOff, days, holidays]);
 
   function cellClass(cell) {
     if (cell.status === "submitted") return "border-success/40 bg-success/15 text-success";
     if (cell.status === "saved") return "border-warning/40 bg-warning/15 text-warning";
     if (cell.off) return "border-info/30 bg-info/10 text-info";
+    // A holiday is shown like a weekend: never « Rien d'entré ».
+    if (cell.holiday) return "border-transparent bg-muted/30 text-muted-foreground";
     const weekday = dayjs(cell.date).day();
     if (cell.date < today && weekday >= 1 && weekday <= 5) return "border-destructive/40 bg-destructive/10 text-destructive";
     return "border-transparent bg-muted/30 text-muted-foreground";
@@ -103,6 +109,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                 {days.map((date) => (
                   <th key={date} className={cn("px-1 font-medium capitalize", date === today && "text-foreground")}>
                     {dayjs(date).format("ddd D")}
+                    {holidays.has(date) && <div className="text-xs font-normal normal-case">{t("live.week.holiday")}</div>}
                   </th>
                 ))}
                 <th className="px-1 text-right font-medium">{t("live.week.total")}</th>
@@ -122,7 +129,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                         {cell.count > 0 ? (
                           <span className="py-1 font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
                         ) : (
-                          <span className="py-1 text-sm">{cell.off ? t("live.week.off") : "—"}</span>
+                          <span className="py-1 text-sm">{cell.off ? t("live.week.off") : cell.holiday ? t("live.week.holiday") : "—"}</span>
                         )}
                       </button>
                     </td>
