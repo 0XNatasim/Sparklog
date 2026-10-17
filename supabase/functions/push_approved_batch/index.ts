@@ -244,9 +244,9 @@ serve(async (req) => {
         // needs this flag to match SparkLog's calculation.
         employee_ot_first_hour_double: Boolean(prof?.overtime_first_hour_double),
         // Return-to-warehouse time is never overtime. By default it is paid at the base rate
-        // without social benefits; when true, it keeps its benefits while the day (work +
-        // return) stays within 8h — only for days from RETURN_WITH_BENEFITS.startDate (week 42),
-        // like the payroll engine. Subcontractors: always false.
+        // without social benefits; when true, it keeps its benefits while the week's regular
+        // time (work + return) stays within 40 h, minus 8 h per weekday holiday (engine 2.6.0) —
+        // only for days from RETURN_WITH_BENEFITS.startDate (week 42). Subcontractors: always false.
         employee_return_with_benefits_to_8h: prof?.role !== "subcontractor_1" && Boolean(prof?.return_with_benefits_to_8h)
           && String(j.job_date || "") >= RETURN_WITH_BENEFITS.startDate,
         // When true, Départ→Arrivée of the employee's first job of the day is unpaid travel.

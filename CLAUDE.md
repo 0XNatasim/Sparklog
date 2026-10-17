@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.150)
+## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.151)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -369,14 +369,17 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [x] **Prélèvement CCQ 0,75 % vs 1,5 %** : tranché, 1,5 % = 0,75 % salarié + 0,75 % employeur.
 - [x] **Retour à l'entrepôt** — tranché le 2026-10-13, codé en V2.4.101 (moteur 2.2.0, migration 0081) :
   jamais de temps sup. ; par défaut sans avantages ; case `return_with_benefits_to_8h` (bonus Messier) =
-  avec avantages jusqu'à 8 h, cochée pour tous et en vigueur pour les journées depuis la **semaine 42 (2026-10-04)**
-  (V2.4.121, moteur 2.5.0, `RETURN_WITH_BENEFITS`, migration 0089). La preuve > 8 h compte le retour ; le souper ne le compte jamais (V2.4.110). Détail :
+  avec avantages jusqu'à **40 h dans la semaine, moins 8 h par férié du lundi au vendredi** (32 h la semaine de l'Action
+  de grâce ; correction du propriétaire le 2026-10-17, V2.4.151, moteur 2.6.0 — avant : 8 h par jour), le travail de la
+  semaine d'abord, puis le retour par ordre de date ; cochée pour tous et en vigueur pour les journées depuis la
+  **semaine 42 (2026-10-04)** (V2.4.121, moteur 2.5.0, `RETURN_WITH_BENEFITS`, migration 0089). La preuve > 8 h compte le retour ; le souper ne le compte jamais (V2.4.110). Détail :
   `docs/rules/compensation-rules.md` (RETURN). La colonne `return_overtime_no_benefits` est dépréciée
   (à supprimer dans une migration ultérieure).
-- [x] **Méthode « Messier » (aperçu Talons / DAS / Paie de la semaine, par défaut)** — corrigée le 2026-10-16 (V2.4.142,
-  moteur 2.5.1) : le retour sans avantages CCQ devient du régulier CCQ **jusqu'à 8 h dans la journée** (le travail
-  d'abord, puis le retour qui garde déjà ses avantages), et non plus jusqu'à 40 h dans la semaine ; jamais samedi /
-  dimanche / férié. Trouvé avec Anthony, semaine 42 : jeudi 8 h 30 de travail + 2 h de retour → l'ancienne règle
+- [x] **Méthode « Messier » (aperçu Talons / DAS / Paie de la semaine, par défaut)** — le retour sans avantages CCQ devient
+  du régulier CCQ **jusqu'au plafond de la semaine** (40 h, moins 8 h par férié en semaine), partagé avec le retour qui
+  garde déjà ses avantages ; le travail de la semaine d'abord ; jamais samedi / dimanche / férié (V2.4.151, moteur 2.6.0,
+  correction du propriétaire le 2026-10-17 : « c'est pour la semaine »). Historique : V2.4.142 (moteur 2.5.1) l'avait mis
+  à 8 h par jour. Trouvé avec Anthony, semaine 42 : jeudi 8 h 30 de travail + 2 h de retour → l'ancienne règle
   convertissait les 2 h (talon 1 724,75 $), la nouvelle les laisse sans avantages comme Dynacom (1 737,88 $ ; réel
   1 736,44 $, écart de 1,44 $ encore à expliquer avec le vrai talon). Corrige aussi un effet de bord : le retour converti
   d'une 1re job poussait le travail d'une job suivante en temps sup. `src/lib/messier-method.test.js`. Les fonctions

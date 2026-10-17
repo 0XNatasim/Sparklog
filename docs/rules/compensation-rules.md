@@ -35,7 +35,7 @@ Sources, filed in `docs/reference/`:
 | CNESST maximum assurable 103 000 $ per year per employee | ACQ note (16) | ⚠️ not coded: `calculateCnesst` assesses all pay. The Q3 report shows an « excédent » even for modest annual pay; hypothesis to verify against weekly stubs: a per-pay cap of 103 000 $ / 52 = 1 980,77 $ |
 | FDRCMO 1 % above 2 M$ payroll | TP-1015.G §8; Loi D-8.3 art. 3 (masse salariale of a **calendar year**), 11 (excess expenses carried forward), 12 (**CCQ training-fund contributions — 0,20 $/h, ACQ (12) — count as eligible training expenses** if the CCQ attests disbursements that year), 14–16; Sommaire 1 (RLZ-1.S) lines 71–75 and 79.1–79.5 | ✅ rate/threshold. **No proration for a first partial year**: guide RLZ-1.S.G (2025-10) §5.7 takes line 71 = the year's RL-1 box A total and never mentions a start of operations, a day count or a reduced threshold (same for the FSS total payroll, §5.5). Associated employers are combined for the FSS rate only. Exemption: CPMT training-quality certificate. Line 79.1: when the year first exceeds 2 M$, the previous year's eligible expenses carry over. The guide does not mention the CCQ training fund (D-8.3 art. 12 does). The engine does not deduct the training-expense credit (annual reconciliation on the Sommaire 1, not per pay) |
 | MÉDIC employee 0,68 $/h | CC 27.03 A) 2) schedules 0,86 $ from 2026-04-26, but annexe R lets the parties reduce it; CCQ notice « Conventions collectives : du nouveau pour le rapport mensuel de mai 2026 » (2026-04-20): CASIC decision keeps 0,68 $ salarié / 2,93 $ patronal **until 2027-04-24** | ✅ dated since V2.4.130 (`MEDIC_RATES` / `medicRatesOn` in `src/payroll/ccq-benefits.js`): 0,68 $ / 2,93 $ until 2027-04-24, then **1,06 $ / 3,31 $ from the pay week of 2027-04-25** (convention; CCQ date — FIPOE writes April 30). The 9 % insurance tax applies to both parts. Only the employee part is withheld; the employer part is already inside ACQ (8). Confirm with the CCQ before 2027-04-25 that the CASIC freeze is not extended |
-| Return-to-warehouse time | CC 23.04 2) a), 23.15: requested travel after the normal day is « temps de transport », « payé au taux de salaire non majoré, sans avantages sociaux ni indemnité de congés » | ✅ since V2.4.101 (engine 2.2.0): never overtime; default without benefits; Messier bonus option keeps benefits up to 8h — see RETURN below |
+| Return-to-warehouse time | CC 23.04 2) a), 23.15: requested travel after the normal day is « temps de transport », « payé au taux de salaire non majoré, sans avantages sociaux ni indemnité de congés » | ✅ since V2.4.101 (engine 2.2.0): never overtime; default without benefits; Messier bonus option keeps benefits up to 40 h in the week (32 h with a weekday holiday, engine 2.6.0) — see RETURN below |
 | No weekend / holiday work | CC 21.01, 21.02 b): Saturday is OT; Sunday/holidays 200 % from the first hour | ⚠️ the engine has no day-of-week rule; it relies on entry being blocked |
 
 ## OVERTIME — thresholds and rates
@@ -68,18 +68,30 @@ Sources, filed in `docs/reference/`:
   no CCQ benefits) — convention ICI 23.04 2) a), 23.15.
 - **Option `return_with_benefits_to_8h`** (Règles de temps, unchecked for everyone at
   rollout): Messier bonus — return time is paid as regular time **with** benefits while the
-  day's work + return stays within 8h; the part beyond 8h is paid without benefits.
+  **week's** regular CCQ time (regular work + that return) stays within the week's cap: **40 h,
+  minus 8 h for each statutory holiday falling Monday–Friday** (Thanksgiving week 2026: 32 h).
+  The part beyond the cap is paid without benefits. Owner decision 2026-10-17 (engine 2.6.0):
+  « c'est pour la semaine … avec un congé donc 32 h max » — it replaces the 8 h-per-day room of
+  engines 2.2.0–2.5.1. A day may therefore go past 8 h (work + return) and keep the return's
+  benefits while the week is under its cap. The column keeps its historical name (`…_to_8h`).
   **Only for days from 2026-10-04 (CCQ week 42)** — owner decision 2026-10-14, when the option
   was checked for every employee; earlier days keep the default (`RETURN_WITH_BENEFITS`, engine 2.5.0).
-- Work always takes the 8h first, whatever the job order. An unpaid first trip is removed
-  before the 8h room is measured. Subcontractors: always the default.
+- The week's regular work (≤ 8 h per weekday) always takes the cap first, whatever the job order;
+  the return then fills what is left **in date order**. Weekday returns only (Saturday, Sunday and
+  holidays: no benefits). An unpaid first trip is removed before the room is measured.
+  Subcontractors: always the default. The cap is `WEEK_REGULAR_CAP_MINUTES` (2400).
+- **Messier method** (talon preview default): the return still without benefits is converted
+  into CCQ regular time within the **same** weekly cap, shared with the return that already
+  keeps its benefits (V2.4.142 had 8 h per day).
 - The >8h overtime-proof threshold still counts return time; the supper never does (owner
   decisions 2026-10-13, see SUPPER).
-- Examples: 6h30 job + 1h return → default 6h30 regular + 1h without benefits; checked
-  7h30 regular. 6h30 job + 2h return → checked 8h regular + 0h30 without benefits.
-  9h job + 1h return → 8h regular + 1h overtime + 1h return without benefits.
-- Engine: `calculatePayrollEntries` (`payroll_engine.js` 2.2.0); tests in
-  `src/lib/payroll-calculations.test.js`.
+- Examples (checked, one-job week): 6h30 job + 1h return → 7h30 regular; 6h30 job + 2h return →
+  8h30 regular; 9h job + 1h return → 9h regular (8h work + 1h return) + 1h overtime. Full week:
+  Mon–Thu 8h + Friday 7h work + 2h return → 1h of the return with benefits, 1h without.
+  Thanksgiving week (Monday holiday): Tue–Fri 8h → every return minute without benefits.
+- Engine: `calculatePayrollEntries` (`payroll_engine.js` 2.6.0); tests in
+  `src/lib/payroll-calculations.test.js` and `src/lib/messier-method.test.js`. Callers must pass
+  the employee's whole CCQ week (Sunday → Saturday) for the cap to be exact.
 
 ## DAY_ROUNDING — each day paid to the nearest 15 minutes (owner decision 2026-10-14)
 - Each day's paid time (Départ→Fin spans, **return included**, unpaid first trip removed) is paid to

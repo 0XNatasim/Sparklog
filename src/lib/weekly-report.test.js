@@ -85,8 +85,9 @@ describe("buildWeeklyReport", () => {
 describe("CCQ / non-CCQ hours", () => {
   it("splits Total heures into Heures CCQ (reg. + 1.5× + 2×) and Hors CCQ (return without benefits)", () => {
     const r = buildWeeklyReport({
-      week, profiles: [alice, office], contributions, employer,
-      // 07:00 → 17:00 with 60 min of return to the shop: 9 h work + 1 h return without benefits.
+      week, profiles: [alice, office], contributions, employer, messierMethod: false,
+      // 07:00 → 17:00 with 60 min of return to the shop: 9 h work + 1 h return without benefits
+      // (reference method: the Messier method would count it CCQ, the week being under 40 h).
       jobs: [job("r1", "a", "2026-09-28", "1234", "07:00", "17:00", 30, "approved", { return_time_minutes: 60 }),
         job("o1", "o", "2026-09-29", "AD-1", "08:00", "16:00", 0)],
     });

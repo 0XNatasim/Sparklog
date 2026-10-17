@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { minutesBetween, calculatePayrollEntries, isMealEligible, roundHours, calculateCongesIndemnity, computeWeek, ENGINE_VERSION, RETURN_WITH_BENEFITS } from "./payroll-calculations";
+import { minutesBetween, calculatePayrollEntries, isMealEligible, roundHours, calculateCongesIndemnity, computeWeek, ENGINE_VERSION, RETURN_WITH_BENEFITS, WEEK_REGULAR_CAP_MINUTES } from "./payroll-calculations";
 
 // Single-job helper: returns the payroll entry for one job worked from 08:00.
 function entry(fin, extra = {}) {
@@ -118,16 +118,19 @@ describe("return-to-storage time", () => {
 // the 8h split. Default: paid at the base rate without benefits. With returnWithBenefitsTo8h:
 // with benefits while work + return stays within 8h, without benefits beyond — from CCQ week 42
 // (2026-10-04); earlier days keep the default.
-describe("return-to-warehouse time: never overtime, benefits only up to 8h when checked", () => {
+describe("return-to-warehouse time: never overtime, benefits up to the week's cap when checked", () => {
   const day = (fin, ret, extra = {}) => ({ id: "j1", job_date: "2026-10-05", depart: "07:00", fin, return_time_minutes: ret, ...extra });
   const run = (jobs, options) => [...calculatePayrollEntries(jobs, options).values()];
   const sum = (entries, key) => entries.reduce((t, e) => t + e[key], 0);
+  // Mon–Thu of week 42 at 8 h of work each (32 h); Friday is 2026-10-09.
+  const fourFullDays = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"]
+    .map((d) => ({ id: `w${d}`, job_date: d, depart: "07:00", fin: "15:00", return_time_minutes: 0 }));
 
   it.each([
-    // [label, fin, return, default (reg / no-benefit), checked (reg / no-benefit)]
+    // [label, fin, return, default (reg / no-benefit), checked (reg / no-benefit)] — alone in the week.
     ["6h30 job + 1h return (7h30)", "14:30", 60, [390, 60], [450, 0]],
-    ["6h30 job + 2h return (8h30)", "15:30", 120, [390, 120], [480, 30]],
-    ["8h job + 1h return (9h)", "16:00", 60, [480, 60], [480, 60]],
+    ["6h30 job + 2h return (8h30)", "15:30", 120, [390, 120], [510, 0]],
+    ["8h job + 1h return (9h): over 8 h in the day, still under 40 h in the week", "16:00", 60, [480, 60], [540, 0]],
   ])("%s", (_, fin, ret, [defReg, defNb], [chkReg, chkNb]) => {
     const def = calculatePayrollEntries([day(fin, ret)]).get("j1");
     expect([def.regularWorkMinutes, def.returnNoBenefitMinutes, def.overtimeWorkMinutes]).toEqual([defReg, defNb, 0]);
@@ -137,23 +140,48 @@ describe("return-to-warehouse time: never overtime, benefits only up to 8h when 
   });
 
   it("work over 8h is still overtime; the return on top never is", () => {
-    // 9h job + 1h return: 8h regular + 1h overtime (work) + 1h return without benefits.
+    // 9h job + 1h return: 8h regular + 1h overtime (work) + 1h return with benefits (week under 40 h).
     const e = calculatePayrollEntries([day("17:00", 60)], { returnWithBenefitsTo8h: true }).get("j1");
-    expect(e.regularWorkMinutes).toBe(480);
+    expect(e.regularWorkMinutes).toBe(540);
     expect(e.overtimeWorkMinutes).toBe(60);
-    expect(e.returnNoBenefitMinutes).toBe(60);
+    expect(e.returnNoBenefitMinutes).toBe(0);
   });
 
-  it("work takes the 8h first even when the return is logged on an earlier job", () => {
-    const jobs = [
-      { id: "a", job_date: "2026-10-05", depart: "07:00", fin: "11:00", return_time_minutes: 60 }, // 3h work + 1h return
-      { id: "b", job_date: "2026-10-05", depart: "11:00", fin: "16:00", return_time_minutes: 0 },  // 5h work
-    ];
-    const entries = run(jobs, { returnWithBenefitsTo8h: true });
-    // 8h of work fills the day: the 1h return gets no benefits and creates no overtime.
-    expect(sum(entries, "regularWorkMinutes")).toBe(480);
-    expect(sum(entries, "returnNoBenefitMinutes")).toBe(60);
+  it("only the part of the return that fits under 40 h in the week keeps its benefits", () => {
+    // 32 h Mon–Thu + Friday 7h work + 2h return: 1 h of room.
+    const friday = { id: "f", job_date: "2026-10-09", depart: "07:00", fin: "16:00", return_time_minutes: 120 };
+    const e = calculatePayrollEntries([...fourFullDays, friday], { returnWithBenefitsTo8h: true }).get("f");
+    expect([e.regularWorkMinutes, e.returnNoBenefitMinutes, e.overtimeWorkMinutes]).toEqual([480, 60, 0]);
+  });
+
+  it("the week's work takes the cap first, even when the return is logged earlier in the week", () => {
+    // Monday's return comes before Friday's 8 h of work: 40 h of work leave no room for it.
+    const monday = { ...fourFullDays[0], fin: "17:00", return_time_minutes: 120 }; // 8h work + 2h return
+    const friday = { id: "f", job_date: "2026-10-09", depart: "07:00", fin: "15:00", return_time_minutes: 0 };
+    const entries = run([monday, ...fourFullDays.slice(1), friday], { returnWithBenefitsTo8h: true });
+    expect(sum(entries, "regularWorkMinutes")).toBe(2400);
+    expect(sum(entries, "returnNoBenefitMinutes")).toBe(120);
     expect(sum(entries, "overtimeWorkMinutes")).toBe(0);
+  });
+
+  it("the room is filled in date order when several returns compete", () => {
+    // Mon–Thu 8h work (Monday with 1h of return), Friday 7h work + 1h return: 1 h of room → Monday.
+    const monday = { ...fourFullDays[0], fin: "16:00", return_time_minutes: 60 };
+    const friday = { id: "f", job_date: "2026-10-09", depart: "07:00", fin: "15:00", return_time_minutes: 60 };
+    const m = calculatePayrollEntries([monday, ...fourFullDays.slice(1), friday], { returnWithBenefitsTo8h: true });
+    expect(m.get(monday.id).returnNoBenefitMinutes).toBe(0);
+    expect(m.get("f").returnNoBenefitMinutes).toBe(60);
+  });
+
+  it("a weekday holiday lowers the week's cap by 8 h (Thanksgiving 2026: 32 h)", () => {
+    // Monday 2026-10-12 off; Tue–Fri 8h of work, Friday + 1h of return.
+    const days = ["2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"]
+      .map((d) => ({ id: d, job_date: d, depart: "07:00", fin: d === "2026-10-16" ? "16:00" : "15:00", return_time_minutes: d === "2026-10-16" ? 60 : 0 }));
+    const withHoliday = calculatePayrollEntries(days, { returnWithBenefitsTo8h: true, holidayDates: ["2026-10-12"] }).get("2026-10-16");
+    expect(withHoliday.returnNoBenefitMinutes).toBe(60);
+    const without = calculatePayrollEntries(days, { returnWithBenefitsTo8h: true }).get("2026-10-16");
+    expect(without.returnNoBenefitMinutes).toBe(0);
+    expect(WEEK_REGULAR_CAP_MINUTES).toBe(2400);
   });
 
   it("applies from week 42 (2026-10-04): an earlier day keeps the return without benefits", () => {
@@ -163,7 +191,7 @@ describe("return-to-warehouse time: never overtime, benefits only up to 8h when 
     expect(RETURN_WITH_BENEFITS.startDate).toBe("2026-10-04");
   });
 
-  it("an unpaid first trip is removed before the 8h room is measured", () => {
+  it("an unpaid first trip is removed before the week's room is measured", () => {
     // 07:00→07:30 unpaid trip, then 6h work + 2h return (span 07:00→15:30).
     const job = day("15:30", 120, { arrivee: "07:30" });
     const e = calculatePayrollEntries([job], { returnWithBenefitsTo8h: true, firstTripUnpaid: true }).get("j1");
