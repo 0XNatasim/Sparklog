@@ -20,7 +20,7 @@ const fixtures = [
 describe("engine parity: app copy === Edge Function copy", () => {
   it("ENGINE_VERSION matches", () => {
     expect(app.ENGINE_VERSION).toBe(shared.ENGINE_VERSION);
-    expect(app.ENGINE_VERSION).toBe("2.5.1");
+    expect(app.ENGINE_VERSION).toBe("2.6.0");
     expect(app.computeWeek).toBe(shared.computeWeek);
     expect(app.calculatePayrollEntries).toBe(shared.calculatePayrollEntries);
   });

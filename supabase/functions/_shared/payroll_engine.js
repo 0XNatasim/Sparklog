@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.5.1";
+export const ENGINE_VERSION = "2.6.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -113,8 +113,12 @@ function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
 //  - default: all return time is paid at the base rate with NO social benefits
 //    (returnNoBenefitMinutes).
 //  - returnWithBenefitsTo8h: return time is paid as regular time WITH benefits while the
-//    day's work + return stays within 8h; only the part beyond 8h is paid without benefits.
-//    Only for days on or after `returnWithBenefitsFrom` (RETURN_WITH_BENEFITS.startDate).
+//    WEEK's regular CCQ time (regular work + that return) stays within the week's cap — 40 h,
+//    minus 8 h for each statutory holiday falling Monday–Friday (Thanksgiving week: 32 h; owner
+//    decision 2026-10-17, engine 2.6.0, replaces « 8 h in the day »). The week's regular work
+//    takes the cap first; the return fills what is left, in date order; the rest is paid
+//    without benefits. Only for weekday returns on or after `returnWithBenefitsFrom`
+//    (RETURN_WITH_BENEFITS.startDate). The column keeps its historical name (…_to_8h).
 //  Day of the week (convention ICI 21.01, 21.02 b); owner decision 2026-10-13):
 //  - Saturday: every worked minute is overtime (no regular hours); the week's first
 //    overtime hour still goes at 1.5× if it is unused, the rest at 2×.
@@ -122,9 +126,10 @@ function jobReturnMinutes(job, span = minutesBetween(job.depart, job.fin)) {
 //    every worked minute at 2× from the first hour; it does not use the 1.5× hour.
 //  On those days return time keeps no benefits (there are no regular hours to fill).
 // `messierMethod` reproduces how Messier Connexion classified hours historically: the return
-// time paid without CCQ benefits ("hors CCQ") is counted as REGULAR CCQ time, up to 8 h in the
-// day (owner, 2026-10-16: « jusqu'à concurrence de 8 h par jour et non 40 h de la semaine »;
-// engine 2.5.1, before: up to 40 h in the week). Overtime (1.5× / 2×) is left exactly as-is.
+// time paid without CCQ benefits ("hors CCQ") is counted as REGULAR CCQ time, up to the WEEK's
+// cap — 40 h minus 8 h per weekday holiday (owner, 2026-10-17: « c'est pour la semaine, cette
+// semaine avec un congé donc 32 h max »; engine 2.6.0 — 2.5.1 capped at 8 h per day). The cap is
+// shared with the return that already keeps its benefits. Overtime (1.5× / 2×) is left as-is.
 // Used only by the parallel "Façon Messier" views — never by the authoritative export path.
 // ── Day rounding (engine 2.4.0, owner decision 2026-10-14) ─────────────────────────────────
 // Each day's paid time (work + return, first unpaid trip removed) is paid to the nearest 15
@@ -142,6 +147,10 @@ export const DAY_ROUNDING = Object.freeze({ stepMinutes: 15, startDate: "2026-10
 // "Return with benefits up to 8 h" (returnWithBenefitsTo8h) applies to days from CCQ week 42
 // (2026-10-04, owner decision 2026-10-14). Earlier days keep the default: return without benefits.
 export const RETURN_WITH_BENEFITS = Object.freeze({ startDate: "2026-10-04" });
+
+// Regular CCQ time of a full week (convention ICI 20.02 1): 40 h Monday–Friday). Return time
+// counts as CCQ regular only up to this cap, less 8 h per weekday holiday (engine 2.6.0).
+export const WEEK_REGULAR_CAP_MINUTES = 2400;
 
 export function roundToStep(minutes, stepMinutes = DAY_ROUNDING.stepMinutes) {
   const half = Math.floor((stepMinutes - 1) / 2);
@@ -241,8 +250,8 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
   };
   const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
   // Pre-pass: the day's WORK minutes (paid span minus return). With returnWithBenefitsTo8h,
-  // the return time that fits under 8h once all of the day's work is counted keeps its
-  // benefits; work always takes the 8h first, whatever the job order.
+  // the return time that fits under the week's cap once all of the week's regular work is
+  // counted keeps its benefits; work always takes the cap first, whatever the job order.
   const unpaidTrip = firstTripUnpaid ? firstTripUnpaidMinutes(sorted) : new Map();
   const paidSpan = (job) => minutesBetween(job.depart, job.fin) - (unpaidTrip.get(job.id) || 0);
   // `rounding` (buildDayRounding result): each day paid to the nearest 15 minutes, see above.
@@ -252,20 +261,27 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const span = paidSpan(job);
     dayWorkTotal.set(job.job_date, (dayWorkTotal.get(job.job_date) || 0) + span - jobReturnMinutes(job, span) + (roundingAdjust.work.get(job.id) || 0));
   }
-  const dayReturnBenefitRoom = new Map(); // job_date -> return minutes still payable with benefits
-  if (returnWithBenefitsTo8h) {
-    for (const [date, work] of dayWorkTotal) {
-      if (dayKind(date) === "regular" && String(date) >= String(returnWithBenefitsFrom || "")) dayReturnBenefitRoom.set(date, Math.max(0, 480 - work));
-    }
+  // Room left under the WEEK's regular cap once all of its regular work is counted: 40 h minus
+  // 8 h per Monday–Friday holiday, minus the week's regular work (≤ 8 h per weekday). The return
+  // with benefits fills it first, then (Façon Messier) the return without benefits.
+  const weekRegularWork = new Map(); // week key -> regular work minutes of the week
+  for (const [date, work] of dayWorkTotal) {
+    if (dayKind(date) !== "regular") continue;
+    const wk = payrollWeekKey(date);
+    weekRegularWork.set(wk, (weekRegularWork.get(wk) || 0) + Math.min(480, Math.max(0, work)));
   }
-  // Façon Messier: room left under 8 h in the day once all of its work is counted (weekdays only,
-  // like the rule above), shared with the return time that already keeps its benefits.
-  const dayMessierRoom = new Map(); // job_date -> minutes of return still convertible to regular
-  if (messierMethod) {
-    for (const [date, work] of dayWorkTotal) {
-      if (dayKind(date) === "regular") dayMessierRoom.set(date, Math.max(0, 480 - work));
+  const weekCapMinutes = (wk) => {
+    let holidaysInWeek = 0;
+    const end = parseWorkDate(wk);
+    for (let back = 1; back <= 5 && end; back += 1) {
+      const d = new Date(end.getTime());
+      d.setUTCDate(d.getUTCDate() - back);
+      if (holidays.has(d.toISOString().slice(0, 10))) holidaysInWeek += 1;
     }
-  }
+    return Math.max(0, WEEK_REGULAR_CAP_MINUTES - 480 * holidaysInWeek);
+  };
+  const weekRoom = new Map(); // week key -> regular minutes still free for return time
+  for (const wk of weekRegularWork.keys()) weekRoom.set(wk, Math.max(0, weekCapMinutes(wk) - weekRegularWork.get(wk)));
 
   // Regular hours are capped per DAY (8h); the first hour of overtime is allowed once
   // per WEEK at 1.5x, everything beyond that is 2x. Jobs are processed chronologically
@@ -287,27 +303,29 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     const declaredReturn = jobReturnMinutes(job, spanMinutes);
     const workMinutes = spanMinutes - declaredReturn + workRounding;
     const returnMinutes = declaredReturn + returnRounding;
-    const returnBenefitRoom = dayReturnBenefitRoom.get(job.job_date) || 0;
-    const returnWithBenefitMinutes = Math.min(returnMinutes, returnBenefitRoom);
-    if (returnWithBenefitMinutes) dayReturnBenefitRoom.set(job.job_date, returnBenefitRoom - returnWithBenefitMinutes);
+    const kind = dayKind(job.job_date);
+    const returnEligible = kind === "regular";
+    const benefitRoom = returnWithBenefitsTo8h && returnEligible && String(job.job_date) >= String(returnWithBenefitsFrom || "")
+      ? (weekRoom.get(wk) || 0) : 0;
+    const returnWithBenefitMinutes = Math.min(returnMinutes, benefitRoom);
+    if (returnWithBenefitMinutes) weekRoom.set(wk, (weekRoom.get(wk) || 0) - returnWithBenefitMinutes);
     let returnNoBenefitMinutes = returnMinutes - returnWithBenefitMinutes;
 
-    const kind = dayKind(job.job_date);
     const regularRoom = kind === "regular" ? Math.max(0, 480 - priorDayWork) : 0;
     const workRegularMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - workRegularMinutes;
-    // Return time with benefits is paid as regular time; the pre-pass keeps it within 8h.
+    // Return time with benefits is paid as regular time; the pre-pass keeps it within the week's cap.
     let regularWorkMinutes = workRegularMinutes + returnWithBenefitMinutes;
     const overtime50Room = firstOtHourDouble || kind === "double" ? 0 : Math.max(0, 60 - priorWeekOvertime);
     let overtime50Minutes = Math.min(overtimeWorkMinutes, overtime50Room);
     let overtime100Minutes = overtimeWorkMinutes - overtime50Minutes;
-    // Façon Messier: the return time with no CCQ benefits becomes regular CCQ time, up to 8 h in
-    // the day (work first, then the return that already keeps its benefits). What does not fit
-    // stays non-CCQ. Overtime (1.5× / double) is not touched.
-    if (messierMethod) {
-      const room = Math.max(0, (dayMessierRoom.get(job.job_date) || 0) - returnWithBenefitMinutes);
+    // Façon Messier: the return time with no CCQ benefits becomes regular CCQ time, up to the
+    // week's cap (regular work first, then the return that already keeps its benefits). What does
+    // not fit stays non-CCQ. Overtime (1.5× / double) is not touched.
+    if (messierMethod && returnEligible) {
+      const room = weekRoom.get(wk) || 0;
       const converted = Math.min(returnNoBenefitMinutes, room);
-      dayMessierRoom.set(job.job_date, room - converted);
+      weekRoom.set(wk, room - converted);
       returnNoBenefitMinutes -= converted;
       regularWorkMinutes += converted;
     }
