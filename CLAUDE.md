@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.152)
+## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.153)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -397,8 +397,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   supplémentaires » (20.07) n'est pas codé.
 - [x] **Arrondi des journées** (V2.4.117, moteur 2.4.0, migration 0088) : chaque journée (travail + retour) payée au
   15 min le plus proche, compteur par employé jamais remis à zéro (`paid = round15(worked − compteur)`), ajustement
-  sur le temps de retour s'il y en a, sinon sur la fin du travail (temps sup. au-delà de 8 h), depuis la **semaine 42 (2026-10-04)** (déplacé de la
-  semaine 41 en V2.4.121, moteur 2.5.0, migration 0089 ; compteur à 0 le 2026-10-04). Détail :
+  sur le temps de retour s'il y en a, sinon sur la fin du travail (temps sup. au-delà de 8 h), depuis la **semaine 43 (2026-10-11)**, compteur à 0
+  (V2.4.153, moteur 2.6.1, migration 0100 : 1re semaine payée par Sparklog, une erreur de la semaine 42 ne peut plus reporter de
+  minutes ; avant : semaine 41, puis semaine 42 en V2.4.121, migration 0089). Détail :
   `docs/rules/compensation-rules.md` (DAY_ROUNDING). Pas appliqué à l'export Google Sheet (Apps Script).
 - [x] **MÉDIC** — avis CCQ du 2026-04-20 (décision du CASIC) : 0,68 $ salarié / 2,93 $ patronal jusqu'au
   **2027-04-24** (la convention prévoyait 0,86 $ / 3,11 $). Daté depuis V2.4.130 (`MEDIC_RATES` / `medicRatesOn`,
@@ -533,7 +534,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   passent ; calcul et suppression refusés (`dynacom_cumulative_locked`). Maintenance SQL / service role non touchées.
   Le 2026-10-17, à la demande du propriétaire, les approbations des semaines 42 (60 fiches, 5 employés) et 43 (12 fiches,
   1 employée) ont été annulées par SQL (remises « soumises », lignes `approval_reverted` au Journal) ; les lignes déjà
-  envoyées restent dans la feuille Google (la réapprobation les saute : clé JobID).
+  envoyées restent dans la feuille Google (la réapprobation les saute : clé JobID). V2.4.153 : À traiter ne liste plus les
+  fiches jusqu'au 2026-10-10 (`gt("job_date", DYNACOM_CUMULATIVE_END)`, `TodoInbox.jsx`) ; elles restent dans la base, Feuilles
+  de temps et l'historique (registre des heures). Les soupers / stationnements en attente de ces semaines restent listés à part.
 - [x] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095, appliquée par l'intégration
   Supabase à la fusion dans `main`, sous la version du nom de fichier). Toujours **une** demande par job
   (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,
