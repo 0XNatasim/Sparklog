@@ -20,22 +20,22 @@ describe("week helpers", () => {
 describe("planPayrollWeek", () => {
   const profiles = [compagnon("a", "Alice"), compagnon("b", "Bruno"), compagnon("c", "Chloé"), compagnon("d", "Dan"), { id: "o", full_name: "Office", role: "admin" }];
   const jobs = [
-    job("a1", "a", "2026-10-05"), job("a2", "a", "2026-10-06"),
-    job("b1", "b", "2026-10-05"), job("b2", "b", "2026-10-06", "submitted"),
-    job("c0", "c", "2026-09-29"), job("c1", "c", "2026-10-05"),
-    job("d1", "d", "2026-10-05"),
-    job("o1", "o", "2026-10-05"),
+    job("a1", "a", "2026-10-14"), job("a2", "a", "2026-10-13"),
+    job("b1", "b", "2026-10-14"), job("b2", "b", "2026-10-13", "submitted"),
+    job("c0", "c", "2026-10-06"), job("c1", "c", "2026-10-14"),
+    job("d1", "d", "2026-10-14"),
+    job("o1", "o", "2026-10-14"),
   ];
   const ledgerByUser = new Map([
-    ["a", [{ user_id: "a", period_end: "2026-10-03", gross_income: 1000 }]],
-    ["d", [{ user_id: "d", period_end: "2026-10-10", talon_seq: 7 }]],
+    ["a", [{ user_id: "a", period_end: "2026-10-10", gross_income: 1000 }]],
+    ["d", [{ user_id: "d", period_end: "2026-10-17", talon_seq: 7 }]],
   ]);
-  const plan = planPayrollWeek({ weekEnd: "2026-10-10", profiles, jobs, ledgerByUser, compute });
+  const plan = planPayrollWeek({ weekEnd: "2026-10-17", profiles, jobs, ledgerByUser, compute });
   const state = Object.fromEntries(plan.rows.map((row) => [row.profile.id, row.state]));
 
   it("classifies every CCQ employee of the week; non-CCQ roles are left out (as on the DAS screen)", () => {
     expect(state).toEqual({ a: "ready", b: "pending", c: "blockedEarlier", d: "posted" });
-    expect(plan.rows.find((row) => row.profile.id === "c").earlierUnposted).toEqual(["2026-10-03"]);
+    expect(plan.rows.find((row) => row.profile.id === "c").earlierUnposted).toEqual(["2026-10-10"]);
     expect(plan.ready.map((row) => row.profile.id)).toEqual(["a"]);
   });
 
@@ -54,22 +54,22 @@ describe("planPayrollWeek", () => {
   });
 
   it("refuses to post behind an already posted later week", () => {
-    const later = planPayrollWeek({ weekEnd: "2026-10-10", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-05")], ledgerByUser: new Map([["a", [{ user_id: "a", period_end: "2026-10-17" }]]]), compute });
+    const later = planPayrollWeek({ weekEnd: "2026-10-17", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-14")], ledgerByUser: new Map([["a", [{ user_id: "a", period_end: "2026-10-24" }]]]), compute });
     expect(later.rows[0].state).toBe("blockedLater");
   });
 });
 
 describe("planPayrollWeek — fixed weekly pay (owner)", () => {
   const owner = { id: "k", full_name: "Karine Messier", role: "owner", hourly_rate: 51 };
-  const taxProfiles = new Map([["k", { fixedWeeklyHours: 40, fixedPayStart: "2026-09-27", eiExempt: true }]]);
-  const fixedCompute = (profile, jobs, opening) => computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: "2026-10-04", taxProfile: taxProfiles.get(profile.id) });
-  const plan = (ledger = [], weekEnd = "2026-10-10", seed = null) => planPayrollWeek({
+  const taxProfiles = new Map([["k", { fixedWeeklyHours: 40, fixedPayStart: "2026-10-04", eiExempt: true }]]);
+  const fixedCompute = (profile, jobs, opening) => computeEmployeeWeekTalon({ profile, jobs, opening, frequency: "weekly", weekDate: "2026-10-11", taxProfile: taxProfiles.get(profile.id) });
+  const plan = (ledger = [], weekEnd = "2026-10-17", seed = null) => planPayrollWeek({
     weekEnd, profiles: [owner], jobs: [], taxProfiles, compute: fixedCompute,
     ledgerByUser: new Map([["k", ledger]]), seedByUser: seed ? new Map([["k", seed]]) : new Map(),
   });
 
   it("is ready without any job once the earlier fixed-pay weeks are posted, and pays 2 040 $ without EI", () => {
-    const row = plan([{ user_id: "k", period_end: "2026-10-03" }]).rows[0];
+    const row = plan([{ user_id: "k", period_end: "2026-10-10" }]).rows[0];
     expect(row.state).toBe("ready");
     expect(row.gross).toBe(2040);
     expect(row.talon.result.employee.ei).toBe(0);
@@ -77,27 +77,27 @@ describe("planPayrollWeek — fixed weekly pay (owner)", () => {
   });
 
   it("asks to post the earlier fixed-pay weeks first (from the start date or the opening)", () => {
-    expect(plan().rows[0]).toMatchObject({ state: "blockedEarlier", earlierUnposted: ["2026-10-03"] });
-    expect(plan([], "2026-10-10", { as_of_date: "2026-10-03" }).rows[0].state).toBe("ready");
+    expect(plan().rows[0]).toMatchObject({ state: "blockedEarlier", earlierUnposted: ["2026-10-10"] });
+    expect(plan([], "2026-10-17", { as_of_date: "2026-10-10" }).rows[0].state).toBe("ready");
   });
 
   it("leaves out the weeks before the start date, and an owner without fixed pay", () => {
-    expect(plan([], "2026-09-26").rows).toEqual([]);
-    expect(planPayrollWeek({ weekEnd: "2026-10-10", profiles: [owner], jobs: [job("k1", "k", "2026-10-05")], compute }).rows).toEqual([]);
+    expect(plan([], "2026-10-03").rows).toEqual([]);
+    expect(planPayrollWeek({ weekEnd: "2026-10-17", profiles: [owner], jobs: [job("k1", "k", "2026-10-14")], compute }).rows).toEqual([]);
   });
 });
 
 describe("posting", () => {
-  const plan = planPayrollWeek({ weekEnd: "2026-10-10", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-05")], compute });
+  const plan = planPayrollWeek({ weekEnd: "2026-10-17", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-14")], compute });
   const row = plan.ready[0];
 
   it("writes Calcul's closing snapshot, talon number and kept talon", () => {
-    const record = ledgerRowFor({ row, weekEnd: "2026-10-10", weekNo: 42, talonSeq: 12 });
-    expect(record).toMatchObject({ user_id: "a", tax_year: 2026, period_end: "2026-10-10", period_start: "2026-10-04", talon_seq: 12 });
+    const record = ledgerRowFor({ row, weekEnd: "2026-10-17", weekNo: 43, talonSeq: 12 });
+    expect(record).toMatchObject({ user_id: "a", tax_year: 2026, period_end: "2026-10-17", period_start: "2026-10-11", talon_seq: 12 });
     expect(record.gross_income).toBeCloseTo(row.talon.result.ytdAfter.grossIncome / 100, 2);
     expect(record.imported_talon.header.source).toBe("calcul");
     expect(record.imported_talon.header.ref).toBe("D0034-0012");
-    expect(ledgerRowFor({ row, weekEnd: "2026-10-10", weekNo: 42, talonSeq: 12, keepsRealStub: true }).imported_talon).toBeUndefined();
+    expect(ledgerRowFor({ row, weekEnd: "2026-10-17", weekNo: 43, talonSeq: 12, keepsRealStub: true }).imported_talon).toBeUndefined();
   });
 
   it("numbers talons in posting order and keeps a real stub already kept", async () => {
@@ -113,9 +113,18 @@ describe("posting", () => {
         return api;
       },
     };
-    const result = await postPayrollWeek(fake, [row], { weekEnd: "2026-10-10", weekNo: 42 });
+    const result = await postPayrollWeek(fake, [row], { weekEnd: "2026-10-17", weekNo: 43 });
     expect(result).toEqual({ posted: ["a"], failed: [] });
     expect(writes[0].talon_seq).toBe(42);
     expect(writes[0].imported_talon).toBeUndefined(); // the imported stub stays
+  });
+});
+
+describe("week 42 and before are closed by the Dynacom cumulative", () => {
+  it("never offers to post them, even with approved work and no ledger row", () => {
+    const plan = planPayrollWeek({ weekEnd: "2026-10-10", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-05")], compute });
+    expect(plan.rows[0].state).toBe("closed");
+    expect(plan.ready).toEqual([]);
+    expect(planPayrollWeek({ weekEnd: "2026-10-17", profiles: [compagnon("a", "Alice")], jobs: [job("a1", "a", "2026-10-13")], compute }).rows[0].state).toBe("ready");
   });
 });

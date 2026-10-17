@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.149)
+## 6. À faire / à préciser (mis à jour 2026-10-17, V2.4.150)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -520,6 +520,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   méthode Messier ; ils utilisent maintenant `congesOverWeeks` / `weekCongesIndemnity` (`src/payroll/employee-week.js`),
   identique au talon au centin (test `conges-indemnity.test.js`, 36 cas). Le sommaire imprimé suit aussi la méthode
   Messier (par défaut des talons). Cumulatifs : le registre reprend le 13 % du talon (`vacancesCcq`), inchangé.
+- [x] **Verrou des cumulatifs Dynacom** (V2.4.150, migration 0099) : la ligne `payroll_period_ledger` du 2026-10-10 (fin de
+  la semaine 42) EST le cumul Dynacom ; « Comptabiliser » une semaine ≤ 42 la remplaçait par un calcul parti de zéro.
+  `isClosedBeforeSparklog` (`src/lib/payroll-opening.js`) : Calcul refuse (`payroll.postClosedWeek`), Paie de la semaine
+  affiche « Payée par Dynacom » (état `closed`). Base : trigger `protect_dynacom_cumulative` (≤ 2026-10-10, utilisateurs de
+  l'app) — seuls un vrai talon (importé / validé, `imported_talon.header.source <> 'calcul'`) et l'approbation officielle
+  passent ; calcul et suppression refusés (`dynacom_cumulative_locked`). Maintenance SQL / service role non touchées.
+  Le 2026-10-17, à la demande du propriétaire, les approbations des semaines 42 (60 fiches, 5 employés) et 43 (12 fiches,
+  1 employée) ont été annulées par SQL (remises « soumises », lignes `approval_reverted` au Journal) ; les lignes déjà
+  envoyées restent dans la feuille Google (la réapprobation les saute : clé JobID).
 - [x] **Stationnement : plusieurs reçus de parcomètre par job** (V2.4.141, migration 0095, appliquée par l'intégration
   Supabase à la fusion dans `main`, sous la version du nom de fichier). Toujours **une** demande par job
   (un montant total, une révision, plafond 20 $/jour, Coûts/Semaine/sommaire inchangés) ; 1re photo dans `storage_path`,

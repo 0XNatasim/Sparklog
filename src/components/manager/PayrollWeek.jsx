@@ -44,6 +44,7 @@ const STATE_STYLE = {
   blockedLater: "bg-warning/15 text-warning",
   error: "bg-destructive/15 text-destructive",
   empty: "bg-muted text-muted-foreground",
+  closed: "bg-muted text-muted-foreground",
 };
 
 // Gestion V3 › Paie › Paie de la semaine: the week is picked once, then approvals → calcul and

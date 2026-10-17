@@ -18,6 +18,7 @@ import { buildCalculTalon } from "@/lib/calcul-talon";
 import { payDateFor } from "@/lib/paystub";
 import PayStubPrint from "@/components/PayStubPrint";
 import { useT } from "@/lib/use-t";
+import { isClosedBeforeSparklog } from "@/lib/payroll-opening";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { isSubcontractorRole } from "@/lib/roles";
 import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
@@ -507,6 +508,11 @@ export default function PayrollEngineTester({ messier = false }) {
     }
     const periodEnd = w.end.format("YYYY-MM-DD");
     const periodStart = w.start.format("YYYY-MM-DD");
+    // Week 42 and before: its closing is the Dynacom cumulative row — never replaced by a calculation.
+    if (isClosedBeforeSparklog(periodEnd)) {
+      if (!silent) setSaveState({ status: "error", message: t("payroll.postClosedWeek") });
+      return false;
+    }
     setSaveState({ status: "saving", message: "" });
     const closing = buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay });
     const talonSeq = await nextTalonSeq(periodEnd);
