@@ -66,7 +66,7 @@ export function legacyTalonSheet(data) {
   return `<div class="sheet">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
       <div style="font-weight:700;font-size:13px;">${esc(EMPLOYER)}</div>
-      <div style="font-size:10px;color:#555;">Talon de paie — reproduction</div>
+      <div style="font-size:10px;color:#555;">${h.source === "dynacom-cumulative" ? "Cumulatifs Dynacom — ce n'est pas un talon" : "Talon de paie — reproduction"}</div>
     </div>
     ${headerHtml(h)}
     <div class="tot">
@@ -88,6 +88,8 @@ export function legacyTalonSheet(data) {
     </div>
     <div class="foot">${h.source === "calcul"
       ? "Talon calculé par SparkLog (Calcul) — reproduction des montants comptabilisés. Ne remplace pas le talon de l'employeur."
+      : h.source === "dynacom-cumulative"
+      ? `Cumulatifs de l'année payés par Dynacom jusqu'au ${esc(h.periodEnd || "")} (fin de la semaine ${esc(h.week || "42")}) — ce n'est pas un talon : seule la colonne Cumulatif est connue. Les talons SparkLog partent de ces montants dès la semaine suivante.`
       : "Talon importé (ancien système) — reproduit tel qu'importé pour les archives et le relevé d'emploi. Ne remplace pas le talon d'origine."}</div>
   </div>`;
 }
