@@ -27,6 +27,7 @@ const EmergencyPage = managerPage("EmergencyPage");
 const FormsPage = managerPage("FormsPage");
 const HealthPage = managerPage("HealthPage");
 const PayRulesPage = managerPage("PayRulesPage");
+const TravelRulesPage = managerPage("TravelRulesPage");
 const LivePage = managerPage("LivePage");
 const TodoTabsPage = managerPage("TodoTabsPage");
 const TimeHubPage = managerPage("TimeHubPage");
@@ -189,6 +190,7 @@ export default function App() {
           <Route path="advanced/audit" element={<AuditPage />} />
           <Route path="advanced/health" element={<HealthPage />} />
           <Route path="advanced/pay-rules" element={<PayRulesPage />} />
+          <Route path="advanced/travel-rules" element={<TravelRulesPage />} />
           <Route path="advanced/emergency" element={<EmergencyPage />} />
           <Route path="*" element={<Navigate to="/manager" replace />} />
         </Route>

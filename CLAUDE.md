@@ -273,7 +273,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-18, V2.4.154)
+## 6. À faire / à préciser (mis à jour 2026-10-18, V2.4.155)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -368,7 +368,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   plus de 65 km, le traversier, le stationnement et le souper deviennent une option dans la fiche de l'employé,
   avec « Chargé à Britton ». Grille et décisions : `NOOB.md` étape 7 (champ de plus dans la fiche de temps ; retour maison
   payé dès 65 km ; plus de 65 km = temps de trajet CCQ dans le 40 h, non-CCQ au-delà ; un taux km par employé ; taux Britton
-  inconnu). Rien n'est codé.
+  inconnu). V2.4.155 (migration 0101) : saisie dans **Gestion V3 › Admin › Trajets et frais** (`TravelRulesManager.jsx`,
+  `src/lib/travel-rules.js`) — table `travel_pay_rules` (employé × ligne × date d'effet ; lecture gestionnaire, écriture
+  seulement par le RPC `set_travel_pay_rule`, gestionnaire / propriétaire, une ligne `travel_rule_set` au Journal par appel).
+  Le moteur de paie ne les lit **pas encore** (défaut de chaque ligne = ce que l'app paie aujourd'hui).
 - [ ] Changement d'heure d'automne : choix gestionnaire de la 1re ou 2e occurrence de l'heure répétée
   (C-6, §1).
 

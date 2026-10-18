@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-18 (V2.4.154).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-18 (V2.4.155).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
@@ -207,8 +207,11 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 - [ ] **Taux et rapport « Chargé à Britton »** : à préciser quand le taux client sera connu.
 
 ### À coder ensuite 💻 (sur demande)
-1. Une section « Trajets, km et frais » dans la fiche employé (V3 : onglet « Paie et options »), avec un choix par
-   ligne et la case Britton ; les valeurs par défaut = la colonne Défaut ci-dessus.
+1. [x] **Fait (V2.4.155)** : **Gestion V3 › Admin › Trajets et frais** — toute la grille au même endroit. Chaque ligne a
+   « Pour tous » (applique le choix aux employés actifs CCQ) et « Choisir… » (demande lesquels), avec « Chargé à
+   Britton ? » (oui / non / pas décidé), le seuil en km du retour maison et une date « en vigueur à partir du ». « Voir
+   par employé » montre le réglage de chacun ; chaque changement va au Journal. **👤 À faire : la propriétaire
+   remplit chaque ligne.** La paie ne lit pas encore ces réglages : chaque ligne garde son défaut d'ici là.
 2. Un champ de plus dans la fiche de temps pour les trajets maison ↔ entrepôt et client → maison (temps et km).
 3. Le moteur de paie et le talon qui lisent ces options ; tests de chaque ligne.
 4. Un rapport « Chargé à Britton » par semaine.
