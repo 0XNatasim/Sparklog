@@ -169,3 +169,4 @@ réel aux données reste celui des politiques RLS et des RPC ci-dessus.
 | Employés (`v3/team`) | Employés → `employees` (`employees`) · Absences (gestionnaire) |
 | Rapports (`v3/reports`) | Coûts · Semaine · Mois · Par employé · Export CCQ (gestionnaire) |
 | Configuration (`v3/config`) | Paramètres · Taux CCQ · Règles de paie · Références (gestionnaire) · Règles de temps → `config/rules` (`employees`) · Formulaires → `forms` (`forms`) |
+| Admin › Trajets et frais (`advanced/travel-rules`, V3 seulement) | Page sans onglet (gestionnaire / propriétaire). Données : table `travel_pay_rules`, lecture `get_my_role() = 'manager'`, écriture seulement par le RPC `set_travel_pay_rule` (rôle `manager` ou `owner` non suspendu, une ligne `travel_rule_set` au Journal par appel) |

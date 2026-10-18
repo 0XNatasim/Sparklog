@@ -149,9 +149,9 @@ const v3Entries = MANAGER_NAV_V3.flatMap((group) => group.items);
 const sourceOf = (t) => (t.from ? MANAGER_NAV_ITEMS.find((item) => item.id === t.from) : t);
 
 describe("Gestion V3 menu", () => {
-  it("has 13 entries, each once, the day's work first", () => {
+  it("has 14 entries, each once, the day's work first", () => {
     const entryIds = v3Entries.map((item) => item.id);
-    expect(entryIds).toHaveLength(13);
+    expect(entryIds).toHaveLength(14); // 13 + Admin › Trajets et frais (V2.4.155)
     expect(new Set(entryIds).size).toBe(entryIds.length);
     expect(firstAllowedPath("owner", [], "v3")).toBe("todo");
     expect(firstAllowedPath("manager", [], "v3")).toBe("todo");
@@ -167,7 +167,7 @@ describe("Gestion V3 menu", () => {
       ...v3Entries.flatMap((item) => (item.tabs || []).filter((t) => t.from).map((t) => t.from)),
     ];
     const unique = [...new Set(reached)];
-    expect(unique.sort()).toEqual(MANAGER_NAV_V2_ITEMS.map((item) => item.id).concat("payroll-week").sort());
+    expect(unique.sort()).toEqual(MANAGER_NAV_V2_ITEMS.map((item) => item.id).concat("payroll-week", "advanced-travel-rules").sort());
     expect(reached.filter((id) => id === "reports-period")).toHaveLength(3); // Semaine · Mois · Par employé
     expect(reached.length - unique.length).toBe(2);
   });

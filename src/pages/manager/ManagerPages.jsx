@@ -38,6 +38,7 @@ const InfraHealthCard = lazyPanel(() => import("@/components/InfraHealthCard"));
 const InventoryScreenshotsPanel = lazyPanel(() => import("@/components/InventoryScreenshotsPanel"));
 const EmergencyTimesheet = lazyPanel(() => import("@/components/EmergencyTimesheet"));
 const PayRulesReference = lazyPanel(() => import("@/components/PayRulesReference"));
+const TravelRulesManager = lazyPanel(() => import("@/components/manager/TravelRulesManager"));
 const ManagerDashboard = lazyPanel(() => import("@/pages/ManagerDashboard"));
 const CcqJsonExport = lazyPanel(() => import("@/components/CcqJsonExport"));
 
@@ -92,6 +93,7 @@ export const DownloadsPage = () => <ManagerDownloads />;
 export const HealthPage = () => <InfraHealthCard />;
 export const EmergencyPage = () => <EmergencyTimesheet />;
 export const PayRulesPage = () => <PayRulesReference />;
+export const TravelRulesPage = () => <TravelRulesManager />;
 
 // ── Paie: Méthode (Messier / Référence) is a page-level choice kept in the URL ──
 const METHODS = ["messier", "book"];

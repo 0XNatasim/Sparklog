@@ -62,6 +62,8 @@ const V3_ONLY_ITEMS = Object.freeze([
     tab("receipts", "receipts", "mgr.nav.receipts"),
   ] },
   { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
+  // Trajets, km et frais: one setting per employee and per line (NOOB.md étape 7). Manager / owner only.
+  { id: "advanced-travel-rules", path: "advanced/travel-rules", grant: null, labelKey: "mgr.nav3.travelRules" },
   { id: "v3-time", path: "v3/time", grant: null, labelKey: "mgr.nav.timesheets", tabs: [
     tab("timesheets", "timesheets", "mgr.nav.timesheets"),
     tab("unlock", "unlock-day", "mgr.nav3.tab.unlockDay"),
@@ -110,7 +112,7 @@ export const MANAGER_NAV_V3 = Object.freeze([
   { id: "reports", labelKey: "mgr.group.reports", open: false, items: [v3("v3-reports")] },
   { id: "config", labelKey: "mgr.group.config", open: false, items: [v3("v3-config")] },
   { id: "advanced", labelKey: "mgr.nav3.group.admin", open: false, items: [
-    v3("advanced-audit"), v3("advanced-health"), v3("advanced-emergency"),
+    v3("advanced-travel-rules"), v3("advanced-audit"), v3("advanced-health"), v3("advanced-emergency"),
   ] },
 ]);
 
