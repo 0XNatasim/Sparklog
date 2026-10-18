@@ -366,7 +366,9 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [ ] Primes autres que chef d'équipe.
 - [ ] **Trajets, km et frais par employé** (décision du 2026-10-18) : chaque trajet (temps et km), l'indemnité de
   plus de 65 km, le traversier, le stationnement et le souper deviennent une option dans la fiche de l'employé,
-  avec « Chargé à Britton ». Grille et questions ouvertes : `NOOB.md` étape 7. Rien n'est codé.
+  avec « Chargé à Britton ». Grille et décisions : `NOOB.md` étape 7 (champ de plus dans la fiche de temps ; retour maison
+  payé dès 65 km ; plus de 65 km = temps de trajet CCQ dans le 40 h, non-CCQ au-delà ; un taux km par employé ; taux Britton
+  inconnu). Rien n'est codé.
 - [ ] Changement d'heure d'automne : choix gestionnaire de la 1re ou 2e occurrence de l'heure répétée
   (C-6, §1).
 

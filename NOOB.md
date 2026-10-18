@@ -162,13 +162,13 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 | Maison → 1er client | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Payé CCQ | ½ (« 1er trajet non payé » ; manque non-CCQ) | 23.04 1) : pas payé |
 | Entrepôt → client | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Payé CCQ (dans Départ → Fin) | ❌ (règle fixe) | 23.01 2) : à la charge de l'employeur |
 | Client → client | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Payé CCQ | ❌ (règle fixe) | 23.01 2) |
-| Arrêt chez un fournisseur | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Payé CCQ (compté comme client → client) | ❌ (pas distingué) | 23.01 2) |
+| Arrêt chez un fournisseur | ✅ | | | ⚙️ | Payé CCQ : inclus dans le temps de la job (capture Field Service, sinon OT manuel) | ✅ (pas d'option) | 23.01 2) |
 | Retour client → entrepôt | ⚙️ | ⚙️ | ⚙️ | ⚙️ | CCQ jusqu'à 40 h / semaine (32 h avec un férié), non-CCQ au-delà, jamais du temps sup. | ½ (« retour avec avantages ») | 23.04 2) a), 23.15 : non-CCQ |
-| Retour client → maison | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Pas payé (pas entré) — à payer selon la distance (plus de 65 km) ou une entente | ❌ | 23.04 1) : pas payé |
+| Retour client → maison | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Pas payé (pas entré). Option : payé à partir de 65 km ; le choix CCQ / non-CCQ n'apparaît que si la case est cochée | ❌ | 23.04 1) : pas payé |
 | Entrepôt → maison (fin de journée) | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Pas payé (pas entré) | ❌ | 23.04 1) : pas payé |
-| Temps à l'entrepôt sans trajet (charger, matériel, inventaire) | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Payé CCQ s'il est dans Départ → Fin | ❌ (pas distingué) | Du travail |
-| Attente sur place (client absent, accès refusé) | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Payé CCQ (dans Départ → Fin) | ❌ (pas distingué) | Du travail |
-| Samedi / dimanche / férié | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Travail tout en temps sup. ; retour non-CCQ | ❌ (règle fixe) | 21.01, 21.02 b) : temps sup. obligatoire |
+| Temps à l'entrepôt sans trajet (charger, matériel, inventaire) | ✅ | | | ⚙️ | Payé CCQ : inclus dans le temps de la job (capture Field Service, sinon OT manuel) | ✅ (pas d'option) | Du travail |
+| Attente sur place (client absent, accès refusé) | ✅ | | | ⚙️ | Payé CCQ : inclus dans le temps de la job (capture Field Service, sinon OT manuel) | ✅ (pas d'option) | Du travail |
+| Samedi / dimanche / férié | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Travail tout en temps sup. ; retour non-CCQ — garder coché pour tous les employés CCQ | ❌ (règle fixe) | 21.01, 21.02 b) : temps sup. obligatoire |
 
 ### Kilomètres (jamais du CCQ : indemnité à part sur le talon)
 
@@ -178,7 +178,7 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 | km maison → 1er client | ⚙️ | ⚙️ | ⚙️ | Remboursé (même avec « 1er trajet non payé ») | ❌ | 23.05 : 0,49 $/km si l'auto sert à ta demande |
 | km entrepôt → client | ⚙️ | ⚙️ | ⚙️ | Remboursé (km du bon de travail × taux km) | ❌ (toujours payé) | 23.05 : 0,49 $/km |
 | km client → client | ⚙️ | ⚙️ | ⚙️ | Remboursé | ❌ (toujours payé) | 23.05 |
-| km chez un fournisseur | ⚙️ | ⚙️ | ⚙️ | Remboursé (comme client → client) | ❌ (pas distingué) | 23.05 |
+| km chez un fournisseur | ✅ (inclus dans les km de la job) | | ⚙️ | Remboursé (comme client → client) | ✅ (pas d'option) | 23.05 |
 | km client → entrepôt | ⚙️ | ⚙️ | ⚙️ | Remboursé (« km du retour ») | ❌ (toujours payé) | 23.05 |
 | km client → maison | ⚙️ | ⚙️ | ⚙️ | Pas remboursé (pas entré) | ❌ | Trajet domicile : rien |
 | km entrepôt → maison | ⚙️ | ⚙️ | ⚙️ | Pas remboursé (pas entré) | ❌ | Trajet domicile : rien |
@@ -187,32 +187,29 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 
 | Élément | Payé CCQ | Payé non-CCQ / remboursé | Pas payé | Chargé à Britton | Défaut (aujourd'hui) | Existe ? | Convention ICI |
 |---|---|---|---|---|---|---|---|
-| Domicile à plus de 65 km du chantier | ⚙️ | ⚙️ | ⚙️ | ⚙️ | Pas payé | ❌ | 23.09 1) : 50,01 $ / jour (plus de 90 km : 56,58 $), depuis le 2026-04-26 |
+| Domicile à plus de 65 km du chantier | ⚙️ dans le 40 h de la semaine | ⚙️ au-delà du 40 h | ⚙️ | ⚙️ | Pas payé | ❌ | 23.09 1) : 50,01 $ / jour (plus de 90 km : 56,58 $), depuis le 2026-04-26 |
 | Traversier (et péage ?) | — | ⚙️ | ⚙️ | ⚙️ | Pas payé | ❌ | 23.09 1) a) : traversier remboursé |
 | Stationnement | — | ⚙️ jusqu'à 20 $ / jour, avec reçus | ⚙️ | ⚙️ | Remboursé (case « reçus de stationnement ») | ½ (manque Britton) | 23.02 |
-| Souper | — | ⚙️ 30 $ dès 10 h 15 de travail | ⚙️ | ⚙️ | Payé à tous, toujours actif | ½ (pour tous, pas d'option) | 20.07 3) c) |
+| Souper | — | ⚙️ 30 $ dès 10 h 15 de travail | ⚙️ | ⚙️ | Payé à tous, toujours actif — garder coché pour tous les employés CCQ | ½ (pour tous, pas d'option) | 20.07 3) c) |
 
-### À préciser avant de coder 👤
-- [ ] **Les km qui ne sont pas entrés aujourd'hui** (maison → entrepôt, client → maison, entrepôt → maison) :
-  une distance fixe maison ↔ entrepôt dans la fiche de l'employé, ou un champ de plus dans la fiche de temps ?
-  Même question pour le **temps** de ces trajets.
-- [ ] **Retour client → maison** : payé au-delà de combien de km (65 km ?) ou seulement sur entente ? La distance
-  vient d'où (la maison de l'employé, ou ce qu'il entre) ?
-- [ ] **« Domicile à plus de 65 km » en CCQ** : la convention en fait un montant fixe par jour, pas des heures.
-  « Payé CCQ » veut-il dire un montant déclaré dans les gains CCQ (avec 13 % et avantages) ?
-- [ ] **Taux km** : un seul taux par employé pour tous les trajets, ou un taux par trajet ? (La convention donne
-  0,49 $/km au minimum quand l'employé prend son auto à ta demande.)
-- [ ] **Chargé à Britton** : à quel taux (le même que celui payé à l'employé, ou un taux client) ? Où le voir :
-  une colonne dans Coûts, un rapport de facturation par semaine ?
-- [ ] **Arrêt chez un fournisseur, attente, temps à l'entrepôt** : l'app ne les distingue pas aujourd'hui (c'est du
-  temps dans Départ → Fin). Pour leur donner une option, l'employé devra les indiquer (un type de trajet ou de job).
-- [ ] **Samedi / dimanche / férié et souper** : la convention les impose. Une option permettrait de payer moins que
-  la convention : garder la case cochée pour tous les employés CCQ.
+### Décisions (2026-10-18) 👤
+- [x] **Km et temps pas entrés aujourd'hui** (maison → entrepôt, client → maison, entrepôt → maison) : **un champ de
+  plus dans la fiche de temps**.
+- [x] **Retour client → maison** : payé **à partir de 65 km** ; dans la fiche employé, le choix CCQ / non-CCQ n'apparaît
+  que si la case « retour maison payé » est cochée.
+- [x] **Domicile à plus de 65 km** : de 2 à 6 chantiers par jour, donc c'est du **temps de trajet** : payé CCQ tant
+  qu'il entre dans le 40 h de la semaine, non-CCQ au-delà (même principe que le retour à l'entrepôt).
+- [x] **Taux km** : un seul taux par employé pour tous les trajets. **Taux facturé à Britton : inconnu pour l'instant.**
+- [x] **Fournisseur, attente, temps à l'entrepôt** : pas d'option ; inclus dans le temps de la job (capture Field
+  Service, sinon OT manuel), payé CCQ.
+- [x] **Samedi / dimanche / férié et souper** : options gardées, mais cochées pour tous les employés CCQ (la convention
+  les impose).
+- [ ] **Taux et rapport « Chargé à Britton »** : à préciser quand le taux client sera connu.
 
 ### À coder ensuite 💻 (sur demande)
 1. Une section « Trajets, km et frais » dans la fiche employé (V3 : onglet « Paie et options »), avec un choix par
    ligne et la case Britton ; les valeurs par défaut = la colonne Défaut ci-dessus.
-2. Les champs manquants dans la fiche de temps (ou la distance fixe dans la fiche employé), selon les réponses.
+2. Un champ de plus dans la fiche de temps pour les trajets maison ↔ entrepôt et client → maison (temps et km).
 3. Le moteur de paie et le talon qui lisent ces options ; tests de chaque ligne.
 4. Un rapport « Chargé à Britton » par semaine.
 
