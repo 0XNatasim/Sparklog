@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { hasManagementAccess, isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
+import { MfaGate } from "@/components/TwoFactor";
 
 // A calm, branded full-screen status page (logo + message). Used for the
 // "service unreachable" and "awaiting approval" states so a new employee always
@@ -21,7 +22,7 @@ function BrandedScreen({ title, children }) {
 }
 
 export default function ProtectedRoute({ children, requireRole }) {
-  const { user, role, isPaused, adminSections, loading, authError, signOut } = useAuth();
+  const { user, role, isPaused, adminSections, loading, authError, signOut, mfa, mfaStep } = useAuth();
   const t = useT();
 
   if (loading) {
@@ -49,6 +50,17 @@ export default function ProtectedRoute({ children, requireRole }) {
   }
 
   if (!user) return <Navigate to="/login" replace />;
+
+  // Two-factor authentication (0103): wait for the role and the session level, then a management
+  // account (or anyone who added a device) passes the code before seeing any page.
+  if (!role || !mfa.ready) {
+    return (
+      <div className="min-h-screen bg-background text-foreground grid place-items-center p-6">
+        <div className="text-lg font-bold">{t("common.loading")}</div>
+      </div>
+    );
+  }
+  if (mfaStep) return <MfaGate step={mfaStep} />;
 
   if (isPaused && !isManagerRole(role)) {
     return (

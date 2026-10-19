@@ -6,6 +6,7 @@ import {
   isPrivileged,
 } from "./roles";
 import { MANAGER_NAV_ITEMS, canOpenNavItem, visibleTabs } from "./manager-nav";
+import { requiresMfa } from "./mfa";
 
 export const APPLICATION_ROLES = Object.freeze([
   "employee",
@@ -51,6 +52,8 @@ export function authorizationFor({ role, adminSections = [], paused = false }) {
     canManageAny: Object.values(sections).some(Boolean),
     managementSections: Object.freeze(sections),
     canAccessSensitiveNas: knownRole && isPrivileged(role),
+    // Password + authenticator code (0103): the database grants manager-level access only then.
+    mustUseTwoFactor: knownRole && requiresMfa(role),
     includedInCcqPayroll: knownRole && !isNonCcqRole(role),
   });
 }

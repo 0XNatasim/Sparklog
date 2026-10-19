@@ -1,6 +1,7 @@
 // supabase/functions/push_approved_to_sheet/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAal2 } from "../_shared/mfa.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,6 +124,8 @@ serve(async (req) => {
     if (!approverProfile || !["manager", "admin", "owner"].includes(approverProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
+    // Two-factor authentication (0103): a manager password alone is not enough.
+    if (!isAal2(token)) return json({ ok: false, error: "mfa_required" }, 403);
 
     const approverName = (approverProfile.full_name || "").trim();
     const approved_by_value = approverName || approverEmail || approverId;

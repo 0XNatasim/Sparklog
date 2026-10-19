@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, Star, TriangleAlert, Trophy, X } from "lucide-react";
+import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, ShieldAlert, ShieldCheck, Star, TriangleAlert, Trophy, X } from "lucide-react";
 import { GRANTABLE_ADMIN_SECTIONS, isAdminEmployee, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
 import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
 import TimeOffControls from "@/components/TimeOffControls";
@@ -22,6 +22,7 @@ import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, L
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { companyDate } from "@/lib/company-time";
+import { mfaBadge } from "@/lib/mfa";
 
 // Region code → administrative region name, for the label shown next to each employee.
 const REGION_NAME = new Map(QUEBEC_REGIONS.map((r) => [r.code, r.name]));
@@ -56,6 +57,7 @@ export default function EmployeesPanel() {
   const [profiles, setProfiles] = useState([]);
   const privileged = isPrivileged(role);
   const [nasSet, setNasSet] = useState(new Set());
+  const [mfaSet, setMfaSet] = useState(() => new Set()); // users with a verified second factor (0103)
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [ccqEdit, setCcqEdit] = useState(null); // employee profile whose CCQ card the manager is capturing
@@ -127,6 +129,9 @@ export default function EmployeesPanel() {
       setProfiles(nextProfiles);
       // NAS lives in the restricted vault; only privileged users can see who has one.
       // Fetch presence only (not the value) — the value is revealed on demand + audited.
+      // Who turned on two-factor authentication (ids only): shield icon next to the name.
+      const { data: mfaRows } = await supabase.rpc("mfa_enrolled_users");
+      setMfaSet(new Set((mfaRows || []).map((r) => r.user_id)));
       if (privileged) {
         const { data: nasRows } = await supabase.rpc("nas_presence");
         setNasSet(new Set((nasRows || []).map((r) => r.user_id)));
@@ -460,6 +465,12 @@ export default function EmployeesPanel() {
                     : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-warning" aria-label={t("manager.roleLabel")} />}
                 {Number(p.team_leader_premium) > 0 && <Star className="h-4 w-4 shrink-0 fill-warning text-warning" aria-label={t("employees.teamLeader")} />}
                 <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
+                {mfaBadge(p.role, mfaSet.has(p.id)) === "on" && (
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-label={t("employees.mfaOn")}><title>{t("employees.mfaOn")}</title></ShieldCheck>
+                )}
+                {mfaBadge(p.role, mfaSet.has(p.id)) === "missing" && (
+                  <ShieldAlert className="h-4 w-4 shrink-0 text-warning" aria-label={t("employees.mfaMissing")}><title>{t("employees.mfaMissing")}</title></ShieldAlert>
+                )}
                 {REGION_NAME.get(p.work_region) && (
                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground" title={t("employees.workRegion")}>
                     {p.work_region} — {REGION_NAME.get(p.work_region)}

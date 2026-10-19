@@ -91,6 +91,12 @@ describe("application authorization matrix", () => {
     }
   });
 
+  it("requires two-factor authentication for every management role (0103)", () => {
+    for (const role of APPLICATION_ROLES) {
+      expect(authorizationFor({ role }).mustUseTwoFactor, role).toBe(["owner", "manager", "admin"].includes(role));
+    }
+  });
+
   it("reserves sensitive NAS access for the owner", () => {
     for (const role of APPLICATION_ROLES) {
       expect(authorizationFor({ role }).canAccessSensitiveNas, role).toBe(role === "owner");

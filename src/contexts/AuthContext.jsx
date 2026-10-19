@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { supabase } from "../supabaseClient";
 import { withTimeout } from "@/lib/utils";
 import { logActivity } from "@/lib/activity-log";
+import { mfaStep } from "@/lib/mfa";
 
 const AuthContext = createContext(null);
 export const SESSION_RESUMED_EVENT = "sparklog:session-resumed";
@@ -37,6 +38,9 @@ export function AuthProvider({ children }) {
   const [adminSections, setAdminSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
+  // Two-factor state of the current session (migration 0103): assurance level of the JWT and
+  // number of verified devices, read from the local session (no network).
+  const [mfa, setMfa] = useState({ ready: false, currentLevel: null, verifiedCount: 0, error: "" });
 
   const subscriptionRef = useRef(null);
   const profileChannelRef = useRef(null);
@@ -226,6 +230,26 @@ export function AuthProvider({ children }) {
     };
   }, [user?.id]);
 
+  // Every auth event (sign-in, code verified, token refresh) replaces `user`: re-read the level then.
+  const refreshMfa = useCallback(async () => {
+    try {
+      const { data, error } = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel(), 8000);
+      if (error) throw error;
+      const { data: sessionData } = await withTimeout(supabase.auth.getSession(), 8000);
+      const verifiedCount = (sessionData?.session?.user?.factors || []).filter((f) => f.status === "verified").length;
+      setMfa({ ready: true, currentLevel: data?.currentLevel ?? null, verifiedCount, error: "" });
+    } catch (e) {
+      setMfa((prev) => ({ ...prev, ready: true, error: e?.message || String(e) }));
+    }
+  }, []);
+  useEffect(() => {
+    if (!user) {
+      setMfa({ ready: false, currentLevel: null, verifiedCount: 0, error: "" });
+      return;
+    }
+    refreshMfa();
+  }, [user, refreshMfa]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -306,6 +330,9 @@ export function AuthProvider({ children }) {
       adminSections,
       loading,
       authError,
+      mfa,
+      mfaStep: mfa.ready ? mfaStep({ role, currentLevel: mfa.currentLevel, verifiedCount: mfa.verifiedCount }) : null,
+      refreshMfa,
       async signOut() {
         // Block the resume-recovery from re-hydrating the session mid sign-out.
         signedOutRef.current = true;
@@ -333,7 +360,7 @@ export function AuthProvider({ children }) {
         setAdminSections([]);
       }
     }),
-    [user, role, fullName, isPaused, adminSections, loading, authError]
+    [user, role, fullName, isPaused, adminSections, loading, authError, mfa, refreshMfa]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

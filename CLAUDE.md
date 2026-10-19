@@ -21,6 +21,10 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
   (bulk export needs a written reason, is rate-limited to 5/h, and the CCQ screen shows only a mask).
   Since `0102` each NAS is a **Supabase Vault secret** (encrypted, key outside the database; plain-text column
   dropped), so a dump/backup holds ciphertext only; `set_nas` rejects a bad check digit (Luhn, `invalid_nas`).
+- Two-factor authentication (`0103`, V2.4.157): owner / manager / admin accounts must enter an authenticator-app
+  code after the password. `get_my_role()` returns `manager` and `is_privileged()` is true only for an `aal2` JWT
+  (every RLS policy and manager RPC goes through them), the manager-level Edge Functions check the same claim
+  (`_shared/mfa.js`), and the app shows the enrolment / code screen before any page (`MfaGate`, `src/lib/mfa.js`).
 - Overtime proof is atomic (`0084`): `save_own_job_with_overtime_evidence` checks the uploaded file, then
   saves the job, the proof row and the manager notification in one transaction; `save_own_job` honours the
   "proof captured" flag only when a proof exists for that day.
@@ -275,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-19, V2.4.156)
+## 6. À faire / à préciser (mis à jour 2026-10-19, V2.4.157)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -611,6 +615,19 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   local avec un Vault simulé (migration rejouée deux fois, chaque RPC, effacement, suppression, Journal sans NAS) ; droits
   Vault du rôle `postgres` vérifiés en production. Limite : un administrateur Supabase connecté peut encore déchiffrer
   (2FA actif sur le compte). Le seul NAS en base au 2026-10-19 échoue le chiffre de contrôle : à corriger par la propriétaire.
+- [x] **Double authentification des comptes de gestion** (V2.4.157, migration 0103) : propriétaire, gestionnaires et
+  administrateurs entrent un code d'application d'authentification (Google / Microsoft Authenticator) après le mot de passe.
+  1re connexion : code QR + 1er code (`MfaEnroll`) ; ensuite le code à chaque nouvelle session (`MfaChallenge`), avant toute
+  page (`ProtectedRoute` → `MfaGate`). Base : sans session `aal2`, `get_my_role()` rend `employee` et `is_privileged()` faux,
+  donc un mot de passe volé n'ouvre ni la Gestion ni les NAS, quel que soit le client ; `set_travel_pay_rule` aussi. Fonctions
+  Edge de gestion (`create_employee`, `delete_user`, `reset_employee_password`, `push_approved_*`, `send_*`, `infra_metrics`,
+  `ccq_rates`, `classify_week`) : `isAal2(token)` après la vérification du rôle → `mfa_required` (à redéployer). Profil ›
+  Double authentification : appareils, appareil de secours, retrait (jamais le dernier d'un compte de gestion). Employés :
+  bouclier vert (activée) / orange (obligatoire, pas encore activée), RPC `mfa_enrolled_users`. Mot de passe dans une fuite
+  connue (protection Supabase activée le 2026-10-19) : message clair à la création / au changement (`authErrorKey`).
+  Téléphone perdu : le développeur supprime les appareils du compte dans Supabase (`auth.mfa_factors`), la personne en
+  ajoute un nouveau à la connexion suivante. Vérifié dans Chromium (Supabase simulé) : inscription, mauvais code, bon code,
+  code à la connexion, employé jamais bloqué, icônes, Profil ; migration testée sur Postgres local (chaque rôle, aal1 / aal2).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

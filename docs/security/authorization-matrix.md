@@ -111,6 +111,20 @@ backup of the database contains ciphertext only.
   (Supabase dashboard / `postgres`), which can still read `vault.decrypted_secrets`. Keep 2FA on the
   Supabase account and the number of dashboard members minimal.
 
+## Two-factor authentication (0103, V2.4.157)
+
+| Role | Code after the password | Without the code (aal1 session) |
+|---|---|---|
+| employee, subcontractor_1 | not asked (unless they added a device) | unchanged |
+| admin, manager, owner | **required** (first sign-in: add a device) | treated as `employee` by `get_my_role()`; `is_privileged()` false; manager Edge Functions answer `mfa_required` |
+
+- Enforced in the database, not only in the UI: every manager policy / RPC goes through `get_my_role()`, NAS through
+  `is_privileged()`, both require `auth.jwt() ->> 'aal' = 'aal2'` for manager-tier roles (`session_is_aal2()`).
+- `mfa_enrolled_users()` (manager level) lists who has a verified device (shield icon in Employés); no secret ever leaves
+  Supabase Auth.
+- Recovery: a backup device can be added in Profil; a lost phone is reset by the developer (delete the account's rows
+  in `auth.mfa_factors`), then the person adds a new device at the next sign-in.
+
 ## Notes, observations, and follow-ups
 
 1. **Paused containment confirmed live.** Every employee write path (tables + storage
