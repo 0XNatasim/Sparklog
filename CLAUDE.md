@@ -19,6 +19,8 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 - NAS/SIN live in the `employee_sensitive` vault (`0026`), RPC-only since `0084`: no table policy or grant
   for the browser; `reveal_nas` / `set_nas` / `nas_presence` / `export_ccq_nas` are owner-only and audited
   (bulk export needs a written reason, is rate-limited to 5/h, and the CCQ screen shows only a mask).
+  Since `0102` each NAS is a **Supabase Vault secret** (encrypted, key outside the database; plain-text column
+  dropped), so a dump/backup holds ciphertext only; `set_nas` rejects a bad check digit (Luhn, `invalid_nas`).
 - Overtime proof is atomic (`0084`): `save_own_job_with_overtime_evidence` checks the uploaded file, then
   saves the job, the proof row and the manager notification in one transaction; `save_own_job` honours the
   "proof captured" flag only when a proof exists for that day.
@@ -273,7 +275,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-18, V2.4.155)
+## 6. À faire / à préciser (mis à jour 2026-10-19, V2.4.156)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -601,6 +603,14 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   stationnement — seront effacés, rien n'expire avant le 2026-10-27). Encore ouvert : Google Sheet (200 onglets max,
   un « SemXX » par semaine → nouveau fichier chaque année) ; OCR.space gratuit (25 000/mois, ≈ 500/jour par IP,
   1 Mo) : vérifier `OCR_SPACE_API_KEY`.
+- [x] **NAS chiffré dans Supabase Vault** (V2.4.156, migration 0102) : la colonne `employee_sensitive.nas` était en
+  clair (protégée par RLS, mais visible dans une copie de la base). Chaque NAS devient un secret Vault (chiffré, clé hors
+  de la base) ; la table ne garde que `nas_secret_id`, la colonne en clair est supprimée. Les 4 RPC gardent la même
+  signature, les mêmes droits (propriétaire) et le même Journal ; `set_nas` refuse un chiffre de contrôle faux (Luhn,
+  `sin_is_valid`, même règle que `src/lib/sin.js` côté écran) ; supprimer la ligne supprime le secret. Testé sur un Postgres
+  local avec un Vault simulé (migration rejouée deux fois, chaque RPC, effacement, suppression, Journal sans NAS) ; droits
+  Vault du rôle `postgres` vérifiés en production. Limite : un administrateur Supabase connecté peut encore déchiffrer
+  (2FA actif sur le compte). Le seul NAS en base au 2026-10-19 échoue le chiffre de contrôle : à corriger par la propriétaire.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

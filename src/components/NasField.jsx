@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { isValidSin } from "@/lib/sin";
 
-// Sensitive NAS/SIN field. The value lives in the restricted `employee_sensitive`
-// vault, reachable only through audited RPCs (reveal_nas / set_nas, owner only).
+// Sensitive NAS/SIN field. The value is a Supabase Vault secret (encrypted, migration 0102) indexed by
+// `employee_sensitive`, reachable only through audited RPCs (reveal_nas / set_nas, owner only).
 // Non-privileged managers only ever see a mask.
 // Privileged users must re-enter their password before the value is revealed, and
 // every reveal is audited server-side via the reveal_nas() RPC.
@@ -57,12 +58,13 @@ export default function NasField({ employeeId, initialHasNas, privileged }) {
     try {
       const clean = value.replace(/\D/g, "");
       if (clean && clean.length !== 9) throw new Error(t("employees.nasInvalid"));
+      if (clean && !isValidSin(clean)) throw new Error(t("employees.nasCheckDigit"));
       // The vault has no direct table access (migration 0084): set_nas writes and audits.
       const { error } = await withTimeout(
         supabase.rpc("set_nas", { target: employeeId, p_nas: clean || null }),
         12000
       );
-      if (error) throw error;
+      if (error) throw error.message === "invalid_nas" ? new Error(t("employees.nasCheckDigit")) : error;
       setHasNas(Boolean(clean));
       setMode("hidden");
       setValue("");

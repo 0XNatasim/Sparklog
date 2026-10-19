@@ -87,19 +87,29 @@ Legend: ✅ allowed · ❌ denied · ⚠️ allowed but constrained (see notes) 
 - Managers have **read-only** on meal/overtime/parking storage (no delete via RLS —
   deletion is service-role only).
 
-## Sensitive data — NAS/SIN vault (M8, done 2026-09-05)
+## Sensitive data — NAS/SIN vault (M8 2026-09-05, RPC-only 0084, encrypted 0102)
 
-NAS/SIN is no longer on `profiles`. It lives in `public.employee_sensitive`:
+NAS/SIN is not on `profiles`. Since migration 0102 (V2.4.156) each number is a **Supabase Vault
+secret** (encrypted with a key kept outside the database); `public.employee_sensitive` only holds
+`user_id → nas_secret_id`. The former plain-text `nas` column is dropped, so a dump or restored
+backup of the database contains ciphertext only.
 
-| Op | anon | emp | manager (non-privileged) | owner + dev (privileged) | service |
+| Op | anon | emp | manager / admin | owner (`is_privileged()`) | service |
 |---|---|---|---|---|---|
-| SELECT / INSERT / UPDATE | ❌ | ❌ | ❌ | ✅ (`is_privileged()`) | ✅ bypasses RLS |
+| Table `employee_sensitive` (any op) | ❌ | ❌ | ❌ | ❌ (no policy, no grant since 0084) | ✅ bypasses RLS |
+| `reveal_nas(target)` | ❌ | ❌ | ❌ | ✅ audited `nas_reveal` | — |
+| `set_nas(target, nas)` | ❌ | ❌ | ❌ | ✅ audited `nas_update` (never the value); Luhn check → `invalid_nas` | — |
+| `nas_presence()` | ❌ | empty | empty | ✅ ids only | — |
+| `export_ccq_nas(ids, reason)` | ❌ | ❌ | ❌ | ✅ reason ≥ 10 chars, 5 / hour, 500 max, audited `nas_bulk_export` | — |
 
-- "Privileged" = owner (`BOSS_ID`) + dev (`DEV_ID`), via `public.is_privileged()`.
-- The UI never eager-loads the value: presence only. Reveal goes through the
-  `reveal_nas(target)` SECURITY DEFINER RPC, which re-checks `is_privileged()` and writes
-  an `audit_log` row (`action = 'nas_reveal'`). The UI adds a password re-prompt on top.
-- CCQ export reads NAS from the vault (only privileged users run it).
+- `is_privileged()` is true for the `owner` role only.
+- The UI never eager-loads the value: presence only. Reveal re-prompts for the owner's password, then
+  calls `reveal_nas`. The CCQ screen shows a mask; the bulk export needs a written reason.
+- Deleting an employee (cascade to `employee_sensitive`) deletes the Vault secret (trigger
+  `employee_sensitive_drop_secret`, not callable by any API role).
+- Limit: Vault protects copies of the database, not a live session with database-admin rights
+  (Supabase dashboard / `postgres`), which can still read `vault.decrypted_secrets`. Keep 2FA on the
+  Supabase account and the number of dashboard members minimal.
 
 ## Notes, observations, and follow-ups
 
