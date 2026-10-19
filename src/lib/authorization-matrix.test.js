@@ -16,6 +16,7 @@ const timezoneMigration = migration("20260927025233_0063_montreal_timezone_and_d
 const privilegeMigration = migration("20260910220157_0032_owner_role_replaces_hardcoded_privileged.sql");
 const snapshotMigration = migration("20261013220000_0085_rate_snapshot_only_at_submission.sql");
 const vaultMigration = migration("20261013200000_0084_nas_server_export_and_atomic_overtime_evidence.sql");
+const encryptedNasMigration = migration("20261019120000_0102_nas_encrypted_in_vault.sql");
 
 describe("application authorization matrix", () => {
   it("covers every persisted application role", () => {
@@ -159,6 +160,33 @@ describe("database authorization contract", () => {
     expect(vaultMigration).toContain("'nas_export_rate_limited'");
     expect(vaultMigration).toContain("'nas_bulk_export'");
     expect(vaultMigration).toContain("'nas_update'");
+  });
+
+  it("keeps the NAS encrypted in Supabase Vault, with the same owner-only RPC contract (0102)", () => {
+    const m = encryptedNasMigration;
+    // The plain-text column is moved into Vault secrets, then dropped: a dump only holds ciphertext.
+    expect(m).toContain("vault.create_secret(r.nas,");
+    expect(m).toContain("alter table public.employee_sensitive drop column nas;");
+    expect(m).not.toMatch(/add column[^;]*\bnas text/);
+    // Still no table policy or grant for the browser.
+    expect(m).not.toMatch(/create policy/i);
+    expect(m).not.toMatch(/grant [^;]* on (table )?public\.employee_sensitive/i);
+    for (const fn of ["reveal_nas", "set_nas", "nas_presence", "export_ccq_nas"]) {
+      const body = m.slice(m.indexOf(`function public.${fn}(`));
+      expect(body.slice(0, body.indexOf("$function$;")), fn).toContain("public.is_privileged()");
+      expect(body.slice(0, body.indexOf("$function$;")), fn).not.toMatch(/\bs\.nas\b|select nas\b/);
+      expect(m, fn).toMatch(new RegExp(`revoke all on function public\\.${fn}\\([^)]*\\) from public, anon;`));
+    }
+    // Audits are unchanged and never carry the number.
+    expect(m).toContain("'nas_reveal'");
+    expect(m).toContain("'nas_update'");
+    expect(m).toContain("jsonb_build_object('cleared', clean is null)");
+    expect(m).toContain("'nas_bulk_export'");
+    expect(m).toContain("'export_reason_required'");
+    expect(m).toContain("'nas_export_rate_limited'");
+    // A deleted row (employee deleted) takes its secret with it; the trigger function is not callable.
+    expect(m).toContain("after delete on public.employee_sensitive");
+    expect(m).toContain("revoke all on function public.employee_sensitive_drop_secret() from public, anon, authenticated;");
   });
 
   it("records an overtime proof only with its job, inside one function (0084)", () => {
