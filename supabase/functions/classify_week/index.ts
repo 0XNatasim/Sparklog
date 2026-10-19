@@ -8,6 +8,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { computeWeek, ENGINE_VERSION, overtimeOptionsFromProfile } from "../_shared/payroll_engine.js";
+import { isAal2 } from "../_shared/mfa.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,6 +55,8 @@ serve(async (req) => {
       .from("profiles").select("role").eq("id", callerRes.user.id).maybeSingle();
     if (profErr) return json({ ok: false, error: profErr.message }, 500);
     if (!prof || !["manager", "admin", "owner"].includes(prof.role)) return json({ ok: false, error: "Forbidden: manager role required" }, 403);
+    // Two-factor authentication (0103): a manager password alone is not enough.
+    if (!isAal2(token)) return json({ ok: false, error: "mfa_required" }, 403);
 
     let q = admin
       .from("jobs")

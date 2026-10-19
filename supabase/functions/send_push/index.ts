@@ -13,6 +13,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 import { buildPushPayload, isGonePushStatus } from "./push_payload.js";
+import { isAal2 } from "../_shared/mfa.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,6 +54,8 @@ serve(async (req) => {
     if (!profile || !["manager", "admin", "owner"].includes(profile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
+    // Two-factor authentication (0103): a manager password alone is not enough.
+    if (!isAal2(token)) return json({ ok: false, error: "mfa_required" }, 403);
 
     const payload = await req.json().catch(() => ({}));
     const broadcastId = typeof payload?.broadcastId === "string" ? payload.broadcastId : "";

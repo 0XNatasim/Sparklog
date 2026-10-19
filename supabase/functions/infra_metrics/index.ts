@@ -12,6 +12,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAal2 } from "../_shared/mfa.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -125,6 +126,8 @@ serve(async (req) => {
     if (!callerProfile || !["manager", "owner"].includes(callerProfile.role)) {
       return json({ ok: false, error: "Forbidden: manager role required" }, 403);
     }
+    // Two-factor authentication (0103): a manager password alone is not enough.
+    if (!isAal2(token)) return json({ ok: false, error: "mfa_required" }, 403);
 
     // Scrape the privileged metrics endpoint twice for the counter deltas.
     const metricsUrl = `${supabaseUrl}/customer/v1/privileged/metrics`;

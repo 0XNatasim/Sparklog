@@ -9,6 +9,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
+import { authErrorKey } from "@/lib/mfa";
+import { MfaChallenge } from "@/components/TwoFactor";
 
 export default function ResetPassword() {
   const t = useT();
@@ -17,12 +19,14 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // An account with two-factor authentication must enter its code before changing the password.
+  const [needCode, setNeedCode] = useState(false);
 
   const passwordsMatch = password === confirmPassword;
   const canSubmit = password.length >= 6 && passwordsMatch;
 
   async function handleSubmit(event) {
-    event.preventDefault();
+    event?.preventDefault();
     if (!canSubmit) return;
 
     setErrorMsg("");
@@ -39,7 +43,9 @@ export default function ResetPassword() {
       }
       window.location.replace(`${window.location.origin}/#/login?passwordReset=success`);
     } catch (error) {
-      setErrorMsg(error?.message || t("auth.resetInvalidLink"));
+      if (error?.code === "insufficient_aal") { setNeedCode(true); return; }
+      const key = authErrorKey(error);
+      setErrorMsg(key ? t(key) : error?.message || t("auth.resetInvalidLink"));
     } finally {
       setLoading(false);
     }
@@ -57,6 +63,9 @@ export default function ResetPassword() {
           <CardDescription>{t("auth.resetDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
+          {needCode ? (
+            <MfaChallenge onDone={() => { setNeedCode(false); handleSubmit(); }} />
+          ) : (
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div className="grid gap-1.5">
               <Label htmlFor="new-password">{t("auth.newPassword")}</Label>
@@ -108,6 +117,7 @@ export default function ResetPassword() {
               {loading ? t("common.pleaseWait") : t("auth.saveNewPassword")}
             </Button>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

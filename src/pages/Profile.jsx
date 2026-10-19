@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { BookOpen, Building2, ChevronDown, ClipboardList, ExternalLink, Mail, MapPin, Phone, UserRound, Users } from "lucide-react";
+import { BookOpen, Building2, ChevronDown, ClipboardList, ExternalLink, Mail, MapPin, Phone, ShieldCheck, UserRound, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
 import AppShell from "@/components/AppShell";
@@ -15,7 +15,9 @@ import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import CcqCardCapture from "@/components/CcqCardCapture";
 import PushNotificationsToggle from "@/components/PushNotificationsToggle";
+import { TwoFactorSettings } from "@/components/TwoFactor";
 import { isOwnerRole } from "@/lib/roles";
+import { requiresMfa } from "@/lib/mfa";
 import { Radio } from "lucide-react";
 
 export default function Profile() {
@@ -102,6 +104,12 @@ export default function Profile() {
                 </div>
               )}
             </CollapsibleCard>
+
+            {!isViewMode && requiresMfa(role) && (
+              <CollapsibleCard icon={ShieldCheck} title={t("mfa.settingsTitle")} description={t("mfa.settingsDescription")}>
+                <TwoFactorSettings bare />
+              </CollapsibleCard>
+            )}
 
             <QuickReferenceCard references={quickReferences} />
 
