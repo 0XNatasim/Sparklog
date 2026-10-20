@@ -14,6 +14,7 @@ import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { getInventoryNegativeTotal } from "@/lib/inventory-alerts";
+import { clearInventoryNegatives } from "@/lib/inventory-clear";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
@@ -81,7 +82,7 @@ function storeFlag(key, on) {
 }
 
 // highlightPath (V3 only): the menu entry that holds the open page when it is a V2 path.
-function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives }) {
+function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives, onInventoryClick }) {
   const t = useT();
   const menuPath = highlightPath || activePath;
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
@@ -131,15 +132,18 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, 
                 <NavLink
                   key={item.id}
                   to={`/manager/${item.path}`}
-                  onClick={onNavigate}
+                  onClick={item.id === "inventory" && onInventoryClick ? onInventoryClick : onNavigate}
                   title={collapsed ? label : undefined}
                   aria-label={collapsed ? label : undefined}
-                  className={({ isActive }) => cn(
-                    "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    collapsed && "justify-center",
-                    !collapsed && !single && "ml-1",
-                    isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
-                  )}
+                  className={({ isActive }) => {
+                    const base = cn(
+                      "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      collapsed && "justify-center",
+                      !collapsed && !single && "ml-1",
+                      isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
+                    );
+                    return cn(base, item.id === "inventory" && inventoryNegatives > 0 && "text-destructive");
+                  }}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   {!collapsed && (
@@ -266,7 +270,17 @@ export default function ManagerLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
 
-  const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
+  const handleInventoryClick = async () => {
+    try {
+      await clearInventoryNegatives();
+      setInventoryNegatives(0);
+    } catch (err) {
+      console.error('Failed to clear inventory negatives', err);
+      // Optionally show toast/error to user
+    }
+  };
+
+  const activePath = location.pathname.replace(/^\\/manager\\/?/, "").replace(/\\/+$/, "");
   const current = findNavItem(activePath, version);
   const highlightPath = version === "v3" ? v3MenuPath(activePath) : undefined;
 
@@ -339,6 +353,7 @@ export default function ManagerLayout() {
             activePath={activePath}
             highlightPath={highlightPath}
             inventoryNegatives={inventoryNegatives}
+            onInventoryClick={handleInventoryClick}
           />
           <button
             type="button"
@@ -369,6 +384,7 @@ export default function ManagerLayout() {
                 highlightPath={highlightPath}
                 inventoryNegatives={inventoryNegatives}
                 onNavigate={() => setDrawerOpen(false)}
+                onInventoryClick={handleInventoryClick}
               />
             </div>
           </div>
