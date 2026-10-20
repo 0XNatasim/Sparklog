@@ -81,7 +81,6 @@ function storeFlag(key, on) {
   try { window.localStorage.setItem(key, on ? "1" : "0"); } catch { /* storage unavailable */ }
 }
 
-// highlightPath (V3 only): the menu entry that holds the open page when it is a V2 path.
 function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives, onInventoryClick }) {
   const t = useT();
   const menuPath = highlightPath || activePath;
@@ -235,7 +234,7 @@ function VersionSwitch({ version, onChange }) {
   const t = useT();
   return (
     <div role="radiogroup" aria-label={t("mgr.ui.label")} title={t("mgr.ui.label")} className="inline-flex shrink-0 rounded-md border bg-muted p-0.5">
-      {["v2", "v3"].map((value) => (
+      {[ "v2", "v3" ].map((value) => (
         <button
           key={value}
           type="button"
@@ -280,7 +279,7 @@ export default function ManagerLayout() {
     }
   };
 
-  const activePath = location.pathname.replace(/^\\/manager\\/?/, "").replace(/\\/+$/, "");
+  const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
   const highlightPath = version === "v3" ? v3MenuPath(activePath) : undefined;
 
@@ -376,16 +375,6 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <SidebarNav
-                key={version}
-                groups={groups}
-                collapsed={false}
-                activePath={activePath}
-                highlightPath={highlightPath}
-                inventoryNegatives={inventoryNegatives}
-                onNavigate={() => setDrawerOpen(false)}
-                onInventoryClick={handleInventoryClick}
-              />
             </div>
           </div>
         )}
