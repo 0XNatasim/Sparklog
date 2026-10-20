@@ -13,6 +13,8 @@ import { useTheme } from "@/components/theme-provider";
 import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
+import { getInventoryNegativeTotal } from "@/lib/inventory-alerts";
+import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
@@ -79,7 +81,7 @@ function storeFlag(key, on) {
 }
 
 // highlightPath (V3 only): the menu entry that holds the open page when it is a V2 path.
-function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }) {
+function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives }) {
   const t = useT();
   const menuPath = highlightPath || activePath;
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
@@ -140,7 +142,16 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  {!collapsed && <span className="truncate">{label}</span>}
+                  {!collapsed && (
+                    <>
+                      <span className="truncate">{label}</span>
+                      {item.id === "inventory" && inventoryNegatives > 0 && (
+                        <Badge variant="destructive" className="ms-2">
+                          {inventoryNegatives}
+                        </Badge>
+                      )}
+                    </>
+                  )}
                 </NavLink>
               );
             })}
@@ -253,6 +264,7 @@ export default function ManagerLayout() {
   const [collapsed, setCollapsed] = useState(() => readFlag(COLLAPSE_KEY));
   const [navHidden, setNavHidden] = useState(() => readFlag(HIDDEN_KEY));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [inventoryNegatives, setInventoryNegatives] = useState(0);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
@@ -266,6 +278,18 @@ export default function ManagerLayout() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
+
+  // ---- Inventory negative alert -------------------------------------------------
+  useEffect(() => {
+    if (!isManagerRole(role)) {
+      setInventoryNegatives(0);
+      return;
+    }
+    (async () => {
+      const total = await getInventoryNegativeTotal();
+      setInventoryNegatives(total);
+    })();
+  }, [role]); // re-fetch when the manager logs in/out or switches V2/V3 (role unchanged) – you can also add date if you have it.
 
   function toggleCollapsed() {
     setCollapsed((value) => {
@@ -308,7 +332,14 @@ export default function ManagerLayout() {
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
-          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} highlightPath={highlightPath} />
+          <SidebarNav
+            key={version}
+            groups={groups}
+            collapsed={collapsed}
+            activePath={activePath}
+            highlightPath={highlightPath}
+            inventoryNegatives={inventoryNegatives}
+          />
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -330,7 +361,15 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} highlightPath={highlightPath} onNavigate={() => setDrawerOpen(false)} />
+              <SidebarNav
+                key={version}
+                groups={groups}
+                collapsed={false}
+                activePath={activePath}
+                highlightPath={highlightPath}
+                inventoryNegatives={inventoryNegatives}
+                onNavigate={() => setDrawerOpen(false)}
+              />
             </div>
           </div>
         )}
