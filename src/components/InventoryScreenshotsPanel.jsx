@@ -443,7 +443,7 @@ export default function InventoryScreenshotsPanel() {
                                 <tr key={code}>
                                   <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{code}</div></td>
                                   {comparison && <td className={cn("px-3 py-2 text-right tabular-nums", !Number(row.previous) && "text-muted-foreground")}>{fmtQty(row.previous)}</td>}
-                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground")}>{fmtQty(quantity)}</td>
+                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground", Number(quantity) < 0 && "font-semibold text-destructive")}>{fmtQty(quantity)}</td>
                                   {comparison && (
                                     <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.diff === null || row.diff === 0 ? "text-muted-foreground" : row.diff < 0 ? "text-destructive" : "text-success")}>
                                       {fmtDiff(row.diff)}

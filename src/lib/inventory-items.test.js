@@ -343,3 +343,23 @@ describe("0073 migration and deployment", () => {
     expect(fn).not.toContain("ocr_text");
   });
 });
+
+describe("negative quantities read from the capture (Field Service « -1,00 »)", () => {
+  it("reads the minus as part of the quantity, never in the name", () => {
+    const stacked = parseInventoryText(`E-\nEQ000008 ...\nGradateur mural intelligent Jasco…\n-1,00\nE-\nEQ000025 ...\nInterrupteur auxiliaire (3 voies et …\n1,00\n`);
+    expect(stacked.items.map((item) => [item.code, item.name, item.quantity])).toEqual([
+      ["EQ000008", "Gradateur mural intelligent Jasco", -1],
+      ["EQ000025", "Interrupteur auxiliaire (3 voies et", 1],
+    ]);
+    const inline = parseInventoryText("E- EQ000008 ··· Gradateur mural intelligent Jasc… - 2,00\nE- EQ000049 ··· Calypso V1 −3,00");
+    expect(inline.items.map((item) => item.quantity)).toEqual([-2, -3]);
+    expect(inline.items[0].name).toBe("Gradateur mural intelligent Jasc");
+  });
+
+  it("keeps a dash inside a name (« Sinope - 3000W ») and positive quantities as they were", () => {
+    const parsed = parseInventoryText(SHOT_2);
+    expect(parsed.items.find((item) => item.code === "EQ000046")).toEqual({ code: "EQ000046", name: "Sinope - 3000W", quantity: 0, section: "inventory" });
+    expect(parsed.items.find((item) => item.code === "EQ000047").quantity).toBe(10);
+    expect(parsed.items.every((item) => item.quantity >= 0)).toBe(true);
+  });
+});
