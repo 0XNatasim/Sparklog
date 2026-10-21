@@ -1,22 +1,51 @@
-import { supabase } from '@/supabaseClient';
-import { useT } from '@/lib/use-t';
+import { supabase } from "@/supabaseClient";
+import { withTimeout } from "@/lib/utils";
 
-/**
- * Returns the total number of negative inventory entries across all employees.
- * If you prefer "number of employees with a negative", change the reducer accordingly.
- * @returns {Promise<number>}
- */
-export async function getInventoryNegativeTotal() {
-  const { data, error } = await supabase
-    .rpc('inventory_negative_alerts') // returns { user_id, job_date, negative_count }
-    .returns(/* { user_id: string, job_date: string, negative_count: number }[] */);
+// The Inventory page and the sidebar badge both listen for this after a dismiss.
+export const INVENTORY_ALERTS_EVENT = "sparklog:inventory-alerts";
 
-  if (error) {
-    console.error('[inventory-alerts] RPC failed', error);
-    return 0;
+// One card per employee and inventory day. Rows come from inventory_negative_alerts()
+// (one row per negative item). The notice is independent of the day picker.
+export function groupInventoryNegativeAlerts(rows) {
+  const groups = new Map();
+  for (const row of rows || []) {
+    const userId = row?.user_id;
+    const jobDate = row?.job_date;
+    if (!userId || !jobDate) continue;
+    const key = `${userId}|${jobDate}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        userId,
+        jobDate: String(jobDate).slice(0, 10),
+        name: String(row.full_name || "").trim() || userId,
+        items: [],
+      };
+      groups.set(key, group);
+    }
+    if (!row.code || group.items.some((item) => item.code === row.code)) continue;
+    group.items.push({
+      code: row.code,
+      name: row.item_name || row.code,
+      quantity: row.quantity,
+    });
   }
+  for (const group of groups.values()) {
+    group.items.sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
+  }
+  return [...groups.values()].sort((a, b) => b.jobDate.localeCompare(a.jobDate) || a.name.localeCompare(b.name, "fr-CA"));
+}
 
-  // Sum the negative_count field – you can also do:
-  //   return data.filter(d => d.negative_count > 0).length; // employees with any negative
-  return data.reduce((sum, row) => sum + (row.negative_count ?? 0), 0);
+export async function fetchInventoryNegativeAlerts() {
+  const { data, error } = await withTimeout(supabase.rpc("inventory_negative_alerts"), 12000);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function dismissInventoryNegativeAlert({ userId, jobDate }) {
+  const { error } = await withTimeout(
+    supabase.rpc("dismiss_inventory_negative_alert", { p_user_id: userId, p_job_date: jobDate }),
+    12000
+  );
+  if (error) throw error;
 }

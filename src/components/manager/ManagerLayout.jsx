@@ -13,8 +13,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
-import { getInventoryNegativeTotal } from "@/lib/inventory-alerts";
-import { clearInventoryNegatives } from "@/lib/inventory-clear";
+import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
@@ -81,7 +80,7 @@ function storeFlag(key, on) {
   try { window.localStorage.setItem(key, on ? "1" : "0"); } catch { /* storage unavailable */ }
 }
 
-function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives, onInventoryClick }) {
+function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives }) {
   const t = useT();
   const menuPath = highlightPath || activePath;
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
@@ -131,7 +130,7 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, 
                 <NavLink
                   key={item.id}
                   to={`/manager/${item.path}`}
-                  onClick={item.id === "inventory" && onInventoryClick ? onInventoryClick : onNavigate}
+                  onClick={onNavigate}
                   title={collapsed ? label : undefined}
                   aria-label={collapsed ? label : undefined}
                   className={({ isActive }) => {
@@ -145,15 +144,9 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, 
                   }}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  {!collapsed && (
-                    <>
-                      <span className="truncate">{label}</span>
-                      {item.id === "inventory" && inventoryNegatives > 0 && (
-                        <Badge variant="destructive" className="ms-2">
-                          {inventoryNegatives}
-                        </Badge>
-                      )}
-                    </>
+                  {!collapsed && <span className="truncate">{label}</span>}
+                  {item.id === "inventory" && inventoryNegatives > 0 && (
+                    <Badge variant="destructive" className={cn("ms-auto", collapsed && "ms-0 px-1.5")}>{inventoryNegatives}</Badge>
                   )}
                 </NavLink>
               );
@@ -269,16 +262,6 @@ export default function ManagerLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
 
-  const handleInventoryClick = async () => {
-    try {
-      await clearInventoryNegatives();
-      setInventoryNegatives(0);
-    } catch (err) {
-      console.error('Failed to clear inventory negatives', err);
-      // Optionally show toast/error to user
-    }
-  };
-
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
   const highlightPath = version === "v3" ? v3MenuPath(activePath) : undefined;
@@ -292,17 +275,31 @@ export default function ManagerLayout() {
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
 
-  // ---- Inventory negative alert -------------------------------------------------
+  // Open negative-stock notices: one per employee and inventory day. A dismiss on the
+  // Inventory page fires INVENTORY_ALERTS_EVENT so the badge drops without a reload.
   useEffect(() => {
     if (!isManagerRole(role)) {
       setInventoryNegatives(0);
-      return;
+      return undefined;
     }
-    (async () => {
-      const total = await getInventoryNegativeTotal();
-      setInventoryNegatives(total);
-    })();
-  }, [role]); // re-fetch when the manager logs in/out or switches V2/V3 (role unchanged) – you can also add date if you have it.
+    let cancelled = false;
+    let generation = 0;
+    async function loadAlerts() {
+      const ticket = ++generation;
+      try {
+        const rows = await fetchInventoryNegativeAlerts();
+        if (!cancelled && ticket === generation) setInventoryNegatives(groupInventoryNegativeAlerts(rows).length);
+      } catch (error) {
+        console.error("[inventory-alerts]", error);
+      }
+    }
+    loadAlerts();
+    window.addEventListener(INVENTORY_ALERTS_EVENT, loadAlerts);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(INVENTORY_ALERTS_EVENT, loadAlerts);
+    };
+  }, [role, location.pathname]);
 
   function toggleCollapsed() {
     setCollapsed((value) => {
@@ -352,7 +349,6 @@ export default function ManagerLayout() {
             activePath={activePath}
             highlightPath={highlightPath}
             inventoryNegatives={inventoryNegatives}
-            onInventoryClick={handleInventoryClick}
           />
           <button
             type="button"
@@ -375,6 +371,15 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+              <SidebarNav
+                key={version}
+                groups={groups}
+                collapsed={false}
+                activePath={activePath}
+                highlightPath={highlightPath}
+                inventoryNegatives={inventoryNegatives}
+                onNavigate={() => setDrawerOpen(false)}
+              />
             </div>
           </div>
         )}

@@ -15,6 +15,7 @@ import { friendlyErrorMessage } from "@/lib/error-messages";
 import { DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
 import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, summarizeInventoryDay, sumCrewDefective, sumCrewInventory } from "@/lib/inventory-items";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
+import { dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -50,10 +51,18 @@ export default function InventoryScreenshotsPanel() {
   const [requestedAt, setRequestedAt] = useState({});
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [confirm, confirmDialog] = useConfirmDialog();
+  // Negative-stock notices for the last 7 days. Independent of the day picker.
+  const [alerts, setAlerts] = useState([]);
+  const [alertsErr, setAlertsErr] = useState("");
+  const [dismissingKey, setDismissingKey] = useState("");
   // useT() returns a new function on every render: keep it out of effect/callback dependencies,
   // or the data reloads (and the open card closes) on every render.
   const tRef = useRef(t);
   tRef.current = t;
+  // Set when a notice asks to open an employee on another day. The date change would
+  // otherwise close the card before it opens.
+  const pendingOpenRef = useRef(null);
+  const alertTicket = useRef(0);
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
@@ -86,7 +95,33 @@ export default function InventoryScreenshotsPanel() {
     }
   }, [date]);
 
-  useEffect(() => { setOpenId(null); setPhotos({}); setCompare(null); }, [date]);
+  const loadAlerts = useCallback(async () => {
+    const ticket = ++alertTicket.current;
+    try {
+      const rows = await fetchInventoryNegativeAlerts();
+      if (ticket !== alertTicket.current) return;
+      setAlerts(groupInventoryNegativeAlerts(rows));
+      setAlertsErr("");
+    } catch (error) {
+      if (ticket !== alertTicket.current) return;
+      setAlertsErr(friendlyErrorMessage(error, tRef.current, "mgr.inventory.negativeFailed"));
+    }
+  }, []);
+
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
+
+  useEffect(() => {
+    if (pendingOpenRef.current) {
+      setOpenId(pendingOpenRef.current);
+      pendingOpenRef.current = null;
+      setPhotos({});
+      setCompare(null);
+      return;
+    }
+    setOpenId(null);
+    setPhotos({});
+    setCompare(null);
+  }, [date]);
   useEffect(() => { setCompare(null); }, [openId]);
   useEffect(() => { load(); }, [load]);
 
@@ -182,6 +217,30 @@ export default function InventoryScreenshotsPanel() {
   const received = entries.filter((entry) => entry.state !== "missing").length;
   const shiftDay = (days) => setDate((current) => dayjs(current).add(days, "day").format("YYYY-MM-DD"));
 
+  function openAlert(alert) {
+    if (alert.jobDate === date) {
+      setOpenId(alert.userId);
+      return;
+    }
+    pendingOpenRef.current = alert.userId;
+    setDate(alert.jobDate);
+  }
+
+  async function dismissAlert(alert) {
+    const key = `${alert.userId}|${alert.jobDate}`;
+    setDismissingKey(key);
+    setAlertsErr("");
+    try {
+      await dismissInventoryNegativeAlert({ userId: alert.userId, jobDate: alert.jobDate });
+      await loadAlerts();
+      window.dispatchEvent(new Event(INVENTORY_ALERTS_EVENT));
+    } catch (error) {
+      setAlertsErr(friendlyErrorMessage(error, t, "mgr.inventory.negativeDismissFailed"));
+    } finally {
+      setDismissingKey("");
+    }
+  }
+
   function chipLabel(entry) {
     if (entry.state === "missing") return t("mgr.inventory.state.missing");
     if (entry.state === "photos") return t("mgr.inventory.state.photos");
@@ -222,6 +281,47 @@ export default function InventoryScreenshotsPanel() {
 
   return (
     <div className="space-y-3">
+      {(alerts.length > 0 || alertsErr) && (
+        <Card>
+          <CardContent className="space-y-3 p-3">
+            {alerts.length > 0 && (
+              <div className="text-sm font-semibold text-destructive">{t("mgr.inventory.negativeTitle", { count: alerts.length })}</div>
+            )}
+            {alertsErr && <p className="text-sm text-destructive" role="alert">{alertsErr}</p>}
+            {alerts.length > 0 && (
+              <ul className="space-y-3">
+                {alerts.map((alert) => {
+                  const key = `${alert.userId}|${alert.jobDate}`;
+                  return (
+                    <li key={key} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <button type="button" className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => openAlert(alert)}>
+                          <span className="block font-medium">{alert.name}</span>
+                          <span className="block text-sm text-muted-foreground">{dayjs(alert.jobDate).format("YYYY-MM-DD")}</span>
+                        </button>
+                        <Button type="button" variant="outline" size="sm" disabled={dismissingKey === key} onClick={() => dismissAlert(alert)}>
+                          {t("mgr.inventory.negativeDismiss")}
+                        </Button>
+                      </div>
+                      {alert.items.length > 0 && (
+                        <ul className="mt-2 space-y-1 text-sm">
+                          {alert.items.map((item) => (
+                            <li key={item.code} className="flex items-baseline justify-between gap-3">
+                              <span><span className="font-medium">{item.name}</span> <span className="text-xs text-muted-foreground">{item.code}</span></span>
+                              <span className="tabular-nums text-destructive">{fmtQty(item.quantity)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
           <Button type="button" variant="outline" size="icon" aria-label={t("mgr.inventory.previousDay")} onClick={() => shiftDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
