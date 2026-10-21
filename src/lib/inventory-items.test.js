@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { sumCrewDefective, sumCrewInventory, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { sumCrewDefective, sumCrewInventory, sumRegionInventory, inventoryRegionChoices, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 import { inventoryCaptured, inventoryStepComplete } from "./inventory-screenshots";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -227,6 +227,31 @@ describe("sumCrewInventory", () => {
   });
 });
 
+describe("sumRegionInventory", () => {
+  const item = (code, quantity) => ({ code, name: `Item ${code}`, quantity });
+  const entry = (name, region, items) => ({ name, state: "ok", person: { work_region: region }, items });
+
+  it("sums only the employees of the selected region", () => {
+    const entries = [
+      entry("A", "06", [item("EQ000001", 4), item("EQ000002", 1)]),
+      entry("B", "06", [item("EQ000001", 3)]),
+      entry("C", "13", [item("EQ000001", 10)]),
+      entry("D", "", [item("EQ000009", 2)]),
+    ];
+    const montreal = sumRegionInventory(entries, "06");
+    expect(montreal.counted).toBe(2);
+    expect(montreal.rows.find((row) => row.code === "EQ000001")).toMatchObject({ total: 7, holders: 2 });
+    expect(montreal.rows.find((row) => row.code === "EQ000002")).toMatchObject({ total: 1, holders: 1 });
+    expect(sumRegionInventory(entries, "13").rows[0]).toMatchObject({ code: "EQ000001", total: 10 });
+    expect(sumRegionInventory(entries, "").rows[0]).toMatchObject({ code: "EQ000009", total: 2 });
+    expect(inventoryRegionChoices(entries, [{ code: "06", name: "Montréal" }, { code: "13", name: "Laval" }])).toEqual([
+      { code: "06", name: "Montréal" },
+      { code: "13", name: "Laval" },
+      { code: "", name: "" },
+    ]);
+  });
+});
+
 describe("compareInventory", () => {
   const item = (code, quantity, name = `Item ${code}`) => ({ code, name, quantity });
   const today = [item("EQ000001", 5), item("EQ000002", 10), item("EQ000004", 0)];
@@ -316,5 +341,25 @@ describe("0073 migration and deployment", () => {
     const fn = read("../../supabase/functions/process_inventory_screenshot/index.ts");
     expect(fn).toContain('role !== "manager"');
     expect(fn).not.toContain("ocr_text");
+  });
+});
+
+describe("negative quantities read from the capture (Field Service « -1,00 »)", () => {
+  it("reads the minus as part of the quantity, never in the name", () => {
+    const stacked = parseInventoryText(`E-\nEQ000008 ...\nGradateur mural intelligent Jasco…\n-1,00\nE-\nEQ000025 ...\nInterrupteur auxiliaire (3 voies et …\n1,00\n`);
+    expect(stacked.items.map((item) => [item.code, item.name, item.quantity])).toEqual([
+      ["EQ000008", "Gradateur mural intelligent Jasco", -1],
+      ["EQ000025", "Interrupteur auxiliaire (3 voies et", 1],
+    ]);
+    const inline = parseInventoryText("E- EQ000008 ··· Gradateur mural intelligent Jasc… - 2,00\nE- EQ000049 ··· Calypso V1 −3,00");
+    expect(inline.items.map((item) => item.quantity)).toEqual([-2, -3]);
+    expect(inline.items[0].name).toBe("Gradateur mural intelligent Jasc");
+  });
+
+  it("keeps a dash inside a name (« Sinope - 3000W ») and positive quantities as they were", () => {
+    const parsed = parseInventoryText(SHOT_2);
+    expect(parsed.items.find((item) => item.code === "EQ000046")).toEqual({ code: "EQ000046", name: "Sinope - 3000W", quantity: 0, section: "inventory" });
+    expect(parsed.items.find((item) => item.code === "EQ000047").quantity).toBe(10);
+    expect(parsed.items.every((item) => item.quantity >= 0)).toBe(true);
   });
 });

@@ -13,6 +13,8 @@ import { useTheme } from "@/components/theme-provider";
 import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
+import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
+import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
@@ -78,8 +80,7 @@ function storeFlag(key, on) {
   try { window.localStorage.setItem(key, on ? "1" : "0"); } catch { /* storage unavailable */ }
 }
 
-// highlightPath (V3 only): the menu entry that holds the open page when it is a V2 path.
-function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }) {
+function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives }) {
   const t = useT();
   const menuPath = highlightPath || activePath;
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
@@ -132,15 +133,21 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }
                   onClick={onNavigate}
                   title={collapsed ? label : undefined}
                   aria-label={collapsed ? label : undefined}
-                  className={({ isActive }) => cn(
-                    "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    collapsed && "justify-center",
-                    !collapsed && !single && "ml-1",
-                    isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
-                  )}
+                  className={({ isActive }) => {
+                    const base = cn(
+                      "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      collapsed && "justify-center",
+                      !collapsed && !single && "ml-1",
+                      isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
+                    );
+                    return cn(base, item.id === "inventory" && inventoryNegatives > 0 && "text-destructive");
+                  }}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   {!collapsed && <span className="truncate">{label}</span>}
+                  {item.id === "inventory" && inventoryNegatives > 0 && (
+                    <Badge variant="destructive" className={cn("ms-auto", collapsed && "ms-0 px-1.5")}>{inventoryNegatives}</Badge>
+                  )}
                 </NavLink>
               );
             })}
@@ -220,7 +227,7 @@ function VersionSwitch({ version, onChange }) {
   const t = useT();
   return (
     <div role="radiogroup" aria-label={t("mgr.ui.label")} title={t("mgr.ui.label")} className="inline-flex shrink-0 rounded-md border bg-muted p-0.5">
-      {["v2", "v3"].map((value) => (
+      {[ "v2", "v3" ].map((value) => (
         <button
           key={value}
           type="button"
@@ -253,6 +260,7 @@ export default function ManagerLayout() {
   const [collapsed, setCollapsed] = useState(() => readFlag(COLLAPSE_KEY));
   const [navHidden, setNavHidden] = useState(() => readFlag(HIDDEN_KEY));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [inventoryNegatives, setInventoryNegatives] = useState(0);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
@@ -266,6 +274,32 @@ export default function ManagerLayout() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
+
+  // Open negative-stock notices: one per employee and inventory day. A dismiss on the
+  // Inventory page fires INVENTORY_ALERTS_EVENT so the badge drops without a reload.
+  useEffect(() => {
+    if (!isManagerRole(role)) {
+      setInventoryNegatives(0);
+      return undefined;
+    }
+    let cancelled = false;
+    let generation = 0;
+    async function loadAlerts() {
+      const ticket = ++generation;
+      try {
+        const rows = await fetchInventoryNegativeAlerts();
+        if (!cancelled && ticket === generation) setInventoryNegatives(groupInventoryNegativeAlerts(rows).length);
+      } catch (error) {
+        console.error("[inventory-alerts]", error);
+      }
+    }
+    loadAlerts();
+    window.addEventListener(INVENTORY_ALERTS_EVENT, loadAlerts);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(INVENTORY_ALERTS_EVENT, loadAlerts);
+    };
+  }, [role, location.pathname]);
 
   function toggleCollapsed() {
     setCollapsed((value) => {
@@ -308,7 +342,14 @@ export default function ManagerLayout() {
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
-          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} highlightPath={highlightPath} />
+          <SidebarNav
+            key={version}
+            groups={groups}
+            collapsed={collapsed}
+            activePath={activePath}
+            highlightPath={highlightPath}
+            inventoryNegatives={inventoryNegatives}
+          />
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -330,7 +371,15 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} highlightPath={highlightPath} onNavigate={() => setDrawerOpen(false)} />
+              <SidebarNav
+                key={version}
+                groups={groups}
+                collapsed={false}
+                activePath={activePath}
+                highlightPath={highlightPath}
+                inventoryNegatives={inventoryNegatives}
+                onNavigate={() => setDrawerOpen(false)}
+              />
             </div>
           </div>
         )}

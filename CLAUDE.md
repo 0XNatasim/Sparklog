@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-19, V2.4.157)
+## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.161)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -628,6 +628,18 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   Téléphone perdu : le développeur supprime les appareils du compte dans Supabase (`auth.mfa_factors`), la personne en
   ajoute un nouveau à la connexion suivante. Vérifié dans Chromium (Supabase simulé) : inscription, mauvais code, bon code,
   code à la connexion, employé jamais bloqué, icônes, Profil ; migration testée sur Postgres local (chaque rôle, aal1 / aal2).
+- [x] **Inventaire : quantités négatives et entrepôt par région** (V2.4.158–161, branche Hermes + lecture ; migrations
+  0104–0105 ; fonction `process_inventory_screenshot` à redéployer). Field Service peut afficher « -1,00 » (plus installé
+  que le camion n'en avait) : la lecture mettait le « - » dans le nom (« Gradateur mural intelligent Jasco - ») et gardait
+  1,00, et la table refusait les quantités < 0. `parse.ts` lit le signe (un « - » après une espace, juste avant la quantité ;
+  « Sinope - 3000W » reste un nom) ; 0104 : contrainte -99 999 à 99 999, ligne du 2026-10-19 corrigée,
+  `inventory_negative_alerts()` (gestionnaire) = dernière liste de chaque employé (7 jours) avec une quantité négative ;
+  0105 : la fonction renvoie l'employé, l'appareil et la date ; `dismiss_inventory_negative_alert` (gestionnaire /
+  propriétaire, aal2) retire l'avis pour cet employé et ce jour (`inventory_alert_dismissals`, ligne
+  `inventory_negative_dismissed` au Journal). Rien ne change pour l'employé. Gestion › Inventaire : carte du stock négatif
+  (qui, quoi, quand, bouton pour retirer l'avis), quantité en rouge, compteur sur « Inventaire » dans le menu
+  (`src/lib/inventory-alerts.js`). « Entrepôt par région » : total des appareils des employés d'une région ce jour-là
+  (`inventoryRegionChoices` / `sumRegionInventory`). `supabase/.temp/` (état local du CLI) n'est plus suivi par git.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

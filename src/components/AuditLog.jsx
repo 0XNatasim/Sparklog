@@ -65,6 +65,7 @@ export default function AuditLog() {
     switch (row.action) {
       case "user_deleted": return t("audit.desc.userDeleted", { name: target, email: d.email || "—" });
       case "inventory_deleted": return t("audit.desc.inventoryDeleted", { name: target, date: d.job_date || "—", count: d.count || 0 });
+      case "inventory_negative_dismissed": return t("audit.desc.inventoryNegativeDismissed", { name: target, date: d.job_date || "—" });
       case "role_change": return t("audit.desc.roleChange", { name: target, from: d.from || "—", to: d.to || "—" });
       case "pause_change": return t(d.is_paused ? "audit.desc.paused" : "audit.desc.unpaused", { name: target });
       case "job_unlock": return t("audit.desc.jobUnlock", { name: target, date: d.job_date || "—" });
@@ -100,6 +101,7 @@ export default function AuditLog() {
               <option value="all">{t("audit.filter.all")}</option>
               <option value="user_deleted">{t("audit.filter.userDeleted")}</option>
               <option value="inventory_deleted">{t("audit.filter.inventoryDeleted")}</option>
+              <option value="inventory_negative_dismissed">{t("audit.filter.inventoryNegativeDismissed")}</option>
               <option value="role_change">{t("audit.filter.roleChange")}</option>
               <option value="pause_change">{t("audit.filter.pauseChange")}</option>
               <option value="job_unlock">{t("audit.filter.jobUnlock")}</option>

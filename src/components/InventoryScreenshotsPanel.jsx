@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { ChevronLeft, ChevronRight, ListChecks, RefreshCw, Trash2, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListChecks, RefreshCw, Trash2, Users, Warehouse } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,10 @@ import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
-import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, summarizeInventoryDay, sumCrewDefective, sumCrewInventory } from "@/lib/inventory-items";
+import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, inventoryRegionChoices, summarizeInventoryDay, sumCrewDefective, sumCrewInventory, sumRegionInventory } from "@/lib/inventory-items";
+import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
+import { alertDisplayName, dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -42,6 +44,8 @@ export default function InventoryScreenshotsPanel() {
   // Comparison with the employee's previous inventory day: { personId, date, status, data }.
   const [compare, setCompare] = useState(null);
   const [crewOpen, setCrewOpen] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
+  const [storageRegion, setStorageRegion] = useState("");
   // « Qui fait l'inventaire » : the per-employee opt-in (profiles.inventory_screenshots_enabled, 0072).
   const [whoOpen, setWhoOpen] = useState(false);
   const [whoBusy, setWhoBusy] = useState("");
@@ -50,10 +54,18 @@ export default function InventoryScreenshotsPanel() {
   const [requestedAt, setRequestedAt] = useState({});
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [confirm, confirmDialog] = useConfirmDialog();
+  // Negative-stock notices for the last 7 days. Independent of the day picker.
+  const [alerts, setAlerts] = useState([]);
+  const [alertsErr, setAlertsErr] = useState("");
+  const [dismissingKey, setDismissingKey] = useState("");
   // useT() returns a new function on every render: keep it out of effect/callback dependencies,
   // or the data reloads (and the open card closes) on every render.
   const tRef = useRef(t);
   tRef.current = t;
+  // Set when a notice asks to open an employee on another day. The date change would
+  // otherwise close the card before it opens.
+  const pendingOpenRef = useRef(null);
+  const alertTicket = useRef(0);
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
@@ -61,7 +73,7 @@ export default function InventoryScreenshotsPanel() {
     try {
       const [peopleResult, shotsResult, itemsResult] = await Promise.all([
         withTimeout(
-          supabase.from("profiles").select("id, full_name, email, role, is_paused, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
+          supabase.from("profiles").select("id, full_name, email, role, is_paused, work_region, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
           12000
         ),
         withTimeout(
@@ -86,7 +98,33 @@ export default function InventoryScreenshotsPanel() {
     }
   }, [date]);
 
-  useEffect(() => { setOpenId(null); setPhotos({}); setCompare(null); }, [date]);
+  const loadAlerts = useCallback(async () => {
+    const ticket = ++alertTicket.current;
+    try {
+      const rows = await fetchInventoryNegativeAlerts();
+      if (ticket !== alertTicket.current) return;
+      setAlerts(groupInventoryNegativeAlerts(rows));
+      setAlertsErr("");
+    } catch (error) {
+      if (ticket !== alertTicket.current) return;
+      setAlertsErr(friendlyErrorMessage(error, tRef.current, "mgr.inventory.negativeFailed"));
+    }
+  }, []);
+
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
+
+  useEffect(() => {
+    if (pendingOpenRef.current) {
+      setOpenId(pendingOpenRef.current);
+      pendingOpenRef.current = null;
+      setPhotos({});
+      setCompare(null);
+      return;
+    }
+    setOpenId(null);
+    setPhotos({});
+    setCompare(null);
+  }, [date]);
   useEffect(() => { setCompare(null); }, [openId]);
   useEffect(() => { load(); }, [load]);
 
@@ -175,12 +213,44 @@ export default function InventoryScreenshotsPanel() {
   }
 
   const crew = useMemo(() => sumCrewInventory(entries), [entries]);
+  const regionChoices = useMemo(() => inventoryRegionChoices(entries, QUEBEC_REGIONS), [entries]);
+  const storageCode = regionChoices.some((region) => region.code === storageRegion) ? storageRegion : (regionChoices[0]?.code ?? "");
+  const regionStorage = useMemo(() => sumRegionInventory(entries, storageCode), [entries, storageCode]);
+  const regionChoice = regionChoices.find((region) => region.code === storageCode) || null;
+  const regionLabel = regionChoice && !regionChoice.code
+    ? t("mgr.inventory.storageNoRegion")
+    : [regionChoice?.code, regionChoice?.name].filter(Boolean).join(" — ");
+  const regionRows = regionStorage.rows.filter((row) => !(hideZero && row.total === 0));
   const crewRows = crew.rows.filter((row) => !(hideZero && row.total === 0));
   // Defective products (« Produits défectueux », 0097) are summed apart and never mixed into the list.
   const crewDefective = useMemo(() => sumCrewDefective(entries), [entries]);
 
   const received = entries.filter((entry) => entry.state !== "missing").length;
   const shiftDay = (days) => setDate((current) => dayjs(current).add(days, "day").format("YYYY-MM-DD"));
+
+  function openAlert(alert) {
+    if (alert.jobDate === date) {
+      setOpenId(alert.userId);
+      return;
+    }
+    pendingOpenRef.current = alert.userId;
+    setDate(alert.jobDate);
+  }
+
+  async function dismissAlert(alert) {
+    const key = `${alert.userId}|${alert.jobDate}`;
+    setDismissingKey(key);
+    setAlertsErr("");
+    try {
+      await dismissInventoryNegativeAlert({ userId: alert.userId, jobDate: alert.jobDate });
+      await loadAlerts();
+      window.dispatchEvent(new Event(INVENTORY_ALERTS_EVENT));
+    } catch (error) {
+      setAlertsErr(friendlyErrorMessage(error, t, "mgr.inventory.negativeDismissFailed"));
+    } finally {
+      setDismissingKey("");
+    }
+  }
 
   function chipLabel(entry) {
     if (entry.state === "missing") return t("mgr.inventory.state.missing");
@@ -222,6 +292,47 @@ export default function InventoryScreenshotsPanel() {
 
   return (
     <div className="space-y-3">
+      {(alerts.length > 0 || alertsErr) && (
+        <Card>
+          <CardContent className="space-y-3 p-3">
+            {alerts.length > 0 && (
+              <div className="text-sm font-semibold text-destructive">{t("mgr.inventory.negativeTitle", { count: alerts.length })}</div>
+            )}
+            {alertsErr && <p className="text-sm text-destructive" role="alert">{alertsErr}</p>}
+            {alerts.length > 0 && (
+              <ul className="space-y-3">
+                {alerts.map((alert) => {
+                  const key = `${alert.userId}|${alert.jobDate}`;
+                  return (
+                    <li key={key} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <button type="button" className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => openAlert(alert)}>
+                          <span className="block font-medium">{alertDisplayName(alert, people)}</span>
+                          <span className="block text-sm text-muted-foreground">{dayjs(alert.jobDate).format("YYYY-MM-DD")}</span>
+                        </button>
+                        <Button type="button" variant="outline" size="sm" disabled={dismissingKey === key} onClick={() => dismissAlert(alert)}>
+                          {t("mgr.inventory.negativeDismiss")}
+                        </Button>
+                      </div>
+                      {alert.items.length > 0 && (
+                        <ul className="mt-2 space-y-1 text-sm">
+                          {alert.items.map((item) => (
+                            <li key={item.code} className="flex items-baseline justify-between gap-3">
+                              <span><span className="font-medium">{item.name}</span> <span className="text-xs text-muted-foreground">{item.code}</span></span>
+                              <span className="tabular-nums text-destructive">{fmtQty(item.quantity)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
           <Button type="button" variant="outline" size="icon" aria-label={t("mgr.inventory.previousDay")} onClick={() => shiftDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
@@ -235,6 +346,9 @@ export default function InventoryScreenshotsPanel() {
             </Button>
             <Button type="button" variant="outline" size="sm" disabled={crew.counted === 0 && crewDefective.counted === 0} onClick={() => setCrewOpen(true)}>
               <Users className="mr-1 h-4 w-4" />{t("mgr.inventory.crew")}
+            </Button>
+            <Button type="button" variant="outline" size="sm" disabled={regionChoices.length === 0} onClick={() => setStorageOpen(true)}>
+              <Warehouse className="mr-1 h-4 w-4" />{t("mgr.inventory.storage")}
             </Button>
             <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
@@ -329,7 +443,7 @@ export default function InventoryScreenshotsPanel() {
                                 <tr key={code}>
                                   <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{code}</div></td>
                                   {comparison && <td className={cn("px-3 py-2 text-right tabular-nums", !Number(row.previous) && "text-muted-foreground")}>{fmtQty(row.previous)}</td>}
-                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground")}>{fmtQty(quantity)}</td>
+                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground", Number(quantity) < 0 && "font-semibold text-destructive")}>{fmtQty(quantity)}</td>
                                   {comparison && (
                                     <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.diff === null || row.diff === 0 ? "text-muted-foreground" : row.diff < 0 ? "text-destructive" : "text-success")}>
                                       {fmtDiff(row.diff)}
@@ -458,6 +572,62 @@ export default function InventoryScreenshotsPanel() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={storageOpen} onOpenChange={setStorageOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("mgr.inventory.storageTitle", { region: regionLabel || "—", date: dayjs(date).format("YYYY-MM-DD") })}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {regionChoices.map((region) => {
+                const label = region.code ? [region.code, region.name].filter(Boolean).join(" — ") : t("mgr.inventory.storageNoRegion");
+                const selected = region.code === storageCode;
+                return (
+                  <Button key={region.code || "none"} type="button" size="sm" variant={selected ? "default" : "outline"} onClick={() => setStorageRegion(region.code)}>
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">{t("mgr.inventory.crewCounted", { count: regionStorage.counted, items: regionStorage.rows.length })}</span>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={hideZero} onChange={(event) => setHideZero(event.target.checked)} className="h-4 w-4 accent-primary" />
+                {t("mgr.inventory.hideZero")}
+              </label>
+            </div>
+            {regionStorage.unverified.length > 0 && (
+              <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+                {t("mgr.inventory.crewUnverified", { names: regionStorage.unverified.join(", ") })}
+              </p>
+            )}
+            {regionStorage.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("mgr.inventory.storageEmpty")}</p>
+            ) : (
+              <div className="overflow-hidden rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colTotal")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colHolders")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {regionRows.map((row) => (
+                      <tr key={row.code}>
+                        <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{row.code}</div></td>
+                        <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.total === 0 && "text-muted-foreground")}>{Number(row.total).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{row.holders}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
