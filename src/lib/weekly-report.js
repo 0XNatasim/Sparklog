@@ -172,6 +172,10 @@ export function buildWeeklyReport({
     // report. Hors CCQ = return-to-shop time without benefits; every hour of a non-CCQ role or of fixed pay.
     hours.ccqMinutes = nonCcq || fixedHours ? 0 : hours.regularMinutes + hours.ot50Minutes + hours.ot100Minutes;
     hours.nonCcqMinutes = hours.paidMinutes - hours.ccqMinutes;
+    // The summary splits the CCQ hours (owner, 2026-10-21): regular apart from overtime, so
+    // Total = CCQ régulier + Temps sup. + Hors CCQ (e.g. 34 h 19 CCQ = 32 h régulier + 2 h 19 sup.).
+    hours.ccqRegularMinutes = nonCcq || fixedHours ? 0 : hours.regularMinutes;
+    hours.ccqOvertimeMinutes = hours.ccqMinutes - hours.ccqRegularMinutes;
     let pay = null;
     if (!nonCcq || fixedHours) {
       pay = employeePay({
@@ -204,6 +208,8 @@ export function buildWeeklyReport({
     paidMinutes: sum(employees, (e) => e.hours.paidMinutes),
     ccqMinutes: sum(employees, (e) => e.hours.ccqMinutes),
     nonCcqMinutes: sum(employees, (e) => e.hours.nonCcqMinutes),
+    ccqRegularMinutes: sum(employees, (e) => e.hours.ccqRegularMinutes),
+    ccqOvertimeMinutes: sum(employees, (e) => e.hours.ccqOvertimeMinutes),
     ot50Minutes: sum(employees, (e) => e.hours.ot50Minutes),
     ot100Minutes: sum(employees, (e) => e.hours.ot100Minutes),
     km: sum(employees, (e) => e.hours.km),
@@ -395,9 +401,9 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td>${esc(e.name)}${e.pendingJobs ? ' <span class="warn">*</span>' : ""}</td>
       <td class="num">${e.jobs.length}</td>
       <td class="num strong">${fmtHM(e.hours.paidMinutes)}</td>
-      <td class="num">${fmtHM(e.hours.ccqMinutes)}</td>
+      <td class="num">${fmtHM(e.hours.ccqRegularMinutes)}</td>
+      <td class="num">${fmtHM(e.hours.ccqOvertimeMinutes)}</td>
       <td class="num">${fmtHM(e.hours.nonCcqMinutes)}</td>
-      <td class="num">${fmtHM(e.hours.ot50Minutes + e.hours.ot100Minutes)}</td>
       <td class="num">${fmtKm(e.hours.km)}</td>
       <td class="num">${e.pay ? fmtMoney(e.pay.salary) : "—"}</td>
       <td class="num">${e.pay ? fmtMoney(e.pay.totalDeductions) : "—"}</td>
@@ -425,9 +431,9 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
     ${stat("Employés", totals.employees)}
     ${stat("Jobs", totals.jobs)}
     ${stat("Total heures", fmtHM(totals.paidMinutes))}
-    ${stat("Heures CCQ", fmtHM(totals.ccqMinutes))}
+    ${stat("Heures CCQ (régulier)", fmtHM(totals.ccqRegularMinutes))}
+    ${stat("Temps sup. CCQ (1,5× + 2×)", fmtHM(totals.ccqOvertimeMinutes))}
     ${stat("Heures hors CCQ", fmtHM(totals.nonCcqMinutes))}
-    ${stat("Temps sup. (1,5× + 2×)", fmtHM(totals.ot50Minutes + totals.ot100Minutes))}
     ${stat("Kilomètres", fmtKm(totals.km))}
     ${stat("Salaires bruts", fmtMoney(totals.salary))}
     ${stat("DAS — ARC", fmtMoney(totals.dasArc))}
@@ -440,7 +446,7 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
   <h3>Sommaire par employé</h3>
   <table class="summary">
     <thead><tr>
-      <th>Employé</th><th class="num">Jobs</th><th class="num">Total heures</th><th class="num">Heures CCQ</th><th class="num">Hors CCQ</th><th class="num">Temps sup.</th><th class="num">km</th>
+      <th>Employé</th><th class="num">Jobs</th><th class="num">Total heures</th><th class="num">Heures CCQ (régulier)</th><th class="num">Temps sup.</th><th class="num">Hors CCQ</th><th class="num">km</th>
       <th class="num">Brut</th><th class="num">Retenues</th><th class="num">Net</th>
       <th class="num">DAS ARC</th><th class="num">DAS QC</th><th class="num">Coût employeur</th>
     </tr></thead>
@@ -449,9 +455,9 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td>Total</td>
       <td class="num">${totals.jobs}</td>
       <td class="num">${fmtHM(totals.paidMinutes)}</td>
-      <td class="num">${fmtHM(totals.ccqMinutes)}</td>
+      <td class="num">${fmtHM(totals.ccqRegularMinutes)}</td>
+      <td class="num">${fmtHM(totals.ccqOvertimeMinutes)}</td>
       <td class="num">${fmtHM(totals.nonCcqMinutes)}</td>
-      <td class="num">${fmtHM(totals.ot50Minutes + totals.ot100Minutes)}</td>
       <td class="num">${fmtKm(totals.km)}</td>
       <td class="num">${fmtMoney(totals.salary)}</td>
       <td class="num">${fmtMoney(totals.totalDeductions)}</td>
@@ -466,8 +472,9 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
   ${employees.map(employeeHtml).join("")}
 
   <div class="foot">
-    Sommaire : Total heures = Heures CCQ + Hors CCQ · Heures CCQ = régulier + 1,5× + 2× (comme le rapport CCQ ; le temps sup.
-    en fait partie) · Hors CCQ = retour à l'entrepôt sans avantages, ou toutes les heures d'un rôle hors CCQ.
+    Sommaire : Total heures = Heures CCQ (régulier) + Temps sup. + Hors CCQ · Heures CCQ (régulier) = heures normales, retour
+    avec avantages compris · Temps sup. = heures CCQ à 1,5× et 2× (au rapport CCQ, les heures CCQ = régulier + temps sup.)
+    · Hors CCQ = retour à l'entrepôt sans avantages, ou toutes les heures d'un rôle hors CCQ (temps sup. compris).
     Heures : Rég. = régulier (retour avec avantages inclus) · 1,5× / 2× = temps supplémentaire · Retour s.a. = temps de retour
     sans avantages · Total = temps payé. Les montants viennent du même calcul que les écrans Talons et DAS (taux du profil
     de l'employé, cumul de l'année comptabilisé). Coût employeur = salaire brut + 13 % CCQ + avantages sociaux CCQ + cotisations

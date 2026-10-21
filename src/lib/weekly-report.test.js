@@ -98,8 +98,28 @@ describe("CCQ / non-CCQ hours", () => {
     expect(o.hours).toMatchObject({ paidMinutes: 480, ccqMinutes: 0, nonCcqMinutes: 480 });
     expect(r.totals).toMatchObject({ paidMinutes: 1080, ccqMinutes: 540, nonCcqMinutes: 540 });
     const html = buildWeeklyReportHtml(r);
-    expect(html).toContain("<th class=\"num\">Heures CCQ</th><th class=\"num\">Hors CCQ</th>");
+    expect(html).toContain("<th class=\"num\">Heures CCQ (régulier)</th><th class=\"num\">Temps sup.</th><th class=\"num\">Hors CCQ</th>");
     expect(html).toContain("Total heures");
+  });
+
+  it("shows CCQ regular hours without the overtime, which has its own column (owner, 2026-10-21)", () => {
+    // 07:00 → 17:00, no return: 10 h = 8 h regular + 2 h overtime (1 h at 1.5×, 1 h at 2×).
+    const r = buildWeeklyReport({
+      week, profiles: [alice, office], contributions, employer, messierMethod: false,
+      jobs: [job("r1", "a", "2026-09-28", "1234", "07:00", "17:00", 30, "approved"),
+        job("o1", "o", "2026-09-29", "AD-1", "08:00", "18:00", 0)],
+    });
+    const [a, o] = r.employees;
+    expect(a.hours).toMatchObject({ paidMinutes: 600, ccqMinutes: 600, ccqRegularMinutes: 480, ccqOvertimeMinutes: 120, nonCcqMinutes: 0 });
+    // A non-CCQ role keeps all its hours (overtime too) in Hors CCQ.
+    expect(o.hours).toMatchObject({ ccqRegularMinutes: 0, ccqOvertimeMinutes: 0, nonCcqMinutes: 600 });
+    for (const e of r.employees) {
+      expect(e.hours.ccqRegularMinutes + e.hours.ccqOvertimeMinutes + e.hours.nonCcqMinutes, e.name).toBe(e.hours.paidMinutes);
+    }
+    expect(r.totals).toMatchObject({ ccqRegularMinutes: 480, ccqOvertimeMinutes: 120, nonCcqMinutes: 600, paidMinutes: 1200 });
+    const html = buildWeeklyReportHtml(r);
+    const aliceRow = html.slice(html.indexOf("<tbody>"), html.indexOf("</tbody>"));
+    expect(aliceRow).toContain('<td class="num">8h00</td>\n      <td class="num">2h00</td>');
   });
 });
 
