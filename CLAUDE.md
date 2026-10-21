@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.162)
+## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.163)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -646,6 +646,13 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   sup. » (heures CCQ à 1,5× et 2×) et « Hors CCQ » : Total = régulier + temps sup. + hors CCQ (`ccqRegularMinutes` /
   `ccqOvertimeMinutes`, `src/lib/weekly-report.js`). Un rôle hors CCQ garde toutes ses heures dans « Hors CCQ ».
   Colonnes « Souper » et « Stationnement » ajoutées (montants de la semaine, demandes acceptées ou en attente, avec totaux).
+- [x] **Absences : catégorie « Maladie » et registre** (V2.4.163, migration 0106 : contrainte `employee_time_off_category_chk`
+  avec `'maladie'`) : choix « Maladie » partout où on saisit une absence (Employés › Absences, fiche de l'employé). Carte
+  « Registre maladie » dans Absences : par employé et par année (sélecteur, année courante + années avec une entrée),
+  nombre d'absences, **jours ouvrables** (sans fins de semaine, fériés ni vacances de la construction, `company_holidays`),
+  heures des parties de journée, dates et notes, total, export CSV. `sickLeaveRegister` / `sickLeaveYears`
+  (`src/lib/timeoff.js`) ; une période qui chevauche le 1er janvier compte dans chaque année. Les règles récurrentes ne
+  comptent pas. Indicatif : aucun effet sur la paie (le 13 % comprend déjà la part maladie de 1,5 %).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

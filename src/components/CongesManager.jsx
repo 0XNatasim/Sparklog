@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, History, Pencil, Plus, X } from "lucide-react";
+import { CalendarDays, Download, History, Pencil, Plus, Stethoscope, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { formatTimeOff, categoryLabel, matchesRecurrence, TIME_OFF_CATEGORIES, TIME_OFF_COLUMNS, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
+import { formatTimeOff, categoryLabel, matchesRecurrence, sickLeaveRegister, sickLeaveYears, TIME_OFF_CATEGORIES, TIME_OFF_COLUMNS, WEEKDAY_KEYS, WEEKDAY_PICKER } from "@/lib/timeoff";
+import { useHolidayDates } from "@/lib/company-holidays";
+import { companyDate } from "@/lib/company-time";
 import TimeOffControls from "@/components/TimeOffControls";
 
 const hm = (value) => (value ? String(value).slice(0, 5) : "");
@@ -100,8 +102,118 @@ function TimeOffEditForm({ row, onSaved, onCancel }) {
   );
 }
 
+const fmtHours = (hours) => (hours ? String(hours).replace(".", ",") : "");
+const entryDates = (entry) => {
+  const dates = entry.start === entry.end ? entry.start : `${entry.start} → ${entry.end}`;
+  return entry.startTime && entry.endTime ? `${dates} ${hm(entry.startTime)}–${hm(entry.endTime)}` : dates;
+};
+
+// Sick-leave register (« Maladie »): per employee and per calendar year, how many sick entries,
+// how many work days they cover and the hours of partial days, with every date. Built from the
+// rows the tab already loaded (no extra query); informational, no pay effect.
+function SickLeaveRegister({ rows, nameById }) {
+  const t = useT();
+  const holidays = useHolidayDates();
+  const currentYear = Number(companyDate().slice(0, 4));
+  const years = useMemo(() => sickLeaveYears(rows, currentYear), [rows, currentYear]);
+  const [year, setYear] = useState(currentYear);
+  const nameOf = useCallback((id) => nameById.get(id) || id, [nameById]);
+  const lines = useMemo(
+    () => sickLeaveRegister(rows, { year, holidays }).sort((a, b) => String(nameOf(a.userId)).localeCompare(String(nameOf(b.userId)), "fr")),
+    [rows, year, holidays, nameOf],
+  );
+  const total = lines.reduce((sum, line) => ({
+    occurrences: sum.occurrences + line.occurrences,
+    days: sum.days + line.days,
+    hours: Math.round((sum.hours + line.hours) * 100) / 100,
+  }), { occurrences: 0, days: 0, hours: 0 });
+
+  function exportCsv() {
+    const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const out = [[t("conges.sickEmployee"), t("conges.sickDetail"), t("conges.sickDays"), t("conges.sickHours"), t("conges.sickNote")].map(esc).join(",")];
+    for (const line of lines) {
+      for (const entry of line.entries) {
+        out.push([nameOf(line.userId), entryDates(entry), entry.days || "", fmtHours(entry.hours), entry.note].map(esc).join(","));
+      }
+    }
+    const blob = new Blob(["\uFEFF" + out.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `registre-maladie-${year}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-semibold"><Stethoscope className="h-4 w-4 text-primary" />{t("conges.sickTitle")}</div>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs">
+              <span className="text-muted-foreground">{t("conges.sickYear")}</span>
+              <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-md border border-input bg-background px-2 py-1.5 text-sm">
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </label>
+            <Button type="button" size="sm" variant="outline" disabled={lines.length === 0} onClick={exportCsv}>
+              <Download className="mr-1 h-4 w-4" />{t("conges.sickExport")}
+            </Button>
+          </div>
+        </div>
+        <p className="border-b px-4 py-2 text-xs text-muted-foreground">{t("conges.sickHint")}</p>
+        {lines.length === 0 ? (
+          <div className="p-4 text-sm text-muted-foreground">{t("conges.sickEmpty", { year })}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold">{t("conges.sickEmployee")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("conges.sickOccurrences")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("conges.sickDays")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("conges.sickHours")}</th>
+                  <th className="px-4 py-2 text-left font-semibold">{t("conges.sickDetail")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {lines.map((line) => (
+                  <tr key={line.userId} className="align-top">
+                    <td className="px-4 py-2 font-medium">{nameOf(line.userId)}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{line.occurrences}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{line.days || ""}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{fmtHours(line.hours)}</td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground">
+                      {line.entries.map((entry) => (
+                        <div key={entry.id}>
+                          {entryDates(entry)}
+                          {entry.note && <span className="italic"> — {entry.note}</span>}
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t bg-muted/40 font-semibold">
+                <tr>
+                  <td className="px-4 py-2">{t("conges.sickTotal")}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{total.occurrences}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{total.days || ""}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{fmtHours(total.hours)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // Full Congés tab (manager dashboard): a complete history of everyone's time off first —
-// filterable by employee and by category (leave / vacation / absence / part-time) — then an
+// filterable by employee and by category (leave / vacation / absence / sick / part-time) — then an
 // add area. Backed by the same employee_time_off table as each employee's profile, so entries
 // stay in sync both ways. Categories are informational (no pay effect).
 export default function CongesManager() {
@@ -214,6 +326,9 @@ export default function CongesManager() {
           {error && <p className="text-xs text-destructive">{error}</p>}
         </CardContent>
       </Card>
+
+      {/* Sick-leave register (« Maladie »), per employee and year. */}
+      {!loading && <SickLeaveRegister rows={rows} nameById={nameById} />}
 
       {/* History of everyone — below the add card. */}
       <Card>
