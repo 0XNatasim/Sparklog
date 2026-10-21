@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 vi.mock("../supabaseClient", () => ({ supabase: { rpc: vi.fn() } }));
 
-const { groupInventoryNegativeAlerts } = await import("./inventory-alerts");
+const { alertDisplayName, groupInventoryNegativeAlerts, namesForAlerts } = await import("./inventory-alerts");
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
@@ -43,6 +43,18 @@ describe("groupInventoryNegativeAlerts", () => {
     expect(cards).toHaveLength(1);
     expect(cards[0].name).toBe("a");
     expect(cards[0].items).toEqual([{ code: "EQ000001", name: "Ampoule", quantity: -1 }]);
+  });
+
+  it("uses the profile name when the alert row has only the account id", () => {
+    const named = namesForAlerts(
+      [{ user_id: "employee-1", job_date: "2026-10-19", negative_count: 1 }],
+      [{ id: "employee-1", full_name: "Alex Martin", email: "alex@example.com" }]
+    );
+    expect(groupInventoryNegativeAlerts(named)[0].name).toBe("Alex Martin");
+    expect(alertDisplayName(
+      { userId: "employee-1", name: "employee-1" },
+      [{ id: "employee-1", full_name: "Alex Martin" }]
+    )).toBe("Alex Martin");
   });
 
   it("returns nothing for an empty list", () => {

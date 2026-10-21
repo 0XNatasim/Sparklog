@@ -15,7 +15,7 @@ import { friendlyErrorMessage } from "@/lib/error-messages";
 import { DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
 import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, summarizeInventoryDay, sumCrewDefective, sumCrewInventory } from "@/lib/inventory-items";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
-import { dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
+import { alertDisplayName, dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -296,7 +296,7 @@ export default function InventoryScreenshotsPanel() {
                     <li key={key} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <button type="button" className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => openAlert(alert)}>
-                          <span className="block font-medium">{alert.name}</span>
+                          <span className="block font-medium">{alertDisplayName(alert, people)}</span>
                           <span className="block text-sm text-muted-foreground">{dayjs(alert.jobDate).format("YYYY-MM-DD")}</span>
                         </button>
                         <Button type="button" variant="outline" size="sm" disabled={dismissingKey === key} onClick={() => dismissAlert(alert)}>
