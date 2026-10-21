@@ -3,7 +3,11 @@
 // Web Push (RFC 8030 + VAPID) for employees' phones — Android and iOS 16.4+ (installed PWA).
 // Called by the manager UI right after a broadcast is created:
 //   POST { broadcastId: string }   (manager/admin/owner bearer token)
+// and after an edit that asks the readers to read it again (migration 0107):
+//   POST { broadcastId: string, reread: true }   → only recipients who have not pressed OK,
+//   body prefixed « Message modifié : ».
 // Recipients are read from broadcast_recipients server-side; the client never supplies them.
+// Withdrawn recipients (0107) never get a push.
 //
 // Secrets: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto: or https: URL).
 // Generate once with `npx web-push generate-vapid-keys`. Without them this returns 503 and
@@ -12,7 +16,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { buildPushPayload, isGonePushStatus } from "./push_payload.js";
+import { buildPushPayload, canPushBroadcast, isGonePushStatus, pushBodyFor } from "./push_payload.js";
 import { isAal2 } from "../_shared/mfa.js";
 
 const corsHeaders = {
@@ -60,15 +64,18 @@ serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const broadcastId = typeof payload?.broadcastId === "string" ? payload.broadcastId : "";
     if (!/^[0-9a-f-]{36}$/i.test(broadcastId)) return json({ ok: false, error: "broadcastId is required" }, 400);
+    const reread = payload?.reread === true;
 
     const { data: broadcast } = await admin
-      .from("manager_broadcasts").select("id, body, sender_id").eq("id", broadcastId).maybeSingle();
+      .from("manager_broadcasts").select("id, body, sender_id, edited_by").eq("id", broadcastId).maybeSingle();
     if (!broadcast) return json({ ok: false, error: "Broadcast not found" }, 404);
-    // A manager may only push their own broadcasts (prevents replaying someone else's).
-    if (broadcast.sender_id !== callerUser.user.id) return json({ ok: false, error: "Forbidden" }, 403);
+    // A manager may only push their own broadcasts, or their own edit of one (prevents replaying someone else's).
+    if (!canPushBroadcast(broadcast, callerUser.user.id, { reread })) return json({ ok: false, error: "Forbidden" }, 403);
 
-    const { data: recipients } = await admin
-      .from("broadcast_recipients").select("employee_id").eq("broadcast_id", broadcastId);
+    let recipientQuery = admin
+      .from("broadcast_recipients").select("employee_id").eq("broadcast_id", broadcastId).is("withdrawn_at", null);
+    if (reread) recipientQuery = recipientQuery.is("acknowledged_at", null);
+    const { data: recipients } = await recipientQuery;
     const employeeIds = (recipients ?? []).map((r) => r.employee_id);
     if (employeeIds.length === 0) return json({ ok: true, sent: 0, failed: 0, removed: 0 });
 
@@ -81,7 +88,7 @@ serve(async (req) => {
     // Unread announcements per employee (this one included) → number on the app icon.
     const { data: unreadRows } = await admin
       .from("broadcast_recipients").select("employee_id")
-      .in("employee_id", employeeIds).is("acknowledged_at", null);
+      .in("employee_id", employeeIds).is("acknowledged_at", null).is("withdrawn_at", null);
     const unread = new Map<string, number>();
     for (const row of unreadRows ?? []) unread.set(row.employee_id, (unread.get(row.employee_id) ?? 0) + 1);
 
@@ -92,7 +99,7 @@ serve(async (req) => {
     await Promise.all((subs ?? []).map(async (sub) => {
       try {
         const message = buildPushPayload({
-          title: "SparkLog", body: broadcast.body, url: "/", tag: `broadcast-${broadcastId}`,
+          title: "SparkLog", body: pushBodyFor(broadcast.body, { reread }), url: "/", tag: `broadcast-${broadcastId}`,
           badge: Math.max(1, unread.get(sub.user_id) ?? 1),
         });
         const d = await webpush.generateRequestDetails(
