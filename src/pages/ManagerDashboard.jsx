@@ -16,7 +16,8 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
 import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
-import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
+import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
+import { loadOtReuse } from "@/lib/ot-reuse";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import LiveCrew from "@/components/LiveCrew";
 import WeekSnapshot from "@/components/WeekSnapshot";
@@ -219,12 +220,16 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       const { data: tripUnpaid } = userIds.length
         ? await supabase.from("profiles").select("id").eq("first_trip_unpaid", true).in("id", userIds).abortSignal(signal)
         : { data: [] };
+      const otReuse = await loadOtReuse(rows.map((row) => row.id), signal);
       if (!ticket.isCurrent()) return;
-      setAnomalies(detectJobAnomalies(
-        [...rows, ...(approved || [])],
-        anomalyLimitsFromSettings(settings),
-        { firstTripUnpaidUsers: new Set((tripUnpaid || []).map((row) => row.id)) },
-      ));
+      setAnomalies(sortAnomalies([
+        ...detectJobAnomalies(
+          [...rows, ...(approved || [])],
+          anomalyLimitsFromSettings(settings),
+          { firstTripUnpaidUsers: new Set((tripUnpaid || []).map((row) => row.id)) },
+        ),
+        ...otReuseAnomalies(otReuse, rows),
+      ]));
       setAnomaliesFailed(false);
     } catch {
       if (ticket.isCurrent()) setAnomaliesFailed(true);
@@ -740,6 +745,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       ot: anomaly.ot,
       depart: String(anomaly.depart || "").slice(0, 5),
       fin: String(anomaly.fin || "").slice(0, 5),
+      others: otReuseOthersText(anomaly.others, { t, formatDate: (d) => dayjs(d).format("DD MMM") }),
     });
   }
 

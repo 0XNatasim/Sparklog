@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.164)
+## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.165)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -664,6 +664,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   même une app pas à jour) ; ceux qui ont fait OK le gardent. « Renvoyer » saute les retirés. Une ligne `broadcast_edited` /
   `broadcast_withdrawn` au Journal. `src/lib/broadcast-edit.js`, `broadcast-upload.js`. Testé sur Postgres local (rôles,
   pièces jointes invalides, relecture, retrait, employé retiré ne peut ni voir ni se « dé-retirer »).
+- [x] **Anomalie « OT déjà utilisé »** (V2.4.165, migration 0108) : rien n'empêchait deux fiches d'avoir le même n° d'OT
+  (au 2026-10-21 : 9 OT en double sur 1 355 fiches, dont des retours sur la même job). Rien n'est bloqué : À traiter et
+  Feuilles de temps demandent à la base, pour les jobs soumises affichées, les **autres** fiches au même n° (tout employé,
+  toute date, tout statut) — RPC `ot_reuse_for_jobs` (gestionnaire, aal2), `normalized_ot` (4 chiffres ou plus, espaces
+  retirés : « FORMATION », « OK KARINE » ignorés) + index. Ligne « OT 200451 déjà utilisé : Patrick G. · 14 oct. (soumis) »
+  avec les autres anomalies (la journée sort de « Tout approuver sans anomalie »). La même fiche entrée deux fois (même
+  employé, jour et heures) reste l'anomalie « Doublon ». `otReuseAnomalies` (`src/lib/job-anomalies.js`), `src/lib/ot-reuse.js`
+  (si l'appel échoue, les autres anomalies s'affichent quand même). Le message « Un job avec l'OT … existe déjà » du formulaire
+  ne vient pas d'une règle sur l'OT (aucune en base) : à revoir si on ajoute un avertissement côté employé.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
