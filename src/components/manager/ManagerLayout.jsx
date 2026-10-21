@@ -18,6 +18,8 @@ import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNa
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { isManagerRole } from "@/lib/roles";
 import NotificationsBell from "@/components/NotificationsBell";
+import { supabase } from "@/supabaseClient";
+import { inventoryAlertCount } from "@/lib/inventory-items";
 import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
@@ -79,7 +81,8 @@ function storeFlag(key, on) {
 }
 
 // highlightPath (V3 only): the menu entry that holds the open page when it is a V2 path.
-function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }) {
+// badges: { [item id]: { count, title } } — e.g. negative inventory quantities on « Inventaire ».
+function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, badges = {} }) {
   const t = useT();
   const menuPath = highlightPath || activePath;
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
@@ -119,12 +122,16 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }
               >
                 {GroupIcon && <GroupIcon className="h-3.5 w-3.5" />}
                 <span className="flex-1 text-left">{t(group.labelKey)}</span>
+                {!expanded && group.items.some((item) => badges[item.id]?.count) && (
+                  <span className="h-2 w-2 rounded-full bg-destructive" aria-hidden="true" />
+                )}
                 <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !expanded && "-rotate-90")} />
               </button>
             )}
             {expanded && group.items.map((item) => {
               const Icon = ICONS[item.id] || Clock3;
               const label = t(item.labelKey);
+              const badge = badges[item.id]?.count ? badges[item.id] : null;
               return (
                 <NavLink
                   key={item.id}
@@ -139,8 +146,16 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate }
                     isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!collapsed && <span className="truncate">{label}</span>}
+                  <span className="relative shrink-0">
+                    <Icon className="h-4 w-4" />
+                    {badge && collapsed && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-destructive" aria-hidden="true" />}
+                  </span>
+                  {!collapsed && <span className="flex-1 truncate">{label}</span>}
+                  {badge && !collapsed && (
+                    <span className="rounded-full bg-destructive px-1.5 text-xs font-semibold text-destructive-foreground" title={badge.title} aria-label={badge.title}>
+                      {badge.count}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
@@ -260,6 +275,25 @@ export default function ManagerLayout() {
 
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
+  // « Inventaire » badge (0104): employees whose latest list shows a negative quantity. Managers only
+  // (the page needs the manager role); re-read on each page change and when the app comes back.
+  const [inventoryAlerts, setInventoryAlerts] = useState(0);
+  useEffect(() => {
+    if (!canSwitch) return undefined;
+    let cancelled = false;
+    const load = async () => {
+      const { data, error } = await supabase.rpc("inventory_negative_alerts");
+      if (!cancelled && !error) setInventoryAlerts(inventoryAlertCount(data));
+    };
+    load();
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); };
+  }, [canSwitch, location.pathname]);
+  const navBadges = inventoryAlerts
+    ? { inventory: { count: inventoryAlerts, title: t("mgr.nav.inventoryAlert", { count: inventoryAlerts }) } }
+    : {};
+
   useEffect(() => {
     if (!drawerOpen) return undefined;
     const onKey = (event) => { if (event.key === "Escape") setDrawerOpen(false); };
@@ -308,7 +342,7 @@ export default function ManagerLayout() {
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
-          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} highlightPath={highlightPath} />
+          <SidebarNav key={version} groups={groups} collapsed={collapsed} activePath={activePath} highlightPath={highlightPath} badges={navBadges} />
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -330,7 +364,7 @@ export default function ManagerLayout() {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} highlightPath={highlightPath} onNavigate={() => setDrawerOpen(false)} />
+              <SidebarNav key={version} groups={groups} collapsed={false} activePath={activePath} highlightPath={highlightPath} badges={navBadges} onNavigate={() => setDrawerOpen(false)} />
             </div>
           </div>
         )}

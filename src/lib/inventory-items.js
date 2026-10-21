@@ -53,8 +53,20 @@ export function summarizeInventoryDay(shots, rows) {
   else state = "review";
   return {
     state, items, count: items.length, expected, captures: listShots.length,
+    // Field Service can show a negative stock ("-1,00"): impossible on a truck, flagged to managers.
+    negative: negativeItems(items).length,
     defective: summarizeDefective(shots, rows),
   };
+}
+
+// Rows of a list whose quantity is below 0 (0104): more installed than the truck held.
+export function negativeItems(items) {
+  return (items || []).filter((item) => Number(item.quantity) < 0);
+}
+
+// Menu badge: how many employees' latest list shows a negative quantity (inventory_negative_alerts rows).
+export function inventoryAlertCount(rows) {
+  return new Set((rows || []).filter((row) => Number(row.negative_count) > 0).map((row) => row.user_id)).size;
 }
 
 // Defective products of the day: rows read under « Produits défectueux » on any screenshot (the

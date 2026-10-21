@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { sumCrewDefective, sumCrewInventory, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { sumCrewDefective, sumCrewInventory, compareInventory, effectiveOcrStatus, inventoryAlertCount, mergeInventoryItems, negativeItems, summarizeInventoryDay } from "./inventory-items";
 import { inventoryCaptured, inventoryStepComplete } from "./inventory-screenshots";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -316,5 +316,49 @@ describe("0073 migration and deployment", () => {
     const fn = read("../../supabase/functions/process_inventory_screenshot/index.ts");
     expect(fn).toContain('role !== "manager"');
     expect(fn).not.toContain("ocr_text");
+  });
+});
+
+describe("negative quantities (Field Service « -1,00 », 0104)", () => {
+  const migration = read("../../supabase/migrations/20261019200000_0104_inventory_negative_quantity.sql");
+
+  it("reads the minus as part of the quantity, never in the name", () => {
+    const stacked = parseInventoryText(`E-\nEQ000008 ...\nGradateur mural intelligent Jasco…\n-1,00\nE-\nEQ000025 ...\nInterrupteur auxiliaire (3 voies et …\n1,00\n`);
+    expect(stacked.items.map((item) => [item.code, item.name, item.quantity])).toEqual([
+      ["EQ000008", "Gradateur mural intelligent Jasco", -1],
+      ["EQ000025", "Interrupteur auxiliaire (3 voies et", 1],
+    ]);
+    const inline = parseInventoryText("E- EQ000008 ··· Gradateur mural intelligent Jasc… - 2,00\nE- EQ000049 ··· Calypso V1 −3,00");
+    expect(inline.items.map((item) => item.quantity)).toEqual([-2, -3]);
+    expect(inline.items[0].name).toBe("Gradateur mural intelligent Jasc");
+  });
+
+  it("keeps a dash inside a name (« Sinope - 3000W ») and positive quantities as they were", () => {
+    const parsed = parseInventoryText(SHOT_2);
+    expect(parsed.items.find((item) => item.code === "EQ000046")).toEqual({ code: "EQ000046", name: "Sinope - 3000W", quantity: 0, section: "inventory" });
+    expect(parsed.items.find((item) => item.code === "EQ000047").quantity).toBe(10);
+    expect(parsed.items.every((item) => item.quantity >= 0)).toBe(true);
+  });
+
+  it("flags an employee's day and counts employees for the menu badge", () => {
+    const shots = [{ slot: 1, ocr_status: "processed", list_total: 2 }];
+    const rows = [
+      { slot: 1, code: "EQ000008", name: "Gradateur", quantity: -1 },
+      { slot: 1, code: "EQ000025", name: "Interrupteur", quantity: 1 },
+    ];
+    expect(summarizeInventoryDay(shots, rows).negative).toBe(1);
+    expect(negativeItems(rows).map((row) => row.code)).toEqual(["EQ000008"]);
+    expect(inventoryAlertCount([
+      { user_id: "a", negative_count: 1 }, { user_id: "a", negative_count: 2 }, { user_id: "b", negative_count: 1 }, { user_id: "c", negative_count: 0 },
+    ])).toBe(2);
+    expect(inventoryAlertCount(null)).toBe(0);
+  });
+
+  it("accepts negative rows in the table, fixes the rows already read, and alerts managers only (0104)", () => {
+    expect(migration).toContain("drop constraint if exists inventory_items_quantity_check");
+    expect(migration).toContain("check (quantity between -99999 and 99999)");
+    expect(migration).toContain("where name ~ '\\s[-–−]\\s*$' and quantity > 0;");
+    expect(migration).toContain("where public.get_my_role() = 'manager'");
+    expect(migration).toContain("revoke all on function public.inventory_negative_alerts() from public, anon;");
   });
 });

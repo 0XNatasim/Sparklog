@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { ChevronLeft, ChevronRight, ListChecks, RefreshCw, Trash2, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListChecks, RefreshCw, Trash2, TriangleAlert, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -261,6 +261,11 @@ export default function InventoryScreenshotsPanel() {
               >
                 <span className="font-medium">{entry.name}</span>
                 <span className="flex flex-wrap items-center justify-end gap-2">
+                  {entry.negative > 0 && (
+                    <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-destructive">
+                      <TriangleAlert className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t("mgr.inventory.negativeChip", { count: entry.negative })}
+                    </Badge>
+                  )}
                   {entry.defective.count > 0 && (
                     <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-destructive">{t("mgr.inventory.defectiveChip", { count: entry.defective.count })}</Badge>
                   )}
@@ -293,6 +298,11 @@ export default function InventoryScreenshotsPanel() {
                   {open.state === "review" && (
                     <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                       {open.expected ? t("mgr.inventory.mismatch", { count: open.count, expected: open.expected }) : t("mgr.inventory.unverified")}
+                    </p>
+                  )}
+                  {open.negative > 0 && (
+                    <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{t("mgr.inventory.negativeNotice", { count: open.negative })}
                     </p>
                   )}
                   {open.items.length > 0 && (
@@ -329,7 +339,10 @@ export default function InventoryScreenshotsPanel() {
                                 <tr key={code}>
                                   <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{code}</div></td>
                                   {comparison && <td className={cn("px-3 py-2 text-right tabular-nums", !Number(row.previous) && "text-muted-foreground")}>{fmtQty(row.previous)}</td>}
-                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground")}>{fmtQty(quantity)}</td>
+                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground", Number(quantity) < 0 && "font-semibold text-destructive")}>
+                                    {Number(quantity) < 0 && <TriangleAlert className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-label={t("mgr.inventory.negativeLabel")} />}
+                                    {fmtQty(quantity)}
+                                  </td>
                                   {comparison && (
                                     <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.diff === null || row.diff === 0 ? "text-muted-foreground" : row.diff < 0 ? "text-destructive" : "text-success")}>
                                       {fmtDiff(row.diff)}

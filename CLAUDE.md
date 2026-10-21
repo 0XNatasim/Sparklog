@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-19, V2.4.157)
+## 6. À faire / à préciser (mis à jour 2026-10-19, V2.4.158)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -628,6 +628,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   Téléphone perdu : le développeur supprime les appareils du compte dans Supabase (`auth.mfa_factors`), la personne en
   ajoute un nouveau à la connexion suivante. Vérifié dans Chromium (Supabase simulé) : inscription, mauvais code, bon code,
   code à la connexion, employé jamais bloqué, icônes, Profil ; migration testée sur Postgres local (chaque rôle, aal1 / aal2).
+- [x] **Inventaire : quantités négatives** (V2.4.158, migration 0104 ; fonction `process_inventory_screenshot` à
+  redéployer) : Field Service peut afficher « -1,00 » (plus installé que le camion n'en avait). La lecture mettait le « - »
+  dans le nom (« Gradateur mural intelligent Jasco - ») et gardait 1,00, et la table refusait les quantités < 0. `parse.ts`
+  lit le signe (un « - » après une espace, juste avant la quantité ; « Sinope - 3000W » reste un nom) ; contrainte
+  -99 999 à 99 999 ; la ligne du 2026-10-19 corrigée par la migration. Rien ne change pour l'employé. Gestionnaires :
+  pastille rouge « N négatif(s) » sur l'employé, ligne en rouge avec ⚠ et avis dans la liste, et **compteur rouge sur
+  « Inventaire » dans le menu de gauche** (point rouge sur le groupe fermé) = employés dont la **dernière** liste (7 derniers
+  jours) a une quantité négative (`inventory_negative_alerts()`, gestionnaire seulement) ; disparaît quand une liste
+  suivante ne l'a plus. `negativeItems` / `inventoryAlertCount` (`src/lib/inventory-items.js`).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

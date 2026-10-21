@@ -8,6 +8,7 @@
 // counted in the equipment list (V2.4.146); everything above it is section "inventory".
 
 export type InventorySection = "inventory" | "defective";
+// quantity can be negative: Field Service shows "-1,00" when more was used than the truck held.
 export type InventoryItem = { code: string; name: string; quantity: number; section: InventorySection };
 export type ParsedInventory = {
   items: InventoryItem[];
@@ -62,14 +63,15 @@ export function parseInventoryText(raw: string): ParsedInventory {
     segment = segment.replace(/[·•…⋯]+|\.{2,}|[|\t]/g, " ").replace(/\s+/g, " ").trim();
 
     // The quantity is the last number written with decimals; anything after it is the next
-    // row's avatar ("E-") and is dropped.
-    const quantities = [...segment.matchAll(/(\d{1,6}[.,]\d{2})(?!\d)/g)];
+    // row's avatar ("E-") and is dropped. Field Service can show a NEGATIVE stock ("-1,00", owner
+    // 2026-10-19): a minus right before it, after a space, belongs to the quantity, not to the name.
+    const quantities = [...segment.matchAll(/(?:(?<=^|\s)([-–−])\s?)?(\d{1,6}[.,]\d{2})(?!\d)/g)];
     const last = quantities[quantities.length - 1];
     if (!last) {
       unparsed += 1;
       return;
     }
-    const quantity = Number(last[1].replace(",", "."));
+    const quantity = (last[1] ? -1 : 1) * Number(last[2].replace(",", "."));
     const name = segment
       .slice(0, last.index)
       .replace(/^(?:E\s*-\s*)+/, "")
