@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { ArrowDown, ArrowUp, Bell, BookmarkPlus, Check, ChevronDown, FileText, Image as ImageIcon, Paperclip, RotateCcw, Send, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, BookmarkPlus, Check, ChevronDown, EyeOff, FileText, History, Image as ImageIcon, Paperclip, Pencil, RotateCcw, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
 import { notifyBroadcastPush } from "@/lib/push";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { compressImage } from "@/lib/ocr";
-import BroadcastAttachments from "@/components/BroadcastAttachments";
-import { BROADCAST_BUCKET, MAX_BROADCAST_ATTACHMENTS, addPickedFiles, attachmentStoragePath, broadcastAttachmentColumns, broadcastAttachments, isPdfFile } from "@/lib/broadcast-attachments";
+import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
+import BroadcastEditForm from "@/components/BroadcastEditForm";
+import { MAX_BROADCAST_ATTACHMENTS, addPickedFiles, broadcastAttachmentColumns, broadcastAttachments, isPdfFile } from "@/lib/broadcast-attachments";
+import { recipientState, recipientStatus } from "@/lib/broadcast-edit";
+import { uploadBroadcastFiles } from "@/lib/broadcast-upload";
 import { addTemplate, loadTemplates, moveTemplate, removeTemplate, resolveTemplates, saveTemplates } from "@/lib/broadcast-templates";
 
 // Ready-made messages a manager can click to fill the message box (recipients are
@@ -93,6 +95,10 @@ export default function BroadcastManager() {
   const [expanded, setExpanded] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [resendingId, setResendingId] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [withdrawingId, setWithdrawingId] = useState("");
+  // Previous versions of edited messages (0107), loaded when a message is opened.
+  const [revisionsById, setRevisionsById] = useState(new Map());
 
   async function loadEmployees() {
     // Include managers too (a manager is a valid recipient / selectable target),
@@ -145,30 +151,10 @@ export default function BroadcastManager() {
     setFiles([]);
   }
 
-  // Uploads every chosen file (pictures compressed to JPEG, PDFs as they are). On a failure the files
-  // already sent are removed so nothing is left behind.
-  async function uploadFiles() {
-    const attachments = [];
-    try {
-      for (const { file } of files) {
-        const pdf = isPdfFile(file);
-        const path = attachmentStoragePath(pdf ? "pdf" : "image", crypto.randomUUID());
-        const blob = pdf ? file : await compressImage(file);
-        const { error } = await supabase.storage.from(BROADCAST_BUCKET).upload(path, blob, { contentType: pdf ? "application/pdf" : "image/jpeg", upsert: false });
-        if (error) throw error;
-        attachments.push({ path, kind: pdf ? "pdf" : "image", name: pdf ? String(file.name || "").slice(0, 120) : "" });
-      }
-      return attachments;
-    } catch (e) {
-      if (attachments.length) await supabase.storage.from(BROADCAST_BUCKET).remove(attachments.map((a) => a.path)).catch(() => undefined);
-      throw e;
-    }
-  }
-
   async function loadLog() {
     const [{ data: rows }, { data: recips }] = await Promise.all([
-      supabase.from("manager_broadcasts").select("id, body, audience, image_path, attachments, created_at").order("created_at", { ascending: false }),
-      supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at"),
+      supabase.from("manager_broadcasts").select("id, body, audience, image_path, attachments, created_at, edited_at").order("created_at", { ascending: false }),
+      supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at, withdrawn_at"),
     ]);
     setBroadcasts(rows || []);
     const map = new Map();
@@ -177,6 +163,22 @@ export default function BroadcastManager() {
       map.get(r.broadcast_id).push(r);
     });
     setRecipientsByBroadcast(map);
+    setRevisionsById(new Map());
+  }
+
+  async function loadRevisions(id) {
+    const { data } = await supabase
+      .from("broadcast_revisions")
+      .select("id, body, attachments, edited_at, reread, reread_count")
+      .eq("broadcast_id", id)
+      .order("edited_at", { ascending: false });
+    setRevisionsById((current) => new Map(current).set(id, data || []));
+  }
+
+  function toggleOpen(b) {
+    const open = expanded !== b.id;
+    setExpanded(open ? b.id : "");
+    if (open && b.edited_at && !revisionsById.has(b.id)) loadRevisions(b.id);
   }
 
   useEffect(() => { loadEmployees(); loadLog(); }, []);
@@ -235,7 +237,7 @@ export default function BroadcastManager() {
 
     setSending(true);
     try {
-      const attachments = await uploadFiles();
+      const attachments = await uploadBroadcastFiles(files.map((f) => f.file));
 
       const { data: created, error: insertError } = await supabase
         .from("manager_broadcasts")
@@ -284,8 +286,8 @@ export default function BroadcastManager() {
     setMessage("");
     setResendingId(b.id);
     try {
-      // Re-send to exactly the same recipients as the original broadcast.
-      const recips = recipientsByBroadcast.get(b.id) || [];
+      // Re-send to the same recipients as the original broadcast, except those it was withdrawn from.
+      const recips = (recipientsByBroadcast.get(b.id) || []).filter((r) => !r.withdrawn_at);
       let targetIds = recips.map((r) => r.employee_id);
       if (targetIds.length === 0 && b.audience === "all") targetIds = employees.map((e) => e.id);
       if (targetIds.length === 0) throw new Error(t("broadcast.needEmployees"));
@@ -308,6 +310,23 @@ export default function BroadcastManager() {
       setMessage(e?.message || "Error");
     } finally {
       setResendingId("");
+    }
+  }
+
+  // Withdraw the message from the recipients who have not pressed OK yet (0107); readers keep it.
+  async function withdrawUnread(b, pending) {
+    if (!(await confirm(t("broadcast.withdrawConfirm", { count: pending })))) return;
+    setMessage("");
+    setWithdrawingId(b.id);
+    try {
+      const { data, error } = await supabase.rpc("withdraw_broadcast_unread", { p_broadcast_id: b.id });
+      if (error) throw error;
+      setMessage(t("broadcast.withdrawn", { count: data ?? 0 }));
+      await loadLog();
+    } catch (e) {
+      setMessage(e?.message || "Error");
+    } finally {
+      setWithdrawingId("");
     }
   }
 
@@ -440,14 +459,17 @@ export default function BroadcastManager() {
           {broadcasts.length === 0 && <p className="text-xs text-muted-foreground">{t("broadcast.noLog")}</p>}
           {broadcasts.map((b) => {
             const recips = recipientsByBroadcast.get(b.id) || [];
-            const acked = recips.filter((r) => r.acknowledged_at).length;
+            const status = recipientStatus(recips);
             const isOpen = expanded === b.id;
+            const isEditing = editingId === b.id;
+            const busyRow = resendingId === b.id || deletingId === b.id || withdrawingId === b.id;
+            const revisions = revisionsById.get(b.id) || [];
             return (
               <div key={b.id} className="rounded-lg border">
                 <div className="flex items-stretch">
                   <button
                     type="button"
-                    onClick={() => setExpanded(isOpen ? "" : b.id)}
+                    onClick={() => toggleOpen(b)}
                     aria-expanded={isOpen}
                     className="flex min-w-0 flex-1 items-start justify-between gap-3 rounded-l-lg p-3 text-left hover:bg-muted/50"
                   >
@@ -457,10 +479,12 @@ export default function BroadcastManager() {
                         {broadcastAttachments(b).some((a) => a.kind !== "pdf") && <ImageIcon className="h-3.5 w-3.5" />}
                         {broadcastAttachments(b).some((a) => a.kind === "pdf") && <FileText className="h-3.5 w-3.5" />}
                         {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
+                        {b.edited_at && <EditedTag at={b.edited_at} />}
                       </div>
                     </div>
                     <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
-                      {t("broadcast.viewedCount", { acked, total: recips.length })}
+                      {t("broadcast.viewedCount", { acked: status.acked, total: status.total })}
+                      {status.withdrawn > 0 && <span className="text-warning">· {t("broadcast.withdrawnCount", { count: status.withdrawn })}</span>}
                       <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                     </span>
                   </button>
@@ -470,9 +494,34 @@ export default function BroadcastManager() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
+                      title={t("broadcast.edit")}
+                      aria-label={t("broadcast.edit")}
+                      aria-pressed={isEditing}
+                      disabled={busyRow}
+                      onClick={() => setEditingId(isEditing ? "" : b.id)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title={t("broadcast.withdraw")}
+                      aria-label={t("broadcast.withdraw")}
+                      disabled={busyRow || status.pending === 0}
+                      onClick={() => withdrawUnread(b, status.pending)}
+                    >
+                      <EyeOff className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
                       title={t("broadcast.resend")}
                       aria-label={t("broadcast.resend")}
-                      disabled={resendingId === b.id || deletingId === b.id}
+                      disabled={busyRow}
                       onClick={() => resend(b)}
                     >
                       <Send className="h-4 w-4" />
@@ -484,13 +533,21 @@ export default function BroadcastManager() {
                       className="h-8 w-8 text-destructive hover:text-destructive"
                       title={t("broadcast.delete")}
                       aria-label={t("broadcast.delete")}
-                      disabled={deletingId === b.id || resendingId === b.id}
+                      disabled={busyRow}
                       onClick={() => remove(b)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
+                {isEditing && (
+                  <BroadcastEditForm
+                    broadcast={b}
+                    recipients={recips}
+                    onCancel={() => setEditingId("")}
+                    onSaved={async (text) => { setEditingId(""); setMessage(text); await loadLog(); }}
+                  />
+                )}
                 {isOpen && (
                   <div className="border-t p-3">
                     {broadcastAttachments(b).length > 0 && <div className="mb-3 max-w-md"><BroadcastAttachments broadcast={b} imageClassName="max-h-48 w-auto" /></div>}
@@ -499,12 +556,29 @@ export default function BroadcastManager() {
                       {recips.map((r) => (
                         <div key={r.employee_id} className="flex items-center justify-between gap-2 rounded border bg-muted/20 px-2 py-1.5 text-xs">
                           <span>{employeeName(r.employee_id)}</span>
-                          {r.acknowledged_at
-                            ? <span className="flex items-center gap-1 text-success"><Check className="h-3.5 w-3.5" />{t("broadcast.viewed")} · {dayjs(r.acknowledged_at).format("DD MMM HH:mm")}</span>
-                            : <span className="text-muted-foreground">{t("broadcast.notViewed")}</span>}
+                          {recipientState(r) === "read" && <span className="flex items-center gap-1 text-success"><Check className="h-3.5 w-3.5" />{t("broadcast.viewed")} · {dayjs(r.acknowledged_at).format("DD MMM HH:mm")}</span>}
+                          {recipientState(r) === "pending" && <span className="text-muted-foreground">{t("broadcast.notViewed")}</span>}
+                          {recipientState(r) === "withdrawn" && <span className="flex items-center gap-1 text-warning"><EyeOff className="h-3.5 w-3.5" />{t("broadcast.withdrawnAt", { date: dayjs(r.withdrawn_at).format("DD MMM HH:mm") })}</span>}
                         </div>
                       ))}
                     </div>
+                    {revisions.length > 0 && (
+                      <div className="mt-3">
+                        <div className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><History className="h-3.5 w-3.5" />{t("broadcast.previousVersions")}</div>
+                        <div className="space-y-2">
+                          {revisions.map((rev) => (
+                            <div key={rev.id} className="rounded border border-dashed px-2 py-1.5 text-xs">
+                              <div className="text-muted-foreground">
+                                {t("broadcast.replacedAt", { date: dayjs(rev.edited_at).format("DD MMM YYYY HH:mm") })}
+                                {rev.reread && ` · ${t("broadcast.rereadAsked", { count: rev.reread_count })}`}
+                                {broadcastAttachments(rev).length > 0 && ` · ${t("broadcast.attachmentCount", { count: broadcastAttachments(rev).length })}`}
+                              </div>
+                              {rev.body && <div className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">{rev.body}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

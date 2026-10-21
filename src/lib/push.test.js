@@ -65,10 +65,10 @@ describe("push wiring invariants", () => {
     expect(migration).toMatch(/is_active_employee\(\)/);
   });
 
-  it("send_push requires a manager and a broadcast the caller sent", () => {
+  it("send_push requires a manager and a broadcast the caller sent (or last edited, for a correction)", () => {
     const fn = read("../../supabase/functions/send_push/index.ts");
     expect(fn).toMatch(/\["manager", "admin", "owner"\]\.includes/);
-    expect(fn).toMatch(/broadcast\.sender_id !== callerUser\.user\.id/);
+    expect(fn).toMatch(/if \(!canPushBroadcast\(broadcast, callerUser\.user\.id, \{ reread \}\)\) return json\(\{ ok: false, error: "Forbidden" \}, 403\)/);
     expect(fn).toMatch(/AbortSignal\.timeout/);
   });
 

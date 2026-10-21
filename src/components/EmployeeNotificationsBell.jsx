@@ -4,7 +4,7 @@ import { Bell } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { SESSION_RESUMED_EVENT, useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import BroadcastAttachments from "@/components/BroadcastAttachments";
+import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { isManagerRole } from "@/lib/roles";
@@ -29,7 +29,7 @@ export default function EmployeeNotificationsBell() {
     if (!enabled) return;
     const { data } = await supabase
       .from("broadcast_recipients")
-      .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments)")
+      .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments, edited_at)")
       .eq("employee_id", user.id);
     const rows = (data || [])
       .filter((row) => row.manager_broadcasts)
@@ -45,6 +45,11 @@ export default function EmployeeNotificationsBell() {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       channelRef.current = supabase.channel(`employee-broadcasts-${user.id}`)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${user.id}` }, load)
+        // A message edited with « read it again » clears this employee's OK (0107): show it as unread again.
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${user.id}` }, () => {
+          load();
+          window.dispatchEvent(new Event(BROADCASTS_REFRESH_EVENT));
+        })
         .subscribe();
     };
     subscribe();
@@ -105,7 +110,10 @@ export default function EmployeeNotificationsBell() {
               className={`block border-t px-3 py-3 ${item.acknowledged_at ? "opacity-70" : "bg-destructive/10"}`}
             >
               <div className={`line-clamp-2 whitespace-pre-wrap text-sm ${item.acknowledged_at ? "" : "font-semibold"}`}>{item.manager_broadcasts.body || t("broadcast.popupTitle")}</div>
-              <div className="mt-1 text-xs text-muted-foreground">{dayjs(item.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {dayjs(item.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}
+                {item.manager_broadcasts.edited_at && <> · <EditedTag at={item.manager_broadcasts.edited_at} /></>}
+              </div>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -119,7 +127,12 @@ export default function EmployeeNotificationsBell() {
           <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
             {opened?.manager_broadcasts?.body && <p className="whitespace-pre-wrap text-sm">{opened.manager_broadcasts.body}</p>}
             {opened && <BroadcastAttachments broadcast={opened.manager_broadcasts} />}
-            {opened && <p className="text-xs text-muted-foreground">{dayjs(opened.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</p>}
+            {opened && (
+              <p className="text-xs text-muted-foreground">
+                {dayjs(opened.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}
+                {opened.manager_broadcasts.edited_at && <> · <EditedTag at={opened.manager_broadcasts.edited_at} /></>}
+              </p>
+            )}
           </div>
           <DialogFooter className="shrink-0 border-t pt-3">
             <Button type="button" className="h-11 w-full text-base sm:w-auto" onClick={() => setOpened(null)}>{t("broadcast.acknowledge")}</Button>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
 import { FileText } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useT } from "@/lib/use-t";
@@ -55,4 +56,10 @@ export default function BroadcastAttachments({ broadcast, imageClassName = "max-
       })}
     </div>
   );
+}
+
+// « Modifié le … » on a message the manager corrected after sending it (migration 0107).
+export function EditedTag({ at }) {
+  const t = useT();
+  return <span className="rounded-full bg-info/15 px-1.5 font-medium text-info">{t("broadcast.editedTag", { date: dayjs(at).format("DD MMM HH:mm") })}</span>;
 }

@@ -51,9 +51,11 @@ export async function disablePush() {
 }
 
 // Best-effort: the broadcast is already saved, so a push failure must never surface as one.
-export async function notifyBroadcastPush(broadcastId) {
+// `reread`: after an edit that asks the readers to read it again (0107), push « Message modifié » to
+// the recipients who have not pressed OK.
+export async function notifyBroadcastPush(broadcastId, { reread = false } = {}) {
   try {
-    await supabase.functions.invoke("send_push", { body: { broadcastId } });
+    await supabase.functions.invoke("send_push", { body: reread ? { broadcastId, reread: true } : { broadcastId } });
   } catch {
     /* in-app bell still shows it */
   }

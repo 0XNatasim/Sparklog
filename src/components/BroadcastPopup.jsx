@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { BROADCASTS_REFRESH_EVENT } from "@/components/EmployeeNotificationsBell";
 import { Button } from "@/components/ui/button";
-import BroadcastAttachments from "@/components/BroadcastAttachments";
+import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 // Shows unacknowledged manager broadcasts to the signed-in user, one at a time.
@@ -23,7 +23,7 @@ export default function BroadcastPopup() {
     const load = async () => {
       const { data } = await supabase
         .from("broadcast_recipients")
-        .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments)")
+        .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments, edited_at)")
         .eq("employee_id", user.id)
         .is("acknowledged_at", null);
       if (cancelled) return;
@@ -69,7 +69,10 @@ export default function BroadcastPopup() {
         <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
           {current.manager_broadcasts.body && <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>}
           <BroadcastAttachments broadcast={current.manager_broadcasts} />
-          <p className="text-xs text-muted-foreground">{dayjs(current.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}</p>
+          <p className="text-xs text-muted-foreground">
+            {dayjs(current.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}
+            {current.manager_broadcasts.edited_at && <> · <EditedTag at={current.manager_broadcasts.edited_at} /></>}
+          </p>
         </div>
         <DialogFooter className="shrink-0 border-t pt-3">
           <Button type="button" className="h-11 w-full text-base sm:w-auto" disabled={busy} onClick={acknowledge}>{busy ? t("common.working") : t("broadcast.acknowledge")}</Button>

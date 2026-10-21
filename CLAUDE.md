@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.163)
+## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.164)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -653,6 +653,17 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   heures des parties de journée, dates et notes, total, export CSV. `sickLeaveRegister` / `sickLeaveYears`
   (`src/lib/timeoff.js`) ; une période qui chevauche le 1er janvier compte dans chaque année. Les règles récurrentes ne
   comptent pas. Indicatif : aucun effet sur la paie (le 13 % comprend déjà la part maladie de 1,5 %).
+- [x] **Communications : modifier un message envoyé, le retirer pour ceux qui ne l'ont pas lu** (V2.4.164, migration 0107 ;
+  fonction `send_push` à redéployer). Bouton ✏️ dans « Notifications envoyées » (`BroadcastEditForm.jsx`) : texte et pièces
+  jointes, en tout temps ; RPC `edit_broadcast` (gestionnaire, aal2) garde l'ancienne version dans `broadcast_revisions`
+  (« Versions précédentes », gestionnaires seulement), étiquette « Modifié le … » chez l'employé. Si quelqu'un a déjà fait OK,
+  case « Redemander la lecture » (cochée par défaut) : leur OK est effacé, la fenêtre revient et une push « Message modifié : … »
+  part vers ceux qui n'ont pas fait OK (`send_push` `{ reread: true }`, seulement le dernier gestionnaire qui a modifié) ; sans
+  relecture, aucune push. Bouton « Retirer pour ceux qui ne l'ont pas lu » : RPC `withdraw_broadcast_unread` met
+  `broadcast_recipients.withdrawn_at` ; les politiques RLS cachent alors le message à l'employé (cloche, fenêtre, compteur,
+  même une app pas à jour) ; ceux qui ont fait OK le gardent. « Renvoyer » saute les retirés. Une ligne `broadcast_edited` /
+  `broadcast_withdrawn` au Journal. `src/lib/broadcast-edit.js`, `broadcast-upload.js`. Testé sur Postgres local (rôles,
+  pièces jointes invalides, relecture, retrait, employé retiré ne peut ni voir ni se « dé-retirer »).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
