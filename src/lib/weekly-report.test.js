@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildWeeklyReport, buildWeeklyReportHtml } from "./weekly-report.js";
+import { buildWeeklyReport, buildWeeklyReportHtml, fmtMoney } from "./weekly-report.js";
 import { computeEmployeeWeekTalon } from "@/payroll/employee-week";
 
 // CCQ week 2026-09-27 (Sunday) → 2026-10-03 (Saturday).
@@ -125,6 +125,15 @@ describe("CCQ / non-CCQ hours", () => {
 
 describe("buildWeeklyReportHtml", () => {
   const html = buildWeeklyReportHtml(report, { generatedAt: new Date("2026-10-13T12:00:00") });
+
+  it("shows supper and parking in their own summary columns, with totals", () => {
+    const head = html.slice(html.indexOf('<table class="summary">'), html.indexOf("</thead>"));
+    expect(head).toContain('<th class="num">km</th><th class="num">Souper</th><th class="num">Stationnement</th>');
+    expect(report.totals).toMatchObject({ meals: 30, parking: 12 });
+    const foot = html.slice(html.indexOf("<tfoot>"), html.indexOf("</tfoot>"));
+    expect(foot).toContain(fmtMoney(30));
+    expect(foot).toContain(fmtMoney(12));
+  });
 
   it("escapes names and prints the jobs, DAS and employer cost, without a per-OT recap", () => {
     expect(html).toContain("Alice &lt;Test&gt;");

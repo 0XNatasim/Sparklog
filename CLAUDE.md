@@ -645,6 +645,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   43 : 34 h 19 « CCQ » dont 2 h 19 sup.). Le sommaire imprimé montre maintenant « Heures CCQ (régulier) » (32 h), « Temps
   sup. » (heures CCQ à 1,5× et 2×) et « Hors CCQ » : Total = régulier + temps sup. + hors CCQ (`ccqRegularMinutes` /
   `ccqOvertimeMinutes`, `src/lib/weekly-report.js`). Un rôle hors CCQ garde toutes ses heures dans « Hors CCQ ».
+  Colonnes « Souper » et « Stationnement » ajoutées (montants de la semaine, demandes acceptées ou en attente, avec totaux).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
