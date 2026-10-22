@@ -1,29 +1,60 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { AlarmClock, BellRing, Check, Clock, Pencil, Plus, RotateCcw, StickyNote, Trash2 } from "lucide-react";
+import { AlarmClock, BellRing, Check, Clock, Lock, Pencil, Plus, RotateCcw, StickyNote, Trash2, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import { useAuth } from "@/contexts/AuthContext";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import {
-  DEFAULT_REMIND_TIME, MAX_NOTE, NOTE_COLUMNS, cleanNoteBody, fetchNotes, noteState, notesChanged, reminderFields,
-  reminderInstant, snoozeChoices, sortNotes,
+  DEFAULT_REMIND_TIME, MAX_NOTE, NOTE_COLUMNS, NOTE_SCOPES, cleanNoteBody, fetchNotes, inScope, isMine, noteState,
+  notesChanged, otherPeopleIds, reminderFields, reminderInstant, snoozeChoices, sortNotes,
 } from "@/lib/notes";
 import { useT } from "@/lib/use-t";
+import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { cn, withTimeout } from "@/lib/utils";
 
 const FILTERS = ["open", "reminders", "done"];
 const textareaClass = "w-full rounded-md border border-input bg-background px-3 py-2 text-base leading-relaxed shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const formatWhen = (value) => dayjs(value).format("ddd D MMM YYYY · HH:mm");
 
-// Text + optional reminder (date, and a time that defaults to 8:00).
-function NoteEditor({ initial, onSave, onCancel, busy, submitLabel }) {
+// Private / shared choice (only the author sees it on an existing note).
+function ShareChoice({ shared, onChange }) {
+  const t = useT();
+  const options = [
+    { value: false, icon: Lock, label: t("notes.private"), on: "border-foreground/40 bg-muted text-foreground" },
+    { value: true, icon: Users, label: t("notes.shared"), on: "border-info bg-info/15 text-info" },
+  ];
+  return (
+    <div role="radiogroup" aria-label={t("notes.visibility")} className="inline-flex rounded-md border bg-background p-0.5">
+      {options.map(({ value, icon: Icon, label, on }) => (
+        <button
+          key={String(value)}
+          type="button"
+          role="radio"
+          aria-checked={shared === value}
+          onClick={() => onChange(value)}
+          className={cn(
+            "inline-flex min-h-9 items-center gap-1.5 rounded border border-transparent px-3 text-sm font-semibold",
+            shared === value ? on : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Icon className="h-4 w-4" />{label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Text + private / shared + optional reminder (date, and a time that defaults to 8:00).
+function NoteEditor({ initial, onSave, onCancel, busy, submitLabel, canShare = true }) {
   const t = useT();
   const start = reminderFields(initial?.remind_at);
   const [body, setBody] = useState(initial?.body || "");
+  const [shared, setShared] = useState(Boolean(initial?.shared));
   const [remind, setRemind] = useState(Boolean(initial?.remind_at));
   const [date, setDate] = useState(start.date || dayjs().add(1, "day").format("YYYY-MM-DD"));
   const [time, setTime] = useState(start.time || DEFAULT_REMIND_TIME);
@@ -36,7 +67,7 @@ function NoteEditor({ initial, onSave, onCancel, busy, submitLabel }) {
     const remindAt = remind ? reminderInstant(date, time) : null;
     if (remind && !remindAt) { setError(t("notes.errors.date")); return; }
     setError("");
-    await onSave({ body: text, remind_at: remindAt });
+    await onSave({ body: text, remind_at: remindAt, ...(canShare ? { shared } : {}) });
   }
 
   return (
@@ -50,6 +81,7 @@ function NoteEditor({ initial, onSave, onCancel, busy, submitLabel }) {
         onChange={(e) => setBody(e.target.value)}
       />
       <div className="flex flex-wrap items-end gap-3">
+        {canShare && <ShareChoice shared={shared} onChange={setShared} />}
         <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm font-medium">
           <input type="checkbox" className="h-5 w-5 accent-primary" checked={remind} onChange={(e) => setRemind(e.target.checked)} />
           <AlarmClock className="h-4 w-4 text-info" />{t("notes.remindMe")}
@@ -91,14 +123,26 @@ function ReminderChip({ note, state }) {
   );
 }
 
-// Gestion › Notes: my own notes, larger cards than the sent notifications, due reminders first.
+// Who wrote / finished a shared note: « Karine » for someone else, « toi » for me.
+function PersonName({ id, me, names }) {
+  const t = useT();
+  if (id === me) return t("notes.you");
+  return names.get(id) || t("notes.someone");
+}
+
+// Gestion › Notes: my private notes and the notes shared between managers, larger cards than the sent
+// notifications, due reminders first. Shared notes have a blue edge and a « Partagée » label.
 export default function NotesPanel() {
   const t = useT();
+  const { user } = useAuth();
+  const me = user?.id;
   const [confirm, confirmDialog] = useConfirmDialog();
   const [notes, setNotes] = useState([]);
+  const [names, setNames] = useState(() => new Map());
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("open");
+  const [scope, setScope] = useState("all");
   const [now, setNow] = useState(() => new Date());
   const [busyId, setBusyId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -113,22 +157,38 @@ export default function NotesPanel() {
     return () => { cancelled = true; };
   }, [t]);
 
+  // Names of the other managers who wrote or finished a shared note (managers may read profiles).
+  const otherIds = useMemo(() => otherPeopleIds(notes, me).sort().join(","), [notes, me]);
+  useEffect(() => {
+    const ids = otherIds ? otherIds.split(",").slice(0, QUERY_BUDGETS.inListChunk) : [];
+    if (!ids.length) return undefined;
+    let cancelled = false;
+    supabase.from("profiles").select("id, full_name, email").in("id", ids).then(({ data }) => {
+      if (!cancelled && data) setNames(new Map(data.map((p) => [p.id, p.full_name || p.email || ""])));
+    });
+    return () => { cancelled = true; };
+  }, [otherIds]);
+
   // A reminder turns « due » while the page is open: re-check every 30 s.
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
 
+  const scoped = useMemo(() => notes.filter((n) => inScope(n, scope)), [notes, scope]);
   const counts = useMemo(() => ({
-    open: notes.filter((n) => !n.done_at).length,
-    reminders: notes.filter((n) => !n.done_at && n.remind_at).length,
-    done: notes.filter((n) => n.done_at).length,
-    due: notes.filter((n) => noteState(n, now) === "due").length,
-  }), [notes, now]);
+    open: scoped.filter((n) => !n.done_at).length,
+    reminders: scoped.filter((n) => !n.done_at && n.remind_at).length,
+    done: scoped.filter((n) => n.done_at).length,
+    due: scoped.filter((n) => noteState(n, now) === "due").length,
+    all: notes.filter((n) => !n.done_at).length,
+    private: notes.filter((n) => !n.done_at && !n.shared).length,
+    shared: notes.filter((n) => !n.done_at && n.shared).length,
+  }), [notes, scoped, now]);
 
-  const visible = useMemo(() => sortNotes(notes.filter((n) => (
+  const visible = useMemo(() => sortNotes(scoped.filter((n) => (
     filter === "done" ? n.done_at : filter === "reminders" ? !n.done_at && n.remind_at : !n.done_at
-  )), now), [notes, filter, now]);
+  )), now), [scoped, filter, now]);
 
   // One write, then the row as stored replaces the local one (and the side-menu badge refreshes).
   async function write(id, run) {
@@ -178,6 +238,29 @@ export default function NotesPanel() {
         </CardContent>
       </Card>
 
+      <div role="radiogroup" aria-label={t("notes.visibility")} className="flex flex-wrap items-center gap-2 text-sm">
+        {NOTE_SCOPES.map((key) => {
+          const Icon = key === "shared" ? Users : key === "private" ? Lock : StickyNote;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={scope === key}
+              onClick={() => setScope(key)}
+              className={cn(
+                "inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 font-semibold",
+                scope === key
+                  ? key === "shared" ? "border-info bg-info/15 text-info" : "border-foreground/40 bg-muted text-foreground"
+                  : "bg-background text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" />{t(`notes.scope.${key}`)} · {counts[key]}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {FILTERS.map((key) => (
           <button
@@ -210,23 +293,43 @@ export default function NotesPanel() {
         {visible.map((note) => {
           const state = noteState(note, now);
           const busy = busyId === note.id;
+          const mine = isMine(note, me);
           return (
             <Card
               key={note.id}
-              className={cn("flex flex-col", state === "due" && "border-destructive/50 bg-destructive/5", state === "done" && "opacity-75")}
+              className={cn(
+                "flex flex-col",
+                // Blue left edge on every shared note, kept when a due reminder turns the card red.
+                note.shared && "border-l-4 !border-l-info",
+                state === "due" ? "border-destructive/50 bg-destructive/5" : note.shared && "bg-info/5",
+                state === "done" && "opacity-75",
+              )}
             >
               <CardContent className="flex flex-1 flex-col gap-3 p-5">
                 {editingId === note.id ? (
-                  <NoteEditor initial={note} busy={busy} submitLabel={t("common.save")} onCancel={() => setEditingId(null)} onSave={(values) => save(note, values)} />
+                  <NoteEditor initial={note} busy={busy} canShare={mine} submitLabel={t("common.save")} onCancel={() => setEditingId(null)} onSave={(values) => save(note, values)} />
                 ) : (
                   <>
-                    <ReminderChip note={note} state={state} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {note.shared ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-info/15 px-2.5 py-1 text-sm font-semibold text-info">
+                          <Users className="h-4 w-4" />
+                          {mine ? t("notes.sharedByMe") : <>{t("notes.sharedBy")} <PersonName id={note.user_id} me={me} names={names} /></>}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-sm font-semibold text-muted-foreground">
+                          <Lock className="h-4 w-4" />{t("notes.private")}
+                        </span>
+                      )}
+                      <ReminderChip note={note} state={state} />
+                    </div>
                     <p className={cn("whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg", state === "done" && "line-through decoration-muted-foreground/50")}>
                       {note.body}
                     </p>
                     <div className="mt-auto flex flex-wrap items-center gap-2 border-t pt-3">
                       <span className="text-xs text-muted-foreground">
                         {note.done_at ? t("notes.doneOn", { when: formatWhen(note.done_at) }) : t("notes.createdOn", { when: formatWhen(note.created_at) })}
+                        {note.shared && note.done_at && note.done_by && <> · {t("notes.doneBy")} <PersonName id={note.done_by} me={me} names={names} /></>}
                       </span>
                       <div className="ms-auto flex flex-wrap items-center gap-1">
                         {state === "done" ? (
@@ -257,9 +360,11 @@ export default function NotesPanel() {
                         <Button size="icon" variant="ghost" className="h-9 w-9" disabled={busy} aria-label={t("notes.edit")} title={t("notes.edit")} onClick={() => setEditingId(note.id)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-9 w-9 text-destructive" disabled={busy} aria-label={t("notes.delete")} title={t("notes.delete")} onClick={() => remove(note)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {mine && (
+                          <Button size="icon" variant="ghost" className="h-9 w-9 text-destructive" disabled={busy} aria-label={t("notes.delete")} title={t("notes.delete")} onClick={() => remove(note)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </>

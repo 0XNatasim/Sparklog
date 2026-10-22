@@ -1,13 +1,15 @@
-// Gestion › Notes (migration 0111): personal notes, some with a reminder. A reminder whose time has
-// passed (and whose note is not done) is « due »: it counts in the badge on Notes in the side menu.
-// Only the author reads or writes their notes (RLS, manager-level session).
+// Gestion › Notes (migration 0111): notes, some with a reminder. A reminder whose time has passed (and
+// whose note is not done) is « due »: it counts in the badge on Notes in the side menu.
+// A note is private (only its author sees it) or shared with the managers (everyone sees it and may edit,
+// snooze or mark it done; only the author deletes it or makes it private again). RLS, manager session.
 import { supabase } from "@/supabaseClient";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { withTimeout } from "@/lib/utils";
 
 export const NOTES_EVENT = "sparklog:notes";
 export const MAX_NOTE = 5000;
-export const NOTE_COLUMNS = "id, body, remind_at, done_at, created_at, updated_at";
+export const NOTE_COLUMNS = "id, user_id, body, shared, remind_at, done_at, done_by, created_at, updated_at";
+export const NOTE_SCOPES = Object.freeze(["all", "private", "shared"]);
 // Time used when a reminder gets a date but no time.
 export const DEFAULT_REMIND_TIME = "08:00";
 
@@ -32,6 +34,28 @@ export function sortNotes(notes, now = new Date()) {
     if (sa === "done") return time(b.done_at) - time(a.done_at);
     return time(b.created_at) - time(a.created_at);
   });
+}
+
+// Scope filter of the page: all notes, my private ones, or the shared ones (mine and the others').
+export function inScope(note, scope) {
+  if (scope === "private") return !note?.shared;
+  if (scope === "shared") return Boolean(note?.shared);
+  return true;
+}
+
+// Only the author deletes a note or switches it between private and shared (the database agrees).
+export function isMine(note, userId) {
+  return Boolean(note && userId && note.user_id === userId);
+}
+
+// Authors and « done by » people of the notes written by someone else, for their names.
+export function otherPeopleIds(notes, userId) {
+  const ids = new Set();
+  for (const note of notes || []) {
+    if (note.user_id && note.user_id !== userId) ids.add(note.user_id);
+    if (note.done_by && note.done_by !== userId) ids.add(note.done_by);
+  }
+  return [...ids];
 }
 
 export function dueCount(notes, now = new Date()) {
@@ -92,10 +116,10 @@ export async function fetchNotes() {
   return data || [];
 }
 
-// Side-menu badge: only the open reminders are read.
+// Side-menu badge: only the open reminders are read (mine and the shared ones).
 export async function fetchOpenReminders() {
   const { data, error } = await withTimeout(
-    supabase.from("manager_notes").select("id, remind_at, done_at").is("done_at", null).not("remind_at", "is", null)
+    supabase.from("manager_notes").select("id, shared, remind_at, done_at").is("done_at", null).not("remind_at", "is", null)
       .order("remind_at", { ascending: true }).limit(QUERY_BUDGETS.managerNotes),
     12000,
   );

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
 import { canOpenNavItem, MANAGER_NAV_ITEMS, MANAGER_NAV_V3 } from "./manager-nav";
-import { cleanNoteBody, dueCount, msUntilNextReminder, noteState, reminderFields, reminderInstant, snoozeChoices, sortNotes } from "./notes";
+import { cleanNoteBody, dueCount, inScope, isMine, msUntilNextReminder, noteState, otherPeopleIds, reminderFields, reminderInstant, snoozeChoices, sortNotes } from "./notes";
 
 const now = new Date("2026-10-22T15:00:00Z");
 const note = (id, extra = {}) => ({ id, body: id, created_at: "2026-10-20T12:00:00Z", remind_at: null, done_at: null, ...extra });
@@ -56,9 +56,28 @@ describe("notes and reminders (0111)", () => {
     expect(canOpenNavItem("employee", [], item)).toBe(false);
   });
 
-  it("keeps notes private to their author, in a manager-level (two-factor) session", () => {
+  it("filters private and shared notes, and knows whose note it is", () => {
+    const mine = note("a", { user_id: "me", shared: false });
+    const shared = note("b", { user_id: "karine", shared: true, done_by: "yanni", done_at: "2026-10-21T13:00:00Z" });
+    expect([mine, shared].filter((n) => inScope(n, "private")).map((n) => n.id)).toEqual(["a"]);
+    expect([mine, shared].filter((n) => inScope(n, "shared")).map((n) => n.id)).toEqual(["b"]);
+    expect([mine, shared].filter((n) => inScope(n, "all"))).toHaveLength(2);
+    expect(isMine(mine, "me")).toBe(true);
+    expect(isMine(shared, "me")).toBe(false);
+    expect(otherPeopleIds([mine, shared], "me").sort()).toEqual(["karine", "yanni"]);
+  });
+
+  it("shows private notes to their author only and shared notes to every manager, in a two-factor session", () => {
     const sql = readFileSync(new URL("../../supabase/migrations/20261022220000_0111_manager_notes.sql", import.meta.url), "utf8");
-    expect(sql).toMatch(/using \(user_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\)\s+with check \(user_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\)/);
+    // Read: mine or shared. Insert: as myself. Update: mine or shared, and a shared note stays shared for a
+    // non-author. Delete: mine only. All behind get_my_role() = 'manager' (aal2).
+    expect(sql).toMatch(/for select to authenticated\s+using \(public\.get_my_role\(\) = 'manager' and \(user_id = auth\.uid\(\) or shared\)\)/);
+    expect(sql).toMatch(/for insert to authenticated\s+with check \(user_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\)/);
+    expect(sql).toMatch(/for update to authenticated\s+using \(public\.get_my_role\(\) = 'manager' and \(user_id = auth\.uid\(\) or shared\)\)\s+with check \(public\.get_my_role\(\) = 'manager' and \(user_id = auth\.uid\(\) or shared\)\)/);
+    expect(sql).toMatch(/for delete to authenticated\s+using \(user_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\)/);
+    // The author never changes; done_by follows done_at.
+    expect(sql).toContain("new.user_id := old.user_id;");
+    expect(sql).toMatch(/when old\.done_at is null then auth\.uid\(\)/);
     expect(sql).toContain("enable row level security");
     expect(sql).toContain("revoke all on public.manager_notes from anon, public");
     expect(sql).toContain("char_length(btrim(body)) between 1 and 5000");
