@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.168)
+## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.169)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -705,6 +705,14 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   revient dans le compteur rouge. La date reste après le début (date d'embauche).
   Ligne `start_date_change` au Journal (`audit_profile_change`). `isNewHire` / `employmentChoice` / `employmentUpdate`
   (`src/lib/signups.js`). La saisie de temps n'est pas bloquée avant la date.
+- [x] **Notes et rappels** (V2.4.169, migration 0111, Gestion V3 › Aujourd'hui › Notes) : table `manager_notes`
+  (texte 1 à 5 000 caractères, `remind_at` facultatif, `done_at`) ; RLS : chacun lit et écrit **ses** notes seulement
+  (`user_id = auth.uid()`, session `aal2` via `get_my_role()`), même la propriétaire ne voit pas celles des autres.
+  Un rappel passé et pas fait = « dû » : carte rouge en tête de liste et compteur rouge sur Notes dans le menu
+  (`ManagerLayout` lit les rappels ouverts, minuterie jusqu'au prochain, au plus 6 h, + retour sur l'onglet +
+  `NOTES_EVENT`). Fait / Rouvrir / Plus tard (1 h, demain 8 h, 1 semaine) / Modifier / Supprimer (confirmation).
+  Cartes en `text-base`/`sm:text-lg`, plus grosses que les notifications envoyées. `src/lib/notes.js`,
+  `NotesPanel.jsx`. Pas de push ni de notification du téléphone (dans l'app seulement). V2 inchangée.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

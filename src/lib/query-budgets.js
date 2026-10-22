@@ -21,6 +21,8 @@ export const QUERY_BUDGETS = Object.freeze({
   emergencyEntries: 50,
   managedForms: 100,
   profileReferences: 200,
+  // Gestion › Notes: one person's own notes (and the side-menu badge's open reminders).
+  managerNotes: 500,
 });
 
 // A narrowed timesheet search must be complete, not merely filtered from the

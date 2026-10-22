@@ -62,6 +62,8 @@ const V3_ONLY_ITEMS = Object.freeze([
     tab("receipts", "receipts", "mgr.nav.receipts"),
   ] },
   { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
+  // My own notes and reminders (0111): private to each manager / owner.
+  { id: "notes", path: "notes", grant: null, labelKey: "mgr.nav3.notes" },
   // Trajets, km et frais: one setting per employee and per line (NOOB.md étape 7). Manager / owner only.
   { id: "advanced-travel-rules", path: "advanced/travel-rules", grant: null, labelKey: "mgr.nav3.travelRules" },
   { id: "v3-time", path: "v3/time", grant: null, labelKey: "mgr.nav.timesheets", tabs: [
@@ -106,7 +108,7 @@ const v3 = (id) => byId.get(id);
 // V3 menu: the day's work first (« Aujourd'hui »), the weekly payroll next; the rest closed.
 // `open` = group expanded by default (a one-entry group always shows its entry).
 export const MANAGER_NAV_V3 = Object.freeze([
-  { id: "today", labelKey: "mgr.group.today", open: true, items: [v3("todo"), v3("live")] },
+  { id: "today", labelKey: "mgr.group.today", open: true, items: [v3("todo"), v3("live"), v3("notes")] },
   { id: "time", labelKey: "mgr.group.time", open: false, items: [v3("v3-time")] },
   { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [v3("payroll-week"), v3("v3-pay-history")] },
   { id: "team", labelKey: "mgr.group.team", open: false, items: [v3("v3-team"), v3("inventory"), v3("messages")] },
