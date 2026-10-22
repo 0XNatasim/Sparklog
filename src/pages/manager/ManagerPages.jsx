@@ -19,6 +19,7 @@ const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const CongesManager = lazyPanel(() => import("@/components/CongesManager"));
 const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
 const ReferencesManager = lazyPanel(() => import("@/components/ReferencesManager"));
+const ContactsManager = lazyPanel(() => import("@/components/ContactsManager"));
 const BroadcastManager = lazyPanel(() => import("@/components/BroadcastManager"));
 const TimeRulesManager = lazyPanel(() => import("@/components/TimeRulesManager"));
 const UnlockDayManager = lazyPanel(() => import("@/components/UnlockDayManager"));
@@ -355,7 +356,7 @@ const REPORTS_TABS = {
 };
 const CONFIG_TABS = {
   settings: SettingsPage, "time-rules": RulesPage, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
-  forms: FormsPage, references: ReferencesPage,
+  forms: FormsPage, references: ReferencesPage, contacts: () => <ContactsManager />,
 };
 
 export const TodoTabsPage = () => <TabbedPage itemId="todo" content={TODO_TABS} />;

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ExternalLink, FileText, Mail, Phone } from "lucide-react";
 import { supabase } from "@/supabaseClient";
-import { REFERENCE_BUCKET, blockFilePaths, parseRichText, phoneHref, safeUrl } from "@/lib/reference-blocks";
+import { REFERENCE_BUCKET, blockFilePaths, contactRoleLabel, parseRichText, phoneHref, safeUrl } from "@/lib/reference-blocks";
+import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 
 const CALLOUT_STYLES = {
@@ -56,6 +57,7 @@ function useSignedUrls(blocks) {
 const linkClass = "flex w-full items-center justify-between gap-3 rounded-lg border p-4 text-left font-medium transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 export default function ReferenceContent({ blocks }) {
+  const t = useT();
   const urls = useSignedUrls(blocks);
   const list = Array.isArray(blocks) ? blocks : [];
   return (
@@ -106,6 +108,11 @@ export default function ReferenceContent({ blocks }) {
             return (
               <div key={index} className="rounded-md border p-3">
                 {block.name && <div className="font-medium">{block.name}{block.role ? <span className="ml-2 text-xs font-normal text-muted-foreground">{block.role}</span> : null}</div>}
+                {Array.isArray(block.roles) && block.roles.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {block.roles.map((role) => <span key={role} className="rounded-full bg-info/15 px-2 py-0.5 text-xs font-medium text-info">{contactRoleLabel(role, t)}</span>)}
+                  </div>
+                )}
                 {block.phone && (tel ? (
                   <a href={tel} className="mt-1 flex items-center gap-1.5 text-primary hover:underline"><Phone className="h-3.5 w-3.5" aria-hidden="true" />{block.phone}</a>
                 ) : <div className="mt-1 flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" aria-hidden="true" />{block.phone}</div>)}

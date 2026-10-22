@@ -12,6 +12,27 @@ export const MAX_TEXT = 8000;
 export const REFERENCE_FILE_MAX_BYTES = 15 * 1024 * 1024;
 export const REFERENCE_FILE_TYPES = Object.freeze(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
 
+// Roles of a contact (Configuration › Contacts): who to call for what. The base list is translated
+// (contacts.role.<key>); a manager can also type their own, stored as written. Display only.
+export const CONTACT_ROLES = Object.freeze(["inventaire", "temps_supplementaire", "stationnement", "repartition", "support_installation", "paie"]);
+export const MAX_CONTACT_ROLES = 10;
+export const MAX_ROLE_LENGTH = 60;
+
+export function sanitizeRoles(roles) {
+  const out = [];
+  for (const role of Array.isArray(roles) ? roles : []) {
+    const value = String(role ?? "").trim().replace(/\s+/g, " ").slice(0, MAX_ROLE_LENGTH);
+    const key = value.toLowerCase();
+    if (value && !out.some((r) => r.toLowerCase() === key)) out.push(value);
+    if (out.length >= MAX_CONTACT_ROLES) break;
+  }
+  return out;
+}
+
+export function contactRoleLabel(role, t) {
+  return CONTACT_ROLES.includes(role) ? t(`contacts.role.${role}`) : role;
+}
+
 // Only these schemes may become an href: a stored `javascript:` or `data:` link must never
 // reach an employee's browser. Returns the cleaned URL, or null when it is not allowed.
 export function safeUrl(value) {
@@ -35,7 +56,7 @@ export function newBlock(type) {
     case "link": return { type, label: "", url: "" };
     case "file": return { type, label: "", path: "" };
     case "image": return { type, path: "", caption: "" };
-    case "contact": return { type, name: "", role: "", phone: "", email: "", note: "" };
+    case "contact": return { type, name: "", role: "", roles: [], phone: "", email: "", note: "" };
     default: throw new Error(`unknown block type: ${type}`);
   }
 }
@@ -87,6 +108,8 @@ export function sanitizeBlocks(blocks) {
           email: str(block.email, 200),
           note: str(block.note, MAX_DESCRIPTION),
         };
+        const roles = sanitizeRoles(block.roles);
+        if (roles.length) contact.roles = roles;
         if (contact.name || contact.phone || contact.email) out.push(contact);
         break;
       }

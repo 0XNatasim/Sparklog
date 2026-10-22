@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-21, V2.4.165)
+## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.166)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -673,6 +673,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   employé, jour et heures) reste l'anomalie « Doublon ». `otReuseAnomalies` (`src/lib/job-anomalies.js`), `src/lib/ot-reuse.js`
   (si l'appel échoue, les autres anomalies s'affichent quand même). Le message « Un job avec l'OT … existe déjà » du formulaire
   ne vient pas d'une règle sur l'OT (aucune en base) : à revoir si on ajoute un avertissement côté employé.
+- [x] **Configuration › Contacts** (V2.4.166, Gestion V3, aucune migration) : onglet à côté de Formulaires et Références,
+  sur les **mêmes lignes** que Références › Contacts (`profile_references`, section `contacts`, cartes `contact`) — le Profil
+  des employés les affiche comme avant. Par section (Britton, HILO…) : ajouter / modifier / retirer / déplacer un contact,
+  ajouter / renommer / masquer / supprimer / déplacer une section (retirer le dernier contact supprime la section, après
+  confirmation). Chaque contact : nom, titre (ex. Contremaître, champ `role` existant), téléphone, courriel, note et **rôles**
+  (`roles`, liste de base `CONTACT_ROLES` : inventaire, temps supplémentaire, stationnement, répartition, support installation,
+  paie — plus des rôles perso tapés par le gestionnaire, au plus 10). Filtre par rôle. Rôles = affichage seulement :
+  étiquettes dans Profil › Contacts (`ReferenceContent`) ; aucune autre partie de l'app ne les lit. Les autres blocs d'une
+  section (titre, texte) restent en place. `src/lib/contacts.js`, `ContactsManager.jsx`, `sanitizeRoles` (`reference-blocks.js`).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
