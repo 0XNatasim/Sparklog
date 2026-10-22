@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { BellRing, CalendarPlus, DoorOpen, EyeOff, FilePlus2, Megaphone, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown, Clock, Car } from "lucide-react";
+import { BellRing, CalendarPlus, DoorOpen, ImageOff, EyeOff, FilePlus2, Megaphone, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown, Clock, Car } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ const ACTION_META = {
   broadcast_edited: { icon: Megaphone, tone: "text-primary" },
   departure_change: { icon: DoorOpen, tone: "text-warning" },
   start_date_change: { icon: CalendarPlus, tone: "text-info" },
+  file_read_error: { icon: ImageOff, tone: "text-destructive" },
   broadcast_withdrawn: { icon: EyeOff, tone: "text-warning" },
   nas_reveal: { icon: Eye, tone: "text-warning" },
   nas_update: { icon: KeyRound, tone: "text-warning" },
@@ -88,6 +89,16 @@ export default function AuditLog() {
       case "departure_change": return d.to
         ? t("audit.desc.departureSet", { name: target, status: t(`employees.status.${d.to}`), note: d.note ? ` — ${d.note}` : "" })
         : t("audit.desc.departureCleared", { name: target });
+      case "file_read_error": return t("audit.desc.fileReadError", {
+        name: target,
+        context: t(`audit.fileContext.${d.context}`),
+        size: d.size >= 0 ? `${Math.round(d.size / 1024)} Ko` : "?",
+        age: d.age_s >= 0 ? (d.age_s < 120 ? `${d.age_s} s` : d.age_s < 7200 ? `${Math.round(d.age_s / 60)} min` : `${Math.round(d.age_s / 3600)} h`) : "?",
+        step: t(`audit.fileStep.${d.step}`),
+        error: d.error || "?",
+        attempts: d.attempts ?? 1,
+        app: t(d.app === "installed" ? "audit.fileApp.installed" : "audit.fileApp.browser"),
+      });
       case "start_date_change": return d.to
         ? t("audit.desc.startDateSet", { name: target, date: dayjs(d.to).format("D MMM YYYY") })
         : t("audit.desc.startDateCleared", { name: target });
@@ -124,6 +135,7 @@ export default function AuditLog() {
               <option value="travel_rule_set">{t("audit.filter.travelRuleSet")}</option>
               <option value="departure_change">{t("audit.filter.departureChange")}</option>
               <option value="start_date_change">{t("audit.filter.startDateChange")}</option>
+              <option value="file_read_error">{t("audit.filter.fileReadError")}</option>
               <option value="broadcast_edited">{t("audit.filter.broadcastEdited")}</option>
               <option value="broadcast_withdrawn">{t("audit.filter.broadcastWithdrawn")}</option>
               <option value="nas">{t("audit.filter.nas")}</option>
@@ -162,6 +174,9 @@ export default function AuditLog() {
                 <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${meta.tone}`} />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm">{describe(row)}</div>
+                  {row.action === "file_read_error" && row.details?.browser && (
+                    <div className="mt-0.5 break-all font-mono text-xs text-muted-foreground">{row.details.browser}</div>
+                  )}
                   <div className="mt-0.5 text-xs text-muted-foreground">
                     {t("audit.byLine", { actor: row.actor_name || t("audit.someone") })} · {dayjs(row.created_at).format("DD MMM YYYY, HH:mm")}
                   </div>

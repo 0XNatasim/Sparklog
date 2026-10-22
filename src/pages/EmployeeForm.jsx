@@ -22,7 +22,8 @@ import { buildJobSaveRpcArgs, buildJobSaveWithEvidenceRpcArgs, kilometreFieldVal
 import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
-import { evidenceUploadFailure, prepareEvidenceImage } from "@/lib/evidence-file";
+import { evidenceUploadFailure, isFileFailure, prepareEvidenceImage, readPickedFile } from "@/lib/evidence-file";
+import { reportFileReadError } from "@/lib/file-read-report";
 import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { classifyApiError } from "@/lib/api-errors";
 import { submitSavedJob } from "@/lib/submit-job";
@@ -655,6 +656,9 @@ export default function EmployeeForm() {
         lastSaveErrorRef.current = overlapMessage || friendlyErrorMessage(e, t, "form.errors.saveFailed");
       } else if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
         lastSaveErrorRef.current = t("form.errors.duplicateOt", { ot: ot || "" });
+      } else if (isFileFailure(e)) {
+        // A parking receipt the phone could not read: say why instead of « save failed ».
+        lastSaveErrorRef.current = `${t("form.parking.fileFailed")} ${t(`form.evidence.reason.${evidenceUploadFailure(e).key}`)}`;
       } else {
         lastSaveErrorRef.current = friendlyErrorMessage(e, t, "form.errors.saveFailed");
       }
@@ -679,7 +683,13 @@ export default function EmployeeForm() {
       // freezing the save button forever.
       for (const file of orderPickedFiles(files)) {
         const storagePath = parkingStoragePath(user.id, job_date, crypto.randomUUID());
-        const image = await prepareEvidenceImage(file);
+        let image;
+        try {
+          image = await prepareEvidenceImage(file);
+        } catch (error) {
+          if (isFileFailure(error)) reportFileReadError("parking", file, error);
+          throw error;
+        }
         const { error: uploadError } = await withTimeout(
           supabase.storage.from(PARKING_BUCKET).upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
           20000
@@ -949,6 +959,7 @@ export default function EmployeeForm() {
         setInventoryRows(rows);
       } catch (error) {
         console.error("[inventory] screenshot failed", error);
+        if (isFileFailure(error)) reportFileReadError("inventory", file, error);
         failed.push(slot);
         lastError = error;
       }
@@ -1194,15 +1205,20 @@ export default function EmployeeForm() {
     const evidenceId = committed?.evidenceId || crypto.randomUUID();
     const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
     let evidenceUploaded = false;
+    // In-memory copy of the picked screenshot: « Réessayer » reuses it instead of reading the phone's
+    // file again. It stays null when the phone refused to read the file (no retry button then).
+    let source = null;
     try {
       let savedJobId = committed?.jobId || null;
       if (!committed) {
         try {
-          const image = await prepareEvidenceImage(file);
+          source = file instanceof File ? await readPickedFile(file) : file;
+          const image = await prepareEvidenceImage(source);
           await uploadEvidenceWithRefresh(storagePath, image);
           evidenceUploaded = true;
         } catch (error) {
           console.error("[overtime evidence] Screenshot upload failed", error);
+          if (isFileFailure(error)) reportFileReadError("overtime", file, error);
           const failure = evidenceUploadFailure(error);
           throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`, { cause: error });
         }
@@ -1268,7 +1284,8 @@ export default function EmployeeForm() {
         await supabase.storage.from("overtime-evidence").remove([storagePath]).catch(() => undefined);
       }
       setErr(error?.message || t("form.evidence.failed"));
-      setFailedEvidenceFile(file);
+      // A proof already committed retries without a file; otherwise only a picture the app could read.
+      setFailedEvidenceFile(committed ? file : source);
       setReturnStep("evidence");
     } finally {
       setEvidenceBusy(false);
