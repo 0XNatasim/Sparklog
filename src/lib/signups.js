@@ -44,12 +44,14 @@ export function employmentUpdate(choice, startDate, previous) {
 }
 
 // One status per account for the Employés list.
-//   active · pending (new sign-up, email validated) · unconfirmed (email not validated yet)
+//   active · new_hire (« En attente »: hired, first day of work still to come, account active or not)
+//   pending (new sign-up, email validated) · unconfirmed (email not validated yet)
 //   mise_a_pied / depart (former employee) · inactive (paused for another reason, e.g. before 0109)
-export function employeeStatus(profile, pendingById) {
+export function employeeStatus(profile, pendingById, today) {
   if (!profile) return "inactive";
-  if (!profile.is_paused) return "active";
   if (DEPARTURE_STATUSES.includes(profile.departure_status)) return profile.departure_status;
+  if (isNewHire(profile, today)) return NEW_HIRE;
+  if (!profile.is_paused) return "active";
   const pending = pendingById?.get(profile.id);
   if (pending) return pending.email_confirmed ? "pending" : "unconfirmed";
   return "inactive";

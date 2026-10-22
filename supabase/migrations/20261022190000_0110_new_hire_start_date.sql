@@ -4,7 +4,9 @@
 -- the hiring (sign-up) and that date the person does not work yet: Équipe en direct, the week view,
 -- « Pas soumis hier » and the missing-entry count leave them out until the date (src/lib/live-crew.js).
 -- The account itself is unchanged: it can be activated before the first day so the person can log in and
--- fill in their profile. Only managers write the column (the employee whitelist trigger 0018 refuses any
+-- fill in their profile. In Employés the person is « En attente » (not active, not inactive) until then, and
+-- leaves the new sign-up badge (pending_signups): if the account is still not activated on the first day,
+-- the badge counts them again. Only managers write the column (the employee whitelist trigger 0018 refuses any
 -- other column from an employee), and every change goes to the Journal.
 
 alter table public.profiles
@@ -38,3 +40,23 @@ begin
   return new;
 end;
 $function$;
+
+-- New sign-ups to activate (0109), minus new hires whose first day of work is still to come.
+create or replace function public.pending_signups()
+returns table (user_id uuid, full_name text, email text, created_at timestamptz, email_confirmed boolean)
+language sql stable security definer set search_path to 'public' as $$
+  select p.id, p.full_name, p.email, u.created_at, u.email_confirmed_at is not null
+    from public.profiles p
+    join auth.users u on u.id = p.id
+   where public.get_my_role() = 'manager'
+     and p.is_paused
+     and p.first_activated_at is null
+     and p.departure_status is null
+     and p.role <> 'owner'
+     and (p.start_date is null or p.start_date <= (now() at time zone 'America/Toronto')::date)
+   order by u.created_at desc
+   limit 500;
+$$;
+
+revoke all on function public.pending_signups() from public, anon;
+grant execute on function public.pending_signups() to authenticated;

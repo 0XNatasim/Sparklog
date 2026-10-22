@@ -19,6 +19,11 @@ describe("employee status (0109)", () => {
     expect(employeeStatus({ id: "y", is_paused: true, departure_status: "depart" }, pending)).toBe("depart");
     // Paused after having worked (not in pending_signups): plain inactive, never a new sign-up.
     expect(employeeStatus({ id: "z", is_paused: true }, pending)).toBe("inactive");
+    // « En attente » (0110): hired, first day still to come — whether the account is active or not.
+    expect(employeeStatus({ id: "h1", is_paused: false, start_date: "2026-10-27" }, pending, "2026-10-22")).toBe(NEW_HIRE);
+    expect(employeeStatus({ id: "h2", is_paused: true, start_date: "2026-10-27" }, pending, "2026-10-22")).toBe(NEW_HIRE);
+    expect(employeeStatus({ id: "h1", is_paused: false, start_date: "2026-10-27" }, pending, "2026-10-27")).toBe("active");
+    expect(employeeStatus({ id: "h3", is_paused: true, start_date: "2026-10-27", departure_status: "depart" }, pending, "2026-10-22")).toBe("depart");
   });
 
   it("counts only validated sign-ups for the side-menu badge", () => {
@@ -88,6 +93,9 @@ describe("new hire and first day of work (0110)", () => {
     expect(sql).toMatch(/new\.start_date is distinct from old\.start_date[\s\S]*'start_date_change'/);
     // 0109 entries kept in the replaced trigger function.
     for (const action of ["'role_change'", "'pause_change'", "'departure_change'"]) expect(sql).toContain(action);
+    // Leaves the new sign-up badge until the first day (Montréal date), same filters as 0109 otherwise.
+    expect(sql).toMatch(/and p\.first_activated_at is null\s+and p\.departure_status is null\s+and p\.role <> 'owner'\s+and \(p\.start_date is null or p\.start_date <= \(now\(\) at time zone 'America\/Toronto'\)::date\)/);
+    expect(sql).toMatch(/revoke all on function public\.pending_signups\(\) from public, anon/);
     expect(read("../components/LiveCrew.jsx")).toMatch(/offUserIds: offToday,\s+date: today/);
     expect(read("../components/LiveCrew.jsx")).toContain("offUserIds: offYesterday, date: yesterday");
     expect(read("../components/manager/TodoInbox.jsx")).toContain("offUserIds: offPrev, date: prevDay");

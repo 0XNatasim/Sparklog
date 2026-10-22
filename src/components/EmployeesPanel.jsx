@@ -149,8 +149,9 @@ export default function EmployeesPanel() {
       const nextProfiles = [...(data ?? [])].sort((a, b) => {
         const byRole = roleRank(a.role) - roleRank(b.role);
         if (byRole !== 0) return byRole;
-        // New sign-ups first (to activate), then active accounts, then the other inactive ones.
-        const rank = (p) => (!p.is_paused ? 1 : pending.has(p.id) ? 0 : 2);
+        // New sign-ups first (to activate), then new hires waiting for their first day, then active
+        // accounts, then the other inactive ones.
+        const rank = (p) => (isNewHire(p, today) ? 1 : !p.is_paused ? 2 : pending.has(p.id) ? 0 : 3);
         const byPaused = rank(a) - rank(b);
         if (byPaused !== 0) return byPaused;
         return (a.full_name || a.email || "").localeCompare(b.full_name || b.email || "", undefined, { sensitivity: "base" });
@@ -411,13 +412,14 @@ export default function EmployeesPanel() {
   }
 
   // Roster counts for the "add employee" card header.
-  const activeCount = profiles.filter((p) => !p.is_paused).length;
-  const inactiveCount = profiles.filter((p) => p.is_paused).length;
-  const pendingCount = profiles.filter((p) => employeeStatus(p, pendingById) === "pending").length;
-  const formerCount = profiles.filter((p) => DEPARTURE_STATUSES.includes(employeeStatus(p, pendingById))).length;
+  // Three states: active, « En attente » (new hire before the first day) and inactive (paused).
+  const activeCount = profiles.filter((p) => employeeStatus(p, pendingById, today) === "active").length;
+  const inactiveCount = profiles.filter((p) => p.is_paused && employeeStatus(p, pendingById, today) !== NEW_HIRE).length;
+  const pendingCount = profiles.filter((p) => employeeStatus(p, pendingById, today) === "pending").length;
+  const formerCount = profiles.filter((p) => DEPARTURE_STATUSES.includes(employeeStatus(p, pendingById, today))).length;
   const newHireCount = profiles.filter((p) => isNewHire(p, today)).length;
   const visibleProfiles = profiles.filter((p) => {
-    const status = employeeStatus(p, pendingById);
+    const status = employeeStatus(p, pendingById, today);
     if (statusFilter === "pending") return status === "pending" || status === "unconfirmed";
     if (statusFilter === "former") return DEPARTURE_STATUSES.includes(status);
     if (statusFilter === NEW_HIRE) return isNewHire(p, today);
@@ -524,7 +526,7 @@ export default function EmployeesPanel() {
         // Non-CCQ roles (administration + owner) skip the CCQ "missing fields" check.
         const missingFields = isNonCcqRole(p.role) ? [] : getMissingEmployeeFields(p, t);
         return (
-        <Card key={p.id} className={p.is_paused ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-warning/40" : ""}>
+        <Card key={p.id} className={p.is_paused && !isNewHire(p, today) ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-warning/40" : ""}>
           <button
             type="button"
             onClick={() => toggleExpanded(p.id)}
@@ -556,18 +558,17 @@ export default function EmployeesPanel() {
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
             </div>
             {(() => {
-              const status = employeeStatus(p, pendingById);
+              const status = employeeStatus(p, pendingById, today);
               const tone = status === "active" ? "bg-success/15 text-success"
+                : status === NEW_HIRE ? "bg-info/15 text-info"
                 : status === "pending" ? "bg-destructive/15 text-destructive"
                   : status === "unconfirmed" ? "bg-warning/15 text-warning"
                     : "bg-muted-foreground/15 text-muted-foreground";
-              return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${tone}`}>{t(`employees.status.${status}`)}</span>;
+              const label = status === NEW_HIRE
+                ? t("employees.newHire.tag", { date: dayjs(p.start_date).format("D MMM") })
+                : t(`employees.status.${status}`);
+              return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${tone}`}>{label}</span>;
             })()}
-            {isNewHire(p, today) && (
-              <span className="rounded-full bg-info/15 px-2 py-1 text-xs font-semibold text-info">
-                {t("employees.newHire.tag", { date: dayjs(p.start_date).format("D MMM") })}
-              </span>
-            )}
             {missingFields.length > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-xs font-semibold text-warning">
                 <TriangleAlert className="h-3.5 w-3.5" />{t("employees.missingCount", { count: missingFields.length })}
@@ -673,7 +674,7 @@ export default function EmployeesPanel() {
                     className="h-9"
                   >
                     <option value="">{t("employees.departure.none")}</option>
-                    <option value={NEW_HIRE}>{t("employees.status.new_hire")}</option>
+                    <option value={NEW_HIRE}>{t("employees.newHire.option")}</option>
                     {DEPARTURE_STATUSES.map((status) => <option key={status} value={status}>{t(`employees.status.${status}`)}</option>)}
                   </Select>
                   {(newHireDraft.has(p.id) || isNewHire(p, today)) && (

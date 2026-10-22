@@ -699,8 +699,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   Équipe en direct, ni dans la vue semaine (cachée si elle commence après la semaine, jours d'avant gris, « 1er jour » le jour
   même), ni dans « Pas soumis hier » (Équipe en direct, À traiter), ni comptée dans les jours manquants du Journal employé
   (`notStartedOn` / `isRegularCrew(person, date)`, `src/lib/live-crew.js`) ; une job entrée quand même l'affiche. Le compte
-  n'est pas touché : il peut être activé avant (profil, 2FA) et le compteur des nouvelles inscriptions reste jusqu'à
-  l'activation. Étiquette « Début le … » et filtre « Nouveaux employés » ; la date reste après le début (date d'embauche).
+  n'est pas touché : il peut être activé avant (profil, 2FA). Employés : trois états — **Actif**, **En attente** (« En attente ·
+  début le … », compte activé ou non, compté à part, filtre) et **Inactif / en pause** ; `employeeStatus(profile, pending, today)`.
+  `pending_signups()` laisse de côté une personne en attente : si son compte n'est toujours pas activé le premier jour, elle
+  revient dans le compteur rouge. La date reste après le début (date d'embauche).
   Ligne `start_date_change` au Journal (`audit_profile_change`). `isNewHire` / `employmentChoice` / `employmentUpdate`
   (`src/lib/signups.js`). La saisie de temps n'est pas bloquée avant la date.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
