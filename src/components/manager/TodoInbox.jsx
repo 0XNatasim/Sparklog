@@ -15,7 +15,7 @@ import { companyDate } from "@/lib/company-time";
 import { isOffOn } from "@/lib/timeoff";
 import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
-import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "@/lib/job-anomalies";
+import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
 import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
 import { DYNACOM_CUMULATIVE_END } from "@/lib/payroll-opening";
@@ -23,6 +23,7 @@ import { notifyBroadcastPush } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 import { loadManualEntryJobIds } from "@/lib/entry-source";
+import { loadOtReuse } from "@/lib/ot-reuse";
 import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import ManualEntryStar from "@/components/ManualEntryStar";
 
@@ -77,7 +78,7 @@ export default function TodoInbox() {
       const ids = submitted.map((job) => job.id);
       const userIds = [...new Set(submitted.map((job) => job.user_id))];
       const dates = [...new Set(submitted.map((job) => job.job_date))];
-      const [peersRes, evidenceRes, manualIds] = await Promise.all([
+      const [peersRes, evidenceRes, manualIds, otReuse] = await Promise.all([
         ids.length
           ? withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "approved").in("user_id", userIds).in("job_date", dates).limit(QUERY_BUDGETS.todoApprovedPeers), 12000)
           : { data: [] },
@@ -85,12 +86,16 @@ export default function TodoInbox() {
           ? selectInChunks(ids, (part) => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes").in("job_id", part))
           : { data: [] },
         loadManualEntryJobIds(supabase, ids),
+        loadOtReuse(ids),
       ]);
-      const anomalies = detectJobAnomalies(
-        [...submitted, ...(peersRes.data || [])],
-        anomalyLimitsFromSettings(settingsRes.data),
-        { firstTripUnpaidUsers: new Set(people.filter((p) => p.first_trip_unpaid).map((p) => p.id)) },
-      );
+      const anomalies = sortAnomalies([
+        ...detectJobAnomalies(
+          [...submitted, ...(peersRes.data || [])],
+          anomalyLimitsFromSettings(settingsRes.data),
+          { firstTripUnpaidUsers: new Set(people.filter((p) => p.first_trip_unpaid).map((p) => p.id)) },
+        ),
+        ...otReuseAnomalies(otReuse, submitted),
+      ]);
       const offPrev = new Set((timeOffRes.data || []).filter((row) => isOffOn(row, prevDay) && !row.start_time).map((row) => row.user_id));
       const missing = notSubmittedYesterday(people, { yesterdayJobs: prevJobsRes.data || [], offUserIds: offPrev })
         .map((p) => ({ id: p.id, name: p.full_name || p.email || p.id, hasJobs: (prevJobsRes.data || []).some((job) => job.user_id === p.id) }))
@@ -143,6 +148,7 @@ export default function TodoInbox() {
       ot: anomaly.ot,
       depart: String(anomaly.depart || "").slice(0, 5),
       fin: String(anomaly.fin || "").slice(0, 5),
+      others: otReuseOthersText(anomaly.others, { t, formatDate: (d) => dayjs(d).format("DD MMM") }),
     });
   }
 

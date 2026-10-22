@@ -106,7 +106,43 @@ export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS, { firstTripUnp
     }
   }
 
+  return sortAnomalies(anomalies);
+}
+
+export function sortAnomalies(anomalies) {
   return anomalies.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || String(a.userId).localeCompare(String(b.userId)));
+}
+
+// « OT déjà utilisé » (migration 0108): `rows` come from the ot_reuse_for_jobs RPC — for each submitted
+// job, the other jobs carrying the same OT number (any employee, date or status). One anomaly per
+// submitted job. The exact same entry (same employee, day and times) is left to « duplicate » above.
+export function otReuseAnomalies(rows, jobs) {
+  const byId = new Map((jobs || []).map((job) => [job.id, job]));
+  const byJob = new Map();
+  for (const row of rows || []) {
+    const job = byId.get(row.job_id);
+    if (!job || job.status !== "submitted") continue;
+    const other = { id: row.other_job_id, user_id: row.other_user_id, job_date: row.other_date, ot: job.ot, depart: row.other_depart, fin: row.other_fin };
+    if (other.user_id === job.user_id && String(other.job_date) === String(job.job_date) && sameEntry(job, other)) continue;
+    if (!byJob.has(job.id)) byJob.set(job.id, { job, others: [] });
+    byJob.get(job.id).others.push({ jobId: row.other_job_id, userId: row.other_user_id, name: row.other_name || "", date: String(row.other_date).slice(0, 10), status: row.other_status });
+  }
+  return [...byJob.values()].map(({ job, others }) => ({
+    key: `ot_reused:${job.id}`,
+    type: "ot_reused",
+    userId: job.user_id,
+    jobDate: job.job_date,
+    jobIds: [job.id],
+    ot: String(job.ot || "").trim(),
+    others,
+  }));
+}
+
+// « Patrick D. · 19 oct. (soumis) ; … » for the anomaly line; at most `max` other jobs, then « +N ».
+export function otReuseOthersText(others, { t, formatDate, max = 3 }) {
+  const list = (others || []).slice(0, max).map((o) => `${o.name || "?"} · ${formatDate(o.date)} (${t(`status.${o.status}`)})`);
+  if ((others || []).length > max) list.push(`+${others.length - max}`);
+  return list.join(" ; ");
 }
 
 // Anomalies that touch any of the given job ids (a batch about to be approved).
