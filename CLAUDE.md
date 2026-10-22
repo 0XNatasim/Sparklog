@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.167)
+## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.168)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -693,6 +693,18 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   intégré de Supabase plafonne les courriels par heure (le 2026-09-23, 14 inscriptions sur 15 sans courriel) ; pour une
   arrivée en groupe, désactiver « Confirm email » le temps des inscriptions (les comptes restent inactifs jusqu'à
   l'activation) ou brancher un SMTP et monter la limite (Authentication › Rate Limits).
+- [x] **Nouvel(le) employé(e) et premier jour de travail** (V2.4.168, migration 0110) : le choix « Embauche / départ » de la
+  fiche Employés (anciennement « Ancien employé ») offre aussi « Nouvel(le) employé(e) », qui exige la date du premier jour
+  (`profiles.start_date`, après aujourd'hui ; rien n'est enregistré sans date). Avant cette date, la personne n'est ni dans
+  Équipe en direct, ni dans la vue semaine (cachée si elle commence après la semaine, jours d'avant gris, « 1er jour » le jour
+  même), ni dans « Pas soumis hier » (Équipe en direct, À traiter), ni comptée dans les jours manquants du Journal employé
+  (`notStartedOn` / `isRegularCrew(person, date)`, `src/lib/live-crew.js`) ; une job entrée quand même l'affiche. Le compte
+  n'est pas touché : il peut être activé avant (profil, 2FA). Employés : trois états — **Actif**, **En attente** (« En attente ·
+  début le … », compte activé ou non, compté à part, filtre) et **Inactif / en pause** ; `employeeStatus(profile, pending, today)`.
+  `pending_signups()` laisse de côté une personne en attente : si son compte n'est toujours pas activé le premier jour, elle
+  revient dans le compteur rouge. La date reste après le début (date d'embauche).
+  Ligne `start_date_change` au Journal (`audit_profile_change`). `isNewHire` / `employmentChoice` / `employmentUpdate`
+  (`src/lib/signups.js`). La saisie de temps n'est pas bloquée avant la date.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

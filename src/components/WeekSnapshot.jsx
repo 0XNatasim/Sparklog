@@ -9,7 +9,7 @@ import { useHolidayDates } from "@/lib/company-holidays";
 import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { weekStartSundayD } from "@/lib/ccq-week";
-import { liveRoster, weekCellSummary } from "@/lib/live-crew";
+import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
 // time, the number of ORs and a colour for saved (orange) / submitted (green) / missing (red).
@@ -34,7 +34,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     setError("");
     const weekEnd = days[6];
     const [p, j, o] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards").order("full_name"),
+      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
       supabase.from("jobs").select("id, user_id, status, depart, fin, job_date").gte("job_date", weekStart).lte("job_date", weekEnd),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
     ]);
@@ -54,7 +54,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
       if (!byKey.has(key)) byKey.set(key, []);
       byKey.get(key).push(job);
     });
-    const roster = liveRoster(people, { jobUserIds: new Set(jobs.map((job) => job.user_id)) });
+    // A new hire whose first day of work is after this week is not listed (0110).
+    const roster = liveRoster(people, { jobUserIds: new Set(jobs.map((job) => job.user_id)), date: days[6] });
     return roster.map((employee) => {
       const cells = days.map((date) => {
         const dayJobs = byKey.get(`${employee.id}:${date}`) || [];
@@ -63,7 +64,13 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
           job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
         ) || 0), 0);
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
-        return { date, hours, off, holiday: holidays.has(date), ...weekCellSummary(dayJobs) };
+        return {
+          date, hours, off, holiday: holidays.has(date),
+          // Days before the first day of work: nothing was expected (never « Rien d'entré »).
+          notStarted: notStartedOn(employee, date),
+          firstDay: employee.start_date === date,
+          ...weekCellSummary(dayJobs),
+        };
       });
       return { employee, cells, total: cells.reduce((sum, c) => sum + c.hours, 0) };
     }).sort((a, b) => (a.employee.full_name || a.employee.email || "").localeCompare(b.employee.full_name || b.employee.email || ""));
@@ -73,6 +80,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     if (cell.status === "submitted") return "border-success/40 bg-success/15 text-success";
     if (cell.status === "saved") return "border-warning/40 bg-warning/15 text-warning";
     if (cell.off) return "border-info/30 bg-info/10 text-info";
+    if (cell.notStarted) return "border-transparent bg-muted/30 text-muted-foreground";
     // A holiday is shown like a weekend: never « Rien d'entré ».
     if (cell.holiday) return "border-transparent bg-muted/30 text-muted-foreground";
     const weekday = dayjs(cell.date).day();
@@ -129,7 +137,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                         {cell.count > 0 ? (
                           <span className="py-1 font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
                         ) : (
-                          <span className="py-1 text-sm">{cell.off ? t("live.week.off") : cell.holiday ? t("live.week.holiday") : "—"}</span>
+                          <span className="py-1 text-sm">{cell.off ? t("live.week.off") : cell.holiday ? t("live.week.holiday") : cell.firstDay ? t("live.week.firstDay") : "—"}</span>
                         )}
                       </button>
                     </td>

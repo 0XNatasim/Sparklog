@@ -65,7 +65,7 @@ export default function TodoInbox() {
       const [submittedRes, peopleRes, mealsRes, parkingRes, settingsRes, timeOffRes, prevJobsRes] = await Promise.all([
         // Weeks paid by Dynacom (up to the imported cumulative, end of week 42) are closed: their jobs are not listed.
         withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").gt("job_date", DYNACOM_CUMULATIVE_END).order("job_date", { ascending: true }).order("id").limit(QUERY_BUDGETS.todoSubmittedJobs), 12000),
-        withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, apprentice_level, first_trip_unpaid"), 12000),
+        withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date, apprentice_level, first_trip_unpaid"), 12000),
         withRetry(() => supabase.from("meal_claims").select("id, job_id, user_id, job_date, amount, status").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         withRetry(() => supabase.from("parking_receipts").select("job_id, user_id, job_date, amount, status, storage_path, extra_storage_paths").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         supabase.from("company_time_settings").select("*").eq("id", true).maybeSingle(),
@@ -97,7 +97,7 @@ export default function TodoInbox() {
         ...otReuseAnomalies(otReuse, submitted),
       ]);
       const offPrev = new Set((timeOffRes.data || []).filter((row) => isOffOn(row, prevDay) && !row.start_time).map((row) => row.user_id));
-      const missing = notSubmittedYesterday(people, { yesterdayJobs: prevJobsRes.data || [], offUserIds: offPrev })
+      const missing = notSubmittedYesterday(people, { yesterdayJobs: prevJobsRes.data || [], offUserIds: offPrev, date: prevDay })
         .map((p) => ({ id: p.id, name: p.full_name || p.email || p.id, hasJobs: (prevJobsRes.data || []).some((job) => job.user_id === p.id) }))
         .sort((a, b) => a.name.localeCompare(b.name, "fr"));
       setErr("");

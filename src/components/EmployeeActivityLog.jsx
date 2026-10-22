@@ -53,7 +53,7 @@ export default function EmployeeActivityLog() {
 
   useEffect(() => {
     let alive = true;
-    supabase.from("profiles").select("id, full_name, email, role, admin_sections, is_paused, show_on_boards").order("full_name").then(({ data }) => {
+    supabase.from("profiles").select("id, full_name, email, role, admin_sections, is_paused, show_on_boards, start_date").order("full_name").then(({ data }) => {
       if (!alive) return;
       // Employees only: anyone who can open Gestion is left out.
       setEmployees((data || []).filter((p) => !hasManagementAccess(p.role, p.admin_sections)));
