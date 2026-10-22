@@ -23,6 +23,7 @@ import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { companyDate } from "@/lib/company-time";
 import { mfaBadge } from "@/lib/mfa";
+import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, SIGNUPS_EVENT, employeeStatus, fetchPendingSignups } from "@/lib/signups";
 
 // Region code → administrative region name, for the label shown next to each employee.
 const REGION_NAME = new Map(QUEBEC_REGIONS.map((r) => [r.code, r.name]));
@@ -58,6 +59,9 @@ export default function EmployeesPanel() {
   const privileged = isPrivileged(role);
   const [nasSet, setNasSet] = useState(new Set());
   const [mfaSet, setMfaSet] = useState(() => new Set()); // users with a verified second factor (0103)
+  // Inactive accounts waiting for activation (0109): id → { email_confirmed }.
+  const [pendingById, setPendingById] = useState(() => new Map());
+  const [statusFilter, setStatusFilter] = useState("all"); // all · pending · former
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [ccqEdit, setCcqEdit] = useState(null); // employee profile whose CCQ card the manager is capturing
@@ -91,6 +95,25 @@ export default function EmployeesPanel() {
     setCardViews((current) => ({ ...current, [profile.id]: { open: true, loading: false, url: data?.signedUrl || null, error: error?.message || (!data ? "not found" : "") } }));
   }
 
+  // Sign-ups waiting for activation (manager level). A failure only hides the « new sign-up » labels.
+  async function loadPending() {
+    try {
+      const rows = await fetchPendingSignups();
+      const next = new Map(rows.map((row) => [row.user_id, row]));
+      setPendingById(next);
+      return next;
+    } catch (pendingError) {
+      console.warn("[employees] pending sign-ups unavailable", pendingError);
+      return new Map();
+    }
+  }
+
+  // After an activation or a former-employee mark: refresh the labels here and the side-menu badge.
+  async function signupsChanged() {
+    await loadPending();
+    window.dispatchEvent(new Event(SIGNUPS_EVENT));
+  }
+
   async function load() {
     setErr("");
     setLoading(true);
@@ -98,7 +121,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -117,12 +140,15 @@ export default function EmployeesPanel() {
       });
       setRates(nextRates);
       setAnnexes(nextAnnexes);
+      const pending = await loadPending();
       // Group by role (owner → admin → manager → employee), keep alphabetical order
       // within each group, and push inactive (paused) accounts to the bottom of their group.
       const nextProfiles = [...(data ?? [])].sort((a, b) => {
         const byRole = roleRank(a.role) - roleRank(b.role);
         if (byRole !== 0) return byRole;
-        const byPaused = (a.is_paused ? 1 : 0) - (b.is_paused ? 1 : 0);
+        // New sign-ups first (to activate), then active accounts, then the other inactive ones.
+        const rank = (p) => (!p.is_paused ? 1 : pending.has(p.id) ? 0 : 2);
+        const byPaused = rank(a) - rank(b);
         if (byPaused !== 0) return byPaused;
         return (a.full_name || a.email || "").localeCompare(b.full_name || b.email || "", undefined, { sensitivity: "base" });
       });
@@ -358,6 +384,14 @@ export default function EmployeesPanel() {
   // Roster counts for the "add employee" card header.
   const activeCount = profiles.filter((p) => !p.is_paused).length;
   const inactiveCount = profiles.filter((p) => p.is_paused).length;
+  const pendingCount = profiles.filter((p) => employeeStatus(p, pendingById) === "pending").length;
+  const formerCount = profiles.filter((p) => DEPARTURE_STATUSES.includes(employeeStatus(p, pendingById))).length;
+  const visibleProfiles = profiles.filter((p) => {
+    const status = employeeStatus(p, pendingById);
+    if (statusFilter === "pending") return status === "pending" || status === "unconfirmed";
+    if (statusFilter === "former") return DEPARTURE_STATUSES.includes(status);
+    return true;
+  });
   const attentionCount = profiles.filter(
     (p) => !p.is_paused && !isNonCcqRole(p.role) && getMissingEmployeeFields(p, t).length > 0
   ).length;
@@ -402,6 +436,17 @@ export default function EmployeesPanel() {
                   <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 font-semibold text-muted-foreground">
                     {inactiveCount} · {t("employees.paused")}
                   </span>
+                  {[["pending", pendingCount, "bg-destructive/15 text-destructive"], ["former", formerCount, "bg-muted text-muted-foreground"]].map(([key, count, tone]) => (count > 0 || statusFilter === key) && (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={statusFilter === key}
+                      onClick={() => setStatusFilter((current) => (current === key ? "all" : key))}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${tone} ${statusFilter === key ? "ring-2 ring-ring" : ""}`}
+                    >
+                      {count} · {t(`employees.filter.${key}`)}
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -444,7 +489,7 @@ export default function EmployeesPanel() {
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">—</CardContent></Card>
       )}
 
-      {!loading && profiles.map((p) => {
+      {!loading && visibleProfiles.map((p) => {
         // Non-CCQ roles (administration + owner) skip the CCQ "missing fields" check.
         const missingFields = isNonCcqRole(p.role) ? [] : getMissingEmployeeFields(p, t);
         return (
@@ -479,9 +524,14 @@ export default function EmployeesPanel() {
               </div>
               <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
             </div>
-            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.is_paused ? "bg-muted-foreground/15 text-muted-foreground" : "bg-success/15 text-success "}`}>
-              {p.is_paused ? t("employees.paused") : t("employees.active")}
-            </span>
+            {(() => {
+              const status = employeeStatus(p, pendingById);
+              const tone = status === "active" ? "bg-success/15 text-success"
+                : status === "pending" ? "bg-destructive/15 text-destructive"
+                  : status === "unconfirmed" ? "bg-warning/15 text-warning"
+                    : "bg-muted-foreground/15 text-muted-foreground";
+              return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${tone}`}>{t(`employees.status.${status}`)}</span>;
+            })()}
             {missingFields.length > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-xs font-semibold text-warning">
                 <TriangleAlert className="h-3.5 w-3.5" />{t("employees.missingCount", { count: missingFields.length })}
@@ -566,16 +616,50 @@ export default function EmployeesPanel() {
                     type="checkbox"
                     checked={Boolean(p.is_paused)}
                     disabled={!p.type_confirmed}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const checked = e.target.checked;
                       setLocal(p.id, "is_paused", checked);
-                      saveField(p.id, "is_paused", checked);
+                      // Activating again clears a former-employee mark (the database does the same, 0109).
+                      if (!checked) setLocal(p.id, "departure_status", null);
+                      await saveField(p.id, "is_paused", checked);
+                      signupsChanged();
                     }}
                     className="h-5 w-5 rounded border-input accent-warning disabled:cursor-not-allowed"
                   />
                 </label>
                 {!p.type_confirmed && <span className="text-xs text-warning">{t("employees.activateNeedsType")}</span>}
               </Field>
+              {isManagerRole(role) && p.role !== "owner" && p.id !== user?.id && (
+                <Field label={t("employees.departure.label")}>
+                  <Select
+                    value={p.departure_status || ""}
+                    onChange={async (e) => {
+                      const value = e.target.value || null;
+                      if (value && !p.is_paused && !(await confirm(t("employees.departure.confirm", { name: p.full_name || p.email, status: t(`employees.status.${value}`) })))) return;
+                      setLocal(p.id, "departure_status", value);
+                      // A former employee is inactive (the database does the same, 0109).
+                      if (value) setLocal(p.id, "is_paused", true);
+                      await saveField(p.id, "departure_status", value);
+                      signupsChanged();
+                    }}
+                    className="h-9"
+                  >
+                    <option value="">{t("employees.departure.none")}</option>
+                    {DEPARTURE_STATUSES.map((status) => <option key={status} value={status}>{t(`employees.status.${status}`)}</option>)}
+                  </Select>
+                  {p.departure_status && (
+                    <Input
+                      className="mt-2 h-9"
+                      value={p.departure_note || ""}
+                      maxLength={MAX_DEPARTURE_NOTE}
+                      placeholder={t("employees.departure.note")}
+                      aria-label={t("employees.departure.note")}
+                      onChange={(e) => setLocal(p.id, "departure_note", e.target.value)}
+                      onBlur={(e) => saveField(p.id, "departure_note", e.target.value)}
+                    />
+                  )}
+                </Field>
+              )}
             </div>
 
             {/* Ligne : téléphone · courriel · carte CCQ */}

@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.166)
+## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.167)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -682,6 +682,17 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   paie — plus des rôles perso tapés par le gestionnaire, au plus 10). Filtre par rôle. Rôles = affichage seulement :
   étiquettes dans Profil › Contacts (`ReferenceContent`) ; aucune autre partie de l'app ne les lit. Les autres blocs d'une
   section (titre, texte) restent en place. `src/lib/contacts.js`, `ContactsManager.jsx`, `sanitizeRoles` (`reference-blocks.js`).
+- [x] **Nouvelles inscriptions et anciens employés** (V2.4.167, migration 0109) : compteur rouge sur « Employés » (V2) et
+  « Équipe › Employés » (V3, aussi sur l'en-tête du groupe fermé : `groupBadgeTotal`) = comptes jamais activés
+  (`profiles.first_activated_at` nul), inactifs, courriel validé, pas anciens employés — RPC `pending_signups()`
+  (gestionnaire, aal2). Il baisse dès l'activation (`SIGNUPS_EVENT`). Employés : nouvelles inscriptions en haut, étiquettes
+  « Nouvelle inscription » / « Courriel non validé » / « Mis à pied » / « Ne travaille plus » / « Inactif », filtres. Ancien
+  employé : `profiles.departure_status` (`mise_a_pied` / `depart`) + note ; le marquer rend le compte inactif, le réactiver
+  efface la marque (trigger `sync_departure_status`) ; ligne `departure_change` au Journal. Les 5 anciens importés de Dynacom
+  (`@messier-connexion.invalid`) passent à « Ne travaille plus ». `src/lib/signups.js`. **Courriels d'inscription** : le service
+  intégré de Supabase plafonne les courriels par heure (le 2026-09-23, 14 inscriptions sur 15 sans courriel) ; pour une
+  arrivée en groupe, désactiver « Confirm email » le temps des inscriptions (les comptes restent inactifs jusqu'à
+  l'activation) ou brancher un SMTP et monter la limite (Authentication › Rate Limits).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

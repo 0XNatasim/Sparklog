@@ -315,6 +315,11 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
   est **très limité** (quelques courriels par heure). La création d'employé et la réinitialisation par un
   gestionnaire n'envoient pas de courriel, donc pas de problème. Pour que « mot de passe oublié » marche
   pour tout le monde, il faudrait configurer un service de courriel (SMTP).
+- **Inscriptions en groupe** (ex. 25 nouveaux le même jour) : chaque inscription envoie un courriel de confirmation, et
+  au-delà de la limite l'inscription échoue (« réessayez plus tard »). C'est ce qui est arrivé le 23 septembre (14 sur 15
+  sans courriel). Avant une arrivée en groupe : Supabase › Authentication › Sign In / Providers › Email, désactiver
+  « Confirm email » le temps des inscriptions (les comptes restent **inactifs** jusqu'à ce qu'un gestionnaire les active
+  dans Employés, où un compteur rouge les signale), puis le réactiver.
 - **Téléphones** : les brouillons hors ligne restent sur l'appareil 30 jours. L'app installée prend ≈ 2 Mo.
 
 ### À corriger avant de passer à 60 employés 💻

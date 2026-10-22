@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import dayjs from "dayjs";
-import { BellRing, EyeOff, FilePlus2, Megaphone, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown, Clock, Car } from "lucide-react";
+import { BellRing, DoorOpen, EyeOff, FilePlus2, Megaphone, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown, Clock, Car } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ const ACTION_META = {
   approval_reverted: { icon: Clock, tone: "text-warning" },
   travel_rule_set: { icon: Car, tone: "text-primary" },
   broadcast_edited: { icon: Megaphone, tone: "text-primary" },
+  departure_change: { icon: DoorOpen, tone: "text-warning" },
   broadcast_withdrawn: { icon: EyeOff, tone: "text-warning" },
   nas_reveal: { icon: Eye, tone: "text-warning" },
   nas_update: { icon: KeyRound, tone: "text-warning" },
@@ -83,6 +84,9 @@ export default function AuditLog() {
       case "travel_rule_set": return t("audit.desc.travelRuleSet", {
         name: target, rule: t(`travel.rule.${d.rule_key}`), choice: t(`travel.choice.${d.choice}`), date: d.effective_from || "—",
       });
+      case "departure_change": return d.to
+        ? t("audit.desc.departureSet", { name: target, status: t(`employees.status.${d.to}`), note: d.note ? ` — ${d.note}` : "" })
+        : t("audit.desc.departureCleared", { name: target });
       case "broadcast_edited": return t(d.reread ? "audit.desc.broadcastEditedReread" : "audit.desc.broadcastEdited", { text: target, count: d.reread_count ?? 0 });
       case "broadcast_withdrawn": return t("audit.desc.broadcastWithdrawn", { text: target, count: d.count ?? 0 });
       case "nas_reveal": return t("audit.desc.nasReveal", { name: target });
@@ -114,6 +118,7 @@ export default function AuditLog() {
               <option value="meal_reviewed">{t("audit.filter.mealReviewed")}</option>
               <option value="parking_reviewed">{t("audit.filter.parkingReviewed")}</option>
               <option value="travel_rule_set">{t("audit.filter.travelRuleSet")}</option>
+              <option value="departure_change">{t("audit.filter.departureChange")}</option>
               <option value="broadcast_edited">{t("audit.filter.broadcastEdited")}</option>
               <option value="broadcast_withdrawn">{t("audit.filter.broadcastWithdrawn")}</option>
               <option value="nas">{t("audit.filter.nas")}</option>

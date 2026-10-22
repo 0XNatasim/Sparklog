@@ -14,6 +14,7 @@ import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
+import { fetchPendingSignups, groupBadgeTotal, pendingSignupCount, SIGNUPS_EVENT } from "@/lib/signups";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
@@ -80,7 +81,9 @@ function storeFlag(key, on) {
   try { window.localStorage.setItem(key, on ? "1" : "0"); } catch { /* storage unavailable */ }
 }
 
-function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, inventoryNegatives }) {
+// Red count on a menu entry: open negative-stock notices on Inventaire, new sign-ups waiting for
+// activation on Employés (V2) and Équipe › Employés (V3).
+function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, badges }) {
   const t = useT();
   const menuPath = highlightPath || activePath;
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
@@ -120,6 +123,9 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, 
               >
                 {GroupIcon && <GroupIcon className="h-3.5 w-3.5" />}
                 <span className="flex-1 text-left">{t(group.labelKey)}</span>
+                {!expanded && groupBadgeTotal(group.items, badges) > 0 && (
+                  <Badge variant="destructive" className="px-1.5 normal-case tracking-normal">{groupBadgeTotal(group.items, badges)}</Badge>
+                )}
                 <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !expanded && "-rotate-90")} />
               </button>
             )}
@@ -140,13 +146,13 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, 
                       !collapsed && !single && "ml-1",
                       isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
                     );
-                    return cn(base, item.id === "inventory" && inventoryNegatives > 0 && "text-destructive");
+                    return cn(base, badges?.[item.id] > 0 && "text-destructive");
                   }}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   {!collapsed && <span className="truncate">{label}</span>}
-                  {item.id === "inventory" && inventoryNegatives > 0 && (
-                    <Badge variant="destructive" className={cn("ms-auto", collapsed && "ms-0 px-1.5")}>{inventoryNegatives}</Badge>
+                  {badges?.[item.id] > 0 && (
+                    <Badge variant="destructive" className={cn("ms-auto", collapsed && "ms-0 px-1.5")}>{badges[item.id]}</Badge>
                   )}
                 </NavLink>
               );
@@ -261,6 +267,12 @@ export default function ManagerLayout() {
   const [navHidden, setNavHidden] = useState(() => readFlag(HIDDEN_KEY));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
+  const [pendingSignups, setPendingSignups] = useState(0);
+  const badges = useMemo(() => ({
+    inventory: inventoryNegatives,
+    employees: isManagerRole(role) ? pendingSignups : 0,
+    "v3-team": isManagerRole(role) ? pendingSignups : 0,
+  }), [inventoryNegatives, pendingSignups, role]);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
@@ -298,6 +310,29 @@ export default function ManagerLayout() {
     return () => {
       cancelled = true;
       window.removeEventListener(INVENTORY_ALERTS_EVENT, loadAlerts);
+    };
+  }, [role, location.pathname]);
+
+  // New sign-ups waiting for activation (email validated). Activating someone in Employés fires
+  // SIGNUPS_EVENT so the badge drops without a reload.
+  useEffect(() => {
+    if (!isManagerRole(role)) return undefined;
+    let cancelled = false;
+    let generation = 0;
+    async function loadSignups() {
+      const ticket = ++generation;
+      try {
+        const rows = await fetchPendingSignups();
+        if (!cancelled && ticket === generation) setPendingSignups(pendingSignupCount(rows));
+      } catch (error) {
+        console.error("[pending-signups]", error);
+      }
+    }
+    loadSignups();
+    window.addEventListener(SIGNUPS_EVENT, loadSignups);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SIGNUPS_EVENT, loadSignups);
     };
   }, [role, location.pathname]);
 
@@ -348,7 +383,7 @@ export default function ManagerLayout() {
             collapsed={collapsed}
             activePath={activePath}
             highlightPath={highlightPath}
-            inventoryNegatives={inventoryNegatives}
+            badges={badges}
           />
           <button
             type="button"
@@ -377,7 +412,7 @@ export default function ManagerLayout() {
                 collapsed={false}
                 activePath={activePath}
                 highlightPath={highlightPath}
-                inventoryNegatives={inventoryNegatives}
+                badges={badges}
                 onNavigate={() => setDrawerOpen(false)}
               />
             </div>
