@@ -3,7 +3,7 @@ import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react
 import {
   BadgeDollarSign, Banknote, BarChart3, BookOpen, CalendarCheck, CalendarClock, CalendarDays, CalendarOff, ChevronDown,
   ClipboardList, Clock3, FilePlus2, FileText, Files, HeartPulse, History, ListChecks, LogOut, Megaphone, Menu, Moon, Package,
-  PanelLeftClose, PanelLeftOpen, Percent, Radio, Receipt, ReceiptText, RefreshCw, Scale, ScrollText, Settings, ShieldCheck,
+  PanelLeftClose, PanelLeftOpen, Percent, Radio, Receipt, ReceiptText, RefreshCw, Scale, ScrollText, Settings, ShieldCheck, StickyNote,
   SlidersHorizontal, Sun, Unlock, UserCircle, Users, Wallet, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { fetchPendingSignups, groupBadgeTotal, pendingSignupCount, SIGNUPS_EVENT } from "@/lib/signups";
+import { dueCount, fetchOpenReminders, msUntilNextReminder, NOTES_EVENT } from "@/lib/notes";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
@@ -35,6 +36,7 @@ const HIDDEN_KEY = "sparklog.managerNavHidden"; // desktop: menu folded away ent
 
 const ICONS = {
   todo: ListChecks,
+  notes: StickyNote,
   "payroll-week": CalendarCheck,
   "v3-time": Clock3,
   "v3-pay-history": History,
@@ -268,11 +270,13 @@ export default function ManagerLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
   const [pendingSignups, setPendingSignups] = useState(0);
+  const [dueNotes, setDueNotes] = useState(0);
   const badges = useMemo(() => ({
     inventory: inventoryNegatives,
     employees: isManagerRole(role) ? pendingSignups : 0,
     "v3-team": isManagerRole(role) ? pendingSignups : 0,
-  }), [inventoryNegatives, pendingSignups, role]);
+    notes: isManagerRole(role) ? dueNotes : 0,
+  }), [inventoryNegatives, pendingSignups, dueNotes, role]);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
@@ -335,6 +339,40 @@ export default function ManagerLayout() {
       window.removeEventListener(SIGNUPS_EVENT, loadSignups);
     };
   }, [role, location.pathname]);
+
+  // My due reminders (Notes): counted now, and again when the next reminder comes due (a timer),
+  // when the tab is shown again, and after any change on the Notes page (NOTES_EVENT).
+  useEffect(() => {
+    if (!isManagerRole(role)) return undefined;
+    let cancelled = false;
+    let generation = 0;
+    let timer = null;
+    async function loadNotes() {
+      const ticket = ++generation;
+      try {
+        const rows = await fetchOpenReminders();
+        if (cancelled || ticket !== generation) return;
+        const now = new Date();
+        setDueNotes(dueCount(rows, now));
+        clearTimeout(timer);
+        const wait = msUntilNextReminder(rows, now);
+        // At most 6 h: a long timer can drift while the computer sleeps.
+        if (wait !== null) timer = setTimeout(loadNotes, Math.min(wait + 1000, 6 * 60 * 60 * 1000));
+      } catch (error) {
+        console.error("[notes]", error);
+      }
+    }
+    const onVisible = () => { if (!document.hidden) loadNotes(); };
+    loadNotes();
+    window.addEventListener(NOTES_EVENT, loadNotes);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      window.removeEventListener(NOTES_EVENT, loadNotes);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [role]);
 
   function toggleCollapsed() {
     setCollapsed((value) => {

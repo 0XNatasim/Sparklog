@@ -124,6 +124,12 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 - [x] **Menu de gauche repliable** (V2 et V3, ordinateur) : petit bouton en haut à gauche de l'en-tête.
 - [x] **Feuilles de temps (V3)** : le nom de l'employé est en premier sur chaque carte (avec n° d'OT et date
   dessous), et le bouton **« ★ Entrées à la main »** n'affiche que les fiches entrées sans la capture Field Service.
+- [x] **Notes** (V2.4.169, sous « Aujourd'hui ») : chaque note est **Privée** (toi seul la vois, cadenas gris) ou
+  **Partagée** avec les gestionnaires (bord bleu, « Partagée par … » : tous la voient, peuvent la modifier ou la marquer
+  faite ; seul l'auteur la supprime). Un rappel partagé apparaît chez tous les gestionnaires. Coche « Me le rappeler » pour choisir une date (et une heure, 8 h par défaut) : à ce moment-là, un
+  compteur rouge apparaît sur **Notes** dans le menu, et la carte passe en rouge en haut de la liste. « Fait » la range
+  dans « Faites », « Plus tard » la repousse (1 heure, demain 8 h, une semaine). Le rappel s'affiche dans l'app
+  seulement : pas de notification sur le téléphone. V3 seulement (la V2 ne change plus).
 
 À faire, dans cet ordre :
 
