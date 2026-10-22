@@ -92,6 +92,7 @@ const V3_ONLY_ITEMS = Object.freeze([
     tab("pay-rules", "advanced-pay-rules", "mgr.nav.payRules"),
     tab("forms", "forms", "mgr.nav.forms"),
     tab("references", "references", "mgr.nav.references"),
+    tab("contacts", "references", "mgr.nav3.tab.contacts"),
   ] },
 ].map((item) => Object.freeze({ ...item, ...(item.tabs ? { tabs: Object.freeze(item.tabs) } : {}) })));
 
