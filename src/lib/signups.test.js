@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/supabaseClient", () => ({ supabase: { rpc: vi.fn() } }));
 
-import { employeeStatus, groupBadgeTotal, pendingSignupCount } from "./signups";
+import { NEW_HIRE, employeeStatus, employmentChoice, employmentUpdate, groupBadgeTotal, isNewHire, pendingSignupCount } from "./signups";
 
 const pending = new Map([
   ["new-ok", { user_id: "new-ok", email_confirmed: true }],
@@ -56,5 +56,44 @@ describe("migration 0109 and wiring", () => {
     expect(layout).toContain("window.addEventListener(SIGNUPS_EVENT, loadSignups)");
     const panel = read("../components/EmployeesPanel.jsx");
     expect(panel).toContain("window.dispatchEvent(new Event(SIGNUPS_EVENT))");
+  });
+});
+
+describe("new hire and first day of work (0110)", () => {
+  const today = "2026-10-22";
+
+  it("is a new hire only while the first day is still to come and the person is not a former employee", () => {
+    expect(isNewHire({ start_date: "2026-10-27" }, today)).toBe(true);
+    expect(isNewHire({ start_date: "2026-10-22" }, today)).toBe(false);
+    expect(isNewHire({ start_date: "2026-10-27", departure_status: "depart" }, today)).toBe(false);
+    expect(isNewHire({}, today)).toBe(false);
+    expect(employmentChoice({ start_date: "2026-10-27" }, today)).toBe(NEW_HIRE);
+    expect(employmentChoice({ start_date: "2026-10-01" }, today)).toBe("");
+    expect(employmentChoice({ departure_status: "mise_a_pied" }, today)).toBe("mise_a_pied");
+  });
+
+  it("writes nothing until the date is entered, and clears the right columns", () => {
+    expect(employmentUpdate(NEW_HIRE, "", "")).toBeNull();
+    expect(employmentUpdate(NEW_HIRE, "2026-10-27", "depart")).toEqual({ departure_status: null, start_date: "2026-10-27" });
+    expect(employmentUpdate("depart", "", NEW_HIRE)).toEqual({ departure_status: "depart" });
+    expect(employmentUpdate("", "", NEW_HIRE)).toEqual({ departure_status: null, start_date: null });
+    // Leaving « former employee » keeps the hiring date already on file.
+    expect(employmentUpdate("", "", "mise_a_pied")).toEqual({ departure_status: null });
+  });
+
+  it("adds the column, logs it to the Journal and passes the day to every board", () => {
+    const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
+    const sql = read("../../supabase/migrations/20261022190000_0110_new_hire_start_date.sql");
+    expect(sql).toContain("add column if not exists start_date date");
+    expect(sql).toMatch(/new\.start_date is distinct from old\.start_date[\s\S]*'start_date_change'/);
+    // 0109 entries kept in the replaced trigger function.
+    for (const action of ["'role_change'", "'pause_change'", "'departure_change'"]) expect(sql).toContain(action);
+    expect(read("../components/LiveCrew.jsx")).toMatch(/offUserIds: offToday,\s+date: today/);
+    expect(read("../components/LiveCrew.jsx")).toContain("offUserIds: offYesterday, date: yesterday");
+    expect(read("../components/manager/TodoInbox.jsx")).toContain("offUserIds: offPrev, date: prevDay");
+    expect(read("../components/WeekSnapshot.jsx")).toContain("date: days[6]");
+    for (const file of ["../components/LiveCrew.jsx", "../components/WeekSnapshot.jsx", "../components/manager/TodoInbox.jsx", "../components/EmployeeActivityLog.jsx"]) {
+      expect(read(file)).toMatch(/show_on_boards, start_date/);
+    }
   });
 });

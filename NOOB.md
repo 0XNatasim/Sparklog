@@ -320,6 +320,9 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
   sans courriel). Avant une arrivée en groupe : Supabase › Authentication › Sign In / Providers › Email, désactiver
   « Confirm email » le temps des inscriptions (les comptes restent **inactifs** jusqu'à ce qu'un gestionnaire les active
   dans Employés, où un compteur rouge les signale), puis le réactiver.
+- **Nouvel(le) employé(e)** (V2.4.168) : dans la fiche de la personne (Employés), « Embauche / départ » › « Nouvel(le)
+  employé(e) », puis la date de son premier jour de travail. Jusqu'à cette date, elle n'apparaît pas dans Équipe en direct,
+  la vue semaine ni « Pas soumis hier ». On peut activer son compte avant, pour qu'elle remplisse son profil.
 - **Téléphones** : les brouillons hors ligne restent sur l'appareil 30 jours. L'app installée prend ≈ 2 Mo.
 
 ### À corriger avant de passer à 60 employés 💻

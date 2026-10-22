@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import dayjs from "dayjs";
 import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, ShieldAlert, ShieldCheck, Star, TriangleAlert, Trophy, X } from "lucide-react";
 import { GRANTABLE_ADMIN_SECTIONS, isAdminEmployee, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
 import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
@@ -21,9 +22,9 @@ import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
 import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
-import { companyDate } from "@/lib/company-time";
+import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { mfaBadge } from "@/lib/mfa";
-import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, SIGNUPS_EVENT, employeeStatus, fetchPendingSignups } from "@/lib/signups";
+import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employmentChoice, employmentUpdate, fetchPendingSignups, isNewHire } from "@/lib/signups";
 
 // Region code → administrative region name, for the label shown next to each employee.
 const REGION_NAME = new Map(QUEBEC_REGIONS.map((r) => [r.code, r.name]));
@@ -61,7 +62,9 @@ export default function EmployeesPanel() {
   const [mfaSet, setMfaSet] = useState(() => new Set()); // users with a verified second factor (0103)
   // Inactive accounts waiting for activation (0109): id → { email_confirmed }.
   const [pendingById, setPendingById] = useState(() => new Map());
-  const [statusFilter, setStatusFilter] = useState("all"); // all · pending · former
+  const [statusFilter, setStatusFilter] = useState("all"); // all · pending · new_hire · former
+  // « Nouvel(le) employé(e) » picked, first day of work not entered yet (nothing saved until then).
+  const [newHireDraft, setNewHireDraft] = useState(() => new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [ccqEdit, setCcqEdit] = useState(null); // employee profile whose CCQ card the manager is capturing
@@ -121,7 +124,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -228,6 +231,32 @@ export default function EmployeesPanel() {
     const { error } = await supabase.from("profiles").update({ [field]: value }).eq("id", id);
     if (error) setErr(error.message);
     else { setInfo(`${field} ✓`); setTimeout(() => setInfo(""), 1500); }
+  }
+
+  // « Embauche / départ » picker: new hire (with the first day of work, 0110) or former employee (0109).
+  function setDraft(id, on) {
+    setNewHireDraft((current) => {
+      const next = new Set(current);
+      if (on) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
+
+  async function saveEmployment(p, choice, startDate) {
+    const previous = newHireDraft.has(p.id) ? NEW_HIRE : employmentChoice(p, today);
+    if (choice === NEW_HIRE && !startDate) { setDraft(p.id, true); return; }
+    if (DEPARTURE_STATUSES.includes(choice) && !p.is_paused
+      && !(await confirm(t("employees.departure.confirm", { name: p.full_name || p.email, status: t(`employees.status.${choice}`) })))) return;
+    const update = employmentUpdate(choice, startDate, previous);
+    if (!update) return;
+    setDraft(p.id, false);
+    // A former employee is inactive (the database does the same, 0109).
+    setProfiles((prev) => prev.map((x) => (x.id === p.id ? { ...x, ...update, ...(update.departure_status ? { is_paused: true } : {}) } : x)));
+    const { error } = await supabase.from("profiles").update(update).eq("id", p.id);
+    if (error) { setErr(error.message); load(); return; }
+    setInfo(`${Object.keys(update).join(", ")} ✓`);
+    setTimeout(() => setInfo(""), 1500);
+    signupsChanged();
   }
 
   // Choosing the employee type (Administration vs Employé CCQ) is the prerequisite for
@@ -386,10 +415,12 @@ export default function EmployeesPanel() {
   const inactiveCount = profiles.filter((p) => p.is_paused).length;
   const pendingCount = profiles.filter((p) => employeeStatus(p, pendingById) === "pending").length;
   const formerCount = profiles.filter((p) => DEPARTURE_STATUSES.includes(employeeStatus(p, pendingById))).length;
+  const newHireCount = profiles.filter((p) => isNewHire(p, today)).length;
   const visibleProfiles = profiles.filter((p) => {
     const status = employeeStatus(p, pendingById);
     if (statusFilter === "pending") return status === "pending" || status === "unconfirmed";
     if (statusFilter === "former") return DEPARTURE_STATUSES.includes(status);
+    if (statusFilter === NEW_HIRE) return isNewHire(p, today);
     return true;
   });
   const attentionCount = profiles.filter(
@@ -436,7 +467,7 @@ export default function EmployeesPanel() {
                   <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 font-semibold text-muted-foreground">
                     {inactiveCount} · {t("employees.paused")}
                   </span>
-                  {[["pending", pendingCount, "bg-destructive/15 text-destructive"], ["former", formerCount, "bg-muted text-muted-foreground"]].map(([key, count, tone]) => (count > 0 || statusFilter === key) && (
+                  {[["pending", pendingCount, "bg-destructive/15 text-destructive"], [NEW_HIRE, newHireCount, "bg-info/15 text-info"], ["former", formerCount, "bg-muted text-muted-foreground"]].map(([key, count, tone]) => (count > 0 || statusFilter === key) && (
                     <button
                       key={key}
                       type="button"
@@ -532,6 +563,11 @@ export default function EmployeesPanel() {
                     : "bg-muted-foreground/15 text-muted-foreground";
               return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${tone}`}>{t(`employees.status.${status}`)}</span>;
             })()}
+            {isNewHire(p, today) && (
+              <span className="rounded-full bg-info/15 px-2 py-1 text-xs font-semibold text-info">
+                {t("employees.newHire.tag", { date: dayjs(p.start_date).format("D MMM") })}
+              </span>
+            )}
             {missingFields.length > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-xs font-semibold text-warning">
                 <TriangleAlert className="h-3.5 w-3.5" />{t("employees.missingCount", { count: missingFields.length })}
@@ -632,21 +668,31 @@ export default function EmployeesPanel() {
               {isManagerRole(role) && p.role !== "owner" && p.id !== user?.id && (
                 <Field label={t("employees.departure.label")}>
                   <Select
-                    value={p.departure_status || ""}
-                    onChange={async (e) => {
-                      const value = e.target.value || null;
-                      if (value && !p.is_paused && !(await confirm(t("employees.departure.confirm", { name: p.full_name || p.email, status: t(`employees.status.${value}`) })))) return;
-                      setLocal(p.id, "departure_status", value);
-                      // A former employee is inactive (the database does the same, 0109).
-                      if (value) setLocal(p.id, "is_paused", true);
-                      await saveField(p.id, "departure_status", value);
-                      signupsChanged();
-                    }}
+                    value={newHireDraft.has(p.id) ? NEW_HIRE : employmentChoice(p, today)}
+                    onChange={(e) => saveEmployment(p, e.target.value)}
                     className="h-9"
                   >
                     <option value="">{t("employees.departure.none")}</option>
+                    <option value={NEW_HIRE}>{t("employees.status.new_hire")}</option>
                     {DEPARTURE_STATUSES.map((status) => <option key={status} value={status}>{t(`employees.status.${status}`)}</option>)}
                   </Select>
+                  {(newHireDraft.has(p.id) || isNewHire(p, today)) && (
+                    <label className="mt-2 block text-xs">
+                      <span className="text-muted-foreground">{t("employees.newHire.startDate")}</span>
+                      <Input
+                        type="date"
+                        className="mt-1 h-9"
+                        min={addCalendarDays(today, 1)}
+                        required
+                        value={isNewHire(p, today) ? p.start_date : ""}
+                        // Only a day after today: someone starting today is simply on the boards.
+                        onChange={(e) => { if (e.target.value > today) saveEmployment(p, NEW_HIRE, e.target.value); }}
+                      />
+                      <span className="mt-1 block text-muted-foreground">
+                        {newHireDraft.has(p.id) ? t("employees.newHire.needDate") : t("employees.newHire.hint")}
+                      </span>
+                    </label>
+                  )}
                   {p.departure_status && (
                     <Input
                       className="mt-2 h-9"

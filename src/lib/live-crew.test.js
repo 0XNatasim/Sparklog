@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activePeopleOnLeave, dayStatus, liveRoster, missingEntryDays, notSubmittedYesterday } from "./live-crew";
+import { activePeopleOnLeave, dayStatus, liveRoster, missingEntryDays, notStartedOn, notSubmittedYesterday } from "./live-crew";
 
 const person = (id, extra = {}) => ({ id, role: "employee", is_paused: false, show_on_boards: true, ...extra });
 const people = [
@@ -96,5 +96,36 @@ describe("weekCellSummary", () => {
     expect(weekCellSummary([{ status: "draft" }])).toEqual({ count: 0, status: "none" });
     expect(weekCellSummary([{ status: "saved" }, { status: "submitted" }])).toEqual({ count: 2, status: "saved" });
     expect(weekCellSummary([{ status: "submitted" }, { status: "approved" }])).toEqual({ count: 2, status: "submitted" });
+  });
+});
+
+describe("new hire before the first day of work (0110)", () => {
+  const hire = person("hire", { start_date: "2026-10-27" });
+  const crew = [person("crew"), hire];
+
+  it("is left off Live Crew and the week view until the first day, then shown", () => {
+    expect(ids(liveRoster(crew, { date: "2026-10-26" }))).toEqual(["crew"]);
+    expect(ids(liveRoster(crew, { date: "2026-10-27" }))).toEqual(["crew", "hire"]);
+    // No date (older callers): unchanged behaviour.
+    expect(ids(liveRoster(crew))).toEqual(["crew", "hire"]);
+    // A job entered anyway still shows on the board.
+    expect(ids(liveRoster(crew, { date: "2026-10-22", jobUserIds: new Set(["hire"]) }))).toEqual(["crew", "hire"]);
+  });
+
+  it("is never « not submitted » for a day before the first day", () => {
+    expect(ids(notSubmittedYesterday(crew, { date: "2026-10-26" }))).toEqual(["crew"]);
+    expect(ids(notSubmittedYesterday(crew, { date: "2026-10-27" }))).toEqual(["crew", "hire"]);
+  });
+
+  it("counts missing days only from the first day of work", () => {
+    const result = missingEntryDays(crew, [], [], "2026-10-25", "2026-10-28");
+    expect(result.find((row) => row.id === "crew").count).toBe(4);
+    expect(result.find((row) => row.id === "hire").count).toBe(2);
+  });
+
+  it("tells which days come before the first day", () => {
+    expect(notStartedOn(hire, "2026-10-26")).toBe(true);
+    expect(notStartedOn(hire, "2026-10-27")).toBe(false);
+    expect(notStartedOn(person("x"), "2026-10-26")).toBe(false);
   });
 });
