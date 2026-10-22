@@ -331,6 +331,10 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
   la vue semaine ni « Pas soumis hier », et la liste Employés la montre « En attente » (ni active, ni inactive). On peut
   activer son compte avant, pour qu'elle remplisse son profil ; sinon elle revient dans le compteur rouge à son premier jour.
 - **Téléphones** : les brouillons hors ligne restent sur l'appareil 30 jours. L'app installée prend ≈ 2 Mo.
+- **« Le téléphone n'a pas laissé l'app lire cette image »** (V2.4.170) : l'image choisie n'est pas lisible (souvent une
+  photo seulement dans le nuage de Google Photos, ou une capture pas encore enregistrée). L'app réessaie seule 3 fois ;
+  sinon, refaire la capture, attendre quelques secondes et la choisir dans Galerie ou Fichiers. Chaque cas est noté au
+  **Journal** (filtre « Image illisible ») avec la taille, l'âge du fichier et le téléphone, pour savoir la vraie cause.
 
 ### À corriger avant de passer à 60 employés 💻
 

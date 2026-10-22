@@ -279,7 +279,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.169)
+## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.170)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -718,6 +718,17 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `NOTES_EVENT`). Fait / Rouvrir / Plus tard (1 h, demain 8 h, 1 semaine) / Modifier / Supprimer (confirmation).
   Cartes en `text-base`/`sm:text-lg`, plus grosses que les notifications envoyées. `src/lib/notes.js`,
   `NotesPanel.jsx`. Pas de push ni de notification du téléphone (dans l'app seulement). V2 inchangée.
+- [x] **Image que le téléphone refuse de lire** (V2.4.170, migration 0112) : le 2026-10-22, Yohan a eu
+  « NotReadableError » sur la capture SMS de temps sup. ; les journaux Supabase montrent qu'aucun envoi n'est parti de
+  son téléphone (4 autres preuves envoyées au même moment), donc Android a refusé la lecture du fichier choisi.
+  `readPickedFile` (`src/lib/evidence-file.js`) lit tout le fichier en mémoire avec 3 essais (0,4 s puis 0,8 s) quand la
+  lecture est refusée ; la copie sert ensuite à tout, y compris « Réessayer avec la même capture » (plus de relecture du
+  fichier ; bouton caché si le fichier n'a jamais pu être lu). Message clair `form.evidence.reason.unreadable` (refaire
+  la capture, attendre, choisir dans Galerie ou Fichiers, pas Google Photos) ; reçu de stationnement illisible : raison
+  affichée au lieu de « enregistrement échoué ». `EvidenceFileError` donne l'étape (lire / type / ouvrir / préparer).
+  Diagnostic au Journal (« Image illisible ») : RPC `log_file_read_error(contexte, détails)` (tout compte connecté, son
+  entrée seulement, clés connues seulement, 20 par heure) — taille, type, âge du fichier, étape, erreur, essais,
+  navigateur, app installée ou non ; jamais l'image. Preuve de temps sup., inventaire et reçus de stationnement.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
