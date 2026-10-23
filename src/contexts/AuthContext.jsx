@@ -336,11 +336,13 @@ export function AuthProvider({ children }) {
       async signOut() {
         // Block the resume-recovery from re-hydrating the session mid sign-out.
         signedOutRef.current = true;
-        // Best-effort server-side revoke, but never let a slow/offline network
-        // request hang the button — race it against a short timer.
+        // Best-effort server-side revoke of THIS device's session only (scope "local"): signing out on a
+        // phone must not close the same account on the office computer — the default ("global") did, and a
+        // manager page left open there then failed silently (e.g. the phone push, 2026-10-22). Never let a
+        // slow/offline network request hang the button — race it against a short timer.
         try {
           await Promise.race([
-            supabase.auth.signOut(),
+            supabase.auth.signOut({ scope: "local" }),
             new Promise((resolve) => setTimeout(resolve, 2500)),
           ]);
         } catch (e) {

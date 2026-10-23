@@ -6,7 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
-import { notifyBroadcastPush } from "@/lib/push";
+import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
 import BroadcastEditForm from "@/components/BroadcastEditForm";
@@ -95,6 +95,8 @@ export default function BroadcastManager() {
   const [expanded, setExpanded] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [resendingId, setResendingId] = useState("");
+  // How the phone push of the last send went (sent / nobody subscribed / refused), under the message.
+  const [pushNote, setPushNote] = useState(null);
   const [editingId, setEditingId] = useState("");
   const [withdrawingId, setWithdrawingId] = useState("");
   // Previous versions of edited messages (0107), loaded when a message is opened.
@@ -231,6 +233,7 @@ export default function BroadcastManager() {
 
   async function send() {
     setMessage("");
+    setPushNote(null);
     if (!body.trim() && files.length === 0) { setMessage(t("broadcast.needMessage")); return; }
     const targetIds = audience === "all" ? employees.map((e) => e.id) : [...selected];
     if (targetIds.length === 0) { setMessage(t("broadcast.needEmployees")); return; }
@@ -249,7 +252,8 @@ export default function BroadcastManager() {
       const rows = targetIds.map((employee_id) => ({ broadcast_id: created.id, employee_id }));
       const { error: recipError } = await supabase.from("broadcast_recipients").insert(rows);
       if (recipError) throw recipError;
-      notifyBroadcastPush(created.id); // phone push, best-effort (not awaited)
+      // Phone push in the background; its outcome shows under the message when it is known.
+      notifyBroadcastPush(created.id).then((result) => setPushNote(pushOutcome(result)));
 
       setBody("");
       clearFiles();
@@ -284,6 +288,7 @@ export default function BroadcastManager() {
 
   async function resend(b) {
     setMessage("");
+    setPushNote(null);
     setResendingId(b.id);
     try {
       // Re-send to the same recipients as the original broadcast, except those it was withdrawn from.
@@ -302,7 +307,7 @@ export default function BroadcastManager() {
       const rows = targetIds.map((employee_id) => ({ broadcast_id: created.id, employee_id }));
       const { error: recipError } = await supabase.from("broadcast_recipients").insert(rows);
       if (recipError) throw recipError;
-      notifyBroadcastPush(created.id); // phone push, best-effort (not awaited)
+      notifyBroadcastPush(created.id).then((result) => setPushNote(pushOutcome(result)));
 
       setMessage(t("broadcast.resent"));
       await loadLog();
@@ -341,6 +346,18 @@ export default function BroadcastManager() {
           <div className="space-y-4 border-t p-4">
           <p className="text-xs text-muted-foreground">{t("broadcast.description")}</p>
           {message && <div className="rounded-md border bg-muted px-3 py-2 text-xs">{message}</div>}
+          {pushNote && (
+            <div
+              role="status"
+              className={pushNote.tone === "warning"
+                ? "rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
+                : pushNote.tone === "ok"
+                  ? "rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs text-success"
+                  : "rounded-md border border-info/30 bg-info/10 px-3 py-2 text-xs text-info"}
+            >
+              {t(pushNote.key, pushNote.params)}
+            </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-sm font-medium">{t("broadcast.message")}</label>
