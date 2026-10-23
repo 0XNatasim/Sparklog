@@ -1,19 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
-import { disablePush, enablePush, getPushStatus } from "@/lib/push";
+import { disablePush, enablePush, getPushStatus, PUSH_EVENT } from "@/lib/push";
+import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 
-// Opt-in switch for phone notifications (Android, and iPhone once installed on the home screen).
+// Switch for phone notifications (Android, and iPhone once installed on the home screen). On by default
+// since V2.4.173 (PushPrompt + syncPushSubscription); turning it off here is remembered on this device.
 export default function PushNotificationsToggle() {
   const t = useT();
+  const { user } = useAuth();
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    getPushStatus().then((s) => { if (!cancelled) setStatus(s); }).catch(() => { if (!cancelled) setStatus("unsupported"); });
-    return () => { cancelled = true; };
+    const read = () => getPushStatus().then((s) => { if (!cancelled) setStatus(s); }).catch(() => { if (!cancelled) setStatus("unsupported"); });
+    read();
+    window.addEventListener(PUSH_EVENT, read);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(PUSH_EVENT, read);
+    };
   }, []);
 
   if (!status || status === "unsupported" || status === "unconfigured") return null;
@@ -22,7 +30,7 @@ export default function PushNotificationsToggle() {
     setBusy(true);
     setError("");
     try {
-      setStatus(next ? await enablePush() : await disablePush());
+      setStatus(next ? await enablePush(user?.id) : await disablePush(user?.id));
     } catch (e) {
       setError(e?.message || t("push.error"));
       setStatus(await getPushStatus().catch(() => "off"));

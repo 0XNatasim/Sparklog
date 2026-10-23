@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, ShieldAlert, ShieldCheck, Star, TriangleAlert, Trophy, X } from "lucide-react";
+import { BellOff, BellRing, Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, ShieldAlert, ShieldCheck, Star, TriangleAlert, Trophy, X } from "lucide-react";
 import { GRANTABLE_ADMIN_SECTIONS, isAdminEmployee, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
 import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
 import TimeOffControls from "@/components/TimeOffControls";
@@ -60,9 +60,10 @@ export default function EmployeesPanel() {
   const privileged = isPrivileged(role);
   const [nasSet, setNasSet] = useState(new Set());
   const [mfaSet, setMfaSet] = useState(() => new Set()); // users with a verified second factor (0103)
+  const [pushSet, setPushSet] = useState(null); // users with phone notifications on (0113); null = unknown
   // Inactive accounts waiting for activation (0109): id → { email_confirmed }.
   const [pendingById, setPendingById] = useState(() => new Map());
-  const [statusFilter, setStatusFilter] = useState("all"); // all · pending · new_hire · former
+  const [statusFilter, setStatusFilter] = useState("all"); // all · pending · new_hire · former · noPush
   // « Nouvel(le) employé(e) » picked, first day of work not entered yet (nothing saved until then).
   const [newHireDraft, setNewHireDraft] = useState(() => new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -162,6 +163,9 @@ export default function EmployeesPanel() {
       // Who turned on two-factor authentication (ids only): shield icon next to the name.
       const { data: mfaRows } = await supabase.rpc("mfa_enrolled_users");
       setMfaSet(new Set((mfaRows || []).map((r) => r.user_id)));
+      // Who has phone notifications on (at least one device): bell icon, « Sans notifications » filter.
+      const { data: pushRows, error: pushError } = await supabase.rpc("push_enabled_users");
+      setPushSet(pushError ? null : new Set((pushRows || []).map((r) => r.user_id)));
       if (privileged) {
         const { data: nasRows } = await supabase.rpc("nas_presence");
         setNasSet(new Set((nasRows || []).map((r) => r.user_id)));
@@ -418,8 +422,12 @@ export default function EmployeesPanel() {
   const pendingCount = profiles.filter((p) => employeeStatus(p, pendingById, today) === "pending").length;
   const formerCount = profiles.filter((p) => DEPARTURE_STATUSES.includes(employeeStatus(p, pendingById, today))).length;
   const newHireCount = profiles.filter((p) => isNewHire(p, today)).length;
+  // Active accounts whose phone has no notifications yet (the app asks them at every opening).
+  const withoutPush = (p) => pushSet != null && !pushSet.has(p.id) && employeeStatus(p, pendingById, today) === "active";
+  const noPushCount = profiles.filter(withoutPush).length;
   const visibleProfiles = profiles.filter((p) => {
     const status = employeeStatus(p, pendingById, today);
+    if (statusFilter === "noPush") return withoutPush(p);
     if (statusFilter === "pending") return status === "pending" || status === "unconfirmed";
     if (statusFilter === "former") return DEPARTURE_STATUSES.includes(status);
     if (statusFilter === NEW_HIRE) return isNewHire(p, today);
@@ -469,7 +477,7 @@ export default function EmployeesPanel() {
                   <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 font-semibold text-muted-foreground">
                     {inactiveCount} · {t("employees.paused")}
                   </span>
-                  {[["pending", pendingCount, "bg-destructive/15 text-destructive"], [NEW_HIRE, newHireCount, "bg-info/15 text-info"], ["former", formerCount, "bg-muted text-muted-foreground"]].map(([key, count, tone]) => (count > 0 || statusFilter === key) && (
+                  {[["pending", pendingCount, "bg-destructive/15 text-destructive"], [NEW_HIRE, newHireCount, "bg-info/15 text-info"], ["former", formerCount, "bg-muted text-muted-foreground"], ["noPush", noPushCount, "bg-warning/15 text-warning"]].map(([key, count, tone]) => (count > 0 || statusFilter === key) && (
                     <button
                       key={key}
                       type="button"
@@ -548,6 +556,12 @@ export default function EmployeesPanel() {
                 )}
                 {mfaBadge(p.role, mfaSet.has(p.id)) === "missing" && (
                   <ShieldAlert className="h-4 w-4 shrink-0 text-warning" aria-label={t("employees.mfaMissing")}><title>{t("employees.mfaMissing")}</title></ShieldAlert>
+                )}
+                {pushSet?.has(p.id) && (
+                  <BellRing className="h-4 w-4 shrink-0 text-success" aria-label={t("employees.pushOn")}><title>{t("employees.pushOn")}</title></BellRing>
+                )}
+                {withoutPush(p) && (
+                  <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={t("employees.pushOff")}><title>{t("employees.pushOff")}</title></BellOff>
                 )}
                 {REGION_NAME.get(p.work_region) && (
                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground" title={t("employees.workRegion")}>
