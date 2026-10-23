@@ -9,6 +9,11 @@ export to Google Apps Script. Roles: `employee` / `manager` / `admin` / `owner` 
 
 **Release rule:** always bump the patch of `APP_VERSION` in `src/lib/version.js` in every PR (shown in the header as `V…`), and mention it in the commit/PR title.
 
+**Docs rule:** `README.md`, `NOOB.md` and `CLAUDE.md` are always updated **together, in the same PR**, and each names
+the current version (`src/lib/docs-sync.test.js` fails otherwise). New feature → README (what it does), NOOB (in plain
+French, what the owner sees or must do) and CLAUDE §6 (technical entry). Never a personal value (NAS, pay amount of a
+person, payroll total) in any of them: the repository is public.
+
 **What is already solid (do not "fix"):**
 - RLS is comprehensive; `get_my_role()` / `is_active_employee()` are `security definer`.
 - Employees read only their own `profiles` row and own `jobs` (no peer PII/pay leakage).
@@ -279,7 +284,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-22, V2.4.170)
+## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.171)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -339,7 +344,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 **B. Informations par employé (formulaires)**
 - [ ] **TD1 (fédéral) et TP-1015.3 (Québec)** de chaque employé : les montants se saisissent dans
   Paramètres › Paie (`employee_tax_profiles`, gestionnaires/propriétaire seulement, V2.4.103) et sont
-  utilisés par Talons, DAS et Calcul — reste à les saisir. Vide = montant personnel de base.
+  utilisés par Talons, DAS et Calcul — reste à les saisir. Vide = montant personnel de base. Au 2026-10-23 : **0 sur
+  36** (les 2 lignes existantes ne portent que la paie fixe / exclusions AE et RRQ). NAS : 1 seul en base, chiffre de
+  contrôle invalide (à ressaisir) ; les autres manquent pour le rapport mensuel CCQ.
+- [ ] **Paie de la semaine 43** (2026-10-11 → 10-17, 1re semaine payée par Sparklog) : au 2026-10-23, 328 fiches
+  soumises non approuvées (21 approuvées), aucune ligne `payroll_period_ledger` après le cumul Dynacom du 10-10.
+  Approuver, puis Paie de la semaine › Comptabiliser, avant la semaine 44.
 - [x] **Cumul de l'année avant Sparklog** — fait le 2026-10-16 pour tous. Source : « Cumulatif des employés » de
   Dynacom du 2026-03-29 au 2026-10-17 (imprimé le 2026-10-15, Drive du propriétaire ; contient les NAS, jamais copié
   ici), qui couvre jusqu'à la **semaine 42** (chiffres identiques au talon D0038-0002 de la propriétaire et au talon de
@@ -729,6 +739,10 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   Diagnostic au Journal (« Image illisible ») : RPC `log_file_read_error(contexte, détails)` (tout compte connecté, son
   entrée seulement, clés connues seulement, 20 par heure) — taille, type, âge du fichier, étape, erreur, essais,
   navigateur, app installée ou non ; jamais l'image. Preuve de temps sup., inventaire et reçus de stationnement.
+- [x] **Documentation toujours à jour** (V2.4.171) : README (15 entrées V3, 2FA, NAS dans Vault, 4 fonctions Edge
+  ajoutées à la liste, nouveautés employés / gestionnaires), NOOB (paie de la semaine 43, TD1 0 / 36, NAS, changement
+  d'heure du 1er novembre, Apps Script, SMTP) et CLAUDE. `src/lib/docs-sync.test.js` : les trois fichiers nomment
+  `V${APP_VERSION}` ; règle « Docs rule » en tête de ce fichier.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
