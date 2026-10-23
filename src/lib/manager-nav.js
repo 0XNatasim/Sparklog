@@ -79,6 +79,8 @@ const V3_ONLY_ITEMS = Object.freeze([
   { id: "v3-team", path: "v3/team", grant: null, labelKey: "mgr.nav.employees", tabs: [
     tab("employees", "employees", "mgr.nav.employees"),
     tab("absences", "absences", "mgr.nav.absences"),
+    // Groupes d'employés (0114): same rule as the Employés page.
+    tab("groups", "employees", "mgr.nav3.tab.groups"),
   ] },
   { id: "v3-reports", path: "v3/reports", grant: null, labelKey: "mgr.nav3.reports", tabs: [
     tab("costs", "reports-costs", "mgr.nav.costs"),

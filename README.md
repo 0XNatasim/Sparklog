@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.174 (2026-10-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.175 (2026-10-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -105,6 +105,13 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   notifications turns them on. When the browser closes or hides its question (Edge's « quiet » requests), the app
   says how to allow them from the padlock left of the address. Turning them off in Profile is remembered on that device. Employees shows a bell per active
   account (on / not yet) and a « Without notifications » filter (`push_enabled_users`, migration 0113).
+- **Employee groups** (V2.4.175, migration 0114): Gestion V3 › Team › **Groups** tab, next to Employees and Absences.
+  Create a group (often a warehouse), tick its employees (a person can be in several groups), rename or delete it.
+  Communications gets a third choice, **Groups**: tick one or more groups, each active member receives the message
+  once. Inventory › Storage can total a **group** as well as a region. Manager-level only (RLS); employees never see groups.
+- **New hires waiting to start** (V2.4.175): when « All employees » or a group includes someone whose first day is
+  still ahead (account already activated), Communications asks « Send them this message too? » — Yes / No (send to
+  the others) / Cancel. No question when there is nobody waiting, or for people ticked one by one.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,

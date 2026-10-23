@@ -284,7 +284,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.174)
+## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.175)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -769,6 +769,19 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `userAgentData.mobile`, iOS, « Android » / « Mobile ») ; un ordinateur passe par Profil. `enablePush` distingue `denied`
   de `dismissed` (question fermée ou cachée) → message `push.prompt.dismissed` (cadenas › Notifications › Autoriser) dans la
   carte et dans Profil, au lieu de « refusées ».
+- [x] **Groupes d'employés et nouveaux en attente dans Communications** (V2.4.175, migration 0114) : tables
+  `employee_groups` (nom 1-60 car., unique sans casse ni espaces, note ≤ 300) et `employee_group_members` (groupe ×
+  profil, cascade des deux côtés) ; RLS `get_my_role() = 'manager'` (gestionnaire / propriétaire / admin avec sections,
+  aal2) pour tout, aucun accès employé ni anon. Onglet **Groupes** de Gestion V3 › Équipe (`v3/team?tab=groups`, même
+  règle que `employees`, `GroupsManager.jsx`) : créer, renommer, supprimer (confirmation), cocher les membres (actifs,
+  nouveaux en attente ; un membre inactif reste listé pour le retirer). `src/lib/employee-groups.js` (`groupsTargetIds`,
+  `pendingNewHires`, `memberChanges`, `inventoryGroupChoices` / `sumGroupInventory`). Communications : 3e choix
+  « Groupes » (union des membres non en pause, chaque personne une fois ; enregistré `audience = 'selected'` avec la liste
+  des destinataires). Avec « Tous » ou des groupes, si des nouveaux en attente (`isNewHire`, compte non en pause) sont
+  parmi les destinataires, une fenêtre demande Oui (inclure) / Non (sans eux) / Annuler (rien n'est envoyé) ; aucune
+  question sans nouveau en attente ni en « Employés précis ». Inventaire › Entrepôt : total d'un groupe en plus des
+  régions. Testé sur Postgres local (propriétaire, employé, anon, nom en double, nom vide, cascades). Test
+  `employee-groups.test.js`. Pas de ligne au Journal pour les groupes (aucun effet sur la paie ni les droits).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

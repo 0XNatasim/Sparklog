@@ -20,6 +20,7 @@ const CongesManager = lazyPanel(() => import("@/components/CongesManager"));
 const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
 const ReferencesManager = lazyPanel(() => import("@/components/ReferencesManager"));
 const ContactsManager = lazyPanel(() => import("@/components/ContactsManager"));
+const GroupsManager = lazyPanel(() => import("@/components/GroupsManager"));
 const BroadcastManager = lazyPanel(() => import("@/components/BroadcastManager"));
 const TimeRulesManager = lazyPanel(() => import("@/components/TimeRulesManager"));
 const UnlockDayManager = lazyPanel(() => import("@/components/UnlockDayManager"));
@@ -347,7 +348,7 @@ const PAY_HISTORY_TABS = {
   roe: PayrollRoePage,
   calcul: () => <PayrollPage Component={PayrollEngineTester} writes compact />,
 };
-const TEAM_TABS = { employees: EmployeesPage, absences: AbsencesPage };
+const TEAM_TABS = { employees: EmployeesPage, absences: AbsencesPage, groups: () => <GroupsManager /> };
 const REPORTS_TABS = {
   costs: CostsPage,
   week: () => <PeriodSummary mode="week" />,
