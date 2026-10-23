@@ -4,7 +4,7 @@ import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { notifyBroadcastPush } from "@/lib/push";
+import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
 import { MAX_BROADCAST_ATTACHMENTS, addPickedFiles, broadcastAttachments, isPdfFile } from "@/lib/broadcast-attachments";
 import { editIsEmpty, editIsUnchanged, recipientStatus } from "@/lib/broadcast-edit";
 import { removeBroadcastFiles, uploadBroadcastFiles } from "@/lib/broadcast-upload";
@@ -62,9 +62,10 @@ export default function BroadcastEditForm({ broadcast, recipients, onSaved, onCa
       });
       if (rpcError) throw rpcError;
       // Push only when someone has to read it again; otherwise the corrected text simply replaces the old one.
-      if (Number(data?.reread_count) > 0) notifyBroadcastPush(broadcast.id, { reread: true });
+      const push = Number(data?.reread_count) > 0 ? pushOutcome(await notifyBroadcastPush(broadcast.id, { reread: true })) : null;
       added.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
-      onSaved(Number(data?.reread_count) > 0 ? t("broadcast.editedReread", { count: data.reread_count }) : t("broadcast.edited"));
+      const saved = Number(data?.reread_count) > 0 ? t("broadcast.editedReread", { count: data.reread_count }) : t("broadcast.edited");
+      onSaved(push?.tone === "warning" ? `${saved} ${t(push.key, push.params)}` : saved);
     } catch (e) {
       await removeBroadcastFiles(uploaded);
       setError(e?.message || "Error");

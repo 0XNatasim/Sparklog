@@ -284,7 +284,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.171)
+## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.172)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -743,6 +743,16 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   ajoutées à la liste, nouveautés employés / gestionnaires), NOOB (paie de la semaine 43, TD1 0 / 36, NAS, changement
   d'heure du 1er novembre, Apps Script, SMTP) et CLAUDE. `src/lib/docs-sync.test.js` : les trois fichiers nomment
   `V${APP_VERSION}` ; règle « Docs rule » en tête de ce fichier.
+- [x] **Notification téléphone refusée sans le dire, déconnexion partout** (V2.4.172) : le 2026-10-22, un test de
+  message vers un compte employé n'est pas arrivé. Journaux : `send_push` 401 (« Session not found » côté Auth). Le
+  gestionnaire s'était déconnecté du compte de gestion sur le téléphone ; `signOut()` (portée « global » par défaut)
+  avait fermé aussi la session de l'ordinateur, dont le jeton restait accepté par la base (message enregistré) mais plus
+  par `auth.getUser` de la fonction ; `notifyBroadcastPush` ignorait l'erreur. Correctif : `AuthContext.signOut` →
+  `signOut({ scope: "local" })` (cet appareil ; `ResetPassword` garde la déconnexion globale après un nouveau mot de
+  passe). `notifyBroadcastPush` (`src/lib/push.js`) rend `{ ok, sent, failed }` ou `{ ok: false, reason }`
+  (`pushFailureReason` : session / not_configured / error), rafraîchit la session et réessaie une fois sur un refus de
+  session, ne lance jamais d'erreur ; `pushOutcome` → message : Communications (envoi, Renvoyer), modification avec
+  relecture, rappel de À traiter, feuille d'urgence. Test `push-outcome.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

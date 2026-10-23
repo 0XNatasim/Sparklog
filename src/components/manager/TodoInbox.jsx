@@ -19,7 +19,7 @@ import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReus
 import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
 import { DYNACOM_CUMULATIVE_END } from "@/lib/payroll-opening";
-import { notifyBroadcastPush } from "@/lib/push";
+import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 import { loadManualEntryJobIds } from "@/lib/entry-source";
@@ -299,8 +299,10 @@ export default function TodoInbox() {
       if (error) throw error;
       const { error: recipError } = await supabase.from("broadcast_recipients").insert(people.map((p) => ({ broadcast_id: created.id, employee_id: p.id })));
       if (recipError) throw recipError;
-      notifyBroadcastPush(created.id); // phone push, best-effort
-      setInfo(t("todo.toast.reminded", { count: people.length }));
+      const push = pushOutcome(await notifyBroadcastPush(created.id)); // the reminder is saved either way
+      setInfo(push?.tone === "warning"
+        ? `${t("todo.toast.reminded", { count: people.length })} ${t(push.key, push.params)}`
+        : t("todo.toast.reminded", { count: people.length }));
     });
   }
 

@@ -19,7 +19,7 @@ import {
   validateManagerEntry,
 } from "@/lib/manager-entry";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
-import { notifyBroadcastPush } from "@/lib/push";
+import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
 import { formatHM, hoursBetween } from "@/lib/time";
 import { useT } from "@/lib/use-t";
 import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
@@ -126,8 +126,11 @@ export default function EmergencyTimesheet() {
         12000
       );
       if (rpcError) throw rpcError;
-      if (data?.broadcast_id) notifyBroadcastPush(data.broadcast_id); // phone push, best-effort
-      setInfo(t("emergency.created", { name: employeeName }));
+      // Phone push (the entry and its in-app message are saved either way); a refusal is said, not hidden.
+      const push = data?.broadcast_id ? pushOutcome(await notifyBroadcastPush(data.broadcast_id)) : null;
+      setInfo(push?.tone === "warning"
+        ? `${t("emergency.created", { name: employeeName })} ${t(push.key, push.params)}`
+        : t("emergency.created", { name: employeeName }));
       setForm({ ...EMPTY_FORM, jobDate: companyDate() });
       setShowErrors(false);
       submissionKeyRef.current = crypto.randomUUID();
@@ -187,8 +190,9 @@ export default function EmergencyTimesheet() {
         12000
       );
       if (rpcError) throw rpcError;
-      if (data?.broadcast_id) notifyBroadcastPush(data.broadcast_id);
-      setInfo(t("emergency.reminded", { name: nameById.get(entry.user_id) || "" }));
+      const push = data?.broadcast_id ? pushOutcome(await notifyBroadcastPush(data.broadcast_id)) : null;
+      const reminded = t("emergency.reminded", { name: nameById.get(entry.user_id) || "" });
+      setInfo(push?.tone === "warning" ? `${reminded} ${t(push.key, push.params)}` : reminded);
       await loadEntries().catch(() => undefined);
     } catch (remindError) {
       setError(friendlyErrorMessage(remindError, t, "emergency.errors.remind"));
