@@ -161,7 +161,7 @@ describe("Gestion V3 menu", () => {
     expect(MANAGER_NAV_V3.filter((group) => group.open).map((group) => group.id)).toEqual(["today", "payroll"]);
   });
 
-  it("reaches every V2 page in V3, as an entry or as a tab, exactly once (reports-period as 3 views, references as 2)", () => {
+  it("reaches every V2 page in V3, as an entry or as a tab, exactly once (reports-period as 3 views, references and employees as 2)", () => {
     const reached = [
       ...v3Entries.filter((item) => !item.tabs).map((item) => item.id),
       ...v3Entries.flatMap((item) => (item.tabs || []).filter((t) => t.from).map((t) => t.from)),
@@ -170,7 +170,8 @@ describe("Gestion V3 menu", () => {
     expect(unique.sort()).toEqual(MANAGER_NAV_V2_ITEMS.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "notes").sort());
     expect(reached.filter((id) => id === "reports-period")).toHaveLength(3); // Semaine · Mois · Par employé
     expect(reached.filter((id) => id === "references")).toHaveLength(2); // Références · Contacts (same rows)
-    expect(reached.length - unique.length).toBe(3);
+    expect(reached.filter((id) => id === "employees")).toHaveLength(2); // Employés · Groupes (same rule, 0114)
+    expect(reached.length - unique.length).toBe(4);
   });
 
   it("gives every tab the access rule of the page it comes from, for every role and grant", () => {

@@ -190,7 +190,7 @@ réel aux données reste celui des politiques RLS et des RPC ci-dessus.
 | À traiter (`todo`) | À approuver (gestionnaire) · Justificatifs → `receipts` (`notifications`) |
 | Feuilles de temps (`v3/time`) | Feuilles de temps → `timesheets` (`timesheet`) · Débloquer une journée → `unlock-day` (`employees`) |
 | Historique paie (`v3/pay-history`) | Talons · DAS · Relevé d'emploi · Calcul détaillé (gestionnaire) |
-| Employés (`v3/team`) | Employés → `employees` (`employees`) · Absences (gestionnaire) |
+| Employés (`v3/team`) | Employés → `employees` (`employees`) · Absences (gestionnaire) · Groupes → `employees` (`employees` ; tables `employee_groups` / `employee_group_members` : RLS `get_my_role() = 'manager'`, 0114) |
 | Rapports (`v3/reports`) | Coûts · Semaine · Mois · Par employé · Export CCQ (gestionnaire) |
 | Configuration (`v3/config`) | Paramètres · Taux CCQ · Règles de paie · Références (gestionnaire) · Contacts → `references` (gestionnaire, mêmes lignes que Références › Contacts) · Règles de temps → `config/rules` (`employees`) · Formulaires → `forms` (`forms`) |
 | Notes (`notes`, V3 seulement, groupe Aujourd'hui) | Page sans onglet (gestionnaire / propriétaire). Données : table `manager_notes` (0111), toujours `get_my_role() = 'manager'` (donc aal2). Lire / modifier : `user_id = auth.uid() or shared` (une note partagée reste partagée pour un non-auteur) ; créer : en son nom ; supprimer : l'auteur seulement. Une note **privée** n'est visible que par son auteur, la propriétaire comprise ; une note **partagée** l'est par tous les gestionnaires. Trigger `manager_notes_guard` : auteur figé, `done_by`. Aucun accès `anon` |

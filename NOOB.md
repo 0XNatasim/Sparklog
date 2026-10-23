@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.174).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.175).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -372,6 +372,18 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
   Seule une personne qui les **désactive** dans Profil ne les a plus (sur ce téléphone). Au 2026-10-23 : 2 comptes
   actifs sur 36 les avaient. **Pour voir qui les a** : Employés, cloche verte à côté du nom (activées) ou cloche barrée
   (pas encore), et la pastille « Sans notifications » pour ne voir que ceux qui manquent — à rappeler à l'équipe.
+- **Groupes d'employés** (V2.4.175) : Gestion › Équipe › onglet **Groupes** (à côté d'Employés et Absences). « Nouveau
+  groupe » → un nom (ex. « Entrepôt Laval ») et une note facultative, puis cocher ses employés. Une personne peut être
+  dans plusieurs groupes. On peut renommer ou supprimer un groupe (les employés restent dans l'app). Ça sert à deux
+  choses : **Communications** → nouveau choix « Groupes » (cocher un ou plusieurs groupes : chaque personne active reçoit
+  le message une seule fois) et **Inventaire › Entrepôt** → le total d'un groupe, en plus du total par région. Seuls les
+  gestionnaires voient les groupes ; les employés ne savent pas dans quel groupe ils sont.
+- **Message à « Tous les employés » et nouveaux en attente** (V2.4.175) : qui reçoit quoi — un compte **inactif** (en
+  pause, mis à pied, ne travaille plus) ou une nouvelle inscription pas encore activée ne reçoit **rien**. Un(e)
+  nouvel(le) employé(e) **en attente** dont le compte est déjà activé : l'app **demande** avant l'envoi « Leur envoyer ce
+  message aussi ? » avec leurs noms et leur date de début — « Oui, les inclure », « Non, sans eux » (les autres le
+  reçoivent) ou « Annuler » (rien ne part). Pas de question s'il n'y a personne en attente, ni quand on coche les gens un
+  par un. Même question avec un groupe.
 - **« Le téléphone n'a pas laissé l'app lire cette image »** (V2.4.170) : l'image choisie n'est pas lisible (souvent une
   photo seulement dans le nuage de Google Photos, ou une capture pas encore enregistrée). L'app réessaie seule 3 fois ;
   sinon, refaire la capture, attendre quelques secondes et la choisir dans Galerie ou Fichiers. Chaque cas est noté au

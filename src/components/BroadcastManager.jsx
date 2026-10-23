@@ -5,6 +5,9 @@ import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { companyDate } from "@/lib/company-time";
+import { fetchGroups, groupsTargetIds, pendingNewHires } from "@/lib/employee-groups";
 import { useT } from "@/lib/use-t";
 import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -87,6 +90,11 @@ export default function BroadcastManager() {
   const [audience, setAudience] = useState("selected");
   const [templates, setTemplates] = useState(() => loadTemplates(BUILT_IN_TEMPLATES));
   const [selected, setSelected] = useState(new Set());
+  // Groupes d'employés (0114): pick whole groups as recipients.
+  const [groups, setGroups] = useState([]);
+  const [selectedGroups, setSelectedGroups] = useState(new Set());
+  // « Envoyer aussi aux nouveaux en attente ? » — { people, resolve } while the question is open.
+  const [newHireQuestion, setNewHireQuestion] = useState(null);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -106,8 +114,32 @@ export default function BroadcastManager() {
     // Include managers too (a manager is a valid recipient / selectable target),
     // but never inactive (paused) accounts.
     const { data } = await supabase
-      .from("profiles").select("id, full_name, email, is_paused").order("full_name");
+      .from("profiles").select("id, full_name, email, is_paused, departure_status, start_date").order("full_name");
     setEmployees((data || []).filter((employee) => !employee.is_paused));
+  }
+
+  async function loadGroups() {
+    // Optional: without groups (or if they cannot be read) the « Groupes » choice is simply hidden.
+    try {
+      setGroups(await fetchGroups());
+    } catch (error) {
+      console.warn("[broadcast] groups not loaded:", error);
+    }
+  }
+
+  function toggleGroup(id) {
+    setSelectedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  // Resolves "include", "exclude" or null (cancel the send).
+  const askAboutNewHires = (people) => new Promise((resolve) => setNewHireQuestion({ people, resolve }));
+  function answerNewHires(value) {
+    newHireQuestion?.resolve(value);
+    setNewHireQuestion(null);
   }
 
   function addFiles(picked) {
@@ -183,7 +215,7 @@ export default function BroadcastManager() {
     if (open && b.edited_at && !revisionsById.has(b.id)) loadRevisions(b.id);
   }
 
-  useEffect(() => { loadEmployees(); loadLog(); }, []);
+  useEffect(() => { loadEmployees(); loadGroups(); loadLog(); }, []);
 
   function toggleEmployee(id) {
     setSelected((current) => {
@@ -235,8 +267,24 @@ export default function BroadcastManager() {
     setMessage("");
     setPushNote(null);
     if (!body.trim() && files.length === 0) { setMessage(t("broadcast.needMessage")); return; }
-    const targetIds = audience === "all" ? employees.map((e) => e.id) : [...selected];
-    if (targetIds.length === 0) { setMessage(t("broadcast.needEmployees")); return; }
+    let targetIds = audience === "all"
+      ? employees.map((e) => e.id)
+      : audience === "groups" ? groupsTargetIds(groups, [...selectedGroups], employees) : [...selected];
+    if (targetIds.length === 0) { setMessage(t(audience === "groups" ? "broadcast.needGroups" : "broadcast.needEmployees")); return; }
+    // « Tous » or a group can include new hires who have not started yet: ask (only when there are some).
+    // A person ticked one by one in « Employés choisis » was chosen on purpose.
+    if (audience !== "selected") {
+      const waiting = pendingNewHires(employees, targetIds, companyDate());
+      if (waiting.length) {
+        const answer = await askAboutNewHires(waiting);
+        if (!answer) return;
+        if (answer === "exclude") {
+          const skip = new Set(waiting.map((person) => person.id));
+          targetIds = targetIds.filter((id) => !skip.has(id));
+          if (targetIds.length === 0) { setMessage(t("broadcast.needEmployees")); return; }
+        }
+      }
+    }
 
     setSending(true);
     try {
@@ -244,7 +292,8 @@ export default function BroadcastManager() {
 
       const { data: created, error: insertError } = await supabase
         .from("manager_broadcasts")
-        .insert({ sender_id: user?.id, body: body.trim(), audience, ...broadcastAttachmentColumns(attachments) })
+        // A group send is stored as « selected »: its recipients are listed one by one.
+        .insert({ sender_id: user?.id, body: body.trim(), audience: audience === "groups" ? "selected" : audience, ...broadcastAttachmentColumns(attachments) })
         .select("id")
         .single();
       if (insertError) throw insertError;
@@ -258,6 +307,7 @@ export default function BroadcastManager() {
       setBody("");
       clearFiles();
       setSelected(new Set());
+      setSelectedGroups(new Set());
       setAudience("selected");
       setMessage(t("broadcast.sent"));
       await loadLog();
@@ -386,7 +436,32 @@ export default function BroadcastManager() {
                 <input type="radio" name="audience" checked={audience === "selected"} onChange={() => setAudience("selected")} className="accent-primary" />
                 {t("broadcast.audienceSelected")}
               </label>
+              {groups.length > 0 && (
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="radio" name="audience" checked={audience === "groups"} onChange={() => setAudience("groups")} className="accent-primary" />
+                  {t("broadcast.audienceGroups")}
+                </label>
+              )}
             </div>
+            {audience === "groups" && (
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
+                {groups.map((group) => {
+                  const count = groupsTargetIds(groups, [group.id], employees).length;
+                  return (
+                    <label key={group.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                      <input type="checkbox" checked={selectedGroups.has(group.id)} onChange={() => toggleGroup(group.id)} className="h-4 w-4 accent-primary" />
+                      <span className="min-w-0 flex-1 truncate">{group.name}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{t("broadcast.groupCount", { count })}</span>
+                    </label>
+                  );
+                })}
+                {selectedGroups.size > 0 && (
+                  <p className="px-2 pt-1 text-xs text-muted-foreground">
+                    {t("broadcast.groupsTotal", { count: groupsTargetIds(groups, [...selectedGroups], employees).length })}
+                  </p>
+                )}
+              </div>
+            )}
             {audience === "selected" && (
               <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
                 {employees.map((employee) => (
@@ -605,6 +680,27 @@ export default function BroadcastManager() {
         </details>
       </Card>
       {confirmDialog}
+      <Dialog open={Boolean(newHireQuestion)} onOpenChange={(open) => { if (!open) answerNewHires(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base leading-snug">{t("broadcast.newHiresTitle", { count: newHireQuestion?.people.length || 0 })}</DialogTitle>
+          </DialogHeader>
+          <ul className="space-y-1 text-sm">
+            {(newHireQuestion?.people || []).map((person) => (
+              <li key={person.id}>
+                <span className="font-medium">{person.full_name || person.email}</span>
+                <span className="text-muted-foreground"> · {t("broadcast.newHireStarts", { date: dayjs(person.start_date).format("YYYY-MM-DD") })}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted-foreground">{t("broadcast.newHiresHint")}</p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => answerNewHires(null)}>{t("common.cancel")}</Button>
+            <Button type="button" variant="outline" onClick={() => answerNewHires("exclude")}>{t("broadcast.newHiresExclude")}</Button>
+            <Button type="button" onClick={() => answerNewHires("include")}>{t("broadcast.newHiresInclude")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
