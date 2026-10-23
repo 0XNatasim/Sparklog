@@ -2,6 +2,10 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
+> **Documentation current as of V2.4.171 (2026-10-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
+> of them does not name the current `APP_VERSION`.
+
 ## Roles
 
 Roles are stored lowercase in `profiles.role`:
@@ -29,10 +33,17 @@ Roles are stored lowercase in `profiles.role`:
   expired session, timeout or network drop is retried once automatically after refreshing
   the session, and a **Réessayer avec la même capture** button re-runs the upload with the
   same file without losing the job details.
-- Attach a parking receipt when the manager enables Parking for that employee.
+- Attach parking receipts when the manager enables Parking for that employee: one claim per job, up to
+  10 meter receipts picked at once, added or replaced while the claim is pending.
+- End-of-day inventory (when enabled): pick several Field Service screenshots at once; the app shows how many
+  lines were read against the « N of N » total, and asks whether there are defective products (one more
+  screenshot of that section).
+- A picture the phone refuses to read (cloud-only photo, screenshot still being saved) is read again up to
+  3 times, then a clear message says what to do; the diagnostic (size, file age, step, browser — never the
+  picture) goes to the Activity log.
 - Review job history and weekly totals. Within each day, jobs are listed in chronological
   order (by departure time, then end time; jobs without a departure last).
-- See manager announcements from a **bell icon** in the header: the dropdown lists the latest announcements (unread highlighted, with a count badge); tapping one simply re-opens that notification (no notifications page) and marks it as read.
+- See manager announcements from a **bell icon** in the header: the dropdown lists the latest announcements (unread highlighted, with a count badge); tapping one simply re-opens that notification (no notifications page) and marks it as read. Announcements can carry several photos and PDFs, show « Modifié le … » when a manager edited them, and disappear when withdrawn before being read.
 - Complete first-login work-region and union-association onboarding.
 - View manager-enabled company forms from the Profile page.
 - New profiles default to `compagnon`, CCQ schedule `C3` (general daytime work), a
@@ -46,17 +57,17 @@ entirely with the toggle at the top left of the header); every page has its own 
 pages a manager is allowed to open are listed. Managers and the owner switch between two menus with the **V2 | V3**
 selector in the header (remembered per device); office admins always see V2.
 
-**V3** (13 entries; pages with tabs keep each tab's original access rule, the active tab is in `?tab=`):
+**V3** (15 entries; pages with tabs keep each tab's original access rule, the active tab is in `?tab=`):
 
 | Group | Entries [tabs] |
 |---|---|
-| **Today** (open) | To do [To approve · Receipts & proofs] · Live crew |
+| **Today** (open) | To do [To approve · Receipts & proofs] · Live crew · Notes (private or shared with managers, optional reminder: red badge on « Notes » when due) |
 | **Time** | Timesheets [Timesheets · Unlock a day] — employee name first on each card, « Entered by hand » ★ filter |
 | **Payroll** (open) | Weekly payroll · Payroll history [Pay stubs · DAS · Record of employment · Detailed calculation] |
 | **Team** | Employees [Employees · Time off] · Inventory · Communications |
 | **Reports** | Reports [Costs · Week · Month · By employee (grid) · CCQ export] |
-| **Configuration** | Configuration [Settings · Time rules · CCQ rates · Pay rules · Forms · References] |
-| **Admin** | Activity log · Service status · Emergency timesheet (owner only) |
+| **Configuration** | Configuration [Settings · Time rules · CCQ rates · Pay rules · Forms · References · Contacts (with roles)] |
+| **Admin** | Travel and expenses (per-employee rules, not yet read by payroll) · Activity log · Service status · Emergency timesheet (owner only) |
 
 **V2** (the classic menu, frozen by tests until V3 becomes the default):
 
@@ -72,6 +83,22 @@ selector in the header (remembered per device); office admins always see V2.
 | **Advanced** | Activity log · Service status · Pay rules · Emergency timesheet (owner only) |
 
 Managers can also broadcast announcements, synchronize CCQ rates, view the app as any employee, and force a manual refresh from the header (useful in installed PWA/App mode).
+
+Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3):
+
+- **Two-factor authentication** is required for owner, manager and admin accounts (authenticator-app code after
+  the password); without it the database treats the session as an employee.
+- **Employees:** red badge for new sign-ups to activate; three states — Active, **Waiting** (new hire with a first
+  day of work, hidden from Live crew and the week view until then) and Inactive; former employees marked « laid
+  off » or « no longer works here ».
+- **To do / Timesheets:** confirmation before every approve/refuse/delete, « OT already used » anomaly (same work
+  order on another job), ★ for jobs entered by hand.
+- **Time off:** « Sick » category and a yearly sick-leave register (working days, CSV).
+- **Inventory:** defective products, negative quantities with a dismissible alert badge, warehouse total by region.
+- **Communications:** several photos and PDFs per message; edit a sent message (with re-read and push) or
+  withdraw it for those who have not read it.
+- **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,
+  « Messier » method by default, printable weekly summary.
 
 ## CCQ assumptions
 
@@ -241,6 +268,10 @@ supabase functions deploy cleanup_overtime_evidence
 supabase functions deploy create_employee
 supabase functions deploy reset_employee_password
 supabase functions deploy delete_user
+supabase functions deploy send_push
+supabase functions deploy infra_metrics
+supabase functions deploy process_inventory_screenshot
+supabase functions deploy delete_inventory_screenshots
 ```
 
 | Function | Purpose |
@@ -256,6 +287,12 @@ supabase functions deploy delete_user
 | `delete_user` | Manager-only hard delete of an inactive account, with guards and an audit-log entry. |
 | `create_employee` | Manager/owner creation of an already-confirmed employee account with an optional generated temporary password. |
 | `reset_employee_password` | Manager/owner generation of a new one-time-displayed temporary password without deleting payroll history. |
+| `send_push` | Web push for announcements (and the « Message modifié » re-read push). |
+| `infra_metrics` | Manager-only service status (database, storage, connections). |
+| `process_inventory_screenshot` | Server-side reading (OCR) of inventory screenshots into equipment lines, including defective products and negative quantities. |
+| `delete_inventory_screenshots` | Manager removal of an inventory screenshot (file, lines and row together). |
+
+Every manager-level function also checks the two-factor (`aal2`) claim (`_shared/mfa.js`).
 
 The frontend sends authenticated bearer tokens to user-facing functions. Keep normal JWT verification/authentication behavior aligned with each function's own authorization checks; do not expose service-role credentials to the browser.
 
@@ -465,7 +502,8 @@ tree):
 - Keep overtime and parking buckets private.
 - Preserve RLS policies and manager-only profile-setting triggers.
 - Pausing an account blocks employee access without deleting historical jobs or evidence.
-- **NAS/SIN is vaulted.** It lives in `employee_sensitive` (RLS: readable/writable only by the **`owner` role** and the service role), not on `profiles`. `is_privileged()` is role-based (`role = 'owner'`) — no hard-coded user ids. Other managers and `admin` staff only see a mask; owners reveal a value and every reveal is logged to `audit_log` via the `reveal_nas()` RPC. Wage information is sensitive; restrict access and production logs accordingly.
+- **NAS/SIN is vaulted.** Each NAS is a Supabase Vault secret (encrypted, key outside the database, migration 0102); `employee_sensitive` keeps only the secret id and has no table policy for the browser. Only the owner-only RPCs `reveal_nas` / `set_nas` / `nas_presence` / `export_ccq_nas` reach it, each audited; `set_nas` rejects a bad check digit. Other managers and `admin` staff only see a mask. Wage information is sensitive; restrict access and production logs accordingly.
+- **Two-factor authentication** (migration 0103): `get_my_role()` returns `manager` and `is_privileged()` is true only for an `aal2` session, so a stolen password alone opens neither Gestion nor NAS data.
 
 ## License
 
@@ -486,7 +524,7 @@ it does not block time-sheet go-live.
 
 > Legend: **✓** = confirmed correct · **✗** = needs fixing · note the correction.
 
-### 1. Per-employee data (repeat for each of the 10 employees)
+### 1. Per-employee data (repeat for each active employee)
 
 Confirmed in **Manager → Employees**. Source of truth is the employee's CCQ
 *certificat de compétence*.

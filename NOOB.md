@@ -1,10 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-18 (V2.4.155).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.171).
+> `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
 ## Où on en est
 
+- 🔴 **À faire en premier : la paie de la semaine 43** (11 au 17 octobre), la **première payée par Sparklog**. Au
+  2026-10-23, presque toutes les fiches de la semaine sont **soumises mais pas approuvées**, et rien n'est encore
+  comptabilisé. Dans l'ordre : **À traiter** (approuver) › **Paie › Paie de la semaine** (semaine 43, « Calculer et
+  comptabiliser ») › imprimer les talons. Puis la semaine 44 de la même façon.
 - ✅ L'app fonctionne et les heures sont bien classées. Toutes tes décisions de paie sont dans l'app.
 - ⚠️ **Les montants en dollars de la paie** (avantages CCQ, impôts, cotisations) sont **des estimations**.
   Ils restent « à réviser » tant que les étapes 1 à 4 ci-dessous ne sont pas faites.
@@ -32,6 +37,10 @@ d'avril.
   **case A des relevés 1** (salaire brut imposable, avec le 13 % et les avantages imposables), pas juste heures × taux.
   Sous 2 M$ en 2026 : aucune cotisation FDRCMO pour 2026 (inscrire « 0 » à la ligne 75). Si 2027 dépasse 2 M$, les
   dépenses de formation de 2026 peuvent être reportées sur 2027 (ligne 79.1).
+  *Comment l'estimer :* le cumul brut de Dynacom jusqu'au 10 octobre (déjà dans l'app, demander le total à Claude)
+  + la moyenne par semaine × les semaines qui restent jusqu'au 31 décembre (sans les vacances de la construction),
+  plus les nouveaux employés. L'année **civile** compte, même si l'année financière de Messier commence le
+  1er novembre. Le comptable confirme le vrai total en décembre (case A des relevés 1).
   *À faire :* inscrire ce total prévu dans **Paramètres › Paie** (il sert aussi au taux du FSS : environ 2 % à 2 M$,
   1,65 % sous 1 M$). Demander au comptable seulement si Messier est **associé à d'autres entreprises** au
   31 décembre : leurs masses s'additionnent alors pour le taux du FSS (pas pour le FDRCMO).
@@ -49,9 +58,14 @@ d'avril.
 ## Étape 2 — Infos de chaque employé 👤
 
 - [ ] **Formulaires TD1 (fédéral) et TP-1015.3 (Québec)** remplis et signés par chaque employé. Ils
-  donnent les crédits d'impôt personnels. *Où l'inscrire :* **Configuration › Paramètres › Paie — TD1 /
-  TP-1015.3 des employés**. Inscris seulement les montants, jamais le NAS ni une copie du formulaire.
-  Tant qu'un employé n'a rien, l'app prend le montant personnel de base.
+  donnent les crédits d'impôt personnels et servent à calculer l'**impôt retenu sur chaque paie**. *Où l'inscrire :*
+  **Configuration › Paramètres › Paie — TD1 / TP-1015.3 des employés**. Inscris seulement les montants, jamais le NAS
+  ni une copie du formulaire. Tant qu'un employé n'a rien, l'app prend le montant personnel de base (bon pour la
+  plupart). **Au 2026-10-23 : aucun saisi (0 sur 36).** Le plus simple : demander à Dynacom les montants qu'ils
+  utilisaient, et n'inscrire que ceux qui diffèrent du montant de base.
+- [ ] **NAS** : un seul est saisi et son **chiffre de contrôle est invalide** (Claude peut dire sur quelle fiche) (un chiffre mal
+  tapé ou deux inversés : le 9e chiffre est calculé à partir des 8 autres). Le revérifier sur la carte et le
+  ressaisir (Employés › fiche › NAS, propriétaire seulement). Les autres sont à saisir pour le rapport mensuel CCQ.
 - [x] **Cumul de l'année avant Sparklog** — ✅ **fait pour tous** (2026-10-16), à partir du « Cumulatif des
   employés » de Dynacom (29 mars → semaine 42) : une ligne par employé au 10 octobre dans le registre de paie,
   avec salaire, RRQ, AE, RQAP, impôts, CCQ, etc. 35 employés, totaux identiques au PDF au centime près. Les
@@ -96,8 +110,9 @@ Aujourd'hui, un seul talon a été vérifié (un compagnon).
 
 Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
-- [ ] **Changement d'heure de l'automne** : permettre au gestionnaire de choisir quelle « 2 h du matin »
-  a été travaillée. Aujourd'hui, l'heure répétée est refusée.
+- [ ] **Changement d'heure de l'automne** (prochain : **dimanche 1er novembre 2026**) : permettre au gestionnaire de
+  choisir quelle « 1 h du matin » a été travaillée (l'heure de 1 h à 2 h se répète). Aujourd'hui, une fiche dans
+  cette heure-là est refusée. Rare (la nuit, un dimanche).
 - [ ] **CNESST sur le salaire admissible (trou du calcul)** : l'app calcule la CNESST (3,17 %) sur tout le
   salaire, alors que le vrai relevé ne la calcule que sur un « salaire admissible ». Le coût CNESST est donc
   **trop élevé** dans DAS, Calcul et Coûts. À corriger dès que la règle de l'excédent est connue (étape 1).
@@ -223,6 +238,14 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 4. Un rapport « Chargé à Britton » par semaine.
 
 ## À surveiller 👤
+
+- [ ] **Apps Script (export Google Sheet)** : coller le nouveau code
+  (`supabase/functions/push_approved_batch/apps-script-doPost.js`) dans la feuille › **Extensions › Apps Script**, à
+  la place de tout le `doPost`, Enregistrer, puis **Déployer › Gérer les déploiements › crayon › Nouvelle version ›
+  Déployer**. Garder le **même** déploiement (sinon l'adresse change et l'envoi ne marche plus).
+- [ ] **Courriels d'inscription (SMTP)** : si « Confirm email » a été désactivé pour une arrivée en groupe, le
+  réactiver. Un **SMTP** est un service d'envoi de courriels (Brevo, Resend, SendGrid, Google Workspace…) : le brancher
+  dans Supabase › Authentication › Emails enlève la limite de quelques courriels par heure du service intégré.
 
 - [ ] **Remplissage automatique (capture Field Service)** : si un employé reste bloqué (« Enregistrement
   bloqué »), il touche **(Détails) › Voir le texte lu sur la capture › Copier le texte** et te l'envoie ;
