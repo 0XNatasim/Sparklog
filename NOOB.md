@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.172).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.173).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -355,11 +355,18 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
   activer son compte avant, pour qu'elle remplisse son profil ; sinon elle revient dans le compteur rouge à son premier jour.
 - **Téléphones** : les brouillons hors ligne restent sur l'appareil 30 jours. L'app installée prend ≈ 2 Mo.
 - **Notifications sur le téléphone** (V2.4.172) : après chaque message, Communications dit ce qui s'est passé :
-  « envoyée à N téléphone(s) », « aucun destinataire n'a activé les notifications » (l'employé l'active dans Profil ›
-  Notifications sur le téléphone) ou « pas partie : ta session est fermée » (se déconnecter, se reconnecter, puis
+  « envoyée à N téléphone(s) », « aucun destinataire n'a activé les notifications » ou « pas partie : ta session est fermée » (se déconnecter, se reconnecter, puis
   « Renvoyer »). **Déconnexion** = cet appareil seulement : se déconnecter sur le téléphone ne ferme plus la Gestion
   ouverte sur l'ordinateur (c'est ce qui avait bloqué le test du 22 octobre). Changer son mot de passe déconnecte
   encore partout.
+- **Notifications activées par défaut** (V2.4.173) : tout le monde les reçoit, sans aller dans Profil. Un téléphone
+  oblige quand même chaque personne à toucher **« Autoriser »** une fois : aucune app ne peut le faire à sa place. Donc,
+  à l'ouverture de l'app, une carte bleue en haut dit « Activer les notifications sur le téléphone » : la personne touche
+  « Activer », puis « Autoriser ». « Plus tard » la cache 3 jours, puis elle revient. Si le téléphone a déjà dit oui,
+  l'app s'abonne toute seule. Sur iPhone, il faut d'abord ajouter SparkLog à l'écran d'accueil (la carte l'explique).
+  Seule une personne qui les **désactive** dans Profil ne les a plus (sur ce téléphone). Au 2026-10-23 : 2 comptes
+  actifs sur 36 les avaient. **Pour voir qui les a** : Employés, cloche verte à côté du nom (activées) ou cloche barrée
+  (pas encore), et la pastille « Sans notifications » pour ne voir que ceux qui manquent — à rappeler à l'équipe.
 - **« Le téléphone n'a pas laissé l'app lire cette image »** (V2.4.170) : l'image choisie n'est pas lisible (souvent une
   photo seulement dans le nuage de Google Photos, ou une capture pas encore enregistrée). L'app réessaie seule 3 fois ;
   sinon, refaire la capture, attendre quelques secondes et la choisir dans Galerie ou Fichiers. Chaque cas est noté au

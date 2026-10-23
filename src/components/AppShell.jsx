@@ -16,6 +16,7 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import PushPrompt from "@/components/PushPrompt";
 import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { APP_VERSION } from "@/lib/version";
@@ -122,6 +123,7 @@ export default function AppShell({ children }) {
       <UpdateBanner />
       {!isViewMode && <RegionOnboarding />}
       {!isViewMode && <BroadcastPopup />}
+      {!isViewMode && <PushPrompt />}
       {isViewMode && (
         <div className="sticky top-0 z-50 border-b border-warning bg-warning px-3 py-2 text-warning-foreground shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">

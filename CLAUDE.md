@@ -284,7 +284,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.172)
+## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.173)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -753,6 +753,16 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`pushFailureReason` : session / not_configured / error), rafraîchit la session et réessaie une fois sur un refus de
   session, ne lance jamais d'erreur ; `pushOutcome` → message : Communications (envoi, Renvoyer), modification avec
   relecture, rappel de À traiter, feuille d'urgence. Test `push-outcome.test.js`.
+- [x] **Notifications téléphone activées par défaut** (V2.4.173, migration 0113) : au 2026-10-23, 2 comptes actifs sur 36
+  avaient un abonnement (l'option était à activer soi-même dans Profil). Le navigateur exige une permission donnée par un
+  geste de la personne, donc : `syncPushSubscription(userId)` (`src/lib/push.js`) à chaque ouverture (`PushPrompt`, dans
+  `AppShell` hors vue employé et `ManagerLayout`) — si la permission est déjà accordée, abonne l'appareil et rappelle
+  `register_push_subscription` (rattache aussi un téléphone partagé au compte connecté) ; sinon la carte
+  `PushPrompt.jsx` (`pushPromptMode` : `ask` / `install` pour un iPhone dans Safari ; jamais pour `denied`, `on`, non pris
+  en charge) demande le geste. « Plus tard » = 3 jours (`sparklog.pushPromptSnooze`). Désactiver dans Profil enregistre
+  `sparklog.pushOff.<userId>` sur l'appareil : ni synchronisation ni carte pour ce compte ; réactiver l'efface.
+  `PUSH_EVENT` garde la carte et Profil d'accord. Employés : RPC `push_enabled_users()` (ids, gestionnaire aal2 via
+  `get_my_role()`), cloche verte / barrée par compte actif, filtre « Sans notifications ». Test `push-default.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

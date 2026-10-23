@@ -27,6 +27,7 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import PushPrompt from "@/components/PushPrompt";
 import { PanelLoading } from "@/components/LazyLoading";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -406,6 +407,7 @@ export default function ManagerLayout() {
     <div className="min-h-screen bg-background text-foreground">
       <OfflineBanner />
       <UpdateBanner />
+      <PushPrompt />
       <RegionOnboarding />
       <BroadcastPopup />
       <div className="flex min-h-screen">
