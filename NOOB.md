@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.175).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.176).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -372,6 +372,12 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
   Seule une personne qui les **désactive** dans Profil ne les a plus (sur ce téléphone). Au 2026-10-23 : 2 comptes
   actifs sur 36 les avaient. **Pour voir qui les a** : Employés, cloche verte à côté du nom (activées) ou cloche barrée
   (pas encore), et la pastille « Sans notifications » pour ne voir que ceux qui manquent — à rappeler à l'équipe.
+- **Dates dans la fiche de l'employé** (V2.4.176) : dans Employés, sous le téléphone et le courriel, une ligne avec la
+  **date de naissance**, le **NAS** (sortis de l'ancienne section « Métadonnées », renommée **« Données CCQ »**), la **date
+  d'embauche** et le **dernier jour travaillé**. La date d'embauche est la même que le « premier jour » d'un(e) nouvel(le)
+  employé(e) : une date à venir le met « En attente ». Le dernier jour travaillé se remplit lors d'une mise à pied ou d'un
+  départ ; il ne peut pas être avant la date d'embauche. Chaque changement est au Journal, et le Relevé d'emploi utilise ces
+  deux dates quand elles sont remplies.
 - **Groupes d'employés** (V2.4.175) : Gestion › Équipe › onglet **Groupes** (à côté d'Employés et Absences). « Nouveau
   groupe » → un nom (ex. « Entrepôt Laval ») et une note facultative, puis cocher ses employés. Une personne peut être
   dans plusieurs groupes. On peut renommer ou supprimer un groupe (les employés restent dans l'app). Ça sert à deux

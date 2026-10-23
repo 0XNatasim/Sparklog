@@ -43,6 +43,22 @@ export function employmentUpdate(choice, startDate, previous) {
   return previous === NEW_HIRE ? { departure_status: null, start_date: null } : { departure_status: null };
 }
 
+// Date d'embauche (start_date, 0110) and dernier jour travaillé (last_work_date, 0115): the last day can never
+// be before the hiring date (the database refuses the same). Returns an i18n key, or null when fine.
+export function employmentDatesError(startDate, lastWorkDate) {
+  if (startDate && lastWorkDate && lastWorkDate < startDate) return "employees.dates.order";
+  return null;
+}
+
+// Relevé d'emploi: the dates typed in the employee card win over the ones guessed from the pay data
+// (block 10 « Premier jour travaillé » = hiring date, block 11 « Dernier jour payé » = last day worked).
+export function roeEmploymentDates(computed, profile) {
+  return {
+    firstDay: profile?.start_date || computed?.firstDay || null,
+    lastDay: profile?.last_work_date || computed?.lastDay || null,
+  };
+}
+
 // One status per account for the Employés list.
 //   active · new_hire (« En attente »: hired, first day of work still to come, account active or not)
 //   pending (new sign-up, email validated) · unconfirmed (email not validated yet)
