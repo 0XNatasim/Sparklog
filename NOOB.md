@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.173).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.174).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -364,6 +364,11 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
   à l'ouverture de l'app, une carte bleue en haut dit « Activer les notifications sur le téléphone » : la personne touche
   « Activer », puis « Autoriser ». « Plus tard » la cache 3 jours, puis elle revient. Si le téléphone a déjà dit oui,
   l'app s'abonne toute seule. Sur iPhone, il faut d'abord ajouter SparkLog à l'écran d'accueil (la carte l'explique).
+  **Seulement sur téléphone ou tablette** (V2.4.174) : sur un ordinateur, la carte n'apparaît plus. Le 23 octobre, Karine
+  (ordinateur, Microsoft Edge) touchait « Activer » et la carte restait : Edge cache sa question dans une petite cloche
+  barrée à droite de l'adresse, donc rien n'était permis. Pour les recevoir sur l'ordinateur quand même : Profil ›
+  Notifications sur le téléphone, puis, si Edge ne pose pas la question, cadenas à gauche de l'adresse › Autorisations
+  pour ce site › Notifications › Autoriser. Pour les recevoir sur son téléphone, ouvrir SparkLog sur le téléphone.
   Seule une personne qui les **désactive** dans Profil ne les a plus (sur ce téléphone). Au 2026-10-23 : 2 comptes
   actifs sur 36 les avaient. **Pour voir qui les a** : Employés, cloche verte à côté du nom (activées) ou cloche barrée
   (pas encore), et la pastille « Sans notifications » pour ne voir que ceux qui manquent — à rappeler à l'équipe.

@@ -30,7 +30,13 @@ export default function PushNotificationsToggle() {
     setBusy(true);
     setError("");
     try {
-      setStatus(next ? await enablePush(user?.id) : await disablePush(user?.id));
+      const result = next ? await enablePush(user?.id) : await disablePush(user?.id);
+      if (result === "dismissed") {
+        setError(t("push.prompt.dismissed"));
+        setStatus(await getPushStatus().catch(() => "off"));
+      } else {
+        setStatus(result);
+      }
     } catch (e) {
       setError(e?.message || t("push.error"));
       setStatus(await getPushStatus().catch(() => "off"));

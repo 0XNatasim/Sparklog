@@ -7,8 +7,9 @@ import { useT } from "@/lib/use-t";
 
 // Phone notifications are on by default (V2.4.173). At start the device is (re)subscribed silently when the
 // browser already allows it; otherwise this card asks for the one tap the browser requires (« Autoriser »).
-// iPhone in a Safari tab: how to install first. Hidden for 3 days by « Plus tard », for good once the
-// person turns notifications off in Profile, and never when they are blocked in the settings.
+// iPhone in a Safari tab: how to install first. Phones and tablets only (a computer uses Profile). Hidden for
+// 3 days by « Plus tard », for good once the person turns notifications off in Profile, and never when they
+// are blocked in the settings.
 export default function PushPrompt() {
   const t = useT();
   const { user } = useAuth();
@@ -41,6 +42,7 @@ export default function PushPrompt() {
     try {
       const status = await enablePush(userId);
       if (status === "denied") setError(t("push.prompt.denied"));
+      if (status === "dismissed") setError(t("push.prompt.dismissed"));
       setMode(pushPromptMode(await getPushStatus(), { userId }));
     } catch (e) {
       setError(e?.message || t("push.error"));

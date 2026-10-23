@@ -1,6 +1,6 @@
 import { supabase } from "@/supabaseClient";
 import { refreshSessionOnce, withTimeout } from "@/lib/utils";
-import { isIos, isStandalone, urlBase64ToUint8Array } from "@/lib/push-support";
+import { isIos, isMobileDevice, isStandalone, urlBase64ToUint8Array } from "@/lib/push-support";
 
 // Public VAPID key (safe to ship). Push is hidden entirely until it is configured.
 export const VAPID_PUBLIC_KEY = import.meta.env?.VITE_VAPID_PUBLIC_KEY || "";
@@ -74,9 +74,11 @@ function promptSnoozedUntil(store = storage()) {
 // Card « Activer les notifications » at the top of the app: shown while this device has no subscription
 // for a person who never turned them off. "ask" = one tap opens the browser's question; "install" = iPhone
 // in a Safari tab (add to the home screen first). Never for "denied" (blocked in the settings: Profile
-// explains it), "on", or unsupported / unconfigured browsers. « Plus tard » hides it for 3 days.
-export function pushPromptMode(status, { userId, now = Date.now(), store = storage() } = {}) {
-  if (!userId || isPushOptedOut(userId, store)) return null;
+// explains it), "on", unsupported / unconfigured browsers, or a computer (V2.4.174: the card speaks of the
+// phone, and Edge on Windows hides the browser's question by default — Profile has the switch there).
+// « Plus tard » hides it for 3 days.
+export function pushPromptMode(status, { userId, now = Date.now(), store = storage(), mobile = isMobileDevice() } = {}) {
+  if (!userId || !mobile || isPushOptedOut(userId, store)) return null;
   if (status !== "off" && status !== "needs-install") return null;
   if (promptSnoozedUntil(store) > now) return null;
   return status === "off" ? "ask" : "install";
@@ -120,9 +122,12 @@ export async function syncPushSubscription(userId) {
   }
 }
 
+// "on", "denied" (refused: the browser will not ask again) or "dismissed" (question closed, or hidden by the
+// browser — Edge's « quiet » requests show only a small bell in the address bar).
 export async function enablePush(userId) {
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") return "denied";
+  if (permission === "denied") return "denied";
+  if (permission !== "granted") return "dismissed";
   setPushOptOut(userId, false);
   const registration = await navigator.serviceWorker.ready;
   const subscription = (await registration.pushManager.getSubscription())
