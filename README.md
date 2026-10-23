@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.173 (2026-10-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.174 (2026-10-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -101,7 +101,9 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
 - **Phone notifications on by default** (V2.4.173): every account gets them. When the browser already allows
   notifications the app subscribes the device by itself at start (and moves a shared phone to the person signed in);
   otherwise a blue card at the top asks for the one tap the browser requires (« Turn on », then « Allow »), with
-  « Later » for 3 days. Turning them off in Profile is remembered on that device. Employees shows a bell per active
+  « Later » for 3 days. The card is shown on phones and tablets only (V2.4.174); on a computer, Profile › Phone
+  notifications turns them on. When the browser closes or hides its question (Edge's « quiet » requests), the app
+  says how to allow them from the padlock left of the address. Turning them off in Profile is remembered on that device. Employees shows a bell per active
   account (on / not yet) and a « Without notifications » filter (`push_enabled_users`, migration 0113).
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).

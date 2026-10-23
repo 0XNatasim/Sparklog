@@ -284,7 +284,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.173)
+## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.174)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -763,6 +763,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `sparklog.pushOff.<userId>` sur l'appareil : ni synchronisation ni carte pour ce compte ; réactiver l'efface.
   `PUSH_EVENT` garde la carte et Profil d'accord. Employés : RPC `push_enabled_users()` (ids, gestionnaire aal2 via
   `get_my_role()`), cloche verte / barrée par compte actif, filtre « Sans notifications ». Test `push-default.test.js`.
+  V2.4.174 : la propriétaire (Windows, Edge seulement, d'après les journaux) touchait « Activer » sans effet — aucun appel à
+  `register_push_subscription` : Edge cache par défaut la question (« demandes silencieuses »), `requestPermission` ne rend
+  pas `granted`. La carte ne s'affiche plus que sur téléphone / tablette (`isMobileDevice`, `src/lib/push-support.js` :
+  `userAgentData.mobile`, iOS, « Android » / « Mobile ») ; un ordinateur passe par Profil. `enablePush` distingue `denied`
+  de `dismissed` (question fermée ou cachée) → message `push.prompt.dismissed` (cadenas › Notifications › Autoriser) dans la
+  carte et dans Profil, au lieu de « refusées ».
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
