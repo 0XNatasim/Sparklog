@@ -284,7 +284,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.175)
+## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.176)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -782,6 +782,16 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   question sans nouveau en attente ni en « Employés précis ». Inventaire › Entrepôt : total d'un groupe en plus des
   régions. Testé sur Postgres local (propriétaire, employé, anon, nom en double, nom vide, cascades). Test
   `employee-groups.test.js`. Pas de ligne au Journal pour les groupes (aucun effet sur la paie ni les droits).
+- [x] **Date d'embauche, dernier jour travaillé, « Données CCQ »** (V2.4.176, migration 0115) : nouvelle colonne
+  `profiles.last_work_date` (contrainte `profiles_last_work_after_start_chk` : jamais avant `start_date`) ; la date
+  d'embauche **est** `start_date` (0110 : à venir = « En attente »). `audit_profile_change` reprend les 4 entrées de 0110
+  (identiques à la production, vérifié) et ajoute `last_work_date_change`. Écriture réservée aux gestionnaires par la liste
+  blanche 0018 (colonne absente de la liste employé). Fiche Employés : ligne date de naissance · NAS · date d'embauche ·
+  dernier jour travaillé, au-dessus des sections ; la naissance et le NAS sortent de la section CCQ, renommée « Données
+  CCQ » (`employees.ccqExport`). Le NAS s'affiche maintenant aussi pour les rôles hors CCQ (bureau, propriétaire), sauf
+  sous-traitant ; mêmes droits (`NasField`, propriétaire). `saveEmploymentDate` vérifie l'ordre (`employmentDatesError`,
+  `src/lib/signups.js`) et rafraîchit le compteur des inscriptions. Relevé d'emploi : `roeEmploymentDates` — blocs 10 / 11
+  pris dans la fiche quand remplis, sinon déduits des paies. Test `employment-dates.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

@@ -12,6 +12,7 @@ import { EMPLOYER } from "@/lib/paystub";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { useHolidayDates } from "@/lib/company-holidays";
+import { roeEmploymentDates } from "@/lib/signups";
 
 // Weekly payroll → the ROE reports up to the last 53 pay periods (Service Canada rule for
 // a weekly pay period, both for Block 15A hours and Block 15C per-period earnings).
@@ -78,7 +79,7 @@ export default function RecordOfEmploymentTab() {
       try {
         const { data, error: e } = await supabase
           .from("profiles")
-          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid")
+          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, start_date, last_work_date")
           .eq("role", "employee")
           .order("full_name", { ascending: true });
         if (e) throw e;
@@ -156,10 +157,10 @@ export default function RecordOfEmploymentTab() {
     const firstJob = jobs[0]?.job_date || null;
     const lastJob = jobs.length ? jobs[jobs.length - 1].job_date : null;
     const starts = [ledger[0]?.period_start, history[0]?.period_start, firstJob].filter(Boolean).sort();
-    const firstDay = starts[0] || null;
     const ends = [ledger[ledger.length - 1]?.period_end, history[history.length - 1]?.period_end, lastJob].filter(Boolean).sort();
     const finalPeriodEnd = ledger[ledger.length - 1]?.period_end || ends[ends.length - 1] || null;
-    const lastDay = lastJob || finalPeriodEnd;
+    // Hiring date / last day worked from the employee card (0115) when filled, else guessed from the data.
+    const { firstDay, lastDay } = roeEmploymentDates({ firstDay: starts[0] || null, lastDay: lastJob || finalPeriodEnd }, employee);
 
     // Annexe D: report CONSECUTIVE weekly pay periods, counting back from the final pay
     // period, up to 53 for a weekly pay. Weeks with no pay are still reported at 0.00 (they

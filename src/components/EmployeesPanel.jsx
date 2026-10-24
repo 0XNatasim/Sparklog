@@ -24,7 +24,7 @@ import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { mfaBadge } from "@/lib/mfa";
-import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employmentChoice, employmentUpdate, fetchPendingSignups, isNewHire } from "@/lib/signups";
+import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employmentChoice, employmentDatesError, employmentUpdate, fetchPendingSignups, isNewHire } from "@/lib/signups";
 
 // Region code → administrative region name, for the label shown next to each employee.
 const REGION_NAME = new Map(QUEBEC_REGIONS.map((r) => [r.code, r.name]));
@@ -125,7 +125,7 @@ export default function EmployeesPanel() {
       const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
         Promise.all([supabase
           .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
+          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, last_work_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
           .order("full_name", { ascending: true }),
         supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
         12000
@@ -236,6 +236,20 @@ export default function EmployeesPanel() {
     const { error } = await supabase.from("profiles").update({ [field]: value }).eq("id", id);
     if (error) setErr(error.message);
     else { setInfo(`${field} ✓`); setTimeout(() => setInfo(""), 1500); }
+  }
+
+  // Date d'embauche (start_date) / dernier jour travaillé (last_work_date, 0115): checked together first.
+  // A hiring date still to come makes the person « En attente » (0110), hence the badge refresh.
+  async function saveEmploymentDate(p, field, rawValue) {
+    const value = rawValue || null;
+    const start = field === "start_date" ? value : p.start_date;
+    const last = field === "last_work_date" ? value : p.last_work_date;
+    const problem = employmentDatesError(start, last);
+    if (problem) { setErr(t(problem)); return; }
+    setErr("");
+    setLocal(p.id, field, value);
+    await saveField(p.id, field, value);
+    if (field === "start_date") signupsChanged();
   }
 
   // « Embauche / départ » picker: new hire (with the first day of work, 0110) or former employee (0109).
@@ -770,6 +784,41 @@ export default function EmployeesPanel() {
               </div>
             )}
 
+            {/* Ligne : date de naissance · NAS · date d'embauche · dernier jour travaillé (0115). Personal
+                data and employment dates live here, not in « Données CCQ ». */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label={t("employees.birthDate")}>
+                <Input type="date" value={p.birth_date || ""} onChange={(e) => setLocal(p.id, "birth_date", e.target.value)} onBlur={(e) => saveField(p.id, "birth_date", e.target.value)} className="h-9" />
+              </Field>
+              {!isSubcontractorRole(p.role) && (
+                <Field label={t("employees.nasEmployee")}>
+                  <NasField employeeId={p.id} initialHasNas={nasSet.has(p.id)} privileged={privileged} />
+                </Field>
+              )}
+              <Field label={t("employees.dates.hire")}>
+                <Input
+                  type="date"
+                  value={p.start_date || ""}
+                  max={p.last_work_date || undefined}
+                  onChange={(e) => setLocal(p.id, "start_date", e.target.value)}
+                  onBlur={(e) => saveEmploymentDate(p, "start_date", e.target.value)}
+                  className="h-9"
+                />
+                <span className="text-xs text-muted-foreground">{t("employees.dates.hireHint")}</span>
+              </Field>
+              <Field label={t("employees.dates.lastWorked")}>
+                <Input
+                  type="date"
+                  value={p.last_work_date || ""}
+                  min={p.start_date || undefined}
+                  onChange={(e) => setLocal(p.id, "last_work_date", e.target.value)}
+                  onBlur={(e) => saveEmploymentDate(p, "last_work_date", e.target.value)}
+                  className="h-9"
+                />
+                <span className="text-xs text-muted-foreground">{t("employees.dates.lastWorkedHint")}</span>
+              </Field>
+            </div>
+
             {/* Time off (day off / week off) */}
             <details className="group rounded-lg border">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
@@ -897,16 +946,8 @@ export default function EmployeesPanel() {
 
                 <div className="rounded-lg bg-muted/20 p-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {!isSubcontractorRole(p.role) && (
-                <Field label={t("employees.nasEmployee")}>
-                  <NasField employeeId={p.id} initialHasNas={nasSet.has(p.id)} privileged={privileged} />
-                </Field>
-                )}
                 <Field label={t("employees.tradeCode")}>
                   <Input value="220" readOnly className="h-9 bg-muted" />
-                </Field>
-                <Field label={t("employees.birthDate")}>
-                  <Input type="date" value={p.birth_date || ""} onChange={(e) => setLocal(p.id, "birth_date", e.target.value)} onBlur={(e) => saveField(p.id, "birth_date", e.target.value)} className="h-9" />
                 </Field>
                 <Field label={t("employees.ccqExpirationDate")}>
                   <Input type="date" value={p.ccq_expiration_date || ""} onChange={(e) => setLocal(p.id, "ccq_expiration_date", e.target.value)} onBlur={(e) => saveField(p.id, "ccq_expiration_date", e.target.value)} className="h-9" />
