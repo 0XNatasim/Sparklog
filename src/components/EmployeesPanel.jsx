@@ -1,55 +1,27 @@
 import React, { useEffect, useState } from "react";
-import dayjs from "dayjs";
-import { BellOff, BellRing, Briefcase, CalendarDays, ChevronDown, Crown, Eye, Mail, PauseCircle, Phone, ShieldAlert, ShieldCheck, Star, TriangleAlert, Trophy, X } from "lucide-react";
-import { GRANTABLE_ADMIN_SECTIONS, isAdminEmployee, isManagerRole, isNonCcqRole, isPrivileged, isSubcontractorRole } from "@/lib/roles";
-import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
-import TimeOffControls from "@/components/TimeOffControls";
-import NasField from "./NasField";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { isNonCcqRole, isManagerRole, isPrivileged } from "@/lib/roles";
+import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CcqCardCapture from "@/components/CcqCardCapture";
-import { IdCard } from "lucide-react";
+import AddEmployeeCard from "@/components/employees/AddEmployeeCard";
+import EmployeeCardHeader from "@/components/employees/EmployeeCardHeader";
+import EmployeeDetails from "@/components/employees/EmployeeDetails";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { withTimeout } from "@/lib/utils";
-import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
-import { COMMERCIAL_RATE_SECTOR, extractRateAnnexes, extractRegularHourlyRate, LEVEL_TO_SKILL } from "@/lib/ccq-rates";
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
-import { UNION_ASSOCIATIONS } from "@/lib/union-associations";
-import { addCalendarDays, companyDate } from "@/lib/company-time";
+import { companyDate } from "@/lib/company-time";
 import { mfaBadge } from "@/lib/mfa";
-import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employmentChoice, employmentDatesError, employmentUpdate, fetchPendingSignups, isNewHire } from "@/lib/signups";
+import { ccqRateFor, defaultAnnex, employeeCounts, filterEmployees, lacksPush, rateSuggestionsFor, ratesFromSnapshots, sortEmployees } from "@/lib/employees-panel";
+import { DEPARTURE_STATUSES, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employmentChoice, employmentDatesError, employmentUpdate, fetchPendingSignups, isNewHire } from "@/lib/signups";
 
-// Region code → administrative region name, for the label shown next to each employee.
-const REGION_NAME = new Map(QUEBEC_REGIONS.map((r) => [r.code, r.name]));
-
-const LEVELS = [
-  { value: "compagnon",  label: "Compagnon" },
-  { value: "apprenti_4", label: "Apprenti 4" },
-  { value: "apprenti_3", label: "Apprenti 3" },
-  { value: "apprenti_2", label: "Apprenti 2" },
-  { value: "apprenti_1", label: "Apprenti 1" },
-];
-
-// Ordering of the employees list: owner first, then administration, then managers,
-// then employees. Within each group the list stays alphabetical (paused sink last).
-const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3, subcontractor_1: 4 };
-const roleRank = (role) => (role in ROLE_ORDER ? ROLE_ORDER[role] : 4);
-
-// Read-only display name for a role (used when the viewer may not reassign roles).
-function roleName(role, t) {
-  if (role === "owner") return t("manager.bossLabel");
-  if (role === "admin") return t("manager.adminLabel");
-  if (role === "manager") return t("manager.roleLabel");
-  if (role === "subcontractor_1") return t("manager.subcontractor1Label");
-  return t("manager.employee");
-}
+// Gestion › Employés: loads the roster and owns every write; the card pieces live in
+// src/components/employees/ and the pure rules (order, CCQ rates, counters) in src/lib/employees-panel.js.
 
 export default function EmployeesPanel() {
   const t = useT();
@@ -79,11 +51,6 @@ export default function EmployeesPanel() {
   const [annexes, setAnnexes] = useState(new Map());
   const [rateSuggestions, setRateSuggestions] = useState(new Map()); // id → { rate, annex, current } (dry-run, P-6)
   const [applyingRates, setApplyingRates] = useState(false);
-  // Owner/manager account creation (bypasses the signup email rate limit).
-  const [addForm, setAddForm] = useState({ full_name: "", email: "", phone: "", password: "" });
-  const [addOpen, setAddOpen] = useState(false);
-  const [addBusy, setAddBusy] = useState(false);
-  const [addResult, setAddResult] = useState(null); // { email, password } after a successful create
   const [cardViews, setCardViews] = useState({});
   // Ids of admin cards whose "Gestion" checklist is expanded (also implicitly open
   // whenever the admin already has at least one granted section).
@@ -132,31 +99,11 @@ export default function EmployeesPanel() {
       );
       if (error) throw error;
       if (ratesError) throw ratesError;
-      const nextRates = new Map();
-      const nextAnnexes = new Map();
-      (snapshotRows || []).forEach((snapshot) => {
-        const availableAnnexes = extractRateAnnexes(snapshot.raw_json);
-        if (!nextAnnexes.has(snapshot.sector_id)) nextAnnexes.set(snapshot.sector_id, availableAnnexes);
-        availableAnnexes.forEach((annex) => {
-          const key = `${snapshot.sector_id}:${snapshot.skill_id}:${annex.code}`;
-          if (!nextRates.has(key)) nextRates.set(key, extractRegularHourlyRate(snapshot.raw_json, annex.code));
-        });
-      });
+      const { rates: nextRates, annexes: nextAnnexes } = ratesFromSnapshots(snapshotRows);
       setRates(nextRates);
       setAnnexes(nextAnnexes);
       const pending = await loadPending();
-      // Group by role (owner → admin → manager → employee), keep alphabetical order
-      // within each group, and push inactive (paused) accounts to the bottom of their group.
-      const nextProfiles = [...(data ?? [])].sort((a, b) => {
-        const byRole = roleRank(a.role) - roleRank(b.role);
-        if (byRole !== 0) return byRole;
-        // New sign-ups first (to activate), then new hires waiting for their first day, then active
-        // accounts, then the other inactive ones.
-        const rank = (p) => (isNewHire(p, today) ? 1 : !p.is_paused ? 2 : pending.has(p.id) ? 0 : 3);
-        const byPaused = rank(a) - rank(b);
-        if (byPaused !== 0) return byPaused;
-        return (a.full_name || a.email || "").localeCompare(b.full_name || b.email || "", undefined, { sensitivity: "base" });
-      });
+      const nextProfiles = sortEmployees(data, pending, today);
       setProfiles(nextProfiles);
       // NAS lives in the restricted vault; only privileged users can see who has one.
       // Fetch presence only (not the value) — the value is revealed on demand + audited.
@@ -170,21 +117,8 @@ export default function EmployeesPanel() {
         const { data: nasRows } = await supabase.rpc("nas_presence");
         setNasSet(new Set((nasRows || []).map((r) => r.user_id)));
       }
-      // P-6: loading is READ-ONLY. Never write compensation as a side effect of a render.
-      // Instead compute a dry-run comparison of each profile's stored rate vs the current
-      // CCQ rate for its level/annex; the manager applies them explicitly (applyRateSuggestions).
-      const suggestions = new Map();
-      nextProfiles.forEach((profile) => {
-        // Only CCQ tradespeople follow the wage grid. Owner/admin/manager and subcontractors
-        // have negotiated or flat rates, so never flag their pay against the CCQ rate.
-        if (isNonCcqRole(profile.role) || isManagerRole(profile.role)) return;
-        const availableAnnexes = nextAnnexes.get(COMMERCIAL_RATE_SECTOR) || [];
-        const annex = profile.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
-        const rate = nextRates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
-        if (rate == null || (Number(profile.hourly_rate) === rate && profile.wage_schedule === annex)) return;
-        suggestions.set(profile.id, { rate, annex, current: profile.hourly_rate });
-      });
-      setRateSuggestions(suggestions);
+      // P-6: a dry-run comparison only; the manager applies it explicitly (applyRateSuggestions).
+      setRateSuggestions(rateSuggestionsFor(nextProfiles, nextRates, nextAnnexes));
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
     } finally {
@@ -352,9 +286,8 @@ export default function EmployeesPanel() {
     setLocal(profile.id, field, value);
     await saveField(profile.id, field, value);
     const next = { ...profile, [field]: value };
-    const availableAnnexes = annexes.get(COMMERCIAL_RATE_SECTOR) || [];
-    const annex = next.wage_schedule || availableAnnexes.find((item) => item.code === "C3")?.code || availableAnnexes[0]?.code;
-    const rate = rates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[next.apprentice_level]}:${annex}`);
+    const annex = defaultAnnex(next, annexes);
+    const rate = ccqRateFor(next.apprentice_level, annex, rates);
     if (rate != null) {
       setLocal(profile.id, "hourly_rate", rate);
       setLocal(profile.id, "wage_schedule", annex);
@@ -365,7 +298,7 @@ export default function EmployeesPanel() {
   async function saveAnnex(profile, annex) {
     setLocal(profile.id, "wage_schedule", annex);
     await saveField(profile.id, "wage_schedule", annex);
-    const rate = rates.get(`${COMMERCIAL_RATE_SECTOR}:${LEVEL_TO_SKILL[profile.apprentice_level]}:${annex}`);
+    const rate = ccqRateFor(profile.apprentice_level, annex, rates);
     if (rate != null) {
       setLocal(profile.id, "hourly_rate", rate);
       await saveField(profile.id, "hourly_rate", rate);
@@ -398,58 +331,15 @@ export default function EmployeesPanel() {
     }
   }
 
-  // Create an employee account server-side (no confirmation email → no rate limit).
-  async function createEmployee(e) {
-    e?.preventDefault?.();
-    if (addBusy) return;
-    setErr(""); setInfo(""); setAddResult(null);
-    setAddBusy(true);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      if (!accessToken) throw new Error(t("auth.failed"));
-      const { data, error } = await supabase.functions.invoke("create_employee", {
-        body: { full_name: addForm.full_name, email: addForm.email, phone: addForm.phone, password: addForm.password || undefined },
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (error) {
-        let message = error.message;
-        try { const ctx = await error.context?.json?.(); if (ctx?.error) message = ctx.error; } catch { /* keep default */ }
-        throw new Error(message);
-      }
-      if (data && data.ok === false) throw new Error(data.error || "Create failed");
-      setAddResult({ email: data.email, password: data.password });
-      setAddForm({ full_name: "", email: "", phone: "", password: "" });
-      setInfo(t("employees.add.created"));
-      await load();
-    } catch (e2) {
-      setErr(e2?.message || "Create failed");
-    } finally {
-      setAddBusy(false);
-    }
-  }
-
-  // Roster counts for the "add employee" card header.
-  // Three states: active, « En attente » (new hire before the first day) and inactive (paused).
-  const activeCount = profiles.filter((p) => employeeStatus(p, pendingById, today) === "active").length;
-  const inactiveCount = profiles.filter((p) => p.is_paused && employeeStatus(p, pendingById, today) !== NEW_HIRE).length;
-  const pendingCount = profiles.filter((p) => employeeStatus(p, pendingById, today) === "pending").length;
-  const formerCount = profiles.filter((p) => DEPARTURE_STATUSES.includes(employeeStatus(p, pendingById, today))).length;
-  const newHireCount = profiles.filter((p) => isNewHire(p, today)).length;
-  // Active accounts whose phone has no notifications yet (the app asks them at every opening).
-  const withoutPush = (p) => pushSet != null && !pushSet.has(p.id) && employeeStatus(p, pendingById, today) === "active";
-  const noPushCount = profiles.filter(withoutPush).length;
-  const visibleProfiles = profiles.filter((p) => {
-    const status = employeeStatus(p, pendingById, today);
-    if (statusFilter === "noPush") return withoutPush(p);
-    if (statusFilter === "pending") return status === "pending" || status === "unconfirmed";
-    if (statusFilter === "former") return DEPARTURE_STATUSES.includes(status);
-    if (statusFilter === NEW_HIRE) return isNewHire(p, today);
-    return true;
-  });
-  const attentionCount = profiles.filter(
-    (p) => !p.is_paused && !isNonCcqRole(p.role) && getMissingEmployeeFields(p, t).length > 0
-  ).length;
+  const counts = employeeCounts(profiles, { pending: pendingById, pushSet, today, t });
+  const visibleProfiles = filterEmployees(profiles, statusFilter, { pending: pendingById, pushSet, today });
+  // State and actions the card pieces read (EmployeeDetails and its sections).
+  const panel = {
+    t, user, role, privileged, today, nasSet, timeOff, loadTimeOff, annexes, newHireDraft, mgmtOpen, cardViews,
+    confirmDelete, deleting, navigate, setLocal, saveField, saveEmploymentDate, saveEmployment, chooseType,
+    toggleManagement, toggleAdminSection, saveClassification, saveAnnex, toggleCard, setCcqEdit, setConfirmDelete,
+    handleDelete, signupsChanged,
+  };
 
   return (
     <div className="space-y-3">
@@ -474,66 +364,7 @@ export default function EmployeesPanel() {
       )}
 
       {isManagerRole(role) && (
-        <Card>
-          <CardContent className="p-4">
-            {!addOpen ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <Button size="sm" onClick={() => { setAddOpen(true); setAddResult(null); }}>{t("employees.add.button")}</Button>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-1 font-semibold text-success">
-                    {activeCount} · {t("employees.active")}
-                  </span>
-                  {attentionCount > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 font-semibold text-warning">
-                      <TriangleAlert className="h-3.5 w-3.5" />{attentionCount} · {t("employees.needAttention")}
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 font-semibold text-muted-foreground">
-                    {inactiveCount} · {t("employees.paused")}
-                  </span>
-                  {[["pending", pendingCount, "bg-destructive/15 text-destructive"], [NEW_HIRE, newHireCount, "bg-info/15 text-info"], ["former", formerCount, "bg-muted text-muted-foreground"], ["noPush", noPushCount, "bg-warning/15 text-warning"]].map(([key, count, tone]) => (count > 0 || statusFilter === key) && (
-                    <button
-                      key={key}
-                      type="button"
-                      aria-pressed={statusFilter === key}
-                      onClick={() => setStatusFilter((current) => (current === key ? "all" : key))}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${tone} ${statusFilter === key ? "ring-2 ring-ring" : ""}`}
-                    >
-                      {count} · {t(`employees.filter.${key}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={createEmployee} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">{t("employees.add.title")}</div>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setAddOpen(false)}>{t("common.cancel")}</Button>
-                </div>
-                <p className="text-xs text-muted-foreground">{t("employees.add.hint")}</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs"><span className="text-muted-foreground">{t("auth.fullName")}</span>
-                    <Input value={addForm.full_name} onChange={(e) => setAddForm((s) => ({ ...s, full_name: e.target.value }))} className="mt-1" required /></label>
-                  <label className="block text-xs"><span className="text-muted-foreground">{t("auth.email")}</span>
-                    <Input type="email" value={addForm.email} onChange={(e) => setAddForm((s) => ({ ...s, email: e.target.value }))} className="mt-1" required /></label>
-                  <label className="block text-xs"><span className="text-muted-foreground">{t("auth.phone")}</span>
-                    <Input value={addForm.phone} onChange={(e) => setAddForm((s) => ({ ...s, phone: e.target.value }))} className="mt-1" /></label>
-                  <label className="block text-xs"><span className="text-muted-foreground">{t("employees.add.passwordOptional")}</span>
-                    <Input value={addForm.password} onChange={(e) => setAddForm((s) => ({ ...s, password: e.target.value }))} className="mt-1" placeholder={t("employees.add.passwordPlaceholder")} /></label>
-                </div>
-                <Button type="submit" size="sm" disabled={addBusy}>{addBusy ? t("common.working") : t("employees.add.submit")}</Button>
-              </form>
-            )}
-            {addResult && (
-              <div className="mt-3 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-                <div className="font-semibold">{t("employees.add.credentials")}</div>
-                <div className="mt-1 font-mono text-xs">{addResult.email}</div>
-                <div className="font-mono text-xs">{t("employees.add.tempPassword")}: <b>{addResult.password}</b></div>
-                <p className="mt-1 text-xs">{t("employees.add.share")}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <AddEmployeeCard counts={counts} statusFilter={statusFilter} onFilter={setStatusFilter} onCreated={load} onError={setErr} onInfo={setInfo} />
       )}
 
       {loading && (
@@ -547,519 +378,24 @@ export default function EmployeesPanel() {
       {!loading && visibleProfiles.map((p) => {
         // Non-CCQ roles (administration + owner) skip the CCQ "missing fields" check.
         const missingFields = isNonCcqRole(p.role) ? [] : getMissingEmployeeFields(p, t);
+        const expanded = expandedIds.has(p.id);
         return (
-        <Card key={p.id} className={p.is_paused && !isNewHire(p, today) ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-warning/40" : ""}>
-          <button
-            type="button"
-            onClick={() => toggleExpanded(p.id)}
-            aria-expanded={expandedIds.has(p.id)}
-            className="flex w-full items-center gap-3 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 truncate font-semibold">
-                {p.employee_number && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">#{p.employee_number}</span>}
-                {p.role === "owner"
-                  ? <Crown className="h-4 w-4 shrink-0 text-warning" aria-label={t("manager.bossLabel")} />
-                  : p.role === "admin"
-                    ? <Briefcase className="h-4 w-4 shrink-0 text-violet-500" aria-label={t("manager.adminLabel")} />
-                    : p.role === "manager" && <Trophy className="h-4 w-4 shrink-0 text-warning" aria-label={t("manager.roleLabel")} />}
-                {Number(p.team_leader_premium) > 0 && <Star className="h-4 w-4 shrink-0 fill-warning text-warning" aria-label={t("employees.teamLeader")} />}
-                <span className="truncate">{p.full_name || p.email || t("manager.employee")}</span>
-                {mfaBadge(p.role, mfaSet.has(p.id)) === "on" && (
-                  <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-label={t("employees.mfaOn")}><title>{t("employees.mfaOn")}</title></ShieldCheck>
-                )}
-                {mfaBadge(p.role, mfaSet.has(p.id)) === "missing" && (
-                  <ShieldAlert className="h-4 w-4 shrink-0 text-warning" aria-label={t("employees.mfaMissing")}><title>{t("employees.mfaMissing")}</title></ShieldAlert>
-                )}
-                {pushSet?.has(p.id) && (
-                  <BellRing className="h-4 w-4 shrink-0 text-success" aria-label={t("employees.pushOn")}><title>{t("employees.pushOn")}</title></BellRing>
-                )}
-                {withoutPush(p) && (
-                  <BellOff className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={t("employees.pushOff")}><title>{t("employees.pushOff")}</title></BellOff>
-                )}
-                {REGION_NAME.get(p.work_region) && (
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground" title={t("employees.workRegion")}>
-                    {p.work_region} — {REGION_NAME.get(p.work_region)}
-                  </span>
-                )}
-              </div>
-              <div className="truncate text-xs text-muted-foreground">{p.email || "—"}</div>
-            </div>
-            {(() => {
-              const status = employeeStatus(p, pendingById, today);
-              const tone = status === "active" ? "bg-success/15 text-success"
-                : status === NEW_HIRE ? "bg-info/15 text-info"
-                : status === "pending" ? "bg-destructive/15 text-destructive"
-                  : status === "unconfirmed" ? "bg-warning/15 text-warning"
-                    : "bg-muted-foreground/15 text-muted-foreground";
-              const label = status === NEW_HIRE
-                ? t("employees.newHire.tag", { date: dayjs(p.start_date).format("D MMM") })
-                : t(`employees.status.${status}`);
-              return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${tone}`}>{label}</span>;
-            })()}
-            {missingFields.length > 0 && (
-              <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-xs font-semibold text-warning">
-                <TriangleAlert className="h-3.5 w-3.5" />{t("employees.missingCount", { count: missingFields.length })}
-              </span>
-            )}
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedIds.has(p.id) ? "rotate-180" : ""}`} />
-          </button>
-          {expandedIds.has(p.id) && <CardContent className="space-y-3 border-t p-4">
-            {/* Type gate: a new account must be typed (Administration vs Employé CCQ)
-                before it can be activated. Until then the activation toggle stays locked. */}
-            {!p.type_confirmed && (
-              <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-                  <Briefcase className="h-4 w-4" />{t("employees.chooseTypeTitle")}
-                </div>
-                <p className="text-xs text-muted-foreground">{t("employees.chooseTypeHint")}</p>
-                {privileged ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "employee")}>
-                      {t("employees.typeCcq")}
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "admin")}>
-                      {t("employees.typeAdmin")}
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "subcontractor_1")}>
-                      {t("employees.typeSubcontractor1")}
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-xs text-warning">{t("employees.chooseTypeOwnerOnly")}</p>
-                )}
-              </div>
-            )}
-            {/* "View as" enters view mode, which is manager-tier only. A granted admin
-                (office employee) manages here but cannot impersonate, so hide it for them. */}
-            {p.id !== user?.id && isManagerRole(role) && (
-              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => navigate(`/form?employee=${p.id}&employeeName=${encodeURIComponent(p.full_name || p.email || "")}`)}>
-                <Eye className="mr-1.5 h-4 w-4" />{t("employees.viewAs")}
-              </Button>
-            )}
-            {missingFields.length > 0 && (
-              <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning" role="alert">
-                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
-              </div>
-            )}
-            {/* Ligne : No d'employé · Rôle · Actif/Inactif */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Field label={t("employees.employeeNumber")}>
-                <Input
-                  value={p.employee_number || ""}
-                  onChange={(e) => setLocal(p.id, "employee_number", e.target.value)}
-                  onBlur={(e) => saveField(p.id, "employee_number", e.target.value)}
-                  placeholder="09"
-                  className="h-9"
-                />
-              </Field>
-              <Field label={t("employees.roleLabel")}>
-                {/* Only the owner may assign roles (0031/0032); the owner's own row is locked
-                    to avoid demoting the last owner. Everyone else sees the role read-only. */}
-                {privileged && p.type_confirmed ? (
-                  <Select
-                    value={p.role || "employee"}
-                    disabled={p.id === user?.id}
-                    onChange={(e) => { const v = e.target.value; setLocal(p.id, "role", v); saveField(p.id, "role", v); }}
-                    className="h-9"
-                  >
-                    <option value="employee">{t("manager.employee")}</option>
-                    <option value="subcontractor_1">{t("manager.subcontractor1Label")}</option>
-                    {p.role === "manager" && <option value="manager">{t("manager.roleLabel")}</option>}
-                    <option value="admin">{t("manager.adminLabel")}</option>
-                    <option value="owner">{t("manager.bossLabel")}</option>
-                  </Select>
-                ) : (
-                  <Input value={roleName(p.role, t)} readOnly className="h-9 bg-muted" />
-                )}
-              </Field>
-              <Field label={t("employees.pauseAccount")}>
-                <label className={`flex h-9 items-center justify-between gap-3 rounded-md border border-warning/30 bg-warning/5 px-3 ${p.type_confirmed ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
-                  <span className="flex items-center gap-2 text-sm font-medium"><PauseCircle className="h-4 w-4 text-warning" />{p.is_paused ? t("employees.paused") : t("employees.active")}</span>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(p.is_paused)}
-                    disabled={!p.type_confirmed}
-                    onChange={async (e) => {
-                      const checked = e.target.checked;
-                      setLocal(p.id, "is_paused", checked);
-                      // Activating again clears a former-employee mark (the database does the same, 0109).
-                      if (!checked) setLocal(p.id, "departure_status", null);
-                      await saveField(p.id, "is_paused", checked);
-                      signupsChanged();
-                    }}
-                    className="h-5 w-5 rounded border-input accent-warning disabled:cursor-not-allowed"
-                  />
-                </label>
-                {!p.type_confirmed && <span className="text-xs text-warning">{t("employees.activateNeedsType")}</span>}
-              </Field>
-              {isManagerRole(role) && p.role !== "owner" && p.id !== user?.id && (
-                <Field label={t("employees.departure.label")}>
-                  <Select
-                    value={newHireDraft.has(p.id) ? NEW_HIRE : employmentChoice(p, today)}
-                    onChange={(e) => saveEmployment(p, e.target.value)}
-                    className="h-9"
-                  >
-                    <option value="">{t("employees.departure.none")}</option>
-                    <option value={NEW_HIRE}>{t("employees.newHire.option")}</option>
-                    {DEPARTURE_STATUSES.map((status) => <option key={status} value={status}>{t(`employees.status.${status}`)}</option>)}
-                  </Select>
-                  {(newHireDraft.has(p.id) || isNewHire(p, today)) && (
-                    <label className="mt-2 block text-xs">
-                      <span className="text-muted-foreground">{t("employees.newHire.startDate")}</span>
-                      <Input
-                        type="date"
-                        className="mt-1 h-9"
-                        min={addCalendarDays(today, 1)}
-                        required
-                        value={isNewHire(p, today) ? p.start_date : ""}
-                        // Only a day after today: someone starting today is simply on the boards.
-                        onChange={(e) => { if (e.target.value > today) saveEmployment(p, NEW_HIRE, e.target.value); }}
-                      />
-                      <span className="mt-1 block text-muted-foreground">
-                        {newHireDraft.has(p.id) ? t("employees.newHire.needDate") : t("employees.newHire.hint")}
-                      </span>
-                    </label>
-                  )}
-                  {p.departure_status && (
-                    <Input
-                      className="mt-2 h-9"
-                      value={p.departure_note || ""}
-                      maxLength={MAX_DEPARTURE_NOTE}
-                      placeholder={t("employees.departure.note")}
-                      aria-label={t("employees.departure.note")}
-                      onChange={(e) => setLocal(p.id, "departure_note", e.target.value)}
-                      onBlur={(e) => saveField(p.id, "departure_note", e.target.value)}
-                    />
-                  )}
-                </Field>
-              )}
-            </div>
-
-            {/* Ligne : téléphone · courriel · carte CCQ */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Field label={t("manager.tbl.phone")}>
-                <div className="flex items-center gap-1">
-                  <Input
-                    value={p.phone || ""}
-                    onChange={(e) => setLocal(p.id, "phone", e.target.value)}
-                    onBlur={(e) => saveField(p.id, "phone", e.target.value)}
-                    className="h-9"
-                  />
-                  {p.phone && (
-                    <a href={`tel:${String(p.phone).replace(/[^+\d]/g, "")}`} className="shrink-0 rounded p-2 text-primary hover:bg-accent" aria-label="call">
-                      <Phone className="h-4 w-4" />
-                    </a>
-                  )}
-                </div>
-              </Field>
-              <Field label={t("manager.tbl.email")}>
-                <div className="flex h-9 items-center text-sm">
-                  {p.email ? (
-                    <a href={`mailto:${p.email}`} className="inline-flex items-center gap-1.5 truncate text-primary hover:underline">
-                      <Mail className="h-4 w-4 shrink-0" /><span className="truncate">{p.email}</span>
-                    </a>
-                  ) : <span className="text-muted-foreground">—</span>}
-                </div>
-              </Field>
-              <Field label={t("ccqCard.title")}>
-                <div className="flex items-center gap-1.5">
-                  {p.ccq_card_path && (
-                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => toggleCard(p)}>
-                      {cardViews[p.id]?.open ? t("ccqCard.hideCard") : t("ccqCard.viewCard")}
-                    </Button>
-                  )}
-                  <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setCcqEdit(p)}>
-                    <IdCard className="mr-1.5 h-4 w-4" />{p.ccq_card_path ? t("ccqCard.managerEdit") : t("ccqCard.managerAdd")}
-                  </Button>
-                </div>
-              </Field>
-            </div>
-            {p.ccq_card_path && cardViews[p.id]?.open && (
-              <div className="rounded-lg border bg-muted/20 p-3">
-                {cardViews[p.id]?.loading && <div className="text-xs text-muted-foreground">{t("common.loading")}</div>}
-                {cardViews[p.id]?.url && <img src={cardViews[p.id].url} alt={t("ccqCard.title")} className="max-h-80 w-full rounded-md border object-contain" />}
-                {cardViews[p.id]?.error && <div className="text-xs text-destructive">{cardViews[p.id].error}</div>}
-              </div>
-            )}
-
-            {/* Ligne : date de naissance · NAS · date d'embauche · dernier jour travaillé (0115). Personal
-                data and employment dates live here, not in « Données CCQ ». */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label={t("employees.birthDate")}>
-                <Input type="date" value={p.birth_date || ""} onChange={(e) => setLocal(p.id, "birth_date", e.target.value)} onBlur={(e) => saveField(p.id, "birth_date", e.target.value)} className="h-9" />
-              </Field>
-              {!isSubcontractorRole(p.role) && (
-                <Field label={t("employees.nasEmployee")}>
-                  <NasField employeeId={p.id} initialHasNas={nasSet.has(p.id)} privileged={privileged} />
-                </Field>
-              )}
-              <Field label={t("employees.dates.hire")}>
-                <Input
-                  type="date"
-                  value={p.start_date || ""}
-                  max={p.last_work_date || undefined}
-                  onChange={(e) => setLocal(p.id, "start_date", e.target.value)}
-                  onBlur={(e) => saveEmploymentDate(p, "start_date", e.target.value)}
-                  className="h-9"
-                />
-                <span className="text-xs text-muted-foreground">{t("employees.dates.hireHint")}</span>
-              </Field>
-              <Field label={t("employees.dates.lastWorked")}>
-                <Input
-                  type="date"
-                  value={p.last_work_date || ""}
-                  min={p.start_date || undefined}
-                  onChange={(e) => setLocal(p.id, "last_work_date", e.target.value)}
-                  onBlur={(e) => saveEmploymentDate(p, "last_work_date", e.target.value)}
-                  className="h-9"
-                />
-                <span className="text-xs text-muted-foreground">{t("employees.dates.lastWorkedHint")}</span>
-              </Field>
-            </div>
-
-            {/* Time off (day off / week off) */}
-            <details className="group rounded-lg border">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
-                <span className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-primary" />{t("timeOff.title")}
-                  {(timeOff.get(p.id) || []).length > 0 && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{(timeOff.get(p.id) || []).length}</span>
-                  )}
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="border-t p-3">
-              <p className="mb-2 text-xs text-muted-foreground">{t("timeOff.description")}</p>
-              <TimeOffControls employeeId={p.id} rows={timeOff.get(p.id) || []} onChanged={loadTimeOff} />
-              </div>
-            </details>
-
-            {/* Non-CCQ roles (administration + owner): show a simple flat hourly pay
-                field instead of the CCQ classification / metadata. Subcontractors are handled
-                in the panel below (they carry the full config plus a simple + double rate). */}
-            {isNonCcqRole(p.role) && !isSubcontractorRole(p.role) && (
-              <details className="group rounded-lg border" open>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
-                  <span className="truncate">{p.role === "subcontractor_1" ? t("employees.subcontractorTerms") : t("employees.adminPayroll")}</span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="space-y-3 border-t p-3">
-                  <Field label={t("employees.flatHourlyRate")}>
-                    <div className="flex h-9 items-center gap-1">
-                      <span className="text-sm text-muted-foreground">$</span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        inputMode="decimal"
-                        value={p.hourly_rate ?? ""}
-                        onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)}
-                        onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)}
-                        placeholder="0.00"
-                        className="h-9"
-                      />
-                      <span className="text-xs text-muted-foreground">/h</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
-                  </Field>
-                </div>
-              </details>
-            )}
-
-            {/* Management (Gestion) access for an office employee — owner only. Tick
-                "Gestion" to reveal the section checklist; each ticked section becomes a
-                tab the admin can open in the manager dashboard. */}
-            {p.role === "admin" && privileged && (
-              <details className="group rounded-lg border" open>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
-                  <span className="truncate">{t("employees.managementAccess")}</span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="space-y-3 border-t p-3">
-                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
-                    <span className="text-sm font-medium">{t("employees.managementEnable")}</span>
-                    <input
-                      type="checkbox"
-                      checked={mgmtOpen.has(p.id) || (p.admin_sections?.length > 0)}
-                      onChange={(e) => toggleManagement(p, e.target.checked)}
-                      className="h-5 w-5 rounded border-input accent-primary"
-                    />
-                  </label>
-                  {(mgmtOpen.has(p.id) || (p.admin_sections?.length > 0)) && (
-                    <div className="space-y-1 rounded-md border p-3">
-                      <p className="mb-1 text-xs text-muted-foreground">{t("employees.managementHint")}</p>
-                      {GRANTABLE_ADMIN_SECTIONS.map((sectionId) => (
-                        <label key={sectionId} className="flex cursor-pointer items-center justify-between gap-3 py-1 text-sm">
-                          <span>{t(`manager.sections.${sectionId}`)}</span>
-                          <input
-                            type="checkbox"
-                            checked={(p.admin_sections || []).includes(sectionId)}
-                            onChange={(e) => toggleAdminSection(p, sectionId, e.target.checked)}
-                            className="h-5 w-5 rounded border-input accent-primary"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-
-            {/* CCQ payroll/export metadata — CCQ tradespeople AND subcontractors (who carry
-                the same config, but with a manual simple + double rate). Not admin/owner. */}
-            {(!isNonCcqRole(p.role) || isSubcontractorRole(p.role)) && (
-            <details className="group rounded-lg border">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate">{t("employees.ccqExport")}</span>
-                  <span className="hidden text-xs font-normal text-muted-foreground sm:inline">CCQ# {p.ccq_number || "—"}</span>
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="space-y-4 border-t p-3">
-                {/* Classification */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="CCQ#">
-                <Input
-                  value={p.ccq_number || ""}
-                  onChange={(e) => setLocal(p.id, "ccq_number", e.target.value)}
-                  onBlur={(e) => saveField(p.id, "ccq_number", e.target.value)}
-                  className="h-9"
-                />
-              </Field>
-              <Field label={t("employees.level")}>
-                <Select
-                  value={p.apprentice_level || ""}
-                  onChange={(e) => saveClassification(p, "apprentice_level", e.target.value)}
-                  className="h-9"
-                >
-                  <option value="">—</option>
-                  {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </Select>
-              </Field>
-              <Field label={t("employees.sector")}>
-                <Input value={t("employees.commercialSector")} readOnly className="h-9 bg-muted" />
-              </Field>
-                </div>
-
-                <div className="rounded-lg bg-muted/20 p-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Field label={t("employees.tradeCode")}>
-                  <Input value="220" readOnly className="h-9 bg-muted" />
-                </Field>
-                <Field label={t("employees.ccqExpirationDate")}>
-                  <Input type="date" value={p.ccq_expiration_date || ""} onChange={(e) => setLocal(p.id, "ccq_expiration_date", e.target.value)} onBlur={(e) => saveField(p.id, "ccq_expiration_date", e.target.value)} className="h-9" />
-                </Field>
-                <Field label={t("employees.workRegion")}>
-                  <Select value={p.work_region || ""} onChange={(e) => { setLocal(p.id, "work_region", e.target.value); saveField(p.id, "work_region", e.target.value); }} className="h-9">
-                    <option value="">—</option>
-                    {QUEBEC_REGIONS.map((region) => <option key={region.code} value={region.code}>{region.code} — {region.name}</option>)}
-                  </Select>
-                </Field>
-                <Field label={t("employees.unionAssociation")}>
-                  <Select value={p.union_association || ""} onChange={(e) => { setLocal(p.id, "union_association", e.target.value); saveField(p.id, "union_association", e.target.value); }} className="h-9">
-                    <option value="">—</option>
-                    {UNION_ASSOCIATIONS.map((association) => <option key={association.code} value={association.code}>{association.name}</option>)}
-                  </Select>
-                </Field>
-                <Field label={t("employees.wageSchedule")}>
-                  {(annexes.get(COMMERCIAL_RATE_SECTOR) || []).length > 0 ? (
-                    <Select value={p.wage_schedule || ""} onChange={(e) => saveAnnex(p, e.target.value)} className="h-9">
-                      <option value="">—</option>
-                      {(annexes.get(COMMERCIAL_RATE_SECTOR) || []).map((annex) => <option key={annex.code} value={annex.code}>{annex.code}{annex.description ? ` — ${annex.description}` : ""}</option>)}
-                      {p.wage_schedule && !(annexes.get(COMMERCIAL_RATE_SECTOR) || []).some((annex) => annex.code === p.wage_schedule) && <option value={p.wage_schedule}>{p.wage_schedule}</option>}
-                    </Select>
-                  ) : (
-                    <>
-                      <Input value={p.wage_schedule || ""} placeholder="C3" onChange={(e) => setLocal(p.id, "wage_schedule", e.target.value.toUpperCase())} onBlur={(e) => saveField(p.id, "wage_schedule", e.target.value.toUpperCase())} className="h-9" />
-                      <span className="text-xs text-warning">{t("employees.wageScheduleManual")}</span>
-                    </>
-                  )}
-                  <span className="text-xs text-muted-foreground">{t("employees.wageScheduleDescription")}</span>
-                </Field>
-                {isSubcontractorRole(p.role) ? (
-                  <>
-                    <Field label={t("employees.simpleHourlyRate")}>
-                      <div className="flex h-9 items-center gap-1">
-                        <span className="text-sm text-muted-foreground">$</span>
-                        <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.hourly_rate ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)} placeholder="0.00" className="h-9" />
-                        <span className="text-xs text-muted-foreground">/h</span>
-                      </div>
-                    </Field>
-                    <Field label={t("employees.doubleHourlyRate")}>
-                      <div className="flex h-9 items-center gap-1">
-                        <span className="text-sm text-muted-foreground">$</span>
-                        <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.hourly_rate_double ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate_double", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate_double", e.target.value)} placeholder="0.00" className="h-9" />
-                        <span className="text-xs text-muted-foreground">/h</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{t("employees.doubleHourlyRateHint")}</span>
-                    </Field>
-                  </>
-                ) : (
-                  <Field label={t("employees.hourlyRate")}>
-                    <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
-                    <span className="text-xs text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
-                  </Field>
-                )}
-              </div>
-                </div>
-
-              </div>
-            </details>
-            )}
-
-            {/* Avantages — compensation extras + politiques de temps supplémentaire. */}
-            {(!isNonCcqRole(p.role) || isSubcontractorRole(p.role)) && (
-            <details className="group rounded-lg border">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden">
-                <span className="truncate">{t("employees.benefitsTitle")}</span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="space-y-3 border-t p-3">
-                <p className="text-xs text-muted-foreground">{t("employees.payAmountsMoved")}</p>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
-                    <span className="text-sm font-medium">{t("employees.parkingReceipts")}</span>
-                    <input type="checkbox" checked={Boolean(p.parking_receipts_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "parking_receipts_enabled", checked); saveField(p.id, "parking_receipts_enabled", checked); }} className="h-5 w-5 rounded border-input accent-warning" />
-                  </label>
-                  {!isAdminEmployee(p.role) && (
-                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3">
-                    <span className="text-sm font-medium">{t("employees.inventoryScreenshots")}</span>
-                    <input type="checkbox" checked={Boolean(p.inventory_screenshots_enabled)} onChange={(e) => { const checked = e.target.checked; setLocal(p.id, "inventory_screenshots_enabled", checked); saveField(p.id, "inventory_screenshots_enabled", checked); }} className="h-5 w-5 rounded border-input accent-primary" />
-                  </label>
-                  )}
-                  {isSubcontractorRole(p.role) && (
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs md:col-span-2">
-                    <div className="font-semibold text-primary">{t("employees.subcontractorRuleTitle")}</div>
-                    <p className="mt-1 text-muted-foreground">{t("employees.subcontractorRuleHint")}</p>
-                  </div>
-                  )}
-                </div>
-              </div>
-            </details>
-            )}
-
-            {p.is_paused && !isManagerRole(p.role) && p.id !== user?.id && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-destructive">{t("employees.deleteUser")}</span>
-                  {confirmDelete === p.id ? (
-                    <div className="flex items-center gap-2">
-                      <Button type="button" size="sm" variant="outline" disabled={deleting} onClick={() => setConfirmDelete(null)}>{t("common.cancel")}</Button>
-                      <Button type="button" size="sm" variant="destructive" disabled={deleting} onClick={() => handleDelete(p)}>{deleting ? t("common.saving") : t("employees.deleteConfirm")}</Button>
-                    </div>
-                  ) : (
-                    <Button type="button" size="sm" variant="destructive" onClick={() => setConfirmDelete(p.id)}>{t("employees.deleteUser")}</Button>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{t("employees.deleteHint")}</p>
-              </div>
-            )}
-          </CardContent>}
-        </Card>
-      );})}
+          <Card key={p.id} className={p.is_paused && !isNewHire(p, today) ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-warning/40" : ""}>
+            <EmployeeCardHeader
+              profile={p}
+              status={employeeStatus(p, pendingById, today)}
+              expanded={expanded}
+              onToggle={() => toggleExpanded(p.id)}
+              missingCount={missingFields.length}
+              mfa={mfaBadge(p.role, mfaSet.has(p.id))}
+              pushOn={Boolean(pushSet?.has(p.id))}
+              pushOff={lacksPush(p, pushSet, pendingById, today)}
+              t={t}
+            />
+            {expanded && <EmployeeDetails profile={p} missingFields={missingFields} panel={panel} />}
+          </Card>
+        );
+      })}
 
       {/* Manager captures/edits an employee's CCQ card (photo + fields) — replaces the old
           employee-facing prompt. */}
@@ -1079,14 +415,5 @@ export default function EmployeesPanel() {
       </Dialog>
       {confirmDialog}
     </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-      {children}
-    </label>
   );
 }
