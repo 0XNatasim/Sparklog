@@ -33,7 +33,7 @@ function Where() {
   return <div data-testid="where">{location.pathname}{location.search}</div>;
 }
 
-function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob } = {}) {
+function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [] } = {}) {
   state.auth = { user: { id: "emp-1" }, role: "employee" };
   state.fake = createFakeSupabase({
     tables: {
@@ -43,6 +43,8 @@ function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", sa
       job_entry_unlocks: [],
       jobs,
       meal_claims: [],
+      inventory_screenshots: inventoryShots,
+      inventory_items: [],
     },
     rpcs: {
       save_own_job: saveJob || ((call) => [{ id: "job-new", status: call.args.p_submit ? "submitted" : "saved", locked: false }]),
@@ -183,5 +185,82 @@ describe("EmployeeForm — existing job", () => {
     await screen.findByText(fr("form.errors.failedLoad"));
     expect(screen.getByRole("button", { name: fr("common.retry") })).toBeTruthy();
     expect(field("ot").value).toBe("");
+  });
+});
+
+describe("EmployeeForm — end of the day", () => {
+  it("saves the return to the shop, then asks for the inventory and submits the day", async () => {
+    const dayJob = { id: "job-new", user_id: "emp-1", job_date: TODAY, ot: "200451", depart: "07:00:00", arrivee: "07:30:00", fin: "15:00:00", km_total: 42, km_aller: 37, km_retour: 5, return_time_minutes: 30, status: "saved", locked: false };
+    setup({
+      profile: { inventory_screenshots_enabled: true },
+      // The day's saved jobs are only listed for the day submission (locked = false filter).
+      jobs: (call) => (call.filters.some(([name, column]) => name === "eq" && column === "locked") ? [dayJob] : []),
+      inventoryShots: [{ slot: 1, storage_path: "emp-1/inv-1.jpg", ocr_status: "processed" }],
+    });
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
+    fill();
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
+    await screen.findByText(fr("form.last.title"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.yes") }));
+    await screen.findByText(fr("form.return.askTitle"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.yes") }));
+    await screen.findByText(fr("form.return.timeTitle"));
+    fireEvent.click(screen.getByRole("button", { name: "30 min" }));
+    fireEvent.change(await screen.findByLabelText(fr("form.return.kmLabel")), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: fr("form.buttons.save") }));
+
+    await screen.findByText(fr("form.inventory.title"));
+    expect(state.fake.rpcCalls("save_own_job")[0].args).toMatchObject({ p_submit: false, p_return_time_minutes: 30, p_km_total: 42, p_km_aller: 37, p_km_retour: 5 });
+    const continueButton = screen.getByRole("button", { name: fr("form.inventory.continue") });
+    expect(continueButton.disabled).toBe(true); // the defective-products question is not answered
+    fireEvent.click(screen.getByRole("button", { name: fr("form.inventory.defectiveNo") }));
+    expect(continueButton.disabled).toBe(false);
+    fireEvent.click(continueButton);
+
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.day.submit") }));
+    await screen.findByText(fr("form.day.submittedTitle"));
+    const submit = state.fake.rpcCalls("save_own_job")[1].args;
+    expect(submit).toMatchObject({ p_job_id: "job-new", p_submit: true, p_return_time_minutes: 30, p_km_retour: 5 });
+  });
+
+  it("refuses a return longer than the work order's kilometres", async () => {
+    setup();
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
+    fill({ km: "10" });
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
+    fireEvent.click(await screen.findByRole("button", { name: fr("common.yes") }));
+    fireEvent.click(await screen.findByRole("button", { name: fr("common.yes") }));
+    fireEvent.click(await screen.findByRole("button", { name: "30 min" }));
+    fireEvent.change(await screen.findByLabelText(fr("form.return.kmLabel")), { target: { value: "12" } });
+    expect(screen.getByText(fr("form.return.kmExceedsTotal"), { exact: false })).toBeTruthy();
+    expect(screen.getByRole("button", { name: fr("form.buttons.save") }).disabled).toBe(true);
+  });
+});
+
+describe("EmployeeForm — parking and autofill", () => {
+  it("needs the amount and a receipt once the parking box is ticked", async () => {
+    setup({ profile: { parking_receipts_enabled: true } });
+    const box = (await screen.findByText(fr("form.parking.title"))).closest("label").querySelector("input");
+    fill();
+    expect(saveButton().disabled).toBe(false);
+    fireEvent.click(box);
+    expect(saveButton().disabled).toBe(true);
+    expect(screen.getByText(fr("form.missing.hint", { fields: fr("form.parking.title") }))).toBeTruthy();
+    fireEvent.change(document.getElementById("parking-amount"), { target: { value: "8.50" } });
+    const choose = screen.getByRole("button", { name: fr("form.parking.chooseReceipts") });
+    expect(choose.className).toContain("border-destructive"); // amount entered, picture still missing
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it("shows the screenshot tip once, then remembers « don't show again »", async () => {
+    window.localStorage.removeItem("autofill_tip_seen");
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.buttons.autofill") }));
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.autofillTip.next") }));
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.autofillTip.dontShowAgain") }));
+    expect(window.localStorage.getItem("autofill_tip_seen")).toBe("1");
+    await waitFor(() => expect(screen.queryByRole("button", { name: fr("form.autofillTip.dontShowAgain") })).toBeNull());
   });
 });

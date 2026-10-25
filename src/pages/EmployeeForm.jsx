@@ -2,24 +2,21 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
-import { Camera, CircleCheck, Images, TriangleAlert } from "lucide-react";
+import { Camera } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
 import AppShell from "@/components/AppShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { isAdminEmployee, isManagerRole } from "@/lib/roles";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
-import { refreshSessionOnce, withRetry, withTimeout } from "@/lib/utils";
-import { mealDecision } from "@/lib/meal-eligibility";
+import { withRetry, withTimeout } from "@/lib/utils";
 import { buildJobSaveRpcArgs, buildJobSaveWithEvidenceRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
-import { RETURN_TIME_OPTIONS, validateJobSubmissionContract } from "@/lib/job-contract";
+import { validateJobSubmissionContract } from "@/lib/job-contract";
 import { COMPANY_TIME_ZONE, companyDate } from "@/lib/company-time";
 import { deleteDraft, loadDraft, saveDraft as persistDraft } from "@/lib/draft-store";
 import { evidenceUploadFailure, isFileFailure, prepareEvidenceImage, readPickedFile } from "@/lib/evidence-file";
@@ -30,63 +27,24 @@ import { submitSavedJob } from "@/lib/submit-job";
 import { extractWorkOrderText, parseExtractedText, workOrderIssues } from "@/lib/work-order-ocr";
 import { ENTRY_SOURCES, recordEntrySource } from "@/lib/entry-source";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
-import { dayFirstTripUnpaidMinutes } from "@/lib/payroll-calculations";
-import { MAX_PARKING_PICTURES, PARKING_BUCKET, mergeParkingPaths, orderPickedFiles, parkingReceiptPaths, parkingStoragePath } from "@/lib/parking-receipts";
-import { DEFECTIVE_SLOT, INVENTORY_SLOTS, defectiveCaptured, inventoryCaptured, inventoryStepComplete, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
-import { fetchInventoryReading, fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
+import { MAX_PARKING_PICTURES, parkingReceiptPaths } from "@/lib/parking-receipts";
+import { uploadParkingReceipt as uploadParkingReceiptFiles } from "@/lib/parking-upload";
+import { createMealClaim as createMealClaimFor, shouldRequestMealClaim as shouldRequestMealClaimFor } from "@/lib/meal-claim-request";
+import { overtimeEvidenceNeeded, uploadOvertimeEvidence } from "@/lib/overtime-evidence-check";
+import { AUTO_RESEND_DELAYS_S, fmtTimeHHmm, isEditableStatus, makeDayjsFromJob, normalizeNumber, toHHmmLabelFromFormatHours } from "@/lib/employee-form-helpers";
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useInventoryStep } from "@/components/employee-form/use-inventory-step";
+import FormMessages from "@/components/employee-form/FormMessages";
+import JobEntryFields from "@/components/employee-form/JobEntryFields";
+import ParkingReceiptFields from "@/components/employee-form/ParkingReceiptFields";
+import AutofillTipDialog from "@/components/employee-form/AutofillTipDialog";
+import EndOfShiftDialog from "@/components/employee-form/EndOfShiftDialog";
+import WorkOrderCheckDialog from "@/components/employee-form/WorkOrderCheckDialog";
+import ManualEntryCheckDialog from "@/components/employee-form/ManualEntryCheckDialog";
 
 dayjs.locale("en");
 
-function fmtTimeHHmm(t) {
-  if (!t) return "";
-  return String(t).slice(0, 5);
-}
-
-function makeDayjsFromJob(job_date, timeStr) {
-  if (!job_date || !timeStr) return null;
-  const d = dayjs(`${job_date}T${timeStr}`);
-  return d.isValid() ? d : null;
-}
-
-function toHHmmLabelFromFormatHours(formatHoursResult) {
-  const num = Number(String(formatHoursResult).replace(",", "."));
-  if (!Number.isFinite(num) || num <= 0) return "0h00";
-  const totalMinutes = Math.round(num * 60);
-  const hh = Math.floor(totalMinutes / 60);
-  const mm = totalMinutes % 60;
-  return `${hh}h${String(mm).padStart(2, "0")}`;
-}
-
-function normalizeNumber(value) {
-  if (value === "" || value === null || value === undefined) return null;
-  const n = Number(String(value).replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
-
-function isEditableStatus(s) {
-  return s === "saved" || s === "updated";
-}
-
-function formatReturnMinutes(minutes) {
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  if (!hours) return `${remainder} min`;
-  if (!remainder) return `${hours} h`;
-  return `${hours} h ${remainder}`;
-}
-
-
-// Delays (seconds) between automatic resends of a save that failed on a network/server outage.
-const AUTO_RESEND_DELAYS_S = [15, 30, 60, 120, 240];
 
 export default function EmployeeForm() {
   const { user, role } = useAuth();
@@ -163,7 +121,6 @@ export default function EmployeeForm() {
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [failedEvidenceFile, setFailedEvidenceFile] = useState(null); // kept so "Réessayer" needs no re-pick
   const [evidenceValidationError, setEvidenceValidationError] = useState("");
-  const [showOvertimeExample, setShowOvertimeExample] = useState(false);
   const [returnSaveError, setReturnSaveError] = useState("");
   const [returnCheckBusy, setReturnCheckBusy] = useState(false);
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
@@ -192,20 +149,8 @@ export default function EmployeeForm() {
   // because the form fields are reset as soon as the job is saved.
   const endShiftRef = useRef(false);
   const endShiftDateRef = useRef(null);
-  const inventoryInputRef = useRef(null);
-  const inventorySlotRef = useRef(null);
-  const inventoryMultiInputRef = useRef(null);
   const daySubmitRef = useRef(false);
-  const [inventoryRows, setInventoryRows] = useState([]);
-  const [inventoryBusySlot, setInventoryBusySlot] = useState(null);
-  const [inventoryError, setInventoryError] = useState("");
-  const [inventoryNotice, setInventoryNotice] = useState("");
-  // Lines read from the day's screenshots against the app's "N de N" total ({ state, count, expected }).
-  const [inventoryReading, setInventoryReading] = useState(null);
-  const [inventoryReadingTick, setInventoryReadingTick] = useState(0);
-  // Answer to « Produits défectueux ? » after the list screenshots: null (not answered), "yes", "no".
-  const [defectiveAnswer, setDefectiveAnswer] = useState(null);
-  const [showInventoryExamples, setShowInventoryExamples] = useState(false);
+  const inventory = useInventoryStep({ userId: user?.id, dayRef: endShiftDateRef, open: returnStep === "inventory", t });
   const [daySubmitBusy, setDaySubmitBusy] = useState(false);
   const [daySubmitError, setDaySubmitError] = useState("");
 
@@ -676,75 +621,12 @@ export default function EmployeeForm() {
     }
   }
 
-  // Uploads every picked parcomètre picture, then writes the ONE claim row of the job (total amount,
-  // first picture + extras). "add" keeps the pictures already saved. Returns the number of pictures.
-  async function uploadParkingReceipt(jobId, files, amount, mode = "add") {
-    const uploaded = [];
-    const removeUploaded = () => (uploaded.length
-      ? supabase.storage.from(PARKING_BUCKET).remove(uploaded).catch(() => undefined)
-      : Promise.resolve());
-    let paths;
-    try {
-      // Every call is timed out so a bad connection surfaces a retryable error instead of
-      // freezing the save button forever.
-      for (const file of orderPickedFiles(files)) {
-        const storagePath = parkingStoragePath(user.id, job_date, crypto.randomUUID());
-        let image;
-        try {
-          image = await prepareEvidenceImage(file);
-        } catch (error) {
-          if (isFileFailure(error)) reportFileReadError("parking", file, error);
-          throw error;
-        }
-        const { error: uploadError } = await withTimeout(
-          supabase.storage.from(PARKING_BUCKET).upload(storagePath, image, { contentType: "image/jpeg", upsert: false }),
-          20000
-        );
-        if (uploadError) throw uploadError;
-        uploaded.push(storagePath);
-      }
-      let existing = [];
-      if (mode === "add") {
-        const { data: current, error: currentError } = await withTimeout(
-          supabase.from("parking_receipts").select("storage_path, extra_storage_paths").eq("job_id", jobId).maybeSingle(),
-          10000
-        );
-        if (currentError) throw currentError;
-        existing = parkingReceiptPaths(current);
-      }
-      paths = mergeParkingPaths(existing, uploaded, mode);
-      if (!paths) throw new Error(t("form.parking.tooMany", { max: MAX_PARKING_PICTURES }));
-    } catch (error) {
-      await removeUploaded();
-      throw error;
-    }
-
-    const { data: savedReceipt, error: receiptError } = await withTimeout(
-      supabase.from("parking_receipts").upsert({
-        job_id: jobId,
-        user_id: user.id,
-        job_date,
-        ...paths,
-        amount,
-      }, { onConflict: "job_id" }).select("id").single(),
-      12000
-    );
-    if (receiptError) {
-      await removeUploaded();
-      throw receiptError;
-    }
-    const { error: notificationError } = await withTimeout(
-      supabase.from("manager_notifications").insert({
-        type: "parking_receipt",
-        employee_id: user.id,
-        job_id: jobId,
-        parking_receipt_id: savedReceipt.id,
-        daily_minutes: 0,
-      }),
-      12000
-    );
-    if (notificationError) throw notificationError;
-    return 1 + paths.extra_storage_paths.length;
+  // Every picked parcomètre picture, then the ONE claim row of the job (src/lib/parking-upload.js).
+  function uploadParkingReceipt(jobId, files, amount, mode = "add") {
+    return uploadParkingReceiptFiles(supabase, {
+      userId: user.id, jobId, jobDate: job_date, files, amount, mode,
+      tooManyMessage: t("form.parking.tooMany", { max: MAX_PARKING_PICTURES }),
+    });
   }
 
   function handleParkingReceipt(event, mode) {
@@ -876,135 +758,20 @@ export default function EmployeeForm() {
       setReturnStep("success");
       return;
     }
-    setInventoryError("");
-    setInventoryNotice("");
-    setInventoryReading(null);
-    setDefectiveAnswer(null);
     setDaySubmitError("");
     if (officeEmployee || !inventoryEnabled) {
       setReturnStep("dayDone");
       return;
     }
-    try {
-      const rows = await fetchInventorySlots(supabase, user.id, endShiftDateRef.current);
-      setInventoryRows(rows);
-      setDefectiveAnswer(defectiveCaptured(rows) ? "yes" : null);
-      // The step stays open until every list slot and the defective-products question are done.
-      setReturnStep(missingInventorySlots(rows).length || !defectiveCaptured(rows) ? "inventory" : "dayDone");
-    } catch (error) {
-      setInventoryRows([]);
-      setInventoryError(friendlyErrorMessage(error, t, "form.errors.failedLoad"));
-      setReturnStep("inventory");
-    }
+    // The step stays open until every list slot and the defective-products question are done.
+    setReturnStep(await inventory.start() ? "inventory" : "dayDone");
   }
 
   function closeReturnDialog() {
     endShiftRef.current = false;
     endShiftDateRef.current = null;
     setReturnStep("closed");
-    setShowOvertimeExample(false);
-    setShowInventoryExamples(false);
   }
-
-  function pickInventorySlot(slot) {
-    setInventoryNotice("");
-    inventorySlotRef.current = slot;
-    inventoryInputRef.current?.click();
-  }
-
-  function pickInventoryFiles() {
-    inventoryMultiInputRef.current?.click();
-  }
-
-  async function handleInventoryFile(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    const slot = inventorySlotRef.current;
-    if (!file || !slot || inventoryBusySlot) return;
-    await uploadInventoryShots([{ slot, file }]);
-  }
-
-  // Several screenshots chosen at once are placed in their slots by planInventoryUploads.
-  async function handleInventoryFiles(event) {
-    const files = [...(event.target.files || [])];
-    event.target.value = "";
-    if (!files.length || inventoryBusySlot) return;
-    const { uploads, extra } = planInventoryUploads(files, inventoryRows);
-    setInventoryNotice(extra > 0 ? t("form.inventory.extraIgnored", { count: extra }) : "");
-    if (uploads.length) await uploadInventoryShots(uploads);
-  }
-
-  // Uploads one screenshot after the other; a failure does not stop the others.
-  async function uploadInventoryShots(uploads) {
-    setInventoryBusySlot(uploads[0].slot);
-    setInventoryError("");
-    let retentionDays = 30;
-    try {
-      const { data } = await withTimeout(
-        supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).maybeSingle(),
-        8000
-      );
-      retentionDays = Number(data?.evidence_retention_days) || 30;
-    } catch { /* default retention applies */ }
-    const failed = [];
-    let lastError = null;
-    let rows = inventoryRows;
-    for (const { slot, file } of uploads) {
-      setInventoryBusySlot(slot);
-      try {
-        const previousPath = rows.find((row) => row.slot === slot)?.storage_path || null;
-        const path = await saveInventoryScreenshot(supabase, {
-          userId: user.id,
-          jobDate: endShiftDateRef.current,
-          slot,
-          file,
-          retentionDays,
-          previousPath,
-        });
-        rows = [...rows.filter((row) => row.slot !== slot), { slot, storage_path: path }];
-        setInventoryRows(rows);
-      } catch (error) {
-        console.error("[inventory] screenshot failed", error);
-        if (isFileFailure(error)) reportFileReadError("inventory", file, error);
-        failed.push(slot);
-        lastError = error;
-      }
-    }
-    if (lastError) {
-      const failure = evidenceUploadFailure(lastError);
-      const which = uploads.length > 1 ? `${t("form.inventory.failedSlots", { slots: failed.join(", ") })} ` : "";
-      setInventoryError(`${which}${t("form.inventory.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}`);
-    }
-    setInventoryBusySlot(null);
-    setInventoryReadingTick((tick) => tick + 1);
-  }
-
-  // While the inventory step is open, show how many lines were read from the screenshots. The
-  // reading runs on the server for a few seconds after each upload: poll a bounded number of times.
-  const hasInventoryShots = inventoryRows.length > 0;
-  useEffect(() => {
-    const jobDate = endShiftDateRef.current;
-    if (returnStep !== "inventory" || !user?.id || !jobDate || !hasInventoryShots) return undefined;
-    let cancelled = false;
-    let timer = null;
-    let tries = 0;
-    const poll = async () => {
-      try {
-        const reading = await fetchInventoryReading(supabase, user.id, jobDate);
-        if (cancelled) return;
-        setInventoryReading(reading);
-        tries += 1;
-        if ((reading.state === "reading" || reading.defective?.state === "reading") && tries < 20) timer = window.setTimeout(poll, 4000);
-      } catch {
-        if (!cancelled) setInventoryReading(null);
-      }
-    };
-    poll();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [returnStep, user?.id, hasInventoryShots, inventoryReadingTick]);
 
   // Submits every editable job of the end-of-shift day. Retrying is safe: only jobs still
   // saved/updated are sent, and each goes through the idempotent save_own_job RPC.
@@ -1048,47 +815,15 @@ export default function EmployeeForm() {
   async function requiresOvertimeEvidence() {
     // CCQ overtime authorization (the screenshot) does not apply to office staff.
     if (officeEmployee) return false;
-    // Known locally without any network call, so it stays valid even if the
-    // day-jobs lookup below fails.
-    const thisMinutes = Math.round(hoursDecimal * 60);
     try {
-      // Retry (with a session refresh + backoff) so a Supabase free-tier cold
-      // start doesn't fail the check on the first slow attempt.
-      const { data: dayJobs } = await withRetry(
-        () => supabase.from("jobs").select("id, depart, arrivee, fin, overtime_evidence_captured").eq("user_id", user.id).eq("job_date", job_date),
-        8000,
-        { retries: 2 }
-      );
-      if (editId && hasOvertimeEvidence) return false;
-      const workedMinutes = (job) => {
-        const start = makeDayjsFromJob(job_date, job.depart);
-        const end = makeDayjsFromJob(job_date, job.fin);
-        return Math.round((hoursBetween(start, end) || 0) * 60);
-      };
-      const others = (dayJobs || []).filter((job) => job.id !== editId);
-      // Full day (all jobs) drives supper eligibility. Return-to-storage time is
-      // deliberately excluded: it is always paid at the regular rate and never
-      // creates overtime or supper eligibility.
-      const fullDayMinutes = others.reduce((total, job) => total + workedMinutes(job), 0) + thisMinutes;
-      // With the "first trip unpaid" option the day's first Départ→Arrivée trip is not paid:
-      // supper eligibility, the overtime threshold and the stored daily total all use PAID
-      // time (same rule as the payroll and the database).
-      const unpaidTrip = firstTripUnpaid
-        ? dayFirstTripUnpaidMinutes([...others, { id: editId || "current", depart, arrivee, fin }])
-        : 0;
-      const paidDayMinutes = fullDayMinutes - unpaidTrip;
-      setOvertimeDailyMinutes(paidDayMinutes);
-      // The overtime authorization is one screenshot per day. If another job
-      // today already has it, don't ask again for this one.
-      if (others.some((job) => job.overtime_evidence_captured)) return false;
-      // Require the screenshot whenever the WHOLE day (all of the employee's jobs
-      // that day, this one included) passes 8h — not just this job's chronological
-      // running total. A day split across several short jobs still needs one
-      // authorization: whichever job is being saved when the running day total
-      // crosses 8h asks for it (the once-per-day guard above prevents a second
-      // prompt, and the manager also sees an "8h+, no evidence" flag at approval
-      // as a backstop for jobs that were entered out of order).
-      return paidDayMinutes > 480;
+      const { needed, paidDayMinutes } = await overtimeEvidenceNeeded(supabase, {
+        userId: user.id, jobDate: job_date, editId, hasOvertimeEvidence, firstTripUnpaid,
+        // Known locally without any network call.
+        thisMinutes: Math.round(hoursDecimal * 60),
+        current: { depart, arrivee, fin },
+      });
+      if (paidDayMinutes != null) setOvertimeDailyMinutes(paidDayMinutes);
+      return needed;
     } catch (error) {
       // Submission must fail closed: without the other jobs we cannot prove that
       // the complete day is at or below 8 h.
@@ -1097,88 +832,19 @@ export default function EmployeeForm() {
     }
   }
 
+  // Supper claim of the day (src/lib/meal-claim-request.js). Office staff are non-CCQ: never.
   async function shouldRequestMealClaim(jobId) {
-    // Meal (supper) claims are a CCQ field-crew benefit; office staff are non-CCQ.
     if (officeEmployee) return false;
-    // Supper: 2 h 15 of overtime (1.5× or 2×) = at least 10 h 15 of paid work that day, return
-    // time never counted. Decided from the employee's saved jobs of the day (this one included).
-    const [{ data: dayJobs, error: dayError }, { data: policy, error: policyError }] = await Promise.all([
-      withTimeout(
-        supabase.from("jobs").select("id, job_date, depart, arrivee, fin, return_time_minutes").eq("user_id", user.id).eq("job_date", job_date),
-        10000
-      ),
-      withTimeout(
-        supabase.from("profiles").select("first_trip_unpaid").eq("id", user.id).maybeSingle(),
-        10000
-      ),
-    ]);
-    if (dayError) throw dayError;
-    if (policyError) throw policyError;
-    if (!mealDecision(dayJobs || [], job_date, policy).eligible) return false;
-    const { data, error } = await withTimeout(
-      supabase.from("meal_claims").select("id").eq("user_id", user.id).eq("job_date", job_date).limit(1),
-      10000
-    );
-    if (error) throw error;
-    return (data || []).length === 0 && Boolean(jobId);
+    return shouldRequestMealClaimFor(supabase, { userId: user.id, jobDate: job_date, jobId });
   }
 
   async function createMealClaim(jobId) {
     try {
-      const claimId = crypto.randomUUID();
-      const { error: claimError } = await withTimeout(
-        supabase.from("meal_claims").insert({
-          id: claimId,
-          user_id: user.id,
-          job_id: jobId,
-          job_date,
-          amount: 30,
-          status: "pending",
-          storage_path: null,
-          daily_work_minutes: overtimeDailyMinutes,
-        }),
-        12000
-      );
-      if (claimError) throw claimError;
-      const { error: mealFlagError } = await withTimeout(
-        supabase.from("jobs").update({ meal_claim_captured: true }).eq("id", jobId),
-        12000
-      );
-      if (mealFlagError) throw mealFlagError;
-      const { error: notificationError } = await withTimeout(
-        supabase.from("manager_notifications").insert({
-          type: "meal_claim",
-          employee_id: user.id,
-          job_id: jobId,
-          meal_claim_id: claimId,
-          daily_minutes: overtimeDailyMinutes,
-        }),
-        12000
-      );
-      if (notificationError) throw notificationError;
+      await createMealClaimFor(supabase, { userId: user.id, jobId, jobDate: job_date, dailyMinutes: overtimeDailyMinutes });
       return true;
     } catch (error) {
       setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.meal.failed"));
       return false;
-    }
-  }
-
-  // Uploads the screenshot; on an expired session, timeout or network drop it refreshes the
-  // session and retries once. A duplicate on the retry means the first attempt did commit.
-  async function uploadEvidenceWithRefresh(path, image) {
-    const attempt = () => withTimeout(
-      supabase.storage.from("overtime-evidence").upload(path, image, { contentType: "image/jpeg", upsert: false }),
-      20000
-    );
-    try {
-      const { error } = await attempt();
-      if (error) throw error;
-    } catch (firstError) {
-      if (!["auth", "timeout", "network"].includes(evidenceUploadFailure(firstError).key)) throw firstError;
-      await refreshSessionOnce();
-      const { error } = await attempt();
-      const duplicate = Number(error?.statusCode ?? error?.status) === 409 || /already exists|duplicate/i.test(error?.message || "");
-      if (error && !duplicate) throw error;
     }
   }
 
@@ -1220,7 +886,7 @@ export default function EmployeeForm() {
         try {
           source = file instanceof File ? await readPickedFile(file) : file;
           const image = await prepareEvidenceImage(source);
-          await uploadEvidenceWithRefresh(storagePath, image);
+          await uploadOvertimeEvidence(supabase, storagePath, image);
           evidenceUploaded = true;
         } catch (error) {
           console.error("[overtime evidence] Screenshot upload failed", error);
@@ -1360,54 +1026,39 @@ export default function EmployeeForm() {
     !parkingComplete && t("form.parking.title"),
   ].filter(Boolean);
 
+  // Autofill: the tip comes first until the employee asks not to see it again.
+  const openAutofill = () => {
+    if (localStorage.getItem("autofill_tip_seen")) {
+      imageInputRef.current?.click();
+    } else {
+      setAutofillTipPage(1);
+      setShowAutofillTip(true);
+    }
+  };
+  const entryValues = { job_date, ot, depart, arrivee, fin, km_aller };
+  const entrySetters = { job_date: setJobDate, ot: setOt, depart: setDepart, arrivee: setArrivee, fin: setFin, km_aller: setKmAller };
+  const changeEntry = (field, value) => { entrySetters[field](value); setDirty(true); };
+
   return (
     <AppShell>
       <div className="space-y-2 sm:space-y-3">
-        {err && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            <span>{err}</span>
-            {editId && editLoadFailed && (
-              <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={loadingEdit} onClick={loadEdit}>
-                {t("common.retry")}
-              </Button>
-            )}
-          </div>
-        )}
-        {pendingResend && (
-          <div className="rounded-md border border-info/40 bg-info/10 px-3 py-2 text-sm text-info" role="status">
-            {t("form.autoResend.pending", { attempt: pendingResend.attempt + 1, max: AUTO_RESEND_DELAYS_S.length })}
-          </div>
-        )}
-        {managerEntryBy && (
-          <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning" role="status">
-            {t("form.managerEntry.banner", { name: managerEntryBy })}
-          </div>
-        )}
-        {info && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            <span>{t(info)}</span>
-            {draftRestored && (
-              <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={discardLocalDraft}>
-                {t("form.draft.discard")}
-              </Button>
-            )}
-          </div>
-        )}
-        {warning && (
-          <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm font-medium text-warning" role="alert">
-            {warning}
-          </div>
-        )}
-        {entryBlockedReason && (
-          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive" role="alert">
-            <span>{entryBlockedReason}</span>
-            {(editId || job_date !== companyDate()) && (
-              <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={saving} onClick={returnToTodaysJobCard}>
-                {t("form.deadline.backToJobCard")}
-              </Button>
-            )}
-          </div>
-        )}
+        <FormMessages
+          t={t}
+          err={err}
+          canRetryLoad={Boolean(editId && editLoadFailed)}
+          retryDisabled={loadingEdit}
+          onRetryLoad={loadEdit}
+          pendingResend={pendingResend}
+          managerEntryBy={managerEntryBy}
+          info={info}
+          draftRestored={draftRestored}
+          onDiscardDraft={discardLocalDraft}
+          warning={warning}
+          entryBlockedReason={entryBlockedReason}
+          canReturnToToday={Boolean(editId || job_date !== companyDate())}
+          returnDisabled={saving}
+          onReturnToToday={returnToTodaysJobCard}
+        />
 
         <Card>
           <CardContent className="space-y-2 p-3 sm:space-y-4 sm:p-6">
@@ -1424,14 +1075,7 @@ export default function EmployeeForm() {
                   type="button"
                   className="h-12 w-full text-base font-semibold"
                   disabled={disableInputs || extracting}
-                  onClick={() => {
-                    if (localStorage.getItem("autofill_tip_seen")) {
-                      imageInputRef.current?.click();
-                    } else {
-                      setAutofillTipPage(1);
-                      setShowAutofillTip(true);
-                    }
-                  }}
+                  onClick={openAutofill}
                 >
                   <Camera className="mr-2 h-5 w-5" />
                   {extracting ? t("common.extracting") : t("form.buttons.autofill")}
@@ -1446,171 +1090,41 @@ export default function EmployeeForm() {
               </>
             )}
 
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3">
-              <div className="grid gap-1 sm:gap-1.5">
-                <Label htmlFor="date" className="text-xs sm:text-sm">{t("form.date")}</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={job_date}
-                  onChange={(e) => { setJobDate(e.target.value); setDirty(true); }}
-                  disabled={disableInputs}
-                  className="h-9 sm:h-10"
-                />
-              </div>
+            <JobEntryFields
+              t={t}
+              values={entryValues}
+              onChange={changeEntry}
+              disabled={disableInputs}
+              officeEmployee={officeEmployee}
+              hoursLabel={hoursLabel}
+              parking={{
+                enabled: parkingReceiptsEnabled,
+                requested: parkingRequested,
+                hasReceipt: hasParkingReceipt,
+                onRequested: (checked) => {
+                  setParkingRequested(checked);
+                  if (!checked) setParkingFiles([]);
+                  setDirty(true);
+                },
+              }}
+            />
 
-              <div className="grid gap-1 sm:gap-1.5">
-                <Label htmlFor="ot" className="text-xs sm:text-sm"><span className="sm:hidden">{t("common.otLabel")}</span><span className="hidden sm:inline">{t("form.ot")}</span></Label>
-                <Input
-                  id="ot"
-                  value={ot}
-                  onChange={(e) => { setOt(e.target.value); setDirty(true); }}
-                  placeholder={t("form.otPlaceholder")}
-                  disabled={disableInputs}
-                  className="h-9 sm:h-10"
-                />
-              </div>
-
-              <div className="grid gap-1 sm:gap-1.5">
-                <Label htmlFor="depart" className="text-xs sm:text-sm">{officeEmployee ? t("form.debut") : t("form.depart")}</Label>
-                <Input
-                  id="depart"
-                  type="time"
-                  value={depart}
-                  onChange={(e) => { setDepart(e.target.value); setDirty(true); }}
-                  disabled={disableInputs}
-                  className="h-9 sm:h-10"
-                />
-              </div>
-
-              {!officeEmployee && (
-              <div className="grid gap-1 sm:gap-1.5">
-                <Label htmlFor="arrivee" className="text-xs sm:text-sm">{t("form.arrival")}</Label>
-                <Input
-                  id="arrivee"
-                  type="time"
-                  value={arrivee}
-                  onChange={(e) => { setArrivee(e.target.value); setDirty(true); }}
-                  disabled={disableInputs}
-                  className="h-9 sm:h-10"
-                />
-              </div>
-              )}
-
-              <div className="grid gap-1 sm:gap-1.5">
-                <Label htmlFor="fin" className="text-xs sm:text-sm">{t("form.end")}</Label>
-                <Input
-                  id="fin"
-                  type="time"
-                  value={fin}
-                  onChange={(e) => { setFin(e.target.value); setDirty(true); }}
-                  disabled={disableInputs}
-                  className="h-9 sm:h-10"
-                />
-              </div>
-
-              {!officeEmployee && (
-              <div className="grid gap-1 sm:gap-1.5">
-                <Label htmlFor="km" className="text-xs sm:text-sm"><span className="sm:hidden">{t("history.km")}</span><span className="hidden sm:inline">{t("form.kmTotal")}</span></Label>
-                <Input
-                  id="km"
-                  type="number"
-                  value={km_aller}
-                  onChange={(e) => { setKmAller(e.target.value); setDirty(true); }}
-                  disabled={disableInputs}
-                  placeholder="0"
-                  className="h-9 sm:h-10"
-                />
-              </div>
-              )}
-
-            </div>
-
-            <div className="flex flex-wrap items-end gap-2 sm:gap-4">
-              <div className="grid min-w-[8rem] flex-1 gap-1 sm:gap-1.5">
-                <Label className="text-xs sm:text-sm">{t("form.totalHours")}</Label>
-                <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-bold sm:h-10">
-                  {hoursLabel}
-                </div>
-              </div>
-
-              {parkingReceiptsEnabled && (
-                <label className="flex h-9 min-w-[9rem] flex-1 cursor-pointer items-center justify-between gap-2 rounded-md border px-3 sm:h-10">
-                  <span className="text-sm font-medium">{t("form.parking.title")}</span>
-                  <input
-                    type="checkbox"
-                    checked={parkingRequested}
-                    disabled={disableInputs || hasParkingReceipt}
-                    onChange={(event) => {
-                      if (event.target.checked) { setParkingRequested(true); setDirty(true); }
-                      else { setParkingRequested(false); setParkingFiles([]); setDirty(true); }
-                    }}
-                    className="h-5 w-5 rounded border-input accent-primary"
-                  />
-                </label>
-              )}
-            </div>
-
-            {parkingReceiptsEnabled && parkingRequested && (() => {
-              // A reviewed claim is final: no more pictures and no amount change (RLS: pending only).
-              const parkingLocked = hasParkingReceipt && parkingSaved.status !== "pending";
-              const pickParking = (mode) => { parkingModeRef.current = mode; parkingInputRef.current?.click(); };
-              const missingPicture = normalizeNumber(parkingAmount) > 0 && parkingFiles.length === 0 && !hasParkingReceipt;
-              return (
-                <div className="space-y-2 rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">
-                    {parkingFiles.length > 0
-                      ? t(parkingFilesMode === "add" && hasParkingReceipt ? "form.parking.pickedAdded" : hasParkingReceipt ? "form.parking.pickedReplacing" : "form.parking.picked", { count: parkingFiles.length, saved: parkingSaved.count })
-                      : hasParkingReceipt
-                        ? t("form.parking.savedCount", { count: Math.max(1, parkingSaved.count) })
-                        : t("form.parking.description")}
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_auto] sm:items-end">
-                    <div className="grid gap-1.5">
-                      <Label htmlFor="parking-amount">{t("form.parking.amount")}</Label>
-                      <Input id="parking-amount" type="number" inputMode="decimal" min="0.01" max="20" step="0.01" value={parkingAmount} disabled={disableInputs || parkingLocked || (hasParkingReceipt && parkingFiles.length === 0)} onChange={(event) => { setParkingAmount(event.target.value); setDirty(true); }} placeholder="0.00" />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {!hasParkingReceipt && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className={`w-fit ${missingPicture ? "border-destructive text-destructive ring-1 ring-destructive/40 hover:border-destructive hover:text-destructive" : ""}`}
-                          disabled={disableInputs}
-                          onClick={() => pickParking("replace")}
-                        >
-                          {t(parkingFiles.length > 0 ? "form.parking.chooseAgain" : "form.parking.chooseReceipts")}
-                        </Button>
-                      )}
-                      {hasParkingReceipt && !parkingLocked && (
-                        <>
-                          <Button type="button" size="sm" variant="outline" className="w-fit" disabled={disableInputs} onClick={() => pickParking("add")}>
-                            {t("form.parking.addReceipts")}
-                          </Button>
-                          <Button type="button" size="sm" variant="ghost" className="w-fit" disabled={disableInputs} onClick={() => pickParking("replace")}>
-                            {t("form.parking.replaceReceipts")}
-                          </Button>
-                        </>
-                      )}
-                      {hasParkingReceipt && parkingFiles.length > 0 && (
-                        <Button type="button" size="sm" variant="ghost" className="w-fit" disabled={disableInputs} onClick={() => { setParkingFiles([]); setParkingFilesMode("add"); }}>
-                          {t("common.cancel")}
-                        </Button>
-                      )}
-                      {hasParkingReceipt && (
-                        <span className="inline-flex items-center gap-1 text-sm font-medium text-success" title={t("form.parking.receiptSaved")}>
-                          <CircleCheck className="h-5 w-5" aria-hidden="true" />
-                          <span className="sr-only">{t("form.parking.receiptSaved")}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {parkingFiles.length > 0 && <div className="text-xs text-muted-foreground">{t("form.parking.amountHint")}</div>}
-                  <input ref={parkingInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => handleParkingReceipt(event, parkingModeRef.current)} />
-                </div>
-              );
-            })()}
+            {parkingReceiptsEnabled && parkingRequested && (
+              <ParkingReceiptFields
+                t={t}
+                disabled={disableInputs}
+                amount={parkingAmount}
+                onAmount={(value) => { setParkingAmount(value); setDirty(true); }}
+                files={parkingFiles}
+                filesMode={parkingFilesMode}
+                saved={parkingSaved}
+                hasReceipt={hasParkingReceipt}
+                inputRef={parkingInputRef}
+                modeRef={parkingModeRef}
+                onPick={handleParkingReceipt}
+                onCancelPicked={() => { setParkingFiles([]); setParkingFilesMode("add"); }}
+              />
+            )}
 
             <div className="space-y-2 pt-3">
               {(dirty || editId) && !locked && (
@@ -1657,464 +1171,67 @@ export default function EmployeeForm() {
           </CardContent>
         </Card>
       </div>
-      <Dialog open={showAutofillTip} onOpenChange={(open) => {
-        setShowAutofillTip(open);
-        if (!open) setAutofillTipPage(1);
-      }}>
-        <DialogContent className="max-w-sm p-0">
-          <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle>
-              {autofillTipPage === 1
-                ? t("form.autofillTip.title")
-                : t("form.autofillTip.exampleTitle")}
-            </DialogTitle>
-            <p className="text-xs font-medium text-muted-foreground">
-              {t("form.autofillTip.page", { current: autofillTipPage, total: 2 })}
-            </p>
-          </DialogHeader>
+      <AutofillTipDialog
+        t={t}
+        open={showAutofillTip}
+        page={autofillTipPage}
+        onPage={setAutofillTipPage}
+        onOpenChange={(open) => {
+          setShowAutofillTip(open);
+          if (!open) setAutofillTipPage(1);
+        }}
+        onChoose={(remember) => {
+          if (remember) localStorage.setItem("autofill_tip_seen", "1");
+          setShowAutofillTip(false);
+          imageInputRef.current?.click();
+        }}
+      />
+      <EndOfShiftDialog
+        t={t}
+        step={returnStep}
+        onStep={setReturnStep}
+        busy={saving || daySubmitBusy || Boolean(inventory.busySlot)}
+        onClose={closeReturnDialog}
+        saveError={returnSaveError}
+        pendingResend={pendingResend}
+        returnFlow={{
+          saving, checking: returnCheckBusy, answerLastJob, saveWithReturn,
+          minutes: returnMinutes, setMinutes: setReturnMinutes, km: returnKm, setKm: setReturnKm, kmTotal: km_aller,
+        }}
+        evidence={{
+          inputRef: overtimeInputRef,
+          onFile: handleOvertimeEvidence,
+          validationError: evidenceValidationError,
+          error: err,
+          canRetry: Boolean(failedEvidenceFile),
+          onRetry: () => processEvidenceFile(failedEvidenceFile),
+          busy: evidenceBusy,
+        }}
+        inventory={inventory}
+        day={{
+          withInventory: !officeEmployee && inventoryEnabled,
+          error: daySubmitError,
+          busy: daySubmitBusy,
+          onReview: () => { closeReturnDialog(); navigate("/history"); },
+          onSubmit: submitEndOfDay,
+        }}
+      />
 
-          {autofillTipPage === 1 ? (
-            <>
-              <div className="px-5 space-y-3 text-sm text-muted-foreground">
-                <p><span className="font-semibold text-foreground">1.</span> {t("form.autofillTip.step1")}</p>
-                <p><span className="font-semibold text-foreground">2.</span> {t("form.autofillTip.step2")}</p>
-                <p><span className="font-semibold text-foreground">3.</span> {t("form.autofillTip.step3")}</p>
-              </div>
-              <DialogFooter className="px-5 pb-5 pt-3">
-                <Button className="w-full" onClick={() => setAutofillTipPage(2)}>
-                  {t("form.autofillTip.next")}
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <>
-              <div className="px-5 pb-2">
-                <div className="mb-3 text-sm text-muted-foreground">
-                  <p>{t("form.autofillTip.exampleDescription")}</p>
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5">
-                    <li>{t("form.autofillTip.exampleItem1")}</li>
-                    <li>{t("form.autofillTip.exampleItem2")}</li>
-                    <li>{t("form.autofillTip.exampleItem3")}</li>
-                  </ul>
-                </div>
-                <img
-                  src="/Auto-fill.webp"
-                  alt={t("form.autofillTip.exampleAlt")}
-                  className="mx-auto w-full rounded-md border object-contain"
-                  style={{ maxHeight: "60vh" }}
-                />
-              </div>
-              <DialogFooter className="gap-2 px-5 pb-5 pt-2 sm:flex-col sm:space-x-0">
-                <Button
-                  className="w-full"
-                  onClick={() => {
-                    setShowAutofillTip(false);
-                    imageInputRef.current?.click();
-                  }}
-                >
-                  {t("form.autofillTip.choose")}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    localStorage.setItem("autofill_tip_seen", "1");
-                    setShowAutofillTip(false);
-                    imageInputRef.current?.click();
-                  }}
-                >
-                  {t("form.autofillTip.dontShowAgain")}
-                </Button>
-                <Button variant="ghost" className="w-full" onClick={() => setAutofillTipPage(1)}>
-                  {t("common.back")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={returnStep !== "closed"} onOpenChange={(open) => {
-        if (!open && !saving && !daySubmitBusy && !inventoryBusySlot) closeReturnDialog();
-      }}>
-        <DialogContent className="max-w-md">
-          {returnSaveError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-              {returnSaveError}
-              {pendingResend && <p className="mt-1 text-xs text-info">{t("form.autoResend.pending", { attempt: pendingResend.attempt + 1, max: AUTO_RESEND_DELAYS_S.length })}</p>}
-            </div>
-          )}
-          {returnStep === "last" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{t("form.last.title")}</DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-muted-foreground">{t("form.last.description")}</p>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" disabled={saving || returnCheckBusy} onClick={() => answerLastJob(false)}>
-                  {returnCheckBusy ? t("common.pleaseWait") : t("common.no")}
-                </Button>
-                <Button type="button" disabled={saving || returnCheckBusy} onClick={() => answerLastJob(true)}>
-                  {t("common.yes")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "ask" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{t("form.return.askTitle")}</DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-muted-foreground">{t("form.return.askDescription")}</p>
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" disabled={saving || returnCheckBusy} onClick={() => saveWithReturn(0, 0, "draft")}>
-                  {returnCheckBusy ? t("common.pleaseWait") : t("common.no")}
-                </Button>
-                <Button type="button" disabled={saving || returnCheckBusy} onClick={() => setReturnStep("time")}>
-                  {t("common.yes")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "time" && (
-            <>
-              <DialogHeader><DialogTitle>{t("form.return.timeTitle")}</DialogTitle></DialogHeader>
-              <div className="grid max-h-[55vh] grid-cols-4 gap-2 overflow-y-auto pr-1">
-                {RETURN_TIME_OPTIONS.map((minutes) => (
-                  <Button key={minutes} type="button" variant={returnMinutes === minutes ? "default" : "outline"} className="px-2" onClick={() => {
-                    setReturnMinutes(minutes);
-                    setReturnStep("km");
-                  }}>
-                    {formatReturnMinutes(minutes)}
-                  </Button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {returnStep === "km" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{t("form.return.kmTitle")}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-2">
-                <Label htmlFor="return-km">{t("form.return.kmLabel")}</Label>
-                <Input
-                  id="return-km"
-                  type="text"
-                  inputMode="decimal"
-                  autoFocus
-                  value={returnKm}
-                  onChange={(event) => setReturnKm(event.target.value)}
-                  placeholder="0"
-                />
-                <p className="text-xs text-muted-foreground">{t("form.return.selectedTime", { time: formatReturnMinutes(returnMinutes || 0) })}</p>
-                {normalizeNumber(returnKm) !== null && normalizeNumber(returnKm) >= 0 && normalizeNumber(returnKm) <= (normalizeNumber(km_aller) || 0) && (
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {t("form.return.kmBreakdown", { client: Math.max(0, (normalizeNumber(km_aller) || 0) - normalizeNumber(returnKm)), returnKm: normalizeNumber(returnKm), total: normalizeNumber(km_aller) || 0 })}
-                  </p>
-                )}
-                {normalizeNumber(returnKm) !== null && normalizeNumber(returnKm) > (normalizeNumber(km_aller) || 0) && (
-                  <p className="text-xs font-medium text-destructive">
-                    {t("form.return.kmExceedsTotal")} ({t("form.return.kmBreakdown", { client: 0, returnKm: normalizeNumber(returnKm), total: normalizeNumber(km_aller) || 0 })})
-                  </p>
-                )}
-                {normalizeNumber(returnKm) !== null && normalizeNumber(returnKm) < 0 && (
-                  <p className="text-xs font-medium text-destructive">{t("form.return.kmNegative")}</p>
-                )}
-                {returnSaveError && <p className="text-xs font-medium text-destructive">{returnSaveError}</p>}
-              </div>
-              <DialogFooter>
-                <Button type="button" disabled={saving || returnCheckBusy || normalizeNumber(returnKm) === null || normalizeNumber(returnKm) < 0 || normalizeNumber(returnKm) > (normalizeNumber(km_aller) || 0)} onClick={() => saveWithReturn(returnMinutes, normalizeNumber(returnKm))}>
-                  {saving || returnCheckBusy ? t("common.saving") : t("form.buttons.save")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "evidence" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{t("form.evidence.title")}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3 text-sm">
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
-                  {t("form.evidence.description")}
-                </div>
-                <div className="rounded-md border bg-muted/40 p-3">
-                  <div className="font-semibold">{t("form.evidence.requiredContentTitle")}</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                    <li>{t("form.evidence.requiredApproval")}</li>
-                    <li>{t("form.evidence.requiredDuration")}</li>
-                    <li>{t("form.evidence.requiredCrop")}</li>
-                  </ul>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="mt-3"
-                    aria-expanded={showOvertimeExample}
-                    aria-controls="overtime-evidence-example"
-                    onClick={() => setShowOvertimeExample((visible) => !visible)}
-                  >
-                    {showOvertimeExample ? t("form.evidence.hideExample") : t("form.evidence.showExample")}
-                  </Button>
-                  {showOvertimeExample && (
-                    <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
-                      <img
-                        src="/overtime-evidence-example.webp"
-                        alt={t("form.evidence.exampleAlt")}
-                        className="max-h-96 w-full rounded object-contain"
-                      />
-                    </div>
-                  )}
-                </div>
-                {evidenceValidationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{evidenceValidationError}</div>}
-                {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{err}</div>}
-                <input
-                  ref={overtimeInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleOvertimeEvidence}
-                />
-              </div>
-              <DialogFooter>
-                {failedEvidenceFile && !evidenceBusy && (
-                  <Button type="button" variant="outline" onClick={() => processEvidenceFile(failedEvidenceFile)}>
-                    {t("form.evidence.retry")}
-                  </Button>
-                )}
-                <Button type="button" disabled={evidenceBusy} onClick={() => overtimeInputRef.current?.click()}>
-                  {evidenceBusy ? t("form.evidence.processing") : t("form.evidence.choose")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "inventory" && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{t("form.inventory.title")}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3 text-sm">
-                <p className="text-muted-foreground">{t("form.inventory.description")}</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  aria-expanded={showInventoryExamples}
-                  onClick={() => setShowInventoryExamples((visible) => !visible)}
-                >
-                  {showInventoryExamples ? t("form.inventory.hideExample") : t("form.inventory.showExample")}
-                </Button>
-                {showInventoryExamples && (
-                  <div className="grid grid-cols-3 gap-2 rounded-md border bg-background p-2">
-                    {INVENTORY_SLOTS.map((slot) => (
-                      <img key={slot} src={`/inventory-examples/${slot}.webp`} alt={t("form.inventory.exampleAlt", { n: slot })} className="max-h-72 w-full rounded object-contain" />
-                    ))}
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  className="w-full"
-                  variant={inventoryCaptured(inventoryRows) ? "outline" : "default"}
-                  disabled={Boolean(inventoryBusySlot)}
-                  onClick={pickInventoryFiles}
-                >
-                  <Images className="mr-2 h-4 w-4" aria-hidden="true" />
-                  {t("form.inventory.pickMany")}
-                </Button>
-                <p className="text-xs text-muted-foreground">{t("form.inventory.pickManyHint")}</p>
-                <ul className="space-y-2">
-                  {INVENTORY_SLOTS.map((slot) => {
-                    const done = inventoryRows.some((row) => row.slot === slot);
-                    const busy = inventoryBusySlot === slot;
-                    return (
-                      <li key={slot} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                        <span className="flex items-center gap-2 font-medium">
-                          {done && <CircleCheck className="h-5 w-5 text-success" aria-hidden="true" />}
-                          {t("form.inventory.slot", { n: slot })}
-                        </span>
-                        <Button type="button" size="sm" variant="outline" disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(slot)}>
-                          {busy ? t("form.inventory.uploading") : done ? t("form.inventory.replace") : t("form.inventory.capture")}
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {inventoryCaptured(inventoryRows) && inventoryReading && (
-                  <InventoryReadingNote reading={inventoryReading} t={t} />
-                )}
-                {inventoryCaptured(inventoryRows) && (
-                  <div className="space-y-2 rounded-md border p-3">
-                    <p className="font-medium">{t("form.inventory.defectiveQuestion")}</p>
-                    <p className="text-xs text-muted-foreground">{t("form.inventory.defectiveHint")}</p>
-                    <div className="grid grid-cols-2 gap-2" role="group" aria-label={t("form.inventory.defectiveQuestion")}>
-                      <Button type="button" variant={defectiveAnswer === "yes" ? "default" : "outline"} aria-pressed={defectiveAnswer === "yes"} disabled={Boolean(inventoryBusySlot)} onClick={() => setDefectiveAnswer("yes")}>
-                        {t("form.inventory.defectiveYes")}
-                      </Button>
-                      <Button type="button" variant={defectiveAnswer === "no" ? "default" : "outline"} aria-pressed={defectiveAnswer === "no"} disabled={Boolean(inventoryBusySlot)} onClick={() => setDefectiveAnswer("no")}>
-                        {t("form.inventory.defectiveNo")}
-                      </Button>
-                    </div>
-                    {defectiveAnswer === "yes" && (
-                      <>
-                        <p className="text-xs text-muted-foreground">{t("form.inventory.defectivePhotoHint")}</p>
-                        <div className="flex items-center justify-between gap-2 rounded-md border p-2">
-                          <span className="flex items-center gap-2 font-medium">
-                            {defectiveCaptured(inventoryRows) && <CircleCheck className="h-5 w-5 text-success" aria-hidden="true" />}
-                            {t("form.inventory.defectiveSlot")}
-                          </span>
-                          <Button type="button" size="sm" variant={defectiveCaptured(inventoryRows) ? "outline" : "default"} disabled={Boolean(inventoryBusySlot)} onClick={() => pickInventorySlot(DEFECTIVE_SLOT)}>
-                            {inventoryBusySlot === DEFECTIVE_SLOT ? t("form.inventory.uploading") : defectiveCaptured(inventoryRows) ? t("form.inventory.replace") : t("form.inventory.capture")}
-                          </Button>
-                        </div>
-                        {defectiveCaptured(inventoryRows) && inventoryReading?.defective && (
-                          <DefectiveReadingNote reading={inventoryReading.defective} t={t} />
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-                {inventoryNotice && <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-warning" role="status">{inventoryNotice}</div>}
-                {inventoryError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive" role="alert">{inventoryError}</div>}
-                <input ref={inventoryInputRef} type="file" accept="image/*" className="hidden" onChange={handleInventoryFile} />
-                <input ref={inventoryMultiInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleInventoryFiles} />
-              </div>
-              <DialogFooter>
-                <Button type="button" disabled={Boolean(inventoryBusySlot) || !inventoryStepComplete(inventoryRows, defectiveAnswer)} onClick={() => setReturnStep("dayDone")}>
-                  {t("form.inventory.continue")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "dayDone" && (
-            <>
-              <DialogHeader><DialogTitle>{t("form.day.readyTitle")}</DialogTitle></DialogHeader>
-              <p className="text-sm text-muted-foreground">{t(!officeEmployee && inventoryEnabled ? "form.day.readyDescription" : "form.day.readyDescriptionPlain")}</p>
-              {daySubmitError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{daySubmitError}</div>}
-              <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" disabled={daySubmitBusy} onClick={() => { closeReturnDialog(); navigate("/history"); }}>
-                  {t("form.day.review")}
-                </Button>
-                <Button type="button" variant="success" disabled={daySubmitBusy} onClick={submitEndOfDay}>
-                  {daySubmitBusy ? t("common.submitting") : t("form.day.submit")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "daySubmitted" && (
-            <>
-              <DialogHeader><DialogTitle>{t("form.day.submittedTitle")}</DialogTitle></DialogHeader>
-              <p className="text-sm text-muted-foreground">{t("form.day.submittedDescription")}</p>
-              <DialogFooter>
-                <Button type="button" onClick={closeReturnDialog}>{t("common.ok")}</Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {returnStep === "success" && (
-            <>
-              <DialogHeader><DialogTitle>{t("form.return.savedTitle")}</DialogTitle></DialogHeader>
-              <p className="text-sm text-muted-foreground">{t("form.return.savedDescription")}</p>
-              <DialogFooter>
-                <Button type="button" onClick={closeReturnDialog}>{t("common.ok")}</Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showWorkOrderCheck && workOrderProblems.length > 0} onOpenChange={setShowWorkOrderCheck}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-warning">
-              <TriangleAlert className="h-5 w-5" />{t("form.workOrderCheck.title")}
-            </DialogTitle>
-          </DialogHeader>
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {workOrderProblems.map((issue) => (
-              <li key={issue.code}>{t(`form.workOrderCheck.${issue.code}`, { miles: String(issue.miles ?? "").replace(".", ","), km: issue.km ?? "" })}</li>
-            ))}
-          </ul>
-          <p className="text-sm text-muted-foreground">{t("form.workOrderCheck.body")}</p>
-          {lastOcrText && (
-            <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer select-none">{t("form.workOrderCheck.showText")}</summary>
-              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded border border-border bg-muted/40 p-2 font-mono">{lastOcrText}</pre>
-              <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => navigator.clipboard?.writeText(lastOcrText).catch(() => undefined)}>
-                {t("form.workOrderCheck.copyText")}
-              </Button>
-            </details>
-          )}
-          <DialogFooter>
-            <Button type="button" onClick={() => setShowWorkOrderCheck(false)}>{t("common.ok")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={showManualEntryCheck} onOpenChange={setShowManualEntryCheck}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-warning">
-              <TriangleAlert className="h-5 w-5" />{t("form.manualEntryCheck.title")}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm">{t("form.manualEntryCheck.body")}</p>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => { setShowManualEntryCheck(false); imageInputRef.current?.click(); }}>
-              <Camera className="mr-2 h-4 w-4" />{t("form.manualEntryCheck.useScreenshot")}
-            </Button>
-            <Button type="button" onClick={startSaveFlow}>{t("form.manualEntryCheck.continue")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WorkOrderCheckDialog
+        t={t}
+        open={showWorkOrderCheck && workOrderProblems.length > 0}
+        onOpenChange={setShowWorkOrderCheck}
+        problems={workOrderProblems}
+        ocrText={lastOcrText}
+      />
+      <ManualEntryCheckDialog
+        t={t}
+        open={showManualEntryCheck}
+        onOpenChange={setShowManualEntryCheck}
+        onUseScreenshot={() => { setShowManualEntryCheck(false); imageInputRef.current?.click(); }}
+        onContinue={startSaveFlow}
+      />
       {confirmDialog}
     </AppShell>
   );
-}
-
-// Result of the automatic reading of the inventory screenshots, shown to the employee: the list
-// is complete when the lines read match the app's own "N de N" total. Informative only.
-// What was read under « Produits défectueux » on the slot 4 picture (indicative, like the list).
-function DefectiveReadingNote({ reading, t }) {
-  if (reading.state === "reading") {
-    return <p className="text-xs text-muted-foreground" role="status">{t("form.inventory.readingNow")}</p>;
-  }
-  if (reading.count > 0) {
-    const complete = reading.state === "ok";
-    return (
-      <p className={complete ? "text-xs text-success" : "text-xs text-warning"} role="status">
-        {complete
-          ? t("form.inventory.defectiveReadComplete", { count: reading.count, expected: reading.expected })
-          : t("form.inventory.defectiveRead", { count: reading.count })}
-      </p>
-    );
-  }
-  return <p className="text-xs text-warning" role="status">{t("form.inventory.defectiveUnreadable")}</p>;
-}
-
-function InventoryReadingNote({ reading, t }) {
-  if (reading.state === "reading") {
-    return <p className="text-muted-foreground" role="status">{t("form.inventory.readingNow")}</p>;
-  }
-  if (reading.state === "ok") {
-    return (
-      <p className="flex items-center gap-2 rounded-md border border-success/40 bg-success/10 p-3 text-success" role="status">
-        <CircleCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
-        {t("form.inventory.readingComplete", { count: reading.count, expected: reading.expected })}
-      </p>
-    );
-  }
-  if (reading.expected && reading.count < reading.expected) {
-    return (
-      <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-warning" role="status">
-        {t("form.inventory.readingShort", { count: reading.count, expected: reading.expected })}
-      </p>
-    );
-  }
-  return <p className="text-muted-foreground" role="status">{t("form.inventory.readingUnverified")}</p>;
 }

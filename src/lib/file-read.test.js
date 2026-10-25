@@ -82,6 +82,11 @@ describe("reading a picked picture (V2.4.170)", () => {
     const form = readFileSync(new URL("../pages/EmployeeForm.jsx", import.meta.url), "utf8");
     expect(form).toContain("source = file instanceof File ? await readPickedFile(file) : file;");
     expect(form).toContain("setFailedEvidenceFile(committed ? file : source);");
-    for (const context of ["overtime", "inventory", "parking"]) expect(form).toContain(`reportFileReadError("${context}"`);
+    // The inventory step and the parking upload moved out of the form (V2.4.178).
+    const inventory = readFileSync(new URL("../components/employee-form/use-inventory-step.js", import.meta.url), "utf8");
+    const parking = readFileSync(new URL("./parking-upload.js", import.meta.url), "utf8");
+    expect(form).toContain('reportFileReadError("overtime"');
+    expect(inventory).toContain('reportFileReadError("inventory"');
+    expect(parking).toContain('reportFileReadError("parking"');
   });
 });
