@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from "react";
+import React from "react";
 import { Loader2 } from "lucide-react";
 import { useT } from "@/lib/use-t";
 
@@ -21,17 +21,4 @@ export function PanelLoading() {
       {t("common.loading")}
     </div>
   );
-}
-
-// React.lazy with its own Suspense boundary, so a page part can load on demand
-// without blanking the page around it.
-export function lazyPanel(importer) {
-  const Lazy = lazy(importer);
-  return function LazyPanel(props) {
-    return (
-      <Suspense fallback={<PanelLoading />}>
-        <Lazy {...props} />
-      </Suspense>
-    );
-  };
 }

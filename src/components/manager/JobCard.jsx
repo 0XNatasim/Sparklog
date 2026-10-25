@@ -6,17 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import ManualEntryStar from "@/components/ManualEntryStar";
-import { formatHM } from "@/lib/time";
+import { clockOrDash as fmtTimeHHmm, formatHM } from "@/lib/time";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
 import { jobCodeTintClass } from "@/lib/job-code";
 import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
-
-export function fmtTimeHHmm(t) {
-  if (!t) return "—";
-  return String(t).slice(0, 5);
-}
 
 // One timesheet row of the manager dashboard. Memoized: it receives only primitives,
 // the row's own objects and stable callbacks, so approving, filtering or loading one

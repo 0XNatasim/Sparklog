@@ -2,9 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
-import { AuthProvider } from "./contexts/AuthContext.jsx";
-import { ThemeProvider } from "./components/theme-provider.jsx";
-import { LanguageProvider } from "./components/language-provider.jsx";
+import { AuthProvider } from "./contexts/AuthProvider.jsx";
+import { ThemeProvider } from "./components/ThemeProvider.jsx";
+import { LanguageProvider } from "./components/LanguageProvider.jsx";
 import { ErrorBoundary, RootErrorFallback } from "./components/ErrorBoundary.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(

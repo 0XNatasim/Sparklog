@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { MANAGER_NAV_ITEMS, firstAllowedPath, legacySectionTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
 import { isManagerRole } from "@/lib/roles";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
-import { lazyPanel } from "@/components/LazyLoading";
+import { lazyPanel } from "@/components/lazy-panel";
 
 // Each page loads on first visit, so employees never download manager code and a
 // manager only fetches the pages they open (each shows its own fallback meanwhile).

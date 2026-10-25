@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
-import { formatHM } from "../lib/time";
+import { clockOrDash as fmtTimeHHmm, formatHM } from "../lib/time";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import LiveCrew from "@/components/LiveCrew";
 import WeekSnapshot from "@/components/WeekSnapshot";
 import { dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
-import JobCard, { fmtTimeHHmm } from "@/components/manager/JobCard";
+import JobCard from "@/components/manager/JobCard";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
@@ -59,6 +59,9 @@ function weekKeyFromDate(dateStr) {
 const ANOMALY_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, overtime_evidence_captured";
 
 const NOTIFICATION_FILTERS = ["overtime", "meals", "parking"];
+
+// Not an employee id: the first render picks the week of the employee shown.
+const INITIAL_PICK = Symbol("initial week pick");
 
 // Two Gestion pages share this component's state (jobs, claims, evidence):
 //   view="timesheet" → Feuilles  (#/manager/timesheets)
@@ -188,95 +191,116 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
 
   // Anomalies across every submitted job (not just the loaded page), compared with the
   // approved jobs of the same employees and dates.
-  async function loadAnomalies() {
-    // Every load() rescans; only the latest scan is kept and older ones are aborted.
-    const ticket = anomaliesRequest.begin();
-    const { signal } = ticket;
-    try {
-      const { data: submitted } = await withRetry(() => supabase
+  async function readAnomalies(signal) {
+    const { data: submitted } = await withRetry(() => supabase
+      .from("jobs")
+      .select(ANOMALY_COLUMNS)
+      .eq("status", "submitted")
+      .order("job_date", { ascending: false })
+      .limit(QUERY_BUDGETS.anomalySubmittedJobs)
+      .abortSignal(signal), 12000, { signal });
+    const rows = submitted || [];
+    const userIds = [...new Set(rows.map((row) => row.user_id))];
+    const dates = [...new Set(rows.map((row) => row.job_date))];
+    const { data: approved } = rows.length
+      ? await withRetry(() => supabase
         .from("jobs")
         .select(ANOMALY_COLUMNS)
-        .eq("status", "submitted")
-        .order("job_date", { ascending: false })
-        .limit(QUERY_BUDGETS.anomalySubmittedJobs)
-        .abortSignal(signal), 12000, { signal });
-      const rows = submitted || [];
-      const userIds = [...new Set(rows.map((row) => row.user_id))];
-      const dates = [...new Set(rows.map((row) => row.job_date))];
-      const { data: approved } = rows.length
-        ? await withRetry(() => supabase
-          .from("jobs")
-          .select(ANOMALY_COLUMNS)
-          .eq("status", "approved")
-          .in("user_id", userIds)
-          .in("job_date", dates)
-          .limit(QUERY_BUDGETS.anomalyApprovedPeers)
-          .abortSignal(signal), 12000, { signal })
-        : { data: [] };
-      // select("*") so the scan keeps working with default limits if the threshold
-      // columns are not deployed yet.
-      const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).abortSignal(signal).maybeSingle();
-      // Employees with "first trip unpaid" reach the 8 h overtime-proof threshold on paid time.
-      const { data: tripUnpaid } = userIds.length
-        ? await supabase.from("profiles").select("id").eq("first_trip_unpaid", true).in("id", userIds).abortSignal(signal)
-        : { data: [] };
-      const otReuse = await loadOtReuse(rows.map((row) => row.id), signal);
-      if (!ticket.isCurrent()) return;
-      setAnomalies(sortAnomalies([
-        ...detectJobAnomalies(
-          [...rows, ...(approved || [])],
-          anomalyLimitsFromSettings(settings),
-          { firstTripUnpaidUsers: new Set((tripUnpaid || []).map((row) => row.id)) },
-        ),
-        ...otReuseAnomalies(otReuse, rows),
-      ]));
-      setAnomaliesFailed(false);
-    } catch {
-      if (ticket.isCurrent()) setAnomaliesFailed(true);
-    }
+        .eq("status", "approved")
+        .in("user_id", userIds)
+        .in("job_date", dates)
+        .limit(QUERY_BUDGETS.anomalyApprovedPeers)
+        .abortSignal(signal), 12000, { signal })
+      : { data: [] };
+    // select("*") so the scan keeps working with default limits if the threshold
+    // columns are not deployed yet.
+    const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).abortSignal(signal).maybeSingle();
+    // Employees with "first trip unpaid" reach the 8 h overtime-proof threshold on paid time.
+    const { data: tripUnpaid } = userIds.length
+      ? await supabase.from("profiles").select("id").eq("first_trip_unpaid", true).in("id", userIds).abortSignal(signal)
+      : { data: [] };
+    const otReuse = await loadOtReuse(rows.map((row) => row.id), signal);
+    return sortAnomalies([
+      ...detectJobAnomalies(
+        [...rows, ...(approved || [])],
+        anomalyLimitsFromSettings(settings),
+        { firstTripUnpaidUsers: new Set((tripUnpaid || []).map((row) => row.id)) },
+      ),
+      ...otReuseAnomalies(otReuse, rows),
+    ]);
   }
 
-  async function load() {
-    const ticket = jobsRequest.begin();
-    const { signal } = ticket;
-    setErr(""); setInfo("");
-    setLoading(true);
-    loadAnomalies();
+  // Every load rescans; only the latest scan is kept and older ones are aborted.
+  function runAnomalies() {
+    const ticket = anomaliesRequest.begin();
+    return readAnomalies(ticket.signal).then(
+      (list) => { if (ticket.isCurrent()) { setAnomalies(list); setAnomaliesFailed(false); } },
+      () => { if (ticket.isCurrent()) setAnomaliesFailed(true); },
+    );
+  }
+
+  // The jobs matching the filters (every page when one employee or one day is chosen), with their
+  // supper and hand-entry flags. No state is set here.
+  async function readJobsPage(signal) {
+    const loadEveryMatch = shouldLoadAllMatchingManagerJobs(employeeId, dayFilter);
+    const jobRows = [];
+    let pageStart = 0;
+    let page;
+    do {
+      const result = await withRetry(
+        () => buildJobsQuery(signal).range(pageStart, pageStart + PAGE_SIZE - 1),
+        12000,
+        { signal }
+      );
+      page = result.data || [];
+      jobRows.push(...page);
+      pageStart += PAGE_SIZE;
+    } while (loadEveryMatch && page.length === PAGE_SIZE);
+
+    // Only the meal indicators for the jobs actually on screen — no full-table scan.
+    const jobIds = jobRows.map((j) => j.id);
+    const { data: mealRows } = jobIds.length
+      ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", jobIds).abortSignal(signal), 12000, { signal })
+      : { data: [] };
+    const manualIds = await loadManualEntryJobIds(supabase, jobIds, { signal });
+    return { jobRows, mealRows, manualIds, hasMore: !loadEveryMatch && page.length === PAGE_SIZE };
+  }
+
+  async function applyJobsPage(ticket, { jobRows, mealRows, manualIds, hasMore: more }) {
+    if (!ticket.isCurrent()) return; // a newer filter took over
+    setJobs(jobRows);
+    setMealJobIds(new Set((mealRows || []).map((claim) => claim.job_id)));
+    setManualEntryIds(manualIds);
+    setHasMore(more);
     try {
-      const loadEveryMatch = shouldLoadAllMatchingManagerJobs(employeeId, dayFilter);
-      const jobRows = [];
-      let pageStart = 0;
-      let page = [];
-      do {
-        const result = await withRetry(
-          () => buildJobsQuery(signal).range(pageStart, pageStart + PAGE_SIZE - 1),
-          12000,
-          { signal }
-        );
-        page = result.data || [];
-        jobRows.push(...page);
-        pageStart += PAGE_SIZE;
-      } while (loadEveryMatch && page.length === PAGE_SIZE);
-
-      // Only the meal indicators for the jobs actually on screen — no full-table scan.
-      const jobIds = jobRows.map((j) => j.id);
-      const { data: mealRows } = jobIds.length
-        ? await withRetry(() => supabase.from("meal_claims").select("job_id").in("job_id", jobIds).abortSignal(signal), 12000, { signal })
-        : { data: [] };
-      const manualIds = await loadManualEntryJobIds(supabase, jobIds, { signal });
-
-      if (!ticket.isCurrent()) return; // a newer filter took over
-      setJobs(jobRows);
-      setMealJobIds(new Set((mealRows || []).map((claim) => claim.job_id)));
-      setManualEntryIds(manualIds);
-      setHasMore(!loadEveryMatch && page.length === PAGE_SIZE);
       await loadCounts(ticket);
     } catch (e) {
-      if (!ticket.isCurrent() || isAbortError(e)) return;
-      setErr(e?.message || t("manager.errors.failedLoad"));
-    } finally {
-      if (ticket.isCurrent()) setLoading(false);
+      failJobsPage(ticket, e);
     }
+    if (ticket.isCurrent()) setLoading(false);
+  }
+
+  function failJobsPage(ticket, e) {
+    if (!ticket.isCurrent() || isAbortError(e)) return;
+    setErr(e?.message || t("manager.errors.failedLoad"));
+    setLoading(false);
+  }
+
+  // Latest wins: a newer load aborts this one (list, meal flags, counts, anomalies).
+  function startJobsLoad() {
+    const ticket = jobsRequest.begin();
+    runAnomalies();
+    return readJobsPage(ticket.signal).then(
+      (page) => applyJobsPage(ticket, page),
+      (e) => failJobsPage(ticket, e),
+    );
+  }
+
+  // Reload after an action (approve, unlock, return…) or « Réessayer ».
+  function load() {
+    setErr(""); setInfo("");
+    setLoading(true);
+    return startJobsLoad();
   }
 
   async function loadMore() {
@@ -309,8 +333,17 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     }
   }
 
+  // Another filter: clear the messages and show the list as loading (adjusted while rendering); the
+  // effect below loads it.
+  const filtersKey = `${employeeId}|${statusFilter}|${dayFilter}`;
+  const [filtersFor, setFiltersFor] = useState(filtersKey);
+  if (filtersFor !== filtersKey) {
+    setFiltersFor(filtersKey);
+    setErr(""); setInfo("");
+    setLoading(true);
+  }
   useEffect(() => {
-    load();
+    startJobsLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId, statusFilter, dayFilter]);
 
@@ -459,6 +492,10 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
+  // The profiles already known are skipped; read through a ref so this effect does not run again
+  // each time it adds the missing ones.
+  const profilesRef = useRef(profiles);
+  useEffect(() => { profilesRef.current = profiles; });
   useEffect(() => {
     if (activeSection !== "notifications") return;
     let cancelled = false;
@@ -474,7 +511,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
           : { data: [] };
         const order = new Map(ids.map((id, index) => [id, index]));
         const orderedRows = (rows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
-        const missingProfileIds = [...new Set(orderedRows.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
+        const missingProfileIds = [...new Set(orderedRows.map((job) => job.user_id).filter((id) => !profilesRef.current.has(id)))];
         const { data: people } = missingProfileIds.length
           ? await withRetry(() => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds), 12000)
           : { data: [] };
@@ -503,7 +540,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     }
     loadNotificationMeals();
     return () => { cancelled = true; };
-  }, [activeSection]);
+  }, [activeSection, t]);
 
   async function ensureEvidenceImage(jobId) {
     const evidence = overtimeEvidence.get(jobId);
@@ -709,14 +746,12 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     return Array.from(groups.values()).sort((a, b) => (a.periodEnd < b.periodEnd ? 1 : -1));
   }, [weekOptions]);
 
-  useEffect(() => {
-    if (!selectedEmployee || weekOptions.length === 0) {
-      setSelectedWeekKey("latest");
-      return;
-    }
-    setSelectedWeekKey(weekOptions[0].key);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEmployee?.id]);
+  // Another employee starts on their newest week (adjusted while rendering).
+  const [weekPickFor, setWeekPickFor] = useState(INITIAL_PICK);
+  if (weekPickFor !== (selectedEmployee?.id ?? null)) {
+    setWeekPickFor(selectedEmployee?.id ?? null);
+    setSelectedWeekKey(!selectedEmployee || weekOptions.length === 0 ? "latest" : weekOptions[0].key);
+  }
 
   // The stored key can go stale (employee switched while jobs were still loading, or
   // the week was fully approved). A <select> then *displays* the first option while the
