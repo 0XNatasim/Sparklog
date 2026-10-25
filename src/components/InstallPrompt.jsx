@@ -28,8 +28,9 @@ function wasDismissed() {
 export default function InstallPrompt() {
   const t = useT();
   const [deferred, setDeferred] = useState(null);
-  const [visible, setVisible] = useState(false);
-  const [iosHint, setIosHint] = useState(false);
+  // iOS (Safari) never fires beforeinstallprompt — show the manual hint from the start.
+  const [iosHint] = useState(() => !isStandalone() && !wasDismissed() && /iphone|ipad|ipod/i.test(navigator.userAgent));
+  const [visible, setVisible] = useState(iosHint);
 
   useEffect(() => {
     if (isStandalone() || wasDismissed()) return;
@@ -46,13 +47,6 @@ export default function InstallPrompt() {
     };
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
-
-    // iOS (Safari) never fires beforeinstallprompt — show the manual hint.
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (isIOS) {
-      setIosHint(true);
-      setVisible(true);
-    }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);

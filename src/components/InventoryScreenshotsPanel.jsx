@@ -29,6 +29,31 @@ const CHIP_CLASS = {
   ok: "border-success/40 bg-success/10 text-success",
 };
 
+// Negative-stock notices of the last 7 days, as { rows } or { error }.
+const fetchAlerts = () => fetchInventoryNegativeAlerts().then((rows) => ({ rows }), (error) => ({ error }));
+
+// Employees (with the inventory option) and the day's screenshots and lines read. Throws on error.
+async function fetchInventoryDay(date) {
+  const [peopleResult, shotsResult, itemsResult] = await Promise.all([
+    withTimeout(
+      supabase.from("profiles").select("id, full_name, email, role, is_paused, work_region, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
+      12000
+    ),
+    withTimeout(
+      supabase.from("inventory_screenshots").select("user_id, slot, storage_path, ocr_status, list_total, defective_total, created_at")
+        .eq("job_date", date).order("slot").limit(QUERY_BUDGETS.inventoryRows),
+      12000
+    ),
+    withTimeout(
+      supabase.from("inventory_items").select("user_id, slot, section, code, name, quantity")
+        .eq("job_date", date).limit(QUERY_BUDGETS.inventoryItems),
+      12000
+    ),
+  ]);
+  for (const result of [peopleResult, shotsResult, itemsResult]) if (result.error) throw result.error;
+  return { people: peopleResult.data || [], shots: shotsResult.data || [], items: itemsResult.data || [] };
+}
+
 // Manager view of the end-of-shift inventory. One row per employee for the chosen day; a tap
 // opens that employee's card: the written equipment list first, the photos second.
 export default function InventoryScreenshotsPanel() {
@@ -37,7 +62,10 @@ export default function InventoryScreenshotsPanel() {
   const [people, setPeople] = useState([]);
   const [shots, setShots] = useState([]);
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // The day the lists shown belong to, and when they were read (OCR still « reading » after a while
+  // counts as failed). It is loading until the answer for the chosen day arrives.
+  const [loadedDay, setLoadedDay] = useState({ date: null, at: 0 });
+  const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState("");
   const [openId, setOpenId] = useState(null);
   const [photos, setPhotos] = useState({});
@@ -62,60 +90,59 @@ export default function InventoryScreenshotsPanel() {
   const [alerts, setAlerts] = useState([]);
   const [alertsErr, setAlertsErr] = useState("");
   const [dismissingKey, setDismissingKey] = useState("");
-  // useT() returns a new function on every render: keep it out of effect/callback dependencies,
-  // or the data reloads (and the open card closes) on every render.
-  const tRef = useRef(t);
-  tRef.current = t;
-  // Set when a notice asks to open an employee on another day. The date change would
-  // otherwise close the card before it opens.
-  const pendingOpenRef = useRef(null);
   const alertTicket = useRef(0);
+  // Kept out of effect/callback dependencies: a translate function that changed would reload the
+  // day, close the open card and clear the photos (it is stable per language today).
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; });
+  const loading = loadedDay.date !== date || refreshing;
 
-  const load = useCallback(async ({ quiet = false } = {}) => {
-    if (!quiet) setLoading(true);
+  const applyDay = useCallback((day, { people: nextPeople, shots: nextShots, items: nextItems }) => {
+    setPeople(nextPeople);
+    setShots(nextShots);
+    setItems(nextItems);
     setErr("");
-    try {
-      const [peopleResult, shotsResult, itemsResult] = await Promise.all([
-        withTimeout(
-          supabase.from("profiles").select("id, full_name, email, role, is_paused, work_region, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
-          12000
-        ),
-        withTimeout(
-          supabase.from("inventory_screenshots").select("user_id, slot, storage_path, ocr_status, list_total, defective_total, created_at")
-            .eq("job_date", date).order("slot").limit(QUERY_BUDGETS.inventoryRows),
-          12000
-        ),
-        withTimeout(
-          supabase.from("inventory_items").select("user_id, slot, section, code, name, quantity")
-            .eq("job_date", date).limit(QUERY_BUDGETS.inventoryItems),
-          12000
-        ),
-      ]);
-      for (const result of [peopleResult, shotsResult, itemsResult]) if (result.error) throw result.error;
-      setPeople(peopleResult.data || []);
-      setShots(shotsResult.data || []);
-      setItems(itemsResult.data || []);
-    } catch (error) {
-      setErr(friendlyErrorMessage(error, tRef.current, "mgr.inventory.failedLoad"));
-    } finally {
-      setLoading(false);
-    }
-  }, [date]);
-
-  const loadAlerts = useCallback(async () => {
-    const ticket = ++alertTicket.current;
-    try {
-      const rows = await fetchInventoryNegativeAlerts();
-      if (ticket !== alertTicket.current) return;
-      setAlerts(groupInventoryNegativeAlerts(rows));
-      setAlertsErr("");
-    } catch (error) {
-      if (ticket !== alertTicket.current) return;
-      setAlertsErr(friendlyErrorMessage(error, tRef.current, "mgr.inventory.negativeFailed"));
-    }
+    setLoadedDay({ date: day, at: Date.now() });
+  }, []);
+  const failDay = useCallback((day, error) => {
+    setErr(friendlyErrorMessage(error, tRef.current, "mgr.inventory.failedLoad"));
+    setLoadedDay((current) => ({ date: day, at: current.at }));
   }, []);
 
-  useEffect(() => { loadAlerts(); }, [loadAlerts]);
+  // Reload of the chosen day after an action (or « Réessayer »); `quiet` keeps the spinner off.
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setRefreshing(true);
+    try {
+      applyDay(date, await fetchInventoryDay(date));
+    } catch (error) {
+      failDay(date, error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [applyDay, date, failDay]);
+
+  useEffect(() => {
+    let alive = true;
+    fetchInventoryDay(date).then(
+      (day) => { if (alive) applyDay(date, day); },
+      (error) => { if (alive) failDay(date, error); },
+    );
+    return () => { alive = false; };
+  }, [applyDay, date, failDay]);
+
+  const applyAlerts = useCallback((ticket, result) => {
+    if (ticket !== alertTicket.current) return;
+    if (result.error) setAlertsErr(friendlyErrorMessage(result.error, tRef.current, "mgr.inventory.negativeFailed"));
+    else { setAlerts(groupInventoryNegativeAlerts(result.rows)); setAlertsErr(""); }
+  }, []);
+  const loadAlerts = async () => {
+    const ticket = ++alertTicket.current;
+    applyAlerts(ticket, await fetchAlerts());
+  };
+  useEffect(() => {
+    const ticket = ++alertTicket.current;
+    fetchAlerts().then((result) => applyAlerts(ticket, result));
+  }, [applyAlerts]);
   // Groups are optional here: if they cannot be read, the region choices stay.
   useEffect(() => {
     let cancelled = false;
@@ -123,24 +150,22 @@ export default function InventoryScreenshotsPanel() {
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    if (pendingOpenRef.current) {
-      setOpenId(pendingOpenRef.current);
-      pendingOpenRef.current = null;
-      setPhotos({});
-      setCompare(null);
-      return;
-    }
-    setOpenId(null);
+  // Another day closes the open card (or opens the one a notice asks for); a card always opens
+  // without the previous comparison.
+  function changeDate(next, openPerson = null) {
+    setDate(next);
+    setOpenId(openPerson);
     setPhotos({});
     setCompare(null);
-  }, [date]);
-  useEffect(() => { setCompare(null); }, [openId]);
-  useEffect(() => { load(); }, [load]);
+  }
+  function openCard(id) {
+    setOpenId(id);
+    setCompare(null);
+  }
 
   const entries = useMemo(() => {
     const shotsBy = new Map();
-    const now = Date.now();
+    const now = loadedDay.at;
     for (const raw of shots) {
       const shot = { ...raw, ocr_status: effectiveOcrStatus(raw, now, requestedAt[`${raw.user_id}:${raw.slot}`]) };
       shotsBy.set(shot.user_id, [...(shotsBy.get(shot.user_id) || []), shot]);
@@ -151,7 +176,7 @@ export default function InventoryScreenshotsPanel() {
       .filter((p) => p.inventory_screenshots_enabled || shotsBy.has(p.id))
       .map((p) => ({ person: p, name: p.full_name || p.email || p.id, ...summarizeInventoryDay(shotsBy.get(p.id) || [], itemsBy.get(p.id) || []), shots: shotsBy.get(p.id) || [] }))
       .sort((a, b) => INVENTORY_STATE_ORDER.indexOf(a.state) - INVENTORY_STATE_ORDER.indexOf(b.state) || a.name.localeCompare(b.name, "fr-CA"));
-  }, [people, shots, items, requestedAt]);
+  }, [people, shots, items, requestedAt, loadedDay.at]);
 
   // The OCR runs in the background: keep refreshing quietly while some reading is pending.
   const pending = entries.some((entry) => entry.state === "reading");
@@ -213,7 +238,7 @@ export default function InventoryScreenshotsPanel() {
     try {
       await deleteInventoryScreenshots(supabase, { userId: open.person.id, jobDate: date, slot });
       setPhotos((current) => ({ ...current, [open.person.id]: undefined }));
-      if (!slot || open.shots.length <= 1) setOpenId(null);
+      if (!slot || open.shots.length <= 1) openCard(null);
       await load({ quiet: true });
     } catch (error) {
       setErr(friendlyErrorMessage(error, t, "mgr.inventory.deleteFailed"));
@@ -243,15 +268,11 @@ export default function InventoryScreenshotsPanel() {
   const crewDefective = useMemo(() => sumCrewDefective(entries), [entries]);
 
   const received = entries.filter((entry) => entry.state !== "missing").length;
-  const shiftDay = (days) => setDate((current) => dayjs(current).add(days, "day").format("YYYY-MM-DD"));
+  const shiftDay = (days) => changeDate(dayjs(date).add(days, "day").format("YYYY-MM-DD"));
 
   function openAlert(alert) {
-    if (alert.jobDate === date) {
-      setOpenId(alert.userId);
-      return;
-    }
-    pendingOpenRef.current = alert.userId;
-    setDate(alert.jobDate);
+    if (alert.jobDate === date) openCard(alert.userId);
+    else changeDate(alert.jobDate, alert.userId);
   }
 
   async function dismissAlert(alert) {
@@ -353,9 +374,9 @@ export default function InventoryScreenshotsPanel() {
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
           <Button type="button" variant="outline" size="icon" aria-label={t("mgr.inventory.previousDay")} onClick={() => shiftDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-          <Input type="date" aria-label={t("mgr.inventory.date")} value={date} onChange={(event) => event.target.value && setDate(event.target.value)} className="h-9 w-44" />
+          <Input type="date" aria-label={t("mgr.inventory.date")} value={date} onChange={(event) => event.target.value && changeDate(event.target.value)} className="h-9 w-44" />
           <Button type="button" variant="outline" size="icon" aria-label={t("mgr.inventory.nextDay")} onClick={() => shiftDay(1)}><ChevronRight className="h-4 w-4" /></Button>
-          <Button type="button" variant="ghost" size="sm" disabled={date === companyDate()} onClick={() => setDate(companyDate())}>{t("mgr.inventory.today")}</Button>
+          <Button type="button" variant="ghost" size="sm" disabled={date === companyDate()} onClick={() => changeDate(companyDate())}>{t("mgr.inventory.today")}</Button>
           <div className="ml-auto flex items-center gap-3">
             {entries.length > 0 && <span className="text-sm text-muted-foreground">{t("mgr.inventory.received", { received, total: entries.length })}</span>}
             <Button type="button" variant="outline" size="sm" onClick={() => setWhoOpen(true)}>
@@ -387,7 +408,7 @@ export default function InventoryScreenshotsPanel() {
               <button
                 key={entry.person.id}
                 type="button"
-                onClick={() => setOpenId(entry.person.id)}
+                onClick={() => openCard(entry.person.id)}
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
               >
                 <span className="font-medium">{entry.name}</span>
@@ -404,7 +425,7 @@ export default function InventoryScreenshotsPanel() {
         </Card>
       )}
 
-      <Dialog open={Boolean(open)} onOpenChange={(next) => !next && setOpenId(null)}>
+      <Dialog open={Boolean(open)} onOpenChange={(next) => !next && openCard(null)}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           {open && (
             <>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,6 +22,71 @@ import { DEPARTURE_STATUSES, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employment
 
 // Gestion › Employés: loads the roster and owns every write; the card pieces live in
 // src/components/employees/ and the pure rules (order, CCQ rates, counters) in src/lib/employees-panel.js.
+
+const PROFILE_COLUMNS = "id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, last_work_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path";
+
+// Everything the panel shows: profiles (in list order), current CCQ rates, sign-ups waiting for
+// activation, two-factor / notification / NAS presence (ids only) and the dry-run rate suggestions.
+async function fetchEmployeesData({ privileged, today }) {
+  const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
+    Promise.all([
+      supabase.from("profiles").select(PROFILE_COLUMNS).order("full_name", { ascending: true }),
+      supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false }),
+    ]),
+    12000
+  );
+  if (error) throw error;
+  if (ratesError) throw ratesError;
+  const { rates, annexes } = ratesFromSnapshots(snapshotRows);
+  const pending = await fetchPendingMap();
+  const profiles = sortEmployees(data, pending, today);
+  // Who turned on two-factor authentication (ids only): shield icon next to the name.
+  const { data: mfaRows } = await supabase.rpc("mfa_enrolled_users");
+  // Who has phone notifications on (at least one device): bell icon, « Sans notifications » filter.
+  const { data: pushRows, error: pushError } = await supabase.rpc("push_enabled_users");
+  // NAS lives in the restricted vault; only privileged users can see who has one.
+  // Fetch presence only (not the value) — the value is revealed on demand + audited.
+  const nasRows = privileged ? (await supabase.rpc("nas_presence")).data : null;
+  return {
+    rates,
+    annexes,
+    pending,
+    profiles,
+    mfaSet: new Set((mfaRows || []).map((r) => r.user_id)),
+    pushSet: pushError ? null : new Set((pushRows || []).map((r) => r.user_id)),
+    nasSet: privileged ? new Set((nasRows || []).map((r) => r.user_id)) : null,
+    // P-6: a dry-run comparison only; the manager applies it explicitly (applyRateSuggestions).
+    rateSuggestions: rateSuggestionsFor(profiles, rates, annexes),
+  };
+}
+
+// Sign-ups waiting for activation (manager level): id → { email_confirmed }. A failure only hides
+// the « new sign-up » labels.
+async function fetchPendingMap() {
+  try {
+    const rows = await fetchPendingSignups();
+    return new Map(rows.map((row) => [row.user_id, row]));
+  } catch (pendingError) {
+    console.warn("[employees] pending sign-ups unavailable", pendingError);
+    return new Map();
+  }
+}
+
+// Upcoming / current dated time off (not fully past) plus live weekly recurrences
+// (open-ended, i.e. end_date is null, or an "until" still in the future), by employee.
+async function fetchTimeOff(today) {
+  const { data } = await supabase
+    .from("employee_time_off")
+    .select(TIME_OFF_COLUMNS)
+    .or(`end_date.gte.${today},end_date.is.null`)
+    .order("start_date", { ascending: true });
+  const map = new Map();
+  (data || []).forEach((row) => {
+    if (!map.has(row.user_id)) map.set(row.user_id, []);
+    map.get(row.user_id).push(row);
+  });
+  return map;
+}
 
 export default function EmployeesPanel() {
   const t = useT();
@@ -66,17 +131,10 @@ export default function EmployeesPanel() {
     setCardViews((current) => ({ ...current, [profile.id]: { open: true, loading: false, url: data?.signedUrl || null, error: error?.message || (!data ? "not found" : "") } }));
   }
 
-  // Sign-ups waiting for activation (manager level). A failure only hides the « new sign-up » labels.
   async function loadPending() {
-    try {
-      const rows = await fetchPendingSignups();
-      const next = new Map(rows.map((row) => [row.user_id, row]));
-      setPendingById(next);
-      return next;
-    } catch (pendingError) {
-      console.warn("[employees] pending sign-ups unavailable", pendingError);
-      return new Map();
-    }
+    const next = await fetchPendingMap();
+    setPendingById(next);
+    return next;
   }
 
   // After an activation or a former-employee mark: refresh the labels here and the side-menu badge.
@@ -85,40 +143,22 @@ export default function EmployeesPanel() {
     window.dispatchEvent(new Event(SIGNUPS_EVENT));
   }
 
+  const applyLoaded = useCallback((next) => {
+    setRates(next.rates);
+    setAnnexes(next.annexes);
+    setPendingById(next.pending);
+    setProfiles(next.profiles);
+    setMfaSet(next.mfaSet);
+    setPushSet(next.pushSet);
+    if (next.nasSet) setNasSet(next.nasSet);
+    setRateSuggestions(next.rateSuggestions);
+  }, []);
+
   async function load() {
     setErr("");
     setLoading(true);
     try {
-      const [{ data, error }, { data: snapshotRows, error: ratesError }] = await withTimeout(
-        Promise.all([supabase
-          .from("profiles")
-          .select("id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, last_work_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path")
-          .order("full_name", { ascending: true }),
-        supabase.from("ccq_rate_snapshots").select("sector_id, skill_id, raw_json, fetched_at").eq("occupation_id", "220").order("fetched_at", { ascending: false })]),
-        12000
-      );
-      if (error) throw error;
-      if (ratesError) throw ratesError;
-      const { rates: nextRates, annexes: nextAnnexes } = ratesFromSnapshots(snapshotRows);
-      setRates(nextRates);
-      setAnnexes(nextAnnexes);
-      const pending = await loadPending();
-      const nextProfiles = sortEmployees(data, pending, today);
-      setProfiles(nextProfiles);
-      // NAS lives in the restricted vault; only privileged users can see who has one.
-      // Fetch presence only (not the value) — the value is revealed on demand + audited.
-      // Who turned on two-factor authentication (ids only): shield icon next to the name.
-      const { data: mfaRows } = await supabase.rpc("mfa_enrolled_users");
-      setMfaSet(new Set((mfaRows || []).map((r) => r.user_id)));
-      // Who has phone notifications on (at least one device): bell icon, « Sans notifications » filter.
-      const { data: pushRows, error: pushError } = await supabase.rpc("push_enabled_users");
-      setPushSet(pushError ? null : new Set((pushRows || []).map((r) => r.user_id)));
-      if (privileged) {
-        const { data: nasRows } = await supabase.rpc("nas_presence");
-        setNasSet(new Set((nasRows || []).map((r) => r.user_id)));
-      }
-      // P-6: a dry-run comparison only; the manager applies it explicitly (applyRateSuggestions).
-      setRateSuggestions(rateSuggestionsFor(nextProfiles, nextRates, nextAnnexes));
+      applyLoaded(await fetchEmployeesData({ privileged, today }));
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
     } finally {
@@ -127,22 +167,18 @@ export default function EmployeesPanel() {
   }
 
   async function loadTimeOff() {
-    // Upcoming / current dated time off (not fully past) plus live weekly recurrences
-    // (open-ended, i.e. end_date is null, or an "until" still in the future).
-    const { data } = await supabase
-      .from("employee_time_off")
-      .select(TIME_OFF_COLUMNS)
-      .or(`end_date.gte.${today},end_date.is.null`)
-      .order("start_date", { ascending: true });
-    const map = new Map();
-    (data || []).forEach((row) => {
-      if (!map.has(row.user_id)) map.set(row.user_id, []);
-      map.get(row.user_id).push(row);
-    });
-    setTimeOff(map);
+    setTimeOff(await fetchTimeOff(today));
   }
 
-  useEffect(() => { load(); loadTimeOff(); }, []);
+  useEffect(() => {
+    let alive = true;
+    fetchEmployeesData({ privileged, today }).then(
+      (next) => { if (alive) applyLoaded(next); },
+      (e) => { if (alive) setErr(e?.message ?? "Failed to load employees."); },
+    ).finally(() => { if (alive) setLoading(false); });
+    fetchTimeOff(today).then((map) => { if (alive) setTimeOff(map); });
+    return () => { alive = false; };
+  }, [applyLoaded, privileged, today]);
 
   function setLocal(id, field, value) {
     setProfiles((prev) =>

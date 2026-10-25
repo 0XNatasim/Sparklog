@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Printer, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -21,18 +21,26 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
   });
   const setH = (k) => (e) => setHdr((s) => ({ ...s, [k]: e.target.value }));
 
-  useEffect(() => {
-    if (!open || !week) return;
-    setHdr((s) => ({
-      ...s,
-      employer: s.employer || EMPLOYER,
-      periodStart: week.start ? week.start.format("YYYY-MM-DD") : s.periodStart,
-      periodEnd: week.end ? week.end.format("YYYY-MM-DD") : s.periodEnd,
-      payDate: week.end ? payDateFor(week.end) : s.payDate,
-      week: week.weekNo ? String(week.weekNo) : s.week,
-      ref: reference || s.ref,
-    }));
-  }, [open, week, reference]);
+  // Each opening (or another week / reference) refills the header from the week; the employer
+  // typed by hand is kept. Adjusted while rendering, as React recommends for state that follows a prop.
+  const headerKey = open && week
+    ? [week.start?.format("YYYY-MM-DD"), week.end?.format("YYYY-MM-DD"), week.weekNo, reference].join("|")
+    : null;
+  const [filledFor, setFilledFor] = useState(null);
+  if (headerKey !== filledFor) {
+    setFilledFor(headerKey);
+    if (headerKey) {
+      setHdr((s) => ({
+        ...s,
+        employer: s.employer || EMPLOYER,
+        periodStart: week.start ? week.start.format("YYYY-MM-DD") : s.periodStart,
+        periodEnd: week.end ? week.end.format("YYYY-MM-DD") : s.periodEnd,
+        payDate: week.end ? payDateFor(week.end) : s.payDate,
+        week: week.weekNo ? String(week.weekNo) : s.week,
+        ref: reference || s.ref,
+      }));
+    }
+  }
 
   const model = buildStubModel({ result, ytd, pay, reimb, ccq: ccqPeriod });
   if (!model) return null;
@@ -68,7 +76,6 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
     );
   };
 
-  let lastGroup = null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,7 +195,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
                 <thead><tr className="border-b border-neutral-900 text-left text-[9px] uppercase text-slate-500"><th className="py-0.5">Description</th><th className="text-right">Période</th><th className="text-right">Cumulatif</th></tr></thead>
                 <tbody>
                   {sommaire.map((r, i) => {
-                    const head = r.group !== lastGroup ? (lastGroup = r.group, true) : false;
+                    const head = i === 0 || sommaire[i - 1].group !== r.group;
                     return (
                       <React.Fragment key={`s${i}`}>
                         {head && (

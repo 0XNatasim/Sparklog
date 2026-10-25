@@ -17,6 +17,21 @@ function formatChangeValue(field, value) {
   return String(value);
 }
 
+// The 50 latest manager notifications, with the employee's name and whether this manager read it.
+async function fetchManagerNotifications(managerId) {
+  const [{ data: rows }, { data: reads }] = await Promise.all([
+    supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, parking_receipt_id, daily_minutes, changes, created_at").order("created_at", { ascending: false }).limit(50),
+    supabase.from("manager_notification_reads").select("notification_id").eq("manager_id", managerId),
+  ]);
+  const employeeIds = [...new Set((rows || []).map((row) => row.employee_id))];
+  const { data: profiles } = employeeIds.length
+    ? await supabase.from("profiles").select("id, full_name, email").in("id", employeeIds)
+    : { data: [] };
+  const names = new Map((profiles || []).map((profile) => [profile.id, profile.full_name || profile.email]));
+  const readIds = new Set((reads || []).map((read) => read.notification_id));
+  return (rows || []).map((row) => ({ ...row, employeeName: names.get(row.employee_id) || "Employee", read: readIds.has(row.id) }));
+}
+
 export default function NotificationsBell() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
@@ -24,31 +39,22 @@ export default function NotificationsBell() {
   const [notifications, setNotifications] = useState([]);
   const channelRef = useRef(null);
 
-  const load = useCallback(async () => {
-    if (!isManagerRole(role) || !user?.id) return;
-    const [{ data: rows }, { data: reads }] = await Promise.all([
-      supabase.from("manager_notifications").select("id, type, employee_id, job_id, meal_claim_id, parking_receipt_id, daily_minutes, changes, created_at").order("created_at", { ascending: false }).limit(50),
-      supabase.from("manager_notification_reads").select("notification_id").eq("manager_id", user.id),
-    ]);
-    const employeeIds = [...new Set((rows || []).map((row) => row.employee_id))];
-    const { data: profiles } = employeeIds.length
-      ? await supabase.from("profiles").select("id, full_name, email").in("id", employeeIds)
-      : { data: [] };
-    const names = new Map((profiles || []).map((profile) => [profile.id, profile.full_name || profile.email]));
-    const readIds = new Set((reads || []).map((read) => read.notification_id));
-    setNotifications((rows || []).map((row) => ({ ...row, employeeName: names.get(row.employee_id) || "Employee", read: readIds.has(row.id) })));
-  }, [role, user?.id]);
+  const userId = user?.id;
+  const load = useCallback(() => {
+    if (!isManagerRole(role) || !userId) return undefined;
+    return fetchManagerNotifications(userId).then(setNotifications);
+  }, [role, userId]);
 
   const subscribeToNotifications = useCallback(() => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    if (!isManagerRole(role) || !user?.id) return;
+    if (!isManagerRole(role) || !userId) return;
     channelRef.current = supabase.channel("manager-overtime-notifications")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "manager_notifications" }, load)
       .subscribe();
-  }, [load, role, user?.id]);
+  }, [load, role, userId]);
 
   useEffect(() => {
     load();

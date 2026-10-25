@@ -134,10 +134,54 @@ function fmt(value) {
   return `$${Number(value).toFixed(2)}/h`;
 }
 
+// The five levels of the electrician trade (sector C) for `today`, one level after the other.
+async function fetchCcqRates(today) {
+  const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+  if (sessErr) throw sessErr;
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error("No session — please log in again.");
+
+  // Fetch levels sequentially. Sending five simultaneous Edge Function
+  // requests also sends five simultaneous requests to CCQ, which can make
+  // an otherwise valid level fail intermittently (commonly Apprenti 4).
+  const responses = [];
+  for (const skill of SKILLS) {
+      const { data, error } = await withTimeout(
+        supabase.functions.invoke("ccq_rates", {
+          body: {
+            occupationId: OCCUPATION.id,
+            sectorId: COMMERCIAL_SECTOR.id,
+            skillId:  skill.id,
+            ratesToDate: today,
+            annexId:  "ALL",
+          },
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        25000
+      );
+      if (error) throw new Error(`${skill.label}: ${await getFunctionErrorMessage(error)}`);
+      if (!data?.ok) throw new Error(`${skill.label}: ${data?.error ?? "Unknown error"}`);
+      responses.push({ skill, snapshot: data.snapshot });
+  }
+
+  const rows = responses.map(({ skill, snapshot }) => ({
+    skill,
+    raw:   snapshot?.raw_json ?? null,
+    rates: parseRates(snapshot?.raw_json),
+  }));
+
+  return {
+    sector:    COMMERCIAL_SECTOR.name,
+    date:      today,
+    fetchedAt: new Date().toLocaleTimeString(),
+    rows,
+  };
+}
+
 // ─── CCQ rates panel ──────────────────────────────────────────────────────────
 export default function CcqRatesPanel() {
   const t = useT();
-  const [loading, setLoading]   = useState(false);
+  const [loading, setLoading]   = useState(true); // the rates load on mount
   const [err, setErr]           = useState("");
   const [results, setResults]   = useState(null);
 
@@ -146,48 +190,8 @@ export default function CcqRatesPanel() {
   async function handleSync() {
     setErr("");
     setLoading(true);
-
     try {
-      const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
-      if (sessErr) throw sessErr;
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error("No session — please log in again.");
-
-      // Fetch levels sequentially. Sending five simultaneous Edge Function
-      // requests also sends five simultaneous requests to CCQ, which can make
-      // an otherwise valid level fail intermittently (commonly Apprenti 4).
-      const responses = [];
-      for (const skill of SKILLS) {
-          const { data, error } = await withTimeout(
-            supabase.functions.invoke("ccq_rates", {
-              body: {
-                occupationId: OCCUPATION.id,
-                sectorId: COMMERCIAL_SECTOR.id,
-                skillId:  skill.id,
-                ratesToDate: today,
-                annexId:  "ALL",
-              },
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            25000
-          );
-          if (error) throw new Error(`${skill.label}: ${await getFunctionErrorMessage(error)}`);
-          if (!data?.ok) throw new Error(`${skill.label}: ${data?.error ?? "Unknown error"}`);
-          responses.push({ skill, snapshot: data.snapshot });
-      }
-
-      const rows = responses.map(({ skill, snapshot }) => ({
-        skill,
-        raw:   snapshot?.raw_json ?? null,
-        rates: parseRates(snapshot?.raw_json),
-      }));
-
-      setResults({
-        sector:    COMMERCIAL_SECTOR.name,
-        date:      today,
-        fetchedAt: new Date().toLocaleTimeString(),
-        rows,
-      });
+      setResults(await fetchCcqRates(today));
     } catch (e) {
       setErr(e?.message ?? "Sync failed.");
     } finally {
@@ -196,7 +200,14 @@ export default function CcqRatesPanel() {
   }
 
   // Auto-load the only supported sector on mount.
-  useEffect(() => { handleSync(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let alive = true;
+    fetchCcqRates(today).then(
+      (next) => { if (alive) setResults(next); },
+      (e) => { if (alive) setErr(e?.message ?? "Sync failed."); },
+    ).finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [today]);
 
   return (
     <div className="space-y-4">

@@ -96,10 +96,12 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, 
     ...(activeGroup ? [activeGroup] : []),
   ]));
 
-  // Moving to another group (menu, link, deep link) opens it.
-  useEffect(() => {
+  // Moving to another group (menu, link, deep link) opens it (adjusted while rendering).
+  const [openedFor, setOpenedFor] = useState(activeGroup);
+  if (activeGroup !== openedFor) {
+    setOpenedFor(activeGroup);
     if (activeGroup) setOpen((current) => (current.has(activeGroup) ? current : new Set(current).add(activeGroup)));
-  }, [activeGroup]);
+  }
 
   function toggle(id) {
     setOpen((current) => {
@@ -273,7 +275,7 @@ export default function ManagerLayout() {
   const [pendingSignups, setPendingSignups] = useState(0);
   const [dueNotes, setDueNotes] = useState(0);
   const badges = useMemo(() => ({
-    inventory: inventoryNegatives,
+    inventory: isManagerRole(role) ? inventoryNegatives : 0,
     employees: isManagerRole(role) ? pendingSignups : 0,
     "v3-team": isManagerRole(role) ? pendingSignups : 0,
     notes: isManagerRole(role) ? dueNotes : 0,
@@ -283,7 +285,12 @@ export default function ManagerLayout() {
   const current = findNavItem(activePath, version);
   const highlightPath = version === "v3" ? v3MenuPath(activePath) : undefined;
 
-  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
+  // Another page closes the phone drawer (adjusted while rendering).
+  const [drawerPath, setDrawerPath] = useState(location.pathname);
+  if (drawerPath !== location.pathname) {
+    setDrawerPath(location.pathname);
+    setDrawerOpen(false);
+  }
 
   useEffect(() => {
     if (!drawerOpen) return undefined;
@@ -295,10 +302,7 @@ export default function ManagerLayout() {
   // Open negative-stock notices: one per employee and inventory day. A dismiss on the
   // Inventory page fires INVENTORY_ALERTS_EVENT so the badge drops without a reload.
   useEffect(() => {
-    if (!isManagerRole(role)) {
-      setInventoryNegatives(0);
-      return undefined;
-    }
+    if (!isManagerRole(role)) return undefined;
     let cancelled = false;
     let generation = 0;
     async function loadAlerts() {

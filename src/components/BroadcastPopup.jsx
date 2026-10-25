@@ -14,11 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 export default function BroadcastPopup() {
   const { user } = useAuth();
   const t = useT();
-  const [queue, setQueue] = useState([]);
+  // Messages waiting for this account; another (or no) account sees none of them.
+  const [loaded, setLoaded] = useState({ userId: null, rows: [] });
+  const queue = loaded.userId === user?.id ? loaded.rows : [];
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) { setQueue([]); return undefined; }
+    if (!user?.id) return undefined;
     let cancelled = false;
     const load = async () => {
       const { data } = await supabase
@@ -30,7 +32,7 @@ export default function BroadcastPopup() {
       const rows = (data || [])
         .filter((r) => r.manager_broadcasts)
         .sort((a, b) => new Date(a.manager_broadcasts.created_at) - new Date(b.manager_broadcasts.created_at));
-      setQueue(rows);
+      setLoaded({ userId: user.id, rows });
     };
     load();
     // The notification bell acknowledges items too; reload so they leave this queue.
@@ -53,7 +55,7 @@ export default function BroadcastPopup() {
       .eq("broadcast_id", current.broadcast_id)
       .eq("employee_id", user.id);
     setBusy(false);
-    if (!error) setQueue((q) => q.slice(1));
+    if (!error) setLoaded((current) => ({ ...current, rows: current.rows.slice(1) }));
   }
 
   if (!current) return null;

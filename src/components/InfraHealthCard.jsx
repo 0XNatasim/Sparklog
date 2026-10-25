@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import dayjs from "dayjs";
 import { Activity, ChevronDown, RefreshCw } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -56,8 +56,13 @@ export default function InfraHealthCard() {
     }
   }, []);
 
-  // Fetch only once the card is opened (and not already loaded).
-  useEffect(() => { if (open && !stats && !loading) load(); }, [open, stats, loading, load]);
+  // Fetch when the card is opened and not already loaded (a failure waits for « Actualiser »
+  // instead of retrying in a loop).
+  function toggleOpen() {
+    const next = !open;
+    setOpen(next);
+    if (next && !stats && !loading) load();
+  }
 
   const pctTone = (p) => (p == null ? "ok" : p < 60 ? "good" : p < 85 ? "warn" : "bad");
   const fmtRate = (bps) => {
@@ -98,7 +103,7 @@ export default function InfraHealthCard() {
     <Card>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         aria-expanded={open}
         className="flex w-full items-center gap-3 p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
