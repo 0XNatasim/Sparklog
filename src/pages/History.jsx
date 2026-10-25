@@ -104,17 +104,26 @@ export default function History() {
     return (data || []).map((claim) => claim.job_id);
   }
 
+  // First page of jobs (newest first) and which of them carry a supper claim.
+  async function readFirstPage() {
+    const jobsResult = await withTimeout(historyQuery(), 12000);
+    if (jobsResult.error) throw jobsResult.error;
+    const page = jobsResult.data || [];
+    return { page, mealIds: await mealIdsFor(page) };
+  }
+
+  function applyFirstPage({ page, mealIds }) {
+    setJobs(page);
+    setMealJobIds(new Set(mealIds));
+    setHasMore(page.length === QUERY_BUDGETS.employeeHistoryPage);
+  }
+
   async function load() {
     setErr("");
     setInfo("");
     setLoading(true);
     try {
-      const jobsResult = await withTimeout(historyQuery(), 12000);
-      if (jobsResult.error) throw jobsResult.error;
-      const page = jobsResult.data || [];
-      setJobs(page);
-      setMealJobIds(new Set(await mealIdsFor(page)));
-      setHasMore(page.length === QUERY_BUDGETS.employeeHistoryPage);
+      applyFirstPage(await readFirstPage());
     } catch (e) {
       showError(e, "history.errors.failedLoad");
     } finally {
@@ -142,9 +151,23 @@ export default function History() {
     }
   }
 
+  // Another employee (view mode): clear the messages and show the list as loading (adjusted while
+  // rendering); the effect below reads its first page.
+  const [historyUser, setHistoryUser] = useState(effectiveUserId);
+  if (historyUser !== effectiveUserId) {
+    setHistoryUser(effectiveUserId);
+    setErr("");
+    setInfo("");
+    setLoading(true);
+  }
   useEffect(() => {
-    if (!effectiveUserId) return;
-    load();
+    if (!effectiveUserId) return undefined;
+    let alive = true;
+    readFirstPage().then(
+      (first) => { if (alive) applyFirstPage(first); },
+      (e) => { if (alive) showError(e, "history.errors.failedLoad"); },
+    ).finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveUserId]);
 

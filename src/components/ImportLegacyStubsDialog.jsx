@@ -28,6 +28,16 @@ function TalonPreview({ talon }) {
   return <iframe ref={ref} title="talon-preview" className="h-[520px] w-full rounded-md border bg-white" />;
 }
 
+// Weeks of the pay register of one employee, newest first.
+async function fetchLedgerWeeks(userId) {
+  const { data } = await supabase
+    .from("payroll_period_ledger")
+    .select("period_start, period_end, insurable_income_ei, hours_ytd, talon_seq, imported_talon")
+    .eq("user_id", userId)
+    .order("period_end", { ascending: false });
+  return data || [];
+}
+
 // Import an OLD pay stub (PDF) → parse the FULL talon (header + Transactions + Sommaire
 // Période/Cumulatif) in the original layout → validate → insert the week into the pay ledger.
 // The ledger row stores the "Cumulatif" figures (for the chain / Record of Employment) AND the
@@ -44,20 +54,27 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
-  const [existing, setExisting] = useState([]);
+  // Weeks already in the register for the chosen employee (empty until they load).
+  const [loadedExisting, setLoadedExisting] = useState({ userId: "", rows: [] });
+  const existing = selectedId && loadedExisting.userId === selectedId ? loadedExisting.rows : [];
 
-  useEffect(() => { if (!open) { setSelectedId(""); resetParse(); } }, [open]);
-  useEffect(() => { if (selectedId) loadExisting(); else setExisting([]); }, [selectedId]);
+  useEffect(() => {
+    if (!selectedId) return undefined;
+    let alive = true;
+    fetchLedgerWeeks(selectedId).then((rows) => { if (alive) setLoadedExisting({ userId: selectedId, rows }); });
+    return () => { alive = false; };
+  }, [selectedId]);
 
   function resetParse() { setTalon(null); setSnapshot(null); setPeriodEnd(""); setFileName(""); setMsg(""); setErr(""); }
 
+  // Closing the dialog starts the next import from scratch.
+  function handleOpenChange(next) {
+    if (!next) { setSelectedId(""); resetParse(); }
+    onOpenChange(next);
+  }
+
   async function loadExisting() {
-    const { data } = await supabase
-      .from("payroll_period_ledger")
-      .select("period_start, period_end, insurable_income_ei, hours_ytd, talon_seq, imported_talon")
-      .eq("user_id", selectedId)
-      .order("period_end", { ascending: false });
-    setExisting(data || []);
+    setLoadedExisting({ userId: selectedId, rows: await fetchLedgerWeeks(selectedId) });
   }
 
   async function handleFile(e) {
@@ -127,7 +144,7 @@ export default function ImportLegacyStubsDialog({ open, onOpenChange, employees,
   const printTitle = () => `${t("payroll.legacy.title")} — ${emp?.full_name || ""} — ${periodEnd}`;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("payroll.legacy.title")}</DialogTitle>

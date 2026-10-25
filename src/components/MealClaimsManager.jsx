@@ -14,6 +14,19 @@ import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { withRetry } from "@/lib/utils";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 
+// Every supper claim (newest first) with its employees and jobs.
+async function fetchMealClaims() {
+  const { data } = await supabase.from("meal_claims").select("*").order("created_at", { ascending: false });
+  const rows = data || [];
+  const ids = [...new Set(rows.map((claim) => claim.user_id))];
+  const jobIds = [...new Set(rows.map((claim) => claim.job_id))];
+  const [{ data: people }, { data: jobRows }] = await Promise.all([
+    ids.length ? supabase.from("profiles").select("id,full_name,email").in("id", ids) : Promise.resolve({ data: [] }),
+    jobIds.length ? supabase.from("jobs").select("id,job_date,ot,depart,arrivee,fin,km_total,km_aller,km_retour,status").in("id", jobIds) : Promise.resolve({ data: [] }),
+  ]);
+  return { rows, people, jobRows };
+}
+
 export default function MealClaimsManager() {
   const t = useT();
   const [searchParams] = useSearchParams();
@@ -26,20 +39,19 @@ export default function MealClaimsManager() {
   const [error, setError] = useState("");
   const [confirm, confirmDialog] = useConfirmDialog();
 
-  async function load() {
-    const { data } = await supabase.from("meal_claims").select("*").order("created_at", { ascending: false });
-    const rows = data || [];
-    const ids = [...new Set(rows.map((claim) => claim.user_id))];
-    const jobIds = [...new Set(rows.map((claim) => claim.job_id))];
-    const [{ data: people }, { data: jobRows }] = await Promise.all([
-      ids.length ? supabase.from("profiles").select("id,full_name,email").in("id", ids) : Promise.resolve({ data: [] }),
-      jobIds.length ? supabase.from("jobs").select("id,job_date,ot,depart,arrivee,fin,km_total,km_aller,km_retour,status").in("id", jobIds) : Promise.resolve({ data: [] }),
-    ]);
+  function applyLoaded({ rows, people, jobRows }) {
     setProfiles(new Map((people || []).map((person) => [person.id, person])));
     setJobs(new Map((jobRows || []).map((job) => [job.id, job])));
     setClaims(rows);
   }
-  useEffect(() => { load(); }, []);
+  async function load() {
+    applyLoaded(await fetchMealClaims());
+  }
+  useEffect(() => {
+    let alive = true;
+    fetchMealClaims().then((loaded) => { if (alive) applyLoaded(loaded); });
+    return () => { alive = false; };
+  }, []);
   useEffect(() => {
     if (!focusedJobId || !jobs.has(focusedJobId)) return;
     requestAnimationFrame(() => document.getElementById(`meal-job-${focusedJobId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));

@@ -32,13 +32,14 @@ describe("date d'embauche et dernier jour travaillé (0115)", () => {
   });
 
   it("birth date and SIN are in the card itself, no longer in « Données CCQ »", () => {
-    const src = read("src/components/EmployeesPanel.jsx");
-    const ccqStart = src.indexOf('t("employees.ccqExport")');
-    const ccqEnd = src.indexOf("</details>", ccqStart);
-    const ccqSection = src.slice(ccqStart, ccqEnd);
+    // The card is split in src/components/employees/ (V2.4.178): « Données CCQ » is its own file.
+    const ccqSection = read("src/components/employees/EmployeeCcqSection.jsx");
+    const src = read("src/components/employees/EmployeeContactSection.jsx");
+    expect(ccqSection).toContain('t("employees.ccqExport")');
     expect(ccqSection).not.toContain("birth_date");
     expect(ccqSection).not.toContain("NasField");
     expect(src.match(/<NasField /g)).toHaveLength(1);
+    expect(src).toContain('"birth_date"');
     expect(src).toContain('saveEmploymentDate(p, "start_date"');
     expect(src).toContain('saveEmploymentDate(p, "last_work_date"');
   });

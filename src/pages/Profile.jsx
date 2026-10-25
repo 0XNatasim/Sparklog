@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { BookOpen, Building2, ChevronDown, ClipboardList, ExternalLink, Mail, MapPin, Phone, ShieldCheck, UserRound, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +20,25 @@ import { isOwnerRole } from "@/lib/roles";
 import { requiresMfa } from "@/lib/mfa";
 import { Radio } from "lucide-react";
 
+// The profile shown (the employee viewed), the forms the signed-in account may open and the published
+// references. { error } when one of them cannot be read.
+async function fetchProfilePage(profileId, signedInId) {
+  const [profileResult, formsResult, accessResult, referencesResult] = await Promise.all([
+    supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, show_on_boards").eq("id", profileId).single(),
+    supabase.from("employee_forms").select("form_id, name_fr, name_en, url, employee_specific, sort_order").eq("enabled", true).order("sort_order").limit(QUERY_BUDGETS.managedForms),
+    supabase.from("employee_form_access").select("form_id").eq("employee_id", signedInId),
+    supabase.from("profile_references").select("id, section, title, description, blocks").eq("published", true).order("sort_order").order("created_at").limit(QUERY_BUDGETS.profileReferences),
+  ]);
+  const error = profileResult.error || formsResult.error || accessResult.error || referencesResult.error;
+  if (error) return { error };
+  const accessibleIds = new Set((accessResult.data || []).map((row) => row.form_id));
+  return {
+    profile: profileResult.data,
+    forms: (formsResult.data || []).filter((form) => form.url && (!form.employee_specific || accessibleIds.has(form.form_id))),
+    references: referencesResult.data || [],
+  };
+}
+
 export default function Profile() {
   const t = useT();
   const { user, role } = useAuth();
@@ -32,30 +51,32 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    if (!effectiveUserId) return;
-    const [profileResult, formsResult, accessResult, referencesResult] = await Promise.all([
-      supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, show_on_boards").eq("id", effectiveUserId).single(),
-      supabase.from("employee_forms").select("form_id, name_fr, name_en, url, employee_specific, sort_order").eq("enabled", true).order("sort_order").limit(QUERY_BUDGETS.managedForms),
-      supabase.from("employee_form_access").select("form_id").eq("employee_id", user.id),
-      supabase.from("profile_references").select("id, section, title, description, blocks").eq("published", true).order("sort_order").order("created_at").limit(QUERY_BUDGETS.profileReferences),
-    ]);
-    const loadError = profileResult.error || formsResult.error || accessResult.error || referencesResult.error;
-    if (loadError) setError(loadError.message);
-    else {
-      setProfile(profileResult.data);
-      const accessibleIds = new Set((accessResult.data || []).map((row) => row.form_id));
-      setForms((formsResult.data || []).filter((form) => form.url && (!form.employee_specific || accessibleIds.has(form.form_id))));
-      setReferences(referencesResult.data || []);
-    }
-    setLoading(false);
-  }, [effectiveUserId, user?.id]);
+  const signedInId = user?.id;
 
   const formName = (form) => (language === "en" ? form.name_en || form.name_fr : form.name_fr || form.name_en) || "—";
   const quickReferences = references.filter((reference) => reference.section === "quick");
   const contactReferences = references.filter((reference) => reference.section === "contacts");
 
-  useEffect(() => { load(); }, [load]);
+  function applyPage(page) {
+    if (page.error) setError(page.error.message);
+    else {
+      setProfile(page.profile);
+      setForms(page.forms);
+      setReferences(page.references);
+    }
+    setLoading(false);
+  }
+  // After the CCQ card is saved.
+  async function load() {
+    if (effectiveUserId) applyPage(await fetchProfilePage(effectiveUserId, signedInId));
+  }
+
+  useEffect(() => {
+    if (!effectiveUserId) return undefined;
+    let alive = true;
+    fetchProfilePage(effectiveUserId, signedInId).then((page) => { if (alive) applyPage(page); });
+    return () => { alive = false; };
+  }, [effectiveUserId, signedInId]);
 
   async function toggleShowOnBoards(next) {
     setProfile((current) => ({ ...current, show_on_boards: next }));

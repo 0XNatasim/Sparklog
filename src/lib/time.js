@@ -40,3 +40,9 @@ export function formatHM(hours) {
   const minutes = Math.max(0, Math.round((hours || 0) * 60));
   return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}`;
 }
+
+// "07:30" from a stored time ("07:30:00"), or "—" when there is none (manager cards).
+export function clockOrDash(time) {
+  if (!time) return "—";
+  return String(time).slice(0, 5);
+}

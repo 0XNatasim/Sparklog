@@ -1,0 +1,369 @@
+// The signed-in account (user, role, pause, Gestion sections, two-factor step) for the whole app;
+// read it with useAuth() (src/contexts/AuthContext.jsx).
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "../supabaseClient";
+import { withTimeout } from "@/lib/utils";
+import { logActivity } from "@/lib/activity-log";
+import { mfaStep } from "@/lib/mfa";
+import { AuthContext, SESSION_RESUMED_EVENT } from "./AuthContext";
+
+async function fetchRoleForUser(userId) {
+  let data, error;
+  try {
+    // Bound the profile read: it runs inside the auth-state callback and on resume,
+    // so an un-timed query here can hang those paths. On timeout, fall through to
+    // the safe default below rather than freezing.
+    ({ data, error } = await withTimeout(
+      supabase.from("profiles").select("role, full_name, is_paused, admin_sections").eq("id", userId).maybeSingle(),
+      8000
+    ));
+  } catch (e) {
+    error = e;
+  }
+
+  if (error) {
+    console.warn("[Auth] fetchRole error:", error);
+    return { role: "Employee", full_name: null, is_paused: false, admin_sections: [] };
+  }
+  if (!data) return { role: "Employee", full_name: null, is_paused: false, admin_sections: [] };
+
+  return { role: data.role || "Employee", full_name: data.full_name || null, is_paused: Boolean(data.is_paused), admin_sections: Array.isArray(data.admin_sections) ? data.admin_sections : [] };
+}
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
+  const [fullName, setFullName] = useState(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [adminSections, setAdminSections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
+  // Two-factor state of the current session (migration 0103): assurance level of the JWT and
+  // number of verified devices, read from the local session (no network).
+  const [mfa, setMfa] = useState({ ready: false, currentLevel: null, verifiedCount: 0, error: "" });
+
+  const subscriptionRef = useRef(null);
+  const profileChannelRef = useRef(null);
+  const isBootstrappedRef = useRef(false);
+  const resumeInFlightRef = useRef(false);
+  const resumeDebounceRef = useRef(null);
+  // Set the instant the user asks to sign out, so the focus/visibility "resume"
+  // recovery below can't silently re-hydrate the session and log them back in.
+  const signedOutRef = useRef(false);
+
+  const subscribeToProfile = useCallback((userId) => {
+    if (profileChannelRef.current) {
+      supabase.removeChannel(profileChannelRef.current);
+      profileChannelRef.current = null;
+    }
+    if (!userId) return;
+    profileChannelRef.current = supabase
+      .channel(`profile-access-${userId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, (payload) => {
+        setRole(payload.new?.role || "Employee");
+        setFullName(payload.new?.full_name || null);
+        setIsPaused(Boolean(payload.new?.is_paused));
+        setAdminSections(Array.isArray(payload.new?.admin_sections) ? payload.new.admin_sections : []);
+      })
+      .subscribe();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 10000);
+
+    function subscribeToProfile(userId) {
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
+      }
+      if (!userId) return;
+      profileChannelRef.current = supabase
+        .channel(`profile-access-${userId}`)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, (payload) => {
+          setRole(payload.new?.role || "Employee");
+          setFullName(payload.new?.full_name || null);
+          setIsPaused(Boolean(payload.new?.is_paused));
+        })
+        .subscribe();
+    }
+
+    async function bootstrap() {
+      if (isBootstrappedRef.current) return;
+      isBootstrappedRef.current = true;
+
+      setLoading(true);
+
+      // getSession is usually instant (local storage), but the email-confirmation
+      // redirect can make the first call race with token processing. Retry a few times
+      // before giving up so a transient hiccup doesn't dead-end a brand-new employee.
+      let data = null;
+      let error = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const result = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("Supabase session request timed out.")), 7000)
+            ),
+          ]);
+          data = result?.data ?? null;
+          error = result?.error ?? null;
+          if (!error) break;
+        } catch (e) {
+          error = e;
+        }
+        if (cancelled) return;
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
+      }
+
+      if (error) {
+        const msg = error instanceof Error ? error.message : "Failed to reach Supabase auth.";
+        console.warn("[Auth] getSession error:", msg);
+        setAuthError(msg);
+      } else {
+        setAuthError("");
+      }
+
+      const sessionUser = data?.session?.user ?? null;
+
+      if (!cancelled) {
+        setUser(sessionUser);
+        setLoading(false);
+        if (sessionUser) {
+          signedOutRef.current = false;
+          const r = await fetchRoleForUser(sessionUser.id);
+          if (!cancelled) {
+            setRole(r.role);
+            setFullName(r.full_name);
+            setIsPaused(r.is_paused);
+            setAdminSections(r.admin_sections);
+          }
+        } else {
+          setRole(null);
+          setFullName(null);
+          setIsPaused(false);
+          setAdminSections([]);
+        }
+      }
+
+      if (cancelled) return;
+
+      // StrictMode-safe: clean up any prior subscription before creating a new one
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe?.();
+        subscriptionRef.current = null;
+      }
+
+      // NOTE: this callback runs while GoTrue holds its auth lock. It must stay
+      // synchronous and must NOT await another supabase call, or it extends how long
+      // the lock is held (Supabase's documented guidance). We defer the profile read
+      // with setTimeout(0) so the lock is released immediately.
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        const nextUser = session?.user ?? null;
+        setUser(nextUser);
+        setLoading(false);
+        setAuthError("");
+
+        if (nextUser) {
+          signedOutRef.current = false;
+          subscribeToProfile(nextUser.id);
+          setTimeout(async () => {
+            const r = await fetchRoleForUser(nextUser.id);
+            setRole(r.role);
+            setFullName(r.full_name);
+            setIsPaused(r.is_paused);
+            setAdminSections(r.admin_sections);
+          }, 0);
+        } else {
+          setRole(null);
+          setFullName(null);
+          setIsPaused(false);
+          setAdminSections([]);
+          subscribeToProfile(null);
+        }
+      });
+
+      subscriptionRef.current = sub?.subscription ?? null;
+
+      subscribeToProfile(sessionUser?.id);
+    }
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+      isBootstrappedRef.current = false;
+      clearTimeout(fallbackTimer);
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe?.();
+        subscriptionRef.current = null;
+      }
+      if (profileChannelRef.current) {
+        supabase.removeChannel(profileChannelRef.current);
+        profileChannelRef.current = null;
+      }
+    };
+  }, [subscribeToProfile]);
+
+  // Record "app opened" presences for the activity log (Gestion → Audit → Employés):
+  // once per page load, and again when the app comes back to the foreground. The
+  // server keeps at most one per 30 minutes; the first one waits a few seconds so a
+  // fresh password sign-in (logged by the Login page) wins the de-duplication.
+  const lastOpenLogRef = useRef(0);
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return undefined;
+    const record = () => {
+      if (Date.now() - lastOpenLogRef.current < 5 * 60 * 1000) return;
+      lastOpenLogRef.current = Date.now();
+      logActivity("app_open");
+    };
+    const timer = setTimeout(record, 5000);
+    const onVisible = () => { if (document.visibilityState === "visible") record(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user?.id]);
+
+  // Every auth event (sign-in, code verified, token refresh) replaces `user`: re-read the level then.
+  const refreshMfa = useCallback(async () => {
+    try {
+      const { data, error } = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel(), 8000);
+      if (error) throw error;
+      const { data: sessionData } = await withTimeout(supabase.auth.getSession(), 8000);
+      const verifiedCount = (sessionData?.session?.user?.factors || []).filter((f) => f.status === "verified").length;
+      setMfa({ ready: true, currentLevel: data?.currentLevel ?? null, verifiedCount, error: "" });
+    } catch (e) {
+      setMfa((prev) => ({ ...prev, ready: true, error: e?.message || String(e) }));
+    }
+  }, []);
+  useEffect(() => {
+    if (!user) {
+      setMfa({ ready: false, currentLevel: null, verifiedCount: 0, error: "" });
+      return;
+    }
+    refreshMfa();
+  }, [user, refreshMfa]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function recoverSessionOnResume() {
+      if (cancelled || resumeInFlightRef.current || signedOutRef.current) return;
+      resumeInFlightRef.current = true;
+      try {
+        let session = null;
+        let sessionError = null;
+        try {
+          // Bound both auth calls: on a phone returning from the camera/photos, these
+          // can stall on the auth lock and otherwise leave resumeInFlightRef stuck true,
+          // blocking every future resume. Time them out so the app recovers.
+          const result = await withTimeout(supabase.auth.getSession(), 8000);
+          session = result.data?.session ?? null;
+          sessionError = result.error ?? null;
+        } catch (error) {
+          sessionError = error;
+        }
+        const expiresSoon = session?.expires_at && session.expires_at * 1000 <= Date.now() + 60_000;
+
+        if (sessionError || !session || expiresSoon) {
+          const refreshed = await withTimeout(supabase.auth.refreshSession(), 8000);
+          if (refreshed.error) throw refreshed.error;
+          session = refreshed.data?.session ?? null;
+        }
+
+        if (cancelled) return;
+        if (session?.user?.id) {
+          const profile = await fetchRoleForUser(session.user.id);
+          if (cancelled) return;
+          setRole(profile.role);
+          setFullName(profile.full_name);
+          setIsPaused(profile.is_paused);
+          setAdminSections(profile.admin_sections);
+        }
+        subscribeToProfile(session?.user?.id ?? null);
+        window.dispatchEvent(new CustomEvent(SESSION_RESUMED_EVENT));
+      } catch (error) {
+        if (!cancelled) console.warn("[Auth] session resume recovery failed:", error);
+      } finally {
+        resumeInFlightRef.current = false;
+      }
+    }
+
+    function scheduleResumeRecovery() {
+      if (resumeDebounceRef.current) clearTimeout(resumeDebounceRef.current);
+      resumeDebounceRef.current = setTimeout(() => {
+        resumeDebounceRef.current = null;
+        recoverSessionOnResume();
+      }, 200);
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") scheduleResumeRecovery();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", scheduleResumeRecovery);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", scheduleResumeRecovery);
+      if (resumeDebounceRef.current) {
+        clearTimeout(resumeDebounceRef.current);
+        resumeDebounceRef.current = null;
+      }
+    };
+  }, [subscribeToProfile]);
+
+  const value = useMemo(
+    () => ({
+      user,
+      role,
+      fullName,
+      isPaused,
+      adminSections,
+      loading,
+      authError,
+      mfa,
+      mfaStep: mfa.ready ? mfaStep({ role, currentLevel: mfa.currentLevel, verifiedCount: mfa.verifiedCount }) : null,
+      refreshMfa,
+      async signOut() {
+        // Block the resume-recovery from re-hydrating the session mid sign-out.
+        signedOutRef.current = true;
+        // Best-effort server-side revoke of THIS device's session only (scope "local"): signing out on a
+        // phone must not close the same account on the office computer — the default ("global") did, and a
+        // manager page left open there then failed silently (e.g. the phone push, 2026-10-22). Never let a
+        // slow/offline network request hang the button — race it against a short timer.
+        try {
+          await Promise.race([
+            supabase.auth.signOut({ scope: "local" }),
+            new Promise((resolve) => setTimeout(resolve, 2500)),
+          ]);
+        } catch (e) {
+          /* ignore — local clear + state reset below cover it */
+        }
+        // Always clear the locally persisted session (works offline / in the PWA)
+        // so the app can't re-hydrate and log the user straight back in.
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch (e) {
+          /* ignore */
+        }
+        setUser(null);
+        setRole(null);
+        setFullName(null);
+        setIsPaused(false);
+        setAdminSections([]);
+      }
+    }),
+    [user, role, fullName, isPaused, adminSections, loading, authError, mfa, refreshMfa]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}

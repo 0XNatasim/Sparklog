@@ -46,7 +46,9 @@ export default function EmployeeActivityLog() {
   const [period, setPeriod] = useState("week");
   const [rows, setRows] = useState([]);
   const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [reloads, setReloads] = useState(0);
+  const [loaded, setLoaded] = useState(null); // filters the list shown answers
   const [error, setError] = useState("");
   const [missingDays, setMissingDays] = useState([]);
   const [missingLoading, setMissingLoading] = useState(false);
@@ -79,22 +81,23 @@ export default function EmployeeActivityLog() {
     return signal ? query.abortSignal(signal) : query;
   }, [employee, employeeIds, period, type]);
 
-  const load = useCallback(async () => {
+  // Loading until the answer for the current filters (and the latest « Actualiser ») arrives.
+  const loadKey = `${employee}|${period}|${type}|${employeeIds.join(",")}|${reloads}`;
+  const loading = (employeeIds.length > 0 && loaded !== loadKey) || loadingMore;
+  useEffect(() => {
     if (employeeIds.length === 0) return;
     const ticket = request.begin();
-    setLoading(true);
-    setError("");
-    const { data, error: loadError } = await fetchPage(null, ticket.signal);
-    if (!ticket.isCurrent()) return;
-    if (loadError) { if (!isAbortError(loadError)) setError(loadError.message); }
-    else {
-      setRows(data || []);
-      setHasMore((data || []).length === QUERY_BUDGETS.employeeActivityPage);
-    }
-    setLoading(false);
-  }, [employeeIds.length, fetchPage, request]);
-
-  useEffect(() => { load(); }, [load]);
+    fetchPage(null, ticket.signal).then(({ data, error: loadError }) => {
+      if (!ticket.isCurrent()) return;
+      if (loadError) { if (!isAbortError(loadError)) setError(loadError.message); }
+      else {
+        setError("");
+        setRows(data || []);
+        setHasMore((data || []).length === QUERY_BUDGETS.employeeActivityPage);
+      }
+      setLoaded(loadKey);
+    });
+  }, [employeeIds.length, fetchPage, loadKey, request]);
 
   useEffect(() => {
     if (employeeIds.length === 0) return;
@@ -139,15 +142,15 @@ export default function EmployeeActivityLog() {
     const last = rows[rows.length - 1];
     if (!last) return;
     const generation = request.generation();
-    setLoading(true);
+    setLoadingMore(true);
     const { data, error: loadError } = await fetchPage(last.created_at);
+    setLoadingMore(false);
     if (request.generation() !== generation) return; // filters changed meanwhile
     if (loadError) setError(loadError.message);
     else {
       setRows((current) => [...current, ...(data || [])]);
       setHasMore((data || []).length === QUERY_BUDGETS.employeeActivityPage);
     }
-    setLoading(false);
   }
 
   const nameOf = useCallback((row) => {
@@ -229,7 +232,7 @@ export default function EmployeeActivityLog() {
               <option value="month">{t("activity.period.month")}</option>
               <option value="quarter">{t("activity.period.quarter")}</option>
             </Select>
-            <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
+            <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => setReloads((count) => count + 1)}>
               <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
             </Button>
           </div>
@@ -282,7 +285,7 @@ export default function EmployeeActivityLog() {
         </Card>
       )}
 
-      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {error && !loading && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
       {!loading && rows.length === 0 && !error && (
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("activity.empty")}</CardContent></Card>
       )}

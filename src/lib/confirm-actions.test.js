@@ -56,7 +56,7 @@ describe("approve / refuse / delete actions ask for confirmation", () => {
   });
 
   it("deleting an employee keeps its two-step confirmation", () => {
-    const source = read("../components/EmployeesPanel.jsx");
+    const source = read("../components/employees/EmployeeDetails.jsx");
     expect(source).toMatch(/confirmDelete === p\.id \?/);
   });
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { Search, Send, Mail, Eye, Loader2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -33,6 +33,31 @@ function StatusBadge({ status }) {
   );
 }
 
+// Every profile by name; the panel leaves the sender out.
+async function fetchAnnounceProfiles() {
+  const { data, error } = await withTimeout(
+    supabase.from("profiles")
+      .select("id, full_name, email, role")
+      .order("full_name", { ascending: true }),
+    12000,
+  );
+  if (error) throw error;
+  return data ?? [];
+}
+
+// The 50 latest e-mails sent from this panel.
+async function fetchSentMessages() {
+  const { data, error } = await withTimeout(
+    supabase.from("messages")
+      .select("id, sender_name, subject, body, recipient_count, provider, status, created_at, sent_at")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    12000,
+  );
+  if (error) throw error;
+  return data ?? [];
+}
+
 export default function ManagerAnnouncePanel() {
   const t = useT();
   const { user } = useAuth();
@@ -58,18 +83,13 @@ export default function ManagerAnnouncePanel() {
   const [detail, setDetail]       = useState(null); // { message, recipients }
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Exclude the sender — a manager shouldn't email themselves.
+  const applyEmployees = useCallback((rows) => setEmployees(rows.filter((p) => p.id !== meId)), [meId]);
+
   async function loadEmployees() {
     setLoadingEmp(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase.from("profiles")
-          .select("id, full_name, email, role")
-          .order("full_name", { ascending: true }),
-        12000,
-      );
-      if (error) throw error;
-      // Exclude the sender — a manager shouldn't email themselves.
-      setEmployees((data ?? []).filter((p) => p.id !== meId));
+      applyEmployees(await fetchAnnounceProfiles());
     } catch (e) {
       setErr(e?.message ?? "Failed to load employees.");
     } finally {
@@ -80,15 +100,7 @@ export default function ManagerAnnouncePanel() {
   async function loadHistory() {
     setLoadingHist(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase.from("messages")
-          .select("id, sender_name, subject, body, recipient_count, provider, status, created_at, sent_at")
-          .order("created_at", { ascending: false })
-          .limit(50),
-        12000,
-      );
-      if (error) throw error;
-      setHistory(data ?? []);
+      setHistory(await fetchSentMessages());
     } catch (e) {
       setErr(e?.message ?? "Failed to load history.");
     } finally {
@@ -96,8 +108,22 @@ export default function ManagerAnnouncePanel() {
     }
   }
 
-  useEffect(() => { loadEmployees(); }, [meId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => {
+    let alive = true;
+    fetchAnnounceProfiles().then(
+      (rows) => { if (alive) applyEmployees(rows); },
+      (e) => { if (alive) setErr(e?.message ?? "Failed to load employees."); },
+    ).finally(() => { if (alive) setLoadingEmp(false); });
+    return () => { alive = false; };
+  }, [applyEmployees]);
+  useEffect(() => {
+    let alive = true;
+    fetchSentMessages().then(
+      (rows) => { if (alive) setHistory(rows); },
+      (e) => { if (alive) setErr(e?.message ?? "Failed to load history."); },
+    ).finally(() => { if (alive) setLoadingHist(false); });
+    return () => { alive = false; };
+  }, []);
 
   // Employees carrying an email address are the sendable set.
   const withEmail = useMemo(() => employees.filter((e) => e.email), [employees]);

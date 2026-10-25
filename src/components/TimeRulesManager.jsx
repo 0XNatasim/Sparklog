@@ -22,16 +22,22 @@ export default function TimeRulesManager() {
   const [teamLeaderCcqPremium, setTeamLeaderCcqPremium] = useState("");
   const [teamLeaderBusy, setTeamLeaderBusy] = useState(false);
 
-  async function load() {
-    // Deadline, evidence retention and the CCQ calendar live in Réglage.
-    // Day unlocks live in Temps › Débloquer journée (UnlockDayManager).
-    const { data: employeeRows } = await supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name");
+  // Deadline, evidence retention and the CCQ calendar live in Réglage.
+  // Day unlocks live in Temps › Débloquer journée (UnlockDayManager).
+  const fetchEmployees = () => supabase.from("profiles").select("id, full_name, email, role, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, is_paused, first_trip_unpaid, overtime_first_hour_double, return_with_benefits_to_8h, km_rate, phone_data_reimbursement, storage_compensation, storage_compensation_amount").order("full_name");
+  function applyEmployees({ data: employeeRows }) {
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
     setPayRuleRows((employeeRows || []).filter((employee) => !isManagerRole(employee.role)));
   }
+  async function load() {
+    applyEmployees(await fetchEmployees());
+  }
 
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let alive = true;
+    fetchEmployees().then((result) => { if (alive) applyEmployees(result); });
+    return () => { alive = false; };
+  }, []);
 
 
   function selectTeamLeader(id) {

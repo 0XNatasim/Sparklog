@@ -51,7 +51,7 @@ const RulesPage = managerPage("RulesPage");
 const UnlockDayPage = managerPage("UnlockDayPage");
 const SettingsPage = managerPage("SettingsPage");
 const TimesheetsPage = managerPage("TimesheetsPage");
-import { ViewModeProvider } from "@/contexts/ViewModeContext";
+import { ViewModeProvider } from "@/contexts/ViewModeProvider";
 import { isManagerRole } from "@/lib/roles";
 import InstallPrompt from "@/components/InstallPrompt";
 

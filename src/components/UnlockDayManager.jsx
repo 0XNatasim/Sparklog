@@ -19,16 +19,23 @@ export default function UnlockDayManager() {
   const [unlocks, setUnlocks] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  async function load() {
-    const [{ data: employeeRows }, { data: unlockRows }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, is_paused").order("full_name"),
-      supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
-    ]);
+  const fetchUnlocks = () => Promise.all([
+    supabase.from("profiles").select("id, full_name, email, is_paused").order("full_name"),
+    supabase.from("job_entry_unlocks").select("id, user_id, job_date, unlocked_until").order("job_date", { ascending: false }),
+  ]);
+  function applyUnlocks([{ data: employeeRows }, { data: unlockRows }]) {
     setEmployees((employeeRows || []).filter((employee) => !employee.is_paused));
     setUnlocks(unlockRows || []);
   }
+  async function load() {
+    applyUnlocks(await fetchUnlocks());
+  }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let alive = true;
+    fetchUnlocks().then((results) => { if (alive) applyUnlocks(results); });
+    return () => { alive = false; };
+  }, []);
 
   const employeeName = (id) => {
     const e = employees.find((row) => row.id === id);

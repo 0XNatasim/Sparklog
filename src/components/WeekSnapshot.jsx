@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import dayjs from "dayjs";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +18,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   const [people, setPeople] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [timeOff, setTimeOff] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedWeek, setLoadedWeek] = useState(null); // week the rows shown belong to
   const [error, setError] = useState("");
 
   const today = companyDate();
@@ -28,24 +28,25 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   // weekOffset: 0 = current week, -1 = last week (Sunday → Saturday).
   const weekStart = addCalendarDays(weekStartSundayD(today).format("YYYY-MM-DD"), weekOffset * 7);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addCalendarDays(weekStart, i)), [weekStart]);
+  const loading = loadedWeek !== weekStart;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
+    let alive = true;
     const weekEnd = days[6];
-    const [p, j, o] = await Promise.all([
+    Promise.all([
       supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
       supabase.from("jobs").select("id, user_id, status, depart, fin, job_date").gte("job_date", weekStart).lte("job_date", weekEnd),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
-    ]);
-    if (p.error || j.error) setError((p.error || j.error).message);
-    setPeople(p.data || []);
-    setJobs(j.data || []);
-    setTimeOff(o.data || []);
-    setLoading(false);
+    ]).then(([p, j, o]) => {
+      if (!alive) return;
+      setError(p.error || j.error ? (p.error || j.error).message : "");
+      setPeople(p.data || []);
+      setJobs(j.data || []);
+      setTimeOff(o.data || []);
+      setLoadedWeek(weekStart);
+    });
+    return () => { alive = false; };
   }, [days, weekStart]);
-
-  useEffect(() => { load(); }, [load]);
 
   const rows = useMemo(() => {
     const byKey = new Map();

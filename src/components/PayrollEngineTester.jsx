@@ -207,16 +207,19 @@ export default function PayrollEngineTester({ messier = false }) {
   // cnesstRate is in $ per 100 $ (as on the CNESST notice); empty = requires_review.
   const [employer, setEmployer] = useState({ annualPayrollEstimate: 0, fssCategory: "general", cnesstRate: "", workforceSkillsFundApplicable: false });
   const payrollSettings = usePayrollSettings();
-  useEffect(() => {
-    if (!payrollSettings.loaded) return;
+  // Filled once the settings arrive (adjusted while rendering, as React recommends for state that
+  // follows another value); edits made here afterwards are kept.
+  const [employerFrom, setEmployerFrom] = useState(null);
+  if (payrollSettings.loaded && employerFrom !== payrollSettings.employer) {
     const e = payrollSettings.employer;
+    setEmployerFrom(e);
     setEmployer({
       annualPayrollEstimate: e.annualPayrollEstimate || 0,
       fssCategory: e.fssCategory || "general",
       cnesstRate: e.cnesstRate == null ? "" : Math.round(e.cnesstRate * 100 * 10000) / 10000,
       workforceSkillsFundApplicable: Boolean(e.workforceSkillsFundApplicable),
     });
-  }, [payrollSettings]);
+  }
   const [result, setResult] = useState(null);
   const [reimb, setReimb] = useState({ km: 0, phone: 0, storage: 0, other: 0, total: 0 });
   // CCQ benefit modelling (folded into the DAS bases via baseAdjustments). Rates
@@ -239,7 +242,9 @@ export default function PayrollEngineTester({ messier = false }) {
   const [testRates, setTestRates] = useState({ enabled: false, safety: "", social: "", pensionPerHour: "", unionDues: "" });
   const [presetKind, setPresetKind] = useState(""); // "before" | "after" the 2026-04-26 agreement (test mode)
   const [weekEndOverride, setWeekEndOverride] = useState(""); // test mode: Saturday of the week to calculate when weeks without pay (vacation) are skipped
-  const [cmp, setCmp] = useState(null); // { talon, exact, fileName } from the talon comparison card
+  // { talon, exact, fileName } from the talon comparison card, for the calculation it compared:
+  // a new calculation (calcCtx) drops it.
+  const [cmpFor, setCmpFor] = useState({ ctx: undefined, value: null });
   const [keeping, setKeeping] = useState(false);
   const [ccqAmounts, setCcqAmounts] = useState(null);
   const [openExplain, setOpenExplain] = useState(false);
@@ -252,6 +257,7 @@ export default function PayrollEngineTester({ messier = false }) {
   // reads from this snapshot (never the live YTD) so it is idempotent — comptabiliser
   // the same calculation twice never double-counts.
   const [calcCtx, setCalcCtx] = useState(null);
+  const cmp = cmpFor.ctx === calcCtx ? cmpFor.value : null;
 
   const [employees, setEmployees] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -626,7 +632,7 @@ export default function PayrollEngineTester({ messier = false }) {
       setWeekEndOverride("");
       setYtd(closing);
       setAsOfDate(periodEnd);
-      setResult(null); setCalcCtx(null); setCmp(null);
+      setResult(null); setCalcCtx(null); setCmpFor({ ctx: undefined, value: null });
       presetForNextWeek(periodEnd);
       setSaveState({ status: "saved", message: t("payroll.keep.done", { week: ccqWeekNumber(dayjs(periodEnd)), date: periodEnd }) });
     } finally {
@@ -697,30 +703,34 @@ export default function PayrollEngineTester({ messier = false }) {
       social: on && s.social === "" ? String(employerSocialBenefitRateFor(ccq.status)) : s.social,
     }));
   }
-  useEffect(() => { setCmp(null); }, [calcCtx]);
-  useEffect(() => { if (!startFromEnd) setTestRates((s) => (s.enabled ? { ...s, enabled: false } : s)); }, [startFromEnd]);
+  // Test rates belong to a chosen start week: clearing it turns them off.
+  if (!startFromEnd && testRates.enabled) setTestRates((s) => ({ ...s, enabled: false }));
 
   // Auto-fill the CCQ levies (prélèvement + caisse d'éducation) from hours/wage/union,
   // the same way the union dues are auto-computed. They stay editable (a manual entry
-  // is overwritten only when hours/wage/union/vacation change).
-  useEffect(() => {
-    if (!ccq.enabled) return;
-    const hours = (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0);
-    const ccqPremiumPay = printedPayLines({ ...pay, baseRate: Number(pay.baseRate) || 0, premium: Number(pay.premium) || 0, ccqPremium: Number(pay.ccqPremium) || 0 }).ccqPremiumPay;
-    const levies = computeCcqLevies({
-      ccqPremiumPay,
-      hours,
-      hourlyWage: Number(pay.baseRate) || 0,
-      overtime150Hours: Number(pay.ot150Hours) || 0,
-      overtime200Hours: Number(pay.ot200Hours) || 0,
-      vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
-      union: ccq.union,
-    });
-    // Test rates: the prélèvement formula (0,75 % of wage + indemnity) still holds; the caisse is typed by hand.
-    setCcq((s) => (testRatesOn
-      ? { ...s, prelevementCcq: levies.prelevementCcq }
-      : { ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
-  }, [pay, ccq.vacationRatePct, ccq.union, ccq.enabled, testRatesOn]);
+  // is overwritten only when hours/wage/union/vacation change). Adjusted while rendering.
+  const leviesKey = ccq.enabled ? JSON.stringify([pay, ccq.vacationRatePct, ccq.union, testRatesOn]) : null;
+  const [leviesFor, setLeviesFor] = useState(null);
+  if (leviesKey !== leviesFor) {
+    setLeviesFor(leviesKey);
+    if (leviesKey) {
+      const hours = (Number(pay.regularHours) || 0) + (Number(pay.ot150Hours) || 0) + (Number(pay.ot200Hours) || 0);
+      const ccqPremiumPay = printedPayLines({ ...pay, baseRate: Number(pay.baseRate) || 0, premium: Number(pay.premium) || 0, ccqPremium: Number(pay.ccqPremium) || 0 }).ccqPremiumPay;
+      const levies = computeCcqLevies({
+        ccqPremiumPay,
+        hours,
+        hourlyWage: Number(pay.baseRate) || 0,
+        overtime150Hours: Number(pay.ot150Hours) || 0,
+        overtime200Hours: Number(pay.ot200Hours) || 0,
+        vacationHolidaySickRate: (Number(ccq.vacationRatePct) || 0) / 100,
+        union: ccq.union,
+      });
+      // Test rates: the prélèvement formula (0,75 % of wage + indemnity) still holds; the caisse is typed by hand.
+      setCcq((s) => (testRatesOn
+        ? { ...s, prelevementCcq: levies.prelevementCcq }
+        : { ...s, prelevementCcq: levies.prelevementCcq, caisseEducation: levies.caisseEducationSyndicale }));
+    }
+  }
 
   // Run the calculation (phone-data / other reimbursements come from typed fields).
   function runCalculate() {
@@ -1172,7 +1182,7 @@ export default function PayrollEngineTester({ messier = false }) {
           opening={calcCtx.ytdSnapshot}
           closing={buildClosing({ opening: calcCtx.ytdSnapshot, result, ccq: ccqAmounts, reimb, pay })}
           totals={payTotals(result, ccqAmounts, reimb)}
-          onComparison={setCmp}
+          onComparison={(value) => setCmpFor({ ctx: calcCtx, value })}
         />
       )}
 

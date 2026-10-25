@@ -52,6 +52,8 @@ function insurableHoursInRange(jobs, start, end, otOptions) {
   return minutes / 60;
 }
 
+const NO_ROWS = [];
+
 // ── Relevé d'emploi (Testing) ────────────────────────────────────────────────
 // Compiles the Service Canada Record of Employment figures for a laid-off employee:
 // insurable earnings come from the accounted pay ledger (payroll_period_ledger), insurable
@@ -64,9 +66,13 @@ export default function RecordOfEmploymentTab() {
   const [selectedId, setSelectedId] = useState("");
   const [reason, setReason] = useState("A");
   const [recall, setRecall] = useState("");
-  const [ledger, setLedger] = useState([]);
-  const [jobs, setJobs] = useState([]);
-  const [history, setHistory] = useState([]);
+  const [ledgerRows, setLedger] = useState([]);
+  const [jobRows, setJobs] = useState([]);
+  const [historyRows, setHistory] = useState([]);
+  // No employee chosen: nothing to show (the rows of the last one stay loaded until another is chosen).
+  const ledger = selectedId ? ledgerRows : NO_ROWS;
+  const jobs = selectedId ? jobRows : NO_ROWS;
+  const history = selectedId ? historyRows : NO_ROWS;
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -108,7 +114,7 @@ export default function RecordOfEmploymentTab() {
 
   // Pay ledger + time entries for the selected employee.
   useEffect(() => {
-    if (!selectedId) { setLedger([]); setJobs([]); setHistory([]); return; }
+    if (!selectedId) return undefined;
     let cancelled = false;
     (async () => {
       setBusy(true);

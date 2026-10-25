@@ -78,6 +78,15 @@ Sans cette capture, le temps supplémentaire ne peut pas être approuvé. Appuye
 • Stationnement payé ➜ cocher « Stationnement » et joindre la photo du reçu, avec le montant.
 • Vérifier vos km avant de soumettre.`,
 ];
+
+// Messages sent (newest first) and their recipients.
+function fetchBroadcastLog() {
+  return Promise.all([
+    supabase.from("manager_broadcasts").select("id, body, audience, image_path, attachments, created_at, edited_at").order("created_at", { ascending: false }),
+    supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at, withdrawn_at"),
+  ]);
+}
+
 export default function BroadcastManager() {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -110,22 +119,6 @@ export default function BroadcastManager() {
   // Previous versions of edited messages (0107), loaded when a message is opened.
   const [revisionsById, setRevisionsById] = useState(new Map());
 
-  async function loadEmployees() {
-    // Include managers too (a manager is a valid recipient / selectable target),
-    // but never inactive (paused) accounts.
-    const { data } = await supabase
-      .from("profiles").select("id, full_name, email, is_paused, departure_status, start_date").order("full_name");
-    setEmployees((data || []).filter((employee) => !employee.is_paused));
-  }
-
-  async function loadGroups() {
-    // Optional: without groups (or if they cannot be read) the « Groupes » choice is simply hidden.
-    try {
-      setGroups(await fetchGroups());
-    } catch (error) {
-      console.warn("[broadcast] groups not loaded:", error);
-    }
-  }
 
   function toggleGroup(id) {
     setSelectedGroups((current) => {
@@ -185,11 +178,7 @@ export default function BroadcastManager() {
     setFiles([]);
   }
 
-  async function loadLog() {
-    const [{ data: rows }, { data: recips }] = await Promise.all([
-      supabase.from("manager_broadcasts").select("id, body, audience, image_path, attachments, created_at, edited_at").order("created_at", { ascending: false }),
-      supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at, withdrawn_at"),
-    ]);
+  function applyLog([{ data: rows }, { data: recips }]) {
     setBroadcasts(rows || []);
     const map = new Map();
     (recips || []).forEach((r) => {
@@ -198,6 +187,10 @@ export default function BroadcastManager() {
     });
     setRecipientsByBroadcast(map);
     setRevisionsById(new Map());
+  }
+
+  async function loadLog() {
+    applyLog(await fetchBroadcastLog());
   }
 
   async function loadRevisions(id) {
@@ -215,7 +208,20 @@ export default function BroadcastManager() {
     if (open && b.edited_at && !revisionsById.has(b.id)) loadRevisions(b.id);
   }
 
-  useEffect(() => { loadEmployees(); loadGroups(); loadLog(); }, []);
+  useEffect(() => {
+    let alive = true;
+    // Include managers too (a manager is a valid recipient / selectable target),
+    // but never inactive (paused) accounts.
+    supabase.from("profiles").select("id, full_name, email, is_paused, departure_status, start_date").order("full_name")
+      .then(({ data }) => { if (alive) setEmployees((data || []).filter((employee) => !employee.is_paused)); });
+    // Optional: without groups (or if they cannot be read) the « Groupes » choice is simply hidden.
+    fetchGroups().then(
+      (rows) => { if (alive) setGroups(rows); },
+      (error) => console.warn("[broadcast] groups not loaded:", error),
+    );
+    fetchBroadcastLog().then((log) => { if (alive) applyLog(log); });
+    return () => { alive = false; };
+  }, []);
 
   function toggleEmployee(id) {
     setSelected((current) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { withTimeout } from "@/lib/utils";
@@ -10,16 +10,16 @@ import { fetchInventorySlots } from "@/lib/inventory-upload";
 // check what was sent when proof of inventory is requested.
 export default function InventoryPhotosDialog({ date, userId, onClose }) {
   const t = useT();
-  const tRef = useRef(t); // useT() returns a new function each render: keep it out of deps
-  tRef.current = t;
-  const [photos, setPhotos] = useState(null); // { slot: url | "" }
-  const [error, setError] = useState("");
+  // Pictures of the day shown ({ slot: url | "" }, null while loading) and a load failure, both for
+  // the employee and day they were read for.
+  const loadKey = `${userId}|${date}`;
+  const [loaded, setLoaded] = useState({ key: null, photos: null, failed: false });
+  const photos = loaded.key === loadKey ? loaded.photos : null;
+  const error = loaded.key === loadKey && loaded.failed ? t("history.inventory.failed") : "";
 
   useEffect(() => {
     if (!date || !userId) return undefined;
     let cancelled = false;
-    setPhotos(null);
-    setError("");
     (async () => {
       try {
         const rows = await fetchInventorySlots(supabase, userId, date);
@@ -29,13 +29,13 @@ export default function InventoryPhotosDialog({ date, userId, onClose }) {
           const { data } = await withTimeout(supabase.storage.from(INVENTORY_BUCKET).createSignedUrls(paths, 600), 12000);
           for (const item of data || []) if (item.signedUrl) urls.set(item.path, item.signedUrl);
         }
-        if (!cancelled) setPhotos(Object.fromEntries(rows.map((row) => [row.slot, urls.get(row.storage_path) || ""])));
+        if (!cancelled) setLoaded({ key: loadKey, photos: Object.fromEntries(rows.map((row) => [row.slot, urls.get(row.storage_path) || ""])), failed: false });
       } catch {
-        if (!cancelled) setError(tRef.current("history.inventory.failed"));
+        if (!cancelled) setLoaded({ key: loadKey, photos: null, failed: true });
       }
     })();
     return () => { cancelled = true; };
-  }, [date, userId]);
+  }, [date, userId, loadKey]);
 
   return (
     <Dialog open={Boolean(date)} onOpenChange={(open) => !open && onClose()}>

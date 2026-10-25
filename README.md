@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.177 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.178 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -121,6 +121,11 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   starting or ending in that hour is still refused for the employee, with a plain message to send the hours to the
   manager; the owner enters it in Admin › Emergency timesheet and picks « 1st time (before going back) » or « 2nd time
   (after) ». The employee then confirms it as usual. Pay still counts clock time.
+- **Code cleanup** (V2.4.178, no visible change): the time-entry form and the Employees list are split into small
+  files (`src/components/employee-form/`, `src/components/employees/`), with screen tests (jsdom + Testing Library,
+  `src/test/fake-supabase.js`) written first and passing on both versions. ESLint goes from 64 warnings to 0 and
+  `npm run lint` now fails on any warning. Fixed on the way: switching the payroll method (Messier / Reference) now
+  recomputes the DAS screen; the service-health card no longer retries a failed load in a loop.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,
@@ -156,7 +161,7 @@ Parking receipt pictures and overtime proof screenshots are stored as images wit
 - Vercel as the primary static host; Render is also configured
 - `dayjs` for date/week calculations
 - ocr.space with an in-browser Tesseract fallback
-- ESLint 10 (`npm run lint`, run in CI) and Vitest
+- ESLint 10 (`npm run lint`, run in CI, no warning allowed), Vitest and Testing Library (screen tests in jsdom)
 
 ## Repository layout
 
@@ -216,8 +221,8 @@ npm run dev
 Check and build (the same three steps CI runs on every pull request):
 
 ```bash
-npm run lint    # ESLint — 0 errors required; React-Compiler rules are warnings
-npm test        # Vitest — includes payroll parity fixtures and the WCAG theme-contrast test
+npm run lint    # ESLint — 0 errors and 0 warnings (--max-warnings=0)
+npm test        # Vitest — payroll parity fixtures, WCAG theme contrast, screen tests (*.test.jsx, jsdom)
 npm run build
 ```
 

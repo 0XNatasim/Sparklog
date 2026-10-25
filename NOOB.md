@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.177).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.178).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -121,9 +121,11 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 - [ ] **CNESST sur le salaire admissible (trou du calcul)** : l'app calcule la CNESST (3,17 %) sur tout le
   salaire, alors que le vrai relevé ne la calcule que sur un « salaire admissible ». Le coût CNESST est donc
   **trop élevé** dans DAS, Calcul et Coûts. À corriger dès que la règle de l'excédent est connue (étape 1).
-- [ ] **Ménage du code** : découper les deux plus gros écrans (la fiche employé et la liste des employés)
-  et corriger environ 60 avertissements du vérificateur de code. Il faudra d'abord ajouter des tests
-  d'écran.
+- [x] **Ménage du code** (V2.4.178) : rien ne change à l'écran. La fiche de temps et la liste des employés sont
+  découpées en petits fichiers, après avoir écrit des tests d'écran qui passent sur l'ancienne et la nouvelle
+  version. Les 64 avertissements du vérificateur de code sont corrigés (il n'en reste aucun, et il en refuse
+  maintenant un nouveau). Deux petits défauts trouvés au passage : dans DAS, changer la méthode (Messier /
+  Référence) ne recalculait pas les montants ; la carte État du service relançait sans fin un chargement raté.
 
 ## Étape 6 — Gestion V3 : ce qu'il reste à convertir 💻
 

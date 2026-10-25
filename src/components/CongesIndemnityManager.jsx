@@ -21,12 +21,16 @@ export default function CongesIndemnityManager() {
   const [row, setRow] = useState(null);
   const [err, setErr] = useState("");
 
-  async function load() {
-    const { data, error } = await supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle();
+  function applyRates({ data, error }) {
     if (error) setErr(error.message);
     else setRow(data || { vacation: 0.06, statutory_holidays: 0.055, sick: 0.015 });
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let alive = true;
+    supabase.from("conges_indemnity_rate").select("*").eq("id", true).maybeSingle()
+      .then((result) => { if (alive) applyRates(result); });
+    return () => { alive = false; };
+  }, []);
 
   const asPct = (v) => (v == null || v === "" ? "" : (Number(v) * 100).toString());
   const total = FIELDS.reduce((s, f) => s + (Number(row?.[f.key]) || 0), 0);

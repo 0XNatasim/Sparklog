@@ -25,8 +25,8 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_', caughtErrors: 'none' }],
-      // React Compiler-era rules (eslint-plugin-react-hooks 7). The existing screens predate them;
-      // keep them visible as warnings and fix them file by file instead of a risky bulk rewrite.
+      // React Compiler-era rules (eslint-plugin-react-hooks 7). Warnings, but `npm run lint` (and CI)
+      // allows none (--max-warnings=0, V2.4.178): every screen was brought to zero.
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/refs': 'warn',
       'react-hooks/purity': 'warn',
@@ -37,7 +37,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['*.config.js', 'scripts/**/*.{js,mjs}', '**/*.test.js'],
+    files: ['*.config.js', 'scripts/**/*.{js,mjs}', '**/*.test.{js,jsx}', 'src/test/**/*.{js,jsx}'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {

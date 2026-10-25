@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { AlertTriangle, Download, Landmark } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -118,12 +118,12 @@ export default function DasTab({ messier = false }) {
     return weekKeys.filter((w) => payMonthOf(w.end) === selectedMonth);
   }, [period, weekKeys, selectedWeek, selectedMonth]);
 
-  function openingFor(userId, weekStart) {
+  const openingFor = useCallback((userId, weekStart) => {
     const before = (ledgerByEmp.get(userId) || [])
       .filter((r) => r.period_end && dayjs(r.period_end).isBefore(weekStart))
       .sort((a, b) => (a.period_end < b.period_end ? 1 : -1));
     return snapshotFromRow(before[0] || seedByEmp.get(userId) || null);
-  }
+  }, [ledgerByEmp, seedByEmp]);
 
   const payrollEmployees = useMemo(() => employees.filter((e) => isPayrollEmployee(e, taxProfiles.get(e.id))), [employees, taxProfiles]);
 
@@ -163,7 +163,7 @@ export default function DasTab({ messier = false }) {
       out.push({ profile, pendingWeeks, countedWeeks, ...acc });
     }
     return out;
-  }, [scopeWeeks, payrollEmployees, selectedEmp, jobsByEmp, seedByEmp, ledgerByEmp, holidayDates, employer, taxProfiles, roundingByEmp]);
+  }, [scopeWeeks, payrollEmployees, selectedEmp, jobsByEmp, openingFor, holidayDates, employer, taxProfiles, roundingByEmp, messier]);
 
   const computed = rows.filter((r) => r.countedWeeks > 0);
   const blocked = rows.filter((r) => r.pendingWeeks > 0);

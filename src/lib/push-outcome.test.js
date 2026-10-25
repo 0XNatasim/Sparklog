@@ -60,7 +60,7 @@ describe("phone push outcome (V2.4.172)", () => {
   });
 
   it("signs out this device only, keeps the global sign-out after a password change, and shows every push outcome", () => {
-    const auth = read("../contexts/AuthContext.jsx");
+    const auth = read("../contexts/AuthProvider.jsx");
     expect(auth).toContain('supabase.auth.signOut({ scope: "local" }),');
     expect(auth).not.toMatch(/supabase\.auth\.signOut\(\)/);
     // A new password must still close every other session.

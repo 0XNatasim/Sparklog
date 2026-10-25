@@ -14,6 +14,18 @@ import { setAppBadgeCount } from "@/lib/push-support";
 export const BROADCASTS_REFRESH_EVENT = "sparklog:broadcasts-refresh";
 const LIST_LIMIT = 30;
 
+// The latest announcements sent to this employee, newest first.
+async function fetchEmployeeBroadcasts(userId) {
+  const { data } = await supabase
+    .from("broadcast_recipients")
+    .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments, edited_at)")
+    .eq("employee_id", userId);
+  return (data || [])
+    .filter((row) => row.manager_broadcasts)
+    .sort((a, b) => new Date(b.manager_broadcasts.created_at) - new Date(a.manager_broadcasts.created_at))
+    .slice(0, LIST_LIMIT);
+}
+
 // Employee notification bell: lists the manager announcements sent to this employee
 // (unread first-class, read ones greyed so they can be re-read). Clicking one simply
 // opens that notification again — there is no notifications page for employees.
@@ -23,30 +35,23 @@ export default function EmployeeNotificationsBell() {
   const [items, setItems] = useState([]);
   const [opened, setOpened] = useState(null);
   const channelRef = useRef(null);
-  const enabled = Boolean(user?.id) && !isManagerRole(role);
+  const userId = user?.id;
+  const enabled = Boolean(userId) && !isManagerRole(role);
 
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    const { data } = await supabase
-      .from("broadcast_recipients")
-      .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments, edited_at)")
-      .eq("employee_id", user.id);
-    const rows = (data || [])
-      .filter((row) => row.manager_broadcasts)
-      .sort((a, b) => new Date(b.manager_broadcasts.created_at) - new Date(a.manager_broadcasts.created_at))
-      .slice(0, LIST_LIMIT);
-    setItems(rows);
-  }, [enabled, user?.id]);
+  const load = useCallback(() => {
+    if (!enabled) return undefined;
+    return fetchEmployeeBroadcasts(userId).then(setItems);
+  }, [enabled, userId]);
 
   useEffect(() => {
     if (!enabled) return undefined;
     load();
     const subscribe = () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
-      channelRef.current = supabase.channel(`employee-broadcasts-${user.id}`)
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${user.id}` }, load)
+      channelRef.current = supabase.channel(`employee-broadcasts-${userId}`)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${userId}` }, load)
         // A message edited with « read it again » clears this employee's OK (0107): show it as unread again.
-        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${user.id}` }, () => {
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${userId}` }, () => {
           load();
           window.dispatchEvent(new Event(BROADCASTS_REFRESH_EVENT));
         })
@@ -64,7 +69,7 @@ export default function EmployeeNotificationsBell() {
         channelRef.current = null;
       }
     };
-  }, [enabled, load, user?.id]);
+  }, [enabled, load, userId]);
 
   const unread = items.filter((item) => !item.acknowledged_at).length;
 

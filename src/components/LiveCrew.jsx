@@ -21,6 +21,55 @@ const montrealDate = companyDate;
 
 const fmtHM = formatHM;
 
+// The board of `targetDate` (default today, Montréal): who is expected, their jobs in order, who is
+// on leave or an exception to their usual pattern, and who did not submit the previous workday.
+async function fetchLiveCrew(targetDate) {
+  const today = targetDate || montrealDate();
+  const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
+  const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }, holidays] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
+    supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at, overtime_evidence_captured").eq("job_date", today),
+    supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
+    supabase.from("jobs").select("user_id, status").eq("job_date", yesterday),
+    loadHolidayDates(),
+  ]);
+  // Off for the FULL day — a full-day range or a weekly recurrence (e.g. never Fridays).
+  // A partial-hours congé (start_time set) still leaves them on the board. Owners, admins,
+  // board opt-outs and full-day-off people are hidden unless they enter a job today
+  // (see liveRoster).
+  const offToday = new Set(
+    (timeOff || []).filter((row) => isOffOn(row, today) && !row.start_time).map((row) => row.user_id)
+  );
+  // Full-day leave YESTERDAY — excluded from "not submitted yesterday" (nothing to submit).
+  const offYesterday = new Set(
+    (timeOff || []).filter((row) => isOffOn(row, yesterday) && !row.start_time).map((row) => row.user_id)
+  );
+  // Recap "en congé": everyone with time off applicable today (full day OR partial hours).
+  const onLeaveList = activePeopleOnLeave(people, timeOff, today);
+  // Present today despite a recurring rule that would otherwise put them off — flag it so a
+  // manager sees at a glance who's an exception to their usual pattern (e.g. in to cover).
+  const exceptionToday = new Set((timeOff || []).filter((row) => isExceptionOn(row, today)).map((row) => row.user_id));
+  const activePeople = liveRoster(people, {
+    jobUserIds: new Set((jobs || []).map((job) => job.user_id)),
+    offUserIds: offToday,
+    date: today,
+  });
+  // Nothing was due on a weekend or a CCQ holiday (company_holidays): nobody is "not submitted".
+  const notSubmittedList = isNonWorkday(yesterday, holidays) ? [] :
+    notSubmittedYesterday(people, { yesterdayJobs: yJobs || [], offUserIds: offYesterday, date: yesterday })
+      .map((p) => ({ id: p.id, name: p.full_name || p.email || p.id }));
+  const map = new Map();
+  (jobs || []).forEach((job) => {
+    if (!map.has(job.user_id)) map.set(job.user_id, []);
+    map.get(job.user_id).push(job);
+  });
+  // Chronological order within the day (1st job, 2nd, …).
+  map.forEach((list) => list.sort((a, b) =>
+    String(a.depart || "99").localeCompare(String(b.depart || "99")) || String(a.updated_at).localeCompare(String(b.updated_at))
+  ));
+  return { today, yesterday, onLeaveList, exceptionToday, notSubmittedList, employees: activePeople, jobsByUser: map };
+}
+
 export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot = false }) {
   const t = useT();
   const [employees, setEmployees] = useState([]);
@@ -37,72 +86,37 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const applyCrew = useCallback((crew) => {
+    setTodayDate(crew.today);
+    setYesterdayDate(crew.yesterday);
+    setOnLeaveList(crew.onLeaveList);
+    setExceptionToday(crew.exceptionToday);
+    setNotSubmittedList(crew.notSubmittedList);
+    setEmployees(crew.employees);
+    setJobsByUser(crew.jobsByUser);
+    setUpdatedAt(new Date());
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const today = targetDate || montrealDate();
-    setTodayDate(today);
-    const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
-    setYesterdayDate(yesterday);
-    const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }, holidays] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
-      supabase.from("jobs").select("id, user_id, ot, status, depart, fin, job_date, updated_at, overtime_evidence_captured").eq("job_date", today),
-      supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", today).or(`end_date.gte.${yesterday},end_date.is.null`),
-      supabase.from("jobs").select("user_id, status").eq("job_date", yesterday),
-      loadHolidayDates(),
-    ]);
-    // Off for the FULL day — a full-day range or a weekly recurrence (e.g. never Fridays).
-    // A partial-hours congé (start_time set) still leaves them on the board. Owners, admins,
-    // board opt-outs and full-day-off people are hidden unless they enter a job today
-    // (see liveRoster).
-    const offToday = new Set(
-      (timeOff || []).filter((row) => isOffOn(row, today) && !row.start_time).map((row) => row.user_id)
-    );
-    // Full-day leave YESTERDAY — excluded from "not submitted yesterday" (nothing to submit).
-    const offYesterday = new Set(
-      (timeOff || []).filter((row) => isOffOn(row, yesterday) && !row.start_time).map((row) => row.user_id)
-    );
-    // Recap "en congé": everyone with time off applicable today (full day OR partial hours).
-    setOnLeaveList(activePeopleOnLeave(people, timeOff, today));
-    // Present today despite a recurring rule that would otherwise put them off — flag it so a
-    // manager sees at a glance who's an exception to their usual pattern (e.g. in to cover).
-    setExceptionToday(new Set((timeOff || []).filter((row) => isExceptionOn(row, today)).map((row) => row.user_id)));
-    const activePeople = liveRoster(people, {
-      jobUserIds: new Set((jobs || []).map((job) => job.user_id)),
-      offUserIds: offToday,
-      date: today,
-    });
-    // Nothing was due on a weekend or a CCQ holiday (company_holidays): nobody is "not submitted".
-    setNotSubmittedList(isNonWorkday(yesterday, holidays) ? [] :
-      notSubmittedYesterday(people, { yesterdayJobs: yJobs || [], offUserIds: offYesterday, date: yesterday })
-        .map((p) => ({ id: p.id, name: p.full_name || p.email || p.id }))
-    );
-    const map = new Map();
-    (jobs || []).forEach((job) => {
-      if (!map.has(job.user_id)) map.set(job.user_id, []);
-      map.get(job.user_id).push(job);
-    });
-    // Chronological order within the day (1st job, 2nd, …).
-    map.forEach((list) => list.sort((a, b) =>
-      String(a.depart || "99").localeCompare(String(b.depart || "99")) || String(a.updated_at).localeCompare(String(b.updated_at))
-    ));
-    setEmployees(activePeople);
-    setJobsByUser(map);
-    setUpdatedAt(new Date());
+    applyCrew(await fetchLiveCrew(targetDate));
     setLoading(false);
-  }, [targetDate]);
+  }, [applyCrew, targetDate]);
 
   // Poll only while the tab is visible; refresh as soon as it is shown again.
   useEffect(() => {
-    load();
-    if (snapshot) return undefined;
+    let alive = true;
+    fetchLiveCrew(targetDate).then((crew) => { if (alive) applyCrew(crew); });
+    if (snapshot) return () => { alive = false; };
     const refreshIfVisible = () => { if (!document.hidden) load(); };
     const id = setInterval(refreshIfVisible, REFRESH_MS);
     document.addEventListener("visibilitychange", refreshIfVisible);
     return () => {
+      alive = false;
       clearInterval(id);
       document.removeEventListener("visibilitychange", refreshIfVisible);
     };
-  }, [load, snapshot]);
+  }, [applyCrew, load, snapshot, targetDate]);
 
   const rows = employees
     .map((employee) => {

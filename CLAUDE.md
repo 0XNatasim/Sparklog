@@ -266,7 +266,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 - Vérifié dans Chromium (Supabase simulé) : pas de défilement horizontal sur 10 écrans à 360 et 1280 px ;
   plantage forcé (build de test) d'Historique et d'Équipe en direct → erreur récupérable, navigation OK.
 
-### Lot 6 — Qualité du code — ✅ en partie (V2.4.99)
+### Lot 6 — Qualité du code — ✅ fait (V2.4.99, V2.4.178)
 - [x] ESLint 10 (`eslint`, `@eslint/js`, `globals`, `eslint-plugin-react-hooks` 7, `eslint-plugin-react-refresh`)
   en devDependencies, script `npm run lint`, étape `npm run lint` dans `.github/workflows/ci.yml`.
   Config par environnement (Node pour configs/tests, service worker pour `push-sw.js`) ; les sources Apps
@@ -281,14 +281,13 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 - [x] P-10 : carte de feuille de temps extraite dans `components/manager/JobCard.jsx` (`React.memo`, props
   primitives, `onApprove`/`onUnlock` stables via ref) ; `useT()` mémoïsé par langue. Mesuré (build de test,
   20 cartes) : ouvrir la confirmation d'approbation re-rendait toutes les cartes, maintenant 0.
-- [ ] Reste : découper `EmployeeForm.jsx` (≈ 1 750 l.) et `EmployeesPanel.jsx` (≈ 900 l.), et la carte de
-  notification de `ManagerDashboard`. Volontairement non fait ici : `EmployeeForm` est le chemin de saisie
-  du temps soumis aux « release gates » (timeouts, double-clic, DST…) ; un découpage doit venir avec des
-  tests de composant (pas encore d'environnement jsdom/testing-library dans le projet).
+- [x] V2.4.178 : `EmployeeForm.jsx` 2 120 → 1 237 l. et `EmployeesPanel.jsx` 1 092 → 419 l., avec tests d'écran
+  écrits avant le découpage (voir §6.3) ; 64 avertissements → 0 et `npm run lint --max-warnings=0`.
+- [ ] Reste (optionnel) : la carte de notification de `ManagerDashboard`.
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.177)
+## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.178)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -824,8 +823,25 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   passagères gardent rafraîchir-puis-réessayer. Fiche de temps : après une panne passagère, la fiche reste sur
   l'appareil et est renvoyée seule (retour du réseau, ou 15 / 30 / 60 / 120 / 240 s), même clé de soumission,
   arrêt si l'employé la modifie. Vérifié dans Chromium : coupure réseau, 503, refus (aucun réessai).
-- [ ] Lot 6 restant : découper `EmployeeForm.jsx` / `EmployeesPanel.jsx` avec des tests de composant
-  (jsdom + testing-library à ajouter) ; corriger les ~63 avertissements ESLint écran par écran.
+- [x] **Ménage du code** (V2.4.178, aucun changement visible) : tests d'écran — `jsdom`, `@testing-library/react`
+  (dev), `// @vitest-environment jsdom` par fichier, faux client `src/test/fake-supabase.js` (requêtes enregistrées,
+  réponses par table / RPC, réponse différée possible) ; `EmployeeForm.test.jsx` (18 : champs manquants, rappel
+  « entrée à la main », double tap = un seul `save_own_job`, preuve > 8 h, retour + inventaire + soumission de la
+  journée, km de retour, stationnement, brouillon de l'appareil plus récent / plus ancien / panne de lecture, envoi
+  automatique depuis Historique, job verrouillée, job d'un autre) et `EmployeesPanel.test.jsx` (8) — ceux d'avant le
+  découpage passent sur l'ancienne et la nouvelle version. Découpage : `src/components/employee-form/` (messages,
+  champs, stationnement, conseil de capture, vérifications, `EndOfShiftDialog`, preuve, inventaire,
+  `useInventoryStep`) + `src/lib/` (`parking-upload`, `meal-claim-request`, `overtime-evidence-check`,
+  `employee-form-helpers`) ; `src/components/employees/` (en-tête, ajout, compte, contact et dates, CCQ et avantages,
+  bureau) + `src/lib/employees-panel.js` (ordre, taux CCQ, compteurs, filtres, testé). ESLint 64 → 0 :
+  chargements lus dans l'effet et appliqués au rappel (garde à la fermeture), états qui suivent une valeur ajustés
+  pendant le rendu, remises à zéro dans l'action qui les cause, fournisseurs séparés de leurs hooks
+  (`AuthProvider.jsx`, `ViewModeProvider.jsx`, `LanguageProvider.jsx`, `ThemeProvider.jsx`), `lazy-panel.jsx`,
+  `clockOrDash` (`lib/time.js`). Corrigés au passage : DAS ne recalculait pas au changement de méthode (`messier`
+  absent des dépendances) ; État du service relançait en boucle un chargement raté ; le talon imprimable
+  réécrasait l'en-tête à chaque rendu si la semaine changeait d'objet. La preuve de temps sup. garde le mode de
+  son flux (`pendingReturn.mode`). Vérifié dans Chromium (Supabase simulé) : 41 écrans (propriétaire V3, employé)
+  sans erreur ni écran d'erreur.
 - [ ] Optionnel : charger une seule langue de `i18n.js` (nécessite de retirer le repli anglais).
 
 ---
