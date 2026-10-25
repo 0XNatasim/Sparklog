@@ -50,7 +50,9 @@ export function addCalendarDays(date, days) {
 // Resolve a Montréal wall-clock value without guessing through a DST fold/gap.
 // Montréal offsets are UTC-5/UTC-4; testing both yields 0 candidates in the spring
 // gap, 2 during the repeated fall hour, and exactly 1 for an unambiguous time.
-export function resolveCompanyWallTime(date, time) {
+// `fold` (migration 0116) is a manager's choice in the repeated hour: 1 = first time (before the clocks go
+// back), 2 = second time. Without it a repeated time stays "ambiguous", like the database.
+export function resolveCompanyWallTime(date, time, fold = null) {
   const match = `${date || ""}T${time || ""}`.match(
     /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2})?$/
   );
@@ -69,14 +71,28 @@ export function resolveCompanyWallTime(date, time) {
       return actual.date === expectedDate && actual.time === expectedTime;
     });
   if (candidates.length === 0) return { status: "nonexistent", instant: null };
-  if (candidates.length > 1) return { status: "ambiguous", instant: null };
+  if (candidates.length > 1) {
+    // [UTC-4, UTC-5] → the first time is the earlier instant.
+    if (fold === 1 || fold === 2) return { status: "valid", instant: candidates[fold === 1 ? 0 : 1], repeated: true };
+    return { status: "ambiguous", instant: null };
+  }
   return { status: "valid", instant: candidates[0] };
 }
 
-export function resolveJobInstants(jobDate, depart, fin) {
-  const endDate = String(fin) <= String(depart) ? addCalendarDays(jobDate, 1) : jobDate;
-  const start = resolveCompanyWallTime(jobDate, depart);
-  const end = resolveCompanyWallTime(endDate, fin);
+// The repeated 1:00-1:59 of the fall time change (both Montréal offsets match).
+export function isRepeatedCompanyTime(date, time) {
+  return resolveCompanyWallTime(date, time).status === "ambiguous";
+}
+
+// Date of the fin: the next day when the job crosses midnight.
+export function jobEndDate(jobDate, depart, fin) {
+  return String(fin) <= String(depart) ? addCalendarDays(jobDate, 1) : jobDate;
+}
+
+export function resolveJobInstants(jobDate, depart, fin, { departFold = null, finFold = null } = {}) {
+  const endDate = jobEndDate(jobDate, depart, fin);
+  const start = resolveCompanyWallTime(jobDate, depart, departFold);
+  const end = resolveCompanyWallTime(endDate, fin, finFold);
   if (start.status !== "valid" || end.status !== "valid") {
     return { status: start.status !== "valid" ? start.status : end.status, start: null, end: null };
   }

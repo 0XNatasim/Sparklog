@@ -1,4 +1,4 @@
-import { addCalendarDays, companyDate } from "./company-time";
+import { addCalendarDays, companyDate, isRepeatedCompanyTime, jobEndDate } from "./company-time";
 import { jobDurationMinutes, MAX_JOB_DURATION_MINUTES } from "./job-contract";
 
 // Owner emergency timesheet: the owner creates a draft job for an employee, who must
@@ -29,6 +29,15 @@ export function managerEntryState(job) {
   return "pending";
 }
 
+// Night of the fall time change (0116): which of départ / fin falls in the repeated 1:00-1:59.
+export function repeatedHourFields(values) {
+  if (!values?.jobDate) return { depart: false, fin: false };
+  return {
+    depart: Boolean(values.depart) && isRepeatedCompanyTime(values.jobDate, values.depart),
+    fin: Boolean(values.depart && values.fin) && isRepeatedCompanyTime(jobEndDate(values.jobDate, values.depart, values.fin), values.fin),
+  };
+}
+
 // Returns the list of invalid field keys (empty when the form can be sent).
 export function validateManagerEntry(values, today = companyDate()) {
   const errors = [];
@@ -41,6 +50,10 @@ export function validateManagerEntry(values, today = companyDate()) {
   const duration = jobDurationMinutes(values.depart, values.fin);
   if (values.depart && values.fin && (duration === null || duration <= 0 || duration > MAX_JOB_DURATION_MINUTES)) {
     errors.push("interval");
+  }
+  const repeated = repeatedHourFields(values);
+  if ((repeated.depart && ![1, 2].includes(values.departFold)) || (repeated.fin && ![1, 2].includes(values.finFold))) {
+    errors.push("dstChoice");
   }
   const km = String(values.km ?? "").trim();
   if (km !== "" && !(Number(km.replace(",", ".")) >= 0)) errors.push("km");
@@ -62,5 +75,8 @@ export function buildCreateJobForEmployeeArgs(values, submissionKey) {
     p_fin: values.fin || null,
     p_km_aller: km === "" ? 0 : Number(km.replace(",", ".")),
     p_note: String(values.note || "").trim(),
+    // Only in the repeated hour; the database clears a choice anywhere else.
+    p_depart_fold: repeatedHourFields(values).depart ? values.departFold : null,
+    p_fin_fold: repeatedHourFields(values).fin ? values.finFold : null,
   };
 }

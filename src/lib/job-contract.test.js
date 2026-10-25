@@ -52,10 +52,21 @@ describe("job UI/database contract", () => {
     const base = { return_time_minutes: 0, km_total: 0, km_aller: 0, km_retour: 0 };
     expect(validateJobSubmissionContract({
       ...base, job_date: "2026-03-08", depart: "02:30", fin: "03:30",
-    })).toContain("invalid_dst_time");
+    })).toContain("invalid_dst_time:nonexistent");
     expect(validateJobSubmissionContract({
       ...base, job_date: "2026-11-01", depart: "01:30", fin: "02:30",
-    })).toContain("invalid_dst_time");
+    })).toContain("invalid_dst_time:ambiguous");
+  });
+
+  it("accepts a repeated fall hour once a manager chose the time (0116)", () => {
+    const base = { return_time_minutes: 0, km_total: 0, km_aller: 0, km_retour: 0 };
+    expect(validateJobSubmissionContract({
+      ...base, job_date: "2026-11-01", depart: "01:30", fin: "02:30", depart_fold: 1,
+    })).toEqual([]);
+    // 1:30 first time → 2:30 = 2 real hours; second time → 1 real hour. Both are valid.
+    expect(validateJobSubmissionContract({
+      ...base, job_date: "2026-11-01", depart: "01:30", fin: "02:30", depart_fold: 2,
+    })).toEqual([]);
   });
 
   it("locks the migration literals to the UI contract", () => {

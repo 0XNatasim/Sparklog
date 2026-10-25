@@ -69,6 +69,7 @@ describe("buildCreateJobForEmployeeArgs", () => {
     expect(args).toEqual({
       p_employee_id: "emp-1", p_submission_key: "key-1", p_job_date: "2026-10-07", p_ot: "190403",
       p_depart: "08:00", p_arrivee: "08:30", p_fin: "16:00", p_km_aller: 3.2, p_note: "Phone lost",
+      p_depart_fold: null, p_fin_fold: null,
     });
   });
 });

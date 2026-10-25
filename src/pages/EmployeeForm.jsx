@@ -115,6 +115,9 @@ export default function EmployeeForm() {
   const [depart, setDepart] = useState("");
   const [arrivee, setArrivee] = useState("");
   const [fin, setFin] = useState("");
+  // Night of the fall time change (0116): the manager's choice of the repeated hour on this job, kept so the
+  // check before submitting resolves the same instant as the database. Only a manager sets it.
+  const dstFoldsRef = useRef({ depart_fold: null, fin_fold: null });
   const [km_aller, setKmAller] = useState("");
 
   // dirty = the form has unsaved changes. Reset on load/save, set on edit.
@@ -278,6 +281,7 @@ export default function EmployeeForm() {
       setDepart(fmtTimeHHmm(data.depart) || "");
       setArrivee(fmtTimeHHmm(data.arrivee) || "");
       setFin(fmtTimeHHmm(data.fin) || "");
+      dstFoldsRef.current = { depart_fold: data.depart_fold ?? null, fin_fold: data.fin_fold ?? null };
       setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
       loadedReturnRef.current = {
         minutes: Number(data.return_time_minutes) || 0,
@@ -331,6 +335,7 @@ export default function EmployeeForm() {
 
   // "New job" defaults, so a previous job's data doesn't bleed into the next entry.
   function resetNewJobFields() {
+    dstFoldsRef.current = { depart_fold: null, fin_fold: null };
     setJobDate(companyDate());
     setOt("");
     setDepart("");
@@ -569,6 +574,7 @@ export default function EmployeeForm() {
           km_total: kmTotalNum,
           km_aller: kmClientNum,
           km_retour: kmReturnNum,
+          ...(editId ? dstFoldsRef.current : {}),
         });
         if (contractErrors.length) {
           throw new Error(`invalid_job_contract:${contractErrors.join(",")}`);
