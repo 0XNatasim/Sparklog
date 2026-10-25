@@ -56,3 +56,20 @@ export function monthlyReportPeriod(input) {
 
   return { key: iso(end), start: iso(start), end: iso(end) };
 }
+
+// The reporting month ('YYYY-MM') whose period ended last: the period containing `today` is still
+// open (it ends on this month's last Saturday, or next month's once that Saturday is past), so the one
+// just finished is the month before it. Used as the CCQ report's default month (Gestion V3).
+export function lastFinishedReportMonth(today) {
+  const current = monthlyReportPeriod(today);
+  if (!current) return null;
+  const [year, month] = current.end.split("-").map(Number);
+  return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
+}
+
+// The period of a reporting month ('YYYY-MM'): the one that ends on that month's last Saturday.
+export function reportMonthPeriod(month) {
+  const [year, m] = String(month || "").split("-").map(Number);
+  if (!year || !m || m < 1 || m > 12) return null;
+  return monthlyReportPeriod(lastSaturdayOfMonth(year, m));
+}

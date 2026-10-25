@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lastSaturdayOfMonth, monthlyReportPeriod } from "./monthly-report-period";
+import { lastFinishedReportMonth, lastSaturdayOfMonth, monthlyReportPeriod, reportMonthPeriod } from "./monthly-report-period";
 
 const isoLast = (y, m) => lastSaturdayOfMonth(y, m).toISOString().slice(0, 10);
 
@@ -52,5 +52,30 @@ describe("monthlyReportPeriod", () => {
   it("returns null for an unparseable date", () => {
     expect(monthlyReportPeriod("")).toBeNull();
     expect(monthlyReportPeriod(null)).toBeNull();
+  });
+});
+
+describe("lastFinishedReportMonth", () => {
+  it("is the month before the open period", () => {
+    // October 2026 closes on Saturday the 31st: on the 25th and on the 31st itself, September is the last finished.
+    expect(lastFinishedReportMonth("2026-10-25")).toBe("2026-09");
+    expect(lastFinishedReportMonth("2026-10-31")).toBe("2026-09");
+    // The day after, October is finished.
+    expect(lastFinishedReportMonth("2026-11-01")).toBe("2026-10");
+    // A date after its month's last Saturday is already in next month's period.
+    expect(lastFinishedReportMonth("2026-09-28")).toBe("2026-09");
+    // Across the new year.
+    expect(lastFinishedReportMonth("2027-01-10")).toBe("2026-12");
+    expect(lastFinishedReportMonth("2026-12-27")).toBe("2026-12");
+    expect(lastFinishedReportMonth("")).toBeNull();
+  });
+});
+
+describe("reportMonthPeriod", () => {
+  it("gives the weeks of a reporting month", () => {
+    expect(reportMonthPeriod("2026-09")).toEqual({ key: "2026-09-26", start: "2026-08-30", end: "2026-09-26" });
+    expect(reportMonthPeriod("2027-01")).toEqual({ key: "2027-01-30", start: "2026-12-27", end: "2027-01-30" });
+    expect(reportMonthPeriod("")).toBeNull();
+    expect(reportMonthPeriod("2026-13")).toBeNull();
   });
 });

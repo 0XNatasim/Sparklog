@@ -15,13 +15,17 @@ import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useHolidayDates } from "@/lib/company-holidays";
 import { useAuth } from "@/contexts/AuthContext";
+import { companyDate } from "@/lib/company-time";
+import { lastFinishedReportMonth, reportMonthPeriod } from "@/lib/monthly-report-period";
 
 // On screen the NAS is only a mask. The real values are read at download time through
 // export_ccq_nas (migration 0084): owner only, written reason, password re-entry,
 // audited and rate-limited. The browser never selects the vault table.
 const NAS_MASK = "•••••••••";
 
-export default function CcqJsonExport() {
+// `lastFinishedMonth` (Gestion V3): open on the reporting month that just ended, the one to declare,
+// and show its weeks under the month. Without it (V2) the month is the calendar month, as before.
+export default function CcqJsonExport({ lastFinishedMonth = false }) {
   const holidayDates = useHolidayDates();
   const t = useT();
   const { user } = useAuth();
@@ -34,7 +38,7 @@ export default function CcqJsonExport() {
   const [profiles, setProfiles] = useState([]);
   const [roundingByUser, setRoundingByUser] = useState(new Map());
   const [employeeId, setEmployeeId] = useState("all");
-  const [month, setMonth] = useState(dayjs().format("YYYY-MM"));
+  const [month, setMonth] = useState(() => (lastFinishedMonth && lastFinishedReportMonth(companyDate())) || dayjs().format("YYYY-MM"));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -89,6 +93,7 @@ export default function CcqJsonExport() {
   const records = useMemo(() => buildRecords(ccqProfiles), [exportJobs, month, ccqProfiles, holidayDates, roundingByUser]);
 
   const incomplete = records.filter((record) => missingCcqFields(record).length > 0);
+  const monthPeriod = reportMonthPeriod(month);
 
   async function confirmExport() {
     setExportBusy(true);
@@ -162,6 +167,9 @@ export default function CcqJsonExport() {
             </Select>
             <Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} aria-label={t("manager.download.reportingMonth")} />
           </div>
+          {lastFinishedMonth && monthPeriod && (
+            <p className="text-xs text-muted-foreground">{t("manager.download.periodHint", { start: monthPeriod.start, end: monthPeriod.end })}</p>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-sm">
             <div>
               <b>{records.length}</b> {t("manager.download.weeklyRecords")}

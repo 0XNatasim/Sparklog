@@ -9,8 +9,11 @@ import { companyDate } from "@/lib/company-time";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 
 // Temps › Débloquer journée: let one employee enter or edit a closed day (job_entry_unlocks).
-export default function UnlockDayManager() {
+// plainWords (Gestion V3): « rouvrir / refermer une journée » and « retourner pour correction » instead of
+// « déverrouiller ». The V2 page keeps its words.
+export default function UnlockDayManager({ plainWords = false }) {
   const t = useT();
+  const word = (key) => (plainWords ? `${key}.plain` : key);
   const [confirm, confirmDialog] = useConfirmDialog();
   const [message, setMessage] = useState("");
   const [employees, setEmployees] = useState([]);
@@ -70,27 +73,27 @@ export default function UnlockDayManager() {
       .eq("user_id", userId)
       .eq("job_date", jobDate)
       .eq("status", "submitted");
-    if (error || !submitted?.length) return t("timeRules.dayUnlocked");
-    const ok = await confirm(t("timeRules.reopenSubmittedConfirm", { name: employeeName(userId), count: submitted.length, date: jobDate }));
-    if (!ok) return t("timeRules.dayUnlocked");
+    if (error || !submitted?.length) return t(word("timeRules.dayUnlocked"));
+    const ok = await confirm(t(word("timeRules.reopenSubmittedConfirm"), { name: employeeName(userId), count: submitted.length, date: jobDate }));
+    if (!ok) return t(word("timeRules.dayUnlocked"));
     const results = await Promise.all(submitted.map((job) => supabase.rpc("return_job_for_correction", {
       p_job_id: job.id,
       p_expected_updated_at: job.updated_at,
     })));
     const failed = results.filter((result) => result.error).length;
     return failed
-      ? t("timeRules.reopenSubmittedPartial", { done: submitted.length - failed, failed })
-      : t("timeRules.reopenSubmittedDone", { count: submitted.length });
+      ? t(word("timeRules.reopenSubmittedPartial"), { done: submitted.length - failed, failed })
+      : t(word("timeRules.reopenSubmittedDone"), { count: submitted.length });
   }
 
   async function removeUnlock(row) {
-    if (!(await confirm(t("confirm.removeUnlock", { name: employeeName(row.user_id), date: row.job_date })))) return;
+    if (!(await confirm(t(word("confirm.removeUnlock"), { name: employeeName(row.user_id), date: row.job_date })))) return;
     const { id } = row;
     setBusy(true);
     const { error } = await supabase.from("job_entry_unlocks").delete().eq("id", id);
     if (error) setMessage(error.message);
     else {
-      setMessage(t("timeRules.unlockRemoved"));
+      setMessage(t(word("timeRules.unlockRemoved")));
       setUnlocks((current) => current.filter((row) => row.id !== id));
     }
     setBusy(false);
@@ -100,7 +103,7 @@ export default function UnlockDayManager() {
     <Card>
       <CardContent className="space-y-3 p-4">
         {message && <div className="rounded-md border bg-muted px-3 py-2 text-xs" role="status">{message}</div>}
-        <p className="text-xs text-muted-foreground">{t("timeRules.unlockHelp")}</p>
+        <p className="text-xs text-muted-foreground">{t(word("timeRules.unlockHelp"))}</p>
         <div className="grid gap-2 sm:grid-cols-[1fr,auto,auto] sm:items-end">
           <label className="space-y-1">
             <span className="text-xs text-muted-foreground">{t("notifications.employee")}</span>
@@ -115,19 +118,19 @@ export default function UnlockDayManager() {
             <span className="text-xs text-muted-foreground">{t("timeRules.unlockDate")}</span>
             <Input type="date" value={unlockDate} onChange={(e) => setUnlockDate(e.target.value)} />
           </label>
-          <Button type="button" className="h-11 sm:h-10" disabled={busy} onClick={unlockDay}>{busy ? t("common.working") : t("timeRules.unlockDay")}</Button>
+          <Button type="button" className="h-11 sm:h-10" disabled={busy} onClick={unlockDay}>{busy ? t("common.working") : t(word("timeRules.unlockDay"))}</Button>
         </div>
 
         <div className="space-y-1">
-          <span className="text-xs font-medium">{t("timeRules.activeUnlocks")}</span>
+          <span className="text-xs font-medium">{t(word("timeRules.activeUnlocks"))}</span>
           {unlocks.length === 0 ? (
-            <p className="text-xs text-muted-foreground">{t("timeRules.noUnlocks")}</p>
+            <p className="text-xs text-muted-foreground">{t(word("timeRules.noUnlocks"))}</p>
           ) : (
             <div className="max-h-96 space-y-1 overflow-y-auto pr-1">
               {unlocks.map((row) => (
                 <div key={row.id} className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-xs">
                   <span><b>{row.job_date}</b> · {employeeName(row.user_id)}</span>
-                  <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-destructive" disabled={busy} onClick={() => removeUnlock(row)}>{t("timeRules.remove")}</Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-destructive" disabled={busy} onClick={() => removeUnlock(row)}>{t(word("timeRules.remove"))}</Button>
                 </div>
               ))}
             </div>

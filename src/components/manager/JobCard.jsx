@@ -19,7 +19,7 @@ import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculation
 // nameFirst (Gestion V3): the employee's full name heads the card with the OT number and the
 // date under it, in a fixed-width column the pills and buttons cannot squeeze. Without it, the
 // V2 card, unchanged.
-function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, manualEntry, focused, focusedEvidence, busy, onApprove, onUnlock, nameFirst = false }) {
+function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, manualEntry, focused, focusedEvidence, busy, onApprove, onUnlock, nameFirst = false, plainWords = false }) {
   const t = useT();
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
 
@@ -140,7 +140,7 @@ function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCapt
               )}
               {j.locked === true && j.status !== "approved" && (
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => onUnlock(j.id)}>
-                  {busy ? t("common.working") : t("manager.unlock")}
+                  {busy ? t("common.working") : t(plainWords ? "manager.unlock.plain" : "manager.unlock")}
                 </Button>
               )}
             </div>

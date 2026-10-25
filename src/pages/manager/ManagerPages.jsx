@@ -337,10 +337,10 @@ function TabbedPage({ itemId, content }) {
   );
 }
 
-const TODO_TABS = { todo: TodoPage, receipts: ReceiptsPage };
+const TODO_TABS = { todo: TodoPage, receipts: () => <ManagerDashboard view="receipts" reviewFilters /> };
 // V3 timesheets: same page, cards with the employee's name first and the « Entrées à la main »
 // filter (the V2 page is unchanged).
-const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter />, unlock: UnlockDayPage };
+const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter plainWords />, unlock: () => <Narrow><UnlockDayManager plainWords /></Narrow> };
 // Same pages as V2 Paie, with the compact Méthode control; Calcul détaillé keeps the « writes » warning.
 const PAY_HISTORY_TABS = {
   stubs: () => <PayrollPage Component={TalonTab} compact />,
@@ -355,7 +355,7 @@ const REPORTS_TABS = {
   month: () => <PeriodSummary mode="month" />,
   grid: () => <WeekViewTab />,
   // CCQ export only: the DAS (already in Historique paie) and the « bientôt » bank card are left out.
-  ccq: () => <CcqJsonExport />,
+  ccq: () => <CcqJsonExport lastFinishedMonth />,
 };
 const CONFIG_TABS = {
   settings: SettingsPage, "time-rules": RulesPage, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,

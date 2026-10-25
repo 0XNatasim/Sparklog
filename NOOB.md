@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.178).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.179).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -159,13 +159,16 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
 - [ ] **DAS de Téléchargements (V2 seulement)** : il calcule avec la méthode « Référence » alors que Paie › DAS
   utilise « Messier ». Réglé en V3 (pas de DAS dans l'export) ; disparaîtra avec la V2.
-- [ ] **Débloquer** : des mots clairs — « rouvrir une journée » ou « retourner une job pour correction ». En V3, le
-  déblocage d'un jour précis est déjà un seul onglet (Feuilles de temps › Débloquer une journée), mais le bouton
-  « Déverrouiller » des cartes garde son ancien nom.
-- [ ] **Reçus et preuves** (onglet Justificatifs de À traiter en V3) : n'afficher par défaut que ce qui reste à
-  traiter ; recherche par employé et par date.
+- [x] **Débloquer** (V2.4.179) : des mots clairs en V3. L'onglet s'appelle **« Rouvrir une journée »** (bouton
+  « Rouvrir la journée », liste « Journées rouvertes », « Refermer ») et le bouton des cartes de Feuilles de temps dit
+  **« Retourner pour correction »** (l'employé la corrige et la soumet de nouveau). La V2 garde ses anciens mots.
+- [x] **Reçus et preuves** (V2.4.179, onglet Justificatifs de À traiter) : par défaut, seulement ce qui reste à
+  traiter (souper ou stationnement en attente, preuve de temps sup. d'une job pas encore approuvée), avec le nombre.
+  Décocher « À traiter seulement » montre tout. Choix d'un employé et d'une journée. Un lien de la cloche ouvre
+  toujours sa job.
 - [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
-- [ ] **Rapport CCQ** : proposer par défaut le mois qui vient de finir.
+- [x] **Rapport CCQ** (V2.4.179, Rapports › Export CCQ) : s'ouvre sur le mois qui vient de finir (le mois CCQ finit
+  le dernier samedi : le 25 octobre, c'est septembre ; dès le 1er novembre, octobre) et affiche ses semaines.
 - [ ] **Petits plus** : recherche dans les listes (Employés, Messages), « tout marquer comme lu » sur la cloche,
   « jours sans saisie » visible dans Temps plutôt que dans Avancé, une seule cloche en V3, un compteur sur
   « À traiter » (demande une petite requête de plus : à décider).

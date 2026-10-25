@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.178)
+## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.179)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -813,6 +813,18 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   comparées). Testé sur Postgres local (1re / 2e fois, 22 h → 1 h 30 = 3,5 h ou 4,5 h réelles, choix effacé hors de
   l'heure, écriture directe refusée, RPC par le rôle navigateur) et dans Chromium (horloge au 2 novembre). La paie compte
   encore l'heure affichée (§6.1 D). Test `dst-repeated-hour.test.js`.
+- [x] **Gestion V3 : mots clairs, justificatifs à traiter, mois CCQ** (V2.4.179, aucune migration, V2 inchangée :
+  tout passe par des props données par les onglets V3 de `ManagerPages.jsx`). (1) `UnlockDayManager({ plainWords })`,
+  `ManagerDashboard({ plainWords })` → `JobCard({ plainWords })` : clés `….plain` (« Rouvrir une journée », « Retourner
+  pour correction » = `return_job_for_correction`, inchangé) ; onglet `mgr.nav3.tab.unlockDay` et `todo.unlock` /
+  `todo.toast.unlocked` (V3 seulement) reformulés. (2) `ManagerDashboard({ reviewFilters })` (Justificatifs de À traiter) :
+  `receiptNeedsReview` / `filterReceiptJobs` / `receiptEmployees` (`src/lib/receipts-review.js`) — à traiter = stationnement
+  ou souper `pending` (dernier souper de la job), ou preuve de temps sup. d'une job non approuvée ; case « À traiter
+  seulement » cochée par défaut (décochée si `?job=` d'un lien de notification), employé, journée. Filtre sur les lignes
+  déjà chargées, aucune requête de plus (le souper lit aussi `status`). (3) `CcqJsonExport({ lastFinishedMonth })` :
+  `lastFinishedReportMonth(companyDate())` (mois avant celui de la période en cours, `src/lib/monthly-report-period.js`)
+  et `reportMonthPeriod` pour afficher les semaines. Tests `receipts-review.test.js`, `monthly-report-period.test.js`,
+  `UnlockDayManager.test.jsx` (mots V2 / V3, chaque clé `.plain` dans les deux langues).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.178 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.179 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -126,6 +126,11 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   `src/test/fake-supabase.js`) written first and passing on both versions. ESLint goes from 64 warnings to 0 and
   `npm run lint` now fails on any warning. Fixed on the way: switching the payroll method (Messier / Reference) now
   recomputes the DAS screen; the service-health card no longer retries a failed load in a loop.
+- **Manager V3: plain words, receipts to process, CCQ month** (V2.4.179, V3 only; V2 unchanged): Time › « Reopen a
+  day » (was « Unlock a day »), and the time-sheet card button says « Send back for correction » instead of « Unlock ».
+  To do › Receipts shows by default only what is left to process (supper or parking claim pending, overtime proof on a
+  job not approved yet), with an employee and a day filter; a notification link still opens its job. Reports › CCQ
+  export opens on the reporting month that just ended and shows its weeks.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,
