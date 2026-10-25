@@ -33,7 +33,7 @@ function Where() {
   return <div data-testid="where">{location.pathname}{location.search}</div>;
 }
 
-function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [] } = {}) {
+function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [], parking = [] } = {}) {
   state.auth = { user: { id: "emp-1" }, role: "employee" };
   state.fake = createFakeSupabase({
     tables: {
@@ -45,6 +45,7 @@ function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", sa
       meal_claims: [],
       inventory_screenshots: inventoryShots,
       inventory_items: [],
+      parking_receipts: parking,
     },
     rpcs: {
       save_own_job: saveJob || ((call) => [{ id: "job-new", status: call.args.p_submit ? "submitted" : "saved", locked: false }]),
@@ -177,6 +178,49 @@ describe("EmployeeForm — existing job", () => {
     expect(field("ot").disabled).toBe(true);
     expect(saveButton()).toBeNull();
     expect(screen.getByText(fr("form.lockedNotice", { status: fr("status.submitted"), saved: fr("status.saved"), updated: fr("status.updated") }))).toBeTruthy();
+  });
+
+  const savedJob = { id: "job-5", user_id: "emp-1", job_date: "2026-10-26", ot: "190005", depart: "07:00:00", arrivee: "07:20:00", fin: "12:00:00", km_total: 30, km_aller: 30, status: "saved", locked: false, updated_at: "2026-10-26T13:00:00Z" };
+
+  it("offers the newer draft kept on the device, and uses it when accepted", async () => {
+    state.drafts.set("emp-1:job-5", { userId: "emp-1", editId: "job-5", updatedAt: "2026-10-26T14:00:00Z", data: { job_date: "2026-10-26", ot: "190005", depart: "07:00", arrivee: "07:20", fin: "13:30", km_aller: "30" } });
+    setup({ path: "/form?edit=job-5", jobs: [savedJob] });
+    fireEvent.click(await screen.findByRole("button", { name: fr("common.yes") }));
+    await waitFor(() => expect(field("fin").value).toBe("13:30"));
+    expect(screen.getByText(fr("form.toasts.draftRestored"))).toBeTruthy();
+  });
+
+  it("drops a draft older than the server copy", async () => {
+    state.drafts.set("emp-1:job-5", { userId: "emp-1", editId: "job-5", updatedAt: "2026-10-26T12:00:00Z", data: { job_date: "2026-10-26", ot: "190005", fin: "09:00" } });
+    setup({ path: "/form?edit=job-5", jobs: [savedJob] });
+    await waitFor(() => expect(field("fin").value).toBe("12:00"));
+    await waitFor(() => expect(state.drafts.has("emp-1:job-5")).toBe(false));
+    expect(screen.queryByText(fr("form.draft.restoreNewer"))).toBeNull();
+  });
+
+  it("falls back to the device draft when the job cannot be read", async () => {
+    state.drafts.set("emp-1:job-5", { userId: "emp-1", editId: "job-5", updatedAt: "2026-10-26T14:00:00Z", data: { job_date: "2026-10-26", ot: "190005", depart: "07:00", arrivee: "07:20", fin: "13:30", km_aller: "30" } });
+    setup({ path: "/form?edit=job-5", jobs: () => ({ data: null, error: { message: "boom", code: "XX000" } }) });
+    await waitFor(() => expect(field("fin").value).toBe("13:30"));
+    expect(screen.getByText(fr("form.toasts.draftRestored"))).toBeTruthy();
+    expect(screen.queryByText(fr("form.errors.failedLoad"))).toBeNull();
+  });
+
+  it("loads the parking amount of a job that has a receipt", async () => {
+    setup({
+      path: "/form?edit=job-5",
+      profile: { parking_receipts_enabled: true },
+      jobs: [{ ...savedJob, parking_receipt_captured: true }],
+      parking: [{ amount: 8.5, status: "pending", storage_path: "emp-1/p1.jpg", extra_storage_paths: ["emp-1/p2.jpg"] }],
+    });
+    await waitFor(() => expect(document.getElementById("parking-amount")?.value).toBe("8.5"));
+    expect(screen.getByText(fr("form.parking.savedCount", { count: 2 }))).toBeTruthy();
+  });
+
+  it("opens the overtime proof by itself when History sends a long day to submit", async () => {
+    setup({ path: "/form?edit=job-5&submit=1", jobs: [{ ...savedJob, depart: "06:00:00", fin: "15:30:00" }] });
+    await screen.findByText(fr("form.evidence.title"));
+    expect(state.fake.rpcCalls("save_own_job")).toHaveLength(0);
   });
 
   it("refuses to open another employee's job", async () => {

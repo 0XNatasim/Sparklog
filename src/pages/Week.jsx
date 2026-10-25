@@ -45,6 +45,26 @@ function isNonEmptyOT(ot) {
   return String(ot || "").trim().length > 0;
 }
 
+// The employee's jobs of the last weeks and the per-employee policies that split the totals
+// (overtime first hour, return with benefits, first trip unpaid, day-rounding counter).
+async function fetchWeeks(userId) {
+  const { data, error } = await withTimeout(
+    supabase
+      .from("jobs")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("job_date", dayjs(companyDate()).subtract(QUERY_BUDGETS.employeeWeekLookbackWeeks, "week").format("YYYY-MM-DD"))
+      .order("job_date", { ascending: false })
+      .order("updated_at", { ascending: false }),
+    12000
+  );
+  if (error) throw error;
+  const { data: profile } = await supabase
+    .from("profiles").select("overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").eq("id", userId).maybeSingle();
+  const counters = await loadDayRounding({ userIds: [userId], profiles: [{ id: userId, first_trip_unpaid: Boolean(profile?.first_trip_unpaid) }] });
+  return { jobs: data || [], profile, rounding: roundingFor(counters, userId) };
+}
+
 export default function Week() {
   const { user, role } = useAuth();
   const [searchParams] = useSearchParams();
@@ -66,45 +86,46 @@ export default function Week() {
 
   const [openWeekKey, setOpenWeekKey] = useState(null);
 
+  function applyWeeks({ jobs: rows, profile: prof, rounding: nextRounding }) {
+    setJobs(rows);
+    setOtFirstHourDouble(Boolean(prof?.overtime_first_hour_double));
+    setReturnWithBenefitsTo8h(Boolean(prof?.return_with_benefits_to_8h));
+    setFirstTripUnpaid(Boolean(prof?.first_trip_unpaid));
+    setRounding(nextRounding);
+  }
+  function failWeeks(e) {
+    setErr(e?.message || t("week.errors.failedLoad"));
+    setJobs([]);
+  }
+
   async function load() {
     setErr("");
     setLoading(true);
     try {
-      if (!effectiveUserId) {
-        setJobs([]);
-        setLoading(false);
-        return;
-      }
-      const { data, error } = await withTimeout(
-        supabase
-          .from("jobs")
-          .select("*")
-          .eq("user_id", effectiveUserId)
-          .gte("job_date", dayjs(companyDate()).subtract(QUERY_BUDGETS.employeeWeekLookbackWeeks, "week").format("YYYY-MM-DD"))
-          .order("job_date", { ascending: false })
-          .order("updated_at", { ascending: false }),
-        12000
-      );
-      if (error) throw error;
-      setJobs(data || []);
-      // Per-employee overtime policies drive the split in the weekly totals.
-      const { data: prof } = await supabase
-        .from("profiles").select("overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").eq("id", effectiveUserId).maybeSingle();
-      setOtFirstHourDouble(Boolean(prof?.overtime_first_hour_double));
-      setReturnWithBenefitsTo8h(Boolean(prof?.return_with_benefits_to_8h));
-      setFirstTripUnpaid(Boolean(prof?.first_trip_unpaid));
-      const counters = await loadDayRounding({ userIds: [effectiveUserId], profiles: [{ id: effectiveUserId, first_trip_unpaid: Boolean(prof?.first_trip_unpaid) }] });
-      setRounding(roundingFor(counters, effectiveUserId));
+      if (!effectiveUserId) setJobs([]);
+      else applyWeeks(await fetchWeeks(effectiveUserId));
     } catch (e) {
-      setErr(e?.message || t("week.errors.failedLoad"));
-      setJobs([]);
+      failWeeks(e);
     } finally {
       setLoading(false);
     }
   }
 
+  // Another employee: clear the message and show the weeks as loading (adjusted while rendering).
+  const [weeksUser, setWeeksUser] = useState(effectiveUserId);
+  if (weeksUser !== effectiveUserId) {
+    setWeeksUser(effectiveUserId);
+    setErr("");
+    setLoading(true);
+  }
   useEffect(() => {
-    load();
+    let alive = true;
+    const read = effectiveUserId ? fetchWeeks(effectiveUserId) : Promise.resolve(null);
+    read.then(
+      (weeks) => { if (alive) { if (weeks) applyWeeks(weeks); else setJobs([]); } },
+      (e) => { if (alive) failWeeks(e); },
+    ).finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveUserId]);
 

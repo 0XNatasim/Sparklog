@@ -46,6 +46,32 @@ import ManualEntryCheckDialog from "@/components/employee-form/ManualEntryCheckD
 dayjs.locale("en");
 
 
+// An existing job of this employee and its parking claim. Never throws: { job, parkingReceipt } or
+// { error } (with the job when only its parking claim could not be read).
+async function readEditJob({ editId, userId, t }) {
+  let job = null;
+  try {
+    const { data, error } = await withRetry(
+      () => supabase.from("jobs").select("*").eq("id", editId).single(),
+      12000
+    );
+    if (error) throw error;
+    if (!data) throw new Error(t("form.errors.notFound"));
+    if (data.user_id !== userId) throw new Error(t("form.errors.notAuthorized"));
+    job = data;
+    let parkingReceipt = null;
+    if (data.parking_receipt_captured) {
+      ({ data: parkingReceipt } = await withTimeout(
+        supabase.from("parking_receipts").select("amount, status, storage_path, extra_storage_paths").eq("job_id", data.id).maybeSingle(),
+        10000
+      ));
+    }
+    return { job, parkingReceipt };
+  } catch (error) {
+    return { job, error };
+  }
+}
+
 export default function EmployeeForm() {
   const { user, role } = useAuth();
   const isManager = isManagerRole(String(role || "").toLowerCase());
@@ -201,47 +227,41 @@ export default function EmployeeForm() {
     submissionKeyRef.current = crypto.randomUUID();
   }
 
-  async function loadEdit() {
-    if (!editId || !effectiveUserId) return;
-
+  // Opening an existing job: clear the previous messages and show it as loading.
+  function beginEditLoad() {
     setErr("");
     setInfo("");
     setDraftRestored(false);
     setWarning("");
     setLoadingEdit(true);
     setEditLoadFailed(false);
+  }
 
+  // Shows what readEditJob returned: the job (its parking claim), the newer device draft if the
+  // employee wants it, or the load error — then the device draft when there is one.
+  async function applyEditLoad({ job: data, parkingReceipt, error }) {
     try {
-      const { data, error } = await withRetry(
-        () => supabase.from("jobs").select("*").eq("id", editId).single(),
-        12000
-      );
+      if (data) {
+        setManagerEntryBy(isPendingManagerEntry(data) ? (data.manager_entry_by_name || t("audit.someone")) : null);
+        setJobDate(data.job_date || companyDate());
+        setOt(data.ot || "");
+        setDepart(fmtTimeHHmm(data.depart) || "");
+        setArrivee(fmtTimeHHmm(data.arrivee) || "");
+        setFin(fmtTimeHHmm(data.fin) || "");
+        dstFoldsRef.current = { depart_fold: data.depart_fold ?? null, fin_fold: data.fin_fold ?? null };
+        setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
+        loadedReturnRef.current = {
+          minutes: Number(data.return_time_minutes) || 0,
+          km: Number(data.km_retour) || 0,
+        };
+        setParkingRequested(Boolean(data.parking_receipt_captured));
+        setHasParkingReceipt(Boolean(data.parking_receipt_captured));
+        setParkingFiles([]);
+        setKmAller(kilometreFieldValue(data));
+      }
       if (error) throw error;
-      if (!data) throw new Error(t("form.errors.notFound"));
-      if (data.user_id !== effectiveUserId) throw new Error(t("form.errors.notAuthorized"));
 
-      setManagerEntryBy(isPendingManagerEntry(data) ? (data.manager_entry_by_name || t("audit.someone")) : null);
-      setJobDate(data.job_date || companyDate());
-      setOt(data.ot || "");
-      setDepart(fmtTimeHHmm(data.depart) || "");
-      setArrivee(fmtTimeHHmm(data.arrivee) || "");
-      setFin(fmtTimeHHmm(data.fin) || "");
-      dstFoldsRef.current = { depart_fold: data.depart_fold ?? null, fin_fold: data.fin_fold ?? null };
-      setHasOvertimeEvidence(Boolean(data.overtime_evidence_captured));
-      loadedReturnRef.current = {
-        minutes: Number(data.return_time_minutes) || 0,
-        km: Number(data.km_retour) || 0,
-      };
-      setParkingRequested(Boolean(data.parking_receipt_captured));
-      setHasParkingReceipt(Boolean(data.parking_receipt_captured));
-      setParkingFiles([]);
-
-      setKmAller(kilometreFieldValue(data));
       if (data.parking_receipt_captured) {
-        const { data: parkingReceipt } = await withTimeout(
-          supabase.from("parking_receipts").select("amount, status, storage_path, extra_storage_paths").eq("job_id", data.id).maybeSingle(),
-          10000
-        );
         setParkingAmount(parkingReceipt?.amount == null ? "" : String(parkingReceipt.amount));
         setParkingSaved({ count: parkingReceiptPaths(parkingReceipt).length, status: parkingReceipt?.status || "pending" });
       } else {
@@ -278,9 +298,21 @@ export default function EmployeeForm() {
     }
   }
 
+  // « Réessayer » and discarding a restored draft read the job again.
+  async function loadEdit() {
+    if (!editId || !effectiveUserId) return;
+    beginEditLoad();
+    await applyEditLoad(await readEditJob({ editId, userId: effectiveUserId, t }));
+  }
+
   // "New job" defaults, so a previous job's data doesn't bleed into the next entry.
   function resetNewJobFields() {
     dstFoldsRef.current = { depart_fold: null, fin_fold: null };
+    resetNewJobState();
+  }
+
+  // The state part of resetNewJobFields (also run while rendering when another form opens).
+  function resetNewJobState() {
     setJobDate(companyDate());
     setOt("");
     setDepart("");
@@ -320,16 +352,30 @@ export default function EmployeeForm() {
     submissionKeyRef.current = crypto.randomUUID();
   }
 
-  useEffect(() => {
+  // Another job (or a new entry, or another employee in view mode) opens: reset the form while
+  // rendering, then the effect below reads the job or the device draft.
+  const formKey = `${editId || ""}|${effectiveUserId || ""}`;
+  const [formFor, setFormFor] = useState(null);
+  if (formFor !== formKey) {
+    setFormFor(formKey);
     setDraftReady(false);
+    if (!editId) resetNewJobState();
+    else if (effectiveUserId) beginEditLoad();
+  }
+
+  useEffect(() => {
+    let alive = true;
     if (editId) {
-      loadEdit();
+      if (effectiveUserId) {
+        readEditJob({ editId, userId: effectiveUserId, t }).then((result) => { if (alive) applyEditLoad(result); });
+      }
     } else {
-      resetNewJobFields();
+      dstFoldsRef.current = { depart_fold: null, fin_fold: null };
       loadDraft({ userId: effectiveUserId }).then((record) => {
-        if (record) restoreLocalDraft(record);
-      }).catch(() => undefined).finally(() => setDraftReady(true));
+        if (alive && record) restoreLocalDraft(record);
+      }).catch(() => undefined).finally(() => { if (alive) setDraftReady(true); });
     }
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, effectiveUserId]);
 
@@ -372,7 +418,7 @@ export default function EmployeeForm() {
         setParkingFiles([]);
       }
     });
-  }, [effectiveUserId]);
+  }, [effectiveUserId, t]);
 
   useEffect(() => {
     if (!effectiveUserId || !job_date) return;
@@ -658,7 +704,6 @@ export default function EmployeeForm() {
     // Coming from History to submit a day: run the end-of-shift flow for this job's day.
     endShiftRef.current = true;
     endShiftDateRef.current = job_date;
-    setPendingSaveMode("draft");
     saveWithReturn(loadedReturnRef.current.minutes, loadedReturnRef.current.km, "draft");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, loadingEdit, draftReady, editLoadFailed, locked, isViewMode]);
@@ -714,7 +759,8 @@ export default function EmployeeForm() {
       setReturnCheckBusy(false);
     }
     if (needsEvidence) {
-      setPendingReturn(returnValues);
+      // The proof step saves the job with the same mode as this flow.
+      setPendingReturn({ ...returnValues, mode: requestedMode });
       setReturnStep("evidence");
       return;
     }
@@ -897,7 +943,7 @@ export default function EmployeeForm() {
 
         // Job + proof row + manager notification in ONE transaction (migration 0084): a
         // failure leaves none of them, so a job can never claim a proof that was not recorded.
-        savedJobId = await saveJob(pendingSaveMode, pendingReturn, jobId, { evidenceId, storagePath, dailyMinutes: overtimeDailyMinutes });
+        savedJobId = await saveJob(pendingReturn.mode || pendingSaveMode, pendingReturn, jobId, { evidenceId, storagePath, dailyMinutes: overtimeDailyMinutes });
         if (!savedJobId) {
           // saveJob also fails when only the parking receipt (sent after the commit) fails.
           const { data: committedJob } = await withTimeout(
