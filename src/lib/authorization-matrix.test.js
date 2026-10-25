@@ -65,7 +65,7 @@ describe("application authorization matrix", () => {
       todo: { todo: "manager", receipts: "notifications" },
       "v3-time": { timesheets: "timesheet", unlock: "employees" },
       "v3-team": { employees: "employees", absences: "manager" },
-      "v3-config": { settings: "manager", "time-rules": "employees", "ccq-rates": "manager", "pay-rules": "manager", forms: "forms", references: "manager" },
+      "v3-config": { settings: "manager", "ccq-rates": "manager", "pay-rules": "manager", forms: "forms", references: "manager" },
       "v3-pay-history": { stubs: "manager", das: "manager", roe: "manager", calcul: "manager" },
       "v3-reports": { costs: "manager", week: "manager", month: "manager", grid: "manager", ccq: "manager" },
     };

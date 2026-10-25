@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.179)
+## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.180)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -825,6 +825,20 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `lastFinishedReportMonth(companyDate())` (mois avant celui de la période en cours, `src/lib/monthly-report-period.js`)
   et `reportMonthPeriod` pour afficher les semaines. Tests `receipts-review.test.js`, `monthly-report-period.test.js`,
   `UnlockDayManager.test.jsx` (mots V2 / V3, chaque clé `.plain` dans les deux langues).
+- [x] **Gestion V3 : fiche employé unique** (V2.4.180, aucune migration, V2 inchangée) : `EmployeesPanel({ tabbed })`
+  depuis l'onglet V3 `v3/team?tab=employees` — recherche (`matchesEmployeeSearch` : nom, courriel, n° d'employé / CCQ,
+  chiffres du téléphone, sans accents), filtre « Chefs d'équipe » (`isTeamLeader`), fiche ouverte = `EmployeeTabs`
+  (`employeeCardTabs(profile, viewerRole)` : CCQ pour métier et sous-traitant, Impôts pour un lecteur gestionnaire /
+  propriétaire et jamais pour un sous-traitant, comme la RLS 0083 de `employee_tax_profiles`). Les morceaux de la fiche V2
+  sont exportés et réutilisés tels quels (`EmployeeAccountSection` : type, n°, rôle, pause, embauche / départ ;
+  `CcqDataFields` / `CcqOptionsFields` ; `OfficePayFields` / `ManagementAccessFields` ; `EmployeeDeleteBlock`) ; la fiche V2
+  les assemble comme avant (tests d'écran V2 inchangés). Règles de temps : `src/lib/pay-options.js` (`payRuleToggles`,
+  `reimbursements`, `parsePayAmount`) + `components/employees/PayOptionsFields.jsx`, partagés avec `TimeRulesManager` (V2).
+  TD1 : `src/lib/tax-profile.js` (`taxFormRow`, `taxProfileUpsert`) + `TaxProfileFields.jsx`, partagés avec
+  `PayrollSettings` ; onglet `EmployeeTaxTab` (lit la ligne de l'employé à l'ouverture, même upsert). Menu V3 : onglet
+  `time-rules` retiré de `v3-config` ; `V2_TO_V3["config/rules"]` → `v3/team?tab=employees` avec `merged: true` (retour
+  V3 → V2 sur Employés, même règle `employees`) ; `SettingsPanel({ taxForms: false })` en V3. Tests
+  `EmployeesPanel.test.jsx` (6 cas V3), `employee-card.test.js`, `manager-nav.test.js`, `authorization-matrix.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

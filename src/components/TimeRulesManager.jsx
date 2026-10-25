@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import Fold from "@/components/ui/fold";
 import { useT } from "@/lib/use-t";
-import { isAdminEmployee, isManagerRole, isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
+import { isManagerRole, isSubcontractorRole } from "@/lib/roles";
+import { parsePayAmount } from "@/lib/pay-options";
+import PayOptionsFields from "@/components/employees/PayOptionsFields";
 
 export default function TimeRulesManager() {
   const t = useT();
@@ -88,9 +90,8 @@ export default function TimeRulesManager() {
   }
 
   async function savePayAmount(id, field, rawValue) {
-    const text = String(rawValue ?? "").trim().replace(",", ".");
-    const value = text === "" ? (field === "km_rate" ? null : 0) : Number(text);
-    if (value != null && (Number.isNaN(value) || value < 0)) {
+    const value = parsePayAmount(field, rawValue);
+    if (Number.isNaN(value)) {
       setMessage(t("timeRules.payRules.invalidAmount"));
       return;
     }
@@ -125,78 +126,12 @@ export default function TimeRulesManager() {
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">{t("timeRules.payRules.help")}</p>
             <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
-              {payRuleRows.map((row) => {
-                const fixed = isSubcontractorRole(row.role);
-                // Office (admin) employees have no km/phone reimbursement; storage is CCQ-only.
-                const reimbursable = !isAdminEmployee(row.role);
-                const storageEligible = !isNonCcqRole(row.role);
-                const rules = [
-                  { field: "first_trip_unpaid", label: t("settings.firstTrip.title"), hint: t("settings.firstTrip.help"), locked: false },
-                  // Subcontractors: return always at the simple rate, first OT hour always double.
-                  { field: "return_with_benefits_to_8h", label: t("employees.returnWithBenefits"), hint: t("employees.returnWithBenefitsHint"), locked: fixed, lockedValue: false },
-                  { field: "overtime_first_hour_double", label: t("employees.otFirstHourDouble"), hint: t("employees.otFirstHourDoubleHint"), locked: fixed, lockedValue: true },
-                  ...(Number(row.team_leader_premium) > 0 || Number(row.team_leader_premium_ccq) > 0
-                    ? [{ field: "team_leader_premium_overtime", label: t("employees.premiumOnOvertime"), hint: t("employees.premiumOnOvertimeHint"), locked: fixed, lockedValue: false }]
-                    : []),
-                ];
-                return (
-                  <div key={row.id} className="rounded border bg-muted/30 px-3 py-2">
-                    <div className="mb-1 text-sm font-semibold">{row.full_name || row.email || row.id}{fixed ? <span className="ml-2 text-xs font-normal text-muted-foreground">{t("timeRules.payRules.subcontractor")}</span> : null}</div>
-                    <div className="grid gap-1 md:grid-cols-3">
-                      {rules.map((rule) => (
-                        <label key={rule.field} title={rule.hint} className={`flex items-center justify-between gap-3 rounded border bg-background px-2 py-2 text-xs ${rule.locked ? "opacity-70" : "cursor-pointer"}`}>
-                          <span>{rule.label}</span>
-                          <input
-                            type="checkbox"
-                            checked={rule.locked ? rule.lockedValue : Boolean(row[rule.field])}
-                            disabled={rule.locked}
-                            onChange={(e) => setPayRule(row.id, rule.field, e.target.checked)}
-                            className="h-5 w-5 shrink-0 rounded border-input accent-primary"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                    {reimbursable && (
-                      <div className="mt-1 grid gap-1 md:grid-cols-3">
-                        <label className="flex items-center justify-between gap-3 rounded border bg-background px-2 py-1.5 text-xs">
-                          <span>{t("employees.kmRate")}</span>
-                          <span className="flex items-center gap-1">
-                            <span className="text-muted-foreground">$</span>
-                            <Input type="number" step="0.01" min="0" max="9.99" inputMode="decimal" value={row.km_rate ?? ""} onChange={(e) => setPayRuleLocal(row.id, "km_rate", e.target.value)} onBlur={(e) => savePayAmount(row.id, "km_rate", e.target.value)} placeholder="0.65" className="h-8 w-20 text-right font-mono" />
-                            <span className="text-muted-foreground">/km</span>
-                          </span>
-                        </label>
-                        <label title={t("employees.phoneDataHint")} className="flex items-center justify-between gap-3 rounded border bg-background px-2 py-1.5 text-xs">
-                          <span>{t("employees.phoneData")}</span>
-                          <span className="flex items-center gap-1">
-                            <span className="text-muted-foreground">$</span>
-                            <Input type="number" step="0.01" min="0" inputMode="decimal" value={row.phone_data_reimbursement ?? ""} onChange={(e) => setPayRuleLocal(row.id, "phone_data_reimbursement", e.target.value)} onBlur={(e) => savePayAmount(row.id, "phone_data_reimbursement", e.target.value)} placeholder="7.00" className="h-8 w-20 text-right font-mono" />
-                            <span className="text-muted-foreground">/{t("employees.perWeek")}</span>
-                          </span>
-                        </label>
-                        {storageEligible && (
-                          <div title={t("employees.storageHint")} className="flex items-center justify-between gap-3 rounded border bg-background px-2 py-1.5 text-xs">
-                            <label className="flex cursor-pointer items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={Boolean(row.storage_compensation)}
-                                onChange={(e) => setPayRule(row.id, "storage_compensation", e.target.checked)}
-                                className="h-5 w-5 shrink-0 rounded border-input accent-primary"
-                              />
-                              <span>{t("employees.storage")}</span>
-                            </label>
-                            <span className={`flex items-center gap-1 ${row.storage_compensation ? "" : "opacity-50"}`}>
-                              <span className="text-muted-foreground">$</span>
-                              <Input type="number" step="0.01" min="0" inputMode="decimal" aria-label={t("employees.storage")} disabled={!row.storage_compensation} value={row.storage_compensation_amount ?? ""} onChange={(e) => setPayRuleLocal(row.id, "storage_compensation_amount", e.target.value)} onBlur={(e) => savePayAmount(row.id, "storage_compensation_amount", e.target.value)} placeholder="50.00" className="h-8 w-20 text-right font-mono" />
-                              <span className="text-muted-foreground">/{t("employees.perWeek")}</span>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {payRuleRows.map((row) => (
+                <div key={row.id} className="rounded border bg-muted/30 px-3 py-2">
+                  <div className="mb-1 text-sm font-semibold">{row.full_name || row.email || row.id}{isSubcontractorRole(row.role) ? <span className="ml-2 text-xs font-normal text-muted-foreground">{t("timeRules.payRules.subcontractor")}</span> : null}</div>
+                  <PayOptionsFields t={t} row={row} onToggle={setPayRule} onLocal={setPayRuleLocal} onAmount={savePayAmount} />
+                </div>
+              ))}
             </div>
           </div>
         </Fold>

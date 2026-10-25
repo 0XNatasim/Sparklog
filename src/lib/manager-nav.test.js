@@ -147,6 +147,13 @@ const ADMIN_GRANTS = [[], ...GRANTABLE_ADMIN_SECTIONS.map((s) => [s]), [...GRANT
 const personas = [...ROLES.map((role) => [role, []]), ...ADMIN_GRANTS.map((grants) => ["admin", grants])];
 const v3Entries = MANAGER_NAV_V3.flatMap((group) => group.items);
 const sourceOf = (t) => (t.from ? MANAGER_NAV_ITEMS.find((item) => item.id === t.from) : t);
+// V2 pages with no V3 tab of their own: another V3 tab holds them (Règles de temps → the employee card).
+const mergedPages = MANAGER_NAV_V2_ITEMS.filter((item) => V2_TO_V3[item.path]?.merged);
+const mergedTarget = (item) => {
+  const eq = V2_TO_V3[item.path];
+  const entry = v3Entries.find((e) => e.path === eq.path);
+  return { entry, tab: entry?.tabs?.find((t) => t.key === eq.tab) };
+};
 
 describe("Gestion V3 menu", () => {
   it("has 15 entries, each once, the day's work first", () => {
@@ -167,7 +174,8 @@ describe("Gestion V3 menu", () => {
       ...v3Entries.flatMap((item) => (item.tabs || []).filter((t) => t.from).map((t) => t.from)),
     ];
     const unique = [...new Set(reached)];
-    expect(unique.sort()).toEqual(MANAGER_NAV_V2_ITEMS.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "notes").sort());
+    expect(mergedPages.map((item) => item.id)).toEqual(["config-rules"]); // in the V3 employee card (V2.4.180)
+    expect([...unique, ...mergedPages.map((item) => item.id)].sort()).toEqual(MANAGER_NAV_V2_ITEMS.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "notes").sort());
     expect(reached.filter((id) => id === "reports-period")).toHaveLength(3); // Semaine · Mois · Par employé
     expect(reached.filter((id) => id === "references")).toHaveLength(2); // Références · Contacts (same rows)
     expect(reached.filter((id) => id === "employees")).toHaveLength(2); // Employés · Groupes (same rule, 0114)
@@ -190,7 +198,10 @@ describe("Gestion V3 menu", () => {
   it("lets a granted admin reach the same V2 pages in V3 (through entries or tabs), nothing more", () => {
     const reachableV3 = (grants) => visibleManagerNav("admin", grants, "v3").flatMap((group) => group.items).flatMap((item) => (
       item.tabs ? visibleTabs(item, "admin", grants).map((t) => t.from || `inline:${t.key}`) : [item.id]
-    ));
+    )).concat(mergedPages.filter((page) => {
+      const { entry, tab } = mergedTarget(page);
+      return visibleTabs(entry, "admin", grants).some((v) => v.key === tab.key);
+    }).map((page) => page.id));
     for (const grants of ADMIN_GRANTS) {
       expect([...new Set(reachableV3(grants))].sort(), String(grants)).toEqual(ids("admin", grants).sort());
     }
@@ -207,7 +218,7 @@ describe("Gestion V3 menu", () => {
     for (const id of ["payroll-week", "v3-pay-history", "v3-reports", "advanced-audit", "advanced-health"]) {
       expect(ids("admin", all, "v3"), id).not.toContain(id);
     }
-    expect(visibleTabs(MANAGER_NAV_ITEMS.find((i) => i.id === "v3-config"), "admin", all).map((t) => t.key)).toEqual(["time-rules", "forms"]);
+    expect(visibleTabs(MANAGER_NAV_ITEMS.find((i) => i.id === "v3-config"), "admin", all).map((t) => t.key)).toEqual(["forms"]);
   });
 
   it("falls back from a forbidden or unknown ?tab= to the first allowed tab, and to none without access", () => {
@@ -233,7 +244,12 @@ describe("switching between V2 and V3", () => {
   it("maps every V2 page to an existing V3 page and tab, or to the same shared path", () => {
     for (const item of MANAGER_NAV_V2_ITEMS) {
       const eq = V2_TO_V3[item.path];
-      if (eq) {
+      if (eq?.merged) {
+        // Held by another tab with the same access rule.
+        const { tab } = mergedTarget(item);
+        expect(tab, item.path).toBeTruthy();
+        expect(sourceOf(tab).grant, item.path).toBe(item.grant);
+      } else if (eq) {
         const page = v3Entries.find((entry) => entry.path === eq.path);
         expect(page?.tabs?.some((t) => t.key === eq.tab && t.from === item.id), item.path).toBe(true);
       } else {
@@ -246,10 +262,14 @@ describe("switching between V2 and V3", () => {
     for (const item of MANAGER_NAV_V2_ITEMS) {
       const v3Target = switchTarget("v3", item.path, "?emp=abc&date=2026-10-14");
       expect(v3Target, item.path).not.toBeNull();
-      expect(switchTarget("v2", ...v3Target.split("?"))).toBe(`${item.path}?emp=abc&date=2026-10-14`);
+      // A merged page comes back on the page of the tab that holds it.
+      const back = V2_TO_V3[item.path]?.merged ? mergedTarget(item).tab.from : null;
+      const backPath = back ? MANAGER_NAV_ITEMS.find((i) => i.id === back).path : item.path;
+      expect(switchTarget("v2", ...v3Target.split("?"))).toBe(`${backPath}?emp=abc&date=2026-10-14`);
     }
     expect(switchTarget("v3", "payroll/stubs", "")).toBe("v3/pay-history?tab=stubs");
     expect(switchTarget("v3", "config/references", "")).toBe("v3/config?tab=references");
+    expect(switchTarget("v3", "config/rules", "")).toBe("v3/team?tab=employees");
     expect(switchTarget("v3", "receipts", "?filter=meals&job=9")).toBe("todo?filter=meals&job=9&tab=receipts");
     expect(switchTarget("v3", "reports/period", "?view=month")).toBe("v3/reports?tab=month");
     expect(switchTarget("v2", "v3/reports", "?tab=grid")).toBe("reports/period?view=grid");

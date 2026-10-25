@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.179).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.180).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -155,8 +155,14 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 
 À faire, dans cet ordre :
 
-- [ ] **Fiche employé unique** : une liste avec recherche, et une fiche à onglets (Identité, CCQ, Paie et options,
-  Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
+- [x] **Fiche employé unique** (V2.4.180, Équipe › Employés) : une case de recherche (nom, courriel, téléphone,
+  numéro d'employé ou CCQ, sans se soucier des accents) et un bouton « Chefs d'équipe ». Chaque fiche ouverte a des
+  onglets : **Identité**, **CCQ**, **Paie et options** (ce qui était dans Règles de temps : premier trajet, retour,
+  1re heure sup., km, cellulaire, entreposage, primes de chef d'équipe, plus stationnement et inventaire), **Impôts
+  (TD1)** (TD1, TP-1015.3, paie fixe, exclusions AE / RRQ : gestionnaires et propriétaire seulement), **Congés** et
+  **Accès** (rôle, actif / en pause, accès à la Gestion, double authentification, notifications, « Voir comme »,
+  supprimer). En V3, Configuration n'a plus l'onglet Règles de temps, et Paramètres n'a plus les formulaires TD1 : tout
+  est dans la fiche. Rien ne change dans la V2.
 - [ ] **DAS de Téléchargements (V2 seulement)** : il calcule avec la méthode « Référence » alors que Paie › DAS
   utilise « Messier ». Réglé en V3 (pas de DAS dans l'export) ; disparaîtra avec la V2.
 - [x] **Débloquer** (V2.4.179) : des mots clairs en V3. L'onglet s'appelle **« Rouvrir une journée »** (bouton

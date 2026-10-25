@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.179 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.180 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -131,6 +131,14 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   To do › Receipts shows by default only what is left to process (supper or parking claim pending, overtime proof on a
   job not approved yet), with an employee and a day filter; a notification link still opens its job. Reports › CCQ
   export opens on the reporting month that just ended and shows its weeks.
+- **Manager V3: one employee card** (V2.4.180, V3 only; V2 unchanged): Team › Employees has a search box (name,
+  e-mail, phone, employee or CCQ number, accents ignored) and a « Team leaders » filter. Each open card has tabs:
+  **Identity** (number, contact, CCQ card, birth date, SIN, hiring / last day, hiring or departure), **CCQ**
+  (classification, region, union, wage schedule, rate), **Pay and options** (flat rate of an office employee, the pay
+  rules and reimbursements of Time rules, team-leader premiums, parking receipts and inventory screenshots), **Taxes
+  (TD1)** (TD1 / TP-1015.3, fixed pay, EI / QPP exemptions; managers and owner only), **Time off** and **Access** (role,
+  active / paused, Gestion sections, two-factor and phone notifications, view as, delete). Same fields and same saves as
+  before. V3 Configuration no longer has the Time rules tab nor the employees' TD1 forms in Settings.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,

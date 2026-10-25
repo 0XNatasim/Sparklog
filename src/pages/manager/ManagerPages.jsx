@@ -348,7 +348,8 @@ const PAY_HISTORY_TABS = {
   roe: PayrollRoePage,
   calcul: () => <PayrollPage Component={PayrollEngineTester} writes compact />,
 };
-const TEAM_TABS = { employees: EmployeesPage, absences: AbsencesPage, groups: () => <GroupsManager /> };
+// V3 Employés: one card per employee with tabs (it also holds Règles de temps and the TD1 forms).
+const TEAM_TABS = { employees: () => <EmployeesPanel tabbed />, absences: AbsencesPage, groups: () => <GroupsManager /> };
 const REPORTS_TABS = {
   costs: CostsPage,
   week: () => <PeriodSummary mode="week" />,
@@ -357,8 +358,9 @@ const REPORTS_TABS = {
   // CCQ export only: the DAS (already in Historique paie) and the « bientôt » bank card are left out.
   ccq: () => <CcqJsonExport lastFinishedMonth />,
 };
+// No « Règles de temps » and no TD1 forms in V3: both are in each employee's card (Équipe › Employés).
 const CONFIG_TABS = {
-  settings: SettingsPage, "time-rules": RulesPage, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
+  settings: () => <Narrow><SettingsPanel taxForms={false} /></Narrow>, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
   forms: FormsPage, references: ReferencesPage, contacts: () => <ContactsManager />,
 };
 
