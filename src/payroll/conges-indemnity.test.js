@@ -57,11 +57,16 @@ describe("13 % indemnité de congés (convention 19.05)", () => {
   });
 
   it("is what Coûts, Semaine/mois and the printed summary use (same method and options as the talons)", () => {
+    // Since V2.4.181 both screens add up weeklyCosts (src/lib/employer-cost.js): the talon itself, week by
+    // week, so their 13 % is the talon's (ccqAmounts.vacation).
     for (const file of ["../components/CostingDashboard.jsx", "../components/PeriodSummary.jsx"]) {
       const source = read(file);
-      expect(source).toContain("congesOverWeeks({");
+      expect(source).toContain("weeklyCosts(");
       expect(source).not.toContain("calculateCongesIndemnity(");
     }
+    const cost = read("../lib/employer-cost.js");
+    expect(cost).toContain("computeEmployeeWeekTalon({");
+    expect(cost).toContain("ccq?.vacation");
     expect(read("../lib/weekly-report.js")).toContain("messierMethod");
   });
 });

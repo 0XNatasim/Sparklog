@@ -1,51 +1,27 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { ChevronRight } from "lucide-react";
-import { supabase } from "../supabaseClient";
-import { fetchAllRows } from "@/lib/fetch-all";
-import { COUNTED_CLAIM_STATUSES } from "@/lib/claim-status";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
-import { congesOverWeeks } from "@/payroll/employee-week";
 import { weekStartSundayD, weekEndingSaturdayD, ccqWeekNumber } from "@/lib/ccq-week";
 import { useT } from "@/lib/use-t";
 import EmployerContributionsManager from "@/components/EmployerContributionsManager";
 import CongesIndemnityManager from "@/components/CongesIndemnityManager";
-import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { companyDate } from "@/lib/company-time";
-import { weeklyPhoneAmount, weeklyStorageAmount } from "@/lib/weekly-allowances";
-import { loadHolidayDates } from "@/lib/company-holidays";
 import { formatHM } from "@/lib/time";
-import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
-import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/lib/payroll-settings";
-import { fixedPayWeekCost, fixedPayWeekEnds } from "@/lib/fixed-pay-cost";
+import { costsByEmployee, weeklyCosts } from "@/lib/employer-cost";
+import { loadCostInputs } from "@/lib/employer-cost-data";
 
 const montrealToday = companyDate;
 
 const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 
-// CCQ week key (ending Saturday) — used to prorate weekly reimbursements.
-const ccqWeekKey = (dateStr) => {
-  const d = dayjs(dateStr);
-  return d.add((6 - d.day() + 7) % 7, "day").format("YYYY-MM-DD");
-};
-
-// CCQ level → the matching per-hour rate column on employer_contributions.
-const LEVEL_RATE_KEY = {
-  compagnon: "rate_compagnon",
-  apprenti_4: "rate_apprenti_4",
-  apprenti_3: "rate_apprenti_3",
-  apprenti_2: "rate_apprenti_2",
-  apprenti_1: "rate_apprenti_1",
-};
-
 export default function CostingDashboard() {
   const t = useT();
   const [period, setPeriod] = useState("week");
   const [weekEnd, setWeekEnd] = useState(() => weekEndingSaturdayD(montrealToday()).format("YYYY-MM-DD"));
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Rows of the range last loaded; « loading » while the shown range is not the loaded one.
+  const [loaded, setLoaded] = useState({ key: "", rows: [], error: "" });
   const [expanded, setExpanded] = useState(new Set());
 
   // Last 16 CCQ weeks (ending Saturday) for the week picker.
@@ -78,156 +54,26 @@ export default function CostingDashboard() {
     });
   }
 
+  // Same calculation as the talons, week by week (src/lib/employer-cost.js), added up per employee.
+  const rangeKey = `${range.start}|${range.end}`;
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const { start, end } = range;
-      const holidayDates = await loadHolidayDates();
-      // Fixed weekly pay (Paramètres › Paie) is costed from its settings; a failed load keeps the job-based estimate.
-      const [taxProfiles, employerRow] = await Promise.all([
-        loadTaxProfiles().catch(() => new Map()),
-        loadEmployerSettings().catch(() => null),
-      ]);
-      const employer = employerFromSettings(employerRow);
-      const [{ data: people }, { data: jobs }, { data: meals }, { data: parking }, { data: contribRows }, rounding] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid"),
-        // C-4: only count payable work/expenses. Jobs: submitted + approved (exclude
-        // 'saved' drafts and 'updated' un-reviewed edits). Claims: pending + approved
-        // (exclude rejected — a rejected expense must not inflate the estimate).
-        fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot").in("status", ["submitted", "approved"]).gte("job_date", start).lte("job_date", end).order("id")),
-        fetchAllRows(() => supabase.from("meal_claims").select("id, user_id, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
-        fetchAllRows(() => supabase.from("parking_receipts").select("id, user_id, amount").in("status", COUNTED_CLAIM_STATUSES).gte("job_date", start).lte("job_date", end).order("id")),
-        supabase.from("employer_contributions").select("*").eq("active", true).order("sort_order", { ascending: true }),
-        loadDayRounding({ untilDate: end }),
-      ]);
-      if (cancelled) return;
-
-      const contributions = contribRows || [];
-      const profileById = new Map((people || []).map((p) => [p.id, p]));
-      const jobsByUser = new Map();
-      (jobs || []).forEach((job) => {
-        if (!jobsByUser.has(job.user_id)) jobsByUser.set(job.user_id, []);
-        jobsByUser.get(job.user_id).push(job);
-      });
-      const mealByUser = new Map();
-      (meals || []).forEach((m) => mealByUser.set(m.user_id, (mealByUser.get(m.user_id) || 0) + (Number(m.amount) || 0)));
-      const parkingByUser = new Map();
-      (parking || []).forEach((p) => parkingByUser.set(p.user_id, (parkingByUser.get(p.user_id) || 0) + (Number(p.amount) || 0)));
-
-      // Fixed weekly pay: weeks of the range paid at the fixed hours, whatever the jobs.
-      const fixedWeeksByUser = new Map();
-      for (const [userId, taxProfile] of taxProfiles) {
-        const weeks = profileById.has(userId) ? fixedPayWeekEnds(taxProfile, start, end) : [];
-        if (weeks.length) fixedWeeksByUser.set(userId, weeks.length);
-      }
-      const userIds = new Set([...jobsByUser.keys(), ...mealByUser.keys(), ...parkingByUser.keys(), ...fixedWeeksByUser.keys()]);
-      const result = [];
-      userIds.forEach((userId) => {
-        const profile = profileById.get(userId);
-        const baseRate = Number(profile?.hourly_rate) || 0;
-        const premium = Number(profile?.team_leader_premium) || 0;
-        const level = profile?.apprentice_level || null;
-        // Administration staff are non-CCQ: no CCQ level → no employer contributions,
-        // and no 13% CCQ congés indemnity (that is a CCQ advantage they don't get).
-        const isNonCcq = isNonCcqRole(profile?.role);
-        const isSub = isSubcontractorRole(profile?.role);
-        const rateKey = level && !isNonCcq ? LEVEL_RATE_KEY[level] : null;
-        // Subcontractor: negotiated double-time rate for hours over 8h/day (not 2x simple).
-        const subDoubleRate = Number(profile?.hourly_rate_double) || 0;
-
-        let regMin = 0, ot50Min = 0, ot100Min = 0, returnMin = 0, returnNbMin = 0, labor = 0, laborNoBenefit = 0, kmCost = 0;
-        // Hours as on the talons (Messier method, the payroll default) so every figure matches them.
-        const entries = calculatePayrollEntries(jobsByUser.get(userId) || [], { ...overtimeOptionsFromProfile(profile), messierMethod: true, holidayDates, rounding: roundingFor(rounding, userId) });
-        entries.forEach((e) => {
-          regMin += e.regularWorkMinutes;
-          ot50Min += e.overtime50Minutes;
-          ot100Min += e.overtime100Minutes;
-          returnMin += e.returnRegularMinutes;
-          returnNbMin += e.returnNoBenefitMinutes;
-          // Rate frozen on the job at submission (0034); fall back to current profile rate.
-          const jobBase = Number(e.job?.hourly_rate_snapshot ?? profile?.hourly_rate) || 0;
-          const jobPremium = Number(e.job?.team_leader_premium_snapshot ?? profile?.team_leader_premium) || 0;
-          const jobKmRate = Number(e.job?.km_rate_snapshot ?? profile?.km_rate) || 0;
-          if (isSub) {
-            // Simple rate for the first 8h/day and the return time; the negotiated double
-            // rate for hours beyond 8h. The engine already carves the return to simple and
-            // routes all overtime to overtime100 (no 1.5x tier) for subcontractors.
-            labor += jobBase * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60) + subDoubleRate * (e.overtime100Minutes / 60);
-            laborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
-          } else {
-            // Non-CCQ premium (snapshot) + CCQ team-leader premium (profile) on regular hours;
-            // on overtime only with the « prime majorée en temps sup. » option.
-            const premiums = jobPremium + (Number(profile?.team_leader_premium_ccq) || 0);
-            const otPremium = profile?.team_leader_premium_overtime ? premiums : 0;
-            labor += (jobBase + premiums) * ((e.regularWorkMinutes + e.returnRegularMinutes) / 60)
-              + (jobBase + otPremium) * ((e.overtime50Minutes / 60) * 1.5 + (e.overtime100Minutes / 60) * 2);
-            // Return time without benefits: base rate, no premium, and excluded from the CCQ
-            // social-benefits (13% congés) base.
-            laborNoBenefit += jobBase * (e.returnNoBenefitMinutes / 60);
-          }
-          kmCost += e.totalKm * jobKmRate;
-        });
-
-        // Fixed weekly pay: the gross and the employer contributions of the talon calculation × the weeks
-        // of the range (the jobs' hours are not paid; their km are).
-        const fixedWeeks = fixedWeeksByUser.get(userId) || 0;
-        const fixed = fixedWeeks ? fixedPayWeekCost({ profile, taxProfile: taxProfiles.get(userId), employer }) : null;
-        if (fixed) {
-          labor = fixed.labor * fixedWeeks;
-          laborNoBenefit = 0;
-          regMin = fixed.hours * 60 * fixedWeeks;
-          ot50Min = 0; ot100Min = 0; returnMin = 0; returnNbMin = 0;
-        }
-        // 13 % congés (convention 19.05): the talon's own weekly amount, summed over the CCQ weeks.
-        const conges = isNonCcq || fixed ? 0 : congesOverWeeks({ profile, jobs: jobsByUser.get(userId) || [], holidayDates, rounding: roundingFor(rounding, userId) });
-        const paidHours = (regMin + returnMin + returnNbMin + ot50Min + ot100Min) / 60;
-        // Employer contributions: per-hour rate for this employee's level × paid hours.
-        const contribLines = fixed
-          ? fixed.contribLines.map((l) => ({ ...l, amount: l.amount * fixedWeeks }))
-          : rateKey
-          ? contributions.map((c) => ({ code: c.code, label: c.label, amount: (Number(c[rateKey]) || 0) * paidHours })).filter((l) => l.amount !== 0)
-          : [];
-        const contribTotal = contribLines.reduce((s, l) => s + l.amount, 0);
-        // Meals are the CCQ supper allowance — a CCQ advantage, so not for admin staff.
-        // km and parking are actual expense reimbursements and still apply.
-        const mealsCost = isNonCcq ? 0 : (mealByUser.get(userId) || 0);
-        const parkingCost = parkingByUser.get(userId) || 0;
-        // Phone/data and storage are fixed weekly amounts — prorate by the number
-        // of distinct CCQ weeks the employee actually worked in the range.
-        const weeksWorked = fixed ? fixedWeeks : new Set((jobsByUser.get(userId) || []).map((j) => ccqWeekKey(j.job_date))).size;
-        const phoneData = weeksWorked * weeklyPhoneAmount(profile);
-        const storageCost = weeksWorked * weeklyStorageAmount(profile);
-
-        result.push({
-          userId,
-          name: profile?.full_name || profile?.email || String(userId).slice(0, 8),
-          hasRate: baseRate > 0,
-          isNonCcq,
-          fixedPay: Boolean(fixed),
-          hasLevel: Boolean(rateKey),
-          premium,
-          regHours: (regMin + returnMin) / 60,
-          otHours: (ot50Min + ot100Min) / 60,
-          returnNbHours: returnNbMin / 60,
-          labor: labor + laborNoBenefit, conges, contribTotal, contribLines, kmCost, mealsCost, parkingCost, phoneData, storageCost,
-          total: labor + laborNoBenefit + conges + contribTotal + kmCost + mealsCost + parkingCost + phoneData + storageCost,
-        });
-      });
-      result.sort((a, b) => b.total - a.total);
-      setRows(result);
-      setLoading(false);
-    })();
+    loadCostInputs(range)
+      .then((inputs) => { if (!cancelled) setLoaded({ key: rangeKey, rows: costsByEmployee(weeklyCosts(inputs), inputs.profiles), error: "" }); })
+      .catch((e) => { if (!cancelled) setLoaded({ key: rangeKey, rows: [], error: e?.message || String(e) }); });
     return () => { cancelled = true; };
-  }, [range]);
+  }, [range, rangeKey]);
+  const loading = loaded.key !== rangeKey;
+  const rows = loading ? [] : loaded.rows;
+  const error = loading ? "" : loaded.error;
 
   const totals = rows.reduce((acc, r) => ({
-    regHours: acc.regHours + r.regHours,
-    otHours: acc.otHours + r.otHours,
+    regHours: acc.regHours + (r.regularMinutes + r.returnNoBenefitMinutes) / 60,
+    otHours: acc.otHours + r.overtimeMinutes / 60,
     labor: acc.labor + r.labor,
     conges: acc.conges + r.conges,
     contribTotal: acc.contribTotal + r.contribTotal,
-    expenses: acc.expenses + r.kmCost + r.mealsCost + r.parkingCost + r.phoneData + r.storageCost,
+    expenses: acc.expenses + r.expenses,
     total: acc.total + r.total,
   }), { regHours: 0, otHours: 0, labor: 0, conges: 0, contribTotal: 0, expenses: 0, total: 0 });
 
@@ -243,6 +89,7 @@ export default function CostingDashboard() {
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.description")}</p>
               <p className="mt-1 text-xs text-muted-foreground">{t("costing.scopeNote")}</p>
               <p className="mt-1 text-xs font-semibold text-warning">{t("costing.reviewNotice")}</p>
+              {error && <p className="mt-1 text-xs text-destructive" role="alert">{t("costing.loadError", { message: error })}</p>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {period === "week" && (
@@ -293,7 +140,7 @@ export default function CostingDashboard() {
               <tbody>
                 {rows.map((r) => {
                   const isOpen = expanded.has(r.userId);
-                  const expenses = r.kmCost + r.mealsCost + r.parkingCost + r.phoneData + r.storageCost;
+                  const isNonCcq = r.category !== "ccq";
                   return (
                     <React.Fragment key={r.userId}>
                       <tr className="border-b last:border-0 hover:bg-muted/20">
@@ -305,15 +152,15 @@ export default function CostingDashboard() {
                           {r.premium > 0 && <span className="ml-2 text-xs font-normal text-primary">({t("costing.teamLeader")} +{money(r.premium)}/h)</span>}
                           {!r.hasRate && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noRate")})</span>}
                           {r.fixedPay && <span className="ml-2 text-xs font-normal text-info">({t("costing.fixedPay")})</span>}
-                          {r.isNonCcq && !r.fixedPay && <span className="ml-2 text-xs font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
-                          {!r.isNonCcq && !r.hasLevel && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noLevel")})</span>}
+                          {isNonCcq && !r.fixedPay && <span className="ml-2 text-xs font-normal text-violet-600 dark:text-violet-400">({t("manager.adminLabel")})</span>}
+                          {!isNonCcq && !r.hasLevel && <span className="ml-2 text-xs font-normal text-warning">({t("costing.noLevel")})</span>}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-mono">{formatHM(r.regHours)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono">{formatHM(r.otHours)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatHM((r.regularMinutes + r.returnNoBenefitMinutes) / 60)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{formatHM(r.overtimeMinutes / 60)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(r.labor)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(r.conges)}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{money(r.contribTotal)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono">{money(expenses)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono">{money(r.expenses)}</td>
                         <td className="px-3 py-2.5 text-right font-mono font-semibold bg-primary/5">{money(r.total)}</td>
                       </tr>
                       {isOpen && (
@@ -324,11 +171,12 @@ export default function CostingDashboard() {
                               <Detail label={t("costing.col.conges")} value={money(r.conges)} />
                               {r.contribLines.map((l) => <Detail key={l.code} label={l.label} value={money(l.amount)} sub />)}
                               <Detail label={t("costing.col.contrib")} value={money(r.contribTotal)} />
-                              <Detail label={t("costing.col.km")} value={money(r.kmCost)} />
-                              <Detail label={t("costing.col.meals")} value={money(r.mealsCost)} />
-                              <Detail label={t("costing.col.parking")} value={money(r.parkingCost)} />
-                              <Detail label={t("costing.col.phoneData")} value={money(r.phoneData)} />
-                              <Detail label={t("employees.storage")} value={money(r.storageCost)} />
+                              <Detail label={t("costing.col.km")} value={money(r.km)} />
+                              <Detail label={t("costing.col.meals")} value={money(r.meals)} />
+                              <Detail label={t("costing.col.parking")} value={money(r.parking)} />
+                              <Detail label={t("costing.col.phoneData")} value={money(r.phone)} />
+                              <Detail label={t("employees.storage")} value={money(r.storage)} />
+                              {r.safety > 0 && <Detail label={t("costing.col.safety")} value={money(r.safety)} />}
                             </div>
                           </td>
                         </tr>

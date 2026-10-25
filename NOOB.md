@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.180).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.181).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -172,7 +172,12 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   traiter (souper ou stationnement en attente, preuve de temps sup. d'une job pas encore approuvée), avec le nombre.
   Décocher « À traiter seulement » montre tout. Choix d'un employé et d'une journée. Un lien de la cloche ouvre
   toujours sa job.
-- [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
+- [x] **Coûts** et **Semaine / mois** (V2.4.181, V2 et V3) : ils additionnent maintenant, semaine par semaine, les mêmes
+  chiffres que les talons et le sommaire imprimé (heures, salaire, 13 %, charges de l'employeur calculées par la paie :
+  RRQ, AE, RQAP, FSS, CNT, CNESST, FDRCMO et avantages sociaux CCQ, avec le TD1 et le cumul de chacun). Avant, une
+  formule à part (un taux par heure pour chaque charge) donnait d'autres montants. Bureau, propriétaire et
+  sous-traitants : leurs heures à leur taux, sans charges, comme avant. Les fiches retournées pour correction comptent
+  aussi ; les brouillons jamais. Les montants restent une estimation tant que les règles de paie ne sont pas validées.
 - [x] **Rapport CCQ** (V2.4.179, Rapports › Export CCQ) : s'ouvre sur le mois qui vient de finir (le mois CCQ finit
   le dernier samedi : le 25 octobre, c'est septembre ; dès le 1er novembre, octobre) et affiche ses semaines.
 - [ ] **Petits plus** : recherche dans les listes (Employés, Messages), « tout marquer comme lu » sur la cloche,

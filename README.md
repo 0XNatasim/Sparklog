@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.180 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.181 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -139,6 +139,12 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   (TD1)** (TD1 / TP-1015.3, fixed pay, EI / QPP exemptions; managers and owner only), **Time off** and **Access** (role,
   active / paused, Gestion sections, two-factor and phone notifications, view as, delete). Same fields and same saves as
   before. V3 Configuration no longer has the Time rules tab nor the employees' TD1 forms in Settings.
+- **Costs and Week / Month use the payroll calculation** (V2.4.181, V2 and V3): Reports › Costs and Week / Month now
+  add up, week by week, the same figures as the pay stubs and the printed weekly summary — hours, gross pay, 13%,
+  statutory employer contributions (QPP, EI, QPIP, FSS, CNT, CNESST, FDRCMO) and CCQ employer benefits computed by the
+  payroll engine, with each employee's TD1, exemptions and year-to-date — instead of a separate per-hour formula.
+  Office, owner and subcontractors stay at their hourly rate without contributions; jobs returned for correction now
+  count, drafts never.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,

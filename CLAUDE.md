@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.180)
+## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.181)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -839,6 +839,20 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `time-rules` retiré de `v3-config` ; `V2_TO_V3["config/rules"]` → `v3/team?tab=employees` avec `merged: true` (retour
   V3 → V2 sur Employés, même règle `employees`) ; `SettingsPanel({ taxForms: false })` en V3. Tests
   `EmployeesPanel.test.jsx` (6 cas V3), `employee-card.test.js`, `manager-nav.test.js`, `authorization-matrix.test.js`.
+- [x] **Coûts et Semaine / Mois = calcul de la paie** (V2.4.181, aucune migration, V2 et V3) : `src/lib/employer-cost.js`
+  — `payrollWeekCost` (= `computeEmployeeWeekTalon`, méthode Messier : brut, 13 % `ccqAmounts.vacation`, charges
+  légales de l'employeur du moteur, `employerSocialBenefit`, taux par heure de `employer_contributions` **hors**
+  `ENGINE_CONTRIBUTION_CODES`, km / cellulaire / entreposage / équipement), `nonPayrollWeekCost` (bureau, propriétaire sans
+  paie fixe, sous-traitant : taux figé sur la job, sans charges), `weeklyCosts` (une ligne par employé × semaine CCQ ;
+  jobs `COST_JOB_STATUSES` = soumises / retournées / approuvées ; souper CCQ seulement), `costsByEmployee` (Coûts),
+  `openingLookup` (cumul = dernière semaine comptabilisée de la même année fiscale — date de paie = samedi + 5 j — sinon
+  `payroll_ytd`, comme le sommaire imprimé). `src/lib/employer-cost-data.js` (`loadCostInputs`) charge tout ;
+  `src/lib/period-costs.js` (`periodsFromWeeklyCosts`) regroupe par semaine / période mensuelle CCQ. `weekly-report.js`
+  (`employeePay`) utilise `payrollWeekCost` (chiffres inchangés, tests existants). Avant : charges = taux par heure de
+  `employer_contributions` × heures (RRQ, AE… approximés) et brut au taux figé sur la job ; PeriodSummary comptait aussi
+  les brouillons. `fixed-pay-cost.js` retiré (sa logique est dans `weeklyCosts`). Mesuré : 40 employés × 1 an (16 800
+  jobs) ≈ 0,3 s dans le navigateur. Tests `employer-cost.test.js` (égalité au centime avec le sommaire imprimé),
+  `fixed-pay.test.js`, `claim-status.test.js`, `conges-indemnity.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
