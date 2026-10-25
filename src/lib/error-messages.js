@@ -2,6 +2,7 @@
 const CODE_MESSAGES = [
   [/ambiguous_montreal_local_time|invalid_dst_time:ambiguous/i, "form.errors.ambiguousTime"],
   [/nonexistent_montreal_local_time|invalid_dst_time:nonexistent/i, "form.errors.nonexistentTime"],
+  [/dst_choice_manager_only|invalid_dst_choice/i, "form.errors.dstChoiceManagerOnly"],
   [/overlapping_job_interval/i, "form.errors.overlappingInterval"],
   [/overtime_evidence_required/i, "form.errors.overtimeEvidenceRequired"],
   [/inventory_screenshots_required/i, "form.errors.inventoryRequired"],

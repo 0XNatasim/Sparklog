@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-23 (V2.4.176).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.177).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -110,9 +110,14 @@ Aujourd'hui, un seul talon a été vérifié (un compagnon).
 
 Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
-- [ ] **Changement d'heure de l'automne** (prochain : **dimanche 1er novembre 2026**) : permettre au gestionnaire de
-  choisir quelle « 1 h du matin » a été travaillée (l'heure de 1 h à 2 h se répète). Aujourd'hui, une fiche dans
-  cette heure-là est refusée. Rare (la nuit, un dimanche).
+- [x] **Changement d'heure de l'automne** (V2.4.177, **dimanche 1er novembre 2026**) : la nuit où on recule l'heure, de
+  1 h à 1 h 59 arrive deux fois. Si un employé a commencé ou fini sa journée dans cette heure-là, l'app ne peut pas
+  savoir laquelle des deux : elle lui dit d'envoyer ses heures au gestionnaire. **Quoi faire :** Karine (ou toi) ouvre
+  Gestion › Admin › **Feuille de temps d'urgence**, entre la fiche, puis répond à la question « 1re fois (avant de
+  reculer) » ou « 2e fois (après avoir reculé) » en demandant à l'employé. L'employé la confirme ensuite comme d'habitude.
+  Très rare : aucune fiche de nuit ni de fin de semaine jusqu'ici. **À savoir :** la paie compte l'heure affichée sur la
+  montre, pas le temps réel ; cette nuit-là, quelqu'un qui travaille pendant l'heure répétée serait payé 1 h de moins.
+  On corrigera seulement si ça arrive et avec l'accord du comptable.
 - [ ] **CNESST sur le salaire admissible (trou du calcul)** : l'app calcule la CNESST (3,17 %) sur tout le
   salaire, alors que le vrai relevé ne la calcule que sur un « salaire admissible ». Le coût CNESST est donc
   **trop élevé** dans DAS, Calcul et Coûts. À corriger dès que la règle de l'excédent est connue (étape 1).
@@ -413,7 +418,7 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
 Une phrase suffit, par exemple :
 - « Voici 3 talons de paie, compare-les avec l'app. »
 - « Ajoute une prime de soir de 2 $/h pour tel employé. »
-- « Fais l'étape 5, le point sur le changement d'heure de l'automne. »
+- « Fais l'étape 5, le point sur la CNESST. »
 
 Claude crée une PR. Toi, tu vérifies l'aperçu Vercel, puis tu fusionnes.
 

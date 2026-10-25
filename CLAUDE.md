@@ -70,8 +70,8 @@ Before releasing changes to time entry, auth, payroll, approval, or imports:
 6. Confirm retries produce one business event, one audit event, and no orphaned storage object.
 7. Compare query counts and rows read with a production-sized dataset before adding dashboard polling or filters.
 
-Nine protections are complete. Timezone normalization is deployed, but point 6 remains open until managers
-can explicitly disambiguate the repeated hour during Montréal's autumn DST transition.
+The ten protections are in place. Point 6 closed with V2.4.177 (migration 0116): an owner can now say which
+occurrence of Montréal's repeated autumn hour was worked. Pay still counts clock time (see §6.1 D).
 
 ### Ordre recommandé
 
@@ -80,7 +80,7 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
 - [x] **3.** Transitions d’approbation sécurisées côté serveur.
 - [x] **4.** Tests de contrat entre l’interface et la base.
 - [x] **5.** Moteur de paie unique avec tests de parité.
-- [ ] **6.** Uniformisation du fuseau horaire et gestion du DST (heure répétée : contournement gestionnaire à ajouter).
+- [x] **6.** Uniformisation du fuseau horaire et gestion du DST (heure répétée : choix du gestionnaire, V2.4.177).
 - [x] **7.** Matrice automatisée des rôles et autorisations.
 - [x] **8.** Brouillons locaux et reprise hors ligne.
 - [x] **9.** Pagination, agrégations et budgets de requêtes.
@@ -123,9 +123,13 @@ can explicitly disambiguate the repeated hour during Montréal's autumn DST tran
   `saved`/`updated` to `submitted`; export rollbacks and service-role metadata updates are not revalidated.
 - **Done (overlap):** submitted/approved ranges are checked under a per-employee transaction lock, so
   concurrent overlapping submissions cannot both pass.
-- **Remaining:** add a manager-only choice of the first or second occurrence for legitimate work during the
-  repeated autumn hour; rejection without this override is safe but operationally incomplete.
-- **Status:** 🟠 partial
+- **Done (repeated autumn hour, V2.4.177, migration 0116):** `jobs.depart_fold` / `fin_fold` (1 = first time,
+  EDT; 2 = second time, EST). `montreal_local_instant(local, fold)` tests both Montréal offsets; without a choice a
+  repeated time is still refused (`ambiguous_montreal_local_time`). Only the owner's emergency timesheet
+  (`create_job_for_employee`, security definer, two new defaulted arguments) writes the choice; a direct browser write
+  is refused (`dst_choice_manager_only`); the choice is cleared outside the repeated hour. The employee's confirmation
+  keeps it (`EmployeeForm` passes it to the pre-submit check).
+- **Status:** ✅ resolved (pay still counts clock time: §6.1 D)
 
 ---
 
@@ -284,7 +288,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-23, V2.4.176)
+## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.177)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -388,8 +392,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `src/lib/travel-rules.js`) — table `travel_pay_rules` (employé × ligne × date d'effet ; lecture gestionnaire, écriture
   seulement par le RPC `set_travel_pay_rule`, gestionnaire / propriétaire, une ligne `travel_rule_set` au Journal par appel).
   Le moteur de paie ne les lit **pas encore** (défaut de chaque ligne = ce que l'app paie aujourd'hui).
-- [ ] Changement d'heure d'automne : choix gestionnaire de la 1re ou 2e occurrence de l'heure répétée
-  (C-6, §1).
+- [x] Changement d'heure d'automne : choix gestionnaire de la 1re ou 2e occurrence de l'heure répétée
+  (C-6, §1) — V2.4.177, voir §6.3.
+- [ ] **Heures payées la nuit d'un changement d'heure** : le moteur de paie compte l'heure affichée
+  (`minutesBetween(depart, fin)`), pas le temps réellement écoulé (`started_at` / `ended_at`). Une fiche qui chevauche
+  l'heure répétée de l'automne est payée 1 h de moins que travaillée (au printemps, 1 h de trop). Au 2026-10-25 : aucune
+  fiche de nuit ni de fin de semaine sur 1 564. Ne pas changer le moteur sans règle confirmée (spécialiste, ADR 0001).
 
 ### 6.2 Écarts code ↔ convention / documentation à trancher (aucune règle modifiée)
 - [x] **Prélèvement CCQ 0,75 % vs 1,5 %** : tranché, 1,5 % = 0,75 % salarié + 0,75 % employeur.
@@ -792,6 +800,20 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   sous-traitant ; mêmes droits (`NasField`, propriétaire). `saveEmploymentDate` vérifie l'ordre (`employmentDatesError`,
   `src/lib/signups.js`) et rafraîchit le compteur des inscriptions. Relevé d'emploi : `roeEmploymentDates` — blocs 10 / 11
   pris dans la fiche quand remplis, sinon déduits des paies. Test `employment-dates.test.js`.
+- [x] **Changement d'heure de l'automne : choix de l'heure répétée** (V2.4.177, migration 0116) : le 1er novembre 2026,
+  1 h à 1 h 59 arrive deux fois. Avant, toute fiche avec un départ ou une fin dans cette heure était refusée et l'employé
+  devait « demander à un gestionnaire », qui n'avait aucun moyen de l'entrer. Maintenant : l'employé reçoit un message
+  clair (envoyer ses heures au gestionnaire) ; la propriétaire entre la fiche dans Admin › Feuille de temps d'urgence et,
+  seulement pour un départ ou une fin dans l'heure répétée, choisit « 1re fois (avant de reculer) » ou « 2e fois (après) »
+  (`repeatedHourFields`, `validateManagerEntry` → `dstChoice`, `src/lib/manager-entry.js`) ; l'employé confirme comme
+  d'habitude (le choix est gardé). Client : `resolveCompanyWallTime(date, time, fold)`, `isRepeatedCompanyTime`,
+  `jobEndDate` (`src/lib/company-time.js`), `validateJobSubmissionContract` lit `depart_fold` / `fin_fold`. Corrigé au
+  passage : l'erreur du contrôle avant soumission (`invalid_dst_time`) donne maintenant le cas (`:ambiguous` /
+  `:nonexistent`), sinon l'employé voyait « intervalle invalide » au lieu du message du changement d'heure. Production :
+  `resolve_montreal_job_instants` et `create_job_for_employee` identiques au dépôt avant la migration (empreintes
+  comparées). Testé sur Postgres local (1re / 2e fois, 22 h → 1 h 30 = 3,5 h ou 4,5 h réelles, choix effacé hors de
+  l'heure, écriture directe refusée, RPC par le rôle navigateur) et dans Chromium (horloge au 2 novembre). La paie compte
+  encore l'heure affichée (§6.1 D). Test `dst-repeated-hour.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

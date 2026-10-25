@@ -43,10 +43,11 @@ export function validateJobSubmissionContract(job) {
   const kmAller = Number(job.km_aller ?? 0);
   const kmRetour = Number(job.km_retour ?? 0);
   const instants = job.job_date
-    ? resolveJobInstants(job.job_date, job.depart, job.fin)
+    ? resolveJobInstants(job.job_date, job.depart, job.fin, { departFold: job.depart_fold ?? null, finFold: job.fin_fold ?? null })
     : null;
 
-  if (instants && instants.status !== "valid") errors.push("invalid_dst_time");
+  // With the case (nonexistent / ambiguous) so the employee gets the matching sentence.
+  if (instants && instants.status !== "valid") errors.push(`invalid_dst_time:${instants.status}`);
   const actualDuration = instants?.status === "valid"
     ? (instants.end - instants.start) / 60000
     : duration;

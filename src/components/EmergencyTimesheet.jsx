@@ -16,6 +16,7 @@ import {
   buildCreateJobForEmployeeArgs,
   managerEntryDateRange,
   managerEntryState,
+  repeatedHourFields,
   validateManagerEntry,
 } from "@/lib/manager-entry";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -26,7 +27,7 @@ import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
 import { withRetry, withTimeout } from "@/lib/utils";
 
 const ELIGIBLE_ROLES = ["employee", "admin", "subcontractor_1"];
-const EMPTY_FORM = { employeeId: "", jobDate: "", ot: "", depart: "", arrivee: "", fin: "", km: "", note: "" };
+const EMPTY_FORM = { employeeId: "", jobDate: "", ot: "", depart: "", arrivee: "", fin: "", km: "", note: "", departFold: null, finFold: null };
 const STATE_VARIANT = { pending: "warning", submitted: "success", approved: "neutral" };
 
 const hhmm = (value) => String(value || "").slice(0, 5);
@@ -54,6 +55,8 @@ export default function EmergencyTimesheet() {
 
   const range = useMemo(() => managerEntryDateRange(), []);
   const errors = validateManagerEntry(form);
+  // Night of the fall time change (0116): départ / fin in the 1:00-1:59 that happens twice.
+  const repeated = repeatedHourFields(form);
   const nameById = useMemo(() => new Map(people.map((p) => [p.id, p.full_name])), [people]);
   const activePeople = useMemo(() => people.filter((p) => !p.is_paused), [people]);
   const totalLabel = useMemo(() => {
@@ -282,6 +285,31 @@ export default function EmergencyTimesheet() {
               <Input id="em-fin" type="time" value={form.fin} onChange={setField("fin")} disabled={busy} className={invalid("fin") || invalid("interval") ? "border-destructive" : ""} />
               {invalid("interval") && <p className="text-xs text-destructive">{t("form.errors.invalidInterval")}</p>}
             </div>
+            {(repeated.depart || repeated.fin) && (
+              <fieldset className={`grid gap-2 rounded-md border p-3 text-sm sm:col-span-2 ${invalid("dstChoice") ? "border-destructive bg-destructive/5" : "border-warning/40 bg-warning/10"}`}>
+                <legend className="px-1 font-semibold">{t("emergency.dst.title")}</legend>
+                <p className="text-muted-foreground">{t("emergency.dst.hint")}</p>
+                {[["depart", "departFold", "form.depart"], ["fin", "finFold", "form.end"]].filter(([key]) => repeated[key]).map(([key, foldKey, labelKey]) => (
+                  <div key={key} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="font-medium">{t(labelKey)} {form[key]}</span>
+                    {[1, 2].map((fold) => (
+                      <label key={fold} className="flex cursor-pointer items-center gap-1.5">
+                        <input
+                          type="radio"
+                          name={`em-${foldKey}`}
+                          checked={form[foldKey] === fold}
+                          onChange={() => setForm((current) => ({ ...current, [foldKey]: fold }))}
+                          disabled={busy}
+                          className="accent-primary"
+                        />
+                        {t(fold === 1 ? "emergency.dst.first" : "emergency.dst.second")}
+                      </label>
+                    ))}
+                  </div>
+                ))}
+                {invalid("dstChoice") && <p className="text-xs text-destructive">{t("emergency.dst.required")}</p>}
+              </fieldset>
+            )}
             <div className="grid gap-1.5">
               <Label htmlFor="em-km">{t("form.kmTotal")}</Label>
               <Input id="em-km" type="text" inputMode="decimal" value={form.km} onChange={setField("km")} disabled={busy} className={invalid("km") ? "border-destructive" : ""} />
