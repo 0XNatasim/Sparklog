@@ -42,6 +42,19 @@ async function hasPdfHeader(file) {
   return String.fromCharCode(...head) === "%PDF-";
 }
 
+// Every reference card (all sections), in display order. Throws on a load error.
+async function fetchReferences() {
+  const { data, error } = await withTimeout(
+    supabase.from("profile_references")
+      .select("id, section, title, description, blocks, published, sort_order, created_at")
+      .order("section").order("sort_order").order("created_at")
+      .limit(QUERY_BUDGETS.profileReferences),
+    15000
+  );
+  if (error) throw error;
+  return data || [];
+}
+
 // Configuration › Références: owners/managers write the content employees read in
 // Profile › Références rapides / Contacts — text, links, PDFs, images and contact cards.
 export default function ReferencesManager() {
@@ -58,23 +71,23 @@ export default function ReferencesManager() {
   const originalPaths = useRef(new Set()); // files already stored for the reference being edited
   const sessionUploads = useRef(new Set()); // files uploaded during this edit, not yet saved
 
+  const showLoadError = useCallback((loadError) => setError(friendlyErrorMessage(loadError, t, "ref.errors.load")), [t]);
   const load = useCallback(async () => {
     try {
-      const { data, error: loadError } = await withTimeout(
-        supabase.from("profile_references")
-          .select("id, section, title, description, blocks, published, sort_order, created_at")
-          .order("section").order("sort_order").order("created_at")
-          .limit(QUERY_BUDGETS.profileReferences),
-        15000
-      );
-      if (loadError) throw loadError;
-      setReferences(data || []);
+      setReferences(await fetchReferences());
     } catch (loadError) {
-      setError(friendlyErrorMessage(loadError, t, "ref.errors.load"));
+      showLoadError(loadError);
     }
-  }, [t]);
+  }, [showLoadError]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let alive = true;
+    fetchReferences().then(
+      (rows) => { if (alive) setReferences(rows); },
+      (loadError) => { if (alive) showLoadError(loadError); },
+    );
+    return () => { alive = false; };
+  }, [showLoadError]);
 
   async function run(id, action, fallbackKey) {
     if (busyRef.current) return false;

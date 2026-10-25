@@ -16,6 +16,28 @@ import { withTimeout } from "@/lib/utils";
 
 const EMPTY_DRAFT = { name_fr: "", name_en: "", url: "", employee_specific: false };
 
+// Forms, active employees and the per-employee access of each form. Throws on a load error.
+async function fetchFormsData() {
+  const [formsResult, employeesResult, accessResult] = await withTimeout(Promise.all([
+    supabase.from("employee_forms").select("form_id, enabled, name_fr, name_en, url, employee_specific, sort_order, created_at")
+      .order("sort_order").order("created_at").limit(QUERY_BUDGETS.managedForms),
+    supabase.from("profiles").select("id, full_name, email, is_paused").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
+    supabase.from("employee_form_access").select("form_id, employee_id").limit(5000),
+  ]), 15000);
+  const loadError = formsResult.error || employeesResult.error || accessResult.error;
+  if (loadError) throw loadError;
+  const access = {};
+  (accessResult.data || []).forEach((row) => {
+    if (!access[row.form_id]) access[row.form_id] = [];
+    access[row.form_id].push(row.employee_id);
+  });
+  return {
+    forms: formsResult.data || [],
+    employees: (employeesResult.data || []).filter((employee) => !employee.is_paused),
+    access,
+  };
+}
+
 // Configuration › Formulaires: owners/managers create, edit, reorder, delete and switch on
 // the links shown in each employee's Profile — no code change or deployment needed.
 export default function FormsManager({ collapsible = true }) {
@@ -35,30 +57,28 @@ export default function FormsManager({ collapsible = true }) {
   const [isOpen, setIsOpen] = useState(!collapsible);
   const busyRef = useRef(false);
 
+  const applyLoaded = useCallback(({ forms: nextForms, employees: nextEmployees, access: nextAccess }) => {
+    setForms(nextForms);
+    setEmployees(nextEmployees);
+    setAccess(nextAccess);
+  }, []);
+  const showLoadError = useCallback((loadError) => setError(friendlyErrorMessage(loadError, t, "manager.forms.errors.load")), [t]);
   const load = useCallback(async () => {
     try {
-      const [formsResult, employeesResult, accessResult] = await withTimeout(Promise.all([
-        supabase.from("employee_forms").select("form_id, enabled, name_fr, name_en, url, employee_specific, sort_order, created_at")
-          .order("sort_order").order("created_at").limit(QUERY_BUDGETS.managedForms),
-        supabase.from("profiles").select("id, full_name, email, is_paused").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
-        supabase.from("employee_form_access").select("form_id, employee_id").limit(5000),
-      ]), 15000);
-      const loadError = formsResult.error || employeesResult.error || accessResult.error;
-      if (loadError) throw loadError;
-      setForms(formsResult.data || []);
-      setEmployees((employeesResult.data || []).filter((employee) => !employee.is_paused));
-      const nextAccess = {};
-      (accessResult.data || []).forEach((row) => {
-        if (!nextAccess[row.form_id]) nextAccess[row.form_id] = [];
-        nextAccess[row.form_id].push(row.employee_id);
-      });
-      setAccess(nextAccess);
+      applyLoaded(await fetchFormsData());
     } catch (loadError) {
-      setError(friendlyErrorMessage(loadError, t, "manager.forms.errors.load"));
+      showLoadError(loadError);
     }
-  }, [t]);
+  }, [applyLoaded, showLoadError]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let alive = true;
+    fetchFormsData().then(
+      (loaded) => { if (alive) applyLoaded(loaded); },
+      (loadError) => { if (alive) showLoadError(loadError); },
+    );
+    return () => { alive = false; };
+  }, [applyLoaded, showLoadError]);
 
   const displayName = (form) => (language === "en" ? form.name_en || form.name_fr : form.name_fr || form.name_en) || "—";
   const nameOf = (employeeId) => {

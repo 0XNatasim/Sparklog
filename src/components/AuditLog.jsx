@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { BellRing, CalendarPlus, DoorOpen, ImageOff, EyeOff, FilePlus2, Megaphone, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown, Clock, Car } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -42,27 +42,29 @@ const NAS_ACTIONS = ["nas_reveal", "nas_update", "nas_bulk_export"];
 export default function AuditLog() {
   const t = useT();
   const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
+  // The list shown answers `loaded`; it is loading until the answer for the current filter (and the
+  // latest « Actualiser ») arrives.
+  const [reloads, setReloads] = useState(0);
+  const [loaded, setLoaded] = useState(null);
+  const loadKey = `${filter}:${reloads}`;
+  const loading = loaded !== loadKey;
 
   // Latest filter wins: switching filters aborts the previous request and ignores its answer.
   const request = useLatestRequest();
-  const load = useCallback(async () => {
+  useEffect(() => {
     const ticket = request.begin();
-    setLoading(true);
-    setError("");
     let query = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(PAGE_SIZE);
     if (filter === "nas") query = query.in("action", NAS_ACTIONS);
     else if (filter !== "all") query = query.eq("action", filter);
-    const { data, error: loadError } = await query.abortSignal(ticket.signal);
-    if (!ticket.isCurrent()) return;
-    if (loadError) { if (!isAbortError(loadError)) setError(loadError.message); }
-    else setRows(data || []);
-    setLoading(false);
-  }, [filter, request]);
-
-  useEffect(() => { load(); }, [load]);
+    query.abortSignal(ticket.signal).then(({ data, error: loadError }) => {
+      if (!ticket.isCurrent()) return;
+      if (loadError) { if (!isAbortError(loadError)) setError(loadError.message); }
+      else { setError(""); setRows(data || []); }
+      setLoaded(loadKey);
+    });
+  }, [filter, loadKey, request]);
 
   function describe(row) {
     const target = row.target_name || t("audit.someone");
@@ -140,7 +142,7 @@ export default function AuditLog() {
               <option value="broadcast_withdrawn">{t("audit.filter.broadcastWithdrawn")}</option>
               <option value="nas">{t("audit.filter.nas")}</option>
             </Select>
-            <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
+            <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => setReloads((count) => count + 1)}>
               <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
             </Button>
           </div>
@@ -161,7 +163,7 @@ export default function AuditLog() {
         </CardContent>
       </Card>
 
-      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {error && !loading && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
       {!loading && rows.length === 0 && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("audit.empty")}</CardContent></Card>}
 
       <div className="space-y-2">

@@ -21,18 +21,20 @@ export default function EmployerContributionsManager() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  async function load() {
-    setLoading(true);
-    const { data, error } = await supabase
+  useEffect(() => {
+    let alive = true;
+    supabase
       .from("employer_contributions")
       .select("*")
-      .order("sort_order", { ascending: true });
-    if (error) setErr(error.message);
-    else setRows(data || []);
-    setLoading(false);
-  }
-
-  useEffect(() => { load(); }, []);
+      .order("sort_order", { ascending: true })
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) setErr(error.message);
+        else setRows(data || []);
+        setLoading(false);
+      });
+    return () => { alive = false; };
+  }, []);
 
 
   return (

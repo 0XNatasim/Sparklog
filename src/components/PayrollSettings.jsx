@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Building2, FileText } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -135,36 +135,38 @@ function TaxFormsSection({ t }) {
   const [message, setMessage] = useState("");
   const [savingId, setSavingId] = useState(null);
 
-  const load = useCallback(async () => {
-    const [{ data: people, error: pErr }, { data: forms, error: fErr }] = await Promise.all([
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
       supabase.from("profiles").select("id, full_name, email, role, is_paused, hourly_rate").order("full_name", { ascending: true }),
       supabase.from("employee_tax_profiles").select("*"),
-    ]);
-    if (pErr || fErr) { setMessage((pErr || fErr).message); return; }
-    const byUser = new Map((forms || []).map((row) => [row.user_id, row]));
-    setRows((people || [])
-      .filter((p) => !isSubcontractorRole(p.role))
-      .map((p) => {
-        const f = byUser.get(p.id) || {};
-        return {
-          id: p.id,
-          name: p.full_name || p.email || p.id,
-          paused: p.is_paused,
-          td1_claim_amount: asText(f.td1_claim_amount),
-          federal_additional_tax: asText(f.federal_additional_tax && Number(f.federal_additional_tax) ? f.federal_additional_tax : ""),
-          tp1015_3_credits: asText(f.tp1015_3_credits),
-          quebec_additional_tax: asText(f.quebec_additional_tax && Number(f.quebec_additional_tax) ? f.quebec_additional_tax : ""),
-          forms_received_on: f.forms_received_on || "",
-          hourly_rate: Number(p.hourly_rate) || 0,
-          fixed_weekly_hours: asText(f.fixed_weekly_hours),
-          fixed_pay_start: f.fixed_pay_start || "",
-          ei_exempt: Boolean(f.ei_exempt),
-          rrq_exempt: Boolean(f.rrq_exempt),
-        };
-      }));
+    ]).then(([{ data: people, error: pErr }, { data: forms, error: fErr }]) => {
+      if (!alive) return;
+      if (pErr || fErr) { setMessage((pErr || fErr).message); return; }
+      const byUser = new Map((forms || []).map((row) => [row.user_id, row]));
+      setRows((people || [])
+        .filter((p) => !isSubcontractorRole(p.role))
+        .map((p) => {
+          const f = byUser.get(p.id) || {};
+          return {
+            id: p.id,
+            name: p.full_name || p.email || p.id,
+            paused: p.is_paused,
+            td1_claim_amount: asText(f.td1_claim_amount),
+            federal_additional_tax: asText(f.federal_additional_tax && Number(f.federal_additional_tax) ? f.federal_additional_tax : ""),
+            tp1015_3_credits: asText(f.tp1015_3_credits),
+            quebec_additional_tax: asText(f.quebec_additional_tax && Number(f.quebec_additional_tax) ? f.quebec_additional_tax : ""),
+            forms_received_on: f.forms_received_on || "",
+            hourly_rate: Number(p.hourly_rate) || 0,
+            fixed_weekly_hours: asText(f.fixed_weekly_hours),
+            fixed_pay_start: f.fixed_pay_start || "",
+            ei_exempt: Boolean(f.ei_exempt),
+            rrq_exempt: Boolean(f.rrq_exempt),
+          };
+        }));
+    });
+    return () => { alive = false; };
   }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   const setField = (id, key, value) => setRows((list) => list.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
 
