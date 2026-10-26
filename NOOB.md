@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.183).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.184).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -192,6 +192,9 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 - [x] **V3 par défaut** (V2.4.183) : chaque appareil s'ouvre en V3, même s'il avait choisi la V2 avant (un choix fait
   après est gardé). Les employés de bureau qui ont accès à la Gestion passent aussi en V3 (avant, ils ne voyaient que
   la V2) : chacun ne voit que les pages et onglets permis. La cloche de la V3 ouvre les pages de la V3.
+- [x] **Noms visibles sur téléphone** (V2.4.184) : dans Équipe › Employés, le nom de chaque employé était coupé (« J… »)
+  ou caché par les étiquettes. Maintenant le nom est sur sa propre ligne, en entier, et les étiquettes (Actif, En attente,
+  manquant(s), région) passent dessous. La recherche prend toute la largeur.
 - [ ] **Retirer la V2** : après quelques jours d'utilisation de la V3 sans problème. On enlèvera le bouton V2 | V3,
   le menu V2 et ses pages en double ; les anciens liens (favoris, cloche) seront redirigés vers la page V3 équivalente.
 

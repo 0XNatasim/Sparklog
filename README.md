@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.183 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.184 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -158,6 +158,8 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
 - **Gestion V3 by default** (V2.4.183): Gestion opens in V3 for everyone (office admins too, who saw only V2 before;
   each tab keeps its access rule). The V3 bell opens the V3 pages (To do › Receipts, Team › Employees). V2 stays one
   click away (V2 | V3) until it is removed.
+- **Employee list on a phone** (V2.4.184): each employee's name is on its own line and never cut; the state, missing
+  fields and region badges go on the line below. The search box takes the full width on a phone.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,

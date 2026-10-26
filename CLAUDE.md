@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.183)
+## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.184)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -877,6 +877,12 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `notificationTargetV3` (`switchTarget("v3", …)`) ouvre Justificatifs de À traiter / Équipe › Employés. Reste : retirer
   la V2 (sélecteur, `MANAGER_NAV`, pages en double, redirection des anciens chemins). Tests `manager-ui-version.test.js`,
   `bell-and-todo.test.js`.
+- [x] **Liste des employés sur téléphone** (V2.4.184, aucune migration, V2 et V3) : `EmployeeCardHeader.jsx` mettait n°,
+  icônes, nom, région, état et « manquant(s) » sur une seule ligne ; les étiquettes `shrink-0` écrasaient le nom
+  (`truncate`) jusqu'à « J… » ou rien (comptes « En attente »). Maintenant : ligne 1 = n°, rôle, chef d'équipe, nom
+  (`break-words`, jamais tronqué), 2FA, notifications ; ligne 2 = courriel ; ligne 3 (`flex-wrap`) = état, manquant(s),
+  région. Recherche V3 en pleine largeur sous `sm` ; texte d'aide raccourci (`employees.search`). Vérifié dans Chromium à
+  360 px (nom long de 30 caractères en entier, aucun défilement horizontal).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
