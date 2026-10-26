@@ -10,7 +10,8 @@ import { useT } from "@/lib/use-t";
 import { hasManagementAccess } from "@/lib/roles";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
-import { MISSING_ENTRY_TRACKING_START, missingEntryDays } from "@/lib/live-crew";
+import { MISSING_ENTRY_TRACKING_START } from "@/lib/live-crew";
+import { loadMissingEntryDays } from "@/lib/missing-days";
 
 // Gestion → Audit → Employés: when each employee signs in / opens the app and when
 // they save, submit or delete a job (table employee_activity_log, migration 0067).
@@ -51,7 +52,7 @@ export default function EmployeeActivityLog() {
   const [loaded, setLoaded] = useState(null); // filters the list shown answers
   const [error, setError] = useState("");
   const [missingDays, setMissingDays] = useState([]);
-  const [missingLoading, setMissingLoading] = useState(false);
+  const [missingKey, setMissingKey] = useState(""); // the period / roster the missing days answer
 
   useEffect(() => {
     let alive = true;
@@ -64,6 +65,7 @@ export default function EmployeeActivityLog() {
   }, []);
 
   const employeeIds = useMemo(() => employees.map((e) => e.id), [employees]);
+  const missingLoading = employeeIds.length > 0 && missingKey !== `${period}|${employeeIds.join(",")}`;
 
   // Latest filter wins (employee, type, period): an older answer never replaces a newer one.
   const request = useLatestRequest();
@@ -108,32 +110,11 @@ export default function EmployeeActivityLog() {
     // completed days so nobody receives a missing day before they can finish entering it.
     const endDate = addCalendarDays(companyDate(), -1);
 
-    (async () => {
-      setMissingLoading(true);
-      const fetchAll = async (makeQuery) => {
-        const all = [];
-        const pageSize = 500;
-        for (let from = 0; ; from += pageSize) {
-          const result = await makeQuery().range(from, from + pageSize - 1);
-          if (result.error) return result;
-          all.push(...(result.data || []));
-          if ((result.data || []).length < pageSize) return { data: all, error: null };
-        }
-      };
-      const [jobsResult, timeOffResult] = await Promise.all([
-        fetchAll(() => supabase.from("jobs").select("user_id, job_date").in("user_id", employeeIds).gte("job_date", startDate).lte("job_date", endDate).order("job_date")),
-        fetchAll(() => supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").in("user_id", employeeIds).lte("start_date", endDate).or(`end_date.gte.${startDate},end_date.is.null`).order("start_date")),
-      ]);
-      if (!cancelled) {
-        if (jobsResult.error || timeOffResult.error) {
-          setError(jobsResult.error?.message || timeOffResult.error?.message || "");
-          setMissingDays([]);
-        } else {
-          setMissingDays(missingEntryDays(employees, jobsResult.data, timeOffResult.data, startDate, endDate));
-        }
-        setMissingLoading(false);
-      }
-    })();
+    const key = `${period}|${employeeIds.join(",")}`;
+    loadMissingEntryDays({ employees, startDate, endDate })
+      .then((days) => { if (!cancelled) setMissingDays(days); })
+      .catch((loadError) => { if (!cancelled) { setError(loadError?.message || ""); setMissingDays([]); } })
+      .finally(() => { if (!cancelled) setMissingKey(key); });
 
     return () => { cancelled = true; };
   }, [employeeIds, employees, period]);

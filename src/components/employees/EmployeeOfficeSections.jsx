@@ -6,11 +6,73 @@ import Field from "./EmployeeField";
 
 const SUMMARY = "flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-sm font-semibold select-none [&::-webkit-details-marker]:hidden";
 
-// Administration and owner: a simple flat hourly pay instead of the CCQ classification (subcontractors
-// carry the CCQ configuration instead), and the Gestion access of an office employee (owner only).
-export default function EmployeeOfficeSections({ profile: p, panel }) {
-  const { t, privileged, mgmtOpen, setLocal, saveField, toggleManagement, toggleAdminSection } = panel;
+// Administration and owner: a simple flat hourly rate instead of the CCQ classification.
+export function OfficePayFields({ profile: p, panel, className = "space-y-3 border-t p-3" }) {
+  const { t, setLocal, saveField } = panel;
+  return (
+    <div className={className}>
+      <Field label={t("employees.flatHourlyRate")}>
+        <div className="flex h-9 items-center gap-1">
+          <span className="text-sm text-muted-foreground">$</span>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            inputMode="decimal"
+            value={p.hourly_rate ?? ""}
+            onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)}
+            onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)}
+            placeholder="0.00"
+            className="h-9"
+          />
+          <span className="text-xs text-muted-foreground">/h</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
+      </Field>
+    </div>
+  );
+}
+
+// Management (Gestion) access of an office employee (owner only): tick « Gestion », then each section
+// becomes a tab the admin can open in the manager dashboard.
+export function ManagementAccessFields({ profile: p, panel, className = "space-y-3 border-t p-3" }) {
+  const { t, mgmtOpen, toggleManagement, toggleAdminSection } = panel;
   const managementOn = mgmtOpen.has(p.id) || p.admin_sections?.length > 0;
+  return (
+    <div className={className}>
+      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
+        <span className="text-sm font-medium">{t("employees.managementEnable")}</span>
+        <input
+          type="checkbox"
+          checked={managementOn}
+          onChange={(e) => toggleManagement(p, e.target.checked)}
+          className="h-5 w-5 rounded border-input accent-primary"
+        />
+      </label>
+      {managementOn && (
+        <div className="space-y-1 rounded-md border p-3">
+          <p className="mb-1 text-xs text-muted-foreground">{t("employees.managementHint")}</p>
+          {GRANTABLE_ADMIN_SECTIONS.map((sectionId) => (
+            <label key={sectionId} className="flex cursor-pointer items-center justify-between gap-3 py-1 text-sm">
+              <span>{t(`manager.sections.${sectionId}`)}</span>
+              <input
+                type="checkbox"
+                checked={(p.admin_sections || []).includes(sectionId)}
+                onChange={(e) => toggleAdminSection(p, sectionId, e.target.checked)}
+                className="h-5 w-5 rounded border-input accent-primary"
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// V2 card: administration and owner get a simple flat hourly pay instead of the CCQ classification
+// (subcontractors carry the CCQ configuration instead), and the Gestion access of an office employee.
+export default function EmployeeOfficeSections({ profile: p, panel }) {
+  const { t, privileged } = panel;
   return (
     <>
       {isNonCcqRole(p.role) && !isSubcontractorRole(p.role) && (
@@ -19,26 +81,7 @@ export default function EmployeeOfficeSections({ profile: p, panel }) {
             <span className="truncate">{p.role === "subcontractor_1" ? t("employees.subcontractorTerms") : t("employees.adminPayroll")}</span>
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
           </summary>
-          <div className="space-y-3 border-t p-3">
-            <Field label={t("employees.flatHourlyRate")}>
-              <div className="flex h-9 items-center gap-1">
-                <span className="text-sm text-muted-foreground">$</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  inputMode="decimal"
-                  value={p.hourly_rate ?? ""}
-                  onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)}
-                  onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)}
-                  placeholder="0.00"
-                  className="h-9"
-                />
-                <span className="text-xs text-muted-foreground">/h</span>
-              </div>
-              <span className="text-xs text-muted-foreground">{t("employees.flatHourlyRateHint")}</span>
-            </Field>
-          </div>
+          <OfficePayFields profile={p} panel={panel} />
         </details>
       )}
 
@@ -51,33 +94,7 @@ export default function EmployeeOfficeSections({ profile: p, panel }) {
             <span className="truncate">{t("employees.managementAccess")}</span>
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
           </summary>
-          <div className="space-y-3 border-t p-3">
-            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
-              <span className="text-sm font-medium">{t("employees.managementEnable")}</span>
-              <input
-                type="checkbox"
-                checked={managementOn}
-                onChange={(e) => toggleManagement(p, e.target.checked)}
-                className="h-5 w-5 rounded border-input accent-primary"
-              />
-            </label>
-            {managementOn && (
-              <div className="space-y-1 rounded-md border p-3">
-                <p className="mb-1 text-xs text-muted-foreground">{t("employees.managementHint")}</p>
-                {GRANTABLE_ADMIN_SECTIONS.map((sectionId) => (
-                  <label key={sectionId} className="flex cursor-pointer items-center justify-between gap-3 py-1 text-sm">
-                    <span>{t(`manager.sections.${sectionId}`)}</span>
-                    <input
-                      type="checkbox"
-                      checked={(p.admin_sections || []).includes(sectionId)}
-                      onChange={(e) => toggleAdminSection(p, sectionId, e.target.checked)}
-                      className="h-5 w-5 rounded border-input accent-primary"
-                    />
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
+          <ManagementAccessFields profile={p} panel={panel} />
         </details>
       )}
     </>

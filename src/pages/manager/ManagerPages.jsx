@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
 import { MANAGER_NAV_ITEMS, firstAllowedPath, legacySectionTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
-import { isManagerRole } from "@/lib/roles";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { lazyPanel } from "@/components/lazy-panel";
 
@@ -20,6 +19,7 @@ const CongesManager = lazyPanel(() => import("@/components/CongesManager"));
 const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
 const ReferencesManager = lazyPanel(() => import("@/components/ReferencesManager"));
 const ContactsManager = lazyPanel(() => import("@/components/ContactsManager"));
+const MissingDaysPanel = lazyPanel(() => import("@/components/manager/MissingDaysPanel"));
 const GroupsManager = lazyPanel(() => import("@/components/GroupsManager"));
 const BroadcastManager = lazyPanel(() => import("@/components/BroadcastManager"));
 const TimeRulesManager = lazyPanel(() => import("@/components/TimeRulesManager"));
@@ -52,7 +52,7 @@ export function ManagerIndex() {
   const [version] = useManagerUiVersion();
   const legacy = legacySectionTarget(search);
   if (legacy) return <Navigate to={`/manager/${legacy}`} replace />;
-  const first = firstAllowedPath(role, adminSections, isManagerRole(role) ? version : "v2");
+  const first = firstAllowedPath(role, adminSections, version);
   return <Navigate to={first ? `/manager/${first}` : "/"} replace />;
 }
 
@@ -337,10 +337,10 @@ function TabbedPage({ itemId, content }) {
   );
 }
 
-const TODO_TABS = { todo: TodoPage, receipts: ReceiptsPage };
+const TODO_TABS = { todo: TodoPage, receipts: () => <ManagerDashboard view="receipts" reviewFilters /> };
 // V3 timesheets: same page, cards with the employee's name first and the « Entrées à la main »
 // filter (the V2 page is unchanged).
-const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter />, unlock: UnlockDayPage };
+const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter plainWords />, unlock: () => <Narrow><UnlockDayManager plainWords /></Narrow>, missing: () => <Narrow><MissingDaysPanel /></Narrow> };
 // Same pages as V2 Paie, with the compact Méthode control; Calcul détaillé keeps the « writes » warning.
 const PAY_HISTORY_TABS = {
   stubs: () => <PayrollPage Component={TalonTab} compact />,
@@ -348,17 +348,19 @@ const PAY_HISTORY_TABS = {
   roe: PayrollRoePage,
   calcul: () => <PayrollPage Component={PayrollEngineTester} writes compact />,
 };
-const TEAM_TABS = { employees: EmployeesPage, absences: AbsencesPage, groups: () => <GroupsManager /> };
+// V3 Employés: one card per employee with tabs (it also holds Règles de temps and the TD1 forms).
+const TEAM_TABS = { employees: () => <EmployeesPanel tabbed />, absences: AbsencesPage, groups: () => <GroupsManager /> };
 const REPORTS_TABS = {
   costs: CostsPage,
   week: () => <PeriodSummary mode="week" />,
   month: () => <PeriodSummary mode="month" />,
   grid: () => <WeekViewTab />,
   // CCQ export only: the DAS (already in Historique paie) and the « bientôt » bank card are left out.
-  ccq: () => <CcqJsonExport />,
+  ccq: () => <CcqJsonExport lastFinishedMonth />,
 };
+// No « Règles de temps » and no TD1 forms in V3: both are in each employee's card (Équipe › Employés).
 const CONFIG_TABS = {
-  settings: SettingsPage, "time-rules": RulesPage, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
+  settings: () => <Narrow><SettingsPanel taxForms={false} /></Narrow>, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
   forms: FormsPage, references: ReferencesPage, contacts: () => <ContactsManager />,
 };
 

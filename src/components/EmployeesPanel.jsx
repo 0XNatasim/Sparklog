@@ -11,19 +11,23 @@ import CcqCardCapture from "@/components/CcqCardCapture";
 import AddEmployeeCard from "@/components/employees/AddEmployeeCard";
 import EmployeeCardHeader from "@/components/employees/EmployeeCardHeader";
 import EmployeeDetails from "@/components/employees/EmployeeDetails";
+import EmployeeTabs from "@/components/employees/EmployeeTabs";
+import { Input } from "@/components/ui/input";
+import { Search, Star } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { withTimeout } from "@/lib/utils";
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { companyDate } from "@/lib/company-time";
 import { mfaBadge } from "@/lib/mfa";
-import { ccqRateFor, defaultAnnex, employeeCounts, filterEmployees, lacksPush, rateSuggestionsFor, ratesFromSnapshots, sortEmployees } from "@/lib/employees-panel";
+import { ccqRateFor, defaultAnnex, employeeCounts, filterEmployees, lacksPush, matchesEmployeeSearch, rateSuggestionsFor, ratesFromSnapshots, sortEmployees } from "@/lib/employees-panel";
+import { isTeamLeader, parsePayAmount } from "@/lib/pay-options";
 import { DEPARTURE_STATUSES, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employmentChoice, employmentDatesError, employmentUpdate, fetchPendingSignups, isNewHire } from "@/lib/signups";
 
 // Gestion › Employés: loads the roster and owns every write; the card pieces live in
 // src/components/employees/ and the pure rules (order, CCQ rates, counters) in src/lib/employees-panel.js.
 
-const PROFILE_COLUMNS = "id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, last_work_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, phone_data_reimbursement, storage_compensation, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path";
+const PROFILE_COLUMNS = "id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, last_work_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, first_trip_unpaid, phone_data_reimbursement, storage_compensation, storage_compensation_amount, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path";
 
 // Everything the panel shows: profiles (in list order), current CCQ rates, sign-ups waiting for
 // activation, two-factor / notification / NAS presence (ids only) and the dry-run rate suggestions.
@@ -88,7 +92,10 @@ async function fetchTimeOff(today) {
   return map;
 }
 
-export default function EmployeesPanel() {
+// `tabbed` (Gestion V3 › Équipe › Employés): a search box and a « Chefs d'équipe » filter above the list,
+// and each open card shows tabs (Identité, CCQ, Paie et options, Impôts, Congés, Accès) that also hold
+// Règles de temps and the TD1 forms of Paramètres. Without it (V2) the page is unchanged.
+export default function EmployeesPanel({ tabbed = false }) {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
   const { user, role } = useAuth();
@@ -101,6 +108,8 @@ export default function EmployeesPanel() {
   // Inactive accounts waiting for activation (0109): id → { email_confirmed }.
   const [pendingById, setPendingById] = useState(() => new Map());
   const [statusFilter, setStatusFilter] = useState("all"); // all · pending · new_hire · former · noPush
+  const [search, setSearch] = useState(""); // V3 only
+  const [leadersOnly, setLeadersOnly] = useState(false); // V3 only
   // « Nouvel(le) employé(e) » picked, first day of work not entered yet (nothing saved until then).
   const [newHireDraft, setNewHireDraft] = useState(() => new Set());
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -206,6 +215,22 @@ export default function EmployeesPanel() {
     const { error } = await supabase.from("profiles").update({ [field]: value }).eq("id", id);
     if (error) setErr(error.message);
     else { setInfo(`${field} ✓`); setTimeout(() => setInfo(""), 1500); }
+  }
+
+  // A pay option box of the V3 card (Paie et options), saved at once.
+  async function savePayToggle(id, field, checked) {
+    setLocal(id, field, checked);
+    await saveField(id, field, checked);
+  }
+
+  // A pay amount of the V3 card (km rate, phone data, storage, team-leader premiums): same rule as
+  // Règles de temps — empty = none, else a number of 0 or more.
+  async function savePayAmount(id, field, rawValue) {
+    const value = parsePayAmount(field, rawValue);
+    if (Number.isNaN(value)) { setErr(t("timeRules.payRules.invalidAmount")); return; }
+    setErr("");
+    setLocal(id, field, value);
+    await saveField(id, field, value);
   }
 
   // Date d'embauche (start_date) / dernier jour travaillé (last_work_date, 0115): checked together first.
@@ -368,13 +393,14 @@ export default function EmployeesPanel() {
   }
 
   const counts = employeeCounts(profiles, { pending: pendingById, pushSet, today, t });
-  const visibleProfiles = filterEmployees(profiles, statusFilter, { pending: pendingById, pushSet, today });
+  const visibleProfiles = filterEmployees(profiles, statusFilter, { pending: pendingById, pushSet, today })
+    .filter((p) => !tabbed || ((!leadersOnly || isTeamLeader(p)) && matchesEmployeeSearch(p, search)));
   // State and actions the card pieces read (EmployeeDetails and its sections).
   const panel = {
     t, user, role, privileged, today, nasSet, timeOff, loadTimeOff, annexes, newHireDraft, mgmtOpen, cardViews,
     confirmDelete, deleting, navigate, setLocal, saveField, saveEmploymentDate, saveEmployment, chooseType,
     toggleManagement, toggleAdminSection, saveClassification, saveAnnex, toggleCard, setCcqEdit, setConfirmDelete,
-    handleDelete, signupsChanged,
+    handleDelete, signupsChanged, savePayToggle, savePayAmount,
   };
 
   return (
@@ -403,8 +429,31 @@ export default function EmployeesPanel() {
         <AddEmployeeCard counts={counts} statusFilter={statusFilter} onFilter={setStatusFilter} onCreated={load} onError={setErr} onInfo={setInfo} />
       )}
 
+      {tabbed && !loading && profiles.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("employees.search")}
+              aria-label={t("employees.search")}
+              className="h-11 pl-9 sm:h-10"
+            />
+          </label>
+          <Button type="button" variant={leadersOnly ? "default" : "outline"} className="h-11 sm:h-10" aria-pressed={leadersOnly} onClick={() => setLeadersOnly((on) => !on)}>
+            <Star className="mr-1.5 h-4 w-4" />{t("employees.filter.leaders")}
+          </Button>
+        </div>
+      )}
+
       {loading && (
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("common.loading")}</CardContent></Card>
+      )}
+
+      {tabbed && !loading && profiles.length > 0 && visibleProfiles.length === 0 && (
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("employees.noMatch")}</CardContent></Card>
       )}
 
       {!loading && profiles.length === 0 && (
@@ -415,6 +464,9 @@ export default function EmployeesPanel() {
         // Non-CCQ roles (administration + owner) skip the CCQ "missing fields" check.
         const missingFields = isNonCcqRole(p.role) ? [] : getMissingEmployeeFields(p, t);
         const expanded = expandedIds.has(p.id);
+        const mfa = mfaBadge(p.role, mfaSet.has(p.id));
+        const pushOn = Boolean(pushSet?.has(p.id));
+        const pushOff = lacksPush(p, pushSet, pendingById, today);
         return (
           <Card key={p.id} className={p.is_paused && !isNewHire(p, today) ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-warning/40" : ""}>
             <EmployeeCardHeader
@@ -423,12 +475,14 @@ export default function EmployeesPanel() {
               expanded={expanded}
               onToggle={() => toggleExpanded(p.id)}
               missingCount={missingFields.length}
-              mfa={mfaBadge(p.role, mfaSet.has(p.id))}
-              pushOn={Boolean(pushSet?.has(p.id))}
-              pushOff={lacksPush(p, pushSet, pendingById, today)}
+              mfa={mfa}
+              pushOn={pushOn}
+              pushOff={pushOff}
               t={t}
             />
-            {expanded && <EmployeeDetails profile={p} missingFields={missingFields} panel={panel} />}
+            {expanded && (tabbed
+              ? <EmployeeTabs profile={p} missingFields={missingFields} panel={panel} status={{ mfa, pushOn, pushOff }} />
+              : <EmployeeDetails profile={p} missingFields={missingFields} panel={panel} />)}
           </Card>
         );
       })}

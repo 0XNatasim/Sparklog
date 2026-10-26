@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.178 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.183 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -54,22 +54,23 @@ Roles are stored lowercase in `profiles.role`:
 
 The Manager workspace is a sidebar (a drawer on phones; on desktop it can be shrunk to an icon rail or hidden
 entirely with the toggle at the top left of the header); every page has its own URL (`#/manager/…`) and only the
-pages a manager is allowed to open are listed. Managers and the owner switch between two menus with the **V2 | V3**
-selector in the header (remembered per device); office admins always see V2.
+pages a manager is allowed to open are listed. **V3 is the default** since V2.4.183, for everyone who opens Gestion
+(managers, owner and office admins with sections); the **V2 | V3** selector in the header still brings V2 back
+(remembered per device) until V2 is removed. A choice made before V2.4.183 is ignored once, so every device opens V3.
 
 **V3** (15 entries; pages with tabs keep each tab's original access rule, the active tab is in `?tab=`):
 
 | Group | Entries [tabs] |
 |---|---|
 | **Today** (open) | To do [To approve · Receipts & proofs] · Live crew · Notes (private or shared with managers, optional reminder: red badge on « Notes » when due) |
-| **Time** | Timesheets [Timesheets · Unlock a day] — employee name first on each card, « Entered by hand » ★ filter |
+| **Time** | Timesheets [Timesheets · Unlock a day · Days without entry] — employee name first on each card, « Entered by hand » ★ filter |
 | **Payroll** (open) | Weekly payroll · Payroll history [Pay stubs · DAS · Record of employment · Detailed calculation] |
-| **Team** | Employees [Employees · Time off] · Inventory · Communications |
+| **Team** | Employees [Employees (one card with tabs: identity, CCQ, pay and options, taxes, time off, access) · Time off · Groups] · Inventory · Communications |
 | **Reports** | Reports [Costs · Week · Month · By employee (grid) · CCQ export] |
-| **Configuration** | Configuration [Settings · Time rules · CCQ rates · Pay rules · Forms · References · Contacts (with roles)] |
+| **Configuration** | Configuration [Settings · CCQ rates · Pay rules · Forms · References · Contacts (with roles)] |
 | **Admin** | Travel and expenses (per-employee rules, not yet read by payroll) · Activity log · Service status · Emergency timesheet (owner only) |
 
-**V2** (the classic menu, frozen by tests until V3 becomes the default):
+**V2** (the classic menu, still available from the V2 | V3 switch, frozen by tests until it is removed):
 
 | Group | Pages |
 |---|---|
@@ -126,6 +127,37 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   `src/test/fake-supabase.js`) written first and passing on both versions. ESLint goes from 64 warnings to 0 and
   `npm run lint` now fails on any warning. Fixed on the way: switching the payroll method (Messier / Reference) now
   recomputes the DAS screen; the service-health card no longer retries a failed load in a loop.
+- **Manager V3: plain words, receipts to process, CCQ month** (V2.4.179, V3 only; V2 unchanged): Time › « Reopen a
+  day » (was « Unlock a day »), and the time-sheet card button says « Send back for correction » instead of « Unlock ».
+  To do › Receipts shows by default only what is left to process (supper or parking claim pending, overtime proof on a
+  job not approved yet), with an employee and a day filter; a notification link still opens its job. Reports › CCQ
+  export opens on the reporting month that just ended and shows its weeks.
+- **Manager V3: one employee card** (V2.4.180, V3 only; V2 unchanged): Team › Employees has a search box (name,
+  e-mail, phone, employee or CCQ number, accents ignored) and a « Team leaders » filter. Each open card has tabs:
+  **Identity** (number, contact, CCQ card, birth date, SIN, hiring / last day, hiring or departure), **CCQ**
+  (classification, region, union, wage schedule, rate), **Pay and options** (flat rate of an office employee, the pay
+  rules and reimbursements of Time rules, team-leader premiums, parking receipts and inventory screenshots), **Taxes
+  (TD1)** (TD1 / TP-1015.3, fixed pay, EI / QPP exemptions; managers and owner only), **Time off** and **Access** (role,
+  active / paused, Gestion sections, two-factor and phone notifications, view as, delete). Same fields and same saves as
+  before. V3 Configuration no longer has the Time rules tab nor the employees' TD1 forms in Settings.
+- **Costs and Week / Month use the payroll calculation** (V2.4.181, V2 and V3): Reports › Costs and Week / Month now
+  add up, week by week, the same figures as the pay stubs and the printed weekly summary — hours, gross pay, 13%,
+  statutory employer contributions (QPP, EI, QPIP, FSS, CNT, CNESST, FDRCMO) and CCQ employer benefits computed by the
+  payroll engine, with each employee's TD1, exemptions and year-to-date — instead of a separate per-hour formula.
+  Office, owner and subcontractors stay at their hourly rate without contributions; jobs returned for correction now
+  count, drafts never.
+- **Manager V3: small extras** (V2.4.182):
+  - **To do** shows in the menu the number of submitted jobs waiting for approval (one count-only request on each page
+    change and after each approval).
+  - **Time › Days without entry**: the completed work days with no job entered, per employee, with the dates and a link
+    to the person's time sheets. Weekends and CCQ holidays never count any more, here and in Journal › Employees, where
+    they used to be added.
+  - **Communications**: search boxes in the employee picker and in « Sent notifications » (text or recipient).
+  - **One bell** in V3 (manager notifications, plus the person's messages for someone who is not a manager) and
+    **Mark all as read** on the manager notifications (V2 bell too).
+- **Gestion V3 by default** (V2.4.183): Gestion opens in V3 for everyone (office admins too, who saw only V2 before;
+  each tab keeps its access rule). The V3 bell opens the V3 pages (To do › Receipts, Team › Employees). V2 stays one
+  click away (V2 | V3) until it is removed.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,

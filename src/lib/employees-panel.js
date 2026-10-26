@@ -1,6 +1,6 @@
 // Gestion › Employés: the pure parts of the panel (order of the list, CCQ rate lookups, counters and
 // filters), kept apart from the screen so they can be read and tested on their own.
-import { isManagerRole, isNonCcqRole } from "@/lib/roles";
+import { isManagerRole, isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { COMMERCIAL_RATE_SECTOR, LEVEL_TO_SKILL, extractRateAnnexes, extractRegularHourlyRate } from "@/lib/ccq-rates";
 import { getMissingEmployeeFields } from "@/lib/employee-fields";
 import { DEPARTURE_STATUSES, NEW_HIRE, employeeStatus, isNewHire } from "@/lib/signups";
@@ -115,4 +115,32 @@ export function filterEmployees(profiles, filter, { pending, pushSet, today }) {
     if (filter === NEW_HIRE) return isNewHire(p, today);
     return true;
   });
+}
+
+// « Embauche / départ » (new hire, former employee): managers, never on the owner's or one's own card.
+export function canSetEmployment(p, { role, user }) {
+  return isManagerRole(role) && p.role !== "owner" && p.id !== user?.id;
+}
+
+// Tabs of the V3 employee card (Gestion V3 › Équipe › Employés), in order. CCQ: tradespeople and
+// subcontractors. Impôts (TD1 / TP-1015.3, fixed pay, EI / QPP exemptions): manager-tier viewers only
+// (employee_tax_profiles RLS), never for a subcontractor (no payroll deductions).
+export const EMPLOYEE_CARD_TABS = Object.freeze(["identity", "ccq", "pay", "tax", "timeoff", "access"]);
+
+export function employeeCardTabs(p, viewerRole) {
+  return EMPLOYEE_CARD_TABS.filter((tab) => {
+    if (tab === "ccq") return !isNonCcqRole(p.role) || isSubcontractorRole(p.role);
+    if (tab === "tax") return isManagerRole(viewerRole) && !isSubcontractorRole(p.role);
+    return true;
+  });
+}
+
+// Search box of the V3 list: name, e-mail, phone (digits), employee number or CCQ number.
+export function matchesEmployeeSearch(p, query) {
+  const words = String(query || "").trim().toLocaleLowerCase("fr-CA").normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const plain = (value) => String(value || "").toLocaleLowerCase("fr-CA").normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const haystack = [p.full_name, p.email, p.employee_number, p.ccq_number].map(plain).join(" ");
+  const phone = String(p.phone || "").replace(/\D/g, "");
+  return words.every((word) => haystack.includes(word) || (/^\d{3,}$/.test(word) && phone.includes(word)));
 }

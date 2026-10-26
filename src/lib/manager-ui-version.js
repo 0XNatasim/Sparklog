@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 
-// Gestion V2 (current menus and pages) or V3 (new menus: « À traiter », « Paie de la semaine »).
-// A per-device preference, switched from the Gestion header.
-export const MANAGER_UI_KEY = "sparklog.managerUi";
-const LEGACY_LIVE_KEY = "sparklog.liveVersion"; // V2.4.115 tab on Équipe en direct
+// Gestion V3 (new menus: « À traiter », « Paie de la semaine »…) or V2 (the former menus and pages).
+// V3 is the default since V2.4.183, for everyone who opens Gestion; the V2 | V3 switch of the header
+// stays until V2 is removed, as a per-device choice. The choices stored before V3 became the default
+// (MANAGER_UI_KEY_BEFORE_V3) are ignored, so every device opens V3 once.
+export const MANAGER_UI_KEY = "sparklog.managerUiChoice";
+export const MANAGER_UI_KEY_BEFORE_V3 = "sparklog.managerUi";
+export const DEFAULT_MANAGER_UI_VERSION = "v3";
 const EVENT = "sparklog:manager-ui";
 
 export function readManagerUiVersion() {
   try {
     const stored = window.localStorage.getItem(MANAGER_UI_KEY);
-    if (stored === "v2" || stored === "v3") return stored;
-    return window.localStorage.getItem(LEGACY_LIVE_KEY) === "3" ? "v3" : "v2";
+    return stored === "v2" || stored === "v3" ? stored : DEFAULT_MANAGER_UI_VERSION;
   } catch {
-    return "v2";
+    return DEFAULT_MANAGER_UI_VERSION;
   }
 }
 
@@ -28,7 +30,7 @@ export function useManagerUiVersion() {
     };
   }, []);
   const setVersion = useCallback((value) => {
-    const next = value === "v3" ? "v3" : "v2";
+    const next = value === "v2" ? "v2" : "v3";
     try { window.localStorage.setItem(MANAGER_UI_KEY, next); } catch { /* private mode: this tab only */ }
     setVersionState(next);
     window.dispatchEvent(new CustomEvent(EVENT));

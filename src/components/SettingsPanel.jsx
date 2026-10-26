@@ -11,12 +11,13 @@ import { useT } from "@/lib/use-t";
 import PayrollSettings from "@/components/PayrollSettings";
 
 // Paramètres: company-wide editable parameters, plus the payroll parameters (employer settings,
-// employees' TD1 / TP-1015.3). Congés and Formulaires are their own pages.
-export default function SettingsPanel() {
+// employees' TD1 / TP-1015.3). Congés and Formulaires are their own pages. Gestion V3 passes
+// `taxForms={false}`: each employee's forms are in the Impôts tab of the employee card.
+export default function SettingsPanel({ taxForms = true }) {
   return (
     <div className="space-y-4">
       <GeneralSettings />
-      <PayrollSettings />
+      <PayrollSettings taxForms={taxForms} />
     </div>
   );
 }

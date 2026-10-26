@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.178)
+## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.183)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -385,7 +385,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [ ] Primes autres que chef d'équipe.
 - [ ] **Trajets, km et frais par employé** (décision du 2026-10-18) : chaque trajet (temps et km), l'indemnité de
   plus de 65 km, le traversier, le stationnement et le souper deviennent une option dans la fiche de l'employé,
-  avec « Chargé à Britton ». Grille et décisions : `NOOB.md` étape 7 (champ de plus dans la fiche de temps ; retour maison
+  avec « Chargé à Britton ». Grille et décisions : `NOOB.md` étape 7 (le champ de plus dans la fiche de temps n'est plus prévu, décision du 2026-10-26 ; retour maison
   payé dès 65 km ; plus de 65 km = temps de trajet CCQ dans le 40 h, non-CCQ au-delà ; un taux km par employé ; taux Britton
   inconnu). V2.4.155 (migration 0101) : saisie dans **Gestion V3 › Admin › Trajets et frais** (`TravelRulesManager.jsx`,
   `src/lib/travel-rules.js`) — table `travel_pay_rules` (employé × ligne × date d'effet ; lecture gestionnaire, écriture
@@ -491,7 +491,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`tabs[].from`, `visibleTabs` / `resolveTab`, `authorizationFor().tabs`, `docs/security/authorization-matrix.md`).
   `PayrollPage({ compact })` (V3) ; `V2_TO_V3` / `switchTarget` (changement de version) / `v3MenuPath` (surbrillance).
   Verrous : `MANAGER_NAV` figé en littéral (`manager-nav.test.js`), routes V2 → même export → même rendu
-  (`manager-routes.test.js`). Toute évolution de menu se fait dans la V3 tant qu'elle n'est pas la version par défaut.
+  (`manager-routes.test.js`). Toute évolution de menu se fait dans la V3 (la version par défaut depuis V2.4.183).
 - [x] **Menu de la Gestion repliable** (V2.4.133) : bouton en haut à gauche de l'en-tête (ordinateur seulement ; le
   téléphone garde son tiroir) qui masque ou affiche tout le menu de gauche, mémorisé sur l'appareil
   (`sparklog.managerNavHidden`, `ManagerLayout.jsx`). Le mode « rail » (« Réduire le menu ») reste.
@@ -606,7 +606,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   heures / semaine » + date de début, et case « Exclu de l'AE » (Loi sur l'AE 5(2)b), > 40 % des actions). La
   propriétaire (Karine) reçoit 40 h × 51 $ chaque semaine sans job, une ligne « Régulier à taux horaire », sans CCQ ni AE :
   talon D0038-0002 reproduit au centime (`employee-week.test.js`). Présente dans Talons, DAS, Calcul, Paie de la semaine,
-  Coûts, Semaine/mois et le sommaire imprimé (`src/lib/fixed-pay.js`, `fixed-pay-cost.js`). Hors rapport CCQ.
+  Coûts, Semaine/mois et le sommaire imprimé (`src/lib/fixed-pay.js` ; coût : `weeklyCosts` de `src/lib/employer-cost.js` depuis V2.4.181). Hors rapport CCQ.
   En production depuis le 2026-10-15 : `employee_tax_profiles` de Karine = 40 h, `fixed_pay_start` 2026-10-04 (semaine
   42, celle du talon importé ; 2026-04-05 si on veut son coût d'avril à septembre dans les rapports), `ei_exempt` vrai ;
   TD1 / TP-1015.3 vides (montant de base, qui reproduit l'impôt du talon). Reste : confirmer si sa paie est cotisable à
@@ -813,6 +813,70 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   comparées). Testé sur Postgres local (1re / 2e fois, 22 h → 1 h 30 = 3,5 h ou 4,5 h réelles, choix effacé hors de
   l'heure, écriture directe refusée, RPC par le rôle navigateur) et dans Chromium (horloge au 2 novembre). La paie compte
   encore l'heure affichée (§6.1 D). Test `dst-repeated-hour.test.js`.
+- [x] **Gestion V3 : mots clairs, justificatifs à traiter, mois CCQ** (V2.4.179, aucune migration, V2 inchangée :
+  tout passe par des props données par les onglets V3 de `ManagerPages.jsx`). (1) `UnlockDayManager({ plainWords })`,
+  `ManagerDashboard({ plainWords })` → `JobCard({ plainWords })` : clés `….plain` (« Rouvrir une journée », « Retourner
+  pour correction » = `return_job_for_correction`, inchangé) ; onglet `mgr.nav3.tab.unlockDay` et `todo.unlock` /
+  `todo.toast.unlocked` (V3 seulement) reformulés. (2) `ManagerDashboard({ reviewFilters })` (Justificatifs de À traiter) :
+  `receiptNeedsReview` / `filterReceiptJobs` / `receiptEmployees` (`src/lib/receipts-review.js`) — à traiter = stationnement
+  ou souper `pending` (dernier souper de la job), ou preuve de temps sup. d'une job non approuvée ; case « À traiter
+  seulement » cochée par défaut (décochée si `?job=` d'un lien de notification), employé, journée. Filtre sur les lignes
+  déjà chargées, aucune requête de plus (le souper lit aussi `status`). (3) `CcqJsonExport({ lastFinishedMonth })` :
+  `lastFinishedReportMonth(companyDate())` (mois avant celui de la période en cours, `src/lib/monthly-report-period.js`)
+  et `reportMonthPeriod` pour afficher les semaines. Tests `receipts-review.test.js`, `monthly-report-period.test.js`,
+  `UnlockDayManager.test.jsx` (mots V2 / V3, chaque clé `.plain` dans les deux langues).
+- [x] **Gestion V3 : fiche employé unique** (V2.4.180, aucune migration, V2 inchangée) : `EmployeesPanel({ tabbed })`
+  depuis l'onglet V3 `v3/team?tab=employees` — recherche (`matchesEmployeeSearch` : nom, courriel, n° d'employé / CCQ,
+  chiffres du téléphone, sans accents), filtre « Chefs d'équipe » (`isTeamLeader`), fiche ouverte = `EmployeeTabs`
+  (`employeeCardTabs(profile, viewerRole)` : CCQ pour métier et sous-traitant, Impôts pour un lecteur gestionnaire /
+  propriétaire et jamais pour un sous-traitant, comme la RLS 0083 de `employee_tax_profiles`). Les morceaux de la fiche V2
+  sont exportés et réutilisés tels quels (`EmployeeAccountSection` : type, n°, rôle, pause, embauche / départ ;
+  `CcqDataFields` / `CcqOptionsFields` ; `OfficePayFields` / `ManagementAccessFields` ; `EmployeeDeleteBlock`) ; la fiche V2
+  les assemble comme avant (tests d'écran V2 inchangés). Règles de temps : `src/lib/pay-options.js` (`payRuleToggles`,
+  `reimbursements`, `parsePayAmount`) + `components/employees/PayOptionsFields.jsx`, partagés avec `TimeRulesManager` (V2).
+  TD1 : `src/lib/tax-profile.js` (`taxFormRow`, `taxProfileUpsert`) + `TaxProfileFields.jsx`, partagés avec
+  `PayrollSettings` ; onglet `EmployeeTaxTab` (lit la ligne de l'employé à l'ouverture, même upsert). Menu V3 : onglet
+  `time-rules` retiré de `v3-config` ; `V2_TO_V3["config/rules"]` → `v3/team?tab=employees` avec `merged: true` (retour
+  V3 → V2 sur Employés, même règle `employees`) ; `SettingsPanel({ taxForms: false })` en V3. Tests
+  `EmployeesPanel.test.jsx` (6 cas V3), `employee-card.test.js`, `manager-nav.test.js`, `authorization-matrix.test.js`.
+- [x] **Coûts et Semaine / Mois = calcul de la paie** (V2.4.181, aucune migration, V2 et V3) : `src/lib/employer-cost.js`
+  — `payrollWeekCost` (= `computeEmployeeWeekTalon`, méthode Messier : brut, 13 % `ccqAmounts.vacation`, charges
+  légales de l'employeur du moteur, `employerSocialBenefit`, taux par heure de `employer_contributions` **hors**
+  `ENGINE_CONTRIBUTION_CODES`, km / cellulaire / entreposage / équipement), `nonPayrollWeekCost` (bureau, propriétaire sans
+  paie fixe, sous-traitant : taux figé sur la job, sans charges), `weeklyCosts` (une ligne par employé × semaine CCQ ;
+  jobs `COST_JOB_STATUSES` = soumises / retournées / approuvées ; souper CCQ seulement), `costsByEmployee` (Coûts),
+  `openingLookup` (cumul = dernière semaine comptabilisée de la même année fiscale — date de paie = samedi + 5 j — sinon
+  `payroll_ytd`, comme le sommaire imprimé). `src/lib/employer-cost-data.js` (`loadCostInputs`) charge tout ;
+  `src/lib/period-costs.js` (`periodsFromWeeklyCosts`) regroupe par semaine / période mensuelle CCQ. `weekly-report.js`
+  (`employeePay`) utilise `payrollWeekCost` (chiffres inchangés, tests existants). Avant : charges = taux par heure de
+  `employer_contributions` × heures (RRQ, AE… approximés) et brut au taux figé sur la job ; PeriodSummary comptait aussi
+  les brouillons. `fixed-pay-cost.js` retiré (sa logique est dans `weeklyCosts`). Mesuré : 40 employés × 1 an (16 800
+  jobs) ≈ 0,3 s dans le navigateur. Tests `employer-cost.test.js` (égalité au centime avec le sommaire imprimé),
+  `fixed-pay.test.js`, `claim-status.test.js`, `conges-indemnity.test.js`.
+- [x] **Gestion V3 : petits plus** (V2.4.182, aucune migration) : (1) compteur « À traiter » dans le menu V3
+  (`badges.todo`, `fetchTodoCount` : `jobs` soumises après `DYNACOM_CUMULATIVE_END`, `count: exact, head: true`, aucune
+  ligne lue ; rechargé à chaque changement de page et sur `TODO_EVENT`, émis par `TodoInbox` après chaque chargement).
+  (2) onglet `missing` de `v3-time` (« Jours sans saisie », règle de `advanced-audit`) : `MissingDaysPanel.jsx` +
+  `src/lib/missing-days.js` (`loadMissingEntryDays`, aussi utilisé par `EmployeeActivityLog`) ; `missingEntryDays` saute
+  maintenant les fins de semaine et `company_holidays` (`isNonWorkday`, comme `workdays.js` l'exige) et rend les `dates`.
+  (3) Communications : recherche du choix d'employés et des notifications envoyées (`src/lib/broadcast-search.js`).
+  (4) une seule cloche en V3 (`components/manager/ManagerBell.jsx`) : notifications de gestion pour
+  `canAccessSection(…, "notifications")` + messages reçus pour un non-gestionnaire, un seul compteur ; V2 et l'app
+  employé gardent leurs deux composants, sur les mêmes hooks (`use-manager-notifications.js`,
+  `use-employee-broadcasts.js`). « Tout marquer comme lu » (`markRead(visible)`, un seul upsert de
+  `manager_notification_reads`) dans les deux. Les admins de bureau ont la V3 (donc la cloche unique) depuis V2.4.183 (« V3 par défaut »). Tests `bell-and-todo.test.js`,
+  `broadcast-search.test.js`, `live-crew.test.js` (fins de semaine / fériés), `manager-nav.test.js`,
+  `authorization-matrix.test.js`.
+- [x] **Gestion V3 par défaut** (V2.4.183, aucune migration) : `src/lib/manager-ui-version.js` — clé
+  `sparklog.managerUiChoice` (`MANAGER_UI_KEY`), défaut `DEFAULT_MANAGER_UI_VERSION = "v3"` ; l'ancienne clé
+  `sparklog.managerUi` (`MANAGER_UI_KEY_BEFORE_V3`) est ignorée, donc chaque appareil ouvre la V3 une fois, puis garde le
+  choix fait depuis. `ManagerLayout` : plus de `canSwitch` réservé aux gestionnaires — tout le monde dans la Gestion
+  (admins de bureau compris, qui étaient forcés en V2) a la V3 par défaut et le sélecteur ; `ManagerIndex` atterrit selon
+  la version pour tous (`firstAllowedPath(role, sections, version)`). Les droits ne changent pas : chaque entrée et chaque
+  onglet V3 gardent la règle de leur page (tests existants : un admin atteint en V3 exactement ses pages V2). Cloche V3 :
+  `notificationTargetV3` (`switchTarget("v3", …)`) ouvre Justificatifs de À traiter / Équipe › Employés. Reste : retirer
+  la V2 (sélecteur, `MANAGER_NAV`, pages en double, redirection des anciens chemins). Tests `manager-ui-version.test.js`,
+  `bell-and-todo.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

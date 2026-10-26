@@ -77,6 +77,7 @@ export function createFakeSupabase({ tables = {}, rpcs = {}, functions = {}, ses
     },
     auth: {
       getSession: () => Promise.resolve({ data: { session }, error: null }),
+      getUser: () => Promise.resolve({ data: { user: session?.user ?? null }, error: null }),
       refreshSession: () => Promise.resolve({ data: { session }, error: null }),
     },
     channel() {

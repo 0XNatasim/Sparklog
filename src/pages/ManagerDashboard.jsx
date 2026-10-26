@@ -31,6 +31,7 @@ import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 import { loadManualEntryJobIds, onlyManualEntries } from "@/lib/entry-source";
 import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
+import { filterReceiptJobs, receiptEmployees, receiptNeedsReview } from "@/lib/receipts-review";
 import ManualEntryStar from "@/components/ManualEntryStar";
 
 dayjs.extend(isoWeek);
@@ -69,8 +70,11 @@ const INITIAL_PICK = Symbol("initial week pick");
 // Employee, status and day live in the URL so a timesheet view can be bookmarked or shared.
 // Gestion V3 › Feuilles de temps only (both off = the V2 page, unchanged):
 //   nameFirst — job cards show the employee's name first (JobCard);
+//   plainWords — « Retourner pour correction » instead of « Déverrouiller » (button, question, message);
 //   manualFilter — a « ★ Entrées à la main » toggle that keeps only the jobs typed by hand.
-export default function ManagerDashboard({ view = "timesheet", nameFirst = false, manualFilter = false }) {
+// Gestion V3 › À traiter › Justificatifs only:
+//   reviewFilters — « À traiter seulement » (on by default, off when a notification opens one job), employee and date.
+export default function ManagerDashboard({ view = "timesheet", nameFirst = false, manualFilter = false, plainWords = false, reviewFilters = false }) {
   const PAGE_SIZE = QUERY_BUDGETS.managerJobsPage;
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -93,6 +97,10 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const [parkingImageLoading, setParkingImageLoading] = useState("");
   const [notificationMealJobs, setNotificationMealJobs] = useState([]);
   const [mealDayJobs, setMealDayJobs] = useState(new Map()); // `${user}|${date}` → that day's jobs (supper check)
+  const [notificationMealStatus, setNotificationMealStatus] = useState(new Map()); // job id → newest supper claim status
+  const [pendingOnly, setPendingOnly] = useState(() => !focusedJobId);
+  const [receiptEmployee, setReceiptEmployee] = useState("");
+  const [receiptDate, setReceiptDate] = useState("");
   const [notificationMealsLoading, setNotificationMealsLoading] = useState(false);
 
   const [jobs, setJobs] = useState([]);
@@ -503,7 +511,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       setNotificationMealsLoading(true);
       try {
         const { data: claims } = await withRetry(
-          () => supabase.from("meal_claims").select("job_id, created_at").order("created_at", { ascending: false }).limit(QUERY_BUDGETS.reviewQueue), 12000
+          () => supabase.from("meal_claims").select("job_id, created_at, status").order("created_at", { ascending: false }).limit(QUERY_BUDGETS.reviewQueue), 12000
         );
         const ids = [...new Set((claims || []).map((claim) => claim.job_id))];
         const { data: rows } = ids.length
@@ -528,6 +536,9 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
           byDay.get(key).push(row);
         }
         if (!cancelled) {
+          const mealStatus = new Map();
+          for (const claim of claims || []) if (!mealStatus.has(claim.job_id)) mealStatus.set(claim.job_id, claim.status);
+          setNotificationMealStatus(mealStatus);
           setMealDayJobs(byDay);
           setNotificationMealJobs(orderedRows);
           setProfiles((current) => new Map([...current, ...(people || []).map((person) => [person.id, person])]));
@@ -877,7 +888,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   }
 
   async function unlock(jobId) {
-    const ok = await confirm(t("manager.confirm.unlock"));
+    const ok = await confirm(t(plainWords ? "manager.confirm.unlock.plain" : "manager.confirm.unlock"));
     if (!ok) return;
     setActionLoadingId(jobId);
     setErr(""); setInfo("");
@@ -893,7 +904,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         12000
       );
       if (error) throw error;
-      setInfo(t("manager.toasts.unlocked"));
+      setInfo(t(plainWords ? "manager.toasts.unlocked.plain" : "manager.toasts.unlocked"));
       await load();
     } catch (e) {
       setErr(e?.message || t("manager.errors.unlockFailed"));
@@ -1027,6 +1038,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       onApprove: approveStable,
       onUnlock: unlockStable,
       nameFirst,
+      plainWords,
     };
   }
 
@@ -1093,6 +1105,19 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     return [...merged.values()].sort((a, b) => dayjs(b.job_date).valueOf() - dayjs(a.job_date).valueOf());
   }, [notificationFilter, notificationMealJobs, overtimeJobs, parkingJobs]);
 
+  // V3: what is left to process, for one employee or one day (src/lib/receipts-review.js).
+  const receiptStatus = useCallback((job) => ({
+    parkingStatus: parkingReceipts.get(job.id)?.status ?? null,
+    mealStatus: notificationMealStatus.get(job.id) ?? null,
+    hasOvertimeProof: overtimeEvidence.has(job.id),
+  }), [parkingReceipts, notificationMealStatus, overtimeEvidence]);
+  const shownNotificationJobs = useMemo(() => (reviewFilters
+    ? filterReceiptJobs(notificationJobs, { pendingOnly, employeeId: receiptEmployee, date: receiptDate, status: receiptStatus })
+    : notificationJobs), [reviewFilters, notificationJobs, pendingOnly, receiptEmployee, receiptDate, receiptStatus]);
+  const receiptPendingCount = useMemo(() => (reviewFilters
+    ? notificationJobs.filter((job) => receiptNeedsReview(job, receiptStatus(job))).length
+    : 0), [reviewFilters, notificationJobs, receiptStatus]);
+
   const bulkBusy = typeof actionLoadingId === "string" && actionLoadingId.startsWith("week:");
 
   return (
@@ -1100,11 +1125,28 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       <div className="space-y-3">
         {activeSection === "notifications" && (
           <div className="space-y-3">
-            <Card><CardContent className="space-y-3 p-4"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select></CardContent></Card>
+            <Card><CardContent className="space-y-3 p-4"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select>
+              {reviewFilters && (
+                <div className="grid gap-2 sm:grid-cols-[auto,1fr,auto] sm:items-end">
+                  <label className="flex h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium">
+                    <input type="checkbox" checked={pendingOnly} onChange={(event) => setPendingOnly(event.target.checked)} className="h-4 w-4 accent-primary" />
+                    {t("manager.receipts.pendingOnly", { count: receiptPendingCount })}
+                  </label>
+                  <Select value={receiptEmployee} onChange={(event) => setReceiptEmployee(event.target.value)} aria-label={t("manager.receipts.employee")}>
+                    <option value="">{t("manager.receipts.allEmployees")}</option>
+                    {receiptEmployees(notificationJobs, profiles).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                  </Select>
+                  <div className="flex items-center gap-1">
+                    <Input type="date" value={receiptDate} onChange={(event) => setReceiptDate(event.target.value)} aria-label={t("manager.receipts.date")} className="h-10" />
+                    {receiptDate && <Button type="button" size="sm" variant="ghost" onClick={() => setReceiptDate("")}>{t("manager.receipts.allDates")}</Button>}
+                  </div>
+                </div>
+              )}
+            </CardContent></Card>
             {(overtimeLoading || parkingLoading || notificationMealsLoading) && <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>}
             {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{err}</div>}
-            {!overtimeLoading && !parkingLoading && !notificationMealsLoading && notificationJobs.map(renderNotificationCard)}
-            {!overtimeLoading && !parkingLoading && !notificationMealsLoading && notificationJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("manager.notifications.empty")}</CardContent></Card>}
+            {!overtimeLoading && !parkingLoading && !notificationMealsLoading && shownNotificationJobs.map(renderNotificationCard)}
+            {!overtimeLoading && !parkingLoading && !notificationMealsLoading && shownNotificationJobs.length === 0 && <Card><CardContent className="p-4 text-sm text-muted-foreground">{t(reviewFilters && pendingOnly && !receiptEmployee && !receiptDate ? "manager.receipts.nothingPending" : "manager.notifications.empty")}</CardContent></Card>}
           </div>
         )}
 

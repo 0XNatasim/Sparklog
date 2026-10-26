@@ -6,7 +6,8 @@
 // as Talons and DAS — so the printed week agrees with those screens. ⚠️ Draft rule set: every
 // amount is an estimate that requires payroll review, never a filing.
 import { calculatePayrollEntries, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
-import { computeEmployeeWeekTalon, DEFAULT_EMPLOYER } from "@/payroll/employee-week";
+import { DEFAULT_EMPLOYER } from "@/payroll/employee-week";
+import { payrollWeekCost } from "@/lib/employer-cost";
 import { payTotals } from "@/lib/payroll-closing";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { EMPLOYER } from "@/lib/paystub";
@@ -16,22 +17,7 @@ import { fixedWeeklyHours, isFixedPayWeek } from "@/lib/fixed-pay";
 // approved: their amounts can still change.
 export const REPORT_JOB_STATUSES = ["submitted", "updated", "approved"];
 
-// employer_contributions codes the engine already computes (statutory contributions, the CCQ
-// employer benefits and the safety-equipment allowance). The remaining per-hour rates of that
-// table (prélèvement CCQ employeur, AECQ/ACQ, taxe d'assurance, fonds divers, autres) are added
-// on top, so nothing is counted twice.
-const ENGINE_CONTRIBUTION_CODES = new Set(["rrq", "ei", "rqap", "fss", "cnesst", "benefits", "safety_equip"]);
-
-const LEVEL_RATE_KEY = {
-  compagnon: "rate_compagnon",
-  apprenti_4: "rate_apprenti_4",
-  apprenti_3: "rate_apprenti_3",
-  apprenti_2: "rate_apprenti_2",
-  apprenti_1: "rate_apprenti_1",
-};
-
 const n = (v) => Number(v) || 0;
-const round2 = (x) => Math.round(x * 100) / 100;
 const sum = (list, key) => list.reduce((s, x) => s + n(typeof key === "function" ? key(x) : x[key]), 0);
 const otKey = (ot) => String(ot ?? "").trim();
 
@@ -60,27 +46,13 @@ function jobRows(jobs, entries) {
     });
 }
 
-// One employee's CCQ pay for the week (null for non-CCQ roles, like the DAS screen).
+// One employee's CCQ pay for the week (null for non-CCQ roles, like the DAS screen). The employer cost
+// is payrollWeekCost (src/lib/employer-cost.js), the same figure Coûts and Semaine / Mois add up.
 function employeePay({ profile, jobs, week, opening, holidayDates, employer, taxProfile, contributions, meals, parking, rounding, messierMethod }) {
-  const talon = computeEmployeeWeekTalon({
-    profile, jobs, opening, frequency: "weekly", includePhone: true, includeStorage: true,
-    weekDate: week.start, holidayDates, employer, taxProfile, rounding, messierMethod,
-  });
-  const { result, ccqAmounts: ccq, reimb, hours } = talon;
+  const cost = payrollWeekCost({ profile, jobs, weekStart: week.start, opening, holidayDates, employer, taxProfile, contributions, rounding, messierMethod });
+  const { result, ccqAmounts: ccq, reimb } = cost.talon;
   const totals = payTotals(result, ccq, reimb);
-  const emp = result.employee, empr = result.employer, das = result.das;
-
-  // Fixed weekly pay has no CCQ layer: no per-hour CCQ contributions either.
-  const rateKey = talon.fixedPay ? null : LEVEL_RATE_KEY[profile?.apprentice_level] || null;
-  const otherCcq = rateKey
-    ? contributions
-      .filter((c) => !ENGINE_CONTRIBUTION_CODES.has(c.code))
-      .map((c) => ({ code: c.code, label: c.label, rate: n(c[rateKey]), amount: round2(n(c[rateKey]) * hours.totalHours) }))
-      .filter((c) => c.amount)
-    : [];
-
-  const salary = n(result.gross?.total);
-  const vacation = n(ccq?.vacation);
+  const emp = result.employee, das = result.das;
   const ccqWithheld = n(ccq?.netWithholdings);
   const deductions = {
     federalTax: n(emp.federalTax),
@@ -90,28 +62,19 @@ function employeePay({ profile, jobs, week, opening, holidayDates, employer, tax
     rqap: n(emp.rqap),
     ccq: ccqWithheld, // retraite, MÉDIC, cotisation syndicale, prélèvement, caisse d'éducation
   };
-  const reimbursements = {
-    km: n(reimb.km), phone: n(reimb.phone), storage: n(reimb.storage), safety: n(reimb.safety),
-    meals, parking,
-  };
+  const reimbursements = { ...cost.reimbursements, meals, parking };
   const reimbursementTotal = sum(Object.values(reimbursements), (v) => v);
-  const statutory = {
-    rrq: n(empr.rrq), ei: n(empr.ei), rqap: n(empr.rqap), fss: n(empr.fss),
-    cnt: n(empr.labourStandards), cnesst: n(empr.cnesst), fdrcmo: n(empr.workforceFund),
-  };
-  const statutoryTotal = sum(Object.values(statutory), (v) => v);
-  const ccqBenefits = n(ccq?.employerSocialBenefit);
-  const otherCcqTotal = sum(otherCcq, "amount");
-  const employerCost = salary + vacation + statutoryTotal + ccqBenefits + otherCcqTotal + reimbursementTotal;
-
   return {
-    salary, vacation,
+    salary: cost.salary, vacation: cost.vacation,
     deductions, totalDeductions: sum(Object.values(deductions), (v) => v),
     // Net deposited = pay − deductions (+ safety allowance) + km, phone, storage. Supper and parking
     // are reimbursed apart from the stub.
     net: totals.netPlusReimb,
     reimbursements, reimbursementTotal,
-    employer: { statutory, statutoryTotal, ccqBenefits, otherCcq, otherCcqTotal, total: employerCost },
+    employer: {
+      statutory: cost.statutory, statutoryTotal: cost.statutoryTotal, ccqBenefits: cost.ccqBenefits,
+      otherCcq: cost.otherCcq, otherCcqTotal: cost.otherCcqTotal, total: cost.total + meals + parking,
+    },
     das: { arc: n(das.arc), quebec: n(das.quebec), total: n(das.total) },
     reviewReasons: result.reviewReasons || [],
   };

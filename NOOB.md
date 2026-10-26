@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.178).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.183).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -59,7 +59,7 @@ d'avril.
 
 - [ ] **Formulaires TD1 (fédéral) et TP-1015.3 (Québec)** remplis et signés par chaque employé. Ils
   donnent les crédits d'impôt personnels et servent à calculer l'**impôt retenu sur chaque paie**. *Où l'inscrire :*
-  **Configuration › Paramètres › Paie — TD1 / TP-1015.3 des employés**. Inscris seulement les montants, jamais le NAS
+  **Équipe › Employés › fiche de l'employé › onglet Impôts** (en V2 : Configuration › Paramètres › Paie — TD1 / TP-1015.3 des employés). Inscris seulement les montants, jamais le NAS
   ni une copie du formulaire. Tant qu'un employé n'a rien, l'app prend le montant personnel de base (bon pour la
   plupart). **Au 2026-10-23 : aucun saisi (0 sur 36).** Le plus simple : demander à Dynacom les montants qu'ils
   utilisaient, et n'inscrire que ceux qui diffèrent du montant de base.
@@ -74,7 +74,7 @@ d'avril.
   **comptabiliser chaque semaine** pour que le cumul suive.
   - Karine : paie fixe 40 h × 51 $ par semaine depuis le 4 octobre, **exclue de l'AE** (si tu veux son coût
     d'avril à septembre dans les rapports, change « Paie fixe depuis le » pour le 2026-04-05).
-  - **Exclu du RRQ** (nouvelle case, Configuration › Paramètres › Paie) : cochée pour l'employé à qui Dynacom ne
+  - **Exclu du RRQ** (case de la fiche de l'employé › onglet Impôts ; en V2 : Configuration › Paramètres › Paie) : cochée pour l'employé à qui Dynacom ne
     retient aucun RRQ. À cocher aussi pour tout autre employé qui a cessé de cotiser (garder la preuve au dossier).
   - Si Dynacom met à jour les cumuls (par exemple le RRQ d'avant avril, comme pour un employé cette semaine),
     me redonner le nouveau « Cumulatif des employés » : je remplace les lignes du 10 octobre.
@@ -129,9 +129,10 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
 ## Étape 6 — Gestion V3 : ce qu'il reste à convertir 💻
 
-La V3 (bouton **V2 | V3** en haut à droite de la Gestion) a déjà **À traiter**, **Paie de la semaine** et le
-nouveau menu. **La V2 ne change pas** : tant que la V3 n'est pas la version par défaut, chaque changement de menu
-se fait seulement dans la V3 (un test fige le menu, les chemins et les pages de la V2).
+**Depuis V2.4.183, la V3 est la version par défaut** : la Gestion s'ouvre en V3 pour tout le monde (toi, les
+gestionnaires et les employés de bureau qui ont accès à la Gestion). Le bouton **V2 | V3** en haut à droite ramène
+encore la V2 au besoin, jusqu'à ce qu'on la retire. **La V2 ne change pas** (un test fige son menu, ses chemins et
+ses pages).
 
 Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 - [x] **Pages à onglets** : À traiter (À approuver · Justificatifs), Feuilles de temps (Feuilles de temps ·
@@ -155,21 +156,44 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 
 À faire, dans cet ordre :
 
-- [ ] **Fiche employé unique** : une liste avec recherche, et une fiche à onglets (Identité, CCQ, Paie et options,
-  Impôts TD1, Congés, Accès). Elle remplace Employés + Règles de temps + la partie TD1 de Paramètres.
+- [x] **Fiche employé unique** (V2.4.180, Équipe › Employés) : une case de recherche (nom, courriel, téléphone,
+  numéro d'employé ou CCQ, sans se soucier des accents) et un bouton « Chefs d'équipe ». Chaque fiche ouverte a des
+  onglets : **Identité**, **CCQ**, **Paie et options** (ce qui était dans Règles de temps : premier trajet, retour,
+  1re heure sup., km, cellulaire, entreposage, primes de chef d'équipe, plus stationnement et inventaire), **Impôts
+  (TD1)** (TD1, TP-1015.3, paie fixe, exclusions AE / RRQ : gestionnaires et propriétaire seulement), **Congés** et
+  **Accès** (rôle, actif / en pause, accès à la Gestion, double authentification, notifications, « Voir comme »,
+  supprimer). En V3, Configuration n'a plus l'onglet Règles de temps, et Paramètres n'a plus les formulaires TD1 : tout
+  est dans la fiche. Rien ne change dans la V2.
 - [ ] **DAS de Téléchargements (V2 seulement)** : il calcule avec la méthode « Référence » alors que Paie › DAS
   utilise « Messier ». Réglé en V3 (pas de DAS dans l'export) ; disparaîtra avec la V2.
-- [ ] **Débloquer** : des mots clairs — « rouvrir une journée » ou « retourner une job pour correction ». En V3, le
-  déblocage d'un jour précis est déjà un seul onglet (Feuilles de temps › Débloquer une journée), mais le bouton
-  « Déverrouiller » des cartes garde son ancien nom.
-- [ ] **Reçus et preuves** (onglet Justificatifs de À traiter en V3) : n'afficher par défaut que ce qui reste à
-  traiter ; recherche par employé et par date.
-- [ ] **Coûts** et **Semaine / mois** : utiliser le même calcul que la paie (aujourd'hui, une formule à part).
-- [ ] **Rapport CCQ** : proposer par défaut le mois qui vient de finir.
-- [ ] **Petits plus** : recherche dans les listes (Employés, Messages), « tout marquer comme lu » sur la cloche,
-  « jours sans saisie » visible dans Temps plutôt que dans Avancé, une seule cloche en V3, un compteur sur
-  « À traiter » (demande une petite requête de plus : à décider).
-- [ ] **Fin** : quand tout est converti et testé, faire de la V3 la version par défaut, puis retirer la V2.
+- [x] **Débloquer** (V2.4.179) : des mots clairs en V3. L'onglet s'appelle **« Rouvrir une journée »** (bouton
+  « Rouvrir la journée », liste « Journées rouvertes », « Refermer ») et le bouton des cartes de Feuilles de temps dit
+  **« Retourner pour correction »** (l'employé la corrige et la soumet de nouveau). La V2 garde ses anciens mots.
+- [x] **Reçus et preuves** (V2.4.179, onglet Justificatifs de À traiter) : par défaut, seulement ce qui reste à
+  traiter (souper ou stationnement en attente, preuve de temps sup. d'une job pas encore approuvée), avec le nombre.
+  Décocher « À traiter seulement » montre tout. Choix d'un employé et d'une journée. Un lien de la cloche ouvre
+  toujours sa job.
+- [x] **Coûts** et **Semaine / mois** (V2.4.181, V2 et V3) : ils additionnent maintenant, semaine par semaine, les mêmes
+  chiffres que les talons et le sommaire imprimé (heures, salaire, 13 %, charges de l'employeur calculées par la paie :
+  RRQ, AE, RQAP, FSS, CNT, CNESST, FDRCMO et avantages sociaux CCQ, avec le TD1 et le cumul de chacun). Avant, une
+  formule à part (un taux par heure pour chaque charge) donnait d'autres montants. Bureau, propriétaire et
+  sous-traitants : leurs heures à leur taux, sans charges, comme avant. Les fiches retournées pour correction comptent
+  aussi ; les brouillons jamais. Les montants restent une estimation tant que les règles de paie ne sont pas validées.
+- [x] **Rapport CCQ** (V2.4.179, Rapports › Export CCQ) : s'ouvre sur le mois qui vient de finir (le mois CCQ finit
+  le dernier samedi : le 25 octobre, c'est septembre ; dès le 1er novembre, octobre) et affiche ses semaines.
+- [x] **Petits plus** (V2.4.182) :
+  - **À traiter** affiche dans le menu le nombre de fiches soumises à approuver (il baisse après chaque approbation).
+  - **Temps › Jours sans saisie** : les journées de travail terminées sans aucune job, par employé, avec les dates et un
+    bouton « Voir ses feuilles de temps ». Les fins de semaine et les fériés ne comptent plus (avant, le Journal › Employés
+    les comptait aussi).
+  - **Communications** : une recherche dans la liste des employés et une dans « Notifications envoyées » (texte ou
+    destinataire). Employés avait déjà la sienne (V2.4.180).
+  - **Une seule cloche** en V3, avec **« Tout marquer comme lu »** (aussi sur la cloche de la V2).
+- [x] **V3 par défaut** (V2.4.183) : chaque appareil s'ouvre en V3, même s'il avait choisi la V2 avant (un choix fait
+  après est gardé). Les employés de bureau qui ont accès à la Gestion passent aussi en V3 (avant, ils ne voyaient que
+  la V2) : chacun ne voit que les pages et onglets permis. La cloche de la V3 ouvre les pages de la V3.
+- [ ] **Retirer la V2** : après quelques jours d'utilisation de la V3 sans problème. On enlèvera le bouton V2 | V3,
+  le menu V2 et ses pages en double ; les anciens liens (favoris, cloche) seront redirigés vers la page V3 équivalente.
 
 ## Étape 7 — Temps de trajet, km et frais : une option par employé 👤 💻
 
@@ -240,7 +264,8 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
    Britton ? » (oui / non / pas décidé), le seuil en km du retour maison et une date « en vigueur à partir du ». « Voir
    par employé » montre le réglage de chacun ; chaque changement va au Journal. **👤 À faire : la propriétaire
    remplit chaque ligne.** La paie ne lit pas encore ces réglages : chaque ligne garde son défaut d'ici là.
-2. Un champ de plus dans la fiche de temps pour les trajets maison ↔ entrepôt et client → maison (temps et km).
+2. ~~Un champ de plus dans la fiche de temps pour les trajets maison ↔ entrepôt et client → maison~~ : **pas
+   nécessaire** (décision du 2026-10-26).
 3. Le moteur de paie et le talon qui lisent ces options ; tests de chaque ligne.
 4. Un rapport « Chargé à Britton » par semaine.
 

@@ -5,10 +5,12 @@ import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { companyDate } from "@/lib/company-time";
 import { fetchGroups, groupsTargetIds, pendingNewHires } from "@/lib/employee-groups";
 import { useT } from "@/lib/use-t";
+import { matchesBroadcastSearch, matchesPickerSearch } from "@/lib/broadcast-search";
 import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
@@ -99,6 +101,8 @@ export default function BroadcastManager() {
   const [audience, setAudience] = useState("selected");
   const [templates, setTemplates] = useState(() => loadTemplates(BUILT_IN_TEMPLATES));
   const [selected, setSelected] = useState(new Set());
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [logSearch, setLogSearch] = useState("");
   // Groupes d'employés (0114): pick whole groups as recipients.
   const [groups, setGroups] = useState([]);
   const [selectedGroups, setSelectedGroups] = useState(new Set());
@@ -268,6 +272,8 @@ export default function BroadcastManager() {
     const e = employees.find((row) => row.id === id);
     return e?.full_name || e?.email || id;
   };
+  // « Notifications envoyées » search: the text or a recipient's name.
+  const visibleBroadcasts = broadcasts.filter((b) => matchesBroadcastSearch(b, (recipientsByBroadcast.get(b.id) || []).map((r) => employeeName(r.employee_id)), logSearch));
 
   async function send() {
     setMessage("");
@@ -469,8 +475,21 @@ export default function BroadcastManager() {
               </div>
             )}
             {audience === "selected" && (
+              <Input
+                type="search"
+                value={pickerSearch}
+                onChange={(e) => setPickerSearch(e.target.value)}
+                placeholder={t("broadcast.searchEmployees")}
+                aria-label={t("broadcast.searchEmployees")}
+                className="h-10"
+              />
+            )}
+            {audience === "selected" && selected.size > 0 && (
+              <p className="text-xs text-muted-foreground">{t("broadcast.selectedCount", { count: selected.size })}</p>
+            )}
+            {audience === "selected" && (
               <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
-                {employees.map((employee) => (
+                {employees.filter((employee) => matchesPickerSearch(employee, pickerSearch)).map((employee) => (
                   <label key={employee.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
                     <input type="checkbox" checked={selected.has(employee.id)} onChange={() => toggleEmployee(employee.id)} className="h-4 w-4 accent-primary" />
                     <span>{employee.full_name || employee.email}</span>
@@ -554,8 +573,19 @@ export default function BroadcastManager() {
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
           </summary>
           <div className="space-y-2 border-t p-4">
+          {broadcasts.length > 0 && (
+            <Input
+              type="search"
+              value={logSearch}
+              onChange={(e) => setLogSearch(e.target.value)}
+              placeholder={t("broadcast.searchLog")}
+              aria-label={t("broadcast.searchLog")}
+              className="h-10"
+            />
+          )}
           {broadcasts.length === 0 && <p className="text-xs text-muted-foreground">{t("broadcast.noLog")}</p>}
-          {broadcasts.map((b) => {
+          {broadcasts.length > 0 && visibleBroadcasts.length === 0 && <p className="text-xs text-muted-foreground">{t("broadcast.noLogMatch")}</p>}
+          {visibleBroadcasts.map((b) => {
             const recips = recipientsByBroadcast.get(b.id) || [];
             const status = recipientStatus(recips);
             const isOpen = expanded === b.id;

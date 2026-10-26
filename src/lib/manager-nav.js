@@ -69,6 +69,8 @@ const V3_ONLY_ITEMS = Object.freeze([
   { id: "v3-time", path: "v3/time", grant: null, labelKey: "mgr.nav.timesheets", tabs: [
     tab("timesheets", "timesheets", "mgr.nav.timesheets"),
     tab("unlock", "unlock-day", "mgr.nav3.tab.unlockDay"),
+    // Jours sans saisie: the count of Avancé › Journal › Employés, with the dates (same rule).
+    tab("missing", "advanced-audit", "mgr.nav3.tab.missingDays"),
   ] },
   { id: "v3-pay-history", path: "v3/pay-history", grant: null, labelKey: "mgr.nav3.payHistory", tabs: [
     tab("stubs", "payroll-stubs", "mgr.nav.stubs"),
@@ -91,7 +93,6 @@ const V3_ONLY_ITEMS = Object.freeze([
   ] },
   { id: "v3-config", path: "v3/config", grant: null, labelKey: "mgr.nav3.config", tabs: [
     tab("settings", "config-settings", "mgr.nav.settings"),
-    tab("time-rules", "config-rules", "mgr.nav.rules"),
     tab("ccq-rates", "reports-ccq", "mgr.nav.ccq"),
     tab("pay-rules", "advanced-pay-rules", "mgr.nav.payRules"),
     tab("forms", "forms", "mgr.nav.forms"),
@@ -183,7 +184,8 @@ export const V2_TO_V3 = Object.freeze({
   "reports/period": { path: "v3/reports", tab: "week" }, // ?view=month|grid → that tab
   "reports/downloads": { path: "v3/reports", tab: "ccq" },
   "config/settings": { path: "v3/config", tab: "settings" },
-  "config/rules": { path: "v3/config", tab: "time-rules" },
+  // Règles de temps has no V3 tab: each employee's card holds it (`merged`: V3 → V2 lands on Employés).
+  "config/rules": { path: "v3/team", tab: "employees", merged: true },
   "reports/ccq": { path: "v3/config", tab: "ccq-rates" },
   "advanced/pay-rules": { path: "v3/config", tab: "pay-rules" },
   forms: { path: "v3/config", tab: "forms" },
@@ -222,7 +224,7 @@ export function switchTarget(next, path, search = "") {
     params.set("view", tabKey);
     return withQuery("reports/period", params);
   }
-  const v2 = Object.entries(V2_TO_V3).find(([, eq]) => eq.path === clean && eq.tab === tabKey)?.[0];
+  const v2 = Object.entries(V2_TO_V3).find(([, eq]) => !eq.merged && eq.path === clean && eq.tab === tabKey)?.[0];
   return v2 ? withQuery(v2, params) : null;
 }
 
