@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Trash2, UsersRound, X } from "lucide-react";
+import { Pencil, Plus, Trash2, UserX, UsersRound, X } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import {
   MAX_GROUP_NAME, MAX_GROUP_NOTE, cleanGroupName, createGroup, deleteGroup, fetchGroups, groupMembers, groupNameTaken,
-  saveGroupMembers, updateGroup,
+  saveGroupMembers, ungroupedPeople, updateGroup,
 } from "@/lib/employee-groups";
 import { DEPARTURE_STATUSES, isNewHire } from "@/lib/signups";
 import { useT } from "@/lib/use-t";
@@ -95,6 +95,46 @@ function MembersEditor({ group, people, today, onSave, onCancel, busy }) {
   );
 }
 
+// Field employees in no group (warehouse), each with a picker to put them in one.
+function UngroupedCard({ people, groups, today, busy, onAdd }) {
+  const t = useT();
+  if (people.length === 0) {
+    return <p className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success" role="status">{t("groups.ungrouped.none")}</p>;
+  }
+  return (
+    <Card className="border-warning/40">
+      <CardContent className="space-y-2 p-4">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-warning"><UserX className="h-4 w-4" />{t("groups.ungrouped.title", { count: people.length })}</h3>
+          <p className="text-xs text-muted-foreground">{t("groups.ungrouped.help")}</p>
+        </div>
+        <ul className="divide-y">
+          {people.map((person) => (
+            <li key={person.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+              <span className="min-w-0 break-words text-sm">
+                {personName(person)}
+                {isNewHire(person, today) && <span className="ml-1 text-xs text-info">· {t("groups.newHire")}</span>}
+              </span>
+              {groups.length > 0 && (
+                <select
+                  value=""
+                  disabled={busy}
+                  aria-label={t("groups.ungrouped.addTo", { name: personName(person) })}
+                  onChange={(event) => { if (event.target.value) onAdd(person, event.target.value); }}
+                  className="ml-auto h-9 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">{t("groups.ungrouped.pick")}</option>
+                  {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                </select>
+              )}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function GroupsManager() {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -113,7 +153,7 @@ export default function GroupsManager() {
   const fetchAll = useCallback(async () => {
     const [nextGroups, { data, error }] = await Promise.all([
       fetchGroups(),
-      withTimeout(supabase.from("profiles").select("id, full_name, email, is_paused, departure_status, start_date").order("full_name"), 12000),
+      withTimeout(supabase.from("profiles").select("id, full_name, email, role, is_paused, departure_status, start_date").order("full_name"), 12000),
     ]);
     if (error) throw error;
     return { nextGroups, nextPeople: data || [] };
@@ -143,6 +183,7 @@ export default function GroupsManager() {
   }, [apply, fetchAll, t]);
 
   const byName = useMemo(() => new Map(groups.map((group) => [group.id, groupMembers(group, people)])), [groups, people]);
+  const ungrouped = useMemo(() => ungroupedPeople(groups, people, today), [groups, people, today]);
 
   async function run(action, done) {
     setBusy(true);
@@ -177,6 +218,12 @@ export default function GroupsManager() {
     if (await run(() => saveGroupMembers(group.id, group.memberIds, ids), t("groups.membersSaved", { name: group.name, count: ids.length }))) setMembersId("");
   }
 
+  async function addToGroup(person, groupId) {
+    const group = groups.find((item) => item.id === groupId);
+    if (!group) return;
+    await run(() => saveGroupMembers(group.id, group.memberIds, [...group.memberIds, person.id]), t("groups.ungrouped.added", { name: personName(person), group: group.name }));
+  }
+
   async function remove(group) {
     if (!(await confirm(t("groups.deleteConfirm", { name: group.name, count: group.memberIds.length })))) return;
     await run(() => deleteGroup(group.id), t("groups.deleted", { name: group.name }));
@@ -207,6 +254,7 @@ export default function GroupsManager() {
 
       {loading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
       {!loading && groups.length === 0 && !err && <p className="text-sm text-muted-foreground">{t("groups.empty")}</p>}
+      {!loading && !err && <UngroupedCard people={ungrouped} groups={groups} today={today} busy={busy} onAdd={addToGroup} />}
 
       {groups.map((group) => {
         const members = byName.get(group.id) || [];

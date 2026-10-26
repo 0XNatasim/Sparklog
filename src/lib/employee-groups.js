@@ -2,7 +2,7 @@
 // employees. Used to pick Communications recipients in one click and to total a warehouse's inventory.
 // Manager-level only (RLS); a person can be in several groups.
 import { supabase } from "@/supabaseClient";
-import { isNewHire } from "@/lib/signups";
+import { DEPARTURE_STATUSES, isNewHire } from "@/lib/signups";
 import { sumCrewInventory } from "@/lib/inventory-items";
 import { withTimeout } from "@/lib/utils";
 
@@ -59,6 +59,18 @@ export function groupMembers(group, profiles) {
   return (group?.memberIds || [])
     .map((id) => byId.get(id))
     .filter(Boolean)
+    .sort((a, b) => (a.full_name || a.email || "").localeCompare(b.full_name || b.email || "", "fr-CA", { sensitivity: "base" }));
+}
+
+// Field people who should belong to a group (warehouse) but are in none: crew and subcontractors (not
+// office admins, managers or the owner), active or waiting to start, never a paused or former account.
+// In name order.
+const FIELD_ROLES = new Set(["employee", "subcontractor_1"]);
+export function ungroupedPeople(groups, people, today) {
+  const grouped = new Set((groups || []).flatMap((group) => group.memberIds || []));
+  return (people || [])
+    .filter((person) => FIELD_ROLES.has(person.role || "employee") && !grouped.has(person.id))
+    .filter((person) => isNewHire(person, today) || (!person.is_paused && !DEPARTURE_STATUSES.includes(person.departure_status)))
     .sort((a, b) => (a.full_name || a.email || "").localeCompare(b.full_name || b.email || "", "fr-CA", { sensitivity: "base" }));
 }
 

@@ -45,7 +45,7 @@ function setup({ role = "owner", profiles = PROFILES, tabbed = false, taxProfile
 }
 
 const cardButtons = () => screen.getAllByRole("button").filter((button) => button.hasAttribute("aria-expanded") && button.closest(".rounded-lg, .rounded-xl"));
-const cardNames = () => cardButtons().map((button) => button.querySelector("span.truncate")?.textContent);
+const cardNames = () => cardButtons().map((button) => button.querySelector("span.break-words")?.textContent);
 const openCard = async (name) => {
   const button = cardButtons().find((b) => b.textContent.includes(name));
   fireEvent.click(button);

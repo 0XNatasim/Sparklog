@@ -431,7 +431,8 @@ export default function EmployeesPanel({ tabbed = false }) {
 
       {tabbed && !loading && profiles.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="relative min-w-0 flex-1">
+          {/* Full width on a phone (the placeholder is long), next to the filter from sm. */}
+          <label className="relative w-full min-w-0 sm:w-auto sm:flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
