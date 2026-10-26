@@ -1,9 +1,10 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
-import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  BarChart3, CalendarCheck, CalendarDays, ChevronDown, ClipboardList, Clock3, FilePlus2, HeartPulse, History,
-  ListChecks, LogOut, Megaphone, Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Radio, RefreshCw, ScrollText,
-  Settings, ShieldCheck, StickyNote, SlidersHorizontal, Sun, UserCircle, Users, Wallet, X,
+  BarChart3, BookOpen, Calculator, Calendar, CalendarCheck, CalendarDays, ChevronDown, ClipboardList, Clock3, Contact,
+  FileCheck, FileDown, FilePlus2, FileText, HeartPulse, History, Landmark, LayoutGrid, ListChecks, LogOut, Megaphone,
+  Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Percent, Radio, Receipt, RefreshCw, Scale, ScrollText, Settings,
+  ShieldCheck, StickyNote, SlidersHorizontal, Sun, UserCircle, Users, Wallet, Wrench, X, Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -18,7 +19,8 @@ import { dueCount, fetchOpenReminders, msUntilNextReminder, NOTES_EVENT } from "
 import { fetchTodoCount, TODO_EVENT } from "@/lib/todo-count";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
-import { canOpenNavItem, findNavItem, visibleManagerNav } from "@/lib/manager-nav";
+import { canOpenNavItem, findNavItem, nestedTabs, resolveTab, tabPath, visibleManagerNav } from "@/lib/manager-nav";
+import { SidebarTabsContext } from "@/components/manager/nav-context";
 import { isManagerRole } from "@/lib/roles";
 import ManagerBell from "@/components/manager/ManagerBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
@@ -50,6 +52,13 @@ const ICONS = {
   "advanced-emergency": FilePlus2,
 };
 
+// Icons of the tabs nested under a many-tab page (tab keys are unique across those pages).
+const TAB_ICONS = {
+  stubs: Receipt, das: Landmark, roe: FileCheck, calcul: Calculator,
+  costs: Coins, week: CalendarDays, month: Calendar, grid: LayoutGrid, ccq: FileDown,
+  settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact,
+};
+
 const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
 
 function readFlag(key) {
@@ -68,6 +77,9 @@ function storeFlag(key, on) {
 // new sign-ups waiting for activation on Équipe › Employés, due reminders on Notes.
 function SidebarNav({ groups, collapsed, activePath, onNavigate, badges }) {
   const t = useT();
+  const { role, adminSections } = useAuth();
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
   const activeGroup = groups.find((group) => group.items.some((item) => item.path === activePath))?.id;
   // Each group says whether it starts expanded; the current page's group is always open.
   const [open, setOpen] = useState(() => new Set([
@@ -116,7 +128,11 @@ function SidebarNav({ groups, collapsed, activePath, onNavigate, badges }) {
             {expanded && group.items.map((item) => {
               const Icon = ICONS[item.id] || Clock3;
               const label = t(item.labelKey);
-              return (
+              // Tabs of a many-tab page nest under its entry while it is the open page.
+              const children = nestedTabs(item, role, adminSections);
+              const activeTab = children.length ? resolveTab(item, role, adminSections, requestedTab) : null;
+              const showChildren = item.path === activePath && children.length > 0;
+              const link = (
                 <NavLink
                   key={item.id}
                   to={`/manager/${item.path}`}
@@ -128,7 +144,8 @@ function SidebarNav({ groups, collapsed, activePath, onNavigate, badges }) {
                       "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       collapsed && "justify-center",
                       !collapsed && !single && "ml-1",
-                      isActive ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
+                      // The open child carries the highlight; its parent stays bold only.
+                      isActive ? (showChildren ? "font-semibold text-foreground" : "bg-primary/10 font-semibold text-primary") : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
                     );
                     return cn(base, badges?.[item.id] > 0 && "text-destructive");
                   }}
@@ -139,6 +156,39 @@ function SidebarNav({ groups, collapsed, activePath, onNavigate, badges }) {
                     <Badge variant="destructive" className={cn("ms-auto", collapsed && "ms-0 px-1.5")}>{badges[item.id]}</Badge>
                   )}
                 </NavLink>
+              );
+              return (
+                <React.Fragment key={item.id}>
+                  {link}
+                  {showChildren && (
+                    <ul className={cn("mb-1 mt-0.5 space-y-0.5", collapsed ? "flex flex-col items-center" : "ml-[1.15rem] border-l pl-2")}>
+                      {children.map((child) => {
+                        const ChildIcon = TAB_ICONS[child.key] || Clock3;
+                        const childLabel = t(child.labelKey);
+                        const isCurrent = child.key === activeTab;
+                        return (
+                          <li key={child.key} className={cn(!collapsed && "min-w-0")}>
+                            <Link
+                              to={tabPath(item, child.key)}
+                              onClick={onNavigate}
+                              title={collapsed ? childLabel : undefined}
+                              aria-label={collapsed ? childLabel : undefined}
+                              aria-current={isCurrent ? "page" : undefined}
+                              className={cn(
+                                "flex min-h-11 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9",
+                                collapsed && "justify-center",
+                                isCurrent ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                              )}
+                            >
+                              <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+                              {!collapsed && <span className="break-words">{childLabel}</span>}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </React.Fragment>
               );
             })}
           </div>
@@ -372,6 +422,7 @@ export default function ManagerLayout() {
   if (current && !canOpenNavItem(role, adminSections, current)) return <Navigate to="/manager" replace />;
 
   return (
+    <SidebarTabsContext.Provider value={!navHidden}>
     <div className="min-h-screen bg-background text-foreground">
       <OfflineBanner />
       <UpdateBanner />
@@ -453,5 +504,6 @@ export default function ManagerLayout() {
         </div>
       </div>
     </div>
+    </SidebarTabsContext.Provider>
   );
 }

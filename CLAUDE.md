@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.186)
+## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.187)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -877,6 +877,13 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `notificationTargetV3` (`switchTarget("v3", …)`) ouvre Justificatifs de À traiter / Équipe › Employés. Reste : retirer
   la V2 (sélecteur, `MANAGER_NAV`, pages en double, redirection des anciens chemins). Tests `manager-ui-version.test.js`,
   `bell-and-todo.test.js`.
+- [x] **Menu imbriqué pour les pages à plusieurs onglets** (V2.4.187, aucune migration) : une page de 4 onglets ou plus
+  (`hasNestedTabs`, `NESTED_TABS_MIN`, `src/lib/manager-nav.js` : Historique paie, Rapports, Configuration) montre ses onglets
+  en sous-entrées indentées (icône, `TAB_ICONS`) sous son entrée de la barre latérale, sur ordinateur (aussi en mode rail,
+  icônes seules) et dans le tiroir du téléphone, tant que la page est ouverte (`nestedTabs`, `tabPath`, `ManagerLayout.jsx`).
+  Même `?tab=`, mêmes droits (`visibleTabs` / `resolveTab`), même chargement à la demande ; `TabbedPage` cache sa rangée
+  d'onglets (`SidebarTabsContext`, `nav-context.js`) et la remet sur ordinateur quand le menu est masqué. 3 onglets ou
+  moins : onglets horizontaux comme avant. Test `manager-nav.test.js`.
 - [x] **V2 retirée** (V2.4.186, aucune migration) : `MANAGER_NAV` = l'ancien menu V3 (15 entrées) ; `MANAGER_PAGES` =
   les pages de l'ancien menu V2 sans `config-rules`, gardées comme règles d'accès (`from` des onglets, `authorizationFor().pages`)
   et dont certaines restent des entrées (live, inventory, messages, journal, état du service, feuille d'urgence).

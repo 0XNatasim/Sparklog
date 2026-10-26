@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.186).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.187).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -10,6 +10,9 @@
   2026-10-23, presque toutes les fiches de la semaine sont **soumises mais pas approuvées**, et rien n'est encore
   comptabilisé. Dans l'ordre : **À traiter** (approuver) › **Paie › Paie de la semaine** (semaine 43, « Calculer et
   comptabiliser ») › imprimer les talons. Puis la semaine 44 de la même façon.
+- ℹ️ **Nouveau menu (V2.4.187)** : dans Rapports, Configuration et Historique paie, les onglets ne sont plus en rangée
+  au-dessus de la page ; ils apparaissent en liste sous le nom de la page dans le menu de gauche (sur téléphone : bouton
+  « Menu »). Rien d'autre ne change.
 - ✅ L'app fonctionne et les heures sont bien classées. Toutes tes décisions de paie sont dans l'app.
 - ⚠️ **Les montants en dollars de la paie** (avantages CCQ, impôts, cotisations) sont **des estimations**.
   Ils restent « à réviser » tant que les étapes 1 à 4 ci-dessous ne sont pas faites.

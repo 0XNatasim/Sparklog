@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
-import { MANAGER_NAV_ITEMS, firstAllowedPath, legacySectionTarget, oldPathTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
+import { MANAGER_NAV_ITEMS, firstAllowedPath, hasNestedTabs, legacySectionTarget, oldPathTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
+import { useSidebarTabs } from "@/components/manager/nav-context";
 import { lazyPanel } from "@/components/lazy-panel";
 
 // Each page loads on first visit, so employees never download manager code and a
@@ -230,7 +231,9 @@ export function AuditPage() {
 // ── Pages with tabs ─────────────────────────────────────────────────────────
 // The active tab lives in the URL (?tab=); a tab this user may not open — or none at all — falls
 // back to the first allowed one, and a page with no allowed tab sends back to #/manager. Only the
-// active tab is mounted, so a tab loads its data only when it is opened.
+// active tab is mounted, so a tab loads its data only when it is opened. A page with many tabs
+// (hasNestedTabs) lists them in the sidebar instead; its horizontal row only comes back, on desktop,
+// while the menu is folded away.
 const navItem = (id) => MANAGER_NAV_ITEMS.find((item) => item.id === id);
 
 function TabbedPage({ itemId, content }) {
@@ -241,6 +244,8 @@ function TabbedPage({ itemId, content }) {
   const tabs = visibleTabs(item, role, adminSections);
   const requested = params.get("tab");
   const active = resolveTab(item, role, adminSections, requested);
+  const nested = hasNestedTabs(item);
+  const menuShown = useSidebarTabs();
 
   // Put the tab actually shown in the URL (replace: Back does not step through the correction).
   useEffect(() => {
@@ -262,11 +267,11 @@ function TabbedPage({ itemId, content }) {
   return (
     <Tabs value={active} onValueChange={select} className="w-full">
       {tabs.length > 1 && (
-        <TabsList className="h-auto max-w-full flex-wrap justify-start">
+        <TabsList className={cn("h-auto max-w-full flex-wrap justify-start", nested && (menuShown ? "hidden" : "max-md:hidden"))}>
           {tabs.map((tabItem) => <TabsTrigger key={tabItem.key} value={tabItem.key}>{t(tabItem.labelKey)}</TabsTrigger>)}
         </TabsList>
       )}
-      <div className={tabs.length > 1 ? "mt-3" : undefined}>{Content ? <Content /> : null}</div>
+      <div className={tabs.length > 1 && !(nested && menuShown) ? "mt-3" : undefined}>{Content ? <Content /> : null}</div>
     </Tabs>
   );
 }
