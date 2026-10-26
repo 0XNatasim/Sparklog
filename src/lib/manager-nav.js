@@ -111,6 +111,19 @@ function tabRule(t) {
   return t.from ? byId.get(t.from) : t;
 }
 
+// A page with this many tabs or more shows them nested under its entry in the sidebar instead of a
+// row of horizontal tabs (Rapports, Configuration, Historique paie); fewer keep the horizontal tabs.
+export const NESTED_TABS_MIN = 4;
+export const hasNestedTabs = (item) => (item?.tabs?.length || 0) >= NESTED_TABS_MIN;
+
+// Sidebar children of an entry for this user: its allowed tabs when it nests them, else none.
+export function nestedTabs(item, role, adminSections) {
+  return hasNestedTabs(item) ? visibleTabs(item, role, adminSections) : [];
+}
+
+// Route of a tab (the ?tab= the page itself reads).
+export const tabPath = (item, key) => `/manager/${item.path}?tab=${encodeURIComponent(key)}`;
+
 // Tabs of a menu entry this user may open, in order.
 export function visibleTabs(item, role, adminSections) {
   return (item?.tabs || []).filter((t) => canOpenNavItem(role, adminSections, tabRule(t)));
