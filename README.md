@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.185 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.186 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -54,11 +54,10 @@ Roles are stored lowercase in `profiles.role`:
 
 The Manager workspace is a sidebar (a drawer on phones; on desktop it can be shrunk to an icon rail or hidden
 entirely with the toggle at the top left of the header); every page has its own URL (`#/manager/…`) and only the
-pages a manager is allowed to open are listed. **V3 is the default** since V2.4.183, for everyone who opens Gestion
-(managers, owner and office admins with sections); the **V2 | V3** selector in the header still brings V2 back
-(remembered per device) until V2 is removed. A choice made before V2.4.183 is ignored once, so every device opens V3.
+pages a manager is allowed to open are listed. Since V2.4.186 there is one menu (the former « V3 »): the V2 menu and
+the V2 | V3 selector are gone, and old V2 addresses (bookmarks, old links) open the matching page and tab.
 
-**V3** (15 entries; pages with tabs keep each tab's original access rule, the active tab is in `?tab=`):
+**Menu** (15 entries; pages with tabs keep each tab's original access rule, the active tab is in `?tab=`):
 
 | Group | Entries [tabs] |
 |---|---|
@@ -70,18 +69,7 @@ pages a manager is allowed to open are listed. **V3 is the default** since V2.4.
 | **Configuration** | Configuration [Settings · CCQ rates · Pay rules · Forms · References · Contacts (with roles)] |
 | **Admin** | Travel and expenses (per-employee rules, not yet read by payroll) · Activity log · Service status · Emergency timesheet (owner only) |
 
-**V2** (the classic menu, still available from the V2 | V3 switch, frozen by tests until it is removed):
-
-| Group | Pages |
-|---|---|
-| **Today** | Live crew (who is working today; pauses polling while the tab is hidden) |
-| **Time** | Timesheets (review, filter, unlock, approve one job or a whole week before export; CCQ weeks run Sunday→Saturday) · Receipts & proofs (overtime screenshots, suppers, parking) · Unlock day |
-| **Team** | Employees (CCQ metadata, rates, options, roles, pause) · Time off · Inventory |
-| **Payroll** | Calculation (DAS test bench) · Pay stubs · DAS · Record of employment (preparation worksheet) |
-| **Reports** | Costs (employer cost estimate) · Week / month · CCQ rates · Downloads (CCQ export) |
-| **Communications** | Announcements |
-| **Configuration** | Time rules · Settings · Forms · References |
-| **Advanced** | Activity log · Service status · Pay rules · Emergency timesheet (owner only) |
+The live crew pauses its polling while the browser tab is hidden; CCQ weeks run Sunday→Saturday.
 
 Managers can also broadcast announcements, synchronize CCQ rates, view the app as any employee, and force a manual refresh from the header (useful in installed PWA/App mode).
 
@@ -156,8 +144,9 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   - **One bell** in V3 (manager notifications, plus the person's messages for someone who is not a manager) and
     **Mark all as read** on the manager notifications (V2 bell too).
 - **Gestion V3 by default** (V2.4.183): Gestion opens in V3 for everyone (office admins too, who saw only V2 before;
-  each tab keeps its access rule). The V3 bell opens the V3 pages (To do › Receipts, Team › Employees). V2 stays one
-  click away (V2 | V3) until it is removed.
+  each tab keeps its access rule). The V3 bell opens the V3 pages (To do › Receipts, Team › Employees).
+- **V2 removed** (V2.4.186): one menu, no V2 | V3 selector. An old V2 address (`#/manager/timesheets`,
+  `payroll/das`, `config/rules`…) opens the page and tab that hold it now, with its filters (employee, day, method…).
 - **Employee list on a phone** (V2.4.184): each employee's name is on its own line and never cut; the state, missing
   fields and region badges go on the line below. The search box takes the full width on a phone.
 - **Employees in no group** (V2.4.185): Team › Groups lists the active field employees (and new hires waiting to start)

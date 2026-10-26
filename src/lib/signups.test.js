@@ -54,9 +54,8 @@ describe("migration 0109 and wiring", () => {
     expect(sql).toMatch(/revoke all on function public\.pending_signups\(\) from public, anon/);
   });
 
-  it("shows the badge on Employés (V2) and Équipe › Employés (V3), and refreshes it after an activation", () => {
+  it("shows the badge on Équipe › Employés, and refreshes it after an activation", () => {
     const layout = read("../components/manager/ManagerLayout.jsx");
-    expect(layout).toMatch(/employees: isManagerRole\(role\) \? pendingSignups : 0/);
     expect(layout).toMatch(/"v3-team": isManagerRole\(role\) \? pendingSignups : 0/);
     expect(layout).toContain("window.addEventListener(SIGNUPS_EVENT, loadSignups)");
     const panel = read("../components/EmployeesPanel.jsx");

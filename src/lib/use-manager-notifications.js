@@ -1,10 +1,9 @@
 // Manager notifications (overtime proofs, suppers, parking, CCQ renewals) for the bell: the 50
-// latest, the unread ones, live updates, « read » marks. Shared by the bell of V2 / the employee
-// shell (NotificationsBell) and the single bell of Gestion V3 (ManagerBell).
+// latest, the unread ones, live updates, « read » marks. Shared by the bell of the employee shell
+// (NotificationsBell, a manager on their own pages) and the bell of Gestion (ManagerBell).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/supabaseClient";
 import { SESSION_RESUMED_EVENT } from "@/contexts/AuthContext";
-import { switchTarget } from "@/lib/manager-nav";
 
 export const NOTIFICATIONS_REFRESH_EVENT = "sparklog:notifications-refresh";
 
@@ -23,20 +22,12 @@ async function fetchManagerNotifications(managerId) {
   return (rows || []).map((row) => ({ ...row, employeeName: names.get(row.employee_id) || "Employee", read: readIds.has(row.id) }));
 }
 
-// Where a notification leads (the same pages in V2 and V3).
+// Where a notification leads: À traiter › Justificatifs (proofs, suppers, parking) or Équipe › Employés.
 export function notificationTarget(notification) {
-  if (notification.type === "meal_claim") return `/manager/receipts?filter=meals&job=${notification.job_id}`;
-  if (notification.type === "parking_receipt") return "/manager/receipts?filter=parking";
-  if (notification.type === "ccq_renewal") return "/manager/employees";
-  return `/manager/receipts?filter=overtime&job=${notification.job_id}`;
-}
-
-// The same page in Gestion V3 (Justificatifs of À traiter, Équipe › Employés), for the V3 bell.
-export function notificationTargetV3(notification) {
-  const target = notificationTarget(notification);
-  const [path, query = ""] = target.replace(/^\/manager\//, "").split("?");
-  const v3 = switchTarget("v3", path, query ? `?${query}` : "");
-  return v3 ? `/manager/${v3}` : target;
+  if (notification.type === "meal_claim") return `/manager/todo?tab=receipts&filter=meals&job=${notification.job_id}`;
+  if (notification.type === "parking_receipt") return "/manager/todo?tab=receipts&filter=parking";
+  if (notification.type === "ccq_renewal") return "/manager/v3/team?tab=employees";
+  return `/manager/todo?tab=receipts&filter=overtime&job=${notification.job_id}`;
 }
 
 export function useManagerNotifications(enabled, userId) {

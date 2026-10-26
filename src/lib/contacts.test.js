@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { availableRoles, contactIsEmpty, contactSections, hasRole, moveContact, removeContact, saveContact, sectionContacts } from "./contacts";
 import { CONTACT_ROLES, contactRoleLabel, sanitizeBlocks, sanitizeRoles } from "./reference-blocks";
-import { MANAGER_NAV_V3, canOpenNavItem } from "./manager-nav";
+import { MANAGER_NAV, canOpenNavItem } from "./manager-nav";
 
 const olivier = { type: "contact", name: "Olivier Dagenais", role: "Contremaître", phone: "438-828-7070", email: "odagenais@britton.ca" };
 const yanni = { type: "contact", name: "Yanni Chabot-Valin", role: "Contremaître", phone: "514-668-3736", email: "yvalin@britton.ca" };
@@ -71,7 +71,7 @@ describe("wiring", () => {
   const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 
   it("adds a Contacts tab to Configuration with the same access as Références (manager only)", () => {
-    const config = MANAGER_NAV_V3.flatMap((g) => g.items).find((i) => i.id === "v3-config");
+    const config = MANAGER_NAV.flatMap((g) => g.items).find((i) => i.id === "v3-config");
     const tab = config.tabs.find((t) => t.key === "contacts");
     expect(tab.from).toBe("references");
     expect(read("../pages/manager/ManagerPages.jsx")).toMatch(/contacts: \(\) => <ContactsManager \/>/);

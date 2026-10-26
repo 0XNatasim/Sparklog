@@ -3,6 +3,7 @@ import React, { Suspense, lazy } from "react";
 import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
+import { OLD_PATHS } from "./lib/manager-nav";
 
 import Login from "./pages/Login";
 import EmployeeForm from "./pages/EmployeeForm";
@@ -17,16 +18,9 @@ const Profile = lazy(() => import("./pages/Profile"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ManagerLayout = lazy(() => import("./components/manager/ManagerLayout"));
 const managerPage = (name) => lazy(() => import("./pages/manager/ManagerPages").then((m) => ({ default: m[name] })));
-const AbsencesPage = managerPage("AbsencesPage");
 const AuditPage = managerPage("AuditPage");
-const CcqPage = managerPage("CcqPage");
-const CostsPage = managerPage("CostsPage");
-const DownloadsPage = managerPage("DownloadsPage");
-const EmployeesPage = managerPage("EmployeesPage");
 const EmergencyPage = managerPage("EmergencyPage");
-const FormsPage = managerPage("FormsPage");
 const HealthPage = managerPage("HealthPage");
-const PayRulesPage = managerPage("PayRulesPage");
 const TravelRulesPage = managerPage("TravelRulesPage");
 const NotesPage = managerPage("NotesPage");
 const LivePage = managerPage("LivePage");
@@ -37,20 +31,10 @@ const TeamHubPage = managerPage("TeamHubPage");
 const ReportsHubPage = managerPage("ReportsHubPage");
 const ConfigHubPage = managerPage("ConfigHubPage");
 const PayrollWeekPage = managerPage("PayrollWeekPage");
-const ReferencesPage = managerPage("ReferencesPage");
 const ManagerIndex = managerPage("ManagerIndex");
 const MessagesPage = managerPage("MessagesPage");
-const PayrollCalculPage = managerPage("PayrollCalculPage");
-const PayrollDasPage = managerPage("PayrollDasPage");
-const PayrollRoePage = managerPage("PayrollRoePage");
-const PayrollStubsPage = managerPage("PayrollStubsPage");
-const PeriodPage = managerPage("PeriodPage");
 const InventoryPage = managerPage("InventoryPage");
-const ReceiptsPage = managerPage("ReceiptsPage");
-const RulesPage = managerPage("RulesPage");
-const UnlockDayPage = managerPage("UnlockDayPage");
-const SettingsPage = managerPage("SettingsPage");
-const TimesheetsPage = managerPage("TimesheetsPage");
+const OldPathRedirect = managerPage("OldPathRedirect");
 import { ViewModeProvider } from "@/contexts/ViewModeProvider";
 import { isManagerRole } from "@/lib/roles";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -158,42 +142,23 @@ export default function App() {
           <Route index element={<ManagerIndex />} />
           <Route path="live" element={<LivePage />} />
           <Route path="todo" element={<TodoTabsPage />} />
-          <Route path="timesheets" element={<TimesheetsPage />} />
-          <Route path="receipts" element={<ReceiptsPage />} />
-          <Route path="unlock-day" element={<UnlockDayPage />} />
           <Route path="inventory" element={<InventoryPage />} />
-          <Route path="employees" element={<EmployeesPage />} />
-          <Route path="absences" element={<AbsencesPage />} />
-          <Route path="forms" element={<FormsPage />} />
-          <Route path="payroll" element={<Navigate to="calcul" replace />} />
           <Route path="payroll/week" element={<PayrollWeekPage />} />
-          <Route path="payroll/calcul" element={<PayrollCalculPage />} />
-          <Route path="payroll/stubs" element={<PayrollStubsPage />} />
-          <Route path="payroll/das" element={<PayrollDasPage />} />
-          <Route path="payroll/roe" element={<PayrollRoePage />} />
-          <Route path="reports" element={<Navigate to="costs" replace />} />
-          <Route path="reports/costs" element={<CostsPage />} />
-          <Route path="reports/period" element={<PeriodPage />} />
-          <Route path="reports/ccq" element={<CcqPage />} />
-          <Route path="reports/downloads" element={<DownloadsPage />} />
           <Route path="messages" element={<MessagesPage />} />
-          {/* Gestion V3 pages with tabs (new paths; the V2 paths above are unchanged) */}
+          {/* Pages with tabs (paths kept from Gestion V3, so links stay valid) */}
           <Route path="v3/time" element={<TimeHubPage />} />
           <Route path="v3/pay-history" element={<PayHistoryPage />} />
           <Route path="v3/team" element={<TeamHubPage />} />
           <Route path="v3/reports" element={<ReportsHubPage />} />
           <Route path="v3/config" element={<ConfigHubPage />} />
-          <Route path="config" element={<Navigate to="rules" replace />} />
-          <Route path="config/rules" element={<RulesPage />} />
-          <Route path="config/settings" element={<SettingsPage />} />
-          <Route path="config/references" element={<ReferencesPage />} />
           <Route path="advanced" element={<Navigate to="audit" replace />} />
           <Route path="advanced/audit" element={<AuditPage />} />
           <Route path="advanced/health" element={<HealthPage />} />
-          <Route path="advanced/pay-rules" element={<PayRulesPage />} />
           <Route path="advanced/travel-rules" element={<TravelRulesPage />} />
           <Route path="notes" element={<NotesPage />} />
           <Route path="advanced/emergency" element={<EmergencyPage />} />
+          {/* Old paths (the V2 menu, removed in V2.4.186) → the page and tab that hold them now */}
+          {Object.keys(OLD_PATHS).map((path) => <Route key={path} path={path} element={<OldPathRedirect />} />)}
           <Route path="*" element={<Navigate to="/manager" replace />} />
         </Route>
 
@@ -202,7 +167,7 @@ export default function App() {
           path="/testing"
           element={
             <ProtectedRoute requireRole="manager">
-              <Navigate to="/manager/reports/costs" replace />
+              <Navigate to="/manager/v3/reports?tab=costs" replace />
             </ProtectedRoute>
           }
         />

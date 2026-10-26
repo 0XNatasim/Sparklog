@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.185).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.186).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -129,10 +129,8 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
 ## Étape 6 — Gestion V3 : ce qu'il reste à convertir 💻
 
-**Depuis V2.4.183, la V3 est la version par défaut** : la Gestion s'ouvre en V3 pour tout le monde (toi, les
-gestionnaires et les employés de bureau qui ont accès à la Gestion). Le bouton **V2 | V3** en haut à droite ramène
-encore la V2 au besoin, jusqu'à ce qu'on la retire. **La V2 ne change pas** (un test fige son menu, ses chemins et
-ses pages).
+**Depuis V2.4.186, il n'y a plus qu'un menu** (l'ancienne « V3 ») : la V2 et le bouton **V2 | V3** sont retirés. Un
+vieux favori ou un vieux lien vers une page de la V2 ouvre la bonne page et le bon onglet.
 
 Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 - [x] **Pages à onglets** : À traiter (À approuver · Justificatifs), Feuilles de temps (Feuilles de temps ·
@@ -199,8 +197,10 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   les employés de terrain actifs (et les nouveaux en attente) qui ne sont dans aucun entrepôt. Le menu « Ajouter à… » à
   côté de chaque nom le met dans un groupe en un geste. Le bureau, les gestionnaires et les comptes en pause n'y sont
   pas. Quand tout le monde est placé, une ligne verte le dit.
-- [ ] **Retirer la V2** : après quelques jours d'utilisation de la V3 sans problème. On enlèvera le bouton V2 | V3,
-  le menu V2 et ses pages en double ; les anciens liens (favoris, cloche) seront redirigés vers la page V3 équivalente.
+- [x] **V2 retirée** (V2.4.186) : un seul menu, plus de bouton V2 | V3, une seule cloche pour tout le monde. Les anciens
+  liens et favoris de la V2 (Feuilles de temps, Talons, DAS, Règles de temps…) ouvrent la page et l'onglet qui les
+  remplacent, avec le même employé, la même journée ou le même filtre. Rien ne change dans les droits : chacun voit les
+  mêmes pages qu'avant.
 
 ## Étape 7 — Temps de trajet, km et frais : une option par employé 👤 💻
 

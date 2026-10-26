@@ -8,7 +8,7 @@ import { createFakeSupabase } from "@/test/fake-supabase";
 const state = vi.hoisted(() => ({ fake: null }));
 vi.mock("@/supabaseClient", () => ({ get supabase() { return state.fake.client; } }));
 
-const { useManagerNotifications, notificationTarget, notificationTargetV3 } = await import("./use-manager-notifications");
+const { useManagerNotifications, notificationTarget } = await import("./use-manager-notifications");
 const { fetchTodoCount } = await import("./todo-count");
 
 afterEach(cleanup);
@@ -45,15 +45,13 @@ describe("manager notifications of the bell", () => {
     expect(state.fake.calls).toHaveLength(0);
   });
 
-  it("opens the same page as before for each kind", () => {
-    expect(notificationTarget({ type: "meal_claim", job_id: "j1" })).toBe("/manager/receipts?filter=meals&job=j1");
-    expect(notificationTarget({ type: "parking_receipt" })).toBe("/manager/receipts?filter=parking");
-    expect(notificationTarget({ type: "ccq_renewal" })).toBe("/manager/employees");
-    expect(notificationTarget({ type: "overtime", job_id: "j2" })).toBe("/manager/receipts?filter=overtime&job=j2");
-    // The V3 bell opens the same page in V3 (V2.4.183).
-    expect(notificationTargetV3({ type: "meal_claim", job_id: "j1" })).toBe("/manager/todo?filter=meals&job=j1&tab=receipts");
-    expect(notificationTargetV3({ type: "ccq_renewal" })).toBe("/manager/v3/team?tab=employees");
+  it("opens À traiter › Justificatifs or Équipe › Employés for each kind", () => {
+    expect(notificationTarget({ type: "meal_claim", job_id: "j1" })).toBe("/manager/todo?tab=receipts&filter=meals&job=j1");
+    expect(notificationTarget({ type: "parking_receipt" })).toBe("/manager/todo?tab=receipts&filter=parking");
+    expect(notificationTarget({ type: "ccq_renewal" })).toBe("/manager/v3/team?tab=employees");
+    expect(notificationTarget({ type: "overtime", job_id: "j2" })).toBe("/manager/todo?tab=receipts&filter=overtime&job=j2");
   });
+
 });
 
 describe("« À traiter » counter", () => {
