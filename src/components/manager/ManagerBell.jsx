@@ -8,7 +8,7 @@ import { ManagerNotificationItem, MarkAllReadButton } from "@/components/Notific
 import { BroadcastDialog, BroadcastItem } from "@/components/EmployeeNotificationsBell";
 import { canAccessSection, isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
-import { notificationTargetV3, useManagerNotifications } from "@/lib/use-manager-notifications";
+import { notificationTarget, useManagerNotifications } from "@/lib/use-manager-notifications";
 import { useEmployeeBroadcasts } from "@/lib/use-employee-broadcasts";
 
 // Gestion V3: one bell instead of two. It lists the manager notifications (overtime proofs,
@@ -31,7 +31,7 @@ export default function ManagerBell() {
 
   async function openNotification(notification) {
     await notifications.markRead([notification]);
-    navigate(notificationTargetV3(notification));
+    navigate(notificationTarget(notification));
   }
 
   function openMessage(item) {

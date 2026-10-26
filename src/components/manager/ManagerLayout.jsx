@@ -1,10 +1,9 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BadgeDollarSign, Banknote, BarChart3, BookOpen, CalendarCheck, CalendarClock, CalendarDays, CalendarOff, ChevronDown,
-  ClipboardList, Clock3, FilePlus2, FileText, Files, HeartPulse, History, ListChecks, LogOut, Megaphone, Menu, Moon, Package,
-  PanelLeftClose, PanelLeftOpen, Percent, Radio, Receipt, ReceiptText, RefreshCw, Scale, ScrollText, Settings, ShieldCheck, StickyNote,
-  SlidersHorizontal, Sun, Unlock, UserCircle, Users, Wallet, X,
+  BarChart3, CalendarCheck, CalendarDays, ChevronDown, ClipboardList, Clock3, FilePlus2, HeartPulse, History,
+  ListChecks, LogOut, Megaphone, Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Radio, RefreshCw, ScrollText,
+  Settings, ShieldCheck, StickyNote, SlidersHorizontal, Sun, UserCircle, Users, Wallet, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,11 +18,8 @@ import { dueCount, fetchOpenReminders, msUntilNextReminder, NOTES_EVENT } from "
 import { fetchTodoCount, TODO_EVENT } from "@/lib/todo-count";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
-import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
-import { useManagerUiVersion } from "@/lib/manager-ui-version";
+import { canOpenNavItem, findNavItem, visibleManagerNav } from "@/lib/manager-nav";
 import { isManagerRole } from "@/lib/roles";
-import NotificationsBell from "@/components/NotificationsBell";
-import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import ManagerBell from "@/components/manager/ManagerBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
@@ -47,26 +43,8 @@ const ICONS = {
   "v3-reports": BarChart3,
   "v3-config": Settings,
   inventory: Package,
-  references: BookOpen,
-  "advanced-pay-rules": Scale,
   live: Radio,
-  timesheets: Clock3,
-  receipts: Receipt,
-  "unlock-day": Unlock,
-  employees: Users,
-  absences: CalendarOff,
-  forms: ClipboardList,
-  "payroll-calcul": Banknote,
-  "payroll-stubs": ReceiptText,
-  "payroll-das": Percent,
-  "payroll-roe": FileText,
-  "reports-costs": BadgeDollarSign,
-  "reports-period": CalendarDays,
-  "reports-ccq": BarChart3,
-  "reports-downloads": Files,
   messages: Megaphone,
-  "config-rules": CalendarClock,
-  "config-settings": Settings,
   "advanced-audit": ScrollText,
   "advanced-health": HeartPulse,
   "advanced-emergency": FilePlus2,
@@ -86,13 +64,12 @@ function storeFlag(key, on) {
   try { window.localStorage.setItem(key, on ? "1" : "0"); } catch { /* storage unavailable */ }
 }
 
-// Red count on a menu entry: open negative-stock notices on Inventaire, new sign-ups waiting for
-// activation on Employés (V2) and Équipe › Employés (V3).
-function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, badges }) {
+// Red count on a menu entry: jobs to approve on À traiter, open negative-stock notices on Inventaire,
+// new sign-ups waiting for activation on Équipe › Employés, due reminders on Notes.
+function SidebarNav({ groups, collapsed, activePath, onNavigate, badges }) {
   const t = useT();
-  const menuPath = highlightPath || activePath;
-  const activeGroup = groups.find((group) => group.items.some((item) => item.path === menuPath))?.id;
-  // V3 groups say whether they start expanded; V2 opens only the current page's group.
+  const activeGroup = groups.find((group) => group.items.some((item) => item.path === activePath))?.id;
+  // Each group says whether it starts expanded; the current page's group is always open.
   const [open, setOpen] = useState(() => new Set([
     ...groups.filter((group) => group.open).map((group) => group.id),
     ...(activeGroup ? [activeGroup] : []),
@@ -151,7 +128,7 @@ function SidebarNav({ groups, collapsed, activePath, highlightPath, onNavigate, 
                       "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       collapsed && "justify-center",
                       !collapsed && !single && "ml-1",
-                      isActive || (highlightPath && item.path === highlightPath) ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
+                      isActive ? "bg-primary/10 font-semibold text-primary" : "text-foreground/80 hover:bg-accent hover:text-accent-foreground"
                     );
                     return cn(base, badges?.[item.id] > 0 && "text-destructive");
                   }}
@@ -235,41 +212,13 @@ function AccountMenu() {
   );
 }
 
-// Gestion V2 / V3 switch (managers and owner). V3 = new menus and pages; V2 = the current Gestion.
-function VersionSwitch({ version, onChange }) {
-  const t = useT();
-  return (
-    <div role="radiogroup" aria-label={t("mgr.ui.label")} title={t("mgr.ui.label")} className="inline-flex shrink-0 rounded-md border bg-muted p-0.5">
-      {[ "v2", "v3" ].map((value) => (
-        <button
-          key={value}
-          type="button"
-          role="radio"
-          aria-checked={version === value}
-          onClick={() => onChange(value)}
-          className={cn(
-            "min-h-9 rounded px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8",
-            version === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {value.toUpperCase()}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // Gestion shell: grouped sidebar (rail or full) on desktop, drawer on phones, compact header.
 // Pages render in <Outlet/> at full width; forms cap their own width.
 export default function ManagerLayout() {
   const t = useT();
   const { role, adminSections } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  // Everyone who opens Gestion (managers, owner, office admins with sections) gets V3 by default and
-  // may switch back to V2 until it is removed.
-  const [version, setVersion] = useManagerUiVersion();
-  const groups = useMemo(() => visibleManagerNav(role, adminSections, version), [role, adminSections, version]);
+  const groups = useMemo(() => visibleManagerNav(role, adminSections), [role, adminSections]);
   const [collapsed, setCollapsed] = useState(() => readFlag(COLLAPSE_KEY));
   const [navHidden, setNavHidden] = useState(() => readFlag(HIDDEN_KEY));
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -278,17 +227,14 @@ export default function ManagerLayout() {
   const [dueNotes, setDueNotes] = useState(0);
   const [todoCount, setTodoCount] = useState(0);
   const badges = useMemo(() => ({
-    // V3 only: submitted jobs waiting for approval.
-    todo: isManagerRole(role) && version === "v3" ? todoCount : 0,
+    todo: isManagerRole(role) ? todoCount : 0,
     inventory: isManagerRole(role) ? inventoryNegatives : 0,
-    employees: isManagerRole(role) ? pendingSignups : 0,
     "v3-team": isManagerRole(role) ? pendingSignups : 0,
     notes: isManagerRole(role) ? dueNotes : 0,
-  }), [inventoryNegatives, pendingSignups, dueNotes, todoCount, role, version]);
+  }), [inventoryNegatives, pendingSignups, dueNotes, todoCount, role]);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
-  const current = findNavItem(activePath, version);
-  const highlightPath = version === "v3" ? v3MenuPath(activePath) : undefined;
+  const current = findNavItem(activePath);
 
   // Another page closes the phone drawer (adjusted while rendering).
   const [drawerPath, setDrawerPath] = useState(location.pathname);
@@ -350,10 +296,10 @@ export default function ManagerLayout() {
     };
   }, [role, location.pathname]);
 
-  // « À traiter » (V3): submitted jobs waiting for approval, a count-only request on each page change
+  // « À traiter »: submitted jobs waiting for approval, a count-only request on each page change
   // and whenever the À traiter page reloads its list (TODO_EVENT).
   useEffect(() => {
-    if (!isManagerRole(role) || version !== "v3") return undefined;
+    if (!isManagerRole(role)) return undefined;
     let cancelled = false;
     let generation = 0;
     async function loadTodo() {
@@ -371,7 +317,7 @@ export default function ManagerLayout() {
       cancelled = true;
       window.removeEventListener(TODO_EVENT, loadTodo);
     };
-  }, [role, version, location.pathname]);
+  }, [role, location.pathname]);
 
   // My due reminders (Notes): counted now, and again when the next reminder comes due (a timer),
   // when the tab is shown again, and after any change on the Notes page (NOTES_EVENT).
@@ -422,16 +368,6 @@ export default function ManagerLayout() {
     });
   }
 
-  // Switching versions opens the same page in the other menu (V2 path ↔ V3 page and tab, query
-  // kept) when it has one, else that menu's landing page.
-  function switchVersion(next) {
-    if (next === version) return;
-    setVersion(next);
-    const target = switchTarget(next, activePath, location.search);
-    if (target === null) navigate("/manager", { replace: true });
-    else if (`/manager/${target}` !== `${location.pathname}${location.search}`) navigate(`/manager/${target}`, { replace: true });
-  }
-
   // Same ids as canAccessSection: an ungranted page by URL goes back to the landing page.
   if (current && !canOpenNavItem(role, adminSections, current)) return <Navigate to="/manager" replace />;
 
@@ -449,14 +385,7 @@ export default function ManagerLayout() {
               {collapsed ? "S" : <>SparkLog<span className="font-mono text-xs font-normal text-muted-foreground">V{APP_VERSION}</span></>}
             </Link>
           </div>
-          <SidebarNav
-            key={version}
-            groups={groups}
-            collapsed={collapsed}
-            activePath={activePath}
-            highlightPath={highlightPath}
-            badges={badges}
-          />
+          <SidebarNav groups={groups} collapsed={collapsed} activePath={activePath} badges={badges} />
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -479,11 +408,9 @@ export default function ManagerLayout() {
                 </Button>
               </div>
               <SidebarNav
-                key={version}
                 groups={groups}
                 collapsed={false}
                 activePath={activePath}
-                highlightPath={highlightPath}
                 badges={badges}
                 onNavigate={() => setDrawerOpen(false)}
               />
@@ -511,9 +438,8 @@ export default function ManagerLayout() {
               <div className="hidden truncate text-xs leading-none text-muted-foreground sm:block">{COMPANY_NAME}</div>
               <h1 className="truncate text-sm font-semibold leading-tight sm:text-base">{current ? t(current.labelKey) : t("nav.manager")}</h1>
             </div>
-            <VersionSwitch version={version} onChange={switchVersion} />
-            {/* V3: one bell (manager notifications + the person's messages); V2 keeps its two. */}
-            {version === "v3" ? <ManagerBell /> : <><NotificationsBell /><EmployeeNotificationsBell /></>}
+            {/* One bell: manager notifications + the person's own messages. */}
+            <ManagerBell />
             <AccountMenu />
           </header>
           <main className="min-w-0 flex-1 px-2 py-3 sm:px-4 sm:py-4">

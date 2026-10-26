@@ -128,7 +128,7 @@ export default function AppShell({ children }) {
         <div className="sticky top-0 z-50 border-b border-warning bg-warning px-3 py-2 text-warning-foreground shadow-sm">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div className="text-sm font-bold">{t("viewMode.banner", { name: viewedEmployee.name })}</div>
-            <Button size="sm" variant="outline" className="h-8 border-warning-foreground/40 bg-background text-foreground hover:bg-background/90" onClick={() => navigate("/manager/employees")}>
+            <Button size="sm" variant="outline" className="h-8 border-warning-foreground/40 bg-background text-foreground hover:bg-background/90" onClick={() => navigate("/manager/v3/team?tab=employees")}>
               {t("viewMode.return")}
             </Button>
           </div>

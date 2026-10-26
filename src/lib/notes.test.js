@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
-import { canOpenNavItem, MANAGER_NAV_ITEMS, MANAGER_NAV_V3 } from "./manager-nav";
+import { canOpenNavItem, MANAGER_NAV_ITEMS, MANAGER_NAV } from "./manager-nav";
 import { cleanNoteBody, dueCount, inScope, isMine, msUntilNextReminder, noteState, otherPeopleIds, reminderFields, reminderInstant, snoozeChoices, sortNotes } from "./notes";
 
 const now = new Date("2026-10-22T15:00:00Z");
@@ -47,8 +47,8 @@ describe("notes and reminders (0111)", () => {
     expect(cleanNoteBody("  appeler Olivier ")).toBe("appeler Olivier");
   });
 
-  it("is in the V3 menu under Aujourd'hui, for managers and the owner only", () => {
-    expect(MANAGER_NAV_V3.find((g) => g.id === "today").items.map((i) => i.id)).toContain("notes");
+  it("is in the menu under Aujourd'hui, for managers and the owner only", () => {
+    expect(MANAGER_NAV.find((g) => g.id === "today").items.map((i) => i.id)).toContain("notes");
     const item = MANAGER_NAV_ITEMS.find((i) => i.id === "notes");
     expect(canOpenNavItem("owner", [], item)).toBe(true);
     expect(canOpenNavItem("manager", [], item)).toBe(true);

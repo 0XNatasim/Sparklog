@@ -5,8 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
-import { MANAGER_NAV_ITEMS, firstAllowedPath, legacySectionTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
-import { useManagerUiVersion } from "@/lib/manager-ui-version";
+import { MANAGER_NAV_ITEMS, firstAllowedPath, legacySectionTarget, oldPathTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
 import { lazyPanel } from "@/components/lazy-panel";
 
 // Each page loads on first visit, so employees never download manager code and a
@@ -22,7 +21,6 @@ const ContactsManager = lazyPanel(() => import("@/components/ContactsManager"));
 const MissingDaysPanel = lazyPanel(() => import("@/components/manager/MissingDaysPanel"));
 const GroupsManager = lazyPanel(() => import("@/components/GroupsManager"));
 const BroadcastManager = lazyPanel(() => import("@/components/BroadcastManager"));
-const TimeRulesManager = lazyPanel(() => import("@/components/TimeRulesManager"));
 const UnlockDayManager = lazyPanel(() => import("@/components/UnlockDayManager"));
 const SettingsPanel = lazyPanel(() => import("@/components/SettingsPanel"));
 const PayrollEngineTester = lazyPanel(() => import("@/components/PayrollEngineTester"));
@@ -33,7 +31,6 @@ const CostingDashboard = lazyPanel(() => import("@/components/CostingDashboard")
 const PeriodSummary = lazyPanel(() => import("@/components/PeriodSummary"));
 const WeekViewTab = lazyPanel(() => import("@/components/WeekViewTab"));
 const CcqRatesPanel = lazyPanel(() => import("@/components/CcqRatesPanel"));
-const ManagerDownloads = lazyPanel(() => import("@/components/ManagerDownloads"));
 const AuditLog = lazyPanel(() => import("@/components/AuditLog"));
 const EmployeeActivityLog = lazyPanel(() => import("@/components/EmployeeActivityLog"));
 const InfraHealthCard = lazyPanel(() => import("@/components/InfraHealthCard"));
@@ -49,11 +46,18 @@ const CcqJsonExport = lazyPanel(() => import("@/components/CcqJsonExport"));
 export function ManagerIndex() {
   const { role, adminSections } = useAuth();
   const { search } = useLocation();
-  const [version] = useManagerUiVersion();
   const legacy = legacySectionTarget(search);
   if (legacy) return <Navigate to={`/manager/${legacy}`} replace />;
-  const first = firstAllowedPath(role, adminSections, version);
+  const first = firstAllowedPath(role, adminSections);
   return <Navigate to={first ? `/manager/${first}` : "/"} replace />;
+}
+
+// An old path (the V2 menu, removed in V2.4.186: a bookmark, an old link) → the page and tab that
+// hold it now, keeping the query (employee, day, filter, job…).
+export function OldPathRedirect() {
+  const { pathname, search } = useLocation();
+  const target = oldPathTarget(pathname.replace(/^\/manager\/?/, ""), search);
+  return <Navigate to={target ? `/manager/${target}` : "/manager"} replace />;
 }
 
 // Setting forms stay readable; tables use the full width.
@@ -69,30 +73,23 @@ export function LivePage() {
       onSelectEmployee={(userId, date) => {
         const params = new URLSearchParams({ emp: userId });
         if (date) params.set("date", date);
-        navigate(`/manager/timesheets?${params}`);
+        params.set("tab", "timesheets");
+        navigate(`/manager/v3/time?${params}`);
       }}
     />
   );
 }
 
-// Gestion V3 pages.
 export const TodoPage = () => <TodoInbox />;
-export const PayrollWeekPage = () => <PayrollPage Component={PayrollWeek} writes compact />;
+export const PayrollWeekPage = () => <PayrollPage Component={PayrollWeek} writes />;
 
-export const TimesheetsPage = () => <ManagerDashboard view="timesheet" />;
-export const ReceiptsPage = () => <ManagerDashboard view="receipts" />;
 export const InventoryPage = () => <InventoryScreenshotsPanel />;
-export const EmployeesPage = () => <EmployeesPanel />;
 export const AbsencesPage = () => <CongesManager />;
 export const FormsPage = () => <FormsManager collapsible={false} />;
 export const ReferencesPage = () => <ReferencesManager />;
 export const MessagesPage = () => <Narrow><BroadcastManager /></Narrow>;
-export const RulesPage = () => <Narrow><TimeRulesManager /></Narrow>;
-export const UnlockDayPage = () => <Narrow><UnlockDayManager /></Narrow>;
-export const SettingsPage = () => <Narrow><SettingsPanel /></Narrow>;
 export const CostsPage = () => <CostingDashboard />;
 export const CcqPage = () => <CcqRatesPanel />;
-export const DownloadsPage = () => <ManagerDownloads />;
 export const HealthPage = () => <InfraHealthCard />;
 export const EmergencyPage = () => <EmergencyTimesheet />;
 export const PayRulesPage = () => <PayRulesReference />;
@@ -101,32 +98,6 @@ export const NotesPage = () => <NotesPanel />;
 
 // ── Paie: Méthode (Messier / Référence) is a page-level choice kept in the URL ──
 const METHODS = ["messier", "book"];
-
-function MethodSwitch({ method, onChange }) {
-  const t = useT();
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium">{t("mgr.payroll.method")}</span>
-      <div role="radiogroup" aria-label={t("mgr.payroll.method")} className="inline-flex rounded-md border bg-muted p-0.5">
-        {METHODS.map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={method === value}
-            onClick={() => onChange(value)}
-            className={cn(
-              "rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              method === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t(value === "messier" ? "mgr.payroll.messier" : "mgr.payroll.book")}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function MethodNote({ method }) {
   const t = useT();
@@ -143,8 +114,8 @@ function MethodNote({ method }) {
   );
 }
 
-// Gestion V3: the same Méthode choice as a small control; its explanation (the banner the V2
-// shows) opens from an « i » button. Closes on Escape or a click outside.
+// Méthode as a small control; its explanation opens from an « i » button. Closes on Escape or a
+// click outside.
 function CompactMethodBar({ method, onChange }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -199,9 +170,8 @@ function CompactMethodBar({ method, onChange }) {
   );
 }
 
-// compact (Gestion V3 only): CompactMethodBar instead of the switch + banner. The default renders
-// exactly the V2 page.
-function PayrollPage({ Component, writes = false, compact = false }) {
+// writes: the page records in the payroll ledger (Paie de la semaine, Calcul détaillé).
+function PayrollPage({ Component, writes = false }) {
   const t = useT();
   const [params, setParams] = useSearchParams();
   const method = METHODS.includes(params.get("method")) ? params.get("method") : "messier";
@@ -213,12 +183,7 @@ function PayrollPage({ Component, writes = false, compact = false }) {
   }
   return (
     <div className="space-y-3">
-      {compact ? <CompactMethodBar method={method} onChange={setMethod} /> : (
-        <>
-          <MethodSwitch method={method} onChange={setMethod} />
-          <MethodNote method={method} />
-        </>
-      )}
+      <CompactMethodBar method={method} onChange={setMethod} />
       {writes && (
         <div className="flex items-start gap-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-xs text-warning">
           <Save className="mt-0.5 h-4 w-4 shrink-0" />
@@ -230,10 +195,6 @@ function PayrollPage({ Component, writes = false, compact = false }) {
   );
 }
 
-export const PayrollCalculPage = () => <PayrollPage Component={PayrollEngineTester} writes />;
-export const PayrollStubsPage = () => <PayrollPage Component={TalonTab} />;
-export const PayrollDasPage = () => <PayrollPage Component={DasTab} />;
-
 export function PayrollRoePage() {
   const t = useT();
   return (
@@ -241,32 +202,6 @@ export function PayrollRoePage() {
       <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">{t("mgr.roe.note")}</div>
       <RecordOfEmploymentTab />
     </div>
-  );
-}
-
-// ── Rapports › Semaine / mois ───────────────────────────────────────────────
-const PERIOD_VIEWS = ["week", "month", "grid"];
-
-export function PeriodPage() {
-  const t = useT();
-  const [params, setParams] = useSearchParams();
-  const view = PERIOD_VIEWS.includes(params.get("view")) ? params.get("view") : "week";
-  function setView(value) {
-    const next = new URLSearchParams(params);
-    if (value === "week") next.delete("view"); else next.set("view", value);
-    setParams(next, { replace: true });
-  }
-  return (
-    <Tabs value={view} onValueChange={setView} className="w-full">
-      <TabsList>
-        <TabsTrigger value="week">{t("testing.tabs.week")}</TabsTrigger>
-        <TabsTrigger value="month">{t("testing.tabs.month")}</TabsTrigger>
-        <TabsTrigger value="grid">{t("testing.weekView.tab")}</TabsTrigger>
-      </TabsList>
-      <TabsContent value="week" className="mt-3"><PeriodSummary mode="week" /></TabsContent>
-      <TabsContent value="month" className="mt-3"><PeriodSummary mode="month" /></TabsContent>
-      <TabsContent value="grid" className="mt-3"><WeekViewTab /></TabsContent>
-    </Tabs>
   );
 }
 
@@ -292,18 +227,17 @@ export function AuditPage() {
   );
 }
 
-// ── Gestion V3: pages with tabs ─────────────────────────────────────────────
-// Each tab renders the V2 page it comes from, unchanged (same component, same props). The active
-// tab lives in the URL (?tab=); a tab this user may not open — or none at all — falls back to the
-// first allowed one, and a page with no allowed tab sends back to #/manager. Only the active tab
-// is mounted, so a tab loads its data only when it is opened.
-const v3Item = (id) => MANAGER_NAV_ITEMS.find((item) => item.id === id);
+// ── Pages with tabs ─────────────────────────────────────────────────────────
+// The active tab lives in the URL (?tab=); a tab this user may not open — or none at all — falls
+// back to the first allowed one, and a page with no allowed tab sends back to #/manager. Only the
+// active tab is mounted, so a tab loads its data only when it is opened.
+const navItem = (id) => MANAGER_NAV_ITEMS.find((item) => item.id === id);
 
 function TabbedPage({ itemId, content }) {
   const t = useT();
   const { role, adminSections } = useAuth();
   const [params, setParams] = useSearchParams();
-  const item = v3Item(itemId);
+  const item = navItem(itemId);
   const tabs = visibleTabs(item, role, adminSections);
   const requested = params.get("tab");
   const active = resolveTab(item, role, adminSections, requested);
@@ -338,17 +272,16 @@ function TabbedPage({ itemId, content }) {
 }
 
 const TODO_TABS = { todo: TodoPage, receipts: () => <ManagerDashboard view="receipts" reviewFilters /> };
-// V3 timesheets: same page, cards with the employee's name first and the « Entrées à la main »
-// filter (the V2 page is unchanged).
+// Timesheets: cards with the employee's name first, the « Entrées à la main » filter, plain words.
 const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter plainWords />, unlock: () => <Narrow><UnlockDayManager plainWords /></Narrow>, missing: () => <Narrow><MissingDaysPanel /></Narrow> };
-// Same pages as V2 Paie, with the compact Méthode control; Calcul détaillé keeps the « writes » warning.
+// Calcul détaillé keeps the « writes » warning.
 const PAY_HISTORY_TABS = {
-  stubs: () => <PayrollPage Component={TalonTab} compact />,
-  das: () => <PayrollPage Component={DasTab} compact />,
+  stubs: () => <PayrollPage Component={TalonTab} />,
+  das: () => <PayrollPage Component={DasTab} />,
   roe: PayrollRoePage,
-  calcul: () => <PayrollPage Component={PayrollEngineTester} writes compact />,
+  calcul: () => <PayrollPage Component={PayrollEngineTester} writes />,
 };
-// V3 Employés: one card per employee with tabs (it also holds Règles de temps and the TD1 forms).
+// Employés: one card per employee with tabs (it also holds Règles de temps and the TD1 forms).
 const TEAM_TABS = { employees: () => <EmployeesPanel tabbed />, absences: AbsencesPage, groups: () => <GroupsManager /> };
 const REPORTS_TABS = {
   costs: CostsPage,
@@ -358,7 +291,7 @@ const REPORTS_TABS = {
   // CCQ export only: the DAS (already in Historique paie) and the « bientôt » bank card are left out.
   ccq: () => <CcqJsonExport lastFinishedMonth />,
 };
-// No « Règles de temps » and no TD1 forms in V3: both are in each employee's card (Équipe › Employés).
+// No « Règles de temps » and no TD1 forms here: both are in each employee's card (Équipe › Employés).
 const CONFIG_TABS = {
   settings: () => <Narrow><SettingsPanel taxForms={false} /></Narrow>, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
   forms: FormsPage, references: ReferencesPage, contacts: () => <ContactsManager />,

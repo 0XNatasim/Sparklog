@@ -65,8 +65,8 @@ const NOTIFICATION_FILTERS = ["overtime", "meals", "parking"];
 const INITIAL_PICK = Symbol("initial week pick");
 
 // Two Gestion pages share this component's state (jobs, claims, evidence):
-//   view="timesheet" → Feuilles  (#/manager/timesheets)
-//   view="receipts"  → Justificatifs (#/manager/receipts)
+//   view="timesheet" → Feuilles  (#/manager/v3/time?tab=timesheets)
+//   view="receipts"  → Justificatifs (#/manager/todo?tab=receipts)
 // Employee, status and day live in the URL so a timesheet view can be bookmarked or shared.
 // Gestion V3 › Feuilles de temps only (both off = the V2 page, unchanged):
 //   nameFirst — job cards show the employee's name first (JobCard);

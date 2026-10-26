@@ -170,28 +170,29 @@ backup of the database contains ciphertext only.
   upgrade migration path, so the matrix is enforced on every PR. Header of the SQL file
   tracks this.
 
-## Pages de la Gestion (V2 / V3)
+## Pages de la Gestion
 
 Règle exécutable : `canOpenNavItem` / `visibleTabs` (`src/lib/manager-nav.js`), reprise par
 `authorizationFor().pages` et `.tabs` (`src/lib/authorization-matrix.js`) et testée dans
 `manager-nav.test.js` / `authorization-matrix.test.js`. Ce sont des contrôles d'interface : l'accès
 réel aux données reste celui des politiques RLS et des RPC ci-dessus.
 
-- **V2** (`MANAGER_NAV`, inchangée et figée par un test) : une page s'ouvre pour un gestionnaire ou le
-  propriétaire, ou pour un admin de bureau qui a le `grant` de la page (`live`, `timesheet`,
+- **Règle d'une page** (`MANAGER_PAGES`, les pages de l'ancien menu V2, retiré en V2.4.186) : une page s'ouvre pour
+  un gestionnaire ou le propriétaire, ou pour un admin de bureau qui a le `grant` de la page (`live`, `timesheet`,
   `notifications`, `employees`, `forms`). `ownerOnly` = propriétaire seulement (feuille d'urgence).
-- **V3** (`MANAGER_NAV_V3`) : certaines entrées sont des pages à onglets sur de nouveaux chemins
-  (`todo`, `v3/time`, `v3/pay-history`, `v3/team`, `v3/reports`, `v3/config`). **Chaque onglet garde la règle
-  de la page V2 d'où il vient** ; une entrée apparaît si au moins un onglet est permis ; un `?tab=` interdit
-  ou inconnu bascule sur le premier onglet permis ; sans onglet permis, retour à `#/manager`.
+- **Menu** (`MANAGER_NAV`) : certaines entrées sont des pages à onglets (`todo`, `v3/time`, `v3/pay-history`,
+  `v3/team`, `v3/reports`, `v3/config`). **Chaque onglet garde la règle de la page d'où il vient** ; une entrée
+  apparaît si au moins un onglet est permis ; un `?tab=` interdit ou inconnu bascule sur le premier onglet permis ;
+  sans onglet permis, retour à `#/manager`. Un ancien chemin V2 (`OLD_PATHS`) redirige vers la page et l'onglet qui
+  le remplacent, où la même règle s'applique.
 
-| Page V3 | Onglet → page d'origine (règle) |
+| Page | Onglet → page d’origine (règle) |
 |---|---|
 | À traiter (`todo`) | À approuver (gestionnaire) · Justificatifs → `receipts` (`notifications`) |
 | Feuilles de temps (`v3/time`) | Feuilles de temps → `timesheets` (`timesheet`) · Débloquer une journée → `unlock-day` (`employees`) · Jours sans saisie → `advanced/audit` (gestionnaire, même compte que Journal › Employés) |
 | Historique paie (`v3/pay-history`) | Talons · DAS · Relevé d'emploi · Calcul détaillé (gestionnaire) |
 | Employés (`v3/team`) | Employés → `employees` (`employees` ; fiche à onglets V2.4.180 : elle contient aussi Règles de temps — `config/rules`, même règle `employees` — et, pour un gestionnaire / propriétaire seulement, l'onglet Impôts = formulaires TD1 / TP-1015.3 de Paramètres, table `employee_tax_profiles` gestionnaire seulement par RLS 0083) · Absences (gestionnaire) · Groupes → `employees` (`employees` ; tables `employee_groups` / `employee_group_members` : RLS `get_my_role() = 'manager'`, 0114) |
 | Rapports (`v3/reports`) | Coûts · Semaine · Mois · Par employé · Export CCQ (gestionnaire) |
-| Configuration (`v3/config`) | Paramètres (sans les formulaires TD1 en V3) · Taux CCQ · Règles de paie · Références (gestionnaire) · Contacts → `references` (gestionnaire, mêmes lignes que Références › Contacts) · Formulaires → `forms` (`forms`) |
-| Notes (`notes`, V3 seulement, groupe Aujourd'hui) | Page sans onglet (gestionnaire / propriétaire). Données : table `manager_notes` (0111), toujours `get_my_role() = 'manager'` (donc aal2). Lire / modifier : `user_id = auth.uid() or shared` (une note partagée reste partagée pour un non-auteur) ; créer : en son nom ; supprimer : l'auteur seulement. Une note **privée** n'est visible que par son auteur, la propriétaire comprise ; une note **partagée** l'est par tous les gestionnaires. Trigger `manager_notes_guard` : auteur figé, `done_by`. Aucun accès `anon` |
-| Admin › Trajets et frais (`advanced/travel-rules`, V3 seulement) | Page sans onglet (gestionnaire / propriétaire). Données : table `travel_pay_rules`, lecture `get_my_role() = 'manager'`, écriture seulement par le RPC `set_travel_pay_rule` (rôle `manager` ou `owner` non suspendu, une ligne `travel_rule_set` au Journal par appel) |
+| Configuration (`v3/config`) | Paramètres (sans les formulaires TD1 : fiche de l’employé › Impôts) · Taux CCQ · Règles de paie · Références (gestionnaire) · Contacts → `references` (gestionnaire, mêmes lignes que Références › Contacts) · Formulaires → `forms` (`forms`) |
+| Notes (`notes`, groupe Aujourd’hui) | Page sans onglet (gestionnaire / propriétaire). Données : table `manager_notes` (0111), toujours `get_my_role() = 'manager'` (donc aal2). Lire / modifier : `user_id = auth.uid() or shared` (une note partagée reste partagée pour un non-auteur) ; créer : en son nom ; supprimer : l'auteur seulement. Une note **privée** n'est visible que par son auteur, la propriétaire comprise ; une note **partagée** l'est par tous les gestionnaires. Trigger `manager_notes_guard` : auteur figé, `done_by`. Aucun accès `anon` |
+| Admin › Trajets et frais (`advanced/travel-rules`) | Page sans onglet (gestionnaire / propriétaire). Données : table `travel_pay_rules`, lecture `get_my_role() = 'manager'`, écriture seulement par le RPC `set_travel_pay_rule` (rôle `manager` ou `owner` non suspendu, une ligne `travel_rule_set` au Journal par appel) |

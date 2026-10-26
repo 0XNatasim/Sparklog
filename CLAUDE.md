@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.185)
+## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.186)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -877,6 +877,21 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `notificationTargetV3` (`switchTarget("v3", …)`) ouvre Justificatifs de À traiter / Équipe › Employés. Reste : retirer
   la V2 (sélecteur, `MANAGER_NAV`, pages en double, redirection des anciens chemins). Tests `manager-ui-version.test.js`,
   `bell-and-todo.test.js`.
+- [x] **V2 retirée** (V2.4.186, aucune migration) : `MANAGER_NAV` = l'ancien menu V3 (15 entrées) ; `MANAGER_PAGES` =
+  les pages de l'ancien menu V2 sans `config-rules`, gardées comme règles d'accès (`from` des onglets, `authorizationFor().pages`)
+  et dont certaines restent des entrées (live, inventory, messages, journal, état du service, feuille d'urgence).
+  `OLD_PATHS` / `oldPathTarget` (`src/lib/manager-nav.js`) : chaque ancien chemin V2 (+ `payroll`, `reports`, `config`)
+  → page à onglets + `?tab=`, la requête gardée (`reports/period?view=` → onglet) ; routes générées dans `App.jsx` vers
+  `OldPathRedirect` (`ManagerPages.jsx`) ; `legacySectionTarget` passe par la même table ; `/testing` → `v3/reports?tab=costs`.
+  Retirés : `manager-ui-version.js` (sélecteur, clés `sparklog.managerUi*` ignorées), `VersionSwitch`, `switchTarget`,
+  `v3MenuPath`, `V2_TO_V3`, `notificationTargetV3` (`notificationTarget` mène directement aux pages V3, aussi depuis
+  `NotificationsBell` de l'app employé), les deux cloches de la Gestion (`ManagerBell` seule), les pages V2
+  (`TimesheetsPage`… `PeriodPage`, `MethodSwitch` : la barre de méthode compacte partout), `TimeRulesManager.jsx`,
+  `ManagerDownloads.jsx`. Droits inchangés (`manager-nav.test.js` : un admin atteint exactement les pages de ses sections).
+  Vérifié dans Chromium : propriétaire et admin (employees + notifications), 8 anciennes adresses, aucune erreur.
+  Reste (ménage, sans effet visible) : les props qui choisissaient le rendu V3 (`EmployeesPanel tabbed`, `ManagerDashboard
+  nameFirst / manualFilter / plainWords / reviewFilters`, `UnlockDayManager plainWords`, `SettingsPanel taxForms`,
+  `CcqJsonExport lastFinishedMonth`) sont toujours passées ; le rendu V2 qu'elles désactivent est du code mort à retirer.
 - [x] **Liste des employés sur téléphone** (V2.4.184, aucune migration, V2 et V3) : `EmployeeCardHeader.jsx` mettait n°,
   icônes, nom, région, état et « manquant(s) » sur une seule ligne ; les étiquettes `shrink-0` écrasaient le nom
   (`truncate`) jusqu'à « J… » ou rien (comptes « En attente »). Maintenant : ligne 1 = n°, rôle, chef d'équipe, nom
