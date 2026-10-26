@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.182)
+## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.183)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -491,7 +491,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   (`tabs[].from`, `visibleTabs` / `resolveTab`, `authorizationFor().tabs`, `docs/security/authorization-matrix.md`).
   `PayrollPage({ compact })` (V3) ; `V2_TO_V3` / `switchTarget` (changement de version) / `v3MenuPath` (surbrillance).
   Verrous : `MANAGER_NAV` figé en littéral (`manager-nav.test.js`), routes V2 → même export → même rendu
-  (`manager-routes.test.js`). Toute évolution de menu se fait dans la V3 tant qu'elle n'est pas la version par défaut.
+  (`manager-routes.test.js`). Toute évolution de menu se fait dans la V3 (la version par défaut depuis V2.4.183).
 - [x] **Menu de la Gestion repliable** (V2.4.133) : bouton en haut à gauche de l'en-tête (ordinateur seulement ; le
   téléphone garde son tiroir) qui masque ou affiche tout le menu de gauche, mémorisé sur l'appareil
   (`sparklog.managerNavHidden`, `ManagerLayout.jsx`). Le mode « rail » (« Réduire le menu ») reste.
@@ -868,6 +868,16 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   propriétaire) : l'avantage de la cloche unique pour lui viendra avec « V3 par défaut ». Tests `bell-and-todo.test.js`,
   `broadcast-search.test.js`, `live-crew.test.js` (fins de semaine / fériés), `manager-nav.test.js`,
   `authorization-matrix.test.js`.
+- [x] **Gestion V3 par défaut** (V2.4.183, aucune migration) : `src/lib/manager-ui-version.js` — clé
+  `sparklog.managerUiChoice` (`MANAGER_UI_KEY`), défaut `DEFAULT_MANAGER_UI_VERSION = "v3"` ; l'ancienne clé
+  `sparklog.managerUi` (`MANAGER_UI_KEY_BEFORE_V3`) est ignorée, donc chaque appareil ouvre la V3 une fois, puis garde le
+  choix fait depuis. `ManagerLayout` : plus de `canSwitch` réservé aux gestionnaires — tout le monde dans la Gestion
+  (admins de bureau compris, qui étaient forcés en V2) a la V3 par défaut et le sélecteur ; `ManagerIndex` atterrit selon
+  la version pour tous (`firstAllowedPath(role, sections, version)`). Les droits ne changent pas : chaque entrée et chaque
+  onglet V3 gardent la règle de leur page (tests existants : un admin atteint en V3 exactement ses pages V2). Cloche V3 :
+  `notificationTargetV3` (`switchTarget("v3", …)`) ouvre Justificatifs de À traiter / Équipe › Employés. Reste : retirer
+  la V2 (sélecteur, `MANAGER_NAV`, pages en double, redirection des anciens chemins). Tests `manager-ui-version.test.js`,
+  `bell-and-todo.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

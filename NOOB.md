@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.182).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.183).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -129,9 +129,10 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 
 ## Étape 6 — Gestion V3 : ce qu'il reste à convertir 💻
 
-La V3 (bouton **V2 | V3** en haut à droite de la Gestion) a déjà **À traiter**, **Paie de la semaine** et le
-nouveau menu. **La V2 ne change pas** : tant que la V3 n'est pas la version par défaut, chaque changement de menu
-se fait seulement dans la V3 (un test fige le menu, les chemins et les pages de la V2).
+**Depuis V2.4.183, la V3 est la version par défaut** : la Gestion s'ouvre en V3 pour tout le monde (toi, les
+gestionnaires et les employés de bureau qui ont accès à la Gestion). Le bouton **V2 | V3** en haut à droite ramène
+encore la V2 au besoin, jusqu'à ce qu'on la retire. **La V2 ne change pas** (un test fige son menu, ses chemins et
+ses pages).
 
 Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 - [x] **Pages à onglets** : À traiter (À approuver · Justificatifs), Feuilles de temps (Feuilles de temps ·
@@ -188,7 +189,11 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   - **Communications** : une recherche dans la liste des employés et une dans « Notifications envoyées » (texte ou
     destinataire). Employés avait déjà la sienne (V2.4.180).
   - **Une seule cloche** en V3, avec **« Tout marquer comme lu »** (aussi sur la cloche de la V2).
-- [ ] **Fin** : quand tout est converti et testé, faire de la V3 la version par défaut, puis retirer la V2.
+- [x] **V3 par défaut** (V2.4.183) : chaque appareil s'ouvre en V3, même s'il avait choisi la V2 avant (un choix fait
+  après est gardé). Les employés de bureau qui ont accès à la Gestion passent aussi en V3 (avant, ils ne voyaient que
+  la V2) : chacun ne voit que les pages et onglets permis. La cloche de la V3 ouvre les pages de la V3.
+- [ ] **Retirer la V2** : après quelques jours d'utilisation de la V3 sans problème. On enlèvera le bouton V2 | V3,
+  le menu V2 et ses pages en double ; les anciens liens (favoris, cloche) seront redirigés vers la page V3 équivalente.
 
 ## Étape 7 — Temps de trajet, km et frais : une option par employé 👤 💻
 

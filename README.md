@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.182 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.183 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -54,8 +54,9 @@ Roles are stored lowercase in `profiles.role`:
 
 The Manager workspace is a sidebar (a drawer on phones; on desktop it can be shrunk to an icon rail or hidden
 entirely with the toggle at the top left of the header); every page has its own URL (`#/manager/…`) and only the
-pages a manager is allowed to open are listed. Managers and the owner switch between two menus with the **V2 | V3**
-selector in the header (remembered per device); office admins always see V2.
+pages a manager is allowed to open are listed. **V3 is the default** since V2.4.183, for everyone who opens Gestion
+(managers, owner and office admins with sections); the **V2 | V3** selector in the header still brings V2 back
+(remembered per device) until V2 is removed. A choice made before V2.4.183 is ignored once, so every device opens V3.
 
 **V3** (15 entries; pages with tabs keep each tab's original access rule, the active tab is in `?tab=`):
 
@@ -154,6 +155,9 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   - **Communications**: search boxes in the employee picker and in « Sent notifications » (text or recipient).
   - **One bell** in V3 (manager notifications, plus the person's messages for someone who is not a manager) and
     **Mark all as read** on the manager notifications (V2 bell too).
+- **Gestion V3 by default** (V2.4.183): Gestion opens in V3 for everyone (office admins too, who saw only V2 before;
+  each tab keeps its access rule). The V3 bell opens the V3 pages (To do › Receipts, Team › Employees). V2 stays one
+  click away (V2 | V3) until it is removed.
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,

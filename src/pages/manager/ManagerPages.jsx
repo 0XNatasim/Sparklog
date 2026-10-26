@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
 import { MANAGER_NAV_ITEMS, firstAllowedPath, legacySectionTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
-import { isManagerRole } from "@/lib/roles";
 import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { lazyPanel } from "@/components/lazy-panel";
 
@@ -53,7 +52,7 @@ export function ManagerIndex() {
   const [version] = useManagerUiVersion();
   const legacy = legacySectionTarget(search);
   if (legacy) return <Navigate to={`/manager/${legacy}`} replace />;
-  const first = firstAllowedPath(role, adminSections, isManagerRole(role) ? version : "v2");
+  const first = firstAllowedPath(role, adminSections, version);
   return <Navigate to={first ? `/manager/${first}` : "/"} replace />;
 }
 

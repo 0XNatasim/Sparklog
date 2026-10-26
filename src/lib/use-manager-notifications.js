@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/supabaseClient";
 import { SESSION_RESUMED_EVENT } from "@/contexts/AuthContext";
+import { switchTarget } from "@/lib/manager-nav";
 
 export const NOTIFICATIONS_REFRESH_EVENT = "sparklog:notifications-refresh";
 
@@ -28,6 +29,14 @@ export function notificationTarget(notification) {
   if (notification.type === "parking_receipt") return "/manager/receipts?filter=parking";
   if (notification.type === "ccq_renewal") return "/manager/employees";
   return `/manager/receipts?filter=overtime&job=${notification.job_id}`;
+}
+
+// The same page in Gestion V3 (Justificatifs of À traiter, Équipe › Employés), for the V3 bell.
+export function notificationTargetV3(notification) {
+  const target = notificationTarget(notification);
+  const [path, query = ""] = target.replace(/^\/manager\//, "").split("?");
+  const v3 = switchTarget("v3", path, query ? `?${query}` : "");
+  return v3 ? `/manager/${v3}` : target;
 }
 
 export function useManagerNotifications(enabled, userId) {

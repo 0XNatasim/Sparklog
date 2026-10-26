@@ -266,9 +266,9 @@ export default function ManagerLayout() {
   const { role, adminSections } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const canSwitch = isManagerRole(role);
-  const [storedVersion, setVersion] = useManagerUiVersion();
-  const version = canSwitch ? storedVersion : "v2";
+  // Everyone who opens Gestion (managers, owner, office admins with sections) gets V3 by default and
+  // may switch back to V2 until it is removed.
+  const [version, setVersion] = useManagerUiVersion();
   const groups = useMemo(() => visibleManagerNav(role, adminSections, version), [role, adminSections, version]);
   const [collapsed, setCollapsed] = useState(() => readFlag(COLLAPSE_KEY));
   const [navHidden, setNavHidden] = useState(() => readFlag(HIDDEN_KEY));
@@ -511,7 +511,7 @@ export default function ManagerLayout() {
               <div className="hidden truncate text-xs leading-none text-muted-foreground sm:block">{COMPANY_NAME}</div>
               <h1 className="truncate text-sm font-semibold leading-tight sm:text-base">{current ? t(current.labelKey) : t("nav.manager")}</h1>
             </div>
-            {canSwitch && <VersionSwitch version={version} onChange={switchVersion} />}
+            <VersionSwitch version={version} onChange={switchVersion} />
             {/* V3: one bell (manager notifications + the person's messages); V2 keeps its two. */}
             {version === "v3" ? <ManagerBell /> : <><NotificationsBell /><EmployeeNotificationsBell /></>}
             <AccountMenu />
