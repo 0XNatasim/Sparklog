@@ -5,7 +5,7 @@ vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
 const {
   cleanGroupName, groupNameTaken, groupsTargetIds, inventoryGroupChoices, memberChanges, normalizeGroups,
-  pendingNewHires, sumGroupInventory,
+  pendingNewHires, sumGroupInventory, ungroupedPeople,
 } = await import("@/lib/employee-groups");
 
 const read = (path) => fs.readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
@@ -82,5 +82,35 @@ describe("employee groups (0114)", () => {
     expect(src).toContain("pendingNewHires(employees, targetIds, companyDate())");
     expect(src).toContain("if (waiting.length) {");
     expect(src).toContain('audience: audience === "groups" ? "selected" : audience');
+  });
+});
+
+describe("ungroupedPeople (Groupes › Employés sans groupe)", () => {
+  const today = "2026-10-26";
+  const groups = [{ id: "g1", memberIds: ["a"] }, { id: "g2", memberIds: ["b"] }];
+  const people = [
+    { id: "a", full_name: "Alice", role: "employee" },
+    { id: "b", full_name: "Bruno", role: "subcontractor_1" },
+    { id: "z", full_name: "Zoé", role: "employee" },
+    { id: "c", full_name: "Chloé", role: "subcontractor_1" },
+    { id: "n", full_name: "Nadia", role: "employee", is_paused: true, start_date: "2026-11-02" },
+    { id: "p", full_name: "Paul", role: "employee", is_paused: true },
+    { id: "f", full_name: "Félix", role: "employee", departure_status: "depart" },
+    { id: "o", full_name: "Olivia", role: "admin" },
+    { id: "m", full_name: "Marc", role: "manager" },
+    { id: "k", full_name: "Karine", role: "owner" },
+  ];
+
+  it("lists active field people and new hires in no group, by name", () => {
+    expect(ungroupedPeople(groups, people, today).map((p) => p.id)).toEqual(["c", "n", "z"]);
+  });
+
+  it("leaves out office, managers, owner, paused and former accounts", () => {
+    const ids = ungroupedPeople([], people, today).map((p) => p.id);
+    for (const id of ["o", "m", "k", "p", "f"]) expect(ids).not.toContain(id);
+  });
+
+  it("is empty when everyone is grouped", () => {
+    expect(ungroupedPeople([{ id: "g", memberIds: ["a", "b", "c", "n", "z"] }], people, today)).toEqual([]);
   });
 });
