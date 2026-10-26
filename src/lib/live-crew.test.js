@@ -78,14 +78,20 @@ describe("missingEntryDays", () => {
     const jobs = [{ user_id: "crew", job_date: "2026-09-30" }];
 
     expect(missingEntryDays(people, jobs, leave, "2026-09-22", "2026-09-30")).toEqual([
-      { id: "off", name: "off", count: 3 },
-      { id: "crew", name: "crew", count: 1 },
+      { id: "off", name: "off", count: 3, dates: ["2026-09-28", "2026-09-29", "2026-09-30"] },
+      { id: "crew", name: "crew", count: 1, dates: ["2026-09-28"] },
     ]);
+  });
+
+  it("never counts a weekend or a CCQ non-worked day (V2.4.182)", () => {
+    // Fri 2026-10-09, Sat 10, Sun 11, Mon 12 (Thanksgiving), Tue 13.
+    const [crew] = missingEntryDays([person("crew")], [], [], "2026-10-09", "2026-10-13", ["2026-10-12"]);
+    expect(crew).toEqual({ id: "crew", name: "crew", count: 2, dates: ["2026-10-09", "2026-10-13"] });
   });
 
   it("reports zero when the requested period ends before tracking started", () => {
     expect(missingEntryDays([person("crew")], [], [], "2026-09-20", "2026-09-27"))
-      .toEqual([{ id: "crew", name: "crew", count: 0 }]);
+      .toEqual([{ id: "crew", name: "crew", count: 0, dates: [] }]);
   });
 });
 
@@ -118,8 +124,9 @@ describe("new hire before the first day of work (0110)", () => {
   });
 
   it("counts missing days only from the first day of work", () => {
+    // Sunday 2026-10-25 is not a work day.
     const result = missingEntryDays(crew, [], [], "2026-10-25", "2026-10-28");
-    expect(result.find((row) => row.id === "crew").count).toBe(4);
+    expect(result.find((row) => row.id === "crew").count).toBe(3);
     expect(result.find((row) => row.id === "hire").count).toBe(2);
   });
 

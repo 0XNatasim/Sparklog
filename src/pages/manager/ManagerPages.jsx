@@ -20,6 +20,7 @@ const CongesManager = lazyPanel(() => import("@/components/CongesManager"));
 const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
 const ReferencesManager = lazyPanel(() => import("@/components/ReferencesManager"));
 const ContactsManager = lazyPanel(() => import("@/components/ContactsManager"));
+const MissingDaysPanel = lazyPanel(() => import("@/components/manager/MissingDaysPanel"));
 const GroupsManager = lazyPanel(() => import("@/components/GroupsManager"));
 const BroadcastManager = lazyPanel(() => import("@/components/BroadcastManager"));
 const TimeRulesManager = lazyPanel(() => import("@/components/TimeRulesManager"));
@@ -340,7 +341,7 @@ function TabbedPage({ itemId, content }) {
 const TODO_TABS = { todo: TodoPage, receipts: () => <ManagerDashboard view="receipts" reviewFilters /> };
 // V3 timesheets: same page, cards with the employee's name first and the « Entrées à la main »
 // filter (the V2 page is unchanged).
-const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter plainWords />, unlock: () => <Narrow><UnlockDayManager plainWords /></Narrow> };
+const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter plainWords />, unlock: () => <Narrow><UnlockDayManager plainWords /></Narrow>, missing: () => <Narrow><MissingDaysPanel /></Narrow> };
 // Same pages as V2 Paie, with the compact Méthode control; Calcul détaillé keeps the « writes » warning.
 const PAY_HISTORY_TABS = {
   stubs: () => <PayrollPage Component={TalonTab} compact />,

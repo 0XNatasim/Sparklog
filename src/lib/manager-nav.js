@@ -69,6 +69,8 @@ const V3_ONLY_ITEMS = Object.freeze([
   { id: "v3-time", path: "v3/time", grant: null, labelKey: "mgr.nav.timesheets", tabs: [
     tab("timesheets", "timesheets", "mgr.nav.timesheets"),
     tab("unlock", "unlock-day", "mgr.nav3.tab.unlockDay"),
+    // Jours sans saisie: the count of Avancé › Journal › Employés, with the dates (same rule).
+    tab("missing", "advanced-audit", "mgr.nav3.tab.missingDays"),
   ] },
   { id: "v3-pay-history", path: "v3/pay-history", grant: null, labelKey: "mgr.nav3.payHistory", tabs: [
     tab("stubs", "payroll-stubs", "mgr.nav.stubs"),

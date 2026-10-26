@@ -1,29 +1,67 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import dayjs from "dayjs";
 import { Bell } from "lucide-react";
-import { supabase } from "@/supabaseClient";
-import { SESSION_RESUMED_EVENT, useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
-import { setAppBadgeCount } from "@/lib/push-support";
+import { useEmployeeBroadcasts } from "@/lib/use-employee-broadcasts";
 
-export const BROADCASTS_REFRESH_EVENT = "sparklog:broadcasts-refresh";
-const LIST_LIMIT = 30;
+export { BROADCASTS_REFRESH_EVENT } from "@/lib/use-employee-broadcasts";
 
-// The latest announcements sent to this employee, newest first.
-async function fetchEmployeeBroadcasts(userId) {
-  const { data } = await supabase
-    .from("broadcast_recipients")
-    .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments, edited_at)")
-    .eq("employee_id", userId);
-  return (data || [])
-    .filter((row) => row.manager_broadcasts)
-    .sort((a, b) => new Date(b.manager_broadcasts.created_at) - new Date(a.manager_broadcasts.created_at))
-    .slice(0, LIST_LIMIT);
+// One message in a bell menu: unread first-class, read ones greyed so they can be re-read.
+export function BroadcastItem({ item, onOpen }) {
+  return (
+    <DropdownMenuItem
+      onSelect={() => onOpen(item)}
+      className={`block border-t px-3 py-3 ${item.acknowledged_at ? "opacity-70" : "bg-destructive/10"}`}
+    >
+      <BroadcastItemBody item={item} />
+    </DropdownMenuItem>
+  );
+}
+
+function BroadcastItemBody({ item }) {
+  const t = useT();
+  return (
+    <>
+      <div className={`line-clamp-2 whitespace-pre-wrap text-sm ${item.acknowledged_at ? "" : "font-semibold"}`}>{item.manager_broadcasts.body || t("broadcast.popupTitle")}</div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {dayjs(item.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}
+        {item.manager_broadcasts.edited_at && <> · <EditedTag at={item.manager_broadcasts.edited_at} /></>}
+      </div>
+    </>
+  );
+}
+
+// The message opened from the bell, in full.
+export function BroadcastDialog({ opened, onClose }) {
+  const t = useT();
+  return (
+    <Dialog open={Boolean(opened)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex flex-col gap-3 overflow-hidden sm:max-w-md">
+        <DialogHeader className="shrink-0 pr-6">
+          <DialogTitle>{t("broadcast.popupTitle")}</DialogTitle>
+        </DialogHeader>
+        <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
+          {opened?.manager_broadcasts?.body && <p className="whitespace-pre-wrap text-sm">{opened.manager_broadcasts.body}</p>}
+          {opened && <BroadcastAttachments broadcast={opened.manager_broadcasts} />}
+          {opened && (
+            <p className="text-xs text-muted-foreground">
+              {dayjs(opened.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}
+              {opened.manager_broadcasts.edited_at && <> · <EditedTag at={opened.manager_broadcasts.edited_at} /></>}
+            </p>
+          )}
+        </div>
+        <DialogFooter className="shrink-0 border-t pt-3">
+          <Button type="button" className="h-11 w-full text-base sm:w-auto" onClick={onClose}>{t("broadcast.acknowledge")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // Employee notification bell: lists the manager announcements sent to this employee
@@ -32,68 +70,15 @@ async function fetchEmployeeBroadcasts(userId) {
 export default function EmployeeNotificationsBell() {
   const { user, role } = useAuth();
   const t = useT();
-  const [items, setItems] = useState([]);
   const [opened, setOpened] = useState(null);
-  const channelRef = useRef(null);
-  const userId = user?.id;
-  const enabled = Boolean(userId) && !isManagerRole(role);
-
-  const load = useCallback(() => {
-    if (!enabled) return undefined;
-    return fetchEmployeeBroadcasts(userId).then(setItems);
-  }, [enabled, userId]);
-
-  useEffect(() => {
-    if (!enabled) return undefined;
-    load();
-    const subscribe = () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      channelRef.current = supabase.channel(`employee-broadcasts-${userId}`)
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${userId}` }, load)
-        // A message edited with « read it again » clears this employee's OK (0107): show it as unread again.
-        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "broadcast_recipients", filter: `employee_id=eq.${userId}` }, () => {
-          load();
-          window.dispatchEvent(new Event(BROADCASTS_REFRESH_EVENT));
-        })
-        .subscribe();
-    };
-    subscribe();
-    const onResumed = () => { load(); subscribe(); };
-    window.addEventListener(SESSION_RESUMED_EVENT, onResumed);
-    window.addEventListener(BROADCASTS_REFRESH_EVENT, load);
-    return () => {
-      window.removeEventListener(SESSION_RESUMED_EVENT, onResumed);
-      window.removeEventListener(BROADCASTS_REFRESH_EVENT, load);
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [enabled, load, userId]);
-
-  const unread = items.filter((item) => !item.acknowledged_at).length;
-
-  // Keep the app-icon badge equal to the unread count; clear it on logout/unmount.
-  useEffect(() => {
-    if (enabled) setAppBadgeCount(unread);
-  }, [enabled, unread]);
-  useEffect(() => () => { setAppBadgeCount(0); }, []);
+  const enabled = Boolean(user?.id) && !isManagerRole(role);
+  const { items, unread, load, acknowledge } = useEmployeeBroadcasts(enabled, user?.id);
 
   if (!enabled) return null;
 
-  async function openItem(item) {
+  function openItem(item) {
     setOpened(item);
-    if (item.acknowledged_at) return;
-    const acknowledgedAt = new Date().toISOString();
-    const { error } = await supabase
-      .from("broadcast_recipients")
-      .update({ acknowledged_at: acknowledgedAt })
-      .eq("broadcast_id", item.broadcast_id)
-      .eq("employee_id", user.id);
-    if (error) return;
-    setItems((current) => current.map((row) => row.broadcast_id === item.broadcast_id ? { ...row, acknowledged_at: acknowledgedAt } : row));
-    // Let the pop-up queue drop it too, so it doesn't ask for the same OK again.
-    window.dispatchEvent(new Event(BROADCASTS_REFRESH_EVENT));
+    acknowledge(item);
   }
 
   return (
@@ -108,42 +93,10 @@ export default function EmployeeNotificationsBell() {
         <DropdownMenuContent align="end" className="max-h-96 w-[calc(100vw-1rem)] overflow-y-auto sm:w-80">
           <div className="px-2 py-2 text-sm font-semibold">{t("notifications.employeeTitle")}</div>
           {items.length === 0 && <div className="px-2 py-4 text-center text-xs text-muted-foreground">{t("notifications.empty")}</div>}
-          {items.map((item) => (
-            <DropdownMenuItem
-              key={item.broadcast_id}
-              onSelect={() => openItem(item)}
-              className={`block border-t px-3 py-3 ${item.acknowledged_at ? "opacity-70" : "bg-destructive/10"}`}
-            >
-              <div className={`line-clamp-2 whitespace-pre-wrap text-sm ${item.acknowledged_at ? "" : "font-semibold"}`}>{item.manager_broadcasts.body || t("broadcast.popupTitle")}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {dayjs(item.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}
-                {item.manager_broadcasts.edited_at && <> · <EditedTag at={item.manager_broadcasts.edited_at} /></>}
-              </div>
-            </DropdownMenuItem>
-          ))}
+          {items.map((item) => <BroadcastItem key={item.broadcast_id} item={item} onOpen={openItem} />)}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <Dialog open={Boolean(opened)} onOpenChange={(open) => { if (!open) setOpened(null); }}>
-        <DialogContent className="flex flex-col gap-3 overflow-hidden sm:max-w-md">
-          <DialogHeader className="shrink-0 pr-6">
-            <DialogTitle>{t("broadcast.popupTitle")}</DialogTitle>
-          </DialogHeader>
-          <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
-            {opened?.manager_broadcasts?.body && <p className="whitespace-pre-wrap text-sm">{opened.manager_broadcasts.body}</p>}
-            {opened && <BroadcastAttachments broadcast={opened.manager_broadcasts} />}
-            {opened && (
-              <p className="text-xs text-muted-foreground">
-                {dayjs(opened.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}
-                {opened.manager_broadcasts.edited_at && <> · <EditedTag at={opened.manager_broadcasts.edited_at} /></>}
-              </p>
-            )}
-          </div>
-          <DialogFooter className="shrink-0 border-t pt-3">
-            <Button type="button" className="h-11 w-full text-base sm:w-auto" onClick={() => setOpened(null)}>{t("broadcast.acknowledge")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BroadcastDialog opened={opened} onClose={() => setOpened(null)} />
     </>
   );
 }

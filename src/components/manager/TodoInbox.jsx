@@ -19,6 +19,7 @@ import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReus
 import { approvalOutcome, buildInbox, previousWorkday } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
 import { DYNACOM_CUMULATIVE_END } from "@/lib/payroll-opening";
+import { TODO_EVENT } from "@/lib/todo-count";
 import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
@@ -108,6 +109,8 @@ export default function TodoInbox() {
         profiles: new Map(people.map((p) => [p.id, p])),
         raw: { submitted, peers: peersRes.data || [], evidence: evidenceRes.data || [], meals: mealsRes.data || [], parking: parkingRes.data || [] },
       });
+      // The « À traiter » number in the menu follows this list.
+      window.dispatchEvent(new Event(TODO_EVENT));
     } catch (e) {
       setErr(e?.message || t("todo.failedLoad"));
     } finally {

@@ -16,6 +16,7 @@ import { useT } from "@/lib/use-t";
 import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { fetchPendingSignups, groupBadgeTotal, pendingSignupCount, SIGNUPS_EVENT } from "@/lib/signups";
 import { dueCount, fetchOpenReminders, msUntilNextReminder, NOTES_EVENT } from "@/lib/notes";
+import { fetchTodoCount, TODO_EVENT } from "@/lib/todo-count";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
 import { canOpenNavItem, findNavItem, switchTarget, v3MenuPath, visibleManagerNav } from "@/lib/manager-nav";
@@ -23,6 +24,7 @@ import { useManagerUiVersion } from "@/lib/manager-ui-version";
 import { isManagerRole } from "@/lib/roles";
 import NotificationsBell from "@/components/NotificationsBell";
 import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
+import ManagerBell from "@/components/manager/ManagerBell";
 import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -274,12 +276,15 @@ export default function ManagerLayout() {
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
   const [pendingSignups, setPendingSignups] = useState(0);
   const [dueNotes, setDueNotes] = useState(0);
+  const [todoCount, setTodoCount] = useState(0);
   const badges = useMemo(() => ({
+    // V3 only: submitted jobs waiting for approval.
+    todo: isManagerRole(role) && version === "v3" ? todoCount : 0,
     inventory: isManagerRole(role) ? inventoryNegatives : 0,
     employees: isManagerRole(role) ? pendingSignups : 0,
     "v3-team": isManagerRole(role) ? pendingSignups : 0,
     notes: isManagerRole(role) ? dueNotes : 0,
-  }), [inventoryNegatives, pendingSignups, dueNotes, role]);
+  }), [inventoryNegatives, pendingSignups, dueNotes, todoCount, role, version]);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath, version);
@@ -344,6 +349,29 @@ export default function ManagerLayout() {
       window.removeEventListener(SIGNUPS_EVENT, loadSignups);
     };
   }, [role, location.pathname]);
+
+  // « À traiter » (V3): submitted jobs waiting for approval, a count-only request on each page change
+  // and whenever the À traiter page reloads its list (TODO_EVENT).
+  useEffect(() => {
+    if (!isManagerRole(role) || version !== "v3") return undefined;
+    let cancelled = false;
+    let generation = 0;
+    async function loadTodo() {
+      const ticket = ++generation;
+      try {
+        const count = await fetchTodoCount();
+        if (!cancelled && ticket === generation) setTodoCount(count);
+      } catch (error) {
+        console.error("[todo-count]", error);
+      }
+    }
+    loadTodo();
+    window.addEventListener(TODO_EVENT, loadTodo);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(TODO_EVENT, loadTodo);
+    };
+  }, [role, version, location.pathname]);
 
   // My due reminders (Notes): counted now, and again when the next reminder comes due (a timer),
   // when the tab is shown again, and after any change on the Notes page (NOTES_EVENT).
@@ -484,8 +512,8 @@ export default function ManagerLayout() {
               <h1 className="truncate text-sm font-semibold leading-tight sm:text-base">{current ? t(current.labelKey) : t("nav.manager")}</h1>
             </div>
             {canSwitch && <VersionSwitch version={version} onChange={switchVersion} />}
-            <NotificationsBell />
-            <EmployeeNotificationsBell />
+            {/* V3: one bell (manager notifications + the person's messages); V2 keeps its two. */}
+            {version === "v3" ? <ManagerBell /> : <><NotificationsBell /><EmployeeNotificationsBell /></>}
             <AccountMenu />
           </header>
           <main className="min-w-0 flex-1 px-2 py-3 sm:px-4 sm:py-4">

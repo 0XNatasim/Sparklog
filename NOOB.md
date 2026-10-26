@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-25 (V2.4.181).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.182).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -180,9 +180,14 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   aussi ; les brouillons jamais. Les montants restent une estimation tant que les règles de paie ne sont pas validées.
 - [x] **Rapport CCQ** (V2.4.179, Rapports › Export CCQ) : s'ouvre sur le mois qui vient de finir (le mois CCQ finit
   le dernier samedi : le 25 octobre, c'est septembre ; dès le 1er novembre, octobre) et affiche ses semaines.
-- [ ] **Petits plus** : recherche dans les listes (Employés, Messages), « tout marquer comme lu » sur la cloche,
-  « jours sans saisie » visible dans Temps plutôt que dans Avancé, une seule cloche en V3, un compteur sur
-  « À traiter » (demande une petite requête de plus : à décider).
+- [x] **Petits plus** (V2.4.182) :
+  - **À traiter** affiche dans le menu le nombre de fiches soumises à approuver (il baisse après chaque approbation).
+  - **Temps › Jours sans saisie** : les journées de travail terminées sans aucune job, par employé, avec les dates et un
+    bouton « Voir ses feuilles de temps ». Les fins de semaine et les fériés ne comptent plus (avant, le Journal › Employés
+    les comptait aussi).
+  - **Communications** : une recherche dans la liste des employés et une dans « Notifications envoyées » (texte ou
+    destinataire). Employés avait déjà la sienne (V2.4.180).
+  - **Une seule cloche** en V3, avec **« Tout marquer comme lu »** (aussi sur la cloche de la V2).
 - [ ] **Fin** : quand tout est converti et testé, faire de la V3 la version par défaut, puis retirer la V2.
 
 ## Étape 7 — Temps de trajet, km et frais : une option par employé 👤 💻
@@ -254,7 +259,8 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
    Britton ? » (oui / non / pas décidé), le seuil en km du retour maison et une date « en vigueur à partir du ». « Voir
    par employé » montre le réglage de chacun ; chaque changement va au Journal. **👤 À faire : la propriétaire
    remplit chaque ligne.** La paie ne lit pas encore ces réglages : chaque ligne garde son défaut d'ici là.
-2. Un champ de plus dans la fiche de temps pour les trajets maison ↔ entrepôt et client → maison (temps et km).
+2. ~~Un champ de plus dans la fiche de temps pour les trajets maison ↔ entrepôt et client → maison~~ : **pas
+   nécessaire** (décision du 2026-10-26).
 3. Le moteur de paie et le talon qui lisent ces options ; tests de chaque ligne.
 4. Un rapport « Chargé à Britton » par semaine.
 

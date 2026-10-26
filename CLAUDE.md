@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-25, V2.4.181)
+## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.182)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -385,7 +385,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 - [ ] Primes autres que chef d'équipe.
 - [ ] **Trajets, km et frais par employé** (décision du 2026-10-18) : chaque trajet (temps et km), l'indemnité de
   plus de 65 km, le traversier, le stationnement et le souper deviennent une option dans la fiche de l'employé,
-  avec « Chargé à Britton ». Grille et décisions : `NOOB.md` étape 7 (champ de plus dans la fiche de temps ; retour maison
+  avec « Chargé à Britton ». Grille et décisions : `NOOB.md` étape 7 (le champ de plus dans la fiche de temps n'est plus prévu, décision du 2026-10-26 ; retour maison
   payé dès 65 km ; plus de 65 km = temps de trajet CCQ dans le 40 h, non-CCQ au-delà ; un taux km par employé ; taux Britton
   inconnu). V2.4.155 (migration 0101) : saisie dans **Gestion V3 › Admin › Trajets et frais** (`TravelRulesManager.jsx`,
   `src/lib/travel-rules.js`) — table `travel_pay_rules` (employé × ligne × date d'effet ; lecture gestionnaire, écriture
@@ -853,6 +853,21 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   les brouillons. `fixed-pay-cost.js` retiré (sa logique est dans `weeklyCosts`). Mesuré : 40 employés × 1 an (16 800
   jobs) ≈ 0,3 s dans le navigateur. Tests `employer-cost.test.js` (égalité au centime avec le sommaire imprimé),
   `fixed-pay.test.js`, `claim-status.test.js`, `conges-indemnity.test.js`.
+- [x] **Gestion V3 : petits plus** (V2.4.182, aucune migration) : (1) compteur « À traiter » dans le menu V3
+  (`badges.todo`, `fetchTodoCount` : `jobs` soumises après `DYNACOM_CUMULATIVE_END`, `count: exact, head: true`, aucune
+  ligne lue ; rechargé à chaque changement de page et sur `TODO_EVENT`, émis par `TodoInbox` après chaque chargement).
+  (2) onglet `missing` de `v3-time` (« Jours sans saisie », règle de `advanced-audit`) : `MissingDaysPanel.jsx` +
+  `src/lib/missing-days.js` (`loadMissingEntryDays`, aussi utilisé par `EmployeeActivityLog`) ; `missingEntryDays` saute
+  maintenant les fins de semaine et `company_holidays` (`isNonWorkday`, comme `workdays.js` l'exige) et rend les `dates`.
+  (3) Communications : recherche du choix d'employés et des notifications envoyées (`src/lib/broadcast-search.js`).
+  (4) une seule cloche en V3 (`components/manager/ManagerBell.jsx`) : notifications de gestion pour
+  `canAccessSection(…, "notifications")` + messages reçus pour un non-gestionnaire, un seul compteur ; V2 et l'app
+  employé gardent leurs deux composants, sur les mêmes hooks (`use-manager-notifications.js`,
+  `use-employee-broadcasts.js`). « Tout marquer comme lu » (`markRead(visible)`, un seul upsert de
+  `manager_notification_reads`) dans les deux. Un admin de bureau ne voit pas encore la V3 (`canSwitch` = gestionnaire /
+  propriétaire) : l'avantage de la cloche unique pour lui viendra avec « V3 par défaut ». Tests `bell-and-todo.test.js`,
+  `broadcast-search.test.js`, `live-crew.test.js` (fins de semaine / fériés), `manager-nav.test.js`,
+  `authorization-matrix.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

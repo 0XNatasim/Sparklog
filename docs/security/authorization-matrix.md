@@ -188,7 +188,7 @@ réel aux données reste celui des politiques RLS et des RPC ci-dessus.
 | Page V3 | Onglet → page d'origine (règle) |
 |---|---|
 | À traiter (`todo`) | À approuver (gestionnaire) · Justificatifs → `receipts` (`notifications`) |
-| Feuilles de temps (`v3/time`) | Feuilles de temps → `timesheets` (`timesheet`) · Débloquer une journée → `unlock-day` (`employees`) |
+| Feuilles de temps (`v3/time`) | Feuilles de temps → `timesheets` (`timesheet`) · Débloquer une journée → `unlock-day` (`employees`) · Jours sans saisie → `advanced/audit` (gestionnaire, même compte que Journal › Employés) |
 | Historique paie (`v3/pay-history`) | Talons · DAS · Relevé d'emploi · Calcul détaillé (gestionnaire) |
 | Employés (`v3/team`) | Employés → `employees` (`employees` ; fiche à onglets V2.4.180 : elle contient aussi Règles de temps — `config/rules`, même règle `employees` — et, pour un gestionnaire / propriétaire seulement, l'onglet Impôts = formulaires TD1 / TP-1015.3 de Paramètres, table `employee_tax_profiles` gestionnaire seulement par RLS 0083) · Absences (gestionnaire) · Groupes → `employees` (`employees` ; tables `employee_groups` / `employee_group_members` : RLS `get_my_role() = 'manager'`, 0114) |
 | Rapports (`v3/reports`) | Coûts · Semaine · Mois · Par employé · Export CCQ (gestionnaire) |

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.181 (2026-10-25).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.182 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -145,6 +145,15 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   payroll engine, with each employee's TD1, exemptions and year-to-date — instead of a separate per-hour formula.
   Office, owner and subcontractors stay at their hourly rate without contributions; jobs returned for correction now
   count, drafts never.
+- **Manager V3: small extras** (V2.4.182):
+  - **To do** shows in the menu the number of submitted jobs waiting for approval (one count-only request on each page
+    change and after each approval).
+  - **Time › Days without entry**: the completed work days with no job entered, per employee, with the dates and a link
+    to the person's time sheets. Weekends and CCQ holidays never count any more, here and in Journal › Employees, where
+    they used to be added.
+  - **Communications**: search boxes in the employee picker and in « Sent notifications » (text or recipient).
+  - **One bell** in V3 (manager notifications, plus the person's messages for someone who is not a manager) and
+    **Mark all as read** on the manager notifications (V2 bell too).
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,

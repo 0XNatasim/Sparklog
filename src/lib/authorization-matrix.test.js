@@ -63,7 +63,7 @@ describe("application authorization matrix", () => {
   it("keeps each Gestion V3 tab on the rule of the page it comes from", () => {
     const expected = {
       todo: { todo: "manager", receipts: "notifications" },
-      "v3-time": { timesheets: "timesheet", unlock: "employees" },
+      "v3-time": { timesheets: "timesheet", unlock: "employees", missing: "manager" },
       "v3-team": { employees: "employees", absences: "manager" },
       "v3-config": { settings: "manager", "ccq-rates": "manager", "pay-rules": "manager", forms: "forms", references: "manager" },
       "v3-pay-history": { stubs: "manager", das: "manager", roe: "manager", calcul: "manager" },

@@ -1,3 +1,4 @@
+import { isNonWorkday } from "./workdays";
 import { isOffOn } from "./timeoff";
 
 // Historical missing-entry auditing starts on the first day for which the board data
@@ -46,19 +47,23 @@ export function activePeopleOnLeave(people, timeOffRows, date) {
 // Count the dates on which a regular crew member would have appeared red on Live Crew:
 // the account was expected on the board, had no job at all, was not away all day, and had
 // already started (first day of work).
-export function missingEntryDays(people, jobs, timeOffRows, startDate, endDate) {
+// Work days only (V2.4.182): weekends and the CCQ non-worked days (`holidays`) are never missing.
+// Each item also lists the missing `dates`.
+export function missingEntryDays(people, jobs, timeOffRows, startDate, endDate, holidays = []) {
   const jobKeys = new Set((jobs || []).map((job) => `${job.user_id}:${job.job_date}`));
+  const holidaySet = holidays instanceof Set ? holidays : new Set(holidays || []);
   const result = [];
   const effectiveStart = startDate < MISSING_ENTRY_TRACKING_START ? MISSING_ENTRY_TRACKING_START : startDate;
 
   for (const person of (people || []).filter((p) => isRegularCrew(p))) {
-    let count = 0;
+    const dates = [];
     const from = person.start_date && person.start_date > effectiveStart ? person.start_date : effectiveStart;
     for (let date = from; date && date <= endDate; date = dayAfter(date)) {
+      if (isNonWorkday(date, holidaySet)) continue;
       const fullyOff = (timeOffRows || []).some((row) => row.user_id === person.id && !row.start_time && isOffOn(row, date));
-      if (!fullyOff && !jobKeys.has(`${person.id}:${date}`)) count++;
+      if (!fullyOff && !jobKeys.has(`${person.id}:${date}`)) dates.push(date);
     }
-    result.push({ id: person.id, name: person.full_name || person.email || person.id, count });
+    result.push({ id: person.id, name: person.full_name || person.email || person.id, count: dates.length, dates });
   }
 
   return result.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
