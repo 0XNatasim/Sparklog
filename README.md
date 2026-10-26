@@ -63,14 +63,14 @@ pages a manager is allowed to open are listed. **V3 is the default** since V2.4.
 | Group | Entries [tabs] |
 |---|---|
 | **Today** (open) | To do [To approve · Receipts & proofs] · Live crew · Notes (private or shared with managers, optional reminder: red badge on « Notes » when due) |
-| **Time** | Timesheets [Timesheets · Unlock a day] — employee name first on each card, « Entered by hand » ★ filter |
+| **Time** | Timesheets [Timesheets · Unlock a day · Days without entry] — employee name first on each card, « Entered by hand » ★ filter |
 | **Payroll** (open) | Weekly payroll · Payroll history [Pay stubs · DAS · Record of employment · Detailed calculation] |
-| **Team** | Employees [Employees · Time off] · Inventory · Communications |
+| **Team** | Employees [Employees (one card with tabs: identity, CCQ, pay and options, taxes, time off, access) · Time off · Groups] · Inventory · Communications |
 | **Reports** | Reports [Costs · Week · Month · By employee (grid) · CCQ export] |
-| **Configuration** | Configuration [Settings · Time rules · CCQ rates · Pay rules · Forms · References · Contacts (with roles)] |
+| **Configuration** | Configuration [Settings · CCQ rates · Pay rules · Forms · References · Contacts (with roles)] |
 | **Admin** | Travel and expenses (per-employee rules, not yet read by payroll) · Activity log · Service status · Emergency timesheet (owner only) |
 
-**V2** (the classic menu, frozen by tests until V3 becomes the default):
+**V2** (the classic menu, still available from the V2 | V3 switch, frozen by tests until it is removed):
 
 | Group | Pages |
 |---|---|

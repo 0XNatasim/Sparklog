@@ -59,7 +59,7 @@ d'avril.
 
 - [ ] **Formulaires TD1 (fédéral) et TP-1015.3 (Québec)** remplis et signés par chaque employé. Ils
   donnent les crédits d'impôt personnels et servent à calculer l'**impôt retenu sur chaque paie**. *Où l'inscrire :*
-  **Configuration › Paramètres › Paie — TD1 / TP-1015.3 des employés**. Inscris seulement les montants, jamais le NAS
+  **Équipe › Employés › fiche de l'employé › onglet Impôts** (en V2 : Configuration › Paramètres › Paie — TD1 / TP-1015.3 des employés). Inscris seulement les montants, jamais le NAS
   ni une copie du formulaire. Tant qu'un employé n'a rien, l'app prend le montant personnel de base (bon pour la
   plupart). **Au 2026-10-23 : aucun saisi (0 sur 36).** Le plus simple : demander à Dynacom les montants qu'ils
   utilisaient, et n'inscrire que ceux qui diffèrent du montant de base.
@@ -74,7 +74,7 @@ d'avril.
   **comptabiliser chaque semaine** pour que le cumul suive.
   - Karine : paie fixe 40 h × 51 $ par semaine depuis le 4 octobre, **exclue de l'AE** (si tu veux son coût
     d'avril à septembre dans les rapports, change « Paie fixe depuis le » pour le 2026-04-05).
-  - **Exclu du RRQ** (nouvelle case, Configuration › Paramètres › Paie) : cochée pour l'employé à qui Dynacom ne
+  - **Exclu du RRQ** (case de la fiche de l'employé › onglet Impôts ; en V2 : Configuration › Paramètres › Paie) : cochée pour l'employé à qui Dynacom ne
     retient aucun RRQ. À cocher aussi pour tout autre employé qui a cessé de cotiser (garder la preuve au dossier).
   - Si Dynacom met à jour les cumuls (par exemple le RRQ d'avant avril, comme pour un employé cette semaine),
     me redonner le nouveau « Cumulatif des employés » : je remplace les lignes du 10 octobre.

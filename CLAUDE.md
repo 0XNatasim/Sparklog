@@ -606,7 +606,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   heures / semaine » + date de début, et case « Exclu de l'AE » (Loi sur l'AE 5(2)b), > 40 % des actions). La
   propriétaire (Karine) reçoit 40 h × 51 $ chaque semaine sans job, une ligne « Régulier à taux horaire », sans CCQ ni AE :
   talon D0038-0002 reproduit au centime (`employee-week.test.js`). Présente dans Talons, DAS, Calcul, Paie de la semaine,
-  Coûts, Semaine/mois et le sommaire imprimé (`src/lib/fixed-pay.js`, `fixed-pay-cost.js`). Hors rapport CCQ.
+  Coûts, Semaine/mois et le sommaire imprimé (`src/lib/fixed-pay.js` ; coût : `weeklyCosts` de `src/lib/employer-cost.js` depuis V2.4.181). Hors rapport CCQ.
   En production depuis le 2026-10-15 : `employee_tax_profiles` de Karine = 40 h, `fixed_pay_start` 2026-10-04 (semaine
   42, celle du talon importé ; 2026-04-05 si on veut son coût d'avril à septembre dans les rapports), `ei_exempt` vrai ;
   TD1 / TP-1015.3 vides (montant de base, qui reproduit l'impôt du talon). Reste : confirmer si sa paie est cotisable à
@@ -864,8 +864,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `canAccessSection(…, "notifications")` + messages reçus pour un non-gestionnaire, un seul compteur ; V2 et l'app
   employé gardent leurs deux composants, sur les mêmes hooks (`use-manager-notifications.js`,
   `use-employee-broadcasts.js`). « Tout marquer comme lu » (`markRead(visible)`, un seul upsert de
-  `manager_notification_reads`) dans les deux. Un admin de bureau ne voit pas encore la V3 (`canSwitch` = gestionnaire /
-  propriétaire) : l'avantage de la cloche unique pour lui viendra avec « V3 par défaut ». Tests `bell-and-todo.test.js`,
+  `manager_notification_reads`) dans les deux. Les admins de bureau ont la V3 (donc la cloche unique) depuis V2.4.183 (« V3 par défaut »). Tests `bell-and-todo.test.js`,
   `broadcast-search.test.js`, `live-crew.test.js` (fins de semaine / fériés), `manager-nav.test.js`,
   `authorization-matrix.test.js`.
 - [x] **Gestion V3 par défaut** (V2.4.183, aucune migration) : `src/lib/manager-ui-version.js` — clé
