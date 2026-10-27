@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { AlarmClock, BellRing, Check, Clock, Lock, MessageCircle, Pencil, Plus, RotateCcw, StickyNote, Trash2, Users } from "lucide-react";
+import {
+  AlarmClock, BellRing, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, Clock, Lock, MessageCircle, Pencil, Plus, RotateCcw,
+  StickyNote, Trash2, Users,
+} from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +16,7 @@ import { friendlyErrorMessage } from "@/lib/error-messages";
 import {
   DEFAULT_REMIND_TIME, MAX_NOTE, NOTE_COLUMNS, NOTE_SCOPES, REPLY_COLUMNS, cleanNoteBody, fetchNotes, fetchReplies,
   fetchUnreadReplies, inScope, isMine, markNotesRead, newReplyIds, noteState, notesChanged, otherPeopleIds, reminderFields,
-  reminderInstant, repliesByNote, snoozeChoices, sortNotes,
+  readOpenNotes, reminderInstant, repliesByNote, snoozeChoices, sortNotes, splitNote, storeOpenNotes,
 } from "@/lib/notes";
 import { useT } from "@/lib/use-t";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -110,7 +113,7 @@ function NoteEditor({ initial, onSave, onCancel, busy, submitLabel, canShare = t
   );
 }
 
-function ReminderChip({ note, state }) {
+function ReminderChip({ note, state, compact = false }) {
   const t = useT();
   if (!note.remind_at) return null;
   const tone = state === "due" ? "bg-destructive/15 text-destructive"
@@ -118,9 +121,9 @@ function ReminderChip({ note, state }) {
       : "bg-muted text-muted-foreground";
   const Icon = state === "due" ? BellRing : AlarmClock;
   return (
-    <span className={cn("inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-sm font-semibold", tone)}>
-      <Icon className="h-4 w-4" />
-      {t(state === "due" ? "notes.dueSince" : "notes.remindAt", { when: formatWhen(note.remind_at) })}
+    <span className={cn("inline-flex items-center self-start rounded-full font-semibold", compact ? "gap-1 px-2 py-0.5 text-xs" : "gap-1.5 px-2.5 py-1 text-sm", tone)}>
+      <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+      {t(state === "due" ? "notes.dueSince" : "notes.remindAt", { when: compact ? dayjs(note.remind_at).format("D MMM · HH:mm") : formatWhen(note.remind_at) })}
     </span>
   );
 }
@@ -134,7 +137,8 @@ function PersonName({ id, me, names }) {
 
 // Gestion › Notes: my private notes and the notes shared between managers, larger cards than the sent
 // notifications, due reminders first. Shared notes have a blue edge and a « Partagée » label, and a
-// conversation under the note (0118); a note with new replies comes first and says how many.
+// conversation under the note (0118); a note with new replies comes first and says how many. Each card folds
+// to its first line (V2.4.194), with only the reminder and the replies under it; a tap opens it.
 export default function NotesPanel() {
   const t = useT();
   const { user } = useAuth();
@@ -150,6 +154,17 @@ export default function NotesPanel() {
   const [busyId, setBusyId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [formKey, setFormKey] = useState(0);
+  // Notes fold to their first line; the unfolded ones are remembered on this device (V2.4.194).
+  const [openIds, setOpenIds] = useState(readOpenNotes);
+  function setOpen(ids) {
+    setOpenIds(ids);
+    storeOpenNotes(ids);
+  }
+  function toggleOpen(id) {
+    const next = new Set(openIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setOpen(next);
+  }
   const [replies, setReplies] = useState([]);
   // note id → ids of the replies that were new when they were loaded (they keep their mark on this visit).
   const [fresh, setFresh] = useState(() => new Map());
@@ -363,6 +378,17 @@ export default function NotesPanel() {
             <BellRing className="h-4 w-4" />{t("notes.dueCount", { count: counts.due })}
           </span>
         )}
+        {visible.length > 0 && (
+          visible.some((n) => openIds.has(n.id)) ? (
+            <Button size="sm" variant="ghost" className="ms-auto" onClick={() => setOpen(new Set())}>
+              <ChevronsDownUp className="mr-1.5 h-4 w-4" />{t("notes.foldAll")}
+            </Button>
+          ) : (
+            <Button size="sm" variant="ghost" className="ms-auto" onClick={() => setOpen(new Set([...openIds, ...visible.map((n) => n.id)]))}>
+              <ChevronsUpDown className="mr-1.5 h-4 w-4" />{t("notes.unfoldAll")}
+            </Button>
+          )
+        )}
       </div>
 
       {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}
@@ -371,29 +397,70 @@ export default function NotesPanel() {
         <Card><CardContent className="flex items-center gap-2 p-6 text-muted-foreground"><StickyNote className="h-5 w-5" />{t(`notes.empty.${filter}`)}</CardContent></Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {visible.map((note) => {
           const state = noteState(note, now);
           const busy = busyId === note.id;
           const mine = isMine(note, me);
           const thread = threads.get(note.id) || [];
           const newCount = fresh.get(note.id)?.size || 0;
+          const open = openIds.has(note.id) || editingId === note.id;
+          const { title, rest } = splitNote(note.body);
           return (
             <Card
               key={note.id}
               className={cn(
-                "flex flex-col",
+                "flex min-w-0 flex-col",
                 // Blue left edge on every shared note, kept when a due reminder turns the card red.
                 note.shared && "border-l-4 !border-l-info",
                 state === "due" ? "border-destructive/50 bg-destructive/5" : note.shared && "bg-info/5",
                 state === "done" && "opacity-75",
               )}
             >
-              <CardContent className="flex flex-1 flex-col gap-3 p-5">
+              <CardContent className={cn("flex flex-1 flex-col", open ? "gap-3 p-5" : "gap-1.5 px-4 py-3")}>
                 {editingId === note.id ? (
                   <NoteEditor initial={note} busy={busy} canShare={mine} submitLabel={t("common.save")} onCancel={() => setEditingId(null)} onSave={(values) => save(note, values)} />
+                ) : !open ? (
+                  // Folded: the first line to recognise the note, and only the signals that need attention.
+                  <>
+                    <button
+                      type="button"
+                      aria-expanded="false"
+                      aria-label={`${t("notes.unfold")} : ${title}`}
+                      onClick={() => toggleOpen(note.id)}
+                      className="flex min-h-9 w-full items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      {!note.shared && <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={t("notes.private")} />}
+                      <span className={cn("min-w-0 flex-1 truncate text-base font-semibold sm:text-lg", state === "done" && "line-through decoration-muted-foreground/50")}>{title}</span>
+                    </button>
+                    {(note.remind_at && state !== "done") || newCount > 0 || thread.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1.5 ps-6 text-xs">
+                        {note.remind_at && state !== "done" && <ReminderChip note={note} state={state} compact />}
+                        {newCount > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
+                            <MessageCircle className="h-3.5 w-3.5" />{t("notes.replies.newCount", { count: newCount })}
+                          </span>
+                        ) : thread.length > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                            <MessageCircle className="h-3.5 w-3.5" />{t("notes.replies.count", { count: thread.length })}
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
+                  </>
                 ) : (
                   <>
+                    <button
+                      type="button"
+                      aria-expanded="true"
+                      aria-label={`${t("notes.fold")} : ${title}`}
+                      onClick={() => toggleOpen(note.id)}
+                      className="flex min-h-9 w-full items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <ChevronRight className="mt-1 h-4 w-4 shrink-0 rotate-90 text-muted-foreground" />
+                      <span className={cn("min-w-0 flex-1 break-words text-base font-semibold sm:text-lg", state === "done" && "line-through decoration-muted-foreground/50")}>{title}</span>
+                    </button>
                     <div className="flex flex-wrap items-center gap-2">
                       {note.shared ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-info/15 px-2.5 py-1 text-sm font-semibold text-info">
@@ -412,9 +479,11 @@ export default function NotesPanel() {
                         </span>
                       )}
                     </div>
-                    <p className={cn("whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg", state === "done" && "line-through decoration-muted-foreground/50")}>
-                      {note.body}
-                    </p>
+                    {rest && (
+                      <p className={cn("whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg", state === "done" && "line-through decoration-muted-foreground/50")}>
+                        {rest}
+                      </p>
+                    )}
                     <NoteThread
                       note={note}
                       replies={thread}

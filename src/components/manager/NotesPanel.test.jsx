@@ -41,13 +41,20 @@ function setup() {
   return render(<NotesPanel />);
 }
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); localStorage.clear(); });
+
+// Notes fold to their first line (V2.4.194): open them all, as a manager would to read them.
+async function openAll() {
+  await screen.findByText("Note avec conversation");
+  fireEvent.click(screen.getByRole("button", { name: fr("notes.unfoldAll") }));
+}
 
 const card = (text) => screen.getByText(text).closest("[class*='flex-col']");
 
 describe("conversation under a shared note", () => {
   it("shows my replies on the right and the others' on the left with their name, the new one marked", async () => {
     setup();
+    await openAll();
     await screen.findByText("C'est corrigé");
     const chat = within(card("Note avec conversation"));
     const mine = chat.getByText("Tu peux vérifier le NAS ?").closest("li");
@@ -65,6 +72,7 @@ describe("conversation under a shared note", () => {
 
   it("puts the note with a new reply first and marks it as seen", async () => {
     setup();
+    await openAll();
     await screen.findByText("C'est corrigé");
     const bodies = screen.getAllByText(/^Note /).map((el) => el.textContent);
     expect(bodies[0]).toBe("Note avec conversation");
@@ -74,6 +82,7 @@ describe("conversation under a shared note", () => {
 
   it("sends a reply and shows it on my side; a private note has no conversation", async () => {
     setup();
+    await openAll();
     await screen.findByText("C'est corrigé");
     const chat = within(card("Note avec conversation"));
     fireEvent.change(chat.getByLabelText(fr("notes.replies.placeholder")), { target: { value: "  Merci !  " } });
@@ -87,10 +96,28 @@ describe("conversation under a shared note", () => {
 
   it("removes my reply", async () => {
     setup();
+    await openAll();
     await screen.findByText("C'est corrigé");
     const chat = within(card("Note avec conversation"));
     fireEvent.click(chat.getByRole("button", { name: fr("notes.replies.delete") }));
     await waitFor(() => expect(chat.queryByText("Tu peux vérifier le NAS ?")).toBeNull());
     expect(state.fake.writes("manager_note_replies").find((c) => c.op === "delete").filters).toContainEqual(["eq", "id", "r1"]);
+  });
+});
+
+describe("folded notes (V2.4.194)", () => {
+  it("shows only the first line, the reminder and the replies, and opens on a tap (remembered on the device)", async () => {
+    setup();
+    const title = await screen.findByText("Note avec conversation");
+    // Folded: no conversation, no reply box; the number of replies and the new one are shown.
+    expect(screen.queryByText("C'est corrigé")).toBeNull();
+    expect(screen.queryByLabelText(fr("notes.replies.placeholder"))).toBeNull();
+    const card = title.closest("[class*='flex-col']");
+    expect(within(card).getByText(fr("notes.replies.newCount", { count: 1 }))).toBeTruthy();
+    fireEvent.click(within(card).getByRole("button", { name: `${fr("notes.unfold")} : Note avec conversation` }));
+    expect(await within(card).findByText("C'est corrigé")).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem("sparklog.notesOpen"))).toEqual(["chat"]);
+    fireEvent.click(within(card).getByRole("button", { name: `${fr("notes.fold")} : Note avec conversation` }));
+    expect(within(card).queryByText("C'est corrigé")).toBeNull();
   });
 });
