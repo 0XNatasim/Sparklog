@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-27 (V2.4.190).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-27 (V2.4.191).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -139,7 +139,7 @@ vieux favori ou un vieux lien vers une page de la V2 ouvre la bonne page et le b
 Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
 - [x] **Pages à onglets** : À traiter (À approuver · Justificatifs), Feuilles de temps (Feuilles de temps ·
   Débloquer une journée), Historique paie (Talons · DAS · Relevé d'emploi · Calcul détaillé), Employés (Employés ·
-  Absences), Rapports (Coûts · Semaine · Mois · Par employé · Export CCQ), Configuration (Paramètres · Règles de
+  Absences), Rapports (Coûts · Semaine / Mois · Sommaire · Export CCQ), Configuration (Paramètres · Règles de
   temps · Taux CCQ · Règles de paie · Formulaires · Références). Chaque onglet garde les droits de la page d'avant
   (un admin de bureau voit seulement les onglets permis).
 - [x] Seuls **Aujourd'hui** et **Paie** sont ouverts au départ ; sélecteur Messier/Référence compact avec un « i ».
@@ -155,6 +155,15 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   compteur rouge apparaît sur **Notes** dans le menu, et la carte passe en rouge en haut de la liste. « Fait » la range
   dans « Faites », « Plus tard » la repousse (1 heure, demain 8 h, une semaine). Le rappel s'affiche dans l'app
   seulement : pas de notification sur le téléphone. V3 seulement (la V2 ne change plus).
+- [x] **Rapports plus clairs** (V2.4.191) : « Par employé (grille) » s'appelle maintenant **Sommaire**, et Semaine et
+  Mois sont un seul onglet **Semaine / Mois** avec un bouton Semaine | Mois. Une phrase sous chaque rapport dit ce qu'il
+  montre :
+  - **Coûts** : combien coûte **chaque employé** (salaire, charges de l'employeur, km, frais) pour une semaine, le mois ou
+    l'année ; ouvre une ligne pour le détail. C'est la question « combien me coûte Patrick ? ».
+  - **Semaine / Mois** : les **totaux de toute l'équipe**, une carte par semaine CCQ (9 dernières) ou par mois CCQ
+    (7 derniers) : employés actifs, heures, jobs, main-d'œuvre, charges, frais, total. C'est « combien m'a coûté la semaine ? ».
+  - **Sommaire** : les **heures** de chaque employé pour une semaine choisie (régulier, temps sup., retour, km), jour par
+    jour, et le bouton qui imprime le sommaire de la semaine. C'est « qui a fait quoi cette semaine ? ».
 - [x] **Se répondre sur une note partagée** (V2.4.190) : sous chaque note partagée, une case « Répondre… » et la
   conversation comme dans Telegram : tes réponses à droite en vert, celles de Karine à gauche en bleu avec son nom.
   Une réponse que tu n'as pas encore vue est marquée « Nouveau » (cadre rouge), sa note remonte en haut avec

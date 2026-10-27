@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.190)
+## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.191)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -955,6 +955,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `ManagerLayout.jsx`). `src/lib/notes.js` (`repliesByNote`, `newReplyIds`, `visibleReplies`, `cleanReplyBody`). Testé sur
   Postgres local (deux gestionnaires, employé, anon, note privée, heure forgée, cascade). Tests `notes.test.js`,
   `NotesPanel.test.jsx`. Pas de notification téléphone.
+- [x] **Rapports : Semaine / Mois en un onglet, « Sommaire »** (V2.4.191, aucune migration) : `v3-reports` passe de 5 à 4
+  onglets — `costs`, `period` (« Semaine / Mois », `PeriodReport` dans `ManagerPages.jsx` : boutons Semaine | Mois, `?view=month`,
+  même `PeriodSummary`), `grid` (libellé « Sommaire », `WeekViewTab`, clé gardée pour les liens) et `ccq`. Anciennes clés :
+  `aliases` de l'entrée (`week` → `period`, `month` → `period` + `view=month`), lues par `resolveTab` / `tabAlias`
+  (`src/lib/manager-nav.js`) ; `TabbedPage` remet `?tab=period&view=month` dans l'adresse. `OLD_PATHS["reports/period"]` →
+  `period`, `?view=grid` → `grid`, `?view=month` gardé. Une phrase sous chaque rapport (`ReportHint`,
+  `mgr.reports.hint.*`) dit ce qu'il montre. Toujours 4 onglets, donc imbriqués dans le menu (`NESTED_TABS_MIN`).
+  Mêmes droits (`reports-period`, gestionnaire). Tests `manager-nav.test.js`, `TabbedPage.test.jsx`,
+  `authorization-matrix.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
