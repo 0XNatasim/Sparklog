@@ -13,8 +13,9 @@ const SUMMARY = "flex cursor-pointer list-none items-center justify-between gap-
 
 // « Données CCQ » (classification and payroll/export data) and « Avantages » of a CCQ tradesperson or
 // a subcontractor (same configuration, with a manual simple + double rate). Not admin/owner.
-// « Données CCQ »: CCQ number, level, trade, card expiry, region, union, wage schedule and the rate (automatic
-// from the CCQ grid; manual simple + double rate for a subcontractor).
+// « Données CCQ »: level, trade, card expiry, region, union, wage schedule and the rate (automatic from the CCQ
+// grid; manual simple + double rate for a subcontractor). No CCQ number since V2.4.192: the CCQ report goes by the
+// NAS, so the number was never used (the column and its old values stay).
 export function CcqDataFields({ profile: p, panel, className = "space-y-4 border-t p-3" }) {
   const { t, annexes, setLocal, saveField, saveClassification, saveAnnex } = panel;
   const available = annexes.get(COMMERCIAL_RATE_SECTOR) || [];
@@ -23,14 +24,6 @@ export function CcqDataFields({ profile: p, panel, className = "space-y-4 border
     <div className={className}>
       {/* Classification */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="CCQ#">
-          <Input
-            value={p.ccq_number || ""}
-            onChange={(e) => setLocal(p.id, "ccq_number", e.target.value)}
-            onBlur={(e) => saveField(p.id, "ccq_number", e.target.value)}
-            className="h-9"
-          />
-        </Field>
         <Field label={t("employees.level")}>
           <Select
             value={p.apprentice_level || ""}
@@ -148,10 +141,7 @@ export default function EmployeeCcqSection({ profile: p, panel }) {
     <>
       <details className="group rounded-lg border">
         <summary className={SUMMARY}>
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate">{t("employees.ccqExport")}</span>
-            <span className="hidden text-xs font-normal text-muted-foreground sm:inline">CCQ# {p.ccq_number || "—"}</span>
-          </span>
+          <span className="truncate">{t("employees.ccqExport")}</span>
           <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
         </summary>
         <CcqDataFields profile={p} panel={panel} />

@@ -9,10 +9,10 @@ import { taxFormRow, taxProfileUpsert } from "./tax-profile";
 // Règles de temps and Paramètres › TD1.
 describe("employeeCardTabs", () => {
   it("shows CCQ to tradespeople and subcontractors, Impôts to a manager-tier viewer only", () => {
-    expect(employeeCardTabs({ role: "employee" }, "owner")).toEqual(["identity", "ccq", "pay", "tax", "timeoff", "access"]);
-    expect(employeeCardTabs({ role: "admin" }, "manager")).toEqual(["identity", "pay", "tax", "timeoff", "access"]);
-    expect(employeeCardTabs({ role: "subcontractor_1" }, "owner")).toEqual(["identity", "ccq", "pay", "timeoff", "access"]);
-    expect(employeeCardTabs({ role: "employee" }, "admin")).toEqual(["identity", "ccq", "pay", "timeoff", "access"]);
+    expect(employeeCardTabs({ role: "employee" }, "owner")).toEqual(["identity", "ccq", "pay", "tax", "access"]);
+    expect(employeeCardTabs({ role: "admin" }, "manager")).toEqual(["identity", "pay", "tax", "access"]);
+    expect(employeeCardTabs({ role: "subcontractor_1" }, "owner")).toEqual(["identity", "ccq", "pay", "access"]);
+    expect(employeeCardTabs({ role: "employee" }, "admin")).toEqual(["identity", "ccq", "pay", "access"]);
   });
 });
 
@@ -23,7 +23,9 @@ describe("matchesEmployeeSearch", () => {
     expect(matchesEmployeeSearch(p, "ZOE trem")).toBe(true);
     expect(matchesEmployeeSearch(p, "test.ca")).toBe(true);
     expect(matchesEmployeeSearch(p, "5550101")).toBe(true);
-    expect(matchesEmployeeSearch(p, "123456")).toBe(true);
+    expect(matchesEmployeeSearch(p, "09")).toBe(true);
+    // No CCQ number in the card since V2.4.192: it is not searched either.
+    expect(matchesEmployeeSearch(p, "123456")).toBe(false);
     expect(matchesEmployeeSearch(p, "zoé bob")).toBe(false);
   });
 });

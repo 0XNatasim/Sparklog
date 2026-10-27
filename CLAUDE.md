@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.190)
+## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.192)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -826,7 +826,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   et `reportMonthPeriod` pour afficher les semaines. Tests `receipts-review.test.js`, `monthly-report-period.test.js`,
   `UnlockDayManager.test.jsx` (mots V2 / V3, chaque clé `.plain` dans les deux langues).
 - [x] **Gestion V3 : fiche employé unique** (V2.4.180, aucune migration, V2 inchangée) : `EmployeesPanel({ tabbed })`
-  depuis l'onglet V3 `v3/team?tab=employees` — recherche (`matchesEmployeeSearch` : nom, courriel, n° d'employé / CCQ,
+  depuis l'onglet V3 `v3/team?tab=employees` — recherche (`matchesEmployeeSearch` : nom, courriel, n° d'employé (plus le n° CCQ depuis V2.4.192),
   chiffres du téléphone, sans accents), filtre « Chefs d'équipe » (`isTeamLeader`), fiche ouverte = `EmployeeTabs`
   (`employeeCardTabs(profile, viewerRole)` : CCQ pour métier et sous-traitant, Impôts pour un lecteur gestionnaire /
   propriétaire et jamais pour un sous-traitant, comme la RLS 0083 de `employee_tax_profiles`). Les morceaux de la fiche V2
@@ -955,6 +955,14 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `ManagerLayout.jsx`). `src/lib/notes.js` (`repliesByNote`, `newReplyIds`, `visibleReplies`, `cleanReplyBody`). Testé sur
   Postgres local (deux gestionnaires, employé, anon, note privée, heure forgée, cascade). Tests `notes.test.js`,
   `NotesPanel.test.jsx`. Pas de notification téléphone.
+- [x] **Fiche employé sans n° CCQ ni onglet Congés** (V2.4.192, aucune migration) : la CCQ prend le NAS (rapport
+  mensuel), le n° CCQ ne servait à rien. Retiré de `CcqDataFields` (onglet CCQ) et de l'en-tête de `EmployeeCcqSection`,
+  de `CcqCardCapture` (la photo de la carte ne remplit plus que `ccq_expiration_date` et `birth_date` ; `ccq_number` n'est
+  plus écrit), des champs obligatoires (`getMissingEmployeeFields`) et de la recherche (`matchesEmployeeSearch`). La
+  colonne `profiles.ccq_number` et ses valeurs restent : les talons (`paystub.js`, `calcul-talon.js`), le relevé d'emploi
+  et le cumul Dynacom l'impriment encore s'il existe (« — » sinon). Onglet `timeoff` retiré de `EMPLOYEE_CARD_TABS` et
+  bloc Congés de `EmployeeDetails` ; `EmployeesPanel` ne lit plus `employee_time_off` (les absences : Équipe › Absences,
+  `CongesManager`). Tests `employee-card.test.js`, `EmployeesPanel.test.jsx`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

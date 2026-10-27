@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.190 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.192 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -121,11 +121,11 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   job not approved yet), with an employee and a day filter; a notification link still opens its job. Reports › CCQ
   export opens on the reporting month that just ended and shows its weeks.
 - **Manager V3: one employee card** (V2.4.180, V3 only; V2 unchanged): Team › Employees has a search box (name,
-  e-mail, phone, employee or CCQ number, accents ignored) and a « Team leaders » filter. Each open card has tabs:
+  e-mail, phone or employee number, accents ignored) and a « Team leaders » filter. Each open card has tabs:
   **Identity** (number, contact, CCQ card, birth date, SIN, hiring / last day, hiring or departure), **CCQ**
   (classification, region, union, wage schedule, rate), **Pay and options** (flat rate of an office employee, the pay
   rules and reimbursements of Time rules, team-leader premiums, parking receipts and inventory screenshots), **Taxes
-  (TD1)** (TD1 / TP-1015.3, fixed pay, EI / QPP exemptions; managers and owner only), **Time off** and **Access** (role,
+  (TD1)** (TD1 / TP-1015.3, fixed pay, EI / QPP exemptions; managers and owner only) and **Access** (role,
   active / paused, Gestion sections, two-factor and phone notifications, view as, delete). Same fields and same saves as
   before. V3 Configuration no longer has the Time rules tab nor the employees' TD1 forms in Settings.
 - **Costs and Week / Month use the payroll calculation** (V2.4.181, V2 and V3): Reports › Costs and Week / Month now
@@ -166,6 +166,9 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
 - **Employees in no group** (V2.4.185): Team › Groups lists the active field employees (and new hires waiting to start)
   who are in no group (warehouse), with an « Add to… » picker to put each one in a group. Office staff, managers, the
   owner and paused accounts are not listed.
+- **Employee card: no CCQ number, no Time off tab** (V2.4.192): the card no longer asks for the CCQ number (the CCQ
+  report goes by the SIN; the CCQ-card capture keeps the expiry and birth dates only, and the number is not a missing
+  field any more). Time off is entered only in Team › Absences. Existing CCQ numbers stay in the database.
 - **Replies on shared notes** (V2.4.190, migration 0118): under a shared note (Today › Notes) the managers answer each
   other like in a chat: my replies on the right in green, the others' on the left in blue with their name. A reply
   written since I last opened Notes is marked « Nouveau », its note comes first with « N nouvelle(s) réponse(s) », and

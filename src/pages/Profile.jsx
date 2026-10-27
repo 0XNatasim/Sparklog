@@ -24,7 +24,7 @@ import { Radio } from "lucide-react";
 // references. { error } when one of them cannot be read.
 async function fetchProfilePage(profileId, signedInId) {
   const [profileResult, formsResult, accessResult, referencesResult] = await Promise.all([
-    supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_number, ccq_expiration_date, birth_date, ccq_card_path, show_on_boards").eq("id", profileId).single(),
+    supabase.from("profiles").select("full_name, phone, email, work_region, union_association, ccq_expiration_date, birth_date, ccq_card_path, show_on_boards").eq("id", profileId).single(),
     supabase.from("employee_forms").select("form_id, name_fr, name_en, url, employee_specific, sort_order").eq("enabled", true).order("sort_order").limit(QUERY_BUDGETS.managedForms),
     supabase.from("employee_form_access").select("form_id").eq("employee_id", signedInId),
     supabase.from("profile_references").select("id, section, title, description, blocks").eq("published", true).order("sort_order").order("created_at").limit(QUERY_BUDGETS.profileReferences),
