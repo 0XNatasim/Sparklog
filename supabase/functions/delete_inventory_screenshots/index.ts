@@ -2,7 +2,7 @@
 // (all three, or a single slot): the stored files, the written list read from them, and the
 // screenshot rows. The deletion is recorded in the audit log.
 //
-// Request (POST, manager bearer token): { user_id: string, job_date: "YYYY-MM-DD", slot?: 1|2|3 }
+// Request (POST, manager bearer token): { user_id: string, job_date: "YYYY-MM-DD", slot?: 1 to 5 }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -35,9 +35,9 @@ Deno.serve(async (req) => {
   const userId = typeof body?.user_id === "string" ? body.user_id : "";
   const jobDate = String(body?.job_date || "");
   const slot = body?.slot === undefined || body?.slot === null ? null : Number(body.slot);
-  if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || (slot !== null && (!Number.isInteger(slot) || slot < 1 || slot > 4))) {
+  if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || (slot !== null && (!Number.isInteger(slot) || slot < 1 || slot > 5))) {
     // Slots 1-3: equipment list; 4: « Produits défectueux » picture (0097).
-    return json({ ok: false, error: "user_id, job_date and an optional slot (1-4) are required" }, 400);
+    return json({ ok: false, error: "user_id, job_date and an optional slot (1-5) are required" }, 400);
   }
 
   const admin = createClient(supabaseUrl, serviceRole);

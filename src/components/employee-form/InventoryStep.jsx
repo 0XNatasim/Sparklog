@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-import { CircleCheck, Images } from "lucide-react";
+import { Camera, CircleCheck, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFECTIVE_SLOT, INVENTORY_SLOTS, defectiveCaptured, inventoryCaptured, inventoryStepComplete } from "@/lib/inventory-screenshots";
+import { COMPLEMENT_SLOT, DEFECTIVE_SLOT, INVENTORY_SLOTS, defectiveCaptured, inventoryCaptured, inventoryReadingBlock, inventoryStepComplete } from "@/lib/inventory-screenshots";
 
 // End-of-shift inventory step: the list screenshots (several at once), the reading of the lines and
 // the « Produits défectueux » question with its picture. `inventory` comes from useInventoryStep.
 export default function InventoryStep({ t, inventory, onContinue }) {
-  const { rows, busySlot, reading, defectiveAnswer, setDefectiveAnswer, notice, error, inputRef, multiInputRef, pickSlot, pickFiles, handleFile, handleFiles } = inventory;
+  const { rows, busySlot, reading, defectiveAnswer, setDefectiveAnswer, notice, error, inputRef, multiInputRef, pickSlot, pickFiles, pickComplement, handleFile, handleFiles } = inventory;
   const [showExamples, setShowExamples] = useState(false);
   const busy = Boolean(busySlot);
   const captured = inventoryCaptured(rows);
+  // Lines the reading could not read hold « Continuer » until a complément screenshot is sent (0117).
+  const block = captured ? inventoryReadingBlock(reading, rows) : null;
   return (
     <>
       <DialogHeader>
@@ -62,6 +64,9 @@ export default function InventoryStep({ t, inventory, onContinue }) {
           })}
         </ul>
         {captured && reading && <InventoryReadingNote reading={reading} t={t} />}
+        {captured && (block === "retake" || block === "override") && (
+          <RetakeNote reading={reading} t={t} busy={busy} uploading={busySlot === COMPLEMENT_SLOT} again={block === "override"} onRetake={pickComplement} />
+        )}
         {captured && (
           <div className="space-y-2 rounded-md border p-3">
             <p className="font-medium">{t("form.inventory.defectiveQuestion")}</p>
@@ -99,11 +104,55 @@ export default function InventoryStep({ t, inventory, onContinue }) {
         <input ref={multiInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
       </div>
       <DialogFooter>
-        <Button type="button" disabled={busy || !inventoryStepComplete(rows, defectiveAnswer)} onClick={onContinue}>
-          {t("form.inventory.continue")}
+        {block === "wait" && <span className="text-xs text-muted-foreground" role="status">{t("form.inventory.waitReading")}</span>}
+        <Button
+          type="button"
+          variant={block === "override" ? "outline" : "default"}
+          disabled={busy || !inventoryStepComplete(rows, defectiveAnswer) || block === "wait" || block === "retake"}
+          onClick={onContinue}
+        >
+          {block === "override" ? t("form.inventory.continueAnyway") : t("form.inventory.continue")}
         </Button>
       </DialogFooter>
     </>
+  );
+}
+
+// Lines the reading could not read (quantity cut off) or did not find: named, with the button for one
+// more screenshot showing them. `again`: a complément was already sent and the lines are still not read.
+function RetakeNote({ reading, t, busy, uploading, again, onRetake }) {
+  const unreadable = reading?.unreadable || [];
+  const probable = reading?.probable || [];
+  return (
+    <div className="space-y-2 rounded-md border border-warning/50 bg-warning/10 p-3 text-warning" role="alert">
+      <p className="font-medium">{t(again ? "form.inventory.retakeAgain" : "form.inventory.retakeTitle")}</p>
+      {unreadable.length > 0 && (
+        <div>
+          <p>{t("form.inventory.unreadableLines")}</p>
+          <ul className="ml-4 list-disc">
+            {unreadable.map((item) => <li key={item.code}><span className="font-semibold">{item.name}</span> <span className="text-xs opacity-80">{item.code}</span></li>)}
+          </ul>
+        </div>
+      )}
+      {reading?.missing > 0 && (
+        <div>
+          <p>{t("form.inventory.missingLines", { count: reading.missing })}</p>
+          {probable.length > 0 && (
+            <>
+              <p className="text-xs">{t("form.inventory.probableLines")}</p>
+              <ul className="ml-4 list-disc text-xs">
+                {probable.map((item) => <li key={item.code}>{item.name} <span className="opacity-80">{item.code}</span></li>)}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+      <p className="text-xs">{t("form.inventory.retakeHint")}</p>
+      <Button type="button" className="w-full" variant={again ? "outline" : "default"} disabled={busy} onClick={onRetake}>
+        <Camera className="mr-2 h-4 w-4" aria-hidden="true" />
+        {uploading ? t("form.inventory.uploading") : t("form.inventory.retakeButton")}
+      </Button>
+    </div>
   );
 }
 

@@ -5,7 +5,10 @@ export const INVENTORY_SLOTS = [1, 2, 3];
 // After the list, the employee is asked whether Field Service shows « Produits défectueux »; if so,
 // a picture of that section goes in slot 4 (0097). Only rows under that title are counted there.
 export const DEFECTIVE_SLOT = 4;
-export const INVENTORY_PHOTO_SLOTS = [...INVENTORY_SLOTS, DEFECTIVE_SLOT];
+// When the reading finds a line it could not read (quantity cut off) or misses lines of the app's own
+// total, the employee sends one more list screenshot showing them: the « complément », slot 5 (0117).
+export const COMPLEMENT_SLOT = 5;
+export const INVENTORY_PHOTO_SLOTS = [...INVENTORY_SLOTS, DEFECTIVE_SLOT, COMPLEMENT_SLOT];
 export const INVENTORY_BUCKET = "inventory-screenshots";
 export const INVENTORY_REQUIRED_FROM = "2026-10-08";
 
@@ -33,6 +36,26 @@ export function inventoryStepComplete(rows, defectiveAnswer) {
   if (!inventoryCaptured(rows)) return false;
   if (defectiveAnswer === "no") return true;
   return defectiveAnswer === "yes" && defectiveCaptured(rows);
+}
+
+// What the reading still asks of the employee before « Continuer » (0117):
+//   "wait"     the screenshots are being read (released when the polling gives up: `timedOut`);
+//   "retake"   lines unreadable or missing, and no complément screenshot yet;
+//   "override" still incomplete after the complément: « Continuer quand même » (the manager checks);
+//   null       nothing to do (complete, or no total to compare with, or no reading available).
+export function inventoryReadingBlock(reading, rows) {
+  if (!reading) return null;
+  if (reading.state === "reading") return reading.timedOut ? null : "wait";
+  const problem = (reading.unreadable?.length || 0) > 0 || (reading.missing || 0) > 0;
+  if (!problem) return null;
+  return (rows || []).some((row) => Number(row.slot) === COMPLEMENT_SLOT) ? "override" : "retake";
+}
+
+// Lines of the employee's previous complete list that today's reading does not have: the probable
+// names of lines that were not read at all (the code was never seen). Indicative only.
+export function probableMissingLines(todayItems, previousItems) {
+  const today = new Set((todayItems || []).map((item) => item.code));
+  return (previousItems || []).filter((item) => !today.has(item.code));
 }
 
 export function missingInventorySlots(rows) {

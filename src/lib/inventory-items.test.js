@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
 import { sumCrewDefective, sumCrewInventory, sumRegionInventory, inventoryRegionChoices, compareInventory, effectiveOcrStatus, markInventoryAbsences, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
-import { inventoryCaptured, inventoryStepComplete } from "./inventory-screenshots";
+import { inventoryCaptured, inventoryReadingBlock, inventoryStepComplete, probableMissingLines } from "./inventory-screenshots";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 
@@ -316,7 +316,19 @@ describe("0097 migration (defective products)", () => {
     expect(fn).toContain("const DEFECTIVE_SLOT = 4;");
     expect(fn).toContain('item.section === "defective"');
     expect(fn).toContain("section: item.section");
-    expect(read("../../supabase/functions/delete_inventory_screenshots/index.ts")).toContain("slot > 4");
+    // 0117 widened both functions to slot 5 (complément).
+    expect(read("../../supabase/functions/delete_inventory_screenshots/index.ts")).toContain("slot > 5");
+  });
+});
+
+describe("0117 migration (unreadable lines, complément)", () => {
+  const sql = read("../../supabase/migrations/20261027120000_0117_inventory_unreadable_lines.sql");
+  it("lets a quantity be unknown and adds slot 5 to both tables, matched by the reading function", () => {
+    expect(sql).toContain("alter table public.inventory_items alter column quantity drop not null;");
+    expect(sql.match(/check \(slot between 1 and 5\)/g)).toHaveLength(2);
+    const fn = read("../../supabase/functions/process_inventory_screenshot/index.ts");
+    expect(fn).toContain("const LAST_SLOT = 5;");
+    expect(fn).toContain("slot > LAST_SLOT");
   });
 });
 
@@ -388,5 +400,69 @@ describe("markInventoryAbsences (Inventaire : employés en congé grisés)", () 
 
   it("changes nothing without time off", () => {
     expect(markInventoryAbsences(entries, [], date).map((r) => r.off)).toEqual([null, null, null, null, null]);
+  });
+});
+
+describe("lines read without their quantity (0117)", () => {
+  it("keeps a code read without a quantity, with quantity null, and still counts it as unparsed", () => {
+    const parsed = parseInventoryText("E- EQ000049 Calypso V1 2,00 E- EQ000041 Module d'expansion pour planchers E-\n1 - 17 de 17");
+    expect(parsed.unparsed).toBe(1);
+    expect(parsed.items).toEqual([
+      { code: "EQ000049", name: "Calypso V1", quantity: 2, section: "inventory" },
+      { code: "EQ000041", name: "Module d'expansion pour planchers", quantity: null, section: "inventory" },
+    ]);
+  });
+
+  it("prefers the capture that read the quantity, whatever its slot", () => {
+    const merged = mergeInventoryItems([
+      { slot: 1, code: "EQ1", name: "A", quantity: 3 },
+      { slot: 2, code: "EQ1", name: "A", quantity: null },
+      { slot: 1, code: "EQ2", name: "B", quantity: null },
+      { slot: 5, code: "EQ2", name: "B", quantity: 4 },
+    ]);
+    expect(merged.map((row) => [row.code, row.quantity])).toEqual([["EQ1", 3], ["EQ2", 4]]);
+  });
+
+  it("is not complete while a line is unreadable, and counts the lines never read", () => {
+    const shots = [{ slot: 1, ocr_status: "needs_review", list_total: 3 }];
+    const day = summarizeInventoryDay(shots, [
+      { slot: 1, code: "EQ1", name: "A", quantity: 1 },
+      { slot: 1, code: "EQ2", name: "B", quantity: null },
+    ]);
+    expect(day.state).toBe("review");
+    expect(day.unreadable.map((item) => item.code)).toEqual(["EQ2"]);
+    expect(day.missing).toBe(1);
+    const fixed = summarizeInventoryDay([...shots, { slot: 5, ocr_status: "processed", list_total: 3 }], [
+      { slot: 1, code: "EQ1", name: "A", quantity: 1 },
+      { slot: 1, code: "EQ2", name: "B", quantity: null },
+      { slot: 5, code: "EQ2", name: "B", quantity: 2 },
+      { slot: 5, code: "EQ3", name: "C", quantity: 0 },
+    ]);
+    expect(fixed.state).toBe("ok");
+    expect(fixed.unreadable).toEqual([]);
+    expect(fixed.missing).toBe(0);
+  });
+
+  it("keeps an unreadable quantity unknown in the comparison", () => {
+    const rows = compareInventory([{ code: "EQ1", name: "A", quantity: null }], [{ code: "EQ1", name: "A", quantity: 2 }], { todayComplete: true, previousComplete: true });
+    expect(rows[0]).toMatchObject({ today: null, previous: 2, diff: null });
+  });
+});
+
+describe("employee inventory step: retake the unreadable lines (0117)", () => {
+  const rows = [{ slot: 1 }, { slot: 2 }];
+  it("waits for the reading, then asks for a complément, then lets the employee continue anyway", () => {
+    expect(inventoryReadingBlock(null, rows)).toBeNull();
+    expect(inventoryReadingBlock({ state: "reading" }, rows)).toBe("wait");
+    expect(inventoryReadingBlock({ state: "reading", timedOut: true }, rows)).toBeNull();
+    expect(inventoryReadingBlock({ state: "ok", unreadable: [], missing: 0 }, rows)).toBeNull();
+    expect(inventoryReadingBlock({ state: "review", unreadable: [], missing: 0 }, rows)).toBeNull(); // no total to compare with
+    expect(inventoryReadingBlock({ state: "review", unreadable: [{ code: "EQ1" }], missing: 0 }, rows)).toBe("retake");
+    expect(inventoryReadingBlock({ state: "review", unreadable: [], missing: 1 }, rows)).toBe("retake");
+    expect(inventoryReadingBlock({ state: "review", unreadable: [], missing: 1 }, [...rows, { slot: 5 }])).toBe("override");
+  });
+
+  it("names the probable missing lines from the previous list", () => {
+    expect(probableMissingLines([{ code: "EQ1" }], [{ code: "EQ1", name: "A" }, { code: "EQ2", name: "B" }])).toEqual([{ code: "EQ2", name: "B" }]);
   });
 });

@@ -9,7 +9,9 @@
 
 export type InventorySection = "inventory" | "defective";
 // quantity can be negative: Field Service shows "-1,00" when more was used than the truck held.
-export type InventoryItem = { code: string; name: string; quantity: number; section: InventorySection };
+// It is null when the row's code was read but not its quantity (row cut at the edge of the
+// screenshot, 0117): the row is kept so the app can name it and ask for a better screenshot.
+export type InventoryItem = { code: string; name: string; quantity: number | null; section: InventorySection };
 export type ParsedInventory = {
   items: InventoryItem[];
   // Size of the equipment list and of the defective list, from their pagers ("N de N" / "N of N").
@@ -17,6 +19,7 @@ export type ParsedInventory = {
   defectiveTotal: number | null;
   // True when the « Produits défectueux » title was read.
   defectiveHeader: boolean;
+  // Rows whose code was read without a quantity (also returned in `items`, quantity null).
   unparsed: number;
 };
 
@@ -67,16 +70,16 @@ export function parseInventoryText(raw: string): ParsedInventory {
     // 2026-10-19): a minus right before it, after a space, belongs to the quantity, not to the name.
     const quantities = [...segment.matchAll(/(?:(?<=^|\s)([-–−])\s?)?(\d{1,6}[.,]\d{2})(?!\d)/g)];
     const last = quantities[quantities.length - 1];
+    const code = normalizeCode(match[1]);
+    const cleanName = (text: string) => text.replace(/^(?:E\s*-\s*)+/, "").replace(/\s*E\s*-\s*$/, "").trim();
     if (!last) {
+      // Code without quantity: keep the row (quantity unknown) so it can be named and retaken.
       unparsed += 1;
+      items.push({ code, name: cleanName(segment) || code, quantity: null, section: sectionAt(match.index!) });
       return;
     }
     const quantity = (last[1] ? -1 : 1) * Number(last[2].replace(",", "."));
-    const name = segment
-      .slice(0, last.index)
-      .replace(/^(?:E\s*-\s*)+/, "")
-      .trim();
-    const code = normalizeCode(match[1]);
+    const name = cleanName(segment.slice(0, last.index));
     items.push({ code, name: name || code, quantity, section: sectionAt(match.index!) });
   });
 

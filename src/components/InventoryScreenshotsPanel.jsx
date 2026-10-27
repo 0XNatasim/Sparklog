@@ -12,7 +12,7 @@ import { cn, withTimeout } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
+import { COMPLEMENT_SLOT, DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
 import { fetchGroups, inventoryGroupChoices, sumGroupInventory } from "@/lib/employee-groups";
 import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, inventoryRegionChoices, markInventoryAbsences, summarizeInventoryDay, sumCrewDefective, sumCrewInventory, sumRegionInventory } from "@/lib/inventory-items";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
@@ -340,8 +340,9 @@ export default function InventoryScreenshotsPanel() {
   }, [open, compare]);
 
   const shownItems = !open ? [] : comparison
-    ? comparison.rows.filter((row) => !(hideZero && !Number(row.today) && !Number(row.previous)))
-    : open.items.filter((item) => !(hideZero && Number(item.quantity) === 0));
+    // A line whose quantity could not be read (null) is never hidden.
+    ? comparison.rows.filter((row) => !(hideZero && row.today !== null && !Number(row.today) && !Number(row.previous)))
+    : open.items.filter((item) => !(hideZero && item.quantity !== null && Number(item.quantity) === 0));
   const fmtQty = (value) => (value === null || value === undefined ? "—" : Number(value).toLocaleString("fr-CA", { minimumFractionDigits: 2 }));
   const fmtDiff = (value) => (value === null ? "—" : `${value > 0 ? "+" : ""}${Number(value).toLocaleString("fr-CA", { maximumFractionDigits: 2 })}`);
 
@@ -466,7 +467,9 @@ export default function InventoryScreenshotsPanel() {
                   {open.state === "photos" && <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">{t("mgr.inventory.unreadable")}</p>}
                   {open.state === "review" && (
                     <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                      {open.expected ? t("mgr.inventory.mismatch", { count: open.count, expected: open.expected }) : t("mgr.inventory.unverified")}
+                      {open.unreadable.length > 0
+                        ? t("mgr.inventory.unreadableLines", { names: open.unreadable.map((item) => item.name).join(", ") })
+                        : open.expected ? t("mgr.inventory.mismatch", { count: open.count, expected: open.expected }) : t("mgr.inventory.unverified")}
                     </p>
                   )}
                   {open.items.length > 0 && (
@@ -498,12 +501,13 @@ export default function InventoryScreenshotsPanel() {
                           <tbody className="divide-y">
                             {shownItems.map((row) => {
                               const code = row.code;
-                              const quantity = comparison ? row.today : Number(row.quantity);
+                              const quantity = comparison ? row.today : row.quantity === null ? null : Number(row.quantity);
+                              const unreadable = !comparison && row.quantity === null;
                               return (
                                 <tr key={code}>
                                   <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{code}</div></td>
                                   {comparison && <td className={cn("px-3 py-2 text-right tabular-nums", !Number(row.previous) && "text-muted-foreground")}>{fmtQty(row.previous)}</td>}
-                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground", Number(quantity) < 0 && "font-semibold text-destructive")}>{fmtQty(quantity)}</td>
+                                  <td className={cn("px-3 py-2 text-right tabular-nums", !Number(quantity) && "text-muted-foreground", Number(quantity) < 0 && "font-semibold text-destructive", unreadable && "font-medium text-warning")}>{unreadable ? t("mgr.inventory.unreadableQty") : fmtQty(quantity)}</td>
                                   {comparison && (
                                     <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.diff === null || row.diff === 0 ? "text-muted-foreground" : row.diff < 0 ? "text-destructive" : "text-success")}>
                                       {fmtDiff(row.diff)}
@@ -532,8 +536,8 @@ export default function InventoryScreenshotsPanel() {
                       const url = photos[open.person.id]?.[slot];
                       const sent = open.shots.some((shot) => shot.slot === slot);
                       const defectiveShot = slot === DEFECTIVE_SLOT;
-                      // The defective-products tile only appears when that picture was sent.
-                      if (defectiveShot && !sent) return null;
+                      // The defective-products and complément tiles only appear when that picture was sent.
+                      if ((defectiveShot || slot === COMPLEMENT_SLOT) && !sent) return null;
                       return (
                         <div key={slot} className="space-y-2">
                           {url ? (
@@ -546,6 +550,7 @@ export default function InventoryScreenshotsPanel() {
                             </div>
                           )}
                           {defectiveShot && <p className="text-xs font-medium text-destructive">{t("mgr.inventory.defectiveTitle")}</p>}
+                          {slot === COMPLEMENT_SLOT && <p className="text-xs font-medium text-warning">{t("mgr.inventory.complementTitle")}</p>}
                           {sent && (
                             <Button type="button" variant="outline" size="sm" className="w-full text-destructive hover:text-destructive" disabled={deleteBusy} onClick={() => removeShots(slot)}>
                               <Trash2 className="mr-1 h-4 w-4" />{t("mgr.inventory.delete")}
@@ -762,7 +767,7 @@ function DefectiveList({ defective, t, fmtQty }) {
               {defective.items.map((item) => (
                 <tr key={item.code}>
                   <td className="px-3 py-2"><div className="font-medium">{item.name}</div><div className="text-xs text-muted-foreground">{item.code}</div></td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtQty(Number(item.quantity))}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{item.quantity === null ? t("mgr.inventory.unreadableQty") : fmtQty(Number(item.quantity))}</td>
                 </tr>
               ))}
             </tbody>

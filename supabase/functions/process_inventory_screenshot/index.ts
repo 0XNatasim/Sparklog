@@ -13,8 +13,10 @@ function json(data: unknown, status = 200) {
 
 type Target = { userId: string; jobDate: string; slot: number };
 
-// Slots 1-3: equipment list screenshots; slot 4: « Produits défectueux » picture (migration 0097).
+// Slots 1-3: equipment list screenshots; slot 4: « Produits défectueux » picture (migration 0097);
+// slot 5: « complément », one more list screenshot of the rows the others cut off (0117).
 const DEFECTIVE_SLOT = 4;
+const LAST_SLOT = 5;
 
 // Reads one inventory screenshot with OCR, stores the equipment rows it contains and
 // classifies the result. Only the parsed rows (code, name, quantity, section) are kept, never the
@@ -64,7 +66,12 @@ async function processScreenshot(admin: ReturnType<typeof createClient>, target:
       .eq("user_id", userId).eq("job_date", jobDate).eq("slot", slot);
     if (clearError) throw clearError;
     if (rows.length) {
-      const unique = new Map(rows.map((item) => [`${item.section}:${item.code}`, item]));
+      // One row per code; a row with its quantity wins over the same code read without one.
+      const unique = new Map();
+      for (const item of rows) {
+        const key = `${item.section}:${item.code}`;
+        if (!unique.has(key) || (unique.get(key).quantity === null && item.quantity !== null)) unique.set(key, item);
+      }
       const { error: insertError } = await admin.from("inventory_items").insert(
         [...unique.values()].map((item) => ({
           user_id: userId, job_date: jobDate, slot, section: item.section, code: item.code, name: item.name,
@@ -103,8 +110,8 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const jobDate = String(body?.job_date || "");
   const slot = Number(body?.slot);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || !Number.isInteger(slot) || slot < 1 || slot > DEFECTIVE_SLOT) {
-    return json({ ok: false, error: "job_date and slot (1-4) are required" }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(jobDate) || !Number.isInteger(slot) || slot < 1 || slot > LAST_SLOT) {
+    return json({ ok: false, error: "job_date and slot (1-5) are required" }, 400);
   }
 
   // Employees process their own screenshots; managers may re-run any employee's reading.
