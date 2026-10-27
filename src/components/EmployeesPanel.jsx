@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { isNonCcqRole, isManagerRole, isPrivileged } from "@/lib/roles";
-import { TIME_OFF_COLUMNS } from "@/lib/timeoff";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -76,22 +75,6 @@ async function fetchPendingMap() {
   }
 }
 
-// Upcoming / current dated time off (not fully past) plus live weekly recurrences
-// (open-ended, i.e. end_date is null, or an "until" still in the future), by employee.
-async function fetchTimeOff(today) {
-  const { data } = await supabase
-    .from("employee_time_off")
-    .select(TIME_OFF_COLUMNS)
-    .or(`end_date.gte.${today},end_date.is.null`)
-    .order("start_date", { ascending: true });
-  const map = new Map();
-  (data || []).forEach((row) => {
-    if (!map.has(row.user_id)) map.set(row.user_id, []);
-    map.get(row.user_id).push(row);
-  });
-  return map;
-}
-
 // `tabbed` (Gestion V3 › Équipe › Employés): a search box and a « Chefs d'équipe » filter above the list,
 // and each open card shows tabs (Identité, CCQ, Paie et options, Impôts, Congés, Accès) that also hold
 // Règles de temps and the TD1 forms of Paramètres. Without it (V2) the page is unchanged.
@@ -115,7 +98,6 @@ export default function EmployeesPanel({ tabbed = false }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [ccqEdit, setCcqEdit] = useState(null); // employee profile whose CCQ card the manager is capturing
-  const [timeOff, setTimeOff] = useState(new Map());
   const today = companyDate();
   const [loading, setLoading]   = useState(true);
   const [err, setErr]           = useState("");
@@ -175,17 +157,12 @@ export default function EmployeesPanel({ tabbed = false }) {
     }
   }
 
-  async function loadTimeOff() {
-    setTimeOff(await fetchTimeOff(today));
-  }
-
   useEffect(() => {
     let alive = true;
     fetchEmployeesData({ privileged, today }).then(
       (next) => { if (alive) applyLoaded(next); },
       (e) => { if (alive) setErr(e?.message ?? "Failed to load employees."); },
     ).finally(() => { if (alive) setLoading(false); });
-    fetchTimeOff(today).then((map) => { if (alive) setTimeOff(map); });
     return () => { alive = false; };
   }, [applyLoaded, privileged, today]);
 
@@ -397,7 +374,7 @@ export default function EmployeesPanel({ tabbed = false }) {
     .filter((p) => !tabbed || ((!leadersOnly || isTeamLeader(p)) && matchesEmployeeSearch(p, search)));
   // State and actions the card pieces read (EmployeeDetails and its sections).
   const panel = {
-    t, user, role, privileged, today, nasSet, timeOff, loadTimeOff, annexes, newHireDraft, mgmtOpen, cardViews,
+    t, user, role, privileged, today, nasSet, annexes, newHireDraft, mgmtOpen, cardViews,
     confirmDelete, deleting, navigate, setLocal, saveField, saveEmploymentDate, saveEmployment, chooseType,
     toggleManagement, toggleAdminSection, saveClassification, saveAnnex, toggleCard, setCcqEdit, setConfirmDelete,
     handleDelete, signupsChanged, savePayToggle, savePayAmount,

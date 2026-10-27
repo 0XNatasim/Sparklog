@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-27 (V2.4.191).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-27 (V2.4.192).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -155,6 +155,11 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   compteur rouge apparaît sur **Notes** dans le menu, et la carte passe en rouge en haut de la liste. « Fait » la range
   dans « Faites », « Plus tard » la repousse (1 heure, demain 8 h, une semaine). Le rappel s'affiche dans l'app
   seulement : pas de notification sur le téléphone. V3 seulement (la V2 ne change plus).
+- [x] **Fiche employé allégée** (V2.4.192) : plus de **numéro CCQ** à remplir (la CCQ se sert du NAS ; il ne compte plus
+  dans « manquant(s) », et la photo de la carte CCQ ne garde que la date d'expiration et la date de naissance). Plus
+  d'onglet **Congés** dans la fiche : les absences se saisissent dans **Équipe › Absences**. Sur les talons, la ligne
+  « CCQ # » montre maintenant le **numéro CCQ de l'employeur**, comme les talons Dynacom (avant : celui de l'employé). Les
+  anciens numéros CCQ des employés restent en base (le relevé d'emploi les montre encore).
 - [x] **Rapports plus clairs** (V2.4.191) : « Par employé (grille) » s'appelle maintenant **Sommaire**, et Semaine et
   Mois sont un seul onglet **Semaine / Mois** avec un bouton Semaine | Mois. Une phrase sous chaque rapport dit ce qu'il
   montre :
