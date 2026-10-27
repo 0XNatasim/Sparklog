@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
 import { canOpenNavItem, MANAGER_NAV_ITEMS, MANAGER_NAV } from "./manager-nav";
-import { cleanNoteBody, dueCount, inScope, isMine, msUntilNextReminder, noteState, otherPeopleIds, reminderFields, reminderInstant, snoozeChoices, sortNotes } from "./notes";
+import {
+  REPLIES_SHOWN, cleanNoteBody, cleanReplyBody, dueCount, inScope, isMine, msUntilNextReminder, newReplyIds, noteState, otherPeopleIds,
+  reminderFields, reminderInstant, repliesByNote, snoozeChoices, sortNotes, unreadNoteCount, visibleReplies,
+} from "./notes";
 
 const now = new Date("2026-10-22T15:00:00Z");
 const note = (id, extra = {}) => ({ id, body: id, created_at: "2026-10-20T12:00:00Z", remind_at: null, done_at: null, ...extra });
@@ -83,7 +86,43 @@ describe("notes and reminders (0111)", () => {
     expect(sql).toContain("char_length(btrim(body)) between 1 and 5000");
     expect(sql).toContain("references auth.users(id) on delete cascade");
     const layout = readFileSync(new URL("../components/manager/ManagerLayout.jsx", import.meta.url), "utf8");
-    expect(layout).toMatch(/notes: isManagerRole\(role\) \? dueNotes : 0/);
+    expect(layout).toMatch(/notes: isManagerRole\(role\) \? dueNotes \+ repliedNotes : 0/);
     expect(layout).toContain("window.addEventListener(NOTES_EVENT, loadNotes)");
+  });
+
+  it("keeps a conversation in order, marks the newest replies of others as new and counts notes once", () => {
+    const r = (id, user, at, noteId = "a") => ({ id, note_id: noteId, user_id: user, created_at: at, body: id });
+    const rows = [r("3", "karine", "2026-10-26T15:00:00Z"), r("1", "me", "2026-10-26T13:00:00Z"), r("2", "karine", "2026-10-26T14:00:00Z"), r("x", "me", "2026-10-26T10:00:00Z", "b")];
+    const grouped = repliesByNote(rows);
+    expect(grouped.get("a").map((x) => x.id)).toEqual(["1", "2", "3"]);
+    expect([...newReplyIds(grouped.get("a"), "me", 1)]).toEqual(["3"]);
+    expect([...newReplyIds(grouped.get("a"), "me", 5)].sort()).toEqual(["2", "3"]);
+    expect(newReplyIds(grouped.get("a"), "me", 0).size).toBe(0);
+    expect(unreadNoteCount(new Map([["a", 2], ["b", 0], ["c", 1]]))).toBe(2);
+    expect(otherPeopleIds([], "me", rows)).toEqual(["karine"]);
+    const many = Array.from({ length: REPLIES_SHOWN + 2 }, (_, i) => r(String(i), "me", `2026-10-26T1${i}:00:00Z`));
+    expect(visibleReplies(many, false)).toEqual({ shown: many.slice(2), hidden: 2 });
+    expect(visibleReplies(many, true).hidden).toBe(0);
+    expect(cleanReplyBody("  ok ")).toBe("ok");
+    expect(cleanReplyBody(" ")).toBeNull();
+    expect(cleanReplyBody("x".repeat(2001))).toBeNull();
+  });
+
+  it("lets managers reply only to a shared note they see, and only delete their own reply (0118)", () => {
+    const sql = readFileSync(new URL("../../supabase/migrations/20261027180000_0118_manager_note_replies.sql", import.meta.url), "utf8");
+    expect(sql).toMatch(/for select to authenticated\s+using \(public\.get_my_role\(\) = 'manager'\s+and exists \(select 1 from public\.manager_notes n where n\.id = note_id\)\)/);
+    expect(sql).toMatch(/for insert to authenticated\s+with check \(user_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\s+and exists \(select 1 from public\.manager_notes n where n\.id = note_id and n\.shared\)\)/);
+    expect(sql).toMatch(/"manager_note_replies: delete own" on public\.manager_note_replies\s+for delete to authenticated\s+using \(user_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\)/);
+    // No update policy or grant: a reply is never edited. Server time; cascade with the note.
+    expect(sql).not.toMatch(/on public\.manager_note_replies\s+for update/);
+    expect(sql).toContain("grant select, insert, delete on public.manager_note_replies to authenticated");
+    expect(sql).toContain("new.created_at := now();");
+    expect(sql).toContain("references public.manager_notes(id) on delete cascade");
+    expect(sql).toContain("char_length(btrim(body)) between 1 and 2000");
+    // Reads: own rows only; the unread count runs under the caller's RLS.
+    expect(sql).toMatch(/"manager_note_reads: own rows" on public\.manager_note_reads\s+for all to authenticated\s+using \(user_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\)/);
+    expect(sql).toMatch(/my_note_unread_replies\(\)[\s\S]*security invoker/);
+    expect(sql).toContain("revoke all on public.manager_note_replies from anon, public");
+    expect(sql).toContain("revoke all on public.manager_note_reads from anon, public");
   });
 });

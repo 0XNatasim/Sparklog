@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { AlarmClock, BellRing, Check, Clock, Lock, Pencil, Plus, RotateCcw, StickyNote, Trash2, Users } from "lucide-react";
+import { AlarmClock, BellRing, Check, Clock, Lock, MessageCircle, Pencil, Plus, RotateCcw, StickyNote, Trash2, Users } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import NoteThread from "@/components/manager/NoteThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import {
-  DEFAULT_REMIND_TIME, MAX_NOTE, NOTE_COLUMNS, NOTE_SCOPES, cleanNoteBody, fetchNotes, inScope, isMine, noteState,
-  notesChanged, otherPeopleIds, reminderFields, reminderInstant, snoozeChoices, sortNotes,
+  DEFAULT_REMIND_TIME, MAX_NOTE, NOTE_COLUMNS, NOTE_SCOPES, REPLY_COLUMNS, cleanNoteBody, fetchNotes, fetchReplies,
+  fetchUnreadReplies, inScope, isMine, markNotesRead, newReplyIds, noteState, notesChanged, otherPeopleIds, reminderFields,
+  reminderInstant, repliesByNote, snoozeChoices, sortNotes,
 } from "@/lib/notes";
 import { useT } from "@/lib/use-t";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -131,7 +133,8 @@ function PersonName({ id, me, names }) {
 }
 
 // Gestion › Notes: my private notes and the notes shared between managers, larger cards than the sent
-// notifications, due reminders first. Shared notes have a blue edge and a « Partagée » label.
+// notifications, due reminders first. Shared notes have a blue edge and a « Partagée » label, and a
+// conversation under the note (0118); a note with new replies comes first and says how many.
 export default function NotesPanel() {
   const t = useT();
   const { user } = useAuth();
@@ -147,6 +150,9 @@ export default function NotesPanel() {
   const [busyId, setBusyId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [formKey, setFormKey] = useState(0);
+  const [replies, setReplies] = useState([]);
+  // note id → ids of the replies that were new when they were loaded (they keep their mark on this visit).
+  const [fresh, setFresh] = useState(() => new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -157,8 +163,43 @@ export default function NotesPanel() {
     return () => { cancelled = true; };
   }, [t]);
 
-  // Names of the other managers who wrote or finished a shared note (managers may read profiles).
-  const otherIds = useMemo(() => otherPeopleIds(notes, me).sort().join(","), [notes, me]);
+  // Conversations of the shared notes: loaded with the notes, again every minute while the page is shown
+  // and when it comes back. New replies get their mark, then the notes are marked as seen (menu badge).
+  const sharedIds = useMemo(() => notes.filter((n) => n.shared).map((n) => n.id).sort().join(","), [notes]);
+  useEffect(() => {
+    const ids = sharedIds ? sharedIds.split(",") : [];
+    if (!ids.length || !me) return undefined;
+    let cancelled = false;
+    async function load() {
+      if (document.hidden) return;
+      try {
+        const [rows, unread] = await Promise.all([fetchReplies(ids), fetchUnreadReplies()]);
+        if (cancelled) return;
+        const grouped = repliesByNote(rows);
+        const unseen = [...unread.entries()].filter(([id, n]) => n > 0 && grouped.has(id));
+        setReplies(rows);
+        if (unseen.length) {
+          setFresh((current) => {
+            const next = new Map(current);
+            for (const [id, n] of unseen) next.set(id, new Set([...(next.get(id) || []), ...newReplyIds(grouped.get(id), me, n)]));
+            return next;
+          });
+          await markNotesRead(unseen.map(([id]) => id), me);
+          notesChanged();
+        }
+      } catch (error) {
+        console.error("[notes] replies", error);
+      }
+    }
+    load();
+    const timer = setInterval(load, 60000);
+    document.addEventListener("visibilitychange", load);
+    return () => { cancelled = true; clearInterval(timer); document.removeEventListener("visibilitychange", load); };
+  }, [sharedIds, me]);
+  const threads = useMemo(() => repliesByNote(replies), [replies]);
+
+  // Names of the other managers who wrote or finished a shared note or replied (managers may read profiles).
+  const otherIds = useMemo(() => otherPeopleIds(notes, me, replies).sort().join(","), [notes, me, replies]);
   useEffect(() => {
     const ids = otherIds ? otherIds.split(",").slice(0, QUERY_BUDGETS.inListChunk) : [];
     if (!ids.length) return undefined;
@@ -186,9 +227,14 @@ export default function NotesPanel() {
     shared: notes.filter((n) => !n.done_at && n.shared).length,
   }), [notes, scoped, now]);
 
-  const visible = useMemo(() => sortNotes(scoped.filter((n) => (
-    filter === "done" ? n.done_at : filter === "reminders" ? !n.done_at && n.remind_at : !n.done_at
-  )), now), [scoped, filter, now]);
+  // A note with new replies comes first (like a conversation that just moved), then the usual order.
+  const visible = useMemo(() => {
+    const sorted = sortNotes(scoped.filter((n) => (
+      filter === "done" ? n.done_at : filter === "reminders" ? !n.done_at && n.remind_at : !n.done_at
+    )), now);
+    return [...sorted.filter((n) => fresh.get(n.id)?.size), ...sorted.filter((n) => !fresh.get(n.id)?.size)];
+  }, [scoped, filter, now, fresh]);
+  const nameOf = (id) => (id === me ? t("notes.you") : names.get(id) || t("notes.someone"));
 
   // One write, then the row as stored replaces the local one (and the side-menu badge refreshes).
   async function write(id, run) {
@@ -220,6 +266,42 @@ export default function NotesPanel() {
 
   async function save(note, values) {
     if (await update(note, values)) setEditingId(null);
+  }
+
+  async function reply(note, body) {
+    setBusyId(note.id);
+    setErr("");
+    try {
+      const { data, error } = await withTimeout(
+        supabase.from("manager_note_replies").insert({ note_id: note.id, body }).select(REPLY_COLUMNS).single(),
+        12000,
+      );
+      if (error) throw error;
+      setReplies((current) => [...current, data]);
+      // Writing in the conversation means I have seen it.
+      markNotesRead([note.id], me).then(notesChanged, (error) => console.error("[notes] read", error));
+      return true;
+    } catch (error) {
+      setErr(friendlyErrorMessage(error, t));
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeReply(row) {
+    if (!(await confirm(t("notes.replies.deleteConfirm")))) return;
+    setBusyId(row.note_id);
+    setErr("");
+    try {
+      const { error } = await withTimeout(supabase.from("manager_note_replies").delete().eq("id", row.id), 12000);
+      if (error) throw error;
+      setReplies((current) => current.filter((r) => r.id !== row.id));
+    } catch (error) {
+      setErr(friendlyErrorMessage(error, t));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function remove(note) {
@@ -294,6 +376,8 @@ export default function NotesPanel() {
           const state = noteState(note, now);
           const busy = busyId === note.id;
           const mine = isMine(note, me);
+          const thread = threads.get(note.id) || [];
+          const newCount = fresh.get(note.id)?.size || 0;
           return (
             <Card
               key={note.id}
@@ -322,10 +406,25 @@ export default function NotesPanel() {
                         </span>
                       )}
                       <ReminderChip note={note} state={state} />
+                      {newCount > 0 && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/15 px-2.5 py-1 text-sm font-semibold text-destructive">
+                          <MessageCircle className="h-4 w-4" />{t("notes.replies.newCount", { count: newCount })}
+                        </span>
+                      )}
                     </div>
                     <p className={cn("whitespace-pre-wrap break-words text-base leading-relaxed sm:text-lg", state === "done" && "line-through decoration-muted-foreground/50")}>
                       {note.body}
                     </p>
+                    <NoteThread
+                      note={note}
+                      replies={thread}
+                      me={me}
+                      nameOf={nameOf}
+                      newIds={fresh.get(note.id)}
+                      busy={busy}
+                      onSend={(body) => reply(note, body)}
+                      onDelete={removeReply}
+                    />
                     <div className="mt-auto flex flex-wrap items-center gap-2 border-t pt-3">
                       <span className="text-xs text-muted-foreground">
                         {note.done_at ? t("notes.doneOn", { when: formatWhen(note.done_at) }) : t("notes.createdOn", { when: formatWhen(note.created_at) })}

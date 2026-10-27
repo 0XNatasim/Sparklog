@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { fetchPendingSignups, groupBadgeTotal, pendingSignupCount, SIGNUPS_EVENT } from "@/lib/signups";
-import { dueCount, fetchOpenReminders, msUntilNextReminder, NOTES_EVENT } from "@/lib/notes";
+import { dueCount, fetchOpenReminders, fetchUnreadReplies, msUntilNextReminder, NOTES_EVENT, unreadNoteCount } from "@/lib/notes";
 import { fetchTodoCount, TODO_EVENT } from "@/lib/todo-count";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
@@ -275,13 +275,14 @@ export default function ManagerLayout() {
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
   const [pendingSignups, setPendingSignups] = useState(0);
   const [dueNotes, setDueNotes] = useState(0);
+  const [repliedNotes, setRepliedNotes] = useState(0);
   const [todoCount, setTodoCount] = useState(0);
   const badges = useMemo(() => ({
     todo: isManagerRole(role) ? todoCount : 0,
     inventory: isManagerRole(role) ? inventoryNegatives : 0,
     "v3-team": isManagerRole(role) ? pendingSignups : 0,
-    notes: isManagerRole(role) ? dueNotes : 0,
-  }), [inventoryNegatives, pendingSignups, dueNotes, todoCount, role]);
+    notes: isManagerRole(role) ? dueNotes + repliedNotes : 0,
+  }), [inventoryNegatives, pendingSignups, dueNotes, repliedNotes, todoCount, role]);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath);
@@ -370,13 +371,24 @@ export default function ManagerLayout() {
   }, [role, location.pathname]);
 
   // My due reminders (Notes): counted now, and again when the next reminder comes due (a timer),
-  // when the tab is shown again, and after any change on the Notes page (NOTES_EVENT).
+  // when the tab is shown again, and after any change on the Notes page (NOTES_EVENT). Shared notes with
+  // replies I have not seen yet (0118) count too, checked again every 2 minutes while the tab is shown.
   useEffect(() => {
     if (!isManagerRole(role)) return undefined;
     let cancelled = false;
     let generation = 0;
     let timer = null;
+    async function loadReplies() {
+      if (document.hidden) return;
+      try {
+        const unread = await fetchUnreadReplies();
+        if (!cancelled) setRepliedNotes(unreadNoteCount(unread));
+      } catch (error) {
+        console.error("[notes] replies", error);
+      }
+    }
     async function loadNotes() {
+      loadReplies();
       const ticket = ++generation;
       try {
         const rows = await fetchOpenReminders();
@@ -393,11 +405,13 @@ export default function ManagerLayout() {
     }
     const onVisible = () => { if (!document.hidden) loadNotes(); };
     loadNotes();
+    const replyTimer = setInterval(loadReplies, 2 * 60 * 1000);
     window.addEventListener(NOTES_EVENT, loadNotes);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      clearInterval(replyTimer);
       window.removeEventListener(NOTES_EVENT, loadNotes);
       document.removeEventListener("visibilitychange", onVisible);
     };

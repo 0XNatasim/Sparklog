@@ -2,6 +2,8 @@
 // whose note is not done) is « due »: it counts in the badge on Notes in the side menu.
 // A note is private (only its author sees it) or shared with the managers (everyone sees it and may edit,
 // snooze or mark it done; only the author deletes it or makes it private again). RLS, manager session.
+// A shared note also holds a conversation (0118): replies shown as chat bubbles, with « new » replies
+// (written by someone else since I last saw the note) counted on the card and in the menu badge.
 import { supabase } from "@/supabaseClient";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { withTimeout } from "@/lib/utils";
@@ -10,6 +12,10 @@ export const NOTES_EVENT = "sparklog:notes";
 export const MAX_NOTE = 5000;
 export const NOTE_COLUMNS = "id, user_id, body, shared, remind_at, done_at, done_by, created_at, updated_at";
 export const NOTE_SCOPES = Object.freeze(["all", "private", "shared"]);
+export const MAX_REPLY = 2000;
+export const REPLY_COLUMNS = "id, note_id, user_id, body, created_at";
+// Replies shown before « earlier replies » (the newest ones).
+export const REPLIES_SHOWN = 4;
 // Time used when a reminder gets a date but no time.
 export const DEFAULT_REMIND_TIME = "08:00";
 
@@ -48,14 +54,47 @@ export function isMine(note, userId) {
   return Boolean(note && userId && note.user_id === userId);
 }
 
-// Authors and « done by » people of the notes written by someone else, for their names.
-export function otherPeopleIds(notes, userId) {
+// Authors and « done by » people of the notes, and authors of the replies, other than me, for their names.
+export function otherPeopleIds(notes, userId, replies = []) {
   const ids = new Set();
   for (const note of notes || []) {
     if (note.user_id && note.user_id !== userId) ids.add(note.user_id);
     if (note.done_by && note.done_by !== userId) ids.add(note.done_by);
   }
+  for (const reply of replies || []) if (reply.user_id && reply.user_id !== userId) ids.add(reply.user_id);
   return [...ids];
+}
+
+// Replies by note, oldest first (the order of a conversation).
+export function repliesByNote(replies) {
+  const map = new Map();
+  const sorted = [...(replies || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  for (const reply of sorted) {
+    if (!map.has(reply.note_id)) map.set(reply.note_id, []);
+    map.get(reply.note_id).push(reply);
+  }
+  return map;
+}
+
+// The replies to mark « new » in one conversation: the last `unread` ones written by someone else.
+export function newReplyIds(replies, userId, unread) {
+  if (!unread) return new Set();
+  const others = (replies || []).filter((r) => r.user_id !== userId);
+  return new Set(others.slice(-unread).map((r) => r.id));
+}
+
+// Notes with at least one new reply (they count once each in the menu badge).
+export function unreadNoteCount(unread) {
+  let count = 0;
+  for (const value of (unread instanceof Map ? unread.values() : Object.values(unread || {}))) if (value > 0) count += 1;
+  return count;
+}
+
+// The replies shown in a card: all when opened, else the newest REPLIES_SHOWN (and how many are hidden).
+export function visibleReplies(replies, expanded) {
+  const list = replies || [];
+  if (expanded || list.length <= REPLIES_SHOWN) return { shown: list, hidden: 0 };
+  return { shown: list.slice(-REPLIES_SHOWN), hidden: list.length - REPLIES_SHOWN };
 }
 
 export function dueCount(notes, now = new Date()) {
@@ -107,6 +146,11 @@ export function cleanNoteBody(body) {
   return text && text.length <= MAX_NOTE ? text : null;
 }
 
+export function cleanReplyBody(body) {
+  const text = String(body ?? "").trim();
+  return text && text.length <= MAX_REPLY ? text : null;
+}
+
 export async function fetchNotes() {
   const { data, error } = await withTimeout(
     supabase.from("manager_notes").select(NOTE_COLUMNS).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.managerNotes),
@@ -125,6 +169,37 @@ export async function fetchOpenReminders() {
   );
   if (error) throw error;
   return data || [];
+}
+
+// Replies of these notes (only shared ones have replies), by chunks of ids.
+export async function fetchReplies(noteIds) {
+  const ids = [...new Set(noteIds || [])];
+  const rows = [];
+  for (let i = 0; i < ids.length; i += QUERY_BUDGETS.inListChunk) {
+    const { data, error } = await withTimeout(
+      supabase.from("manager_note_replies").select(REPLY_COLUMNS).in("note_id", ids.slice(i, i + QUERY_BUDGETS.inListChunk))
+        .order("created_at", { ascending: true }).limit(QUERY_BUDGETS.managerNoteReplies),
+      12000,
+    );
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+  return rows;
+}
+
+// note id → number of replies written by someone else since I last saw the note.
+export async function fetchUnreadReplies() {
+  const { data, error } = await withTimeout(supabase.rpc("my_note_unread_replies"), 12000);
+  if (error) throw error;
+  return new Map((data || []).map((row) => [row.note_id, row.unread]));
+}
+
+// « I have seen these conversations » (the server stamps the time).
+export async function markNotesRead(noteIds, userId) {
+  const rows = [...new Set(noteIds || [])].map((note_id) => ({ note_id, user_id: userId }));
+  if (!rows.length || !userId) return;
+  const { error } = await withTimeout(supabase.from("manager_note_reads").upsert(rows, { onConflict: "note_id,user_id" }), 12000);
+  if (error) throw error;
 }
 
 export function notesChanged() {
