@@ -23,6 +23,8 @@ export const QUERY_BUDGETS = Object.freeze({
   profileReferences: 200,
   // Gestion › Notes: one person's own notes (and the side-menu badge's open reminders).
   managerNotes: 500,
+  // Replies of the notes shown (0118), per request of up to inListChunk notes.
+  managerNoteReplies: 2000,
 });
 
 // A narrowed timesheet search must be complete, not merely filtered from the

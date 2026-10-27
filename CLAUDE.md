@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.188)
+## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.190)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -931,6 +931,20 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `GroupsManager.jsx` (lit aussi `profiles.role`) ; « Ajouter à… » = `saveGroupMembers(group, before, [...before, id])`
   (même insertion que la case à cocher, mêmes droits RLS 0114). Test `employee-groups.test.js` ; vérifié dans
   Chromium à 360 px (compteur, ajout = une insertion `employee_group_members`).
+- [x] **Notes partagées : se répondre** (V2.4.190, migration 0118) : table `manager_note_replies` (note, auteur, texte
+  1 à 2 000 caractères, heure du serveur par le trigger `manager_note_replies_guard`, cascade avec la note) ; RLS : lecture
+  si la note est visible (sous-requête sur `manager_notes`, donc sous sa RLS), ajout seulement sur une note **partagée** et en
+  son nom, suppression de sa propre réponse, aucune modification (ni politique ni droit `update`) ; tout derrière
+  `get_my_role() = 'manager'` (aal2). `manager_note_reads` (gestionnaire × note, `read_at` posé par le serveur, ses lignes
+  seulement) + `my_note_unread_replies()` (security invoker) = réponses des autres depuis la dernière visite. Écran :
+  `components/manager/NoteThread.jsx` (bulles : les miennes à droite `bg-primary`, les autres à gauche `bg-info/15` avec le
+  nom, « Nouveau » + anneau rouge, 4 dernières + « Voir les N précédentes », Entrée envoie sauf sur écran tactile) ;
+  `NotesPanel` charge les réponses des notes partagées (`fetchReplies`, `QUERY_BUDGETS.managerNoteReplies`), toutes les 60 s
+  et au retour sur l'onglet, met en tête une note avec du nouveau puis la marque vue (`markNotesRead`, `NOTES_EVENT`).
+  Menu : badge Notes = rappels dus + notes avec des réponses non vues (`unreadNoteCount`, toutes les 2 min,
+  `ManagerLayout.jsx`). `src/lib/notes.js` (`repliesByNote`, `newReplyIds`, `visibleReplies`, `cleanReplyBody`). Testé sur
+  Postgres local (deux gestionnaires, employé, anon, note privée, heure forgée, cascade). Tests `notes.test.js`,
+  `NotesPanel.test.jsx`. Pas de notification téléphone.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

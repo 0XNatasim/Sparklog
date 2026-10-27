@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.188 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.190 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -162,6 +162,11 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
 - **Employees in no group** (V2.4.185): Team › Groups lists the active field employees (and new hires waiting to start)
   who are in no group (warehouse), with an « Add to… » picker to put each one in a group. Office staff, managers, the
   owner and paused accounts are not listed.
+- **Replies on shared notes** (V2.4.190, migration 0118): under a shared note (Today › Notes) the managers answer each
+  other like in a chat: my replies on the right in green, the others' on the left in blue with their name. A reply
+  written since I last opened Notes is marked « Nouveau », its note comes first with « N nouvelle(s) réponse(s) », and
+  it counts in the red badge on « Notes » in the menu (checked every 2 minutes). Each person may remove their own reply;
+  replies are never edited. Private notes have no conversation. In the app only (no phone notification).
 - **Sign out** closes the session of this device only; the same account stays signed in on the other devices
   (changing the password still signs out everywhere).
 - **Payroll:** weekly payroll page, Dynacom cumulatives locked up to week 42, fixed pay, EI/RRQ exemptions,
