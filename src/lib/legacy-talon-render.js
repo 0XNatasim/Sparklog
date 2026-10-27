@@ -1,7 +1,7 @@
 // Render an IMPORTED legacy talon exactly in the old layout (header + Transactions +
 // Sommaire Période/Cumulatif), from the parsed record (see talon-import-core). Used for the
 // import preview and for reprinting a past talon. Standalone HTML (no Tailwind).
-import { EMPLOYER } from "@/lib/paystub";
+import { EMPLOYER, EMPLOYER_CCQ_NUMBER } from "@/lib/paystub";
 import { formatHM } from "@/lib/time";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -44,7 +44,7 @@ function headerHtml(h) {
     ${f("Occupation", "Électricien", true)} ${f("Période de paie", `${h.periodStart || "—"} au ${h.periodEnd || "—"}`, true)}
     ${f("Province", "Québec", true)} ${f("Semaine", h.week, true)}
     ${f("Gains", h.gains ? `$${h.gains}` : "—", true)} ${f("Paie nette", h.paieNette ? `$${h.paieNette}` : "—", true)}
-    ${f("Retenues", h.retenues ? `$${h.retenues}` : "—", true)} ${f("CCQ #", h.ccqNumber, true)}
+    ${f("Retenues", h.retenues ? `$${h.retenues}` : "—", true)} ${f("CCQ #", h.ccqNumber || EMPLOYER_CCQ_NUMBER, true)}
     ${f("Gains imposables - Fédéral", h.imposableFederal ? `$${h.imposableFederal}` : "—", true)} ${f("Gains imposables - Provincial", h.imposableProvincial ? `$${h.imposableProvincial}` : "—", true)}
     ${f("RBQ #", h.rbq, true)} <div></div>
   </div>`;

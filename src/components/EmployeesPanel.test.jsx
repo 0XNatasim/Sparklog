@@ -182,12 +182,23 @@ describe("EmployeesPanel (V3, one card with tabs)", () => {
   it("shows the tabs each person needs: CCQ for a tradesperson, Impôts only to a manager", async () => {
     setup({ tabbed: true });
     await screen.findByText("Zoé Tremblay");
-    expect(tabNames(await openCard("Zoé Tremblay"))).toEqual(["identity", "ccq", "pay", "tax", "timeoff", "access"].map((k) => fr(`employees.tab.${k}`)));
-    expect(tabNames(await openCard("Annie Bureau"))).toEqual(["identity", "pay", "tax", "timeoff", "access"].map((k) => fr(`employees.tab.${k}`)));
+    expect(tabNames(await openCard("Zoé Tremblay"))).toEqual(["identity", "ccq", "pay", "tax", "access"].map((k) => fr(`employees.tab.${k}`)));
+    expect(tabNames(await openCard("Annie Bureau"))).toEqual(["identity", "pay", "tax", "access"].map((k) => fr(`employees.tab.${k}`)));
     cleanup();
     setup({ tabbed: true, role: "admin" });
     await screen.findByText("Zoé Tremblay");
     expect(tabNames(await openCard("Zoé Tremblay"))).not.toContain(fr("employees.tab.tax"));
+  });
+
+  it("asks no CCQ number and has no Congés tab (V2.4.192: the CCQ goes by the NAS, time off is in Absences)", async () => {
+    setup({ tabbed: true });
+    await screen.findByText("Zoé Tremblay");
+    const card = await openCard("Zoé Tremblay");
+    expect(tabNames(card)).not.toContain(fr("employees.tab.timeoff"));
+    await openTab(card, "ccq");
+    expect(within(card).getByText(fr("employees.level"))).toBeTruthy();
+    expect(within(card).queryByText("CCQ#")).toBeNull();
+    expect(state.fake.calls.some((c) => c.table === "employee_time_off")).toBe(false);
   });
 
   it("saves the Règles de temps boxes and amounts from the Paie et options tab", async () => {

@@ -13,6 +13,9 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 
 // Fixed employer on every talon.
 export const EMPLOYER = "Messier Connexion inc.";
+// The employer's CCQ number, printed as « CCQ # » on every stub like Dynacom's (not an employee's number: those
+// are no longer collected since V2.4.192, the CCQ report goes by the SIN).
+export const EMPLOYER_CCQ_NUMBER = "9477";
 // Pay date = the Thursday FOLLOWING the pay week (which ends on a Saturday): +5 days.
 export const payDateFor = (weekEnd) => (weekEnd ? weekEnd.add(5, "day").format("YYYY-MM-DD") : "");
 
@@ -180,7 +183,7 @@ export function stubSheetHtml({ model, hdr, employee, frequency, official = fals
     ["Employé", employee?.employee_number || "—"],
     ["Nom", employee?.full_name || "—"],
     ["Occupation", "Électricien"],
-    ["CCQ #", employee?.ccq_number || "—"],
+    ["CCQ #", EMPLOYER_CCQ_NUMBER],
     ["Province", "Québec"],
     ["Fréquence", frequency || "—"],
     ["Période de paie", `${hdr.periodStart || "—"} au ${hdr.periodEnd || "—"}`],

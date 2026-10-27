@@ -826,7 +826,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   et `reportMonthPeriod` pour afficher les semaines. Tests `receipts-review.test.js`, `monthly-report-period.test.js`,
   `UnlockDayManager.test.jsx` (mots V2 / V3, chaque clé `.plain` dans les deux langues).
 - [x] **Gestion V3 : fiche employé unique** (V2.4.180, aucune migration, V2 inchangée) : `EmployeesPanel({ tabbed })`
-  depuis l'onglet V3 `v3/team?tab=employees` — recherche (`matchesEmployeeSearch` : nom, courriel, n° d'employé / CCQ,
+  depuis l'onglet V3 `v3/team?tab=employees` — recherche (`matchesEmployeeSearch` : nom, courriel, n° d'employé (plus le n° CCQ depuis V2.4.192),
   chiffres du téléphone, sans accents), filtre « Chefs d'équipe » (`isTeamLeader`), fiche ouverte = `EmployeeTabs`
   (`employeeCardTabs(profile, viewerRole)` : CCQ pour métier et sous-traitant, Impôts pour un lecteur gestionnaire /
   propriétaire et jamais pour un sous-traitant, comme la RLS 0083 de `employee_tax_profiles`). Les morceaux de la fiche V2
@@ -965,6 +965,26 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   les 53 périodes s'arrêtent à la case 10. Le statut (« En attente », actif, ancien employé) ne lit pas la réembauche.
   Testé sur Postgres local (contrainte, Journal, employé refusé, migration rejouée). Test `employment-dates.test.js`.
   **À faire (propriétaire)** : vérifier la date d'embauche / réembauche de chaque employé.
+- [x] **Fiche employé sans n° CCQ ni onglet Congés** (V2.4.192, aucune migration) : la CCQ prend le NAS (rapport
+  mensuel), le n° CCQ ne servait à rien. Retiré de `CcqDataFields` (onglet CCQ) et de l'en-tête de `EmployeeCcqSection`,
+  de `CcqCardCapture` (la photo de la carte ne remplit plus que `ccq_expiration_date` et `birth_date` ; `ccq_number` n'est
+  plus écrit), des champs obligatoires (`getMissingEmployeeFields`) et de la recherche (`matchesEmployeeSearch`). La
+  colonne `profiles.ccq_number` et ses valeurs restent ; seul le relevé d'emploi l'imprime encore. Talons : la ligne « CCQ # »
+  affiche le n° CCQ **de l'employeur**, comme les talons Dynacom importés (décision du propriétaire) — constante
+  `EMPLOYER_CCQ_NUMBER` à côté de `EMPLOYER` (`src/lib/paystub.js`), lue par `stubSheetHtml`, `PayStubPrint.jsx`,
+  `legacy-talon-render.js` (`h.ccqNumber` d'un talon importé, sinon la constante) et mise dans l'en-tête de
+  `calcul-talon.js` / `dynacom-cumulative-talon.js` ; avant, c'était le n° de l'employé (test `calcul-talon.test.js`). Onglet `timeoff` retiré de `EMPLOYEE_CARD_TABS` et
+  bloc Congés de `EmployeeDetails` ; `EmployeesPanel` ne lit plus `employee_time_off` (les absences : Équipe › Absences,
+  `CongesManager`). Tests `employee-card.test.js`, `EmployeesPanel.test.jsx`.
+- [x] **Rapports : Semaine / Mois en un onglet, « Sommaire »** (V2.4.191, aucune migration) : `v3-reports` passe de 5 à 4
+  onglets — `costs`, `period` (« Semaine / Mois », `PeriodReport` dans `ManagerPages.jsx` : boutons Semaine | Mois, `?view=month`,
+  même `PeriodSummary`), `grid` (libellé « Sommaire », `WeekViewTab`, clé gardée pour les liens) et `ccq`. Anciennes clés :
+  `aliases` de l'entrée (`week` → `period`, `month` → `period` + `view=month`), lues par `resolveTab` / `tabAlias`
+  (`src/lib/manager-nav.js`) ; `TabbedPage` remet `?tab=period&view=month` dans l'adresse. `OLD_PATHS["reports/period"]` →
+  `period`, `?view=grid` → `grid`, `?view=month` gardé. Une phrase sous chaque rapport (`ReportHint`,
+  `mgr.reports.hint.*`) dit ce qu'il montre. Toujours 4 onglets, donc imbriqués dans le menu (`NESTED_TABS_MIN`).
+  Mêmes droits (`reports-period`, gestionnaire). Tests `manager-nav.test.js`, `TabbedPage.test.jsx`,
+  `authorization-matrix.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

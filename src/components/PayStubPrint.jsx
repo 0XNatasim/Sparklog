@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Printer, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { buildStubModel, buildStubHtml, EMPLOYER, payDateFor, stubUnit } from "@/lib/paystub";
+import { buildStubModel, buildStubHtml, EMPLOYER, EMPLOYER_CCQ_NUMBER, payDateFor, stubUnit } from "@/lib/paystub";
 import { formatHM } from "@/lib/time";
 
 const n = (v) => Number(v) || 0;
@@ -135,7 +135,7 @@ export default function PayStubPrint({ open, onOpenChange, result, ytd, pay, rei
               ["Employé", employee?.employee_number || "—"],
               ["Nom", employee?.full_name || "—"],
               ["Occupation", "Électricien"],
-              ["CCQ #", employee?.ccq_number || "—"],
+              ["CCQ #", EMPLOYER_CCQ_NUMBER],
               ["Province", "Québec"],
               ["Fréquence", frequency || "—"],
               ["Période de paie", `${hdr.periodStart || "—"} au ${hdr.periodEnd || "—"}`],

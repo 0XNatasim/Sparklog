@@ -3,6 +3,7 @@
 // show exactly what Calcul computed instead of recalculating from the approved jobs. Pure.
 import { printedPayLines } from "../payroll/earnings";
 import { payTotals } from "./payroll-closing";
+import { EMPLOYER_CCQ_NUMBER } from "./paystub";
 
 const round2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
 const fmt = (v) => round2(v).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -85,7 +86,7 @@ export function buildCalculTalon({ opening = {}, closing, result, ccq = null, re
     source: "calcul",
     employeeNumber: employee.employee_number || "",
     name: employee.full_name || "",
-    ccqNumber: employee.ccq_number || "",
+    ccqNumber: EMPLOYER_CCQ_NUMBER, // the employer's, like Dynacom's stubs
     ref: reference,
     date: payDate,
     periodStart: week.periodStart || "",

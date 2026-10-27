@@ -7,8 +7,9 @@ import { useT } from "@/lib/use-t";
 import { extractTextFromImage, compressImage } from "@/lib/ocr";
 import { parseCcqCard } from "@/lib/ccq-card";
 
-// Employee-facing capture of the CCQ competency card. Fields save automatically:
-// uploading a photo OCR-fills and saves them; editing a field saves on blur.
+// Capture of the CCQ competency card: its expiry date and the birth date. Fields save automatically:
+// uploading a photo OCR-fills and saves them; editing a field saves on blur. The CCQ number on the card is not
+// kept since V2.4.192 (the CCQ report goes by the NAS); an older value stays untouched.
 export default function CcqCardCapture({ userId, profile, onSaved }) {
   const t = useT();
   const inputRef = useRef(null);
@@ -16,13 +17,11 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [form, setForm] = useState({
-    ccq_number: profile?.ccq_number || "",
     ccq_expiration_date: profile?.ccq_expiration_date || "",
     birth_date: profile?.birth_date || "",
   });
   // Track the last-saved values so blur only saves an actual change.
   const savedRef = useRef({
-    ccq_number: profile?.ccq_number || "",
     ccq_expiration_date: profile?.ccq_expiration_date || "",
     birth_date: profile?.birth_date || "",
   });
@@ -37,7 +36,6 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
       cardPath = path;
     }
     const { error } = await supabase.from("profiles").update({
-      ccq_number: values.ccq_number.trim() || null,
       ccq_expiration_date: values.ccq_expiration_date || null,
       birth_date: values.birth_date || null,
       ccq_card_path: cardPath,
@@ -61,7 +59,6 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
       const text = await extractTextFromImage(file);
       const parsed = parseCcqCard(text);
       const values = {
-        ccq_number: parsed.ccqNumber || form.ccq_number,
         ccq_expiration_date: parsed.expiration || form.ccq_expiration_date,
         birth_date: parsed.birth || form.birth_date,
       };
@@ -80,7 +77,7 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
     if (busy) return;
     const s = savedRef.current;
     // Only save when a field actually changed (avoid no-op saves on blur).
-    if (form.ccq_number === s.ccq_number && form.ccq_expiration_date === s.ccq_expiration_date && form.birth_date === s.birth_date) return;
+    if (form.ccq_expiration_date === s.ccq_expiration_date && form.birth_date === s.birth_date) return;
     setErr("");
     setBusy(true);
     try {
@@ -96,11 +93,7 @@ export default function CcqCardCapture({ userId, profile, onSaved }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-2 sm:grid-cols-3">
-        <label className="block space-y-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("ccqCard.number")}</span>
-          <Input value={form.ccq_number} onChange={(e) => setForm((f) => ({ ...f, ccq_number: e.target.value }))} onBlur={saveField} className="h-9" />
-        </label>
+      <div className="grid gap-2 sm:grid-cols-2">
         <label className="block space-y-1">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("ccqCard.expiration")}</span>
           <Input type="date" value={form.ccq_expiration_date} onChange={(e) => setForm((f) => ({ ...f, ccq_expiration_date: e.target.value }))} onBlur={saveField} className="h-9" />

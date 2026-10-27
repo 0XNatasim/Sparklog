@@ -125,7 +125,8 @@ export function canSetEmployment(p, { role, user }) {
 // Tabs of the V3 employee card (Gestion V3 › Équipe › Employés), in order. CCQ: tradespeople and
 // subcontractors. Impôts (TD1 / TP-1015.3, fixed pay, EI / QPP exemptions): manager-tier viewers only
 // (employee_tax_profiles RLS), never for a subcontractor (no payroll deductions).
-export const EMPLOYEE_CARD_TABS = Object.freeze(["identity", "ccq", "pay", "tax", "timeoff", "access"]);
+// No « Congés » tab since V2.4.192: time off is entered in Équipe › Absences.
+export const EMPLOYEE_CARD_TABS = Object.freeze(["identity", "ccq", "pay", "tax", "access"]);
 
 export function employeeCardTabs(p, viewerRole) {
   return EMPLOYEE_CARD_TABS.filter((tab) => {
@@ -135,12 +136,12 @@ export function employeeCardTabs(p, viewerRole) {
   });
 }
 
-// Search box of the V3 list: name, e-mail, phone (digits), employee number or CCQ number.
+// Search box of the V3 list: name, e-mail, phone (digits) or employee number.
 export function matchesEmployeeSearch(p, query) {
   const words = String(query || "").trim().toLocaleLowerCase("fr-CA").normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
   const plain = (value) => String(value || "").toLocaleLowerCase("fr-CA").normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const haystack = [p.full_name, p.email, p.employee_number, p.ccq_number].map(plain).join(" ");
+  const haystack = [p.full_name, p.email, p.employee_number].map(plain).join(" ");
   const phone = String(p.phone || "").replace(/\D/g, "");
   return words.every((word) => haystack.includes(word) || (/^\d{3,}$/.test(word) && phone.includes(word)));
 }

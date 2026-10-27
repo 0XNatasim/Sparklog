@@ -3,6 +3,7 @@
 // Sparklog talons from week 43. Built in the browser from the row (nothing is written), in the record shape
 // legacy-talon-render.js prints ({ header, transactions, sommaire }).
 import { isClosedBeforeSparklog } from "@/lib/payroll-opening";
+import { EMPLOYER_CCQ_NUMBER } from "@/lib/paystub";
 
 export const DYNACOM_CUMULATIVE_SOURCE = "dynacom-cumulative";
 
@@ -52,7 +53,7 @@ export function dynacomCumulativeTalon(row, { profile = {}, week = {} } = {}) {
       source: DYNACOM_CUMULATIVE_SOURCE,
       employeeNumber: profile.employee_number || "",
       name: profile.full_name || "",
-      ccqNumber: profile.ccq_number || "",
+      ccqNumber: EMPLOYER_CCQ_NUMBER, // the employer's, like Dynacom's stubs
       ref: "Cumulatif Dynacom",
       periodStart: fmt(week.start),
       periodEnd: fmt(week.end) || fmt(row?.period_end),

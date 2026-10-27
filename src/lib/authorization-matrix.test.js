@@ -67,7 +67,7 @@ describe("application authorization matrix", () => {
       "v3-team": { employees: "employees", absences: "manager" },
       "v3-config": { settings: "manager", "ccq-rates": "manager", "pay-rules": "manager", forms: "forms", references: "manager" },
       "v3-pay-history": { stubs: "manager", das: "manager", roe: "manager", calcul: "manager" },
-      "v3-reports": { costs: "manager", week: "manager", month: "manager", grid: "manager", ccq: "manager" },
+      "v3-reports": { costs: "manager", period: "manager", grid: "manager", ccq: "manager" },
     };
     for (const role of APPLICATION_ROLES) {
       for (const grants of [[], ...GRANTABLE_ADMIN_SECTIONS.map((s) => [s])]) {

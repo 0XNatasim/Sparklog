@@ -6,7 +6,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 import { canSetEmployment, employeeCardTabs } from "@/lib/employees-panel";
 import { hasPayRules } from "@/lib/pay-options";
-import TimeOffControls from "@/components/TimeOffControls";
 import {
   EmployeeEmploymentField, EmployeeNumberField, EmployeePauseField, EmployeeRoleField, EmployeeTypeGate,
   MissingFieldsAlert, ViewAsButton,
@@ -43,12 +42,6 @@ export default function EmployeeTabs({ profile: p, missingFields, panel, status 
         {active === "ccq" && <CcqDataFields profile={p} panel={panel} className={`${BOX} space-y-4`} />}
         {active === "pay" && <PayTab profile={p} panel={panel} />}
         {active === "tax" && <div className={BOX}><EmployeeTaxTab profile={p} t={t} /></div>}
-        {active === "timeoff" && (
-          <div className={BOX}>
-            <p className="text-xs text-muted-foreground">{t("timeOff.description")}</p>
-            <TimeOffControls employeeId={p.id} rows={panel.timeOff.get(p.id) || []} onChanged={panel.loadTimeOff} />
-          </div>
-        )}
         {active === "access" && <AccessTab profile={p} panel={panel} status={status} />}
       </div>
     </CardContent>
