@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.186 (2026-10-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.188 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -147,6 +147,16 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   each tab keeps its access rule). The V3 bell opens the V3 pages (To do › Receipts, Team › Employees).
 - **V2 removed** (V2.4.186): one menu, no V2 | V3 selector. An old V2 address (`#/manager/timesheets`,
   `payroll/das`, `config/rules`…) opens the page and tab that hold it now, with its filters (employee, day, method…).
+- **Inventory: who is away** (V2.4.187): an employee on full-day time off that day (leave, vacation, absence, sick,
+  part-time schedule) who sent no list is shown greyed at the bottom (« Absent · Vacation »…) and not counted in
+  « received / expected ». Paused or former accounts and new hires before their first day are no longer listed
+  (unless they sent screenshots).
+- **Inventory: unreadable lines must be retaken** (V2.4.188, migration 0117): a Field Service row cut at the edge
+  of a screenshot (code read, quantity not) is kept as « unreadable » instead of being dropped. At the end of the
+  shift the employee sees which line(s) could not be read (and, for lines not read at all, the probable names from
+  their previous list) and must send one more « complément » screenshot showing them before « Continue »; if the
+  lines are still unreadable after it, « Continue anyway » (the manager checks the photos). Managers see
+  « unreadable » on the line and the extra screenshot in the Photos tab.
 - **Employee list on a phone** (V2.4.184): each employee's name is on its own line and never cut; the state, missing
   fields and region badges go on the line below. The search box takes the full width on a phone.
 - **Employees in no group** (V2.4.185): Team › Groups lists the active field employees (and new hires waiting to start)

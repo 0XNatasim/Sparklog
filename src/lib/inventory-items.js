@@ -1,9 +1,13 @@
 // Pure helpers behind the manager Inventory page: merge the rows read from the overlapping
 // screenshots (one to three) into one list, and summarize an employee's day.
 import { DEFECTIVE_SLOT } from "./inventory-screenshots";
+import { isOffOn } from "./timeoff";
 
 // Screenshots overlap (the last rows of one are the first of the next), so the same code can
-// come from several slots. Keep one row per code: the latest capture's quantity, the longest name.
+// come from several slots. Keep one row per code: a row whose quantity was read wins over one read
+// without it (quantity null, 0117: cut at the edge of a capture); otherwise the latest capture's
+// quantity. The longest name is kept.
+const knownQuantity = (row) => row.quantity !== null && row.quantity !== undefined;
 export function mergeInventoryItems(rows) {
   const byCode = new Map();
   for (const row of rows || []) {
@@ -13,7 +17,8 @@ export function mergeInventoryItems(rows) {
       continue;
     }
     const name = String(row.name || "").length >= String(current.name || "").length ? row.name : current.name;
-    byCode.set(row.code, Number(row.slot) >= Number(current.slot) ? { ...row, name } : { ...current, name });
+    const takeRow = knownQuantity(row) !== knownQuantity(current) ? knownQuantity(row) : Number(row.slot) >= Number(current.slot);
+    byCode.set(row.code, takeRow ? { ...row, name } : { ...current, name });
   }
   return [...byCode.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
 }
@@ -33,10 +38,13 @@ export function effectiveOcrStatus(shot, now = Date.now(), requestedAt = 0) {
 // equipment list: they never count toward the list's "N de N" total. Older rows have no section.
 export const isDefectiveRow = (row) => row?.section === "defective";
 
-// state: missing (no capture) · reading (OCR running) · ok (list matches the app's own total)
-// · review (list read but unverified, or fewer lines than the total) · photos (nothing readable).
+// state: missing (no capture) · reading (OCR running) · ok (list matches the app's own total, every
+// quantity read) · review (list read but unverified, fewer lines than the total, or a line whose
+// quantity could not be read) · photos (nothing readable).
+// `unreadable`: the lines read without their quantity (0117); `missing`: how many lines of the app's
+// total were not read at all (code unknown).
 // The number of screenshots does not matter: two captures often show the whole list.
-// Only slots 1 to 3 are list screenshots; slot 4 is the defective-products picture (see `defective`).
+// Slots 1 to 3 and 5 (complément, 0117) are list screenshots; slot 4 is the defective-products picture.
 export const INVENTORY_STATE_ORDER = ["missing", "photos", "review", "reading", "ok"];
 
 export function summarizeInventoryDay(shots, rows) {
@@ -47,12 +55,13 @@ export function summarizeInventoryDay(shots, rows) {
   if (!listShots.length) state = "missing";
   else if (listShots.some((shot) => shot.ocr_status === "pending")) state = "reading";
   else if (!items.length) state = "photos";
-  // The list is complete when the merged readings match the total the app itself shows ("N de N"),
-  // even if a screenshot also held a fragment that could not be parsed.
-  else if (expected !== null && items.length === expected) state = "ok";
-  else state = "review";
+  const unreadable = items.filter((item) => !knownQuantity(item));
+  // The list is complete when the merged readings match the total the app itself shows ("N de N")
+  // and every line has its quantity (a line cut in one capture may be whole in another).
+  if (!state) state = expected !== null && items.length === expected && !unreadable.length ? "ok" : "review";
   return {
     state, items, count: items.length, expected, captures: listShots.length,
+    unreadable, missing: expected !== null ? Math.max(0, expected - items.length) : 0,
     defective: summarizeDefective(shots, rows),
   };
 }
@@ -84,8 +93,10 @@ export function compareInventory(todayItems, previousItems, { todayComplete = fa
     .map((code) => {
       const now = today.get(code);
       const before = previous.get(code);
-      const todayQty = now ? Number(now.quantity) : (todayComplete ? 0 : null);
-      const previousQty = before ? Number(before.quantity) : (previousComplete ? 0 : null);
+      // A quantity that could not be read (null) stays unknown.
+      const qty = (row, complete) => (row ? (knownQuantity(row) ? Number(row.quantity) : null) : (complete ? 0 : null));
+      const todayQty = qty(now, todayComplete);
+      const previousQty = qty(before, previousComplete);
       const name = String(now?.name || "").length >= String(before?.name || "").length ? now?.name : before?.name;
       return {
         code,
@@ -148,4 +159,21 @@ export function sumCrewDefective(entries) {
     state: ["ok", "none"].includes(entry.defective?.state) ? "ok" : "review",
     items: entry.defective?.items || [],
   })));
+}
+
+// Employees away all day (a full-day time-off row: congé, vacances, absence, maladie…) who sent no
+// screenshot are not « missing »: they get `off` (the time-off row) and go to the end of the list,
+// shown greyed. Someone away who still sent a list keeps their normal state. Partial days
+// (start_time) do not count as away.
+export function markInventoryAbsences(entries, timeOffRows, date) {
+  const offBy = new Map();
+  for (const row of timeOffRows || []) {
+    if (row.start_time || offBy.has(row.user_id) || !isOffOn(row, date)) continue;
+    offBy.set(row.user_id, row);
+  }
+  const marked = (entries || []).map((entry) => ({
+    ...entry,
+    off: entry.state === "missing" ? offBy.get(entry.person.id) || null : null,
+  }));
+  return [...marked.filter((entry) => !entry.off), ...marked.filter((entry) => entry.off)];
 }

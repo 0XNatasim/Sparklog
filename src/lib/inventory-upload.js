@@ -1,7 +1,8 @@
 import { prepareEvidenceImage, evidenceUploadFailure } from "./evidence-file";
 import { refreshSessionOnce, withTimeout } from "./utils";
 import { INVENTORY_BUCKET, inventoryStoragePath } from "./inventory-screenshots";
-import { effectiveOcrStatus, summarizeInventoryDay } from "./inventory-items";
+import { effectiveOcrStatus, isDefectiveRow, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { probableMissingLines } from "./inventory-screenshots";
 
 export async function fetchInventorySlots(client, userId, jobDate) {
   const { data, error } = await withTimeout(
@@ -67,6 +68,9 @@ export function requestInventoryReading(client, { jobDate, slot, userId = null }
 // The employee's own reading of the day's list: how many lines (equipment) were read from the
 // screenshots against the app's own "N de N" total. { state, count, expected } as on the manager
 // page, plus the defective products read under « Produits défectueux » ({ state, count, expected }).
+// Since 0117 also `unreadable` (lines read without their quantity: { code, name }), `missing` (lines
+// of the total never read) and, when some are missing, `probable` (their likely names, from the
+// employee's previous complete list).
 export async function fetchInventoryReading(client, userId, jobDate) {
   const [shotsResult, itemsResult] = await Promise.all([
     withTimeout(client.from("inventory_screenshots").select("slot, ocr_status, list_total, defective_total, created_at")
@@ -78,8 +82,22 @@ export async function fetchInventoryReading(client, userId, jobDate) {
   if (itemsResult.error) throw itemsResult.error;
   const now = Date.now();
   const shots = (shotsResult.data || []).map((shot) => ({ ...shot, ocr_status: effectiveOcrStatus(shot, now) }));
-  const { state, count, expected, defective } = summarizeInventoryDay(shots, itemsResult.data || []);
-  return { state, count, expected, defective: { state: defective.state, count: defective.count, expected: defective.expected } };
+  const { state, count, expected, defective, unreadable, missing, items } = summarizeInventoryDay(shots, itemsResult.data || []);
+  let probable = [];
+  if (state !== "reading" && missing > 0) {
+    try {
+      const previous = await fetchPreviousInventory(client, { userId, beforeDate: jobDate });
+      if (previous && summarizeInventoryDay(previous.shots, previous.items).state === "ok") {
+        const previousItems = mergeInventoryItems(previous.items.filter((row) => !isDefectiveRow(row)));
+        probable = probableMissingLines(items, previousItems).map(({ code, name }) => ({ code, name }));
+      }
+    } catch { /* indicative only */ }
+  }
+  return {
+    state, count, expected, missing, probable,
+    unreadable: unreadable.map(({ code, name }) => ({ code, name })),
+    defective: { state: defective.state, count: defective.count, expected: defective.expected },
+  };
 }
 
 // Manager action: removes the files, the written list and the rows of one screenshot (slot) or

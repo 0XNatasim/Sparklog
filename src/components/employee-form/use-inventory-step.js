@@ -1,13 +1,14 @@
 // End-of-shift inventory step of the employee time entry: the day's screenshots (slots 1 to 3, several
-// at once, migration 0092), the « Produits défectueux » answer and picture (slot 4, 0097) and the reading
-// of the lines, polled while the step is open. The job and the day are saved by EmployeeForm.
+// at once, migration 0092), the « Produits défectueux » answer and picture (slot 4, 0097), the reading
+// of the lines, polled while the step is open, and the « complément » screenshot (slot 5, 0117) asked
+// for when lines could not be read. The job and the day are saved by EmployeeForm.
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/supabaseClient";
 import { withTimeout } from "@/lib/utils";
 import { evidenceUploadFailure, isFileFailure } from "@/lib/evidence-file";
 import { reportFileReadError } from "@/lib/file-read-report";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { defectiveCaptured, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
+import { COMPLEMENT_SLOT, defectiveCaptured, missingInventorySlots, planInventoryUploads } from "@/lib/inventory-screenshots";
 import { fetchInventoryReading, fetchInventorySlots, saveInventoryScreenshot } from "@/lib/inventory-upload";
 
 export function useInventoryStep({ userId, dayRef, open, t }) {
@@ -23,6 +24,8 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
   const [readingTick, setReadingTick] = useState(0);
   // Answer to « Produits défectueux ? » after the list screenshots: null (not answered), "yes", "no".
   const [defectiveAnswer, setDefectiveAnswer] = useState(null);
+  // A complément upload was attempted (sent or failed): the step can no longer hold the employee.
+  const [complementTried, setComplementTried] = useState(false);
 
   // Opens the step for the end-of-shift day: the slots already captured are loaded. Returns whether
   // the step is still to do (a list slot or the defective-products picture missing).
@@ -31,6 +34,7 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
     setNotice("");
     setReading(null);
     setDefectiveAnswer(null);
+    setComplementTried(false);
     try {
       const saved = await fetchInventorySlots(supabase, userId, dayRef.current);
       setRows(saved);
@@ -47,6 +51,11 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
     setNotice("");
     slotRef.current = slot;
     inputRef.current?.click();
+  }
+
+  // One more list screenshot showing the lines that could not be read (replaces an earlier one).
+  function pickComplement() {
+    pickSlot(COMPLEMENT_SLOT);
   }
 
   function pickFiles() {
@@ -88,6 +97,7 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
     let next = rows;
     for (const { slot, file } of uploads) {
       setBusySlot(slot);
+      if (slot === COMPLEMENT_SLOT) setComplementTried(true);
       try {
         const previousPath = next.find((row) => row.slot === slot)?.storage_path || null;
         const path = await saveInventoryScreenshot(supabase, {
@@ -129,9 +139,11 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
       try {
         const next = await fetchInventoryReading(supabase, userId, jobDate);
         if (cancelled) return;
-        setReading(next);
         tries += 1;
-        if ((next.state === "reading" || next.defective?.state === "reading") && tries < 20) timer = window.setTimeout(poll, 4000);
+        const stillReading = next.state === "reading" || next.defective?.state === "reading";
+        // After about 80 s the step stops waiting: a slow or failed reading must not hold the employee.
+        setReading(stillReading && tries >= 20 ? { ...next, timedOut: true } : next);
+        if (stillReading && tries < 20) timer = window.setTimeout(poll, 4000);
       } catch {
         if (!cancelled) setReading(null);
       }
@@ -144,7 +156,7 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
   }, [open, userId, hasShots, readingTick, dayRef]);
 
   return {
-    inputRef, multiInputRef, rows, busySlot, error, notice, reading, defectiveAnswer, setDefectiveAnswer,
-    start, pickSlot, pickFiles, handleFile, handleFiles,
+    inputRef, multiInputRef, rows, busySlot, error, notice, reading, defectiveAnswer, setDefectiveAnswer, complementTried,
+    start, pickSlot, pickFiles, pickComplement, handleFile, handleFiles,
   };
 }

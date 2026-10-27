@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.186)
+## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.188)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -892,6 +892,33 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   Reste (ménage, sans effet visible) : les props qui choisissaient le rendu V3 (`EmployeesPanel tabbed`, `ManagerDashboard
   nameFirst / manualFilter / plainWords / reviewFilters`, `UnlockDayManager plainWords`, `SettingsPanel taxForms`,
   `CcqJsonExport lastFinishedMonth`) sont toujours passées ; le rendu V2 qu'elles désactivent est du code mort à retirer.
+- [x] **Inventaire : employés en congé grisés** (V2.4.187, aucune migration) : `fetchInventoryDay` lit aussi
+  `employee_time_off` qui couvre la date ; `markInventoryAbsences(entries, timeOffRows, date)` (`src/lib/inventory-items.js`)
+  donne `off` (la ligne de congé, `isOffOn`, journée entière seulement : pas de `start_time`) à une entrée « missing » et la
+  met en fin de liste ; affichage grisé, pastille `mgr.inventory.state.off` (« Absent · {catégorie} »), hors du compte
+  « reçus / attendus ». Attendus = option inventaire, ni pause, ni `departure_status`, ni `isNewHire` ; quiconque a envoyé
+  des captures reste listé. Test `inventory-items.test.js`.
+  **« La lecture automatique a trouvé 16 appareils… sur 17 »** (expliqué le 2026-10-27, rien changé) : du 2026-10-13 au
+  2026-10-26, 5 journées sur 42 (toujours 1 ligne sur 17) ; chaque fois une capture `needs_review` = `parseInventoryText`
+  a vu un code `EQ…` sans quantité après (ligne coupée au bord de la capture, ou nom long sur deux lignes) → `unparsed`,
+  ligne non enregistrée. Lignes perdues vues : « Module d'expansion pour pl… », « Sinope - 3000W », « Calypso V1 ». Corrigé
+  en V2.4.188 (entrée suivante).
+- [x] **Inventaire : lignes illisibles et capture de complément** (V2.4.188, migration 0117 ; fonctions
+  `process_inventory_screenshot` et `delete_inventory_screenshots` **à redéployer** après la fusion). 0117 :
+  `inventory_items.quantity` nullable ; `slot between 1 and 5` sur `inventory_screenshots` et `inventory_items` (5 =
+  complément, ligne de liste comme 1-3 ; le verrou de soumission 0092/0097 reste sur 1-3). `parseInventoryText` garde un
+  code lu sans quantité (`quantity: null`, nom sans l'avatar « E- » suivant) et le compte toujours dans `unparsed`
+  (`needs_review`) ; l'Edge garde, pour un même code, la ligne qui a sa quantité. Client : `mergeInventoryItems` préfère une
+  quantité lue à `null` (sinon la capture la plus récente) ; `summarizeInventoryDay` rend `unreadable` et `missing`
+  (total « N de N » − lignes vues), « ok » seulement si tout est lu ; `compareInventory` garde `null` inconnu.
+  `fetchInventoryReading` rend `unreadable`, `missing` et `probable` (`probableMissingLines` : codes de la dernière liste
+  complète absents aujourd'hui). Écran employé (`InventoryStep`, `useInventoryStep.pickComplement`) :
+  `inventoryReadingBlock(reading, rows)` → `wait` (lecture en cours, levé après 20 lectures : `timedOut`), `retake` (lignes
+  illisibles ou manquantes, pas de complément : « Continuer » bloqué, bouton « Prendre une capture de ces lignes » → slot 5),
+  `override` (encore incomplet après le complément, ou complément tenté mais pas envoyé : `complementTried` — l'employé
+  n'est jamais bloqué pour de bon : « Continuer quand même »). Gestion › Inventaire : « illisible » dans la
+  colonne quantité (jamais masqué par « cacher les zéros »), message qui nomme les lignes, tuile « Capture de complément »
+  dans Photos. Tests `inventory-items.test.js`, `InventoryStep.test.jsx`.
 - [x] **Liste des employés sur téléphone** (V2.4.184, aucune migration, V2 et V3) : `EmployeeCardHeader.jsx` mettait n°,
   icônes, nom, région, état et « manquant(s) » sur une seule ligne ; les étiquettes `shrink-0` écrasaient le nom
   (`truncate`) jusqu'à « J… » ou rien (comptes « En attente »). Maintenant : ligne 1 = n°, rôle, chef d'équipe, nom
