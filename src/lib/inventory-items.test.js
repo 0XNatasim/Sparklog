@@ -460,6 +460,8 @@ describe("employee inventory step: retake the unreadable lines (0117)", () => {
     expect(inventoryReadingBlock({ state: "review", unreadable: [{ code: "EQ1" }], missing: 0 }, rows)).toBe("retake");
     expect(inventoryReadingBlock({ state: "review", unreadable: [], missing: 1 }, rows)).toBe("retake");
     expect(inventoryReadingBlock({ state: "review", unreadable: [], missing: 1 }, [...rows, { slot: 5 }])).toBe("override");
+    // A complément that could not be sent never holds the employee.
+    expect(inventoryReadingBlock({ state: "review", unreadable: [{ code: "EQ1" }], missing: 0 }, rows, { complementTried: true })).toBe("override");
   });
 
   it("names the probable missing lines from the previous list", () => {

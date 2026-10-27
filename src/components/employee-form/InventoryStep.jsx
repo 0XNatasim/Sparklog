@@ -7,12 +7,12 @@ import { COMPLEMENT_SLOT, DEFECTIVE_SLOT, INVENTORY_SLOTS, defectiveCaptured, in
 // End-of-shift inventory step: the list screenshots (several at once), the reading of the lines and
 // the « Produits défectueux » question with its picture. `inventory` comes from useInventoryStep.
 export default function InventoryStep({ t, inventory, onContinue }) {
-  const { rows, busySlot, reading, defectiveAnswer, setDefectiveAnswer, notice, error, inputRef, multiInputRef, pickSlot, pickFiles, pickComplement, handleFile, handleFiles } = inventory;
+  const { rows, busySlot, reading, defectiveAnswer, setDefectiveAnswer, complementTried, notice, error, inputRef, multiInputRef, pickSlot, pickFiles, pickComplement, handleFile, handleFiles } = inventory;
   const [showExamples, setShowExamples] = useState(false);
   const busy = Boolean(busySlot);
   const captured = inventoryCaptured(rows);
   // Lines the reading could not read hold « Continuer » until a complément screenshot is sent (0117).
-  const block = captured ? inventoryReadingBlock(reading, rows) : null;
+  const block = captured ? inventoryReadingBlock(reading, rows, { complementTried }) : null;
   return (
     <>
       <DialogHeader>

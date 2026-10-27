@@ -41,14 +41,16 @@ export function inventoryStepComplete(rows, defectiveAnswer) {
 // What the reading still asks of the employee before « Continuer » (0117):
 //   "wait"     the screenshots are being read (released when the polling gives up: `timedOut`);
 //   "retake"   lines unreadable or missing, and no complément screenshot yet;
-//   "override" still incomplete after the complément: « Continuer quand même » (the manager checks);
+//   "override" still incomplete after the complément — or the complément could not be sent
+//              (`complementTried`): « Continuer quand même » (the manager checks the photos);
 //   null       nothing to do (complete, or no total to compare with, or no reading available).
-export function inventoryReadingBlock(reading, rows) {
+// The employee is never held for good: a failed upload or a slow reading always lets them go on.
+export function inventoryReadingBlock(reading, rows, { complementTried = false } = {}) {
   if (!reading) return null;
   if (reading.state === "reading") return reading.timedOut ? null : "wait";
   const problem = (reading.unreadable?.length || 0) > 0 || (reading.missing || 0) > 0;
   if (!problem) return null;
-  return (rows || []).some((row) => Number(row.slot) === COMPLEMENT_SLOT) ? "override" : "retake";
+  return complementTried || (rows || []).some((row) => Number(row.slot) === COMPLEMENT_SLOT) ? "override" : "retake";
 }
 
 // Lines of the employee's previous complete list that today's reading does not have: the probable

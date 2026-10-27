@@ -24,6 +24,8 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
   const [readingTick, setReadingTick] = useState(0);
   // Answer to « Produits défectueux ? » after the list screenshots: null (not answered), "yes", "no".
   const [defectiveAnswer, setDefectiveAnswer] = useState(null);
+  // A complément upload was attempted (sent or failed): the step can no longer hold the employee.
+  const [complementTried, setComplementTried] = useState(false);
 
   // Opens the step for the end-of-shift day: the slots already captured are loaded. Returns whether
   // the step is still to do (a list slot or the defective-products picture missing).
@@ -32,6 +34,7 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
     setNotice("");
     setReading(null);
     setDefectiveAnswer(null);
+    setComplementTried(false);
     try {
       const saved = await fetchInventorySlots(supabase, userId, dayRef.current);
       setRows(saved);
@@ -94,6 +97,7 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
     let next = rows;
     for (const { slot, file } of uploads) {
       setBusySlot(slot);
+      if (slot === COMPLEMENT_SLOT) setComplementTried(true);
       try {
         const previousPath = next.find((row) => row.slot === slot)?.storage_path || null;
         const path = await saveInventoryScreenshot(supabase, {
@@ -152,7 +156,7 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
   }, [open, userId, hasShots, readingTick, dayRef]);
 
   return {
-    inputRef, multiInputRef, rows, busySlot, error, notice, reading, defectiveAnswer, setDefectiveAnswer,
+    inputRef, multiInputRef, rows, busySlot, error, notice, reading, defectiveAnswer, setDefectiveAnswer, complementTried,
     start, pickSlot, pickFiles, pickComplement, handleFile, handleFiles,
   };
 }

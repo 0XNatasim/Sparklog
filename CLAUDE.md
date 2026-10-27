@@ -915,7 +915,8 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   complète absents aujourd'hui). Écran employé (`InventoryStep`, `useInventoryStep.pickComplement`) :
   `inventoryReadingBlock(reading, rows)` → `wait` (lecture en cours, levé après 20 lectures : `timedOut`), `retake` (lignes
   illisibles ou manquantes, pas de complément : « Continuer » bloqué, bouton « Prendre une capture de ces lignes » → slot 5),
-  `override` (encore incomplet après le complément : « Continuer quand même »). Gestion › Inventaire : « illisible » dans la
+  `override` (encore incomplet après le complément, ou complément tenté mais pas envoyé : `complementTried` — l'employé
+  n'est jamais bloqué pour de bon : « Continuer quand même »). Gestion › Inventaire : « illisible » dans la
   colonne quantité (jamais masqué par « cacher les zéros »), message qui nomme les lignes, tuile « Capture de complément »
   dans Photos. Tests `inventory-items.test.js`, `InventoryStep.test.jsx`.
 - [x] **Liste des employés sur téléphone** (V2.4.184, aucune migration, V2 et V3) : `EmployeeCardHeader.jsx` mettait n°,
