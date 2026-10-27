@@ -146,6 +146,32 @@ export function cleanNoteBody(body) {
   return text && text.length <= MAX_NOTE ? text : null;
 }
 
+// A note folds to its first non-empty line (its title, V2.4.194); the other lines are its text.
+export function splitNote(body) {
+  const lines = String(body ?? "").split(/\r?\n/);
+  const first = lines.findIndex((line) => line.trim());
+  if (first < 0) return { title: "", rest: "" };
+  return { title: lines[first].trim(), rest: lines.slice(first + 1).join("\n").trim() };
+}
+
+// Which notes are unfolded, remembered on this device only (a convenience: folded when unknown).
+export const NOTES_OPEN_KEY = "sparklog.notesOpen";
+export function readOpenNotes() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(NOTES_OPEN_KEY) || "[]");
+    return new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+export function storeOpenNotes(ids) {
+  try {
+    localStorage.setItem(NOTES_OPEN_KEY, JSON.stringify([...ids].slice(-200)));
+  } catch {
+    // Private window or blocked storage: the notes simply fold again next time.
+  }
+}
+
 export function cleanReplyBody(body) {
   const text = String(body ?? "").trim();
   return text && text.length <= MAX_REPLY ? text : null;

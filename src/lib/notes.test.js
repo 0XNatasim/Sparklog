@@ -5,7 +5,7 @@ vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
 import { canOpenNavItem, MANAGER_NAV_ITEMS, MANAGER_NAV } from "./manager-nav";
 import {
-  REPLIES_SHOWN, cleanNoteBody, cleanReplyBody, dueCount, inScope, isMine, msUntilNextReminder, newReplyIds, noteState, otherPeopleIds,
+  REPLIES_SHOWN, cleanNoteBody, splitNote, cleanReplyBody, dueCount, inScope, isMine, msUntilNextReminder, newReplyIds, noteState, otherPeopleIds,
   reminderFields, reminderInstant, repliesByNote, snoozeChoices, sortNotes, unreadNoteCount, visibleReplies,
 } from "./notes";
 
@@ -124,5 +124,11 @@ describe("notes and reminders (0111)", () => {
     expect(sql).toMatch(/my_note_unread_replies\(\)[\s\S]*security invoker/);
     expect(sql).toContain("revoke all on public.manager_note_replies from anon, public");
     expect(sql).toContain("revoke all on public.manager_note_reads from anon, public");
+  });
+
+  it("folds a note to its first non-empty line (V2.4.194)", () => {
+    expect(splitNote("CNESST : coût trop haut\n\nL'app calcule…\nDeuxième ligne")).toEqual({ title: "CNESST : coût trop haut", rest: "L'app calcule…\nDeuxième ligne" });
+    expect(splitNote("\n  Une seule ligne  \n")).toEqual({ title: "Une seule ligne", rest: "" });
+    expect(splitNote("")).toEqual({ title: "", rest: "" });
   });
 });

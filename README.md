@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.193 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.194 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -166,6 +166,9 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
 - **Employees in no group** (V2.4.185): Team › Groups lists the active field employees (and new hires waiting to start)
   who are in no group (warehouse), with an « Add to… » picker to put each one in a group. Office staff, managers, the
   owner and paused accounts are not listed.
+- **Folded notes** (V2.4.194): each note in Today › Notes shows only its first line (its title), with the reminder and
+  the number of replies (new ones in red) under it; a tap opens the text, the conversation and the buttons. « Open all » /
+  « Fold all » above the list; the open notes are remembered on the device. Tip: start a note with a short title line.
 - **Rehire date** (V2.4.193, migration 0119): the employee card (Identity) has a « Rehire date » next to the hiring
   date, for someone back after a layoff or a departure. The Record of employment then starts there (block 10 « First day
   worked » and its weekly pay periods), since the earlier period was on a previous ROE; a last day worked before the
