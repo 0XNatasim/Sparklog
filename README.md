@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.188 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.189 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -145,6 +145,10 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
     **Mark all as read** on the manager notifications (V2 bell too).
 - **Gestion V3 by default** (V2.4.183): Gestion opens in V3 for everyone (office admins too, who saw only V2 before;
   each tab keeps its access rule). The V3 bell opens the V3 pages (To do › Receipts, Team › Employees).
+- **Nested menu for many-tab pages** (V2.4.189): on a computer, Rapports, Configuration and Historique paie (4 tabs or
+  more) list their tabs, indented with an icon, under their entry in the sidebar instead of a row of horizontal tabs (the
+  row comes back when the menu is hidden). A phone keeps the row of tabs and also lists them in the menu drawer. The
+  `?tab=` address and the access rules are unchanged. Pages with 3 tabs or fewer keep horizontal tabs.
 - **V2 removed** (V2.4.186): one menu, no V2 | V3 selector. An old V2 address (`#/manager/timesheets`,
   `payroll/das`, `config/rules`…) opens the page and tab that hold it now, with its filters (employee, day, method…).
 - **Inventory: who is away** (V2.4.187): an employee on full-day time off that day (leave, vacation, absence, sick,

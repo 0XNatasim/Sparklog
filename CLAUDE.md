@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.188)
+## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.189)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -919,6 +919,16 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   n'est jamais bloqué pour de bon : « Continuer quand même »). Gestion › Inventaire : « illisible » dans la
   colonne quantité (jamais masqué par « cacher les zéros »), message qui nomme les lignes, tuile « Capture de complément »
   dans Photos. Tests `inventory-items.test.js`, `InventoryStep.test.jsx`.
+- [x] **Menu imbriqué pour les pages à plusieurs onglets** (V2.4.189, aucune migration ; proposé par Grok, branche
+  `ccr-e5260b43-lc4j8l`, repris sur `main`) : une page de 4 onglets ou plus (`hasNestedTabs`, `NESTED_TABS_MIN`,
+  `src/lib/manager-nav.js` : Historique paie, Rapports, Configuration) montre ses onglets en sous-entrées indentées (icône,
+  `TAB_ICONS`) sous son entrée de la barre latérale, sur ordinateur (aussi en mode rail, icônes seules) et dans le tiroir du
+  téléphone, tant que la page est ouverte (`nestedTabs`, `tabPath`, `ManagerLayout.jsx`). Même `?tab=`, mêmes droits
+  (`visibleTabs` / `resolveTab`), même chargement à la demande. `TabbedPage` cache sa rangée d'onglets **seulement sur
+  ordinateur quand le menu est affiché** (`md:hidden`, `SidebarTabsContext`, `nav-context.js`) : le téléphone garde la rangée
+  (son menu est un tiroir fermé ; la version de Grok la cachait aussi sur téléphone : 2 touches pour changer d'onglet et
+  l'onglet ouvert invisible). 3 onglets ou moins : onglets horizontaux comme avant. Tests `manager-nav.test.js`,
+  `TabbedPage.test.jsx`.
 - [x] **Liste des employés sur téléphone** (V2.4.184, aucune migration, V2 et V3) : `EmployeeCardHeader.jsx` mettait n°,
   icônes, nom, région, état et « manquant(s) » sur une seule ligne ; les étiquettes `shrink-0` écrasaient le nom
   (`truncate`) jusqu'à « J… » ou rien (comptes « En attente »). Maintenant : ligne 1 = n°, rôle, chef d'équipe, nom

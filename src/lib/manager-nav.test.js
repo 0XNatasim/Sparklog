@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
 import {
   MANAGER_NAV, MANAGER_NAV_ITEMS, MANAGER_PAGES, OLD_PATHS, canOpenNavItem, findNavItem, firstAllowedPath,
-  legacySectionTarget, oldPathTarget, resolveTab, visibleManagerNav, visibleTabs,
+  hasNestedTabs, legacySectionTarget, nestedTabs, oldPathTarget, resolveTab, tabPath, visibleManagerNav, visibleTabs,
 } from "./manager-nav";
 import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
 
@@ -178,5 +178,32 @@ describe("legacy ?section= links", () => {
   it("ignores unknown or missing sections", () => {
     expect(legacySectionTarget("")).toBeNull();
     expect(legacySectionTarget("?section=bogus")).toBeNull();
+  });
+});
+
+describe("tabs nested in the sidebar (4 tabs or more)", () => {
+  it("nests exactly Rapports, Configuration and Historique paie", () => {
+    expect(entries.filter(hasNestedTabs).map((i) => i.id)).toEqual(["v3-pay-history", "v3-reports", "v3-config"]);
+  });
+
+  it("lists, for a nested entry, the tabs the person may open, in order", () => {
+    expect(nestedTabs(byId("v3-reports"), "manager", []).map((t) => t.key)).toEqual(["costs", "week", "month", "grid", "ccq"]);
+    expect(nestedTabs(byId("v3-config"), "owner", []).map((t) => t.key)).toEqual(visibleTabs(byId("v3-config"), "owner", []).map((t) => t.key));
+    expect(nestedTabs(byId("v3-config"), "employee", [])).toEqual([]);
+  });
+
+  it("keeps horizontal tabs (no children) for pages of 3 tabs or fewer", () => {
+    expect(nestedTabs(byId("v3-time"), "manager", [])).toEqual([]);
+    expect(nestedTabs(byId("v3-team"), "manager", [])).toEqual([]);
+  });
+
+  it("links each child to its ?tab= and resolves it back", () => {
+    for (const item of entries.filter(hasNestedTabs)) {
+      for (const child of nestedTabs(item, "owner", [])) {
+        const url = new URL(tabPath(item, child.key), "http://x");
+        expect(url.pathname).toBe(`/manager/${item.path}`);
+        expect(resolveTab(item, "owner", [], url.searchParams.get("tab"))).toBe(child.key);
+      }
+    }
   });
 });
