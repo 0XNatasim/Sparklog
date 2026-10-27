@@ -1,5 +1,5 @@
 // Trajets, km et frais — one rule per employee and per line (owner decision 2026-10-18, NOOB.md
-// étape 7). Gestion › Admin › Trajets et frais records the choices; the payroll engine does NOT read
+// étape 6). Gestion › Admin › Trajets et frais records the choices; the payroll engine does NOT read
 // them yet: the default of each line is what the app pays today. Keep the keys and choices in step
 // with the check constraint of migration 0101 (travel-rules.test.js reads it).
 

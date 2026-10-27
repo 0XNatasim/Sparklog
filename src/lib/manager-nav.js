@@ -49,7 +49,7 @@ const MENU_ONLY_ITEMS = Object.freeze([
   { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
   // My own notes and reminders (0111): private to each manager / owner.
   { id: "notes", path: "notes", grant: null, labelKey: "mgr.nav3.notes" },
-  // Trajets, km et frais: one setting per employee and per line (NOOB.md étape 7). Manager / owner only.
+  // Trajets, km et frais: one setting per employee and per line (NOOB.md étape 6). Manager / owner only.
   { id: "advanced-travel-rules", path: "advanced/travel-rules", grant: null, labelKey: "mgr.nav3.travelRules" },
   { id: "v3-time", path: "v3/time", grant: null, labelKey: "mgr.nav.timesheets", tabs: [
     tab("timesheets", "timesheets", "mgr.nav.timesheets"),
