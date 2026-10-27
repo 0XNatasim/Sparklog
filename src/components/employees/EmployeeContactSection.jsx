@@ -60,7 +60,7 @@ export default function EmployeeContactSection({ profile: p, panel }) {
         </div>
       )}
 
-      {/* Ligne : date de naissance · NAS · date d'embauche · dernier jour travaillé (0115). */}
+      {/* Ligne : date de naissance · NAS · date d'embauche · date de réembauche (0119) · dernier jour travaillé (0115). */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label={t("employees.birthDate")}>
           <Input type="date" value={p.birth_date || ""} onChange={(e) => setLocal(p.id, "birth_date", e.target.value)} onBlur={(e) => saveField(p.id, "birth_date", e.target.value)} className="h-9" />
@@ -80,6 +80,17 @@ export default function EmployeeContactSection({ profile: p, panel }) {
             className="h-9"
           />
           <span className="text-xs text-muted-foreground">{t("employees.dates.hireHint")}</span>
+        </Field>
+        <Field label={t("employees.dates.rehire")}>
+          <Input
+            type="date"
+            value={p.rehire_date || ""}
+            min={p.start_date || undefined}
+            onChange={(e) => setLocal(p.id, "rehire_date", e.target.value)}
+            onBlur={(e) => saveEmploymentDate(p, "rehire_date", e.target.value)}
+            className="h-9"
+          />
+          <span className="text-xs text-muted-foreground">{t("employees.dates.rehireHint")}</span>
         </Field>
         <Field label={t("employees.dates.lastWorked")}>
           <Input

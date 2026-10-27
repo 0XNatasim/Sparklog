@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.190)
+## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.193)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -955,6 +955,16 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `ManagerLayout.jsx`). `src/lib/notes.js` (`repliesByNote`, `newReplyIds`, `visibleReplies`, `cleanReplyBody`). Testé sur
   Postgres local (deux gestionnaires, employé, anon, note privée, heure forgée, cascade). Tests `notes.test.js`,
   `NotesPanel.test.jsx`. Pas de notification téléphone.
+- [x] **Date de réembauche** (V2.4.193, migration 0119) : `profiles.rehire_date` (contrainte
+  `profiles_rehire_after_start_chk` : jamais avant `start_date` ; `last_work_date` peut être avant, c'est l'ancien départ).
+  `audit_profile_change` reprend les 5 entrées de 0115 (identique à la production) et ajoute `rehire_date_change`. Écriture
+  réservée aux gestionnaires par la liste blanche 0018 (colonne absente de la liste employé, vérifiée en production).
+  Fiche › Identité (`EmployeeContactSection`) : champ entre embauche et dernier jour, `saveEmploymentDate` →
+  `employmentDatesError(start, last, rehire)` (`employees.dates.rehireOrder`). Relevé d'emploi : `roeEmploymentDates` — case 10
+  = réembauche, sinon embauche, sinon déduit des paies ; case 11 = dernier jour travaillé sauf s'il est avant la réembauche ;
+  les 53 périodes s'arrêtent à la case 10. Le statut (« En attente », actif, ancien employé) ne lit pas la réembauche.
+  Testé sur Postgres local (contrainte, Journal, employé refusé, migration rejouée). Test `employment-dates.test.js`.
+  **À faire (propriétaire)** : vérifier la date d'embauche / réembauche de chaque employé.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie

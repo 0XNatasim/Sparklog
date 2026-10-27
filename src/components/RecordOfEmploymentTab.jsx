@@ -85,7 +85,7 @@ export default function RecordOfEmploymentTab() {
       try {
         const { data, error: e } = await supabase
           .from("profiles")
-          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, start_date, last_work_date")
+          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, start_date, last_work_date, rehire_date")
           .eq("role", "employee")
           .order("full_name", { ascending: true });
         if (e) throw e;
@@ -165,7 +165,8 @@ export default function RecordOfEmploymentTab() {
     const starts = [ledger[0]?.period_start, history[0]?.period_start, firstJob].filter(Boolean).sort();
     const ends = [ledger[ledger.length - 1]?.period_end, history[history.length - 1]?.period_end, lastJob].filter(Boolean).sort();
     const finalPeriodEnd = ledger[ledger.length - 1]?.period_end || ends[ends.length - 1] || null;
-    // Hiring date / last day worked from the employee card (0115) when filled, else guessed from the data.
+    // Hiring or rehire date / last day worked from the employee card (0115, 0119) when filled, else guessed
+    // from the data. A rehire date also stops the weekly periods below (the earlier period was on a previous ROE).
     const { firstDay, lastDay } = roeEmploymentDates({ firstDay: starts[0] || null, lastDay: lastJob || finalPeriodEnd }, employee);
 
     // Annexe D: report CONSECUTIVE weekly pay periods, counting back from the final pay

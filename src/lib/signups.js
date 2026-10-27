@@ -43,19 +43,26 @@ export function employmentUpdate(choice, startDate, previous) {
   return previous === NEW_HIRE ? { departure_status: null, start_date: null } : { departure_status: null };
 }
 
-// Date d'embauche (start_date, 0110) and dernier jour travaillé (last_work_date, 0115): the last day can never
-// be before the hiring date (the database refuses the same). Returns an i18n key, or null when fine.
-export function employmentDatesError(startDate, lastWorkDate) {
+// Date d'embauche (start_date, 0110), dernier jour travaillé (last_work_date, 0115) and date de réembauche
+// (rehire_date, 0119): neither the last day nor the rehire date can be before the hiring date (the database
+// refuses the same). The last day may be before the rehire date (the earlier departure). Returns an i18n key,
+// or null when fine.
+export function employmentDatesError(startDate, lastWorkDate, rehireDate = null) {
   if (startDate && lastWorkDate && lastWorkDate < startDate) return "employees.dates.order";
+  if (startDate && rehireDate && rehireDate < startDate) return "employees.dates.rehireOrder";
   return null;
 }
 
-// Relevé d'emploi: the dates typed in the employee card win over the ones guessed from the pay data
-// (block 10 « Premier jour travaillé » = hiring date, block 11 « Dernier jour payé » = last day worked).
+// Relevé d'emploi: the dates typed in the employee card win over the ones guessed from the pay data.
+// Block 10 « Premier jour travaillé » = the rehire date when there is one (the current period of employment;
+// the earlier one was on a previous ROE), else the hiring date. Block 11 « Dernier jour payé » = the last day
+// worked, unless it is before the rehire date (that was the earlier departure).
 export function roeEmploymentDates(computed, profile) {
+  const rehire = profile?.rehire_date || null;
+  const last = profile?.last_work_date || null;
   return {
-    firstDay: profile?.start_date || computed?.firstDay || null,
-    lastDay: profile?.last_work_date || computed?.lastDay || null,
+    firstDay: rehire || profile?.start_date || computed?.firstDay || null,
+    lastDay: (last && !(rehire && last < rehire) ? last : null) || computed?.lastDay || null,
   };
 }
 
