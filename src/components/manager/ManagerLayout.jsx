@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  BarChart3, BookOpen, Calculator, Calendar, CalendarCheck, CalendarDays, ChevronDown, ClipboardList, Clock3, Coins,
+  BarChart3, BookOpen, Calculator, CalendarCheck, CalendarDays, ChevronDown, ClipboardList, Clock3, Coins,
   Contact, FileCheck, FileDown, FilePlus2, FileText, HeartPulse, History, Landmark, LayoutGrid, ListChecks, LogOut, Megaphone,
   Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Percent, Radio, Receipt, RefreshCw, Scale, ScrollText, Settings,
   ShieldCheck, StickyNote, SlidersHorizontal, Sun, UserCircle, Users, Wallet, Wrench, X,
@@ -55,7 +55,7 @@ const ICONS = {
 // Icons of the tabs nested under a many-tab page (tab keys are unique across those pages).
 const TAB_ICONS = {
   stubs: Receipt, das: Landmark, roe: FileCheck, calcul: Calculator,
-  costs: Coins, week: CalendarDays, month: Calendar, grid: LayoutGrid, ccq: FileDown,
+  costs: Coins, period: CalendarDays, grid: LayoutGrid, ccq: FileDown,
   settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact,
 };
 

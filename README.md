@@ -65,7 +65,7 @@ the V2 | V3 selector are gone, and old V2 addresses (bookmarks, old links) open 
 | **Time** | Timesheets [Timesheets · Unlock a day · Days without entry] — employee name first on each card, « Entered by hand » ★ filter |
 | **Payroll** (open) | Weekly payroll · Payroll history [Pay stubs · DAS · Record of employment · Detailed calculation] |
 | **Team** | Employees [Employees (one card with tabs: identity, CCQ, pay and options, taxes, time off, access) · Time off · Groups] · Inventory · Communications |
-| **Reports** | Reports [Costs · Week · Month · By employee (grid) · CCQ export] |
+| **Reports** | Reports [Costs · Week / Month · Summary · CCQ export] |
 | **Configuration** | Configuration [Settings · CCQ rates · Pay rules · Forms · References · Contacts (with roles)] |
 | **Admin** | Travel and expenses (per-employee rules, not yet read by payroll) · Activity log · Service status · Emergency timesheet (owner only) |
 
@@ -170,6 +170,11 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   report goes by the SIN; the CCQ-card capture keeps the expiry and birth dates only, and the number is not a missing
   field any more). The « CCQ # » line of the pay stubs now shows the employer's CCQ number, like Dynacom's stubs (it
   showed the employee's). Time off is entered only in Team › Absences. Existing CCQ numbers stay in the database.
+- **Reports tabs** (V2.4.191): « By employee (grid) » is now **Summary**, and Week and Month are one tab **Week / Month**
+  with a Week | Month switch (`?view=month`; former `?tab=week` / `?tab=month` links still open it). A line under each
+  report says what it shows: **Costs** = what each employee costs (pay, employer charges, km, expenses) for a week, the
+  month or the year; **Week / Month** = the whole team's totals per CCQ week or monthly CCQ period; **Summary** = each
+  employee's hours for one CCQ week, day by day, with the printable weekly summary.
 - **Replies on shared notes** (V2.4.190, migration 0118): under a shared note (Today › Notes) the managers answer each
   other like in a chat: my replies on the right in green, the others' on the left in blue with their name. A reply
   written since I last opened Notes is marked « Nouveau », its note comes first with « N nouvelle(s) réponse(s) », and

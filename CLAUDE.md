@@ -966,6 +966,15 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   `calcul-talon.js` / `dynacom-cumulative-talon.js` ; avant, c'était le n° de l'employé (test `calcul-talon.test.js`). Onglet `timeoff` retiré de `EMPLOYEE_CARD_TABS` et
   bloc Congés de `EmployeeDetails` ; `EmployeesPanel` ne lit plus `employee_time_off` (les absences : Équipe › Absences,
   `CongesManager`). Tests `employee-card.test.js`, `EmployeesPanel.test.jsx`.
+- [x] **Rapports : Semaine / Mois en un onglet, « Sommaire »** (V2.4.191, aucune migration) : `v3-reports` passe de 5 à 4
+  onglets — `costs`, `period` (« Semaine / Mois », `PeriodReport` dans `ManagerPages.jsx` : boutons Semaine | Mois, `?view=month`,
+  même `PeriodSummary`), `grid` (libellé « Sommaire », `WeekViewTab`, clé gardée pour les liens) et `ccq`. Anciennes clés :
+  `aliases` de l'entrée (`week` → `period`, `month` → `period` + `view=month`), lues par `resolveTab` / `tabAlias`
+  (`src/lib/manager-nav.js`) ; `TabbedPage` remet `?tab=period&view=month` dans l'adresse. `OLD_PATHS["reports/period"]` →
+  `period`, `?view=grid` → `grid`, `?view=month` gardé. Une phrase sous chaque rapport (`ReportHint`,
+  `mgr.reports.hint.*`) dit ce qu'il montre. Toujours 4 onglets, donc imbriqués dans le menu (`NESTED_TABS_MIN`).
+  Mêmes droits (`reports-period`, gestionnaire). Tests `manager-nav.test.js`, `TabbedPage.test.jsx`,
+  `authorization-matrix.test.js`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)
 - [x] Filtres gestionnaire (V2.4.107) : `src/lib/latest-request.js` (`useLatestRequest`) — chaque chargement
   annule le précédent (AbortController) et seule la dernière réponse s'applique ; `withRetry` ne réessaie
