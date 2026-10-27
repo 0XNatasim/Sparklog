@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.192 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.193 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`.
 
@@ -166,6 +166,10 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
 - **Employees in no group** (V2.4.185): Team › Groups lists the active field employees (and new hires waiting to start)
   who are in no group (warehouse), with an « Add to… » picker to put each one in a group. Office staff, managers, the
   owner and paused accounts are not listed.
+- **Rehire date** (V2.4.193, migration 0119): the employee card (Identity) has a « Rehire date » next to the hiring
+  date, for someone back after a layoff or a departure. The Record of employment then starts there (block 10 « First day
+  worked » and its weekly pay periods), since the earlier period was on a previous ROE; a last day worked before the
+  rehire date (the earlier departure) is ignored. Never before the hiring date; managers only; every change in the Audit log.
 - **Employee card: no CCQ number, no Time off tab** (V2.4.192): the card no longer asks for the CCQ number (the CCQ
   report goes by the SIN; the CCQ-card capture keeps the expiry and birth dates only, and the number is not a missing
   field any more). The « CCQ # » line of the pay stubs now shows the employer's CCQ number, like Dynacom's stubs (it

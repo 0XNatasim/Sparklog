@@ -26,7 +26,7 @@ import { DEPARTURE_STATUSES, NEW_HIRE, SIGNUPS_EVENT, employeeStatus, employment
 // Gestion › Employés: loads the roster and owns every write; the card pieces live in
 // src/components/employees/ and the pure rules (order, CCQ rates, counters) in src/lib/employees-panel.js.
 
-const PROFILE_COLUMNS = "id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, last_work_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, first_trip_unpaid, phone_data_reimbursement, storage_compensation, storage_compensation_amount, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path";
+const PROFILE_COLUMNS = "id, role, type_confirmed, admin_sections, full_name, phone, email, is_paused, departure_status, departure_note, start_date, last_work_date, rehire_date, employee_number, ccq_number, ccq_expiration_date, birth_date, apprentice_level, work_region, union_association, wage_schedule, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, first_trip_unpaid, phone_data_reimbursement, storage_compensation, storage_compensation_amount, parking_receipts_enabled, inventory_screenshots_enabled, overtime_first_hour_double, return_with_benefits_to_8h, ccq_card_capture_enabled, birth_date_capture_enabled, union_association_capture_enabled, ccq_card_path";
 
 // Everything the panel shows: profiles (in list order), current CCQ rates, sign-ups waiting for
 // activation, two-factor / notification / NAS presence (ids only) and the dry-run rate suggestions.
@@ -216,7 +216,8 @@ export default function EmployeesPanel({ tabbed = false }) {
     const value = rawValue || null;
     const start = field === "start_date" ? value : p.start_date;
     const last = field === "last_work_date" ? value : p.last_work_date;
-    const problem = employmentDatesError(start, last);
+    const rehire = field === "rehire_date" ? value : p.rehire_date;
+    const problem = employmentDatesError(start, last, rehire);
     if (problem) { setErr(t(problem)); return; }
     setErr("");
     setLocal(p.id, field, value);
