@@ -13,7 +13,7 @@ import {
   travelRuleValue, weekStartOf,
 } from "@/lib/travel-rules";
 
-// Gestion › Admin › Trajets et frais (NOOB.md étape 7): every travel / km / expense line in one place,
+// Gestion › Admin › Trajets et frais (NOOB.md étape 6): every travel / km / expense line in one place,
 // one setting per employee. « Pour tous » applies a line to every employee; « Choisir » asks which ones.
 // Recorded only: the payroll engine keeps paying each line's default until it reads these settings.
 export default function TravelRulesManager() {
