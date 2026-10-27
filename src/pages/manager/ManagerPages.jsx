@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
-import { MANAGER_NAV_ITEMS, firstAllowedPath, hasNestedTabs, legacySectionTarget, oldPathTarget, resolveTab, visibleTabs } from "@/lib/manager-nav";
+import { MANAGER_NAV_ITEMS, firstAllowedPath, hasNestedTabs, legacySectionTarget, oldPathTarget, resolveTab, tabAlias, visibleTabs } from "@/lib/manager-nav";
 import { useSidebarTabs } from "@/components/manager/nav-context";
 import { lazyPanel } from "@/components/lazy-panel";
 
@@ -252,8 +252,11 @@ function TabbedPage({ itemId, content }) {
     if (!active || requested === active) return;
     const next = new URLSearchParams(params);
     next.set("tab", active);
+    // A former tab (« month ») may also choose the view of the tab that replaced it.
+    const alias = tabAlias(item, requested);
+    if (alias?.tab === active && alias.view) next.set("view", alias.view);
     setParams(next, { replace: true });
-  }, [active, requested, params, setParams]);
+  }, [active, requested, params, setParams, item]);
 
   if (!active) return <Navigate to="/manager" replace />;
 
@@ -288,11 +291,55 @@ const PAY_HISTORY_TABS = {
 };
 // Employés: one card per employee with tabs (it also holds Règles de temps and the TD1 forms).
 const TEAM_TABS = { employees: () => <EmployeesPanel tabbed />, absences: AbsencesPage, groups: () => <GroupsManager /> };
+// One line under each report says what it shows (Coûts, Semaine / Mois and Sommaire are easy to confuse).
+function ReportHint({ which, children }) {
+  const t = useT();
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">{t(`mgr.reports.hint.${which}`)}</p>
+      {children}
+    </div>
+  );
+}
+
+// Semaine / Mois: the team's totals by CCQ week or by monthly CCQ period, the view in the URL (?view=month).
+function PeriodReport() {
+  const t = useT();
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "month" ? "month" : "week";
+  function choose(next) {
+    const p = new URLSearchParams(params);
+    if (next === "month") p.set("view", "month"); else p.delete("view");
+    setParams(p, { replace: true });
+  }
+  return (
+    <ReportHint which="period">
+      <div role="radiogroup" aria-label={t("mgr.reports.periodView")} className="inline-flex rounded-md border bg-background p-0.5">
+        {["week", "month"].map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={view === key}
+            onClick={() => choose(key)}
+            className={cn(
+              "min-h-9 rounded px-4 text-sm font-semibold",
+              view === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t(`mgr.nav3.tab.${key}`)}
+          </button>
+        ))}
+      </div>
+      <PeriodSummary mode={view} />
+    </ReportHint>
+  );
+}
+
 const REPORTS_TABS = {
-  costs: CostsPage,
-  week: () => <PeriodSummary mode="week" />,
-  month: () => <PeriodSummary mode="month" />,
-  grid: () => <WeekViewTab />,
+  costs: () => <ReportHint which="costs"><CostsPage /></ReportHint>,
+  period: PeriodReport,
+  grid: () => <ReportHint which="grid"><WeekViewTab /></ReportHint>,
   // CCQ export only: the DAS (already in Historique paie) and the « bientôt » bank card are left out.
   ccq: () => <CcqJsonExport lastFinishedMonth />,
 };

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { APPLICATION_ROLES, authorizationFor } from "./authorization-matrix";
 import {
   MANAGER_NAV, MANAGER_NAV_ITEMS, MANAGER_PAGES, OLD_PATHS, canOpenNavItem, findNavItem, firstAllowedPath,
-  hasNestedTabs, legacySectionTarget, nestedTabs, oldPathTarget, resolveTab, tabPath, visibleManagerNav, visibleTabs,
+  hasNestedTabs, legacySectionTarget, nestedTabs, oldPathTarget, resolveTab, tabAlias, tabPath, visibleManagerNav, visibleTabs,
 } from "./manager-nav";
 import { GRANTABLE_ADMIN_SECTIONS } from "./roles";
 
@@ -37,12 +37,12 @@ describe("Gestion menu", () => {
     expect(MANAGER_NAV.filter((group) => group.open).map((group) => group.id)).toEqual(["today", "payroll"]);
   });
 
-  it("reaches every page, as an entry or as a tab (reports-period as 3 views, references, employees and the journal as 2)", () => {
+  it("reaches every page, as an entry or as a tab (reports-period, references, employees and the journal as 2)", () => {
     const reached = reachable("owner", []);
     const unique = [...new Set(reached)];
     expect(unique.filter((id) => !id.startsWith("inline:")).sort())
       .toEqual(MANAGER_PAGES.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "notes").sort());
-    expect(reached.filter((id) => id === "reports-period")).toHaveLength(3); // Semaine · Mois · Par employé
+    expect(reached.filter((id) => id === "reports-period")).toHaveLength(2); // Semaine / Mois · Sommaire
     expect(reached.filter((id) => id === "references")).toHaveLength(2); // Références · Contacts (same rows)
     expect(reached.filter((id) => id === "employees")).toHaveLength(2); // Employés · Groupes (same rule, 0114)
     expect(reached.filter((id) => id === "advanced-audit")).toHaveLength(2); // Journal · Temps › Jours sans saisie
@@ -110,6 +110,15 @@ describe("Gestion menu", () => {
     expect(resolveTab(todo, "employee", [], null)).toBeNull();
   });
 
+  it("opens Semaine / Mois for the former Semaine and Mois tabs (bookmarks, old links)", () => {
+    const reports = byId("v3-reports");
+    expect(resolveTab(reports, "manager", [], "week")).toBe("period");
+    expect(resolveTab(reports, "manager", [], "month")).toBe("period");
+    expect(tabAlias(reports, "month")).toEqual({ tab: "period", view: "month" });
+    expect(tabAlias(reports, "costs")).toBeNull();
+    expect(tabAlias(byId("v3-config"), "week")).toBeNull();
+  });
+
   it("finds menu entries by path", () => {
     expect(findNavItem("/v3/pay-history/")?.id).toBe("v3-pay-history");
     expect(findNavItem("payroll/week")?.id).toBe("payroll-week");
@@ -146,9 +155,10 @@ describe("old paths (the V2 menu, removed in V2.4.186)", () => {
     expect(oldPathTarget("config/references", "")).toBe("v3/config?tab=references");
     expect(oldPathTarget("config/rules", "")).toBe("v3/team?tab=employees");
     expect(oldPathTarget("receipts", "?filter=meals&job=9")).toBe("todo?filter=meals&job=9&tab=receipts");
-    expect(oldPathTarget("reports/period", "?view=month")).toBe("v3/reports?tab=month");
+    expect(oldPathTarget("reports/period", "?view=month")).toBe("v3/reports?view=month&tab=period");
     expect(oldPathTarget("reports/period", "?view=grid&week=2026-10-11")).toBe("v3/reports?week=2026-10-11&tab=grid");
-    expect(oldPathTarget("reports/period", "")).toBe("v3/reports?tab=week");
+    expect(oldPathTarget("reports/period", "")).toBe("v3/reports?tab=period");
+    expect(oldPathTarget("reports/period", "?view=week")).toBe("v3/reports?tab=period");
     expect(oldPathTarget("payroll/das", "?method=book")).toBe("v3/pay-history?method=book&tab=das");
   });
 
@@ -187,7 +197,7 @@ describe("tabs nested in the sidebar (4 tabs or more)", () => {
   });
 
   it("lists, for a nested entry, the tabs the person may open, in order", () => {
-    expect(nestedTabs(byId("v3-reports"), "manager", []).map((t) => t.key)).toEqual(["costs", "week", "month", "grid", "ccq"]);
+    expect(nestedTabs(byId("v3-reports"), "manager", []).map((t) => t.key)).toEqual(["costs", "period", "grid", "ccq"]);
     expect(nestedTabs(byId("v3-config"), "owner", []).map((t) => t.key)).toEqual(visibleTabs(byId("v3-config"), "owner", []).map((t) => t.key));
     expect(nestedTabs(byId("v3-config"), "employee", [])).toEqual([]);
   });

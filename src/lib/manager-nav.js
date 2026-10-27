@@ -71,11 +71,12 @@ const MENU_ONLY_ITEMS = Object.freeze([
   ] },
   { id: "v3-reports", path: "v3/reports", grant: null, labelKey: "mgr.nav3.reports", tabs: [
     tab("costs", "reports-costs", "mgr.nav.costs"),
-    tab("week", "reports-period", "mgr.nav3.tab.week"),
-    tab("month", "reports-period", "mgr.nav3.tab.month"),
+    tab("period", "reports-period", "mgr.nav3.tab.period"),
     tab("grid", "reports-period", "mgr.nav3.tab.grid"),
     tab("ccq", "reports-downloads", "mgr.nav3.tab.ccqExport"),
-  ] },
+  ],
+  // Semaine and Mois were two tabs before V2.4.191: their links open « Semaine / Mois » on that view.
+  aliases: { week: { tab: "period" }, month: { tab: "period", view: "month" } } },
   { id: "v3-config", path: "v3/config", grant: null, labelKey: "mgr.nav3.config", tabs: [
     tab("settings", "config-settings", "mgr.nav.settings"),
     tab("ccq-rates", "reports-ccq", "mgr.nav.ccq"),
@@ -132,7 +133,13 @@ export function visibleTabs(item, role, adminSections) {
 // The tab to show for `requested` (?tab=): it when allowed, else the first allowed one, else null.
 export function resolveTab(item, role, adminSections, requested) {
   const allowed = visibleTabs(item, role, adminSections);
-  return (allowed.find((t) => t.key === requested) || allowed[0] || null)?.key ?? null;
+  const key = tabAlias(item, requested)?.tab ?? requested;
+  return (allowed.find((t) => t.key === key) || allowed[0] || null)?.key ?? null;
+}
+
+// A former tab key of this entry (old link or bookmark) → { tab, view? } it opens now; null otherwise.
+export function tabAlias(item, requested) {
+  return (requested && item?.aliases?.[requested]) || null;
 }
 
 // Same rule as canAccessSection: the menu and the route guard cannot disagree.
@@ -182,7 +189,7 @@ export const OLD_PATHS = Object.freeze({
   "payroll/roe": { path: "v3/pay-history", tab: "roe" },
   "payroll/calcul": { path: "v3/pay-history", tab: "calcul" },
   "reports/costs": { path: "v3/reports", tab: "costs" },
-  "reports/period": { path: "v3/reports", tab: "week" }, // ?view=month|grid → that tab
+  "reports/period": { path: "v3/reports", tab: "period" }, // ?view=grid → Sommaire; ?view=month kept
   "reports/downloads": { path: "v3/reports", tab: "ccq" },
   "config/settings": { path: "v3/config", tab: "settings" },
   "config/rules": { path: "v3/team", tab: "employees" }, // Règles de temps: in each employee's card
@@ -191,7 +198,6 @@ export const OLD_PATHS = Object.freeze({
   forms: { path: "v3/config", tab: "forms" },
   "config/references": { path: "v3/config", tab: "references" },
 });
-const PERIOD_VIEW_TABS = ["month", "grid"]; // Semaine / mois's ?view= values that are tabs now
 
 // Where an old path + query lands now, keeping the other parameters (employee, day, filter, job,
 // method…); null when `path` is not an old path.
@@ -202,8 +208,9 @@ export function oldPathTarget(path, search = "") {
   const params = new URLSearchParams(search);
   let tabKey = eq.tab;
   if (clean === "reports/period") {
-    if (PERIOD_VIEW_TABS.includes(params.get("view"))) tabKey = params.get("view");
-    params.delete("view");
+    // Semaine / mois's ?view=: « grid » is the Sommaire tab now, « month » the month view of Semaine / Mois.
+    if (params.get("view") === "grid") tabKey = "grid";
+    if (params.get("view") !== "month") params.delete("view");
   }
   params.set("tab", tabKey);
   return withQuery(eq.path, params);
