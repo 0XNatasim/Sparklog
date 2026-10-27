@@ -10,6 +10,10 @@
   2026-10-23, presque toutes les fiches de la semaine sont **soumises mais pas approuvées**, et rien n'est encore
   comptabilisé. Dans l'ordre : **À traiter** (approuver) › **Paie › Paie de la semaine** (semaine 43, « Calculer et
   comptabiliser ») › imprimer les talons. Puis la semaine 44 de la même façon.
+- ℹ️ **Nouveau menu (V2.4.189)** : sur ordinateur, dans Rapports, Configuration et Historique paie, les onglets
+  apparaissent en liste sous le nom de la page dans le menu de gauche (plus de rangée au-dessus de la page ; elle revient
+  si tu masques le menu). Sur téléphone, la rangée reste au-dessus de la page et la liste est aussi dans le bouton
+  « Menu ». Rien d'autre ne change.
 - ✅ L'app fonctionne et les heures sont bien classées. Toutes tes décisions de paie sont dans l'app.
 - ⚠️ **Les montants en dollars de la paie** (avantages CCQ, impôts, cotisations) sont **des estimations**.
   Ils restent « à réviser » tant que les étapes 1 à 4 ci-dessous ne sont pas faites.
