@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { sumCrewDefective, sumCrewInventory, sumRegionInventory, inventoryRegionChoices, compareInventory, effectiveOcrStatus, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { sumCrewDefective, sumCrewInventory, sumRegionInventory, inventoryRegionChoices, compareInventory, effectiveOcrStatus, markInventoryAbsences, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 import { inventoryCaptured, inventoryStepComplete } from "./inventory-screenshots";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -361,5 +361,32 @@ describe("negative quantities read from the capture (Field Service « -1,00 »)"
     expect(parsed.items.find((item) => item.code === "EQ000046")).toEqual({ code: "EQ000046", name: "Sinope - 3000W", quantity: 0, section: "inventory" });
     expect(parsed.items.find((item) => item.code === "EQ000047").quantity).toBe(10);
     expect(parsed.items.every((item) => item.quantity >= 0)).toBe(true);
+  });
+});
+
+describe("markInventoryAbsences (Inventaire : employés en congé grisés)", () => {
+  const date = "2026-10-27"; // a Tuesday
+  const entry = (id, state) => ({ person: { id }, name: id, state });
+  const entries = [entry("a", "missing"), entry("b", "missing"), entry("c", "ok"), entry("d", "missing"), entry("e", "missing")];
+  const timeOff = [
+    { user_id: "a", category: "vacances", kind: "range", start_date: "2026-10-26", end_date: "2026-10-30" },
+    { user_id: "c", category: "maladie", kind: "range", start_date: "2026-10-27", end_date: "2026-10-27" },
+    { user_id: "d", category: "conge", kind: "range", start_date: "2026-10-27", end_date: "2026-10-27", start_time: "13:00" },
+    { user_id: "e", category: "temps_partiel", kind: "recurring_weekly", start_date: "2026-01-01", end_date: null, weekdays: [2], exception_dates: [] },
+    { user_id: "b", category: "absence", kind: "range", start_date: "2026-10-20", end_date: "2026-10-24" },
+  ];
+
+  it("greys out who is away all day without a list, at the end, and keeps the others", () => {
+    const result = markInventoryAbsences(entries, timeOff, date);
+    expect(result.map((r) => r.person.id)).toEqual(["b", "c", "d", "a", "e"]);
+    expect(result.find((r) => r.person.id === "a").off.category).toBe("vacances");
+    expect(result.find((r) => r.person.id === "e").off.category).toBe("temps_partiel"); // recurring weekday
+    expect(result.find((r) => r.person.id === "b").off).toBeNull(); // leave ended before
+    expect(result.find((r) => r.person.id === "c").off).toBeNull(); // sent a list anyway
+    expect(result.find((r) => r.person.id === "d").off).toBeNull(); // part of the day only
+  });
+
+  it("changes nothing without time off", () => {
+    expect(markInventoryAbsences(entries, [], date).map((r) => r.off)).toEqual([null, null, null, null, null]);
   });
 });

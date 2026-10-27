@@ -14,8 +14,10 @@ import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
 import { fetchGroups, inventoryGroupChoices, sumGroupInventory } from "@/lib/employee-groups";
-import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, inventoryRegionChoices, summarizeInventoryDay, sumCrewDefective, sumCrewInventory, sumRegionInventory } from "@/lib/inventory-items";
+import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, inventoryRegionChoices, markInventoryAbsences, summarizeInventoryDay, sumCrewDefective, sumCrewInventory, sumRegionInventory } from "@/lib/inventory-items";
 import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
+import { categoryLabel } from "@/lib/timeoff";
+import { isNewHire } from "@/lib/signups";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { alertDisplayName, dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -32,11 +34,12 @@ const CHIP_CLASS = {
 // Negative-stock notices of the last 7 days, as { rows } or { error }.
 const fetchAlerts = () => fetchInventoryNegativeAlerts().then((rows) => ({ rows }), (error) => ({ error }));
 
-// Employees (with the inventory option) and the day's screenshots and lines read. Throws on error.
+// Employees (with the inventory option), the day's screenshots and lines read, and the time off that
+// may cover the day (to grey out who was away). Throws on error.
 async function fetchInventoryDay(date) {
-  const [peopleResult, shotsResult, itemsResult] = await Promise.all([
+  const [peopleResult, shotsResult, itemsResult, timeOffResult] = await Promise.all([
     withTimeout(
-      supabase.from("profiles").select("id, full_name, email, role, is_paused, work_region, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
+      supabase.from("profiles").select("id, full_name, email, role, is_paused, departure_status, start_date, work_region, inventory_screenshots_enabled").order("full_name").limit(QUERY_BUDGETS.inventoryPeople),
       12000
     ),
     withTimeout(
@@ -49,9 +52,14 @@ async function fetchInventoryDay(date) {
         .eq("job_date", date).limit(QUERY_BUDGETS.inventoryItems),
       12000
     ),
+    withTimeout(
+      supabase.from("employee_time_off").select("user_id, category, kind, start_date, end_date, start_time, weekdays, exception_dates")
+        .lte("start_date", date).or(`end_date.gte.${date},end_date.is.null`).limit(QUERY_BUDGETS.inventoryPeople),
+      12000
+    ),
   ]);
-  for (const result of [peopleResult, shotsResult, itemsResult]) if (result.error) throw result.error;
-  return { people: peopleResult.data || [], shots: shotsResult.data || [], items: itemsResult.data || [] };
+  for (const result of [peopleResult, shotsResult, itemsResult, timeOffResult]) if (result.error) throw result.error;
+  return { people: peopleResult.data || [], shots: shotsResult.data || [], items: itemsResult.data || [], timeOff: timeOffResult.data || [] };
 }
 
 // Manager view of the end-of-shift inventory. One row per employee for the chosen day; a tap
@@ -62,6 +70,7 @@ export default function InventoryScreenshotsPanel() {
   const [people, setPeople] = useState([]);
   const [shots, setShots] = useState([]);
   const [items, setItems] = useState([]);
+  const [timeOff, setTimeOff] = useState([]);
   // The day the lists shown belong to, and when they were read (OCR still « reading » after a while
   // counts as failed). It is loading until the answer for the chosen day arrives.
   const [loadedDay, setLoadedDay] = useState({ date: null, at: 0 });
@@ -97,10 +106,11 @@ export default function InventoryScreenshotsPanel() {
   useEffect(() => { tRef.current = t; });
   const loading = loadedDay.date !== date || refreshing;
 
-  const applyDay = useCallback((day, { people: nextPeople, shots: nextShots, items: nextItems }) => {
+  const applyDay = useCallback((day, { people: nextPeople, shots: nextShots, items: nextItems, timeOff: nextTimeOff }) => {
     setPeople(nextPeople);
     setShots(nextShots);
     setItems(nextItems);
+    setTimeOff(nextTimeOff);
     setErr("");
     setLoadedDay({ date: day, at: Date.now() });
   }, []);
@@ -172,11 +182,16 @@ export default function InventoryScreenshotsPanel() {
     }
     const itemsBy = new Map();
     for (const item of items) itemsBy.set(item.user_id, [...(itemsBy.get(item.user_id) || []), item]);
-    return people
-      .filter((p) => p.inventory_screenshots_enabled || shotsBy.has(p.id))
+    // Expected: the option is on and the person works that day (not paused, gone, or yet to start).
+    // Anyone who sent screenshots is always listed.
+    const expected = (p) => p.inventory_screenshots_enabled && !p.is_paused && !p.departure_status && !isNewHire(p, date);
+    const rows = people
+      .filter((p) => expected(p) || shotsBy.has(p.id))
       .map((p) => ({ person: p, name: p.full_name || p.email || p.id, ...summarizeInventoryDay(shotsBy.get(p.id) || [], itemsBy.get(p.id) || []), shots: shotsBy.get(p.id) || [] }))
       .sort((a, b) => INVENTORY_STATE_ORDER.indexOf(a.state) - INVENTORY_STATE_ORDER.indexOf(b.state) || a.name.localeCompare(b.name, "fr-CA"));
-  }, [people, shots, items, requestedAt, loadedDay.at]);
+    // Away all day (congé, vacances, absence, maladie) without a list: greyed, at the end.
+    return markInventoryAbsences(rows, timeOff, date);
+  }, [people, shots, items, timeOff, date, requestedAt, loadedDay.at]);
 
   // The OCR runs in the background: keep refreshing quietly while some reading is pending.
   const pending = entries.some((entry) => entry.state === "reading");
@@ -268,6 +283,8 @@ export default function InventoryScreenshotsPanel() {
   const crewDefective = useMemo(() => sumCrewDefective(entries), [entries]);
 
   const received = entries.filter((entry) => entry.state !== "missing").length;
+  // People away all day are not counted as expected.
+  const expectedCount = entries.filter((entry) => !entry.off).length;
   const shiftDay = (days) => changeDate(dayjs(date).add(days, "day").format("YYYY-MM-DD"));
 
   function openAlert(alert) {
@@ -378,7 +395,7 @@ export default function InventoryScreenshotsPanel() {
           <Button type="button" variant="outline" size="icon" aria-label={t("mgr.inventory.nextDay")} onClick={() => shiftDay(1)}><ChevronRight className="h-4 w-4" /></Button>
           <Button type="button" variant="ghost" size="sm" disabled={date === companyDate()} onClick={() => changeDate(companyDate())}>{t("mgr.inventory.today")}</Button>
           <div className="ml-auto flex items-center gap-3">
-            {entries.length > 0 && <span className="text-sm text-muted-foreground">{t("mgr.inventory.received", { received, total: entries.length })}</span>}
+            {entries.length > 0 && <span className="text-sm text-muted-foreground">{t("mgr.inventory.received", { received, total: expectedCount })}</span>}
             <Button type="button" variant="outline" size="sm" onClick={() => setWhoOpen(true)}>
               <ListChecks className="mr-1 h-4 w-4" />{t("mgr.inventory.who")}
             </Button>
@@ -409,14 +426,19 @@ export default function InventoryScreenshotsPanel() {
                 key={entry.person.id}
                 type="button"
                 onClick={() => openCard(entry.person.id)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
+                  entry.off && "bg-muted/30 text-muted-foreground"
+                )}
               >
-                <span className="font-medium">{entry.name}</span>
+                <span className={cn("font-medium", entry.off && "font-normal")}>{entry.name}</span>
                 <span className="flex flex-wrap items-center justify-end gap-2">
                   {entry.defective.count > 0 && (
                     <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-destructive">{t("mgr.inventory.defectiveChip", { count: entry.defective.count })}</Badge>
                   )}
-                  <Badge variant="outline" className={CHIP_CLASS[entry.state]}>{chipLabel(entry)}</Badge>
+                  {entry.off
+                    ? <Badge variant="outline" className="text-muted-foreground">{t("mgr.inventory.state.off", { category: categoryLabel(entry.off.category, t) })}</Badge>
+                    : <Badge variant="outline" className={CHIP_CLASS[entry.state]}>{chipLabel(entry)}</Badge>}
                   <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 </span>
               </button>

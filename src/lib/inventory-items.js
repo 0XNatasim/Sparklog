@@ -1,6 +1,7 @@
 // Pure helpers behind the manager Inventory page: merge the rows read from the overlapping
 // screenshots (one to three) into one list, and summarize an employee's day.
 import { DEFECTIVE_SLOT } from "./inventory-screenshots";
+import { isOffOn } from "./timeoff";
 
 // Screenshots overlap (the last rows of one are the first of the next), so the same code can
 // come from several slots. Keep one row per code: the latest capture's quantity, the longest name.
@@ -148,4 +149,21 @@ export function sumCrewDefective(entries) {
     state: ["ok", "none"].includes(entry.defective?.state) ? "ok" : "review",
     items: entry.defective?.items || [],
   })));
+}
+
+// Employees away all day (a full-day time-off row: congé, vacances, absence, maladie…) who sent no
+// screenshot are not « missing »: they get `off` (the time-off row) and go to the end of the list,
+// shown greyed. Someone away who still sent a list keeps their normal state. Partial days
+// (start_time) do not count as away.
+export function markInventoryAbsences(entries, timeOffRows, date) {
+  const offBy = new Map();
+  for (const row of timeOffRows || []) {
+    if (row.start_time || offBy.has(row.user_id) || !isOffOn(row, date)) continue;
+    offBy.set(row.user_id, row);
+  }
+  const marked = (entries || []).map((entry) => ({
+    ...entry,
+    off: entry.state === "missing" ? offBy.get(entry.person.id) || null : null,
+  }));
+  return [...marked.filter((entry) => !entry.off), ...marked.filter((entry) => entry.off)];
 }

@@ -287,7 +287,7 @@ Décision : `--primary` passe au vert du logo Messier (clair `132 55% 28%` #206f
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-26, V2.4.186)
+## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.187)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Avancé ›
@@ -892,6 +892,18 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   Reste (ménage, sans effet visible) : les props qui choisissaient le rendu V3 (`EmployeesPanel tabbed`, `ManagerDashboard
   nameFirst / manualFilter / plainWords / reviewFilters`, `UnlockDayManager plainWords`, `SettingsPanel taxForms`,
   `CcqJsonExport lastFinishedMonth`) sont toujours passées ; le rendu V2 qu'elles désactivent est du code mort à retirer.
+- [x] **Inventaire : employés en congé grisés** (V2.4.187, aucune migration) : `fetchInventoryDay` lit aussi
+  `employee_time_off` qui couvre la date ; `markInventoryAbsences(entries, timeOffRows, date)` (`src/lib/inventory-items.js`)
+  donne `off` (la ligne de congé, `isOffOn`, journée entière seulement : pas de `start_time`) à une entrée « missing » et la
+  met en fin de liste ; affichage grisé, pastille `mgr.inventory.state.off` (« Absent · {catégorie} »), hors du compte
+  « reçus / attendus ». Attendus = option inventaire, ni pause, ni `departure_status`, ni `isNewHire` ; quiconque a envoyé
+  des captures reste listé. Test `inventory-items.test.js`.
+  **« La lecture automatique a trouvé 16 appareils… sur 17 »** (expliqué le 2026-10-27, rien changé) : du 2026-10-13 au
+  2026-10-26, 5 journées sur 42 (toujours 1 ligne sur 17) ; chaque fois une capture `needs_review` = `parseInventoryText`
+  a vu un code `EQ…` sans quantité après (ligne coupée au bord de la capture, ou nom long sur deux lignes) → `unparsed`,
+  ligne non enregistrée. Lignes perdues vues : « Module d'expansion pour pl… », « Sinope - 3000W », « Calypso V1 ». Piste
+  si on veut corriger : garder la ligne avec une quantité « illisible » (colonne `inventory_items.quantity` nullable,
+  `parse.ts` + redéploiement de `process_inventory_screenshot`) pour que la liste compte 17 et montre laquelle vérifier.
 - [x] **Liste des employés sur téléphone** (V2.4.184, aucune migration, V2 et V3) : `EmployeeCardHeader.jsx` mettait n°,
   icônes, nom, région, état et « manquant(s) » sur une seule ligne ; les étiquettes `shrink-0` écrasaient le nom
   (`truncate`) jusqu'à « J… » ou rien (comptes « En attente »). Maintenant : ligne 1 = n°, rôle, chef d'équipe, nom

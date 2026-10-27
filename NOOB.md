@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-26 (V2.4.186).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-27 (V2.4.187).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git).
 
@@ -201,6 +201,12 @@ Fait (V2.4.132 à V2.4.135) — menu V3 simplifié, de 26 à 13 entrées :
   liens et favoris de la V2 (Feuilles de temps, Talons, DAS, Règles de temps…) ouvrent la page et l'onglet qui les
   remplacent, avec le même employé, la même journée ou le même filtre. Rien ne change dans les droits : chacun voit les
   mêmes pages qu'avant.
+- [x] **Inventaire : employés en congé grisés** (V2.4.187) : un employé en congé toute la journée (congé, vacances,
+  absence, maladie, horaire réduit) qui n'a pas envoyé de liste apparaît en gris, en bas, avec « Absent · Vacances »
+  (par exemple) ; il ne compte plus dans « reçus / attendus ». Les comptes en pause, les anciens employés et les
+  nouveaux qui n'ont pas commencé n'y sont plus (sauf s'ils ont envoyé des captures). Une absence d'une partie de la
+  journée ne compte pas : la personne reste attendue. Pour qu'un congé grise quelqu'un, il doit être inscrit dans
+  Équipe › Absences (ou dans l'onglet Congés de sa fiche).
 
 ## Étape 7 — Temps de trajet, km et frais : une option par employé 👤 💻
 
