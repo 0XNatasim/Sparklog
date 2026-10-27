@@ -959,8 +959,11 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
   mensuel), le n° CCQ ne servait à rien. Retiré de `CcqDataFields` (onglet CCQ) et de l'en-tête de `EmployeeCcqSection`,
   de `CcqCardCapture` (la photo de la carte ne remplit plus que `ccq_expiration_date` et `birth_date` ; `ccq_number` n'est
   plus écrit), des champs obligatoires (`getMissingEmployeeFields`) et de la recherche (`matchesEmployeeSearch`). La
-  colonne `profiles.ccq_number` et ses valeurs restent : les talons (`paystub.js`, `calcul-talon.js`), le relevé d'emploi
-  et le cumul Dynacom l'impriment encore s'il existe (« — » sinon). Onglet `timeoff` retiré de `EMPLOYEE_CARD_TABS` et
+  colonne `profiles.ccq_number` et ses valeurs restent ; seul le relevé d'emploi l'imprime encore. Talons : la ligne « CCQ # »
+  affiche le n° CCQ **de l'employeur**, comme les talons Dynacom importés (décision du propriétaire) — constante
+  `EMPLOYER_CCQ_NUMBER` à côté de `EMPLOYER` (`src/lib/paystub.js`), lue par `stubSheetHtml`, `PayStubPrint.jsx`,
+  `legacy-talon-render.js` (`h.ccqNumber` d'un talon importé, sinon la constante) et mise dans l'en-tête de
+  `calcul-talon.js` / `dynacom-cumulative-talon.js` ; avant, c'était le n° de l'employé (test `calcul-talon.test.js`). Onglet `timeoff` retiré de `EMPLOYEE_CARD_TABS` et
   bloc Congés de `EmployeeDetails` ; `EmployeesPanel` ne lit plus `employee_time_off` (les absences : Équipe › Absences,
   `CongesManager`). Tests `employee-card.test.js`, `EmployeesPanel.test.jsx`.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2. (Faits : S-2 / S-3b V2.4.105, P-12 V2.4.106.)

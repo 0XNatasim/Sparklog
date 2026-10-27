@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildClosing } from "./payroll-closing";
 import { buildCalculTalon } from "./calcul-talon";
+import { legacyTalonSheet } from "./legacy-talon-render";
+import { EMPLOYER_CCQ_NUMBER, stubSheetHtml } from "./paystub";
 
 // S40 (D0035-0036): 40 h fixed at 50,79 + prime 4,06 on 40 h, 346 km, cellular 2 × 7, other 7,11.
 const pay = { regularHours: 40, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, baseOnlyHours: 0, baseRate: 50.79, premium: 4.06, km: 346, kmRate: 0.65 };
@@ -24,7 +26,16 @@ describe("buildCalculTalon — talon gardé depuis Calcul (S40)", () => {
   it("marque la source et reprend l'en-tête", () => {
     expect(talon.header).toMatchObject({ source: "calcul", name: "Simon Bellerive", ref: "D0035-0036", week: "40", periodEnd: "2026-09-26" });
   });
-  it("Transactions : lignes imprimées (prime 162,40 ; KM 224,90 ; cellulaire 2 × 7 ; autre 7,11)", () => {
+  it("imprime le n° CCQ de l'employeur, jamais celui de l'employé (comme Dynacom, V2.4.192)", () => {
+    expect(talon.header.ccqNumber).toBe(EMPLOYER_CCQ_NUMBER);
+    const employee = { full_name: "X", ccq_number: "123456" };
+    const sheet = legacyTalonSheet(buildCalculTalon({ opening, closing, result, reimb, pay, employee, week: {} }));
+    expect(sheet).toContain(`CCQ #</span><span>${EMPLOYER_CCQ_NUMBER}`);
+    expect(sheet).not.toContain("123456");
+    const stub = stubSheetHtml({ model: { gains: [], sommaire: [], net: 0, totalRetenues: 0, grossUp: 0 }, hdr: {}, employee });
+    expect(stub).toContain(`<span>CCQ #</span><b>${EMPLOYER_CCQ_NUMBER}</b>`);
+    expect(stub).not.toContain("123456");
+  });  it("Transactions : lignes imprimées (prime 162,40 ; KM 224,90 ; cellulaire 2 × 7 ; autre 7,11)", () => {
     expect(tx("Salaire régulier fixe")).toMatchObject({ unite: 40, taux: 50.79, montant: 2031.6 });
     expect(tx("Régulier à taux horaire")).toMatchObject({ unite: 40, taux: 4.06, montant: 162.4 });
     expect(tx("Indemnité utilisation véhicule")).toMatchObject({ unite: 346, montant: 224.9 });

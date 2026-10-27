@@ -168,7 +168,8 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
   owner and paused accounts are not listed.
 - **Employee card: no CCQ number, no Time off tab** (V2.4.192): the card no longer asks for the CCQ number (the CCQ
   report goes by the SIN; the CCQ-card capture keeps the expiry and birth dates only, and the number is not a missing
-  field any more). Time off is entered only in Team › Absences. Existing CCQ numbers stay in the database.
+  field any more). The « CCQ # » line of the pay stubs now shows the employer's CCQ number, like Dynacom's stubs (it
+  showed the employee's). Time off is entered only in Team › Absences. Existing CCQ numbers stay in the database.
 - **Replies on shared notes** (V2.4.190, migration 0118): under a shared note (Today › Notes) the managers answer each
   other like in a chat: my replies on the right in green, the others' on the left in blue with their name. A reply
   written since I last opened Notes is marked « Nouveau », its note comes first with « N nouvelle(s) réponse(s) », and
