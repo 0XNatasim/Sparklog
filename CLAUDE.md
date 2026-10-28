@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-27, V2.4.195)
+## 6. À faire / à préciser (mis à jour 2026-10-28, V2.4.196)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.196 (technique).** `validateManagerEntry` (`manager-entry.js`) refuse un champ km vide (0 accepté) ;
+`WeekSnapshot.jsx` ajoute `km_*` à sa requête et affiche `getKilometreBreakdown` par jour ; `WeekViewTab.jsx` et
+`weekly-report.js` ajoutent le tableau « Sous-traitants » (`regularMinutes` / `ot50Minutes` / `ot100Minutes`).
 
 ### 6.1 Paie — ce qui manque pour passer de « estimation » à « paie finale »
 
