@@ -4,7 +4,7 @@ import {
   BarChart3, BookOpen, Calculator, CalendarCheck, CalendarDays, ChevronDown, ClipboardList, Clock3, Coins,
   Contact, FileCheck, FileDown, FilePlus2, FileText, HeartPulse, History, Landmark, LayoutGrid, ListChecks, LogOut, Megaphone,
   Menu, Moon, Package, PanelLeftClose, PanelLeftOpen, Percent, Radio, Receipt, RefreshCw, Scale, ScrollText, Settings,
-  ShieldCheck, StickyNote, SlidersHorizontal, Sun, UserCircle, Users, Wallet, Wrench, X,
+  ShieldAlert, ShieldCheck, StickyNote, SlidersHorizontal, Sun, UserCircle, Users, Wallet, Wrench, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -16,6 +16,7 @@ import { useT } from "@/lib/use-t";
 import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import { fetchPendingSignups, groupBadgeTotal, pendingSignupCount, SIGNUPS_EVENT } from "@/lib/signups";
 import { dueCount, fetchOpenReminders, fetchUnreadReplies, msUntilNextReminder, NOTES_EVENT, unreadNoteCount } from "@/lib/notes";
+import { ACCIDENT_EVENT, fetchOpenAccidentCount } from "@/lib/accidents";
 import { fetchTodoCount, TODO_EVENT } from "@/lib/todo-count";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
@@ -38,6 +39,7 @@ const HIDDEN_KEY = "sparklog.managerNavHidden"; // desktop: menu folded away ent
 const ICONS = {
   todo: ListChecks,
   notes: StickyNote,
+  accidents: ShieldAlert,
   "payroll-week": CalendarCheck,
   "v3-time": Clock3,
   "v3-pay-history": History,
@@ -277,12 +279,14 @@ export default function ManagerLayout() {
   const [dueNotes, setDueNotes] = useState(0);
   const [repliedNotes, setRepliedNotes] = useState(0);
   const [todoCount, setTodoCount] = useState(0);
+  const [openAccidents, setOpenAccidents] = useState(0);
   const badges = useMemo(() => ({
     todo: isManagerRole(role) ? todoCount : 0,
     inventory: isManagerRole(role) ? inventoryNegatives : 0,
     "v3-team": isManagerRole(role) ? pendingSignups : 0,
     notes: isManagerRole(role) ? dueNotes + repliedNotes : 0,
-  }), [inventoryNegatives, pendingSignups, dueNotes, repliedNotes, todoCount, role]);
+    accidents: isManagerRole(role) ? openAccidents : 0,
+  }), [inventoryNegatives, pendingSignups, dueNotes, repliedNotes, todoCount, openAccidents, role]);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath);
@@ -367,6 +371,28 @@ export default function ManagerLayout() {
     return () => {
       cancelled = true;
       window.removeEventListener(TODO_EVENT, loadTodo);
+    };
+  }, [role, location.pathname]);
+
+  // Open accident files (Registre d'accidents): a count-only request on each page change and after a save.
+  useEffect(() => {
+    if (!isManagerRole(role)) return undefined;
+    let cancelled = false;
+    let generation = 0;
+    async function loadAccidents() {
+      const ticket = ++generation;
+      try {
+        const count = await fetchOpenAccidentCount();
+        if (!cancelled && ticket === generation) setOpenAccidents(count);
+      } catch (error) {
+        console.error("[accidents]", error);
+      }
+    }
+    loadAccidents();
+    window.addEventListener(ACCIDENT_EVENT, loadAccidents);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(ACCIDENT_EVENT, loadAccidents);
     };
   }, [role, location.pathname]);
 

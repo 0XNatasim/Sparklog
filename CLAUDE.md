@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-28, V2.4.196)
+## 6. À faire / à préciser (mis à jour 2026-10-28, V2.4.197)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.197 (technique).** Registre d'accidents : table `accident_log` (0120, RLS `get_my_role() = 'manager'`, aucun droit
+`delete`, trigger `accident_log_guard` pour auteur / horodatages / fermeture, trigger d'audit `accident_logged` /
+`accident_status`) ; `src/lib/accidents.js` (validation, filtre, CSV protégé contre les formules, budget `accidentLog`) ;
+`components/manager/AccidentRegister.jsx` ; entrée de menu `accidents` (groupe Équipe) avec pastille des dossiers ouverts
+(`ACCIDENT_EVENT`).
 
 **V2.4.196 (technique).** `validateManagerEntry` (`manager-entry.js`) refuse un champ km vide (0 accepté) ;
 `WeekSnapshot.jsx` ajoute `km_*` à sa requête et affiche `getKilometreBreakdown` par jour ; `WeekViewTab.jsx` et

@@ -1,11 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-28 (V2.4.196).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-28 (V2.4.197).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.197** : nouveau **Registre d'accidents** (menu Équipe, gestionnaires seulement). « Nouveau dossier » : date,
+  la personne, la gravité, ce qui s'est passé, les soins, les jours perdus, le numéro CNESST, les mesures correctives.
+  Un dossier se ferme (ou se rouvre), il ne s'efface jamais. Le menu affiche le nombre de dossiers ouverts. Les employés
+  ne le voient pas. **À faire : appliquer la migration 0120 dans Supabase.**
 - ✅ **V2.4.196** : les carrés « Cette semaine » / « Semaine passée » montrent les km du jour sous les heures. La feuille
   manuelle du gestionnaire demande les km (**0 est accepté, vide non**). Le Sommaire (et son impression) sépare le temps
   régulier et le temps supplémentaire des sous-traitants en colonnes différentes.

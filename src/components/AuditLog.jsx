@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { BellRing, CalendarPlus, DoorOpen, ImageOff, EyeOff, FilePlus2, Megaphone, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown, Clock, Car } from "lucide-react";
+import { BellRing, CalendarPlus, DoorOpen, ImageOff, EyeOff, FilePlus2, Megaphone, Images, RefreshCw, UserCheck, ShieldCheck, Trash2, Unlock, CheckCircle2, PauseCircle, UserCog, Utensils, SquareParking, Eye, KeyRound, FileDown, Clock, Car, ShieldAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ const ACTION_META = {
   parking_review_reset: { icon: SquareParking, tone: "text-warning" },
   approval_reverted: { icon: Clock, tone: "text-warning" },
   travel_rule_set: { icon: Car, tone: "text-primary" },
+  accident_logged: { icon: ShieldAlert, tone: "text-destructive" },
+  accident_status: { icon: ShieldAlert, tone: "text-warning" },
   broadcast_edited: { icon: Megaphone, tone: "text-primary" },
   departure_change: { icon: DoorOpen, tone: "text-warning" },
   start_date_change: { icon: CalendarPlus, tone: "text-info" },
@@ -85,6 +87,8 @@ export default function AuditLog() {
       case "parking_reviewed": return t("audit.desc.parkingReviewed", { name: target, status: d.status || "—" });
       case "parking_review_reset": return t("audit.desc.parkingReviewReset", { name: target, date: d.job_date || "—" });
       case "approval_reverted": return t("audit.desc.approvalReverted", { name: target, count: d.jobs ?? 0, from: d.from || "—", to: d.to || "—" });
+      case "accident_logged": return t("audit.desc.accidentLogged", { name: target, date: d.occurred_on || "—" });
+      case "accident_status": return t("audit.desc.accidentStatus", { name: target, date: d.occurred_on || "—", to: t(`accidents.status.${d.to}`) });
       case "travel_rule_set": return t("audit.desc.travelRuleSet", {
         name: target, rule: t(`travel.rule.${d.rule_key}`), choice: t(`travel.choice.${d.choice}`), date: d.effective_from || "—",
       });

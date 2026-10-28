@@ -25,6 +25,8 @@ export const QUERY_BUDGETS = Object.freeze({
   managerNotes: 500,
   // Replies of the notes shown (0118), per request of up to inListChunk notes.
   managerNoteReplies: 2000,
+  // Gestion › Registre d'accidents (0120): the most recent files.
+  accidentLog: 500,
 });
 
 // A narrowed timesheet search must be complete, not merely filtered from the
