@@ -20,6 +20,7 @@ import { categoryLabel } from "@/lib/timeoff";
 import { isNewHire } from "@/lib/signups";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { alertDisplayName, dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
+import InventoryRatios from "@/components/InventoryRatios";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -348,6 +349,7 @@ export default function InventoryScreenshotsPanel() {
 
   return (
     <div className="space-y-3">
+      <InventoryRatios />
       {(alerts.length > 0 || alertsErr) && (
         <Card>
           <CardContent className="space-y-3 p-3">

@@ -17,6 +17,7 @@ import { fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_A
 import { fetchPendingSignups, groupBadgeTotal, pendingSignupCount, SIGNUPS_EVENT } from "@/lib/signups";
 import { dueCount, fetchOpenReminders, fetchUnreadReplies, msUntilNextReminder, NOTES_EVENT, unreadNoteCount } from "@/lib/notes";
 import { ACCIDENT_EVENT, fetchOpenAccidentCount } from "@/lib/accidents";
+import { fetchStockLevels, lowStockCount } from "@/lib/inventory-ratios";
 import { fetchTodoCount, TODO_EVENT } from "@/lib/todo-count";
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/lib/version";
@@ -305,7 +306,7 @@ export default function ManagerLayout() {
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
 
-  // Open negative-stock notices: one per employee and inventory day. A dismiss on the
+  // Open negative-stock notices (one per employee and inventory day) + warehouses below their minimum stock. A dismiss on the
   // Inventory page fires INVENTORY_ALERTS_EVENT so the badge drops without a reload.
   useEffect(() => {
     if (!isManagerRole(role)) return undefined;
@@ -315,7 +316,9 @@ export default function ManagerLayout() {
       const ticket = ++generation;
       try {
         const rows = await fetchInventoryNegativeAlerts();
-        if (!cancelled && ticket === generation) setInventoryNegatives(groupInventoryNegativeAlerts(rows).length);
+        // Warehouses below their minimum stock (0121) count on the same badge; a failure there never hides the rest.
+        const low = await fetchStockLevels().then(lowStockCount, () => 0);
+        if (!cancelled && ticket === generation) setInventoryNegatives(groupInventoryNegativeAlerts(rows).length + low);
       } catch (error) {
         console.error("[inventory-alerts]", error);
       }

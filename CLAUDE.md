@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-28, V2.4.197)
+## 6. À faire / à préciser (mis à jour 2026-10-28, V2.4.198)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,13 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.198 (technique).** Stock minimum : table `inventory_min_ratios` (0121, `group_id` × `code`, `per_employee` > 0, RLS
+`get_my_role() = 'manager'`) et RPC `inventory_stock_levels()` (membres non en pause du groupe ; stock = dernière liste
+de chaque membre sur 7 jours, une ligne par code ; `is_low` seulement si au moins une liste comptée) ;
+`src/lib/inventory-ratios.js` ; `InventoryRatios.jsx` (bannière + gestion) dans `InventoryScreenshotsPanel` ; la pastille
+d'`inventory` additionne les appareils sous le minimum (`ManagerLayout`). Le « stock » ignore les employés sans liste :
+afficher « — » plutôt qu'une fausse alerte. Pas de notification téléphone ni de ratio par défaut pour tous les entrepôts.
 
 **V2.4.197 (technique).** Registre d'accidents : table `accident_log` (0120, RLS `get_my_role() = 'manager'`, aucun droit
 `delete`, trigger `accident_log_guard` pour auteur / horodatages / fermeture, trigger d'audit `accident_logged` /

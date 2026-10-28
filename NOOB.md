@@ -1,11 +1,16 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-28 (V2.4.197).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-28 (V2.4.198).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.198** : **stock minimum par entrepôt**. Dans Inventaire, bouton « Minimums » : choisissez l'entrepôt (un groupe),
+  un appareil et un **ratio par employé** (ex. 0,5 thermostat par employé). Le minimum = ratio × nombre d'employés du
+  groupe. Si le stock des derniers inventaires passe sous le minimum, l'appareil s'affiche en rouge en haut de la page
+  Inventaire et la pastille d'Inventaire s'allume. **À faire : appliquer la migration 0121 dans Supabase**, puis
+  vérifier que chaque entrepôt est bien un groupe avec ses employés (Équipe › Groupes).
 - ✅ **V2.4.197** : nouveau **Registre d'accidents** (menu Équipe, gestionnaires seulement). « Nouveau dossier » : date,
   la personne, la gravité, ce qui s'est passé, les soins, les jours perdus, le numéro CNESST, les mesures correctives.
   Un dossier se ferme (ou se rouvre), il ne s'efface jamais. Le menu affiche le nombre de dossiers ouverts. Les employés
