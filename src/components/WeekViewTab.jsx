@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
 import { useHolidayDates } from "@/lib/company-holidays";
 import { formatRoundingMinutes, loadDayRounding, roundingFor } from "@/lib/day-rounding";
+import { isSubcontractorRole } from "@/lib/roles";
 import WeeklyReportButton from "@/components/WeeklyReportButton";
 
 const isNonEmptyOT = (ot) => String(ot || "").trim().length > 0;
@@ -44,7 +45,7 @@ export default function WeekViewTab() {
       try {
         const since = dayjs().subtract(16, "week").format("YYYY-MM-DD");
         const [{ data: profs, error: pErr }, { data: jobs, error: jErr }, rounding] = await Promise.all([
-          supabase.from("profiles").select("id, full_name, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name", { ascending: true }),
+          supabase.from("profiles").select("id, full_name, role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name", { ascending: true }),
           fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, ot, km_total, km_aller, km_retour, return_time_minutes").gte("job_date", since).order("id")),
           loadDayRounding(),
         ]);
@@ -107,6 +108,8 @@ export default function WeekViewTab() {
     return out;
   }, [week, employees, jobsByEmp, holidayDates, roundingByEmp]);
 
+  const subcontractors = cards.filter((c) => isSubcontractorRole(c.profile.role));
+
   return (
     <div className="space-y-3">
       <Card>
@@ -130,6 +133,40 @@ export default function WeekViewTab() {
 
       {!loading && week && cards.length === 0 && (
         <Card><CardContent className="p-4 text-sm text-muted-foreground">{t("week.empty")}</CardContent></Card>
+      )}
+
+      {subcontractors.length > 0 && (
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            <div className="font-semibold">{t("week.subcontractors")}</div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="py-1 font-medium">{t("live.week.employee")}</th>
+                    <th className="py-1 text-right font-medium">{t("week.regular")}</th>
+                    <th className="py-1 text-right font-medium">{t("week.ot15")}</th>
+                    <th className="py-1 text-right font-medium">{t("week.ot20")}</th>
+                    <th className="py-1 text-right font-medium">{t("week.total")}</th>
+                    <th className="py-1 text-right font-medium">km</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subcontractors.map((c) => (
+                    <tr key={c.profile.id} className="border-t">
+                      <td className="py-1 font-semibold">{c.profile.full_name || c.profile.id}</td>
+                      <td className="py-1 text-right font-mono">{fmtHM(c.regularHours)}</td>
+                      <td className="py-1 text-right font-mono">{fmtHM(c.ot15)}</td>
+                      <td className="py-1 text-right font-mono">{fmtHM(c.ot20)}</td>
+                      <td className="py-1 text-right font-mono font-bold">{fmtHM(c.totalHours)}</td>
+                      <td className="py-1 text-right font-mono">{Math.round(c.km)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-3 md:grid-cols-2">

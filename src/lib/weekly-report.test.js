@@ -183,3 +183,29 @@ describe("fixed weekly pay (owner)", () => {
     expect(before.employees).toEqual([]);
   });
 });
+
+describe("sous-traitants", () => {
+  const sub = { id: "s", full_name: "Sylvain Sous", role: "subcontractor_1", hourly_rate: 0 };
+  // Monday 10 h (8 regular + 2 overtime), Tuesday 6 h.
+  const r = buildWeeklyReport({
+    week, profiles: [sub], contributions: [], employer,
+    jobs: [job("s1", "s", "2026-09-28", "O1", "06:00", "16:00", 40), job("s2", "s", "2026-09-29", "O2", "08:00", "14:00", 0)],
+  });
+
+  it("keeps regular and overtime minutes separate", () => {
+    const h = r.employees[0].hours;
+    expect(h.regularMinutes).toBe(8 * 60 + 6 * 60);
+    expect(h.ot50Minutes + h.ot100Minutes).toBe(120);
+    expect(h.km).toBe(40);
+  });
+
+  it("prints a Sous-traitants table with one column each", () => {
+    const html = buildWeeklyReportHtml(r);
+    expect(html).toContain("<h3>Sous-traitants</h3>");
+    expect(html).toContain("Temps régulier</th><th class=\"num\">Sup. 1,5×</th><th class=\"num\">Sup. 2×</th>");
+  });
+
+  it("prints no such table when nobody is a subcontractor", () => {
+    expect(buildWeeklyReportHtml(report)).not.toContain("<h3>Sous-traitants</h3>");
+  });
+});

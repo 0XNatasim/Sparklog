@@ -56,7 +56,8 @@ export function validateManagerEntry(values, today = companyDate()) {
     errors.push("dstChoice");
   }
   const km = String(values.km ?? "").trim();
-  if (km !== "" && !(Number(km.replace(",", ".")) >= 0)) errors.push("km");
+  // 0 is a real answer (no driving); an empty field is not.
+  if (km === "" || !(Number(km.replace(",", ".")) >= 0)) errors.push("km");
   const note = String(values.note || "").trim();
   if (note.length < MANAGER_ENTRY_NOTE_MIN || note.length > MANAGER_ENTRY_NOTE_MAX) errors.push("note");
   return errors;
@@ -73,7 +74,7 @@ export function buildCreateJobForEmployeeArgs(values, submissionKey) {
     p_depart: values.depart || null,
     p_arrivee: values.arrivee || null,
     p_fin: values.fin || null,
-    p_km_aller: km === "" ? 0 : Number(km.replace(",", ".")),
+    p_km_aller: Number(km.replace(",", ".")),
     p_note: String(values.note || "").trim(),
     // Only in the repeated hour; the database clears a choice anywhere else.
     p_depart_fold: repeatedHourFields(values).depart ? values.departFold : null,

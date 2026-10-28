@@ -50,6 +50,8 @@ const MENU_ONLY_ITEMS = Object.freeze([
   // My own notes and reminders (0111): private to each manager / owner.
   { id: "notes", path: "notes", grant: null, labelKey: "mgr.nav3.notes" },
   // Trajets, km et frais: one setting per employee and per line (NOOB.md étape 6). Manager / owner only.
+  // Registre d'accidents (0120): managers / owner only; a badge counts the open files.
+  { id: "accidents", path: "accidents", grant: null, labelKey: "mgr.nav3.accidents" },
   { id: "advanced-travel-rules", path: "advanced/travel-rules", grant: null, labelKey: "mgr.nav3.travelRules" },
   { id: "v3-time", path: "v3/time", grant: null, labelKey: "mgr.nav.timesheets", tabs: [
     tab("timesheets", "timesheets", "mgr.nav.timesheets"),
@@ -99,7 +101,7 @@ export const MANAGER_NAV = Object.freeze([
   { id: "today", labelKey: "mgr.group.today", open: true, items: [entry("todo"), entry("live"), entry("notes")] },
   { id: "time", labelKey: "mgr.group.time", open: false, items: [entry("v3-time")] },
   { id: "payroll", labelKey: "mgr.group.payroll", open: true, items: [entry("payroll-week"), entry("v3-pay-history")] },
-  { id: "team", labelKey: "mgr.group.team", open: false, items: [entry("v3-team"), entry("inventory"), entry("messages")] },
+  { id: "team", labelKey: "mgr.group.team", open: false, items: [entry("v3-team"), entry("inventory"), entry("accidents"), entry("messages")] },
   { id: "reports", labelKey: "mgr.group.reports", open: false, items: [entry("v3-reports")] },
   { id: "config", labelKey: "mgr.group.config", open: false, items: [entry("v3-config")] },
   { id: "advanced", labelKey: "mgr.nav3.group.admin", open: false, items: [

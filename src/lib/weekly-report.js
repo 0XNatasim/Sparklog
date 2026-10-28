@@ -380,6 +380,31 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td class="num">${e.pay ? fmtMoney(e.pay.employer.total) : "—"}</td>
     </tr>`).join("");
 
+  // Sous-traitants: regular and overtime in separate columns (they are « hors CCQ » above, in one column).
+  const subs = employees.filter((e) => e.category === "subcontractor");
+  const subRows = subs.map((e) => `
+    <tr>
+      <td>${esc(e.name)}${e.pendingJobs ? ' <span class="warn">*</span>' : ""}</td>
+      <td class="num">${e.jobs.length}</td>
+      <td class="num">${fmtHM(e.hours.regularMinutes)}</td>
+      <td class="num">${fmtHM(e.hours.ot50Minutes)}</td>
+      <td class="num">${fmtHM(e.hours.ot100Minutes)}</td>
+      <td class="num strong">${fmtHM(e.hours.paidMinutes)}</td>
+      <td class="num">${fmtKm(e.hours.km)}</td>
+    </tr>`).join("");
+  const subTotal = (key) => sum(subs, (e) => e.hours[key]);
+  const subSection = subs.length ? `
+  <h3>Sous-traitants</h3>
+  <table class="summary">
+    <thead><tr><th>Sous-traitant</th><th class="num">Jobs</th><th class="num">Temps régulier</th><th class="num">Sup. 1,5×</th><th class="num">Sup. 2×</th><th class="num">Total</th><th class="num">km</th></tr></thead>
+    <tbody>${subRows}</tbody>
+    <tfoot><tr>
+      <td>Total</td><td class="num">${sum(subs, (e) => e.jobs.length)}</td>
+      <td class="num">${fmtHM(subTotal("regularMinutes"))}</td><td class="num">${fmtHM(subTotal("ot50Minutes"))}</td><td class="num">${fmtHM(subTotal("ot100Minutes"))}</td>
+      <td class="num">${fmtHM(subTotal("paidMinutes"))}</td><td class="num">${fmtKm(subTotal("km"))}</td>
+    </tr></tfoot>
+  </table>` : "";
+
   const warnings = [
     "Estimation : les règles de paie sont en brouillon (à réviser) — ce document n'est ni un talon officiel ni une déclaration de DAS.",
     totals.pendingJobs ? `${totals.pendingJobs} job(s) ne sont pas encore approuvées (*) : leurs montants peuvent changer.` : "",
@@ -436,6 +461,7 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td class="num">${fmtMoney(totals.employerCost)}</td>
     </tr></tfoot>
   </table>
+${subSection}
 
   <h3 class="detail-title">Détail par employé</h3>
   ${employees.map(employeeHtml).join("")}

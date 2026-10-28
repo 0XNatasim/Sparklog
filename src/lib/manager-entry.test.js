@@ -59,7 +59,9 @@ describe("validateManagerEntry", () => {
   it("rejects a negative or non-numeric distance", () => {
     expect(validateManagerEntry({ ...valid, km: "-1" }, TODAY)).toContain("km");
     expect(validateManagerEntry({ ...valid, km: "abc" }, TODAY)).toContain("km");
-    expect(validateManagerEntry({ ...valid, km: "" }, TODAY)).toEqual([]);
+    expect(validateManagerEntry({ ...valid, km: "" }, TODAY)).toContain("km");
+    expect(validateManagerEntry({ ...valid, km: "0" }, TODAY)).toEqual([]);
+    expect(validateManagerEntry({ ...valid, km: "0,0" }, TODAY)).toEqual([]);
   });
 });
 

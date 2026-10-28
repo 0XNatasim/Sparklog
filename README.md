@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.195 (2026-10-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.198 (2026-10-28).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -52,6 +52,22 @@ Roles are stored lowercase in `profiles.role`:
   adjust these values per employee.
 
 ### Managers
+
+- **V2.4.198 — Stock minimum par entrepôt** (Gestion › Équipe › Inventaire › Minimums, migration 0121). A warehouse is an
+  employee group. For each device a manager sets a **ratio per employee**; the minimum is that ratio × the group's
+  employees (paused accounts not counted). The stock is the sum of the members' latest inventory list (last 7 days).
+  A device below its minimum is listed at the top of Inventaire and counted on the Inventaire badge; with no list at
+  all there is no alert.
+- **V2.4.197 — Registre d'accidents** (Gestion › Équipe › Registre d'accidents, managers / owner only, migration 0120).
+  One file per event (accident, near miss, property damage, vehicle incident): date, person (an employee or a typed
+  name), severity, place, description, witnesses, care given, days lost, CNESST claim number, corrective actions.
+  Files are closed or reopened, never deleted; each opening and status change is written to the Journal; the menu shows
+  the number of open files; CSV export. Employees cannot see it.
+- **V2.4.196 — Kilomètres et sous-traitants.** « Cette semaine » / « Semaine passée » (Feuilles de temps) show the
+  day's kilometres under the hours in each square, plus a weekly km total. The manager's manual timesheet
+  (Équipe en direct › feuille manuelle) requires the kilometres field: **0 is accepted, empty is refused**. The Sommaire
+  tab and the printed weekly summary list subcontractors in their own table, with regular time, 1.5× and 2× overtime in
+  separate columns.
 
 The Manager workspace is a sidebar (a drawer on phones; on desktop it can be shrunk to an icon rail or hidden
 entirely with the toggle at the top left of the header); every page has its own URL (`#/manager/…`) and only the

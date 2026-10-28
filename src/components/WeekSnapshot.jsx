@@ -9,6 +9,7 @@ import { useHolidayDates } from "@/lib/company-holidays";
 import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { weekStartSundayD } from "@/lib/ccq-week";
+import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
@@ -35,7 +36,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     const weekEnd = days[6];
     Promise.all([
       supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
-      supabase.from("jobs").select("id, user_id, status, depart, fin, job_date").gte("job_date", weekStart).lte("job_date", weekEnd),
+      supabase.from("jobs").select("id, user_id, status, depart, fin, job_date, km_total, km_aller, km_retour").gte("job_date", weekStart).lte("job_date", weekEnd),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
     ]).then(([p, j, o]) => {
       if (!alive) return;
@@ -64,16 +65,17 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
           job.depart ? dayjs(`${job.job_date}T${job.depart}`) : null,
           job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
         ) || 0), 0);
+        const km = dayJobs.reduce((sum, job) => sum + getKilometreBreakdown(job).totalKm, 0);
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
         return {
-          date, hours, off, holiday: holidays.has(date),
+          date, hours, km, off, holiday: holidays.has(date),
           // Days before the first day of work: nothing was expected (never « Rien d'entré »).
           notStarted: notStartedOn(employee, date),
           firstDay: employee.start_date === date,
           ...weekCellSummary(dayJobs),
         };
       });
-      return { employee, cells, total: cells.reduce((sum, c) => sum + c.hours, 0) };
+      return { employee, cells, total: cells.reduce((sum, c) => sum + c.hours, 0), totalKm: cells.reduce((sum, c) => sum + c.km, 0) };
     }).sort((a, b) => (a.employee.full_name || a.employee.email || "").localeCompare(b.employee.full_name || b.employee.email || ""));
   }, [people, jobs, timeOff, days, holidays]);
 
@@ -125,7 +127,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ employee, cells, total }) => (
+              {rows.map(({ employee, cells, total, totalKm }) => (
                 <tr key={employee.id}>
                   <td className="max-w-[180px] truncate px-1 text-sm font-semibold">{employee.full_name || employee.email}</td>
                   {cells.map((cell) => (
@@ -136,14 +138,20 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                         className={cn("flex w-full flex-col items-center rounded-md border px-1 py-1 leading-tight hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", cellClass(cell))}
                       >
                         {cell.count > 0 ? (
-                          <span className="py-1 font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
+                          <>
+                            <span className="pt-1 font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
+                            <span className="pb-1 text-[11px] opacity-80">{Math.round(cell.km)} km</span>
+                          </>
                         ) : (
                           <span className="py-1 text-sm">{cell.off ? t("live.week.off") : cell.holiday ? t("live.week.holiday") : cell.firstDay ? t("live.week.firstDay") : "—"}</span>
                         )}
                       </button>
                     </td>
                   ))}
-                  <td className="px-1 text-right font-mono text-sm font-bold">{formatHM(total)}</td>
+                  <td className="px-1 text-right font-mono text-sm font-bold">
+                    {formatHM(total)}
+                    <div className="text-[11px] font-normal text-muted-foreground">{Math.round(totalKm)} km</div>
+                  </td>
                 </tr>
               ))}
             </tbody>

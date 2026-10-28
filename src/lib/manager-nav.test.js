@@ -27,7 +27,7 @@ describe("Gestion menu", () => {
 
   it("has 15 entries, each once, the day's work first", () => {
     const entryIds = entries.map((item) => item.id);
-    expect(entryIds).toHaveLength(15);
+    expect(entryIds).toHaveLength(16);
     expect(new Set(entryIds).size).toBe(entryIds.length);
     expect(firstAllowedPath("owner", [])).toBe("todo");
     expect(firstAllowedPath("manager", [])).toBe("todo");
@@ -41,7 +41,7 @@ describe("Gestion menu", () => {
     const reached = reachable("owner", []);
     const unique = [...new Set(reached)];
     expect(unique.filter((id) => !id.startsWith("inline:")).sort())
-      .toEqual(MANAGER_PAGES.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "notes").sort());
+      .toEqual(MANAGER_PAGES.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "notes", "accidents").sort());
     expect(reached.filter((id) => id === "reports-period")).toHaveLength(2); // Semaine / Mois · Sommaire
     expect(reached.filter((id) => id === "references")).toHaveLength(2); // Références · Contacts (same rows)
     expect(reached.filter((id) => id === "employees")).toHaveLength(2); // Employés · Groupes (same rule, 0114)
@@ -82,7 +82,7 @@ describe("Gestion menu", () => {
     const all = [...GRANTABLE_ADMIN_SECTIONS];
     for (const role of ["employee", "subcontractor_1", "admin", "manager"]) expect(ids(role, all), role).not.toContain("advanced-emergency");
     expect(ids("owner", [])).toContain("advanced-emergency");
-    for (const id of ["payroll-week", "v3-pay-history", "v3-reports", "advanced-audit", "advanced-health", "inventory", "notes"]) {
+    for (const id of ["payroll-week", "v3-pay-history", "v3-reports", "advanced-audit", "advanced-health", "inventory", "notes", "accidents"]) {
       expect(ids("admin", all), id).not.toContain(id);
     }
     expect(visibleTabs(byId("v3-config"), "admin", all).map((t) => t.key)).toEqual(["forms"]);

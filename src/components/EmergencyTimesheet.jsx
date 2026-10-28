@@ -312,7 +312,8 @@ export default function EmergencyTimesheet() {
             )}
             <div className="grid gap-1.5">
               <Label htmlFor="em-km">{t("form.kmTotal")}</Label>
-              <Input id="em-km" type="text" inputMode="decimal" value={form.km} onChange={setField("km")} disabled={busy} className={invalid("km") ? "border-destructive" : ""} />
+              <Input id="em-km" type="text" inputMode="decimal" value={form.km} onChange={setField("km")} disabled={busy} placeholder="0" aria-invalid={invalid("km")} className={invalid("km") ? "border-destructive" : ""} />
+              {invalid("km") && <p className="text-xs text-destructive">{t("emergency.errors.km")}</p>}
             </div>
             <div className="grid gap-1.5 sm:col-span-2">
               <Label>{t("form.totalHours")}</Label>
