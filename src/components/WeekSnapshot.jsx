@@ -8,15 +8,25 @@ import { isOffOn } from "@/lib/timeoff";
 import { useHolidayDates } from "@/lib/company-holidays";
 import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
-import { weekStartSundayD } from "@/lib/ccq-week";
+import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
-import { formatRoundingMinutes, loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
+import { loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
 // time, the number of ORs and a colour for saved (orange) / submitted (green) / missing (red).
+// +7 / −7 (minutes; the unit is in the legend and the tooltip).
+const signed = (minutes) => `${minutes > 0 ? "+" : minutes < 0 ? "−" : ""}${Math.abs(Math.round(minutes))}`;
+
+// Weeks offered by the week filter, counting the current one (about three months back).
+export const SNAPSHOT_WEEKS = 13;
+
+// weekOffset: the week shown first (0 = this week, -1 = last week); the filter at the top moves to any other.
 export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   const t = useT();
+  const [offset, setOffset] = useState(weekOffset);
   const [people, setPeople] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [timeOff, setTimeOff] = useState([]);
@@ -28,8 +38,19 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   // CCQ non-worked days (jours fériés chômés, construction vacation): nobody is expected to work.
   const holidayDates = useHolidayDates();
   const holidays = useMemo(() => new Set(holidayDates), [holidayDates]);
-  // weekOffset: 0 = current week, -1 = last week (Sunday → Saturday).
-  const weekStart = addCalendarDays(weekStartSundayD(today).format("YYYY-MM-DD"), weekOffset * 7);
+  // offset: 0 = current week, -1 = last week, … (Sunday → Saturday).
+  const thisWeekStart = weekStartSundayD(today).format("YYYY-MM-DD");
+  const weekStart = addCalendarDays(thisWeekStart, offset * 7);
+  const weekChoices = useMemo(() => {
+    const offsets = Array.from({ length: SNAPSHOT_WEEKS }, (_, i) => -i);
+    if (!offsets.includes(offset)) offsets.push(offset);
+    return offsets.sort((a, b) => b - a).map((value) => {
+      const start = addCalendarDays(thisWeekStart, value * 7);
+      const end = addCalendarDays(start, 6);
+      const tag = value === 0 ? ` · ${t("live.week.current")}` : value === -1 ? ` · ${t("live.week.previous")}` : "";
+      return { value, label: `${t("manager.weekShort")} ${ccqWeekNumber(dayjs(end))} · ${dayjs(start).format("D MMM")} → ${dayjs(end).format("D MMM")}${tag}` };
+    });
+  }, [thisWeekStart, offset, t]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addCalendarDays(weekStart, i)), [weekStart]);
   const loading = loadedWeek !== weekStart;
 
@@ -88,6 +109,12 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     }).sort((a, b) => (a.employee.full_name || a.employee.email || "").localeCompare(b.employee.full_name || b.employee.email || ""));
   }, [people, jobs, timeOff, days, holidays, rounding, weekStart]);
 
+  // Saturday and Sunday only when somebody has a day on them (a quiet weekend takes no room).
+  const visibleDays = useMemo(() => days.filter((date) => {
+    const weekday = dayjs(date).day();
+    return (weekday >= 1 && weekday <= 5) || rows.some((row) => row.cells.some((cell) => cell.date === date && cell.count > 0));
+  }), [days, rows]);
+
   function cellClass(cell) {
     if (cell.status === "submitted") return "border-success/40 bg-success/15 text-success";
     if (cell.status === "saved") return "border-warning/40 bg-warning/15 text-warning";
@@ -118,16 +145,33 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="icon" aria-label={t("live.week.earlier")} disabled={offset <= -(SNAPSHOT_WEEKS - 1)} onClick={() => setOffset((value) => value - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <select
+            aria-label={t("live.week.pick")}
+            value={offset}
+            onChange={(event) => setOffset(Number(event.target.value))}
+            className="min-h-9 min-w-[16rem] flex-1 rounded-md border border-input bg-background px-2 text-sm sm:flex-none"
+          >
+            {weekChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+          </select>
+          <Button type="button" variant="outline" size="icon" aria-label={t("live.week.later")} disabled={offset >= 0} onClick={() => setOffset((value) => value + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
         {error && <p className="text-sm text-destructive">{error}</p>}
         {rows.some((row) => row.round.days > 0) && <p className="text-xs text-muted-foreground">{t("rounding.week.note")}</p>}
         {loading && rows.length === 0 && <p className="text-sm text-muted-foreground">{t("common.working")}</p>}
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-separate border-spacing-1 text-xs">
+        <div className={cn("overflow-x-auto", loading && rows.length > 0 && "pointer-events-none opacity-50")}>
+          <table className="w-full min-w-[560px] border-separate border-spacing-1 text-xs">
             <thead>
               <tr className="text-muted-foreground">
                 <th className="px-1 text-left font-medium">{t("live.week.employee")}</th>
-                {days.map((date) => (
+                {visibleDays.map((date) => (
                   <th key={date} className={cn("px-1 font-medium capitalize", date === today && "text-foreground")}>
                     {dayjs(date).format("ddd D")}
                     {holidays.has(date) && <div className="text-xs font-normal normal-case">{t("live.week.holiday")}</div>}
@@ -140,31 +184,30 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
               {rows.map(({ employee, cells, total, totalKm, round, hasDraft }) => (
                 <tr key={employee.id}>
                   <td className="max-w-[180px] truncate px-1 text-sm font-semibold">{employee.full_name || employee.email}</td>
-                  {cells.map((cell) => (
+                  {cells.filter((cell) => visibleDays.includes(cell.date)).map((cell) => (
                     <td key={cell.date} className="p-0">
                       <button
                         type="button"
                         onClick={() => onSelectEmployee?.(employee.id, cell.date)}
-                        className={cn("flex w-full flex-col items-center rounded-md border px-1 py-1 leading-tight hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", cellClass(cell))}
+                        className={cn("flex min-h-8 w-full flex-wrap items-center justify-center gap-x-1.5 rounded-md border px-1 py-0.5 leading-tight hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", cellClass(cell))}
                       >
                         {cell.count > 0 ? (
                           <>
-                            <span className="pt-1 font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
-                            <span className="pb-1 text-[11px] opacity-80">{Math.round(cell.km)} km</span>
+                            <span className="font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
+                            <span className="text-[11px] opacity-80">{Math.round(cell.km)} km</span>
                           </>
                         ) : (
-                          <span className="py-1 text-sm">{cell.off ? t("live.week.off") : cell.holiday ? t("live.week.holiday") : cell.firstDay ? t("live.week.firstDay") : "—"}</span>
+                          <span className="text-sm">{cell.off ? t("live.week.off") : cell.holiday ? t("live.week.holiday") : cell.firstDay ? t("live.week.firstDay") : "—"}</span>
                         )}
                       </button>
                     </td>
                   ))}
-                  <td className="px-1 text-right font-mono text-sm font-bold">
-                    {formatHM(total)}
-                    <div className="text-[11px] font-normal text-muted-foreground">{Math.round(totalKm)} km</div>
+                  <td className="whitespace-nowrap px-1 text-right">
+                    <span className="font-mono text-sm font-bold">{formatHM(total)}</span>
+                    <span className="ms-1 text-[11px] text-muted-foreground">{Math.round(totalKm)} km</span>
                     {round.days > 0 && (
-                      <div className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground" title={t("rounding.help")}>
-                        <div>{t("rounding.week.paid", { time: formatHM(round.paid / 60) })}{hasDraft ? " *" : ""}</div>
-                        <div>{t("rounding.week.line", { delta: formatRoundingMinutes(round.delta), counter: formatRoundingMinutes(round.counter) })}</div>
+                      <div className="text-[11px] leading-tight text-muted-foreground" title={t("rounding.help")}>
+                        {t("rounding.week.paid", { time: formatHM(round.paid / 60) })}{hasDraft ? "*" : ""} · {t("rounding.week.line", { delta: signed(round.delta), counter: signed(round.counter) })}
                       </div>
                     )}
                   </td>

@@ -1,11 +1,18 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-29 (V2.4.203).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-29 (V2.4.205).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.205** : dans « Cette semaine » / « Semaine passée », un **filtre de semaine** en haut (menu déroulant et flèches ◀ ▶) :
+  on choisit parmi les 13 dernières semaines (« Semaine 44 · 18 oct → 24 oct »). Les deux boutons ouvrent la même fenêtre,
+  sur la semaine courante ou la semaine passée ; le filtre permet d'aller plus loin. Le titre devient « Snapshot de la semaine ».
+- ✅ **V2.4.204** : « Cette semaine » et « Semaine passée » sont plus **compactes**. Le **samedi et le dimanche** n'apparaissent
+  que si quelqu'un a une fiche ces jours-là. Dans chaque carré, les heures et les km sont sur **une seule ligne**. À droite,
+  le total et les km sont ensemble, avec une seule petite ligne : « payé 16h15 · arr. +1 · cpt +1 » (arr. = arrondi de la
+  semaine, cpt = compteur, en minutes ; une note sous le tableau l'explique).
 - ✅ **V2.4.203** : le **chiffre** à côté d'« Inventaire » dans le menu est expliqué. Il additionne les avis de stock négatif
   et les appareils **sous leur minimum** (le survol de la pastille le dit). En haut de la page Inventaire, une ligne rouge
   donne le détail : « 8 appareils sous le stock minimum — Entrepôt Rimouski (8) », avec un lien. La page Minimums par
