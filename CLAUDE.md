@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.203)
+## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.204)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.204 (technique).** `WeekSnapshot.jsx` plus compact : `visibleDays` (samedi / dimanche seulement si une cellule a `count > 0`),
+heures + km sur une ligne par carré, total + km sur une ligne et une seule ligne « payé · arr. · cpt » (minutes signées,
+`signed()` ; textes `rounding.week.line` / `rounding.week.note`). `PayrollWeek` garde son propre format (`counterOnly`).
 
 **V2.4.203 (technique).** Explication de la pastille d'« Inventaire » : hook `useLowStock` (`src/lib/use-low-stock.js`, lignes
 `is_low && alert_enabled`, rafraîchi par `RATIOS_EVENT`) lu par `InventoryScreenshotsPanel` ; `InventoryLowStock.jsx` (ligne

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.203 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.204 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,10 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.204 — « Cette semaine » / « Semaine passée » more compact.** Saturday and Sunday columns only show when somebody
+  has a day on them; in each square the hours and the kilometres sit on one line; the total is « 39h45 · 480 km » and one
+  short line under it: « payé 16h15 · arr. +1 · cpt +1 » (rounding and counter, in minutes; the tooltip and the note
+  under the table give the words).
 - **V2.4.203 — What the number on « Inventaire » means.** The badge of the Inventaire menu entry adds the negative-stock
   notices and the devices below their minimum stock (its tooltip says so). The Inventaire page now shows a red line at
   the top: « N appareil(s) sous le stock minimum » with the warehouses (« Entrepôt Rimouski (8) ») and a link; the

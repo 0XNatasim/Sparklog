@@ -39,8 +39,7 @@ describe("WeekSnapshot rounding", () => {
     // Mon 8h07 → 8h00 (−7, counter −7); Tue 8h07 → 7 min carried over: 487 + 7 = 494 → 8h15 (+8, counter +1).
     setup([job("a", "2026-10-19", "07:00", "15:07"), job("b", "2026-10-20", "07:00", "15:07")]);
     await screen.findByText("Employé Test");
-    expect(await screen.findByText(/payé 16h15/)).toBeTruthy();
-    expect(screen.getByText("arrondi +1 min · compteur +1 min")).toBeTruthy();
+    expect(await screen.findByText("payé 16h15 · arr. +1 · cpt +1")).toBeTruthy();
     // The squares keep the time entered, to the minute: 8h07.
     expect(screen.getAllByText("8h07").length).toBe(2);
     expect(screen.getAllByText("12 km").length).toBeGreaterThanOrEqual(2);
@@ -49,6 +48,25 @@ describe("WeekSnapshot rounding", () => {
   it("marks the paid line when a draft day is not counted", async () => {
     setup([job("a", "2026-10-19", "07:00", "15:00"), job("b", "2026-10-20", "07:00", "15:07", { status: "saved" })]);
     await screen.findByText("Employé Test");
-    expect(await screen.findByText("payé 8h00 *")).toBeTruthy();
+    expect(await screen.findByText("payé 8h00* · arr. 0 · cpt 0")).toBeTruthy();
+  });
+});
+
+describe("WeekSnapshot columns", () => {
+  const headers = () => screen.getAllByRole("columnheader").map((th) => th.textContent);
+
+  it("leaves Saturday and Sunday out when nobody has a day on them", async () => {
+    setup([job("a", "2026-10-19", "07:00", "15:07")]);
+    await screen.findByText("Employé Test");
+    expect(headers()).toHaveLength(7); // employee + Monday to Friday + total
+    expect(headers().join(" ")).not.toMatch(/Sat|Sun/);
+  });
+
+  it("shows a weekend day as soon as somebody has a day on it", async () => {
+    setup([job("a", "2026-10-19", "07:00", "15:07"), job("b", "2026-10-24", "08:00", "12:00")]); // Saturday
+    await screen.findByText("Employé Test");
+    expect(headers()).toHaveLength(8);
+    expect(headers().join(" ")).toMatch(/Sat 24/);
+    expect(headers().join(" ")).not.toMatch(/Sun/);
   });
 });
