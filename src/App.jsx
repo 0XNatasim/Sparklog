@@ -35,6 +35,7 @@ const PayrollWeekPage = managerPage("PayrollWeekPage");
 const ManagerIndex = managerPage("ManagerIndex");
 const MessagesPage = managerPage("MessagesPage");
 const InventoryPage = managerPage("InventoryPage");
+const InventoryMinimumsPage = managerPage("InventoryMinimumsPage");
 const OldPathRedirect = managerPage("OldPathRedirect");
 import { ViewModeProvider } from "@/contexts/ViewModeProvider";
 import { isManagerRole } from "@/lib/roles";
@@ -144,6 +145,7 @@ export default function App() {
           <Route path="live" element={<LivePage />} />
           <Route path="todo" element={<TodoTabsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
+          <Route path="inventory/minimums" element={<InventoryMinimumsPage />} />
           <Route path="payroll/week" element={<PayrollWeekPage />} />
           <Route path="messages" element={<MessagesPage />} />
           {/* Pages with tabs (paths kept from Gestion V3, so links stay valid) */}

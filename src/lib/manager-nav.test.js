@@ -217,3 +217,14 @@ describe("tabs nested in the sidebar (4 tabs or more)", () => {
     }
   });
 });
+
+describe("sub-pages opened from a button", () => {
+  it("resolves Inventaire › Minimums for the title and the guard, manager / owner only, and keeps it out of the menu", () => {
+    const page = findNavItem("inventory/minimums");
+    expect(page).toMatchObject({ id: "inventory-minimums", parent: "inventory" });
+    expect(MANAGER_NAV.flatMap((group) => group.items).some((item) => item.path === "inventory/minimums")).toBe(false);
+    expect(canOpenNavItem("manager", [], page)).toBe(true);
+    expect(canOpenNavItem("owner", [], page)).toBe(true);
+    for (const role of ["employee", "subcontractor_1", "admin"]) expect(canOpenNavItem(role, [...GRANTABLE_ADMIN_SECTIONS], page), role).toBe(false);
+  });
+});

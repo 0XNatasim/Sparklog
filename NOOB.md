@@ -6,10 +6,12 @@
 
 ## Où on en est
 
-- ✅ **V2.4.199** : dans Inventaire › Minimums, une case par entrepôt : « Alerter quand cet entrepôt est sous son minimum ».
-  Décochée au départ. À cocher pour Alma (Saguenay), Charlevoix et Rimouski. Les minimums des autres entrepôts restent
-  visibles mais ne sonnent pas l'alerte. Les 74 minimums du tableau de Karine sont déjà saisis (Calypso V2 : Ste-Catherine
-  et Beloeil seulement).
+- ✅ **V2.4.199** : dans Inventaire, le bouton **« Minimums par entrepôt »** ouvre sa propre page : la liste des
+  entrepôts, avec **Oui / Non** (« Compter cet entrepôt ? »). Non = on n'ira pas plus loin avec cet entrepôt. Oui = la
+  liste des appareils avec le **minimum** (ratio par employé × employés du groupe) et, à côté, le **total des
+  inventaires** des employés de l'entrepôt ; en rouge, ce qui est sous le minimum. Seuls les entrepôts à « Oui » donnent
+  l'alerte. Les 74 minimums du tableau de Karine sont déjà saisis. **À faire : mettre « Oui » pour Alma (Saguenay),
+  Charlevoix et Rimouski.**
 - ✅ **V2.4.198** : **stock minimum par entrepôt**. Dans Inventaire, bouton « Minimums » : choisissez l'entrepôt (un groupe),
   un appareil et un **ratio par employé** (ex. 0,5 thermostat par employé). Le minimum = ratio × nombre d'employés du
   groupe. Si le stock des derniers inventaires passe sous le minimum, l'appareil s'affiche en rouge en haut de la page

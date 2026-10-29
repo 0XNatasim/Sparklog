@@ -53,9 +53,12 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
-- **V2.4.199 — Alerte de stock faible par entrepôt** (migration 0122). Each warehouse (group) has a switch, in
-  Inventaire › Minimums, to raise the low-stock alert; off by default. A warehouse below its minimum without the switch
-  is still shown on the Minimums screen, but not on the page banner or the menu badge.
+- **V2.4.199 — Minimums par entrepôt, dans leur propre espace** (migration 0122). Inventaire has a button
+  « Minimums par entrepôt » (with the number of devices below their minimum); it opens `#/manager/inventory/minimums`:
+  the list of warehouses (employee groups), a **Oui / Non** for each (« Compter cet entrepôt ? », stored in
+  `employee_groups.low_stock_alert`, off by default). A warehouse set to Non goes no further. A counted one lists its
+  devices with the minimum (ratio per employee × employees) next to the total of its employees' latest inventory lists,
+  and lets a manager add or remove a ratio. Only counted warehouses raise the alert (menu badge and the button's number).
 - **V2.4.198 — Stock minimum par entrepôt** (Gestion › Équipe › Inventaire › Minimums, migration 0121). A warehouse is an
   employee group. For each device a manager sets a **ratio per employee**; the minimum is that ratio × the group's
   employees (paused accounts not counted). The stock is the sum of the members' latest inventory list (last 7 days).

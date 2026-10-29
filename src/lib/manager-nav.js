@@ -109,6 +109,12 @@ export const MANAGER_NAV = Object.freeze([
   ] },
 ]);
 
+// Pages opened from a button of another page, not listed in the menu: title and access rule only
+// (Inventaire › Minimums par entrepôt, from the Inventaire page).
+export const MANAGER_SUBPAGES = Object.freeze([
+  Object.freeze({ id: "inventory-minimums", path: "inventory/minimums", grant: null, labelKey: "mgr.inventory.ratios.pageTitle", parent: "inventory" }),
+]);
+
 // The access rule a tab carries: its source page, or its inline rule.
 function tabRule(t) {
   return t.from ? byId.get(t.from) : t;
@@ -166,7 +172,8 @@ const withQuery = (path, params) => {
 // The menu entry at `path` (for the header title and the route guard).
 export function findNavItem(path) {
   const clean = cleanPath(path);
-  return MANAGER_NAV.flatMap((group) => group.items).find((item) => item.path === clean) || null;
+  return MANAGER_NAV.flatMap((group) => group.items).find((item) => item.path === clean)
+    || MANAGER_SUBPAGES.find((item) => item.path === clean) || null;
 }
 
 // First page the user may open — the landing page for #/manager (À traiter for managers).
