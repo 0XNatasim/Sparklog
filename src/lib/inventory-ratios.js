@@ -33,9 +33,10 @@ export function validateRatio({ groupId, code, name, ratio }) {
   return errors;
 }
 
-// Rows of inventory_stock_levels() that are below their minimum, the largest shortfall first.
+// Rows of inventory_stock_levels() that are below their minimum in a warehouse that raises the alert (0122),
+// the largest shortfall first.
 export const lowStockRows = (levels) => (levels || [])
-  .filter((row) => row.is_low)
+  .filter((row) => row.is_low && row.alert_enabled)
   .sort((a, b) => (Number(b.minimum) - Number(b.on_hand)) - (Number(a.minimum) - Number(a.on_hand))
     || String(a.group_name).localeCompare(String(b.group_name), "fr-CA"));
 
@@ -55,6 +56,18 @@ export async function fetchStockLevels() {
   const { data, error } = await withTimeout(supabase.rpc("inventory_stock_levels"), 12000);
   if (error) throw error;
   return data || [];
+}
+
+// Which warehouses (groups) raise the alert: Map of group id -> boolean.
+export async function fetchAlertFlags() {
+  const { data, error } = await withTimeout(supabase.from("employee_groups").select("id, low_stock_alert").limit(QUERY_BUDGETS.profileReferences), 12000);
+  if (error) throw error;
+  return new Map((data || []).map((row) => [row.id, Boolean(row.low_stock_alert)]));
+}
+
+export async function setGroupAlert({ groupId, enabled }) {
+  const { error } = await withTimeout(supabase.from("employee_groups").update({ low_stock_alert: Boolean(enabled) }).eq("id", groupId), 12000);
+  if (error) throw error;
 }
 
 export async function fetchKnownEquipment() {

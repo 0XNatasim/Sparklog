@@ -20,7 +20,7 @@ import { categoryLabel } from "@/lib/timeoff";
 import { isNewHire } from "@/lib/signups";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { alertDisplayName, dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
-import InventoryRatios from "@/components/InventoryRatios";
+import InventoryMinimumsLink from "@/components/InventoryMinimumsLink";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -349,7 +349,6 @@ export default function InventoryScreenshotsPanel() {
 
   return (
     <div className="space-y-3">
-      <InventoryRatios />
       {(alerts.length > 0 || alertsErr) && (
         <Card>
           <CardContent className="space-y-3 p-3">
@@ -408,6 +407,7 @@ export default function InventoryScreenshotsPanel() {
             <Button type="button" variant="outline" size="sm" disabled={regionChoices.length === 0} onClick={() => setStorageOpen(true)}>
               <Warehouse className="mr-1 h-4 w-4" />{t("mgr.inventory.storage")}
             </Button>
+            <InventoryMinimumsLink />
             <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>
