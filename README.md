@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.201 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.202 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,9 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.202 — The « Entrepôt » button of Inventaire is removed.** The minimums by warehouse (V2.4.199) replace it: the
+  total of each device by warehouse, next to its minimum, is in Inventaire › Minimums par entrepôt. The « Équipe » (crew
+  total) button stays.
 - **V2.4.201 — Arrondi visible dans « Cette semaine / Semaine passée » et dans Paie de la semaine.** Under the weekly
   total of each employee: « payé X » (the week's submitted and approved days, rounded to 15 minutes; `*` = a draft day is
   not counted), « arrondi ±n min · compteur ±c min ». The squares keep the time entered, to the minute. Paie de la semaine
@@ -130,7 +133,7 @@ Other manager features worth knowing (details and versions in `CLAUDE.md` §6.3)
 - **Employee groups** (V2.4.175, migration 0114): Gestion V3 › Team › **Groups** tab, next to Employees and Absences.
   Create a group (often a warehouse), tick its employees (a person can be in several groups), rename or delete it.
   Communications gets a third choice, **Groups**: tick one or more groups, each active member receives the message
-  once. Inventory › Storage can total a **group** as well as a region. Manager-level only (RLS); employees never see groups.
+  once. The warehouses of the minimum stock (Inventory › Minimums by warehouse) are these groups. Manager-level only (RLS); employees never see groups.
 - **New hires waiting to start** (V2.4.175): when « All employees » or a group includes someone whose first day is
   still ahead (account already activated), Communications asks « Send them this message too? » — Yes / No (send to
   the others) / Cancel. No question when there is nobody waiting, or for people ticked one by one.

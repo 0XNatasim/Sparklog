@@ -4,8 +4,8 @@ import fs from "node:fs";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
 const {
-  cleanGroupName, groupNameTaken, groupsTargetIds, inventoryGroupChoices, memberChanges, normalizeGroups,
-  pendingNewHires, sumGroupInventory, ungroupedPeople,
+  cleanGroupName, groupNameTaken, groupsTargetIds, memberChanges, normalizeGroups,
+  pendingNewHires, ungroupedPeople,
 } = await import("@/lib/employee-groups");
 
 const read = (path) => fs.readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
@@ -52,19 +52,6 @@ describe("employee groups (0114)", () => {
   it("writes only the member changes", () => {
     expect(memberChanges(["a", "b"], ["b", "c"])).toEqual({ add: ["c"], remove: ["a"] });
     expect(memberChanges([], [])).toEqual({ add: [], remove: [] });
-  });
-
-  it("totals a group's inventory like a region", () => {
-    const entries = [
-      { person: { id: "a" }, name: "Alice", state: "ok", items: [{ code: "T1", name: "Thermostat", quantity: 2 }] },
-      { person: { id: "b" }, name: "Bob", state: "ok", items: [{ code: "T1", name: "Thermostat", quantity: 3 }] },
-      { person: { id: "z" }, name: "Zed", state: "ok", items: [{ code: "T1", name: "Thermostat", quantity: 9 }] },
-    ];
-    expect(inventoryGroupChoices(groups, entries).map((g) => g.id)).toEqual(["g1", "g2"]);
-    expect(inventoryGroupChoices(groups, [entries[2]])).toEqual([]);
-    const laval = sumGroupInventory(entries, groups.find((g) => g.id === "g2"));
-    expect(laval.counted).toBe(2);
-    expect(laval.rows[0].total).toBe(5);
   });
 
   it("is manager-level only in the database", () => {

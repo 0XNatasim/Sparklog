@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.201)
+## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.202)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,11 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.202 (technique).** Bouton et fenêtre « Entrepôt » retirés de `InventoryScreenshotsPanel.jsx` (remplacés par
+`InventoryMinimums`) ; code mort supprimé : `sumRegionInventory`, `inventoryRegionChoices` (`inventory-items.js`),
+`sumGroupInventory`, `inventoryGroupChoices` (`employee-groups.js`), leurs tests et les textes `mgr.inventory.storage*`. Le
+total par région n'existe plus dans l'app ; la fenêtre « Équipe » (`sumCrewInventory`) reste.
 
 **V2.4.201 (technique).** Arrondi visible : `weekRoundingSummary(rounding, start, end)` (`day-rounding.js` : jours comptés
 de la semaine, minutes travaillées / payées, écart, compteur en fin de semaine) lue par `WeekSnapshot.jsx` (ligne « payé /

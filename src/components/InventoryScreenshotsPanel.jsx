@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
-import { ChevronLeft, ChevronRight, ListChecks, RefreshCw, Trash2, Users, Warehouse } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListChecks, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,7 @@ import { useT } from "@/lib/use-t";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { COMPLEMENT_SLOT, DEFECTIVE_SLOT, INVENTORY_BUCKET, INVENTORY_PHOTO_SLOTS, inventoryCandidates } from "@/lib/inventory-screenshots";
-import { fetchGroups, inventoryGroupChoices, sumGroupInventory } from "@/lib/employee-groups";
-import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, inventoryRegionChoices, markInventoryAbsences, summarizeInventoryDay, sumCrewDefective, sumCrewInventory, sumRegionInventory } from "@/lib/inventory-items";
-import { QUEBEC_REGIONS } from "@/lib/ccq-regions";
+import { INVENTORY_STATE_ORDER, compareInventory, effectiveOcrStatus, markInventoryAbsences, summarizeInventoryDay, sumCrewDefective, sumCrewInventory } from "@/lib/inventory-items";
 import { categoryLabel } from "@/lib/timeoff";
 import { isNewHire } from "@/lib/signups";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
@@ -83,11 +81,6 @@ export default function InventoryScreenshotsPanel() {
   // Comparison with the employee's previous inventory day: { personId, date, status, data }.
   const [compare, setCompare] = useState(null);
   const [crewOpen, setCrewOpen] = useState(false);
-  const [storageOpen, setStorageOpen] = useState(false);
-  const [storageRegion, setStorageRegion] = useState("");
-  // Entrepôt by employee group (0114) instead of by region: the group's id, "" = by region.
-  const [groups, setGroups] = useState([]);
-  const [storageGroup, setStorageGroup] = useState("");
   // « Qui fait l'inventaire » : the per-employee opt-in (profiles.inventory_screenshots_enabled, 0072).
   const [whoOpen, setWhoOpen] = useState(false);
   const [whoBusy, setWhoBusy] = useState("");
@@ -154,12 +147,6 @@ export default function InventoryScreenshotsPanel() {
     const ticket = ++alertTicket.current;
     fetchAlerts().then((result) => applyAlerts(ticket, result));
   }, [applyAlerts]);
-  // Groups are optional here: if they cannot be read, the region choices stay.
-  useEffect(() => {
-    let cancelled = false;
-    fetchGroups().then((rows) => { if (!cancelled) setGroups(rows); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
 
   // Another day closes the open card (or opens the one a notice asks for); a card always opens
   // without the previous comparison.
@@ -264,21 +251,6 @@ export default function InventoryScreenshotsPanel() {
   }
 
   const crew = useMemo(() => sumCrewInventory(entries), [entries]);
-  const regionChoices = useMemo(() => inventoryRegionChoices(entries, QUEBEC_REGIONS), [entries]);
-  const storageCode = regionChoices.some((region) => region.code === storageRegion) ? storageRegion : (regionChoices[0]?.code ?? "");
-  const groupChoices = useMemo(() => inventoryGroupChoices(groups, entries), [groups, entries]);
-  const groupChoice = groupChoices.find((group) => group.id === storageGroup) || null;
-  const regionStorage = useMemo(
-    () => (groupChoice ? sumGroupInventory(entries, groupChoice) : sumRegionInventory(entries, storageCode)),
-    [entries, storageCode, groupChoice],
-  );
-  const regionChoice = regionChoices.find((region) => region.code === storageCode) || null;
-  const regionLabel = groupChoice
-    ? groupChoice.name
-    : regionChoice && !regionChoice.code
-      ? t("mgr.inventory.storageNoRegion")
-      : [regionChoice?.code, regionChoice?.name].filter(Boolean).join(" — ");
-  const regionRows = regionStorage.rows.filter((row) => !(hideZero && row.total === 0));
   const crewRows = crew.rows.filter((row) => !(hideZero && row.total === 0));
   // Defective products (« Produits défectueux », 0097) are summed apart and never mixed into the list.
   const crewDefective = useMemo(() => sumCrewDefective(entries), [entries]);
@@ -403,9 +375,6 @@ export default function InventoryScreenshotsPanel() {
             </Button>
             <Button type="button" variant="outline" size="sm" disabled={crew.counted === 0 && crewDefective.counted === 0} onClick={() => setCrewOpen(true)}>
               <Users className="mr-1 h-4 w-4" />{t("mgr.inventory.crew")}
-            </Button>
-            <Button type="button" variant="outline" size="sm" disabled={regionChoices.length === 0} onClick={() => setStorageOpen(true)}>
-              <Warehouse className="mr-1 h-4 w-4" />{t("mgr.inventory.storage")}
             </Button>
             <InventoryMinimumsLink />
             <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
@@ -639,74 +608,6 @@ export default function InventoryScreenshotsPanel() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={storageOpen} onOpenChange={setStorageOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t("mgr.inventory.storageTitle", { region: regionLabel || "—", date: dayjs(date).format("YYYY-MM-DD") })}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {regionChoices.map((region) => {
-                const label = region.code ? [region.code, region.name].filter(Boolean).join(" — ") : t("mgr.inventory.storageNoRegion");
-                const selected = !groupChoice && region.code === storageCode;
-                return (
-                  <Button key={region.code || "none"} type="button" size="sm" variant={selected ? "default" : "outline"} onClick={() => { setStorageGroup(""); setStorageRegion(region.code); }}>
-                    {label}
-                  </Button>
-                );
-              })}
-            </div>
-            {groupChoices.length > 0 && (
-              <div className="space-y-1">
-                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("mgr.inventory.storageGroups")}</div>
-                <div className="flex flex-wrap gap-2">
-                  {groupChoices.map((group) => (
-                    <Button key={group.id} type="button" size="sm" variant={groupChoice?.id === group.id ? "default" : "outline"} onClick={() => setStorageGroup(group.id)}>
-                      {group.name}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-medium">{t("mgr.inventory.crewCounted", { count: regionStorage.counted, items: regionStorage.rows.length })}</span>
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input type="checkbox" checked={hideZero} onChange={(event) => setHideZero(event.target.checked)} className="h-4 w-4 accent-primary" />
-                {t("mgr.inventory.hideZero")}
-              </label>
-            </div>
-            {regionStorage.unverified.length > 0 && (
-              <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
-                {t("mgr.inventory.crewUnverified", { names: regionStorage.unverified.join(", ") })}
-              </p>
-            )}
-            {regionStorage.rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t(groupChoice ? "mgr.inventory.storageEmptyGroup" : "mgr.inventory.storageEmpty")}</p>
-            ) : (
-              <div className="overflow-hidden rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">{t("mgr.inventory.colItem")}</th>
-                      <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colTotal")}</th>
-                      <th className="px-3 py-2 text-right font-medium">{t("mgr.inventory.colHolders")}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {regionRows.map((row) => (
-                      <tr key={row.code}>
-                        <td className="px-3 py-2"><div className="font-medium">{row.name}</div><div className="text-xs text-muted-foreground">{row.code}</div></td>
-                        <td className={cn("px-3 py-2 text-right font-medium tabular-nums", row.total === 0 && "text-muted-foreground")}>{Number(row.total).toLocaleString("fr-CA", { minimumFractionDigits: 2 })}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{row.holders}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             )}
           </div>
