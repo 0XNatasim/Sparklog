@@ -59,7 +59,7 @@ const ICONS = {
 const TAB_ICONS = {
   stubs: Receipt, das: Landmark, roe: FileCheck, calcul: Calculator,
   costs: Coins, period: CalendarDays, grid: LayoutGrid, ccq: FileDown,
-  settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact,
+  settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact, "ot-presets": ListChecks,
 };
 
 const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };

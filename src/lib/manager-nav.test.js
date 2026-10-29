@@ -228,3 +228,10 @@ describe("sub-pages opened from a button", () => {
     for (const role of ["employee", "subcontractor_1", "admin"]) expect(canOpenNavItem(role, [...GRANTABLE_ADMIN_SECTIONS], page), role).toBe(false);
   });
 });
+
+describe("Configuration › OT prédéfinis", () => {
+  it("is a tab for the manager and the owner, never for an office admin", () => {
+    for (const role of ["manager", "owner"]) expect(visibleTabs(byId("v3-config"), role, []).map((tab) => tab.key), role).toContain("ot-presets");
+    expect(visibleTabs(byId("v3-config"), "admin", [...GRANTABLE_ADMIN_SECTIONS]).map((tab) => tab.key)).not.toContain("ot-presets");
+  });
+});

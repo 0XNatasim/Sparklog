@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.205)
+## 6. À faire / à préciser (mis à jour 2026-10-30, V2.4.206)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,15 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.206 (technique).** OT prédéfinis : table `preset_work_orders` (0124 ; lecture pour tout compte connecté, écriture
+`get_my_role() = 'manager'` ; libellé de 2 à 60 caractères, jamais un numéro de 4 chiffres ou plus car `normalized_ot` /
+`ot_reuse_for_jobs` (0108) ne regardent que les numéros ; unique sans casse) ; `jobs.ot` reste du texte libre, le libellé choisi y
+est écrit tel quel. `src/lib/preset-work-orders.js` (hook `usePresetWorkOrders` : copie locale `sparklog.presetWorkOrders`, repli sur
+`DEFAULT_PRESET_LABELS` si la lecture échoue, `PRESETS_EVENT` après un changement ; `matchPreset`, `cleanPresetLabel`,
+`moveChanges`) ; `OtPresetSelect.jsx` dans `JobEntryFields` et `EmergencyTimesheet` ; écran `PresetWorkOrdersManager.jsx`
+(onglet `ot-presets` de Configuration, règle de `config-settings`). L'arrivée et les km restent obligatoires comme pour tout OT
+(0 km accepté) : à revoir avec la propriétaire pour une formation sans déplacement.
 
 **V2.4.205 (technique).** `WeekSnapshot.jsx` : état `offset` (initialisé par la prop `weekOffset`), filtre de semaine
 (`<select>` + flèches, `SNAPSHOT_WEEKS` = 13 semaines dont la courante, `weekChoices`), tableau atténué pendant le chargement
