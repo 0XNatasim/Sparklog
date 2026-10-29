@@ -1,11 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-29 (V2.4.202).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-29 (V2.4.203).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.203** : le **chiffre** à côté d'« Inventaire » dans le menu est expliqué. Il additionne les avis de stock négatif
+  et les appareils **sous leur minimum** (le survol de la pastille le dit). En haut de la page Inventaire, une ligne rouge
+  donne le détail : « 8 appareils sous le stock minimum — Entrepôt Rimouski (8) », avec un lien. La page Minimums par
+  entrepôt liste chaque appareil sous son minimum, avec son stock, tout en haut.
 - ✅ **V2.4.202** : le bouton **« Entrepôt »** de la page Inventaire est retiré. Les **Minimums par entrepôt** le remplacent :
   le total de chaque appareil par entrepôt, à côté de son minimum, est dans Inventaire › Minimums par entrepôt. Le bouton
   « Équipe » (total de toute l'équipe) reste.

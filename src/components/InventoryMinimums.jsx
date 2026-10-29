@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import InventoryLowStock from "@/components/InventoryLowStock";
 import { fetchGroups } from "@/lib/employee-groups";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import {
-  RATIOS_EVENT, deleteRatio, fetchAlertFlags, fetchKnownEquipment, fetchStockLevels, parseRatio, saveRatio, setGroupAlert, validateRatio,
+  RATIOS_EVENT, deleteRatio, fetchAlertFlags, fetchKnownEquipment, fetchStockLevels, lowStockRows, parseRatio, saveRatio, setGroupAlert, validateRatio,
 } from "@/lib/inventory-ratios";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
@@ -191,6 +192,7 @@ export default function InventoryMinimums() {
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </CardContent>
       </Card>
+      <InventoryLowStock rows={lowStockRows(levels)} detailed />
       {loading && <p className="text-sm text-muted-foreground">{t("common.working")}</p>}
       {!loading && groups.length === 0 && <p className="text-sm text-muted-foreground">{t("mgr.inventory.ratios.noGroup")}</p>}
       {groups.map((group) => (

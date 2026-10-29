@@ -40,6 +40,14 @@ export const lowStockRows = (levels) => (levels || [])
   .sort((a, b) => (Number(b.minimum) - Number(b.on_hand)) - (Number(a.minimum) - Number(a.on_hand))
     || String(a.group_name).localeCompare(String(b.group_name), "fr-CA"));
 
+// The devices below their minimum counted by warehouse, the warehouse with the most first: [{ name, count }].
+export function lowStockByWarehouse(rows) {
+  const byGroup = new Map();
+  for (const row of rows || []) byGroup.set(row.group_name, (byGroup.get(row.group_name) || 0) + 1);
+  return [...byGroup.entries()].map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name), "fr-CA"));
+}
+
 export const lowStockCount = (levels) => lowStockRows(levels).length;
 
 // Devices seen on recent lists (one per code, longest name), to pick from when adding a ratio.
