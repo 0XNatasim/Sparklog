@@ -32,7 +32,7 @@ function setup({ levels = [level()], counted = true } = {}) {
       inventory_items: [{ code: "EQ000009", name: "Gradateur mural" }],
       inventory_min_ratios: (call) => (call.op === "select" ? [] : null),
     },
-    rpcs: { inventory_stock_levels: levels },
+    rpcs: { inventory_stock_levels: levels.map((row) => ({ ...row, alert_enabled: counted && row.alert_enabled })) },
   });
   return render(<MemoryRouter><InventoryMinimums /></MemoryRouter>);
 }
@@ -42,23 +42,33 @@ afterEach(cleanup);
 describe("InventoryMinimums", () => {
   it("lists every warehouse with a Oui / Non", async () => {
     setup();
-    await screen.findByText("Entrepôt Alma");
+    await screen.findAllByText("Entrepôt Alma");
     expect(screen.getByText("Entrepôt Beloeil")).toBeTruthy();
     expect(screen.getAllByRole("radiogroup")).toHaveLength(2);
   });
 
   it("shows the minimum next to the employees' total for a counted warehouse, the low one marked", async () => {
     setup();
-    await screen.findByText("Thermostat Hilo 4");
+    await screen.findAllByText("Thermostat Hilo 4");
     expect(screen.getByText(fr("mgr.inventory.ratios.lowBadge", { count: 1 }))).toBeTruthy();
     expect(screen.getByText(fr("mgr.inventory.ratios.total"))).toBeTruthy();
-    expect(screen.getByText(/1\s?512/)).toBeTruthy(); // minimum = 504 × 3
-    expect(screen.getByText(/1\s?200/)).toBeTruthy(); // total of the employees' inventories
+    const row = screen.getAllByText("EQ000016").map((el) => el.closest("tr")).find(Boolean);
+    expect(row.textContent).toMatch(/1\s?512/); // minimum = 504 × 3
+    expect(row.textContent).toMatch(/1\s?200/); // total of the employees' inventories
+  });
+
+  it("lists at the top the devices below their minimum, with their stock", async () => {
+    setup();
+    await screen.findAllByText("Thermostat Hilo 4");
+    expect(screen.getByText(fr("mgr.inventory.ratios.lowTitle", { count: 1 }))).toBeTruthy();
+    const normalize = (text) => text.replace(/\s/g, " ");
+    expect(screen.getByText(normalize(fr("mgr.inventory.ratios.lowLine", { onHand: "1 200", minimum: "1 512" })), { normalizer: normalize })).toBeTruthy();
   });
 
   it("goes no further for a warehouse that is not counted", async () => {
     setup({ counted: false });
     await screen.findByText("Entrepôt Alma");
+    expect(screen.queryByText(fr("mgr.inventory.ratios.lowTitle", { count: 1 }))).toBeNull(); // not counted: no alert
     expect(screen.queryByText("Thermostat Hilo 4")).toBeNull();
     expect(screen.queryByLabelText(fr("mgr.inventory.ratios.perEmployee"))).toBeNull();
   });

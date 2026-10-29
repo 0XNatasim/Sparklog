@@ -18,7 +18,9 @@ import { categoryLabel } from "@/lib/timeoff";
 import { isNewHire } from "@/lib/signups";
 import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryReading } from "@/lib/inventory-upload";
 import { alertDisplayName, dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
+import InventoryLowStock from "@/components/InventoryLowStock";
 import InventoryMinimumsLink from "@/components/InventoryMinimumsLink";
+import { useLowStock } from "@/lib/use-low-stock";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
@@ -91,6 +93,7 @@ export default function InventoryScreenshotsPanel() {
   const [confirm, confirmDialog] = useConfirmDialog();
   // Negative-stock notices for the last 7 days. Independent of the day picker.
   const [alerts, setAlerts] = useState([]);
+  const lowStock = useLowStock();
   const [alertsErr, setAlertsErr] = useState("");
   const [dismissingKey, setDismissingKey] = useState("");
   const alertTicket = useRef(0);
@@ -321,6 +324,7 @@ export default function InventoryScreenshotsPanel() {
 
   return (
     <div className="space-y-3">
+      <InventoryLowStock rows={lowStock} />
       {(alerts.length > 0 || alertsErr) && (
         <Card>
           <CardContent className="space-y-3 p-3">
@@ -376,7 +380,7 @@ export default function InventoryScreenshotsPanel() {
             <Button type="button" variant="outline" size="sm" disabled={crew.counted === 0 && crewDefective.counted === 0} onClick={() => setCrewOpen(true)}>
               <Users className="mr-1 h-4 w-4" />{t("mgr.inventory.crew")}
             </Button>
-            <InventoryMinimumsLink />
+            <InventoryMinimumsLink count={lowStock.length} />
             <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>

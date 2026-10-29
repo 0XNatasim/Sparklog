@@ -156,7 +156,7 @@ function SidebarNav({ groups, collapsed, activePath, onNavigate, badges }) {
                   <Icon className="h-4 w-4 shrink-0" />
                   {!collapsed && <span className="truncate">{label}</span>}
                   {badges?.[item.id] > 0 && (
-                    <Badge variant="destructive" className={cn("ms-auto", collapsed && "ms-0 px-1.5")}>{badges[item.id]}</Badge>
+                    <Badge variant="destructive" className={cn("ms-auto", collapsed && "ms-0 px-1.5")} title={item.id === "inventory" ? t("mgr.inventory.badgeTitle") : undefined}>{badges[item.id]}</Badge>
                   )}
                 </NavLink>
               );

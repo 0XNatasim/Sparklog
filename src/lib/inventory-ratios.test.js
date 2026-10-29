@@ -84,3 +84,13 @@ describe("migration 0122", () => {
     expect(sql).toContain("revoke all on function public.inventory_stock_levels() from public, anon");
   });
 });
+
+describe("lowStockByWarehouse", () => {
+  it("counts the low devices by warehouse, the one with the most first", async () => {
+    const { lowStockByWarehouse } = await import("./inventory-ratios");
+    expect(lowStockByWarehouse([
+      { group_name: "Rimouski" }, { group_name: "Alma" }, { group_name: "Rimouski" }, { group_name: "Charlevoix" }, { group_name: "Rimouski" },
+    ])).toEqual([{ name: "Rimouski", count: 3 }, { name: "Alma", count: 1 }, { name: "Charlevoix", count: 1 }]);
+    expect(lowStockByWarehouse(undefined)).toEqual([]);
+  });
+});

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.202)
+## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.203)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.203 (technique).** Explication de la pastille d'« Inventaire » : hook `useLowStock` (`src/lib/use-low-stock.js`, lignes
+`is_low && alert_enabled`, rafraîchi par `RATIOS_EVENT`) lu par `InventoryScreenshotsPanel` ; `InventoryLowStock.jsx` (ligne
+rouge avec `lowStockByWarehouse`, ou liste détaillée sur `InventoryMinimums`) ; `InventoryMinimumsLink` reçoit `count` ;
+`title` de la pastille du menu (`mgr.inventory.badgeTitle`). La pastille additionne toujours avis négatifs + appareils sous le
+minimum (`ManagerLayout`).
 
 **V2.4.202 (technique).** Bouton et fenêtre « Entrepôt » retirés de `InventoryScreenshotsPanel.jsx` (remplacés par
 `InventoryMinimums`) ; code mort supprimé : `sumRegionInventory`, `inventoryRegionChoices` (`inventory-items.js`),
