@@ -8,9 +8,11 @@ import { isOffOn } from "@/lib/timeoff";
 import { useHolidayDates } from "@/lib/company-holidays";
 import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
-import { weekStartSundayD } from "@/lib/ccq-week";
+import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
@@ -18,8 +20,13 @@ import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 // +7 / −7 (minutes; the unit is in the legend and the tooltip).
 const signed = (minutes) => `${minutes > 0 ? "+" : minutes < 0 ? "−" : ""}${Math.abs(Math.round(minutes))}`;
 
+// Weeks offered by the week filter, counting the current one (about three months back).
+export const SNAPSHOT_WEEKS = 13;
+
+// weekOffset: the week shown first (0 = this week, -1 = last week); the filter at the top moves to any other.
 export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   const t = useT();
+  const [offset, setOffset] = useState(weekOffset);
   const [people, setPeople] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [timeOff, setTimeOff] = useState([]);
@@ -31,8 +38,19 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   // CCQ non-worked days (jours fériés chômés, construction vacation): nobody is expected to work.
   const holidayDates = useHolidayDates();
   const holidays = useMemo(() => new Set(holidayDates), [holidayDates]);
-  // weekOffset: 0 = current week, -1 = last week (Sunday → Saturday).
-  const weekStart = addCalendarDays(weekStartSundayD(today).format("YYYY-MM-DD"), weekOffset * 7);
+  // offset: 0 = current week, -1 = last week, … (Sunday → Saturday).
+  const thisWeekStart = weekStartSundayD(today).format("YYYY-MM-DD");
+  const weekStart = addCalendarDays(thisWeekStart, offset * 7);
+  const weekChoices = useMemo(() => {
+    const offsets = Array.from({ length: SNAPSHOT_WEEKS }, (_, i) => -i);
+    if (!offsets.includes(offset)) offsets.push(offset);
+    return offsets.sort((a, b) => b - a).map((value) => {
+      const start = addCalendarDays(thisWeekStart, value * 7);
+      const end = addCalendarDays(start, 6);
+      const tag = value === 0 ? ` · ${t("live.week.current")}` : value === -1 ? ` · ${t("live.week.previous")}` : "";
+      return { value, label: `${t("manager.weekShort")} ${ccqWeekNumber(dayjs(end))} · ${dayjs(start).format("D MMM")} → ${dayjs(end).format("D MMM")}${tag}` };
+    });
+  }, [thisWeekStart, offset, t]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addCalendarDays(weekStart, i)), [weekStart]);
   const loading = loadedWeek !== weekStart;
 
@@ -127,11 +145,28 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="icon" aria-label={t("live.week.earlier")} disabled={offset <= -(SNAPSHOT_WEEKS - 1)} onClick={() => setOffset((value) => value - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <select
+            aria-label={t("live.week.pick")}
+            value={offset}
+            onChange={(event) => setOffset(Number(event.target.value))}
+            className="min-h-9 min-w-[16rem] flex-1 rounded-md border border-input bg-background px-2 text-sm sm:flex-none"
+          >
+            {weekChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+          </select>
+          <Button type="button" variant="outline" size="icon" aria-label={t("live.week.later")} disabled={offset >= 0} onClick={() => setOffset((value) => value + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
         {error && <p className="text-sm text-destructive">{error}</p>}
         {rows.some((row) => row.round.days > 0) && <p className="text-xs text-muted-foreground">{t("rounding.week.note")}</p>}
         {loading && rows.length === 0 && <p className="text-sm text-muted-foreground">{t("common.working")}</p>}
 
-        <div className="overflow-x-auto">
+        <div className={cn("overflow-x-auto", loading && rows.length > 0 && "pointer-events-none opacity-50")}>
           <table className="w-full min-w-[560px] border-separate border-spacing-1 text-xs">
             <thead>
               <tr className="text-muted-foreground">

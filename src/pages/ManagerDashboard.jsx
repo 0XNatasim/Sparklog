@@ -1287,7 +1287,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         <Dialog open={weekSnapshotOpen} onOpenChange={setWeekSnapshotOpen}>
           <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{t("live.week.dialogTitle")}</DialogTitle>
+              <DialogTitle>{t("live.week.dialogTitleAny")}</DialogTitle>
             </DialogHeader>
             <WeekSnapshot
               onSelectEmployee={(userId, date) => {
@@ -1301,7 +1301,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         <Dialog open={lastWeekSnapshotOpen} onOpenChange={setLastWeekSnapshotOpen}>
           <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{t("live.week.dialogTitleLast")}</DialogTitle>
+              <DialogTitle>{t("live.week.dialogTitleAny")}</DialogTitle>
             </DialogHeader>
             <WeekSnapshot
               weekOffset={-1}
