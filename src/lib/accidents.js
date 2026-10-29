@@ -106,7 +106,7 @@ export function accidentsCsv(rows, labels) {
 
 export async function fetchAccidents() {
   const { data, error } = await withTimeout(
-    supabase.from("accident_log").select(ACCIDENT_COLUMNS).order("occurred_on", { ascending: false }).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.accidentLog),
+    supabase.from("accident_log").select(`${ACCIDENT_COLUMNS}, accident_files(count)`).order("occurred_on", { ascending: false }).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.accidentLog),
     12000,
   );
   if (error) throw error;

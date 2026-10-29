@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.199 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.200 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,11 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.200 — Fichiers dans le registre d'accidents** (migration 0123). A file of the accident register carries
+  pictures, PDFs and documents (Word, Excel, text, CSV): « Ajouter des fichiers » on the file, 10 MB each, 20 at most;
+  pictures are shrunk to JPEG before they are sent (SVG refused), and on a new file the picked files are sent once it is
+  saved. The files sit in the private `accident-files` bucket, readable by managers only (signed links, 1 h); a manager can
+  remove one after a confirmation. Adding and removing a file is written to the Journal; the card shows the number of files.
 - **V2.4.199 — Minimums par entrepôt, dans leur propre espace** (migration 0122). Inventaire has a button
   « Minimums par entrepôt » (with the number of devices below their minimum); it opens `#/manager/inventory/minimums`:
   the list of warehouses (employee groups), a **Oui / Non** for each (« Compter cet entrepôt ? », stored in

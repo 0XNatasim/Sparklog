@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.199)
+## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.200)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,15 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.200 (technique).** Fichiers du registre d'accidents : bucket privé `accident-files` (0123, 10 Mo, types listés : images
+JPEG / PNG / WebP, PDF, Word, Excel, texte, CSV ; pas de HTML ni de SVG) avec une seule politique de stockage
+`get_my_role() = 'manager'` (aucune lecture employé ni destinataire) ; table `accident_files` (chemin
+`<accident>/<uuid>.<ext>`, RLS gestionnaire, droits `select / insert / delete`, jamais `update`, trigger de garde : auteur,
+horodatage et 20 fichiers au plus ; trigger d'audit `accident_file_added` / `accident_file_removed`) ;
+`src/lib/accident-files.js` (classement par extension, images recompressées en JPEG, rangée créée avant l'objet retiré en
+cas d'échec) ; `AccidentFiles.jsx` ; `accidents.js` lit `accident_files(count)`. Les fichiers d'un nouveau dossier sont
+envoyés après sa création ; un échec ramène au dossier enregistré pour les rajouter.
 
 **V2.4.199 (technique).** Minimums par entrepôt : page `InventoryMinimums.jsx` (`#/manager/inventory/minimums`, sous-page
 déclarée dans `MANAGER_SUBPAGES` de `manager-nav.js` : titre et garde, hors menu) ouverte par `InventoryMinimumsLink.jsx`
