@@ -1,9 +1,9 @@
 // Groupes d'employés (migration 0114, Gestion V3 › Équipe › Groupes): a name (often a warehouse) and its
-// employees. Used to pick Communications recipients in one click and to total a warehouse's inventory.
+// employees. Used to pick Communications recipients in one click and as the warehouses of the minimum stock
+// (Inventaire › Minimums par entrepôt, 0121-0122).
 // Manager-level only (RLS); a person can be in several groups.
 import { supabase } from "@/supabaseClient";
 import { DEPARTURE_STATUSES, isNewHire } from "@/lib/signups";
-import { sumCrewInventory } from "@/lib/inventory-items";
 import { withTimeout } from "@/lib/utils";
 
 export const MAX_GROUP_NAME = 60;
@@ -82,18 +82,6 @@ export function memberChanges(before, after) {
     add: [...now].filter((id) => !was.has(id)),
     remove: [...was].filter((id) => !now.has(id)),
   };
-}
-
-// Inventaire › Entrepôt: groups with at least one employee on the day's list, and the same crew sum
-// limited to one group (as for a region).
-export function inventoryGroupChoices(groups, entries) {
-  const listed = new Set((entries || []).map((entry) => entry.person?.id).filter(Boolean));
-  return (groups || []).filter((group) => group.memberIds.some((id) => listed.has(id)));
-}
-
-export function sumGroupInventory(entries, group) {
-  const members = new Set(group?.memberIds || []);
-  return sumCrewInventory((entries || []).filter((entry) => members.has(entry.person?.id)));
 }
 
 export async function fetchGroups() {

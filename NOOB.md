@@ -1,11 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-29 (V2.4.201).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-29 (V2.4.202).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.202** : le bouton **« Entrepôt »** de la page Inventaire est retiré. Les **Minimums par entrepôt** le remplacent :
+  le total de chaque appareil par entrepôt, à côté de son minimum, est dans Inventaire › Minimums par entrepôt. Le bouton
+  « Équipe » (total de toute l'équipe) reste.
 - ✅ **V2.4.201** : l'**arrondi** est visible. Dans « Cette semaine » et « Semaine passée », sous le total de chaque
   employé : « payé 39h45 » (arrondi au 15 minutes), puis « arrondi −7 min · compteur −7 min ». Le * veut dire qu'un
   brouillon n'est pas compté. Les carrés restent à la minute (le temps saisi). Dans **Paie de la semaine**, une colonne

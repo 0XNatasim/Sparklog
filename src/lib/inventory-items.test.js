@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { sumCrewDefective, sumCrewInventory, sumRegionInventory, inventoryRegionChoices, compareInventory, effectiveOcrStatus, markInventoryAbsences, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { sumCrewDefective, sumCrewInventory, compareInventory, effectiveOcrStatus, markInventoryAbsences, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 import { inventoryCaptured, inventoryReadingBlock, inventoryStepComplete, probableMissingLines } from "./inventory-screenshots";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -224,31 +224,6 @@ describe("sumCrewInventory", () => {
     ]);
     expect(counted).toBe(2);
     expect(unverified).toEqual(["B", "C"]);
-  });
-});
-
-describe("sumRegionInventory", () => {
-  const item = (code, quantity) => ({ code, name: `Item ${code}`, quantity });
-  const entry = (name, region, items) => ({ name, state: "ok", person: { work_region: region }, items });
-
-  it("sums only the employees of the selected region", () => {
-    const entries = [
-      entry("A", "06", [item("EQ000001", 4), item("EQ000002", 1)]),
-      entry("B", "06", [item("EQ000001", 3)]),
-      entry("C", "13", [item("EQ000001", 10)]),
-      entry("D", "", [item("EQ000009", 2)]),
-    ];
-    const montreal = sumRegionInventory(entries, "06");
-    expect(montreal.counted).toBe(2);
-    expect(montreal.rows.find((row) => row.code === "EQ000001")).toMatchObject({ total: 7, holders: 2 });
-    expect(montreal.rows.find((row) => row.code === "EQ000002")).toMatchObject({ total: 1, holders: 1 });
-    expect(sumRegionInventory(entries, "13").rows[0]).toMatchObject({ code: "EQ000001", total: 10 });
-    expect(sumRegionInventory(entries, "").rows[0]).toMatchObject({ code: "EQ000009", total: 2 });
-    expect(inventoryRegionChoices(entries, [{ code: "06", name: "Montréal" }, { code: "13", name: "Laval" }])).toEqual([
-      { code: "06", name: "Montréal" },
-      { code: "13", name: "Laval" },
-      { code: "", name: "" },
-    ]);
   });
 });
 

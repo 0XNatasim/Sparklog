@@ -134,23 +134,6 @@ export function sumCrewInventory(entries) {
   return { rows, counted, unverified };
 }
 
-// Regions that have at least one employee on the day's inventory list. An empty code is
-// "no region". Names come from the Québec region list; an unknown code keeps the code.
-export function inventoryRegionChoices(entries, regions) {
-  const names = new Map((regions || []).map((region) => [region.code, region.name]));
-  const codes = new Set((entries || []).map((entry) => entry.person?.work_region || ""));
-  return [...codes]
-    .map((code) => ({ code, name: code ? names.get(code) || code : "" }))
-    .sort((a, b) => (a.code || "\uffff").localeCompare(b.code || "\uffff", "fr-CA"));
-}
-
-// The same crew sum, limited to one work region. Minimum stock ratios are not applied:
-// they are not defined yet, and this total is what a later minimum would be compared to.
-export function sumRegionInventory(entries, regionCode) {
-  const code = regionCode || "";
-  return sumCrewInventory((entries || []).filter((entry) => (entry.person?.work_region || "") === code));
-}
-
 // Crew-wide defective products: the same sum over each employee's defective list. An employee
 // with none to declare is not "unverified"; one whose picture is unread or unmatched is.
 export function sumCrewDefective(entries) {
