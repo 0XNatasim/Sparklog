@@ -10,6 +10,7 @@ import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { weekStartSundayD } from "@/lib/ccq-week";
 import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { formatRoundingMinutes, loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
 import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
@@ -19,6 +20,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   const [people, setPeople] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [timeOff, setTimeOff] = useState([]);
+  const [rounding, setRounding] = useState(new Map());
   const [loadedWeek, setLoadedWeek] = useState(null); // week the rows shown belong to
   const [error, setError] = useState("");
 
@@ -38,12 +40,15 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
       supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
       supabase.from("jobs").select("id, user_id, status, depart, fin, job_date, km_total, km_aller, km_retour").gte("job_date", weekStart).lte("job_date", weekEnd),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
-    ]).then(([p, j, o]) => {
+      // The rounding counters (15 min per day): without them the squares still show, only the paid line is missing.
+      loadDayRounding({ untilDate: weekEnd }).catch(() => new Map()),
+    ]).then(([p, j, o, r]) => {
       if (!alive) return;
       setError(p.error || j.error ? (p.error || j.error).message : "");
       setPeople(p.data || []);
       setJobs(j.data || []);
       setTimeOff(o.data || []);
+      setRounding(r);
       setLoadedWeek(weekStart);
     });
     return () => { alive = false; };
@@ -75,9 +80,13 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
           ...weekCellSummary(dayJobs),
         };
       });
-      return { employee, cells, total: cells.reduce((sum, c) => sum + c.hours, 0), totalKm: cells.reduce((sum, c) => sum + c.km, 0) };
+      return {
+        employee, cells, total: cells.reduce((sum, c) => sum + c.hours, 0), totalKm: cells.reduce((sum, c) => sum + c.km, 0),
+        round: weekRoundingSummary(roundingFor(rounding, employee.id), weekStart, days[6]),
+        hasDraft: cells.some((c) => c.status === "saved"),
+      };
     }).sort((a, b) => (a.employee.full_name || a.employee.email || "").localeCompare(b.employee.full_name || b.employee.email || ""));
-  }, [people, jobs, timeOff, days, holidays]);
+  }, [people, jobs, timeOff, days, holidays, rounding, weekStart]);
 
   function cellClass(cell) {
     if (cell.status === "submitted") return "border-success/40 bg-success/15 text-success";
@@ -110,6 +119,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {rows.some((row) => row.round.days > 0) && <p className="text-xs text-muted-foreground">{t("rounding.week.note")}</p>}
         {loading && rows.length === 0 && <p className="text-sm text-muted-foreground">{t("common.working")}</p>}
 
         <div className="overflow-x-auto">
@@ -127,7 +137,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ employee, cells, total, totalKm }) => (
+              {rows.map(({ employee, cells, total, totalKm, round, hasDraft }) => (
                 <tr key={employee.id}>
                   <td className="max-w-[180px] truncate px-1 text-sm font-semibold">{employee.full_name || employee.email}</td>
                   {cells.map((cell) => (
@@ -151,6 +161,12 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                   <td className="px-1 text-right font-mono text-sm font-bold">
                     {formatHM(total)}
                     <div className="text-[11px] font-normal text-muted-foreground">{Math.round(totalKm)} km</div>
+                    {round.days > 0 && (
+                      <div className="mt-0.5 text-[11px] font-normal leading-tight text-muted-foreground" title={t("rounding.help")}>
+                        <div>{t("rounding.week.paid", { time: formatHM(round.paid / 60) })}{hasDraft ? " *" : ""}</div>
+                        <div>{t("rounding.week.line", { delta: formatRoundingMinutes(round.delta), counter: formatRoundingMinutes(round.counter) })}</div>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

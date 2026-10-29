@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Download, Plus, ShieldAlert } from "lucide-react";
+import { Download, Paperclip, Plus, ShieldAlert } from "lucide-react";
 import { supabase } from "@/supabaseClient";
+import AccidentFiles from "@/components/manager/AccidentFiles";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import {
   ACCIDENT_EVENT, ACCIDENT_KINDS, ACCIDENT_SEVERITIES, MAX_ACCIDENT, accidentToForm, accidentsCsv, createAccident, emptyAccident, fetchAccidents,
   filterAccidents, openAccidentCount, updateAccident, validateAccident,
 } from "@/lib/accidents";
+import { accidentFileCount, uploadAccidentFile } from "@/lib/accident-files";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -35,9 +37,10 @@ function Field({ id, label, error, children, className }) {
   );
 }
 
-function AccidentForm({ initial, people, onSave, onCancel, busy }) {
+function AccidentForm({ initial, people, onSave, onCancel, onFileCount, busy }) {
   const t = useT();
   const [form, setForm] = useState(initial);
+  const [pending, setPending] = useState([]); // files picked on a new file, sent once it is saved
   const [showErrors, setShowErrors] = useState(false);
   const errors = useMemo(() => validateAccident(form), [form]);
   const bad = (key) => showErrors && errors.includes(key);
@@ -54,7 +57,7 @@ function AccidentForm({ initial, people, onSave, onCancel, busy }) {
   function submit(event) {
     event.preventDefault();
     if (errors.length) { setShowErrors(true); return; }
-    onSave(form);
+    onSave(form, pending);
   }
 
   return (
@@ -109,11 +112,12 @@ function AccidentForm({ initial, people, onSave, onCancel, busy }) {
       <Field id="acc-actions" label={t("accidents.field.actions")}>
         <textarea id="acc-actions" rows={3} value={form.corrective_actions} onChange={set("corrective_actions")} maxLength={MAX_ACCIDENT.actions} disabled={busy} className={textareaClass} />
       </Field>
+      <AccidentFiles accidentId={initial.id || null} pending={pending} setPending={setPending} onCountChange={onFileCount} disabled={busy} />
       {showErrors && errors.length > 0 && <p className="text-sm text-destructive">{t("accidents.errors.fields")}</p>}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={busy}>{t("accidents.save")}</Button>
         {initial.id && (
-          <Button type="button" variant="outline" disabled={busy} onClick={() => onSave({ ...form, status: form.status === "closed" ? "open" : "closed" })}>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => onSave({ ...form, status: form.status === "closed" ? "open" : "closed" }, [])}>
             {form.status === "closed" ? t("accidents.reopen") : t("accidents.close")}
           </Button>
         )}
@@ -150,16 +154,35 @@ export default function AccidentRegister() {
   const shown = useMemo(() => filterAccidents(rows, { status, kind, search }), [rows, status, kind, search]);
   const nameOf = (row) => row.person_name || "—";
 
-  async function save(form) {
+  const sortRows = (list) => list.sort((a, b) => (a.occurred_on < b.occurred_on ? 1 : a.occurred_on > b.occurred_on ? -1 : String(b.created_at).localeCompare(String(a.created_at))));
+
+  // Files of the open accident file were added (+n) or removed (-1): the count on its card follows.
+  function changeFileCount(id, delta) {
+    setRows((current) => current.map((row) => (row.id === id ? { ...row, accident_files: [{ count: Math.max(0, accidentFileCount(row) + delta) }] } : row)));
+  }
+
+  async function save(form, pending = []) {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
       const saved = form.id ? await updateAccident(form.id, form) : await createAccident(form);
-      setRows((current) => [saved, ...current.filter((r) => r.id !== saved.id)]
-        .sort((a, b) => (a.occurred_on < b.occurred_on ? 1 : a.occurred_on > b.occurred_on ? -1 : String(b.created_at).localeCompare(String(a.created_at)))));
-      setEditing(null);
+      const previous = rows.find((row) => row.id === saved.id);
+      let count = accidentFileCount(previous);
+      // The files picked on a new file are sent now that it exists; one that fails stays to be added again.
+      let failed = 0;
+      for (const file of pending) {
+        try { await uploadAccidentFile(saved.id, file); count += 1; } catch { failed += 1; }
+      }
+      setRows((current) => sortRows([{ ...saved, accident_files: [{ count }] }, ...current.filter((r) => r.id !== saved.id)]));
       window.dispatchEvent(new Event(ACCIDENT_EVENT));
+      if (failed) {
+        // Back to the saved file, where the files can be added again.
+        setEditing(accidentToForm(saved));
+        setError(t("accidents.files.someFailedAfterSave", { count: failed }));
+      } else {
+        setEditing(null);
+      }
     } catch (saveError) {
       setError(friendlyErrorMessage(saveError, t, "accidents.errors.save"));
     } finally {
@@ -226,7 +249,7 @@ export default function AccidentRegister() {
         <Card>
           <CardContent className="space-y-3 p-4">
             <h3 className="font-semibold">{t("accidents.editTitle")}</h3>
-            <AccidentForm key={editing.id || "new"} initial={editing} people={people} busy={busy} onSave={save} onCancel={() => setEditing(null)} />
+            <AccidentForm key={editing.id || "new"} initial={editing} people={people} busy={busy} onSave={save} onCancel={() => setEditing(null)} onFileCount={(delta) => changeFileCount(editing.id, delta)} />
           </CardContent>
         </Card>
       )}
@@ -245,6 +268,7 @@ export default function AccidentRegister() {
                   <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{t(`accidents.kind.${row.kind}`)}</span>
                   <span className={cn("rounded-full border px-2 py-0.5 text-xs font-semibold", SEVERITY_TONE[row.severity])}>{t(`accidents.severity.${row.severity}`)}</span>
                   {row.status === "open" && <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-xs text-warning">{t("accidents.status.open")}</span>}
+                  {accidentFileCount(row) > 0 && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title={t("accidents.files.title")}><Paperclip className="h-3 w-3" />{accidentFileCount(row)}</span>}
                   {row.lost_days ? <span className="text-xs text-muted-foreground">{t("accidents.field.lostDays")}: <b>{row.lost_days}</b></span> : null}
                 </div>
                 <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{row.description}</p>

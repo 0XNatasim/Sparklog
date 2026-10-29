@@ -28,6 +28,8 @@ const ACTION_META = {
   travel_rule_set: { icon: Car, tone: "text-primary" },
   accident_logged: { icon: ShieldAlert, tone: "text-destructive" },
   accident_status: { icon: ShieldAlert, tone: "text-warning" },
+  accident_file_added: { icon: ShieldAlert, tone: "text-info" },
+  accident_file_removed: { icon: ShieldAlert, tone: "text-warning" },
   broadcast_edited: { icon: Megaphone, tone: "text-primary" },
   departure_change: { icon: DoorOpen, tone: "text-warning" },
   start_date_change: { icon: CalendarPlus, tone: "text-info" },
@@ -88,6 +90,8 @@ export default function AuditLog() {
       case "parking_review_reset": return t("audit.desc.parkingReviewReset", { name: target, date: d.job_date || "—" });
       case "approval_reverted": return t("audit.desc.approvalReverted", { name: target, count: d.jobs ?? 0, from: d.from || "—", to: d.to || "—" });
       case "accident_logged": return t("audit.desc.accidentLogged", { name: target, date: d.occurred_on || "—" });
+      case "accident_file_added": return t("audit.desc.accidentFileAdded", { name: target, date: d.occurred_on || "—" });
+      case "accident_file_removed": return t("audit.desc.accidentFileRemoved", { name: target, date: d.occurred_on || "—" });
       case "accident_status": return t("audit.desc.accidentStatus", { name: target, date: d.occurred_on || "—", to: t(`accidents.status.${d.to}`) });
       case "travel_rule_set": return t("audit.desc.travelRuleSet", {
         name: target, rule: t(`travel.rule.${d.rule_key}`), choice: t(`travel.choice.${d.choice}`), date: d.effective_from || "—",

@@ -19,7 +19,7 @@ import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/l
 import { computeEmployeeWeekTalon, formatTalonRef, YTD_COLUMN_TO_KEY, YTD_CCQ_COLUMN_TO_KEY } from "@/payroll/employee-week";
 import { buildStubModel, defaultHeader } from "@/lib/paystub";
 import { openTalonsPrint } from "@/lib/talon-print";
-import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
+import { formatRoundingMinutes, loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
 import { TAX_YEAR, lastCompletedWeekEnd, planPayrollWeek, postPayrollWeek, weekBounds } from "@/lib/payroll-week";
 
 const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
@@ -293,11 +293,12 @@ export default function PayrollWeek({ messier = false }) {
               </Button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[840px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase text-muted-foreground">
                     <th className="px-2 py-2 font-medium">{t("payroll.employee")}</th>
                     <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.hours")}</th>
+                    <th className="px-2 py-2 text-right font-medium" title={t("rounding.help")}>{t("payWeek.col.rounding")}</th>
                     <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.gross")}</th>
                     <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.deductions")}</th>
                     <th className="px-2 py-2 text-right font-medium">{t("payWeek.col.net")}</th>
@@ -310,6 +311,18 @@ export default function PayrollWeek({ messier = false }) {
                     <tr key={row.profile.id} className="border-b last:border-0">
                       <td className="px-2 py-2 font-medium">{row.profile.full_name}</td>
                       <td className="px-2 py-2 text-right font-mono">{row.talon ? hours(row.hours) : "—"}</td>
+                      <td className="px-2 py-2 text-right font-mono">
+                        {(() => {
+                          const week = weekRoundingSummary(roundingFor(data.rounding, row.profile.id), bounds.start, bounds.end);
+                          if (!week.days) return "—";
+                          return (
+                            <span title={t("rounding.help")}>
+                              {formatRoundingMinutes(week.delta)}
+                              <span className="block text-[11px] text-muted-foreground">{t("rounding.week.counterOnly", { counter: formatRoundingMinutes(week.counter) })}</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-2 py-2 text-right font-mono">{row.talon ? money(row.gross) : "—"}</td>
                       <td className="px-2 py-2 text-right font-mono">{row.talon ? money(row.deductions) : "—"}</td>
                       <td className="px-2 py-2 text-right font-mono">{row.talon ? money(row.net) : "—"}</td>
@@ -334,6 +347,7 @@ export default function PayrollWeek({ messier = false }) {
                   <tr className="border-t font-semibold">
                     <td className="px-2 py-2">{t("payroll.das.total")}</td>
                     <td />
+                    <td />
                     <td className="px-2 py-2 text-right font-mono">{money(plan.totals.gross)}</td>
                     <td className="px-2 py-2 text-right font-mono">{money(plan.totals.deductions)}</td>
                     <td className="px-2 py-2 text-right font-mono">{money(plan.totals.net)}</td>
@@ -344,6 +358,7 @@ export default function PayrollWeek({ messier = false }) {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">{t("payWeek.calcNote")}</p>
+            <p className="text-xs text-muted-foreground">{t("payWeek.roundingNote")}</p>
           </CardContent></Card>
 
           <div className="grid gap-3 lg:grid-cols-3">
