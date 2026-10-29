@@ -44,6 +44,16 @@ export function roundingByUser(jobs, profiles = []) {
   return result;
 }
 
+// One week of an employee's counter, from the days it counts (buildDayRounding): minutes worked and paid on
+// those days, the week's rounding difference (paid − worked: + = paid more, − = owed to the employee) and the
+// counter at the end of the week. start / end = YYYY-MM-DD, both included. `days` = 0 when no day counts yet
+// (before the start date, or only drafts): nothing to show.
+export function weekRoundingSummary(rounding, start, end) {
+  const days = (rounding?.days || []).filter((day) => day.date >= start && day.date <= end);
+  const sum = (key) => days.reduce((total, day) => total + day[key], 0);
+  return { days: days.length, worked: sum("worked"), paid: sum("paid"), delta: sum("delta"), counter: days.length && rounding ? rounding.balanceAfter(end) : 0 };
+}
+
 // An employee with no counted day yet: rounding still applies, from a zero counter.
 export const ZERO_ROUNDING = buildDayRounding([]);
 

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.200)
+## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.201)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.201 (technique).** Arrondi visible : `weekRoundingSummary(rounding, start, end)` (`day-rounding.js` : jours comptés
+de la semaine, minutes travaillées / payées, écart, compteur en fin de semaine) lue par `WeekSnapshot.jsx` (ligne « payé /
+arrondi / compteur » sous le total ; `loadDayRounding` en plus, un échec n'empêche pas l'affichage) et `PayrollWeek.jsx`
+(colonne « Arrondi »). Le compteur compte les fiches soumises / modifiées / approuvées (`ROUNDING_STATUSES`) : en Paie de la
+semaine, l'écart peut donc inclure des jours soumis pas encore approuvés (le talon, lui, ne part que des fiches approuvées).
 
 **V2.4.200 (technique).** Fichiers du registre d'accidents : bucket privé `accident-files` (0123, 10 Mo, types listés : images
 JPEG / PNG / WebP, PDF, Word, Excel, texte, CSV ; pas de HTML ni de SVG) avec une seule politique de stockage

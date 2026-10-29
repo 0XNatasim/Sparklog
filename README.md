@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.200 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.201 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,11 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.201 — Arrondi visible dans « Cette semaine / Semaine passée » et dans Paie de la semaine.** Under the weekly
+  total of each employee: « payé X » (the week's submitted and approved days, rounded to 15 minutes; `*` = a draft day is
+  not counted), « arrondi ±n min · compteur ±c min ». The squares keep the time entered, to the minute. Paie de la semaine
+  has an « Arrondi » column: the week's difference and the counter at the end of the week, next to the hours (already
+  rounded). Same counter as Sommaire, talons and the printed summary (`weekRoundingSummary`, `day-rounding.js`).
 - **V2.4.200 — Fichiers dans le registre d'accidents** (migration 0123). A file of the accident register carries
   pictures, PDFs and documents (Word, Excel, text, CSV): « Ajouter des fichiers » on the file, 10 MB each, 20 at most;
   pictures are shrunk to JPEG before they are sent (SVG refused), and on a new file the picked files are sent once it is
