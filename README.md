@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.198 (2026-10-28).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.199 (2026-10-29).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,9 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.199 — Alerte de stock faible par entrepôt** (migration 0122). Each warehouse (group) has a switch, in
+  Inventaire › Minimums, to raise the low-stock alert; off by default. A warehouse below its minimum without the switch
+  is still shown on the Minimums screen, but not on the page banner or the menu badge.
 - **V2.4.198 — Stock minimum par entrepôt** (Gestion › Équipe › Inventaire › Minimums, migration 0121). A warehouse is an
   employee group. For each device a manager sets a **ratio per employee**; the minimum is that ratio × the group's
   employees (paused accounts not counted). The stock is the sum of the members' latest inventory list (last 7 days).

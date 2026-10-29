@@ -15,7 +15,7 @@ const { default: InventoryRatios } = await import("./InventoryRatios");
 const fr = (key, vars = {}) => Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, v), dictionaries.fr[key]);
 const level = (extra) => ({
   group_id: "g1", group_name: "Entrepôt Laval", code: "EQ000001", item_name: "Thermostat", per_employee: 2, headcount: 10,
-  minimum: 20, on_hand: 12, lists_counted: 4, is_low: true, ...extra,
+  minimum: 20, on_hand: 12, lists_counted: 4, is_low: true, alert_enabled: true, ...extra,
 });
 
 function setup(levels) {
@@ -39,6 +39,21 @@ describe("InventoryRatios", () => {
     expect(screen.getByText(/Thermostat/)).toBeTruthy();
     expect(screen.getByText(fr("mgr.inventory.ratios.lowLine", { onHand: "12", minimum: "20", ratio: "2", count: "10" }))).toBeTruthy();
     expect(screen.queryByText(/Capteur/)).toBeNull();
+  });
+
+  it("does not alert for a warehouse whose alert is off", async () => {
+    setup([level({ alert_enabled: false })]);
+    await screen.findByText(fr("mgr.inventory.ratios.title"));
+    expect(screen.queryByText(/sous le stock minimum/)).toBeNull();
+  });
+
+  it("turns the alert of the chosen warehouse on", async () => {
+    setup([]);
+    fireEvent.click(await screen.findByRole("button", { name: fr("mgr.inventory.ratios.manage") }));
+    fireEvent.click(await screen.findByLabelText(fr("mgr.inventory.ratios.alertOn")));
+    await waitFor(() => expect(state.fake.calls.some((call) => call.table === "employee_groups" && call.op === "update")).toBe(true));
+    const update = state.fake.calls.find((call) => call.table === "employee_groups" && call.op === "update");
+    expect(update.payload).toEqual({ low_stock_alert: true });
   });
 
   it("stays calm when nothing is below its minimum", async () => {

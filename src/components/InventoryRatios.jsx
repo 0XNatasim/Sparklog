@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/select";
 import { fetchGroups } from "@/lib/employee-groups";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import {
-  RATIOS_EVENT, deleteRatio, fetchKnownEquipment, fetchStockLevels, lowStockRows, parseRatio, saveRatio, validateRatio,
+  RATIOS_EVENT, deleteRatio, fetchAlertFlags, fetchKnownEquipment, fetchStockLevels, lowStockRows, parseRatio, saveRatio, setGroupAlert, validateRatio,
 } from "@/lib/inventory-ratios";
 import { useT } from "@/lib/use-t";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,7 @@ export default function InventoryRatios() {
   const [levels, setLevels] = useState([]);
   const [groups, setGroups] = useState([]);
   const [equipment, setEquipment] = useState([]);
+  const [flags, setFlags] = useState(new Map());
   const [open, setOpen] = useState(false);
   const [groupId, setGroupId] = useState("");
   const [code, setCode] = useState("");
@@ -32,8 +33,8 @@ export default function InventoryRatios() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchStockLevels(), fetchGroups(), fetchKnownEquipment()])
-      .then(([rows, groupRows, items]) => { if (!cancelled) { setLevels(rows); setGroups(groupRows); setEquipment(items); setError(""); } })
+    Promise.all([fetchStockLevels(), fetchGroups(), fetchKnownEquipment(), fetchAlertFlags()])
+      .then(([rows, groupRows, items, alertFlags]) => { if (!cancelled) { setLevels(rows); setGroups(groupRows); setEquipment(items); setFlags(alertFlags); setError(""); } })
       .catch((loadError) => { if (!cancelled) setError(friendlyErrorMessage(loadError, t, "mgr.inventory.ratios.loadFailed")); });
     return () => { cancelled = true; };
   }, [reload, t]);
@@ -105,6 +106,11 @@ export default function InventoryRatios() {
                 <Select aria-label={t("mgr.inventory.ratios.warehouse")} value={activeGroup?.id || ""} onChange={(e) => setGroupId(e.target.value)}>
                   {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
                 </Select>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" className="h-4 w-4 accent-primary" disabled={busy} checked={Boolean(flags.get(activeGroup.id))}
+                    onChange={(e) => run(() => setGroupAlert({ groupId: activeGroup.id, enabled: e.target.checked }))} />
+                  {t("mgr.inventory.ratios.alertOn")}
+                </label>
                 {groupLevels.length > 0 ? (
                   <div className="overflow-x-auto rounded-md border">
                     <table className="w-full min-w-[520px] text-sm">

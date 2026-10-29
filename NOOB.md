@@ -1,11 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-28 (V2.4.198).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-29 (V2.4.199).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.199** : dans Inventaire › Minimums, une case par entrepôt : « Alerter quand cet entrepôt est sous son minimum ».
+  Décochée au départ. À cocher pour Alma (Saguenay), Charlevoix et Rimouski. Les minimums des autres entrepôts restent
+  visibles mais ne sonnent pas l'alerte. Les 74 minimums du tableau de Karine sont déjà saisis (Calypso V2 : Ste-Catherine
+  et Beloeil seulement).
 - ✅ **V2.4.198** : **stock minimum par entrepôt**. Dans Inventaire, bouton « Minimums » : choisissez l'entrepôt (un groupe),
   un appareil et un **ratio par employé** (ex. 0,5 thermostat par employé). Le minimum = ratio × nombre d'employés du
   groupe. Si le stock des derniers inventaires passe sous le minimum, l'appareil s'affiche en rouge en haut de la page

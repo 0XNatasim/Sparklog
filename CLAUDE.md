@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-28, V2.4.198)
+## 6. À faire / à préciser (mis à jour 2026-10-29, V2.4.199)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.199 (technique).** Alerte par entrepôt : colonne `employee_groups.low_stock_alert` (0122, défaut faux) ; la RPC
+`inventory_stock_levels()` est recréée avec `alert_enabled` ; `lowStockRows` ne garde que `is_low && alert_enabled`
+(bannière et pastille). Données saisies hors dépôt (74 lignes `inventory_min_ratios`, tableau du courriel du 2026-10-28).
 
 **V2.4.198 (technique).** Stock minimum : table `inventory_min_ratios` (0121, `group_id` × `code`, `per_employee` > 0, RLS
 `get_my_role() = 'manager'`) et RPC `inventory_stock_levels()` (membres non en pause du groupe ; stock = dernière liste

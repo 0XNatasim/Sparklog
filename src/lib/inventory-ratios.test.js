@@ -39,11 +39,12 @@ describe("validateRatio", () => {
 
 describe("lowStockRows", () => {
   const levels = [
-    { group_name: "B", code: "EQ000001", minimum: 10, on_hand: 9, is_low: true },
-    { group_name: "A", code: "EQ000002", minimum: 10, on_hand: 2, is_low: true },
-    { group_name: "A", code: "EQ000003", minimum: 10, on_hand: 50, is_low: false },
+    { group_name: "B", code: "EQ000001", minimum: 10, on_hand: 9, is_low: true, alert_enabled: true },
+    { group_name: "A", code: "EQ000002", minimum: 10, on_hand: 2, is_low: true, alert_enabled: true },
+    { group_name: "A", code: "EQ000003", minimum: 10, on_hand: 50, is_low: false, alert_enabled: true },
+    { group_name: "C", code: "EQ000004", minimum: 10, on_hand: 1, is_low: true, alert_enabled: false },
   ];
-  it("keeps the low ones, the largest shortfall first", () => {
+  it("keeps the low ones of the warehouses that alert, the largest shortfall first", () => {
     expect(lowStockRows(levels).map((r) => r.code)).toEqual(["EQ000002", "EQ000001"]);
     expect(lowStockCount(levels)).toBe(2);
     expect(lowStockCount(null)).toBe(0);
@@ -68,5 +69,18 @@ describe("migration 0121", () => {
   });
   it("raises no alert when no list was counted", () => {
     expect(sql).toMatch(/coalesce\(l\.n, 0\) > 0 and/);
+  });
+});
+
+describe("migration 0122", () => {
+  const sql = readFileSync(new URL("../../supabase/migrations/20261029120000_0122_low_stock_alert_per_warehouse.sql", import.meta.url), "utf8");
+  it("adds the per-warehouse flag, off by default, and returns it", () => {
+    expect(sql).toContain("add column if not exists low_stock_alert boolean not null default false");
+    expect(sql).toContain("alert_enabled boolean");
+    expect(sql).toContain("g.low_stock_alert");
+  });
+  it("keeps the function manager-only and not callable by anon", () => {
+    expect(sql).toContain("public.get_my_role() = 'manager'");
+    expect(sql).toContain("revoke all on function public.inventory_stock_levels() from public, anon");
   });
 });
