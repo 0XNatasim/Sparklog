@@ -31,6 +31,17 @@ describe("EvidenceDownload", () => {
     await screen.findByText(/2 photo\(s\) téléchargée\(s\)/);
   });
 
+  it("limits the download to a range of weeks", async () => {
+    const files = [file("a.jpg", "2026-10-20"), file("b.jpg", "2026-10-28"), file("c.jpg", "2026-11-03")];
+    loadEvidenceCatalog.mockResolvedValue({ files, done: new Set() });
+    render(<EvidenceDownload />);
+    fireEvent.click(screen.getByRole("button", { name: /Télécharger les justificatifs/ }));
+    await screen.findByText(/3 nouveaux · 0 déjà téléchargés · 3 dans le ZIP/);
+    fireEvent.change(screen.getByLabelText(/De la semaine/), { target: { value: "2026-10-25" } });
+    fireEvent.change(screen.getByLabelText(/À la semaine/), { target: { value: "2026-10-25" } });
+    await screen.findByText(/1 nouveaux · 0 déjà téléchargés · 1 dans le ZIP/);
+  });
+
   it("offers the ones already downloaded again when asked", async () => {
     const files = [file("a.jpg"), file("b.jpg")];
     loadEvidenceCatalog.mockResolvedValue({ files, done: new Set(files.map(fileKey)) });

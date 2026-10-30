@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.209)
+## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.210)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.210 (technique).** `EvidenceDownload.jsx` : deux menus de semaine (`evidenceWeeks(files)` dans `evidence-download.js`, semaines
+dimanche → samedi qui contiennent des photos) à la place des deux dates ; `selectEvidence` reçoit toujours `from` / `to` en dates
+(début de la 1re semaine, fin de la dernière). Aucun changement de base ni de fonction Edge.
 
 **V2.4.209 (technique).** Migration 0126 : `parking_receipts.expires_at` / `pictures_purged_at`, `storage_path` nullable, trigger
 `parking_receipts_set_expiry` (échéance = `overtime_settings.evidence_retention_days` à l'insertion, non modifiable par le

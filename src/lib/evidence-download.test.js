@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
-import { fileKey, listEvidenceFiles, selectEvidence, zipEntryNames } from "./evidence-download";
+import { evidenceWeeks, fileKey, listEvidenceFiles, selectEvidence, zipEntryNames } from "./evidence-download";
 
 const names = new Map([["u1", "Alex Test"], ["u2", "Sam Essai"]]);
 const files = listEvidenceFiles({
@@ -30,6 +30,12 @@ describe("evidence download", () => {
   it("filters by period and kind", () => {
     expect(selectEvidence(files, { from: "2026-10-28" }).chosen.map((f) => f.path)).toEqual(["u1/a.jpg"]);
     expect(selectEvidence(files, { kinds: ["parking"] }).chosen).toHaveLength(2);
+  });
+
+  it("lists the weeks (Sunday to Saturday) that hold pictures, newest first", () => {
+    const more = listEvidenceFiles({ overtime: [{ storage_path: "x.jpg", job_date: "2026-11-03", user_id: "u1", jobs: null }], names });
+    const weeks = evidenceWeeks([...files, ...more]);
+    expect(weeks.map((w) => [w.start, w.end])).toEqual([["2026-11-01", "2026-11-07"], ["2026-10-25", "2026-10-31"]]);
   });
 
   it("downloading twice the same set gives nothing the second time", () => {
