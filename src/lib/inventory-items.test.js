@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseInventoryText } from "../../supabase/functions/process_inventory_screenshot/parse.ts";
-import { sumCrewDefective, sumCrewInventory, compareInventory, effectiveOcrStatus, markInventoryAbsences, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
+import { compareInventory, effectiveOcrStatus, markInventoryAbsences, mergeInventoryItems, summarizeInventoryDay } from "./inventory-items";
 import { inventoryCaptured, inventoryReadingBlock, inventoryStepComplete, probableMissingLines } from "./inventory-screenshots";
 
 const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -186,44 +186,6 @@ describe("defective products of the day", () => {
     expect(inventoryStepComplete([{ slot: 1 }], "yes")).toBe(false);
     expect(inventoryStepComplete([{ slot: 1 }, { slot: 4 }], "yes")).toBe(true);
     expect(inventoryStepComplete([{ slot: 4 }], "yes")).toBe(false);
-  });
-
-  it("sums the crew's defective products, without flagging employees who have none", () => {
-    const entry = (name, state, items) => ({ name, defective: { state, items } });
-    const { rows, counted, unverified } = sumCrewDefective([
-      entry("A", "ok", [{ code: "EQ000016", name: "Hilo", quantity: 2 }]),
-      entry("B", "none", []),
-      entry("C", "review", [{ code: "EQ000016", name: "Hilo", quantity: 1 }]),
-    ]);
-    expect(rows).toEqual([{ code: "EQ000016", name: "Hilo", total: 3, holders: 2 }]);
-    expect(counted).toBe(2);
-    expect(unverified).toEqual(["C"]);
-  });
-});
-
-describe("sumCrewInventory", () => {
-  const item = (code, quantity, name = `Item ${code}`) => ({ code, name, quantity });
-  const ok = (name, items) => ({ name, state: "ok", items });
-
-  it("sums each equipment code over all employees and counts who holds it", () => {
-    const { rows, counted, unverified } = sumCrewInventory([
-      ok("A", [item("EQ000001", 5), item("EQ000002", 0)]),
-      ok("B", [item("EQ000001", 12.5), item("EQ000003", 2)]),
-    ]);
-    expect(counted).toBe(2);
-    expect(unverified).toEqual([]);
-    expect(rows.find((row) => row.code === "EQ000001")).toMatchObject({ total: 17.5, holders: 2 });
-    expect(rows.find((row) => row.code === "EQ000002")).toMatchObject({ total: 0, holders: 0 });
-  });
-
-  it("flags employees whose list is not verified, so totals are not read as complete", () => {
-    const { counted, unverified } = sumCrewInventory([
-      ok("A", [item("EQ000001", 1)]),
-      { name: "B", state: "review", items: [item("EQ000001", 2)] },
-      { name: "C", state: "missing", items: [] },
-    ]);
-    expect(counted).toBe(2);
-    expect(unverified).toEqual(["B", "C"]);
   });
 });
 

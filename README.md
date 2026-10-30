@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.207 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.208 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,12 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.208 — One box for the OT, no « Inventaire du crew » button, and the Google Sheet follows the 65 km rule.** The pre-made work orders are no longer a
+  second field: the OT box has a small arrow on its right that opens the list; picking a label fills the box, and a real
+  number is typed as before (time entry and manager's manual timesheet). The « Inventaire du crew » button (team totals
+  window, defective products included) is removed from the Inventaire page. The Apps Script `doPost`
+  (`supabase/functions/push_approved_batch/apps-script-doPost.js`, pasted by hand in Google) now keeps the first trip paid
+  when the day's first job is 65 km or more, like the payroll engine 2.7.0 (to paste and redeploy as a new version).
 - **V2.4.207 — Unpaid first trip: paid from 65 km** (payroll engine 2.7.0, migration 0125). An employee with the « premier
   trajet non payé » option no longer loses the first trip of a day when the **first job of that day is 65 km or more**
   (65 exactly counts; only the first job is looked at; days from 2026-10-11). The engine, the supper and the 8 h

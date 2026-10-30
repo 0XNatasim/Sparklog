@@ -1,7 +1,7 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import OtPresetSelect from "@/components/OtPresetSelect";
+import OtField from "@/components/OtField";
 import { usePresetWorkOrders } from "@/lib/preset-work-orders";
 
 const TIME_FIELDS = "grid gap-1 sm:gap-1.5";
@@ -30,8 +30,7 @@ export default function JobEntryFields({ t, values, onChange, disabled, officeEm
 
         <div className={TIME_FIELDS}>
           <Label htmlFor="ot" className="text-xs sm:text-sm"><span className="sm:hidden">{t("common.otLabel")}</span><span className="hidden sm:inline">{t("form.ot")}</span></Label>
-          {input("ot", "ot", { placeholder: t("form.otPlaceholder") })}
-          <OtPresetSelect ot={values.ot} presets={presets} disabled={disabled} onPick={(label) => onChange("ot", label)} />
+          <OtField id="ot" value={values.ot} presets={presets} disabled={disabled} className="h-9 sm:h-10" placeholder={t("form.otPlaceholder")} onChange={(value) => onChange("ot", value)} />
         </div>
 
         <div className={TIME_FIELDS}>
