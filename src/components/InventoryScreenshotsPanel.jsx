@@ -20,6 +20,7 @@ import { deleteInventoryScreenshots, fetchPreviousInventory, requestInventoryRea
 import { alertDisplayName, dismissInventoryNegativeAlert, fetchInventoryNegativeAlerts, groupInventoryNegativeAlerts, INVENTORY_ALERTS_EVENT } from "@/lib/inventory-alerts";
 import InventoryLowStock from "@/components/InventoryLowStock";
 import InventoryMinimumsLink from "@/components/InventoryMinimumsLink";
+import { lowStockByWarehouse } from "@/lib/inventory-ratios";
 import { useLowStock } from "@/lib/use-low-stock";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -371,7 +372,7 @@ export default function InventoryScreenshotsPanel() {
             <Button type="button" variant="outline" size="sm" onClick={() => setWhoOpen(true)}>
               <ListChecks className="mr-1 h-4 w-4" />{t("mgr.inventory.who")}
             </Button>
-            <InventoryMinimumsLink count={lowStock.length} />
+            <InventoryMinimumsLink count={lowStockByWarehouse(lowStock).length} />
             <Button type="button" variant="outline" size="icon" aria-label={t("common.retry")} disabled={loading} onClick={() => load()}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             </Button>

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.210)
+## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.211)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.211 (technique).** `lowStockByWarehouse(rows)` renvoie `{ name, count, rows }` ; `lowStockCount(levels)` compte maintenant les
+**entrepôts** (une notification par entrepôt, pastille du menu dans `ManagerLayout` et bouton `InventoryMinimumsLink`, qui reçoit
+`lowStockByWarehouse(lowStock).length`). `InventoryLowStock.jsx` : un bloc par entrepôt, appareils bas en rouge (`lowLine`) ; le
+lien « Voir le détail » reste seulement hors de la page Minimums. Texte `mgr.inventory.ratios.lowTitle` = entrepôts. Pas de
+notification téléphone (hors périmètre).
 
 **V2.4.210 (technique).** `EvidenceDownload.jsx` : deux menus de semaine (`evidenceWeeks(files)` dans `evidence-download.js`, semaines
 dimanche → samedi qui contiennent des photos) à la place des deux dates ; `selectEvidence` reçoit toujours `from` / `to` en dates

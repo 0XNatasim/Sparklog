@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/lib/use-t";
 
-// Button of the Inventaire page to the minimums by warehouse; `count` = the devices below their minimum
-// (in the warehouses that are counted), shown on it.
+// Button of the Inventaire page to the minimums by warehouse; `count` = the warehouses with a device below its minimum
+// (among the warehouses that are counted), shown on it.
 export default function InventoryMinimumsLink({ count = 0 }) {
   const t = useT();
   return (

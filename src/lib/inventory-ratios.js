@@ -40,15 +40,21 @@ export const lowStockRows = (levels) => (levels || [])
   .sort((a, b) => (Number(b.minimum) - Number(b.on_hand)) - (Number(a.minimum) - Number(a.on_hand))
     || String(a.group_name).localeCompare(String(b.group_name), "fr-CA"));
 
-// The devices below their minimum counted by warehouse, the warehouse with the most first: [{ name, count }].
+// The devices below their minimum grouped by warehouse, the warehouse with the most first:
+// [{ name, count, rows }] (rows = its low devices, in the order given).
 export function lowStockByWarehouse(rows) {
   const byGroup = new Map();
-  for (const row of rows || []) byGroup.set(row.group_name, (byGroup.get(row.group_name) || 0) + 1);
-  return [...byGroup.entries()].map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name), "fr-CA"));
+  for (const row of rows || []) {
+    const entry = byGroup.get(row.group_name) || { name: row.group_name, count: 0, rows: [] };
+    entry.count += 1;
+    entry.rows.push(row);
+    byGroup.set(row.group_name, entry);
+  }
+  return [...byGroup.values()].sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name), "fr-CA"));
 }
 
-export const lowStockCount = (levels) => lowStockRows(levels).length;
+// One notification per warehouse: the number of warehouses with at least one device below its minimum.
+export const lowStockCount = (levels) => lowStockByWarehouse(lowStockRows(levels)).length;
 
 // Devices seen on recent lists (one per code, longest name), to pick from when adding a ratio.
 export function knownEquipment(rows) {
