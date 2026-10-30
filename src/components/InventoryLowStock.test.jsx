@@ -16,18 +16,19 @@ const rows = [row("Entrepôt Rimouski", "EQ000016", "Thermostat Hilo 4"), row("E
 afterEach(cleanup);
 
 describe("InventoryLowStock", () => {
-  it("says what the number is: how many devices, in which warehouses, with a link to the detail", () => {
+  it("says what the number is: one notification per warehouse, its low devices in red, with a link to the detail", () => {
     render(<MemoryRouter><InventoryLowStock rows={rows} /></MemoryRouter>);
-    expect(screen.getByText(fr("mgr.inventory.ratios.lowTitle", { count: 3 }))).toBeTruthy();
-    expect(screen.getByText("Entrepôt Rimouski (2) · Entrepôt Alma (1)")).toBeTruthy();
+    expect(screen.getByText(fr("mgr.inventory.ratios.lowTitle", { count: 2 }))).toBeTruthy();
+    expect(screen.getByText("Entrepôt Rimouski")).toBeTruthy();
+    expect(screen.getByText("Entrepôt Alma")).toBeTruthy();
+    expect(screen.getByText(/Passerelle Hilo/).closest("li").className).toContain("text-destructive");
+    expect(screen.getAllByText(fr("mgr.inventory.ratios.lowLine", { onHand: "12", minimum: "20" }))).toHaveLength(3);
     expect(screen.getByRole("link", { name: fr("mgr.inventory.ratios.seeDetail") }).getAttribute("href")).toBe("/manager/inventory/minimums");
-    expect(screen.queryByText(/Passerelle Hilo/)).toBeNull();
   });
 
-  it("lists every device with its stock on the detailed view, without the link", () => {
+  it("has no link on the minimums page itself (detailed)", () => {
     render(<MemoryRouter><InventoryLowStock rows={rows} detailed /></MemoryRouter>);
     expect(screen.getByText(/Passerelle Hilo/)).toBeTruthy();
-    expect(screen.getAllByText(fr("mgr.inventory.ratios.lowLine", { onHand: "12", minimum: "20" }))).toHaveLength(3);
     expect(screen.queryByRole("link")).toBeNull();
   });
 

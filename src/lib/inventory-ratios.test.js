@@ -46,7 +46,8 @@ describe("lowStockRows", () => {
   ];
   it("keeps the low ones of the warehouses that alert, the largest shortfall first", () => {
     expect(lowStockRows(levels).map((r) => r.code)).toEqual(["EQ000002", "EQ000001"]);
-    expect(lowStockCount(levels)).toBe(2);
+    expect(lowStockCount(levels)).toBe(2); // warehouses B and A: one notification each
+    expect(lowStockCount([...levels, { group_name: "A", code: "EQ000009", minimum: 5, on_hand: 0, is_low: true, alert_enabled: true }])).toBe(2); // a 2nd device of A adds nothing
     expect(lowStockCount(null)).toBe(0);
   });
 });
@@ -90,7 +91,7 @@ describe("lowStockByWarehouse", () => {
     const { lowStockByWarehouse } = await import("./inventory-ratios");
     expect(lowStockByWarehouse([
       { group_name: "Rimouski" }, { group_name: "Alma" }, { group_name: "Rimouski" }, { group_name: "Charlevoix" }, { group_name: "Rimouski" },
-    ])).toEqual([{ name: "Rimouski", count: 3 }, { name: "Alma", count: 1 }, { name: "Charlevoix", count: 1 }]);
+    ]).map(({ name, count, rows }) => ({ name, count, rows: rows.length }))).toEqual([{ name: "Rimouski", count: 3, rows: 3 }, { name: "Alma", count: 1, rows: 1 }, { name: "Charlevoix", count: 1, rows: 1 }]);
     expect(lowStockByWarehouse(undefined)).toEqual([]);
   });
 });
