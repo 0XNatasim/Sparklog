@@ -199,6 +199,16 @@ describe("sous-traitants", () => {
     expect(h.km).toBe(40);
   });
 
+  it("keeps the return time apart from the regular time, even with the Messier method", () => {
+    const withReturn = buildWeeklyReport({
+      week, profiles: [sub], contributions: [], employer, messierMethod: true,
+      jobs: [job("r1", "s", "2026-09-29", "O3", "07:00", "16:00", 10, "approved", { return_time_minutes: 60 })],
+    });
+    const h = withReturn.employees[0].hours;
+    expect(h).toMatchObject({ regularMinutes: 8 * 60, returnNoBenefitMinutes: 60, paidMinutes: 9 * 60 });
+    expect(withReturn.employees[0].jobs[0]).toMatchObject({ regularMinutes: 8 * 60, returnNoBenefitMinutes: 60 });
+  });
+
   it("prints a Sous-traitants table with one column each", () => {
     const html = buildWeeklyReportHtml(r);
     expect(html).toContain("<h3>Sous-traitants</h3>");

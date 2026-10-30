@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.213)
+## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.214)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,11 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.214 (technique).** `buildWeeklyReport` : `calculatePayrollEntries(..., { messierMethod: messierMethod && !isSubcontractorRole(role) })` —
+la méthode « Messier » (retour sans avantages converti en régulier) ne s'applique plus aux sous-traitants du Sommaire imprimable :
+le retour reste dans `returnNoBenefitMinutes` (colonne « Retour »), le régulier n'inclut plus le retour. Même total payé. L'onglet
+Rapport › Sommaire (`WeekViewTab`) n'utilisait déjà pas cette méthode.
 
 **V2.4.213 (technique).** `weekly-report.js` : en-tête `returnHeader` (« Retour » pour la catégorie `subcontractor`, « Retour s.a. » sinon), colonne
 « Retour » (`returnNoBenefitMinutes`, tout le retour d'un sous-traitant) dans le tableau Sous-traitants ; `WeekViewTab.jsx` : colonne et
