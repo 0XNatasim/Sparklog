@@ -155,7 +155,28 @@ export function useInventoryStep({ userId, dayRef, open, t }) {
     };
   }, [open, userId, hasShots, readingTick, dayRef]);
 
+  // What the employee saw when leaving the step (0127): the reading and what the step asked. Never blocks or fails.
+  function recordContinue(block) {
+    if (!userId || !dayRef.current) return;
+    const unreadable = reading?.unreadable?.length ?? null;
+    try {
+      Promise.resolve(supabase.from("inventory_reading_log").insert({
+        user_id: userId,
+        job_date: dayRef.current,
+        reading_state: reading?.state ?? null,
+        lines_read: reading?.count ?? null,
+        lines_expected: reading?.expected ?? null,
+        lines_missing: reading?.missing ?? null,
+        lines_unreadable: unreadable,
+        step_block: block || null,
+        reading_known: Boolean(reading),
+        complement_tried: complementTried || rows.some((row) => row.slot === COMPLEMENT_SLOT),
+      })).then(() => undefined, () => undefined);
+    } catch { /* a log line never holds the employee */ }
+  }
+
   return {
+    recordContinue,
     inputRef, multiInputRef, rows, busySlot, error, notice, reading, defectiveAnswer, setDefectiveAnswer, complementTried,
     start, pickSlot, pickFiles, pickComplement, handleFile, handleFiles,
   };

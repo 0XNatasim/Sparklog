@@ -33,7 +33,7 @@ function Where() {
   return <div data-testid="where">{location.pathname}{location.search}</div>;
 }
 
-function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [], parking = [] } = {}) {
+function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [], inventoryItems = [], parking = [] } = {}) {
   state.auth = { user: { id: "emp-1" }, role: "employee" };
   state.fake = createFakeSupabase({
     tables: {
@@ -44,7 +44,7 @@ function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", sa
       jobs,
       meal_claims: [],
       inventory_screenshots: inventoryShots,
-      inventory_items: [],
+      inventory_items: inventoryItems,
       parking_receipts: parking,
     },
     rpcs: {
@@ -240,6 +240,8 @@ describe("EmployeeForm — end of the day", () => {
       // The day's saved jobs are only listed for the day submission (locked = false filter).
       jobs: (call) => (call.filters.some(([name, column]) => name === "eq" && column === "locked") ? [dayJob] : []),
       inventoryShots: [{ slot: 1, storage_path: "emp-1/inv-1.jpg", ocr_status: "processed" }],
+      // A screenshot that read nothing at all now holds « Continuer » (V2.4.215): this one read a line.
+      inventoryItems: [{ slot: 1, section: "inventory", code: "EQ000001", name: "Thermostat", quantity: 4 }],
     });
     await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
     fill();

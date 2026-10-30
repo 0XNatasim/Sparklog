@@ -40,7 +40,7 @@ export function inventoryStepComplete(rows, defectiveAnswer) {
 
 // What the reading still asks of the employee before « Continuer » (0117):
 //   "wait"     the screenshots are being read (released when the polling gives up: `timedOut`);
-//   "retake"   lines unreadable or missing, and no complément screenshot yet;
+//   "retake"   lines unreadable or missing (or nothing read at all), and no complément screenshot yet;
 //   "override" still incomplete after the complément — or the complément could not be sent
 //              (`complementTried`): « Continuer quand même » (the manager checks the photos);
 //   null       nothing to do (complete, or no total to compare with, or no reading available).
@@ -48,7 +48,8 @@ export function inventoryStepComplete(rows, defectiveAnswer) {
 export function inventoryReadingBlock(reading, rows, { complementTried = false } = {}) {
   if (!reading) return null;
   if (reading.state === "reading") return reading.timedOut ? null : "wait";
-  const problem = (reading.unreadable?.length || 0) > 0 || (reading.missing || 0) > 0;
+  // Nothing readable at all ("photos": every list screenshot failed to be read) is a problem too (V2.4.215).
+  const problem = (reading.unreadable?.length || 0) > 0 || (reading.missing || 0) > 0 || reading.state === "photos";
   if (!problem) return null;
   return complementTried || (rows || []).some((row) => Number(row.slot) === COMPLEMENT_SLOT) ? "override" : "retake";
 }

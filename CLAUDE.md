@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.214)
+## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.215)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,14 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.215 (technique).** `inventoryReadingBlock` : l'état `photos` (aucune ligne lue) compte comme un problème (« retake », puis « override » avec
+complément ou tentative) ; `InventoryStep.jsx` (`RetakeNote` : `form.inventory.nothingRead`, `retakeListButton`). Migration 0127 : table
+`inventory_reading_log` (compteurs seulement : état de lecture, lignes lues / attendues / manquantes / illisibles, `step_block`
+wait / retake / override, `reading_known`, `complement_tried`) ; RLS : insertion par l'employé pour lui-même (le trigger fixe
+`user_id` et l'heure), lecture gestionnaire, jamais de mise à jour ni de suppression. `useInventoryStep.recordContinue(block)` est appelé
+au clic sur « Continuer » (sans bloquer ni échouer). Pas encore d'écran : lecture par SQL. Constat du 2026-10-30 : une lecture
+entièrement échouée ne demandait rien ; pour une lecture à 15 / 17 le blocage aurait dû s'afficher (cause non établie avant ce journal).
 
 **V2.4.214 (technique).** `buildWeeklyReport` : `calculatePayrollEntries(..., { messierMethod: messierMethod && !isSubcontractorRole(role) })` —
 la méthode « Messier » (retour sans avantages converti en régulier) ne s'applique plus aux sous-traitants du Sommaire imprimable :

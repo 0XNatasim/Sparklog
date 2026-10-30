@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.214 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.215 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,12 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.215 — Inventory step: nothing read is no longer silent, and what the employee saw is recorded** (migration 0127). When
+  none of the list screenshots could be read (« Photos seulement »), the employee is now asked to retake or add a screenshot of
+  the list (then « Continuer quand même », like for a missing line); before, only lines missing or unreadable were asked. Each
+  time an employee leaves the step, `inventory_reading_log` records the reading (state, lines read / expected / missing /
+  unreadable), what the step asked (wait / retake / override / none), whether the reading was known and whether a complément was
+  tried: counts only, written by the employee, read by managers.
 - **V2.4.214 — Subcontractor return time is no longer folded into the regular time in the printable Sommaire.** The report
   applied the « Messier » method (return converted to regular hours, like the CCQ pay) to subcontractors too, so their
   « Retour » stayed empty and the return was inside « Régulier ». For a subcontractor the report now keeps the return apart
