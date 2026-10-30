@@ -49,7 +49,7 @@ export default function CcqJsonExport({ lastFinishedMonth = false }) {
       try {
         const [{ data: jobRows, error: jobError }, { data: profileRows, error: profileError }, { data: nasRows }, rounding] = await withTimeout(
           Promise.all([
-            fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }).order("id")),
+            fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, status").eq("status", "approved").order("job_date", { ascending: true }).order("id")),
             supabase.from("profiles").select("id, full_name, email, role, work_region, wage_schedule, union_association, hourly_rate, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name"),
             // Presence only (no value): empty for a non-owner, whose export then lacks NAS.
             supabase.rpc("nas_presence"),

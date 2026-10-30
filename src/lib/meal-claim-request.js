@@ -7,7 +7,7 @@ import { withTimeout } from "@/lib/utils";
 export async function shouldRequestMealClaim(client, { userId, jobDate, jobId }) {
   const [{ data: dayJobs, error: dayError }, { data: policy, error: policyError }] = await Promise.all([
     withTimeout(
-      client.from("jobs").select("id, job_date, depart, arrivee, fin, return_time_minutes").eq("user_id", userId).eq("job_date", jobDate),
+      client.from("jobs").select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes").eq("user_id", userId).eq("job_date", jobDate),
       10000
     ),
     withTimeout(

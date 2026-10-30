@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.6.1";
+export const ENGINE_VERSION = "2.7.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -66,9 +66,23 @@ export function overtimeOptionsFromProfile(profile) {
   };
 }
 
+// A long first trip is paid anyway (owner decision 2026-10-30, engine 2.7.0): when the FIRST job of
+// the day is `km` kilometres or more, the first trip counts even for an employee with the unpaid
+// first trip option. Applies to the days paid by Sparklog (from `startDate`, the first week it pays).
+export const FIRST_TRIP_PAID_FROM_KM = Object.freeze({ km: 65, startDate: "2026-10-11" });
+
+// Kilometres of a job: the total entered, or the legs when only those are known (the Edge Functions
+// do not always select km_total).
+export function jobKilometres(job) {
+  const total = Number(job?.km_total) || 0;
+  const legs = (Number(job?.km_aller) || 0) + (Number(job?.km_retour) || 0);
+  return Math.max(total, legs);
+}
+
 // Unpaid first trip: for employees flagged `firstTripUnpaid`, the time between Départ and
 // Arrivée of the FIRST job of each day (chronologically) is travel to the first client and
-// is not paid. Returns a Map job.id -> unpaid minutes (clamped to the Départ→Fin span).
+// is not paid — unless that first job is FIRST_TRIP_PAID_FROM_KM or more (see above).
+// Returns a Map job.id -> unpaid minutes (clamped to the Départ→Fin span).
 function firstTripUnpaidMinutes(sortedJobs) {
   const unpaid = new Map();
   const seenDays = new Set();
@@ -76,6 +90,7 @@ function firstTripUnpaidMinutes(sortedJobs) {
     if (seenDays.has(job.job_date)) continue;
     seenDays.add(job.job_date);
     if (!job.arrivee) continue;
+    if (String(job.job_date) >= FIRST_TRIP_PAID_FROM_KM.startDate && jobKilometres(job) >= FIRST_TRIP_PAID_FROM_KM.km) continue;
     unpaid.set(job.id, Math.min(minutesBetween(job.depart, job.arrivee), minutesBetween(job.depart, job.fin)));
   }
   return unpaid;
@@ -87,11 +102,13 @@ function firstTripUnpaidMinutes(sortedJobs) {
 // who have the option (a day of 8 h 29 with a 30-minute unpaid trip pays 7 h 59: no overtime).
 // Keep the SQL twin in validate_job_submission_contract (migration 0076) in step.
 export function dayFirstTripUnpaidMinutes(dayJobs) {
+  // All the jobs are of one day: they share its date (the km rule starts on a date).
+  const date = (dayJobs || []).map((job) => job?.job_date).find(Boolean) || "day";
   const jobs = (dayJobs || []).map((job, index) => ({
     ...job,
     id: job.id ?? `#${index}`,
     depart: job.depart ? String(job.depart).slice(0, 5) : job.depart,
-    job_date: "day",
+    job_date: date,
   }));
   jobs.sort((a, b) => `${a.depart || ""}${a.id}`.localeCompare(`${b.depart || ""}${b.id}`));
   return [...firstTripUnpaidMinutes(jobs).values()][0] || 0;

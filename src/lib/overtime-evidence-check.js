@@ -14,7 +14,7 @@ export async function overtimeEvidenceNeeded(client, { userId, jobDate, editId, 
   // Retry (with a session refresh + backoff) so a Supabase cold start doesn't fail the check on the
   // first slow attempt.
   const { data: dayJobs } = await withRetry(
-    () => client.from("jobs").select("id, depart, arrivee, fin, overtime_evidence_captured").eq("user_id", userId).eq("job_date", jobDate),
+    () => client.from("jobs").select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, overtime_evidence_captured").eq("user_id", userId).eq("job_date", jobDate),
     8000,
     { retries: 2 }
   );

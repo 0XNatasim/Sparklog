@@ -1,12 +1,15 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import OtPresetSelect from "@/components/OtPresetSelect";
+import { usePresetWorkOrders } from "@/lib/preset-work-orders";
 
 const TIME_FIELDS = "grid gap-1 sm:gap-1.5";
 
 // Date · OT · Départ (Début for the office) · Arrivée · Fin · km, then the total hours and the parking
 // box. `onChange(field, value)` updates one field and marks the entry as changed.
 export default function JobEntryFields({ t, values, onChange, disabled, officeEmployee, hoursLabel, parking }) {
+  const presets = usePresetWorkOrders();
   const input = (id, field, props = {}) => (
     <Input
       id={id}
@@ -28,6 +31,7 @@ export default function JobEntryFields({ t, values, onChange, disabled, officeEm
         <div className={TIME_FIELDS}>
           <Label htmlFor="ot" className="text-xs sm:text-sm"><span className="sm:hidden">{t("common.otLabel")}</span><span className="hidden sm:inline">{t("form.ot")}</span></Label>
           {input("ot", "ot", { placeholder: t("form.otPlaceholder") })}
+          <OtPresetSelect ot={values.ot} presets={presets} disabled={disabled} onPick={(label) => onChange("ot", label)} />
         </div>
 
         <div className={TIME_FIELDS}>

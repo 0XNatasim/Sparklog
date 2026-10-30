@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { minutesBetween, calculatePayrollEntries, isMealEligible, roundHours, calculateCongesIndemnity, computeWeek, ENGINE_VERSION, RETURN_WITH_BENEFITS, WEEK_REGULAR_CAP_MINUTES } from "./payroll-calculations";
+import { buildDayRounding, calculateDailyTotals, dayFirstTripUnpaidMinutes, minutesBetween, calculatePayrollEntries, isMealEligible, roundHours, calculateCongesIndemnity, computeWeek, ENGINE_VERSION, RETURN_WITH_BENEFITS, WEEK_REGULAR_CAP_MINUTES } from "./payroll-calculations";
 
 // Single-job helper: returns the payroll entry for one job worked from 08:00.
 function entry(fin, extra = {}) {
@@ -316,3 +316,60 @@ describe("firstTripUnpaid", () => {
     expect(on.get("c").totalPaidMinutes).toBe(300);
   });
 });
+
+// Owner decision 2026-10-30 (engine 2.7.0): the first trip of an employee with the unpaid-first-trip option is paid
+// anyway when the first job of the day is 65 km or more, for the days from 2026-10-11.
+describe("firstTripUnpaid — a first job of 65 km or more keeps its first trip", () => {
+  const day = "2026-10-27"; // a Tuesday, after the 2026-10-11 start
+  const first = (km, extra = {}) => ({ id: "a", job_date: day, depart: "06:00", arrivee: "07:07", fin: "08:44", km_total: km, km_aller: km, km_retour: 0, ...extra });
+  const second = (km) => ({ id: "b", job_date: day, depart: "08:44", arrivee: "08:45", fin: "10:40", km_total: km, km_aller: km, km_retour: 0 });
+  const paid = (jobs, id) => calculatePayrollEntries(jobs, { firstTripUnpaid: true }).get(id).totalPaidMinutes;
+
+  it("pays the whole first job from 65 km, and removes the trip below", () => {
+    expect(paid([first(78), second(1)], "a")).toBe(164); // 06:00 → 08:44, nothing removed
+    expect(paid([first(65), second(1)], "a")).toBe(164); // 65 km exactly counts
+    expect(paid([first(64), second(1)], "a")).toBe(97); // 67 minutes removed
+  });
+
+  it("looks at the FIRST job of the day only", () => {
+    expect(paid([first(10), second(120)], "a")).toBe(97);
+    expect(paid([first(10), second(120)], "b")).toBe(116);
+  });
+
+  it("takes the legs when the total is not known, whichever is larger", () => {
+    expect(paid([first(0, { km_total: undefined, km_aller: 40, km_retour: 30 }), second(1)], "a")).toBe(164);
+    expect(paid([first(0, { km_total: null, km_aller: 40, km_retour: 20 }), second(1)], "a")).toBe(97);
+    expect(paid([first(0, { km_total: "66", km_aller: undefined, km_retour: undefined }), second(1)], "a")).toBe(164);
+  });
+
+  it("does not change the days before Sparklog paid (before 2026-10-11)", () => {
+    expect(paid([first(90, { job_date: "2026-10-06" }), { ...second(1), job_date: "2026-10-06" }], "a")).toBe(97);
+  });
+
+  it("changes nothing for an employee without the option", () => {
+    expect(calculatePayrollEntries([first(10), second(1)]).get("a").totalPaidMinutes).toBe(164);
+  });
+
+  it("is the same for dayFirstTripUnpaidMinutes (the overtime-proof gate and the supper)", () => {
+    expect(dayFirstTripUnpaidMinutes([first(78), second(1)])).toBe(0);
+    expect(dayFirstTripUnpaidMinutes([second(1), first(64)])).toBe(67);
+    expect(dayFirstTripUnpaidMinutes([first(70)])).toBe(0);
+  });
+
+  it("pays a whole week like the owner expects: Guillaume's Tuesday (67 minutes, 78 km) is no longer lost", () => {
+    let n = 0;
+    const j = (job_date, depart, arrivee, fin, km = 5) => ({ id: `j${String(++n).padStart(2, "0")}`, job_date, depart, arrivee, fin, km_total: km, km_aller: km, km_retour: 0, return_time_minutes: 0 });
+    const week = [
+      j("2026-10-26", "06:29", "06:29", "06:30"), j("2026-10-26", "06:30", "07:25", "09:11", 33), j("2026-10-26", "09:11", "09:32", "12:57"), j("2026-10-26", "12:57", "13:09", "16:00"),
+      j("2026-10-27", "06:00", "07:07", "08:44", 78), j("2026-10-27", "08:44", "08:45", "10:40", 1), j("2026-10-27", "10:40", "10:47", "13:45", 4),
+      j("2026-10-28", "07:00", "07:00", "09:51"), j("2026-10-28", "09:51", "10:00", "10:22"), j("2026-10-28", "10:22", "11:01", "13:21"), j("2026-10-28", "13:21", "13:29", "15:00"),
+      j("2026-10-29", "07:00", "07:00", "10:19"), j("2026-10-29", "10:19", "10:23", "11:32"), j("2026-10-29", "11:32", "11:42", "13:26"), j("2026-10-29", "13:26", "13:34", "16:00"),
+    ];
+    const options = { firstTripUnpaid: true, firstOtHourDouble: true };
+    const rounding = buildDayRounding(week, { firstTripUnpaid: true });
+    const totals = calculateDailyTotals(week, { ...options, rounding });
+    const minutes = [...totals.values()].reduce((sum, d) => sum + d.totalPaidMinutes, 0);
+    expect(minutes).toBe(34 * 60 + 15); // 34 h 15, as the Historique shows: nothing is removed this week
+  });
+});
+
