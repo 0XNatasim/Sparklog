@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-30, V2.4.208)
+## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.209)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,17 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.209 (technique).** Migration 0126 : `parking_receipts.expires_at` / `pictures_purged_at`, `storage_path` nullable, trigger
+`parking_receipts_set_expiry` (échéance = `overtime_settings.evidence_retention_days` à l'insertion, non modifiable par le
+navigateur ; rattrapage des anciennes lignes à `created_at` + durée), `validate_parking_receipt_paths` accepte un reçu purgé.
+`cleanup_overtime_evidence` : retire les photos échues (`parking-receipts`), vide la ligne (le montant et l'état restent) et
+efface les marques `evidence_downloads` des photos disparues — **fonction à redéployer** ; tant qu'elle ne l'est pas, rien n'est
+purgé. Table `evidence_downloads` (`bucket`, `storage_path`, clé primaire = pas de doublon ; RLS gestionnaire lecture / insertion,
+jamais de mise à jour ni de suppression côté navigateur). `src/lib/evidence-download.js` (catalogue, `selectEvidence`,
+`zipEntryNames`, `downloadEvidenceZip` : 100 photos au plus par ZIP, une photo illisible n'est pas marquée), `src/lib/zip-store.js`
+(écrivain ZIP « stocké », sans dépendance), `components/manager/EvidenceDownload.jsx` (carte « Justificatifs » de
+`ManagerDashboard`), budget `evidenceDownload`. Les reçus de repas ne sont pas inclus.
 
 **V2.4.208 (technique).** `OtField.jsx` remplace `OtPresetSelect.jsx` : une seule case (`Input` + bouton flèche + liste
 `role="listbox"`) dans `JobEntryFields` et `EmergencyTimesheet` ; texte `form.otPresetPlaceholder` retiré. Bouton et fenêtre « Inventaire du crew » retirés de `InventoryScreenshotsPanel.jsx` ; code mort

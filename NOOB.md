@@ -1,11 +1,19 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.208).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.209).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.209** : les **photos de reçus de stationnement** sont gardées **le même nombre de jours que les captures de temps
+  supplémentaire** (le réglage de Configuration › Paramètres, 30 jours). Seules les photos sont retirées : le montant et
+  l'approbation restent. Dans **Justificatifs**, un bouton **« Télécharger les justificatifs »** : on choisit la période et
+  ce qu'on veut (temps supplémentaire, stationnement), et on reçoit un fichier ZIP (nom : jour, employé, OT). L'application
+  retient ce qui est déjà téléchargé : en retélécharger plus tard ne redonne que les nouveaux (case « Inclure ceux déjà
+  téléchargés » pour tout reprendre). Les photos restent dans l'application jusqu'à la fin des 30 jours. **À faire :
+  appliquer la migration 0126 ; télécharger ce que tu veux garder AVANT que la fonction de nettoyage soit redéployée (les
+  reçus de plus de 30 jours disparaîtront à ce moment).**
 - ✅ **V2.4.208** : les OT prédéfinis sont dans **la même case que l'OT** : une petite flèche à droite de la case ouvre la
   liste ; on choisit, ça s'écrit dedans, ou on tape un numéro comme avant. Aussi, le script du **Google Sheet** applique
   maintenant la règle des 65 km (premier trajet payé). Le bouton **« Inventaire du crew »** est retiré de la page Inventaire. **À faire : coller le nouveau `doPost` dans Google Apps Script

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.208 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.209 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,13 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.209 — Parking receipts kept like the overtime proofs, and « Télécharger les justificatifs »** (migration 0126). The
+  parking receipt pictures now expire after the SAME number of days as the overtime screenshots (Gestion › Configuration ›
+  Paramètres, 30 by default). The claim itself (amount, review) stays for payroll; only the pictures go. In Justificatifs, a
+  button « Télécharger les justificatifs » puts the pictures still kept (overtime and parking, by period) in one ZIP named
+  by day, person and OT. It remembers what was already downloaded (all managers, all devices): downloading a week again or a
+  longer period only brings the new ones, unless « Inclure ceux déjà téléchargés » is ticked. Downloading removes nothing:
+  the pictures stay in the app until their retention ends. A ZIP holds 100 pictures at most.
 - **V2.4.208 — One box for the OT, no « Inventaire du crew » button, and the Google Sheet follows the 65 km rule.** The pre-made work orders are no longer a
   second field: the OT box has a small arrow on its right that opens the list; picking a label fills the box, and a real
   number is typed as before (time entry and manager's manual timesheet). The « Inventaire du crew » button (team totals
