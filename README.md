@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.206 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.207 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,10 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.207 — Unpaid first trip: paid from 65 km** (payroll engine 2.7.0, migration 0125). An employee with the « premier
+  trajet non payé » option no longer loses the first trip of a day when the **first job of that day is 65 km or more**
+  (65 exactly counts; only the first job is looked at; days from 2026-10-11). The engine, the supper and the 8 h
+  overtime-proof gate (browser and database) all follow. Owner decision, see `docs/rules/compensation-rules.md` (FIRST_TRIP).
 - **V2.4.206 — Pre-made work orders** (migration 0124). Under the OT field of the time entry (and of the manager's manual
   timesheet), a drop-down « Ou choisir un OT prédéfini… » lists the entries that come back every day: PAUSE SÉCURITÉ,
   FORMATION HILO EMBAUCHE, FORMATION BRITTON, FORMATION HQ, OK KARINE. Picking one writes its label as the OT (plain text, like a

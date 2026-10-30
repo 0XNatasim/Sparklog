@@ -866,7 +866,8 @@ export default function EmployeeForm() {
         userId: user.id, jobDate: job_date, editId, hasOvertimeEvidence, firstTripUnpaid,
         // Known locally without any network call.
         thisMinutes: Math.round(hoursDecimal * 60),
-        current: { depart, arrivee, fin },
+        // The first job of the day of 65 km or more has its first trip paid: its job_date and km count.
+        current: { job_date, depart, arrivee, fin, km_total: normalizeNumber(km_aller) ?? 0 },
       });
       if (paidDayMinutes != null) setOvertimeDailyMinutes(paidDayMinutes);
       return needed;

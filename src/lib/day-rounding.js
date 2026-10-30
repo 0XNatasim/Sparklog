@@ -17,7 +17,7 @@ export async function loadDayRounding({ untilDate, userIds = null, profiles = nu
   if (ids && !ids.length) return new Map();
   const [{ data: jobs, error }, people] = await Promise.all([
     fetchAllRows(() => {
-      let query = supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, status")
+      let query = supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, status")
         .in("status", ROUNDING_STATUSES)
         .gte("job_date", DAY_ROUNDING.startDate)
         .lte("job_date", until);

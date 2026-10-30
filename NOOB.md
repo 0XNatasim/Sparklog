@@ -1,11 +1,17 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.206).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.207).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.207** : **premier trajet non payé, mais payé dès 65 km**. Pour un employé qui a l'option « premier trajet non payé »,
+  le premier trajet de la journée est maintenant **payé si la première fiche de la journée fait 65 km ou plus** (65 compte). En
+  dessous de 65 km, il reste non payé. Depuis le 11 octobre. Le moteur de paie, le souper et l'exigence de la capture
+  d'écran de temps supplémentaire suivent la même règle. **À faire : appliquer la migration 0125 dans Supabase et
+  redéployer les fonctions Edge (`push_approved_batch`, `classify_week`), qui contiennent le moteur.** La règle n'a pas encore été signée par
+  un spécialiste de la paie.
 - ✅ **V2.4.206** : des **OT prédéfinis**. Sous le champ OT de la fiche de temps, un menu « Ou choisir un OT prédéfini… » :
   PAUSE SÉCURITÉ, FORMATION HILO EMBAUCHE, FORMATION BRITTON, FORMATION HQ, OK KARINE. On choisit, le nom s'écrit tout seul
   dans le champ OT ; pour un vrai numéro d'OT, on le tape comme avant. La liste se gère dans **Configuration › OT

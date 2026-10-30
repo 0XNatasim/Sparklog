@@ -113,6 +113,23 @@ Sources, filed in `docs/reference/`:
   l'employé). Not applied: overtime-proof threshold, supper threshold, anomalies (real minutes), the
   Google Sheet export (computed by Apps Script) and the unused `classify_week` Edge Function.
 
+## FIRST_TRIP — unpaid first trip, paid from 65 km (owner decision 2026-10-30, engine 2.7.0)
+
+- Option `profiles.first_trip_unpaid` (0070): the Départ → Arrivée of the **first job of each day** is not paid and does
+  not count toward the 8 h, the overtime, the supper or the overtime proof.
+- **Exception (owner, 2026-10-30):** when that first job is **65 km or more**, its first trip **is paid**, even with the
+  option on. Kilometres of the job = `km_total`, or `km_aller + km_retour` when larger (the Edge Functions do not always
+  select `km_total`). 64 km: still unpaid; 65 km exactly: paid. Only the **first job of the day** counts (a long second job
+  changes nothing).
+- Days **from 2026-10-11** (the first week paid by Sparklog, `FIRST_TRIP_PAID_FROM_KM`); earlier days keep the old rule.
+- Origin: an employee with the option saw 34 h 15 in Historique and 33 h in Semaine, the difference being a 67-minute,
+  78 km first trip of a Tuesday morning. The saved travel setting « temps entrepôt → client : payé CCQ » (0101) is **not read
+  by the engine yet** (§6.1 D of CLAUDE.md); until it is, the option and this km exception are the whole rule.
+- Database twins kept in step (migration 0125): `reconcile_overtime_meal` (supper) and `validate_job_submission_contract`
+  (8 h overtime proof on paid time), next to `dayFirstTripUnpaidMinutes` in `supabase/functions/_shared/payroll_engine.js`.
+- **Not specialist-approved**: an owner decision, like the other owner decisions above; the payroll/CCQ specialist sign-off
+  (ADR 0001) is still to be given before the rule set is `validated`.
+
 ## SUPPER — meal eligibility
 - Eligible on a weekday once the day has **2 h 15 of overtime — at 1.5× or 2×, both are work
   time** — i.e. **at least 10 h 15 (615 min) of paid work**. **Return-to-warehouse time never

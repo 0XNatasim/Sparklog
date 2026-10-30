@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-30, V2.4.206)
+## 6. À faire / à préciser (mis à jour 2026-10-30, V2.4.207)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,17 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.207 (technique).** Premier trajet payé dès 65 km (décision de la propriétaire du 2026-10-30, **moteur 2.7.0**) :
+`FIRST_TRIP_PAID_FROM_KM` (65 km, depuis 2026-10-11) et `jobKilometres` (`km_total`, ou `km_aller + km_retour` si plus grand) dans
+`payroll_engine.js` ; `firstTripUnpaidMinutes` saute la 1re fiche de la journée quand elle atteint le seuil ;
+`dayFirstTripUnpaidMinutes` garde la date du jour. Jumeaux SQL recréés par la 0125 : `reconcile_overtime_meal` (souper) et
+`validate_job_submission_contract` (preuve des 8 h payées). Les lectures de fiches qui alimentent ces calculs prennent `km_total,
+km_aller, km_retour` (`day-rounding.js`, `CcqJsonExport`, `overtime-evidence-check.js`, `meal-claim-request.js`, fiche en cours de
+`EmployeeForm`). **Les fonctions Edge qui importent le moteur (`push_approved_batch`, `classify_week`) sont à redéployer.** Règle de
+paie non signée par un spécialiste (ADR 0001). Le réglage Trajets et frais « temps entrepôt → client : payé CCQ » n'est toujours pas
+lu par le moteur (§6.1 D) : en attendant, l'option + ce seuil sont toute la règle. Fiche des règles et
+`docs/rules/compensation-rules.md` (FIRST_TRIP) à jour.
 
 **V2.4.206 (technique).** OT prédéfinis : table `preset_work_orders` (0124 ; lecture pour tout compte connecté, écriture
 `get_my_role() = 'manager'` ; libellé de 2 à 60 caractères, jamais un numéro de 4 chiffres ou plus car `normalized_ot` /
@@ -310,6 +321,8 @@ Déjà tranché et codé (référence ; détail et historique dans `docs/rules/c
 - **Prime de chef d'équipe en temps sup.** : option `team_leader_premium_overtime` (décochée = heures normales seulement).
 - **Souper** : dû dès 615 min de travail sans le retour (`isMealEligible`, `reconcile_overtime_meal`) ; le 2e repas
   (20.07, « quatre autres heures ») n'est pas codé.
+- **Premier trajet non payé** (option par employé) : payé quand la 1re fiche de la journée fait **65 km ou plus** (65 compte), depuis le
+  2026-10-11 (moteur 2.7.0, 0125).
 - **Arrondi des journées** : au 15 min, compteur par employé (`paid = round15(worked − compteur)`), depuis la
   semaine 43, compteur à 0 (moteur 2.6.1). Pas appliqué à l'export Google Sheet.
 - **MÉDIC** : 0,68 $ / 2,93 $ jusqu'au 2027-04-24, puis 1,06 $ / 3,31 $ (`medicRatesOn`) — à confirmer avec la CCQ
