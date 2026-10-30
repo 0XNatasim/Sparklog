@@ -147,6 +147,7 @@ export default function WeekViewTab() {
                     <th className="py-1 text-right font-medium">{t("week.regular")}</th>
                     <th className="py-1 text-right font-medium">{t("week.ot15")}</th>
                     <th className="py-1 text-right font-medium">{t("week.ot20")}</th>
+                    <th className="py-1 text-right font-medium">{t("week.return")}</th>
                     <th className="py-1 text-right font-medium">{t("week.total")}</th>
                     <th className="py-1 text-right font-medium">km</th>
                   </tr>
@@ -158,6 +159,7 @@ export default function WeekViewTab() {
                       <td className="py-1 text-right font-mono">{fmtHM(c.regularHours)}</td>
                       <td className="py-1 text-right font-mono">{fmtHM(c.ot15)}</td>
                       <td className="py-1 text-right font-mono">{fmtHM(c.ot20)}</td>
+                      <td className="py-1 text-right font-mono">{fmtHM(c.returnNb)}</td>
                       <td className="py-1 text-right font-mono font-bold">{fmtHM(c.totalHours)}</td>
                       <td className="py-1 text-right font-mono">{Math.round(c.km)}</td>
                     </tr>
@@ -199,7 +201,7 @@ export default function WeekViewTab() {
                       <div className="flex items-baseline justify-between gap-3"><span className="text-muted-foreground">{t("week.regular")}:</span><b>{fmtHM(w.regularHours)}</b></div>
                       <div className="flex items-baseline justify-between gap-3"><span className="text-muted-foreground">{t("week.ot15")}:</span><b>{fmtHM(w.ot15)}</b></div>
                       <div className="flex items-baseline justify-between gap-3"><span className="text-muted-foreground">{t("week.ot20")}:</span><b>{fmtHM(w.ot20)}</b></div>
-                      {w.returnNb > 0 && <div className="flex items-baseline justify-between gap-3"><span className="text-muted-foreground">{t("week.returnNoBenefit")}:</span><b>{fmtHM(w.returnNb)}</b></div>}
+                      {w.returnNb > 0 && <div className="flex items-baseline justify-between gap-3"><span className="text-muted-foreground">{t(isSubcontractorRole(profile.role) ? "week.return" : "week.returnNoBenefit")}:</span><b>{fmtHM(w.returnNb)}</b></div>}
                     </div>
                   </div>
                 </CardContent>

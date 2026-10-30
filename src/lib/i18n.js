@@ -1882,6 +1882,7 @@ export const dictionaries = {
     "week.ot15": "1.5x",
     "week.ot20": "2.0x",
     "week.returnNoBenefit": "Return (no benefits)",
+    "week.return": "Return",
     "week.otCountLabel": "OT x",
     "week.errors.failedLoad": "Failed to load weekly data.",
 
@@ -4260,6 +4261,7 @@ export const dictionaries = {
     "week.ot15": "1.5x",
     "week.ot20": "2.0x",
     "week.returnNoBenefit": "Retour (sans av. soc.)",
+    "week.return": "Retour",
     "week.otCountLabel": "OT x",
     "week.errors.failedLoad": "Échec du chargement des données hebdomadaires.",
 

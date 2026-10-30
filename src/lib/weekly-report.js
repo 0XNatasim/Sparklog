@@ -244,6 +244,8 @@ function employeeHtml(emp) {
       <td class="${r.status === "approved" ? "" : "warn"}">${esc(STATUS_LABEL[r.status] || r.status)}</td>
     </tr>`).join("");
   const h = emp.hours;
+  // A subcontractor has no social benefits: its return column is simply the return time (« Retour »).
+  const returnHeader = emp.category === "subcontractor" ? "Retour" : "Retour s.a.";
   const sub = [emp.employeeNumber && `N° ${emp.employeeNumber}`, LEVEL_LABEL[emp.level]].filter(Boolean).join(" · ");
 
   let money;
@@ -292,7 +294,7 @@ function employeeHtml(emp) {
     <table class="jobs">
       <thead><tr>
         <th>Jour</th><th>N° OT</th><th>Départ</th><th>Arrivée</th><th>Fin</th>
-        <th class="num">Rég.</th><th class="num">1,5×</th><th class="num">2×</th><th class="num">Retour s.a.</th>
+        <th class="num">Rég.</th><th class="num">1,5×</th><th class="num">2×</th><th class="num">${returnHeader}</th>
         <th class="num">Total</th><th class="num">km</th><th>Statut</th>
       </tr></thead>
       <tbody>${jobsHtml}</tbody>
@@ -389,6 +391,7 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
       <td class="num">${fmtHM(e.hours.regularMinutes)}</td>
       <td class="num">${fmtHM(e.hours.ot50Minutes)}</td>
       <td class="num">${fmtHM(e.hours.ot100Minutes)}</td>
+      <td class="num">${fmtHM(e.hours.returnNoBenefitMinutes)}</td>
       <td class="num strong">${fmtHM(e.hours.paidMinutes)}</td>
       <td class="num">${fmtKm(e.hours.km)}</td>
     </tr>`).join("");
@@ -396,11 +399,11 @@ export function buildWeeklyReportHtml(report, { generatedAt = new Date() } = {})
   const subSection = subs.length ? `
   <h3>Sous-traitants</h3>
   <table class="summary">
-    <thead><tr><th>Sous-traitant</th><th class="num">Jobs</th><th class="num">Temps régulier</th><th class="num">Sup. 1,5×</th><th class="num">Sup. 2×</th><th class="num">Total</th><th class="num">km</th></tr></thead>
+    <thead><tr><th>Sous-traitant</th><th class="num">Jobs</th><th class="num">Temps régulier</th><th class="num">Sup. 1,5×</th><th class="num">Sup. 2×</th><th class="num">Retour</th><th class="num">Total</th><th class="num">km</th></tr></thead>
     <tbody>${subRows}</tbody>
     <tfoot><tr>
       <td>Total</td><td class="num">${sum(subs, (e) => e.jobs.length)}</td>
-      <td class="num">${fmtHM(subTotal("regularMinutes"))}</td><td class="num">${fmtHM(subTotal("ot50Minutes"))}</td><td class="num">${fmtHM(subTotal("ot100Minutes"))}</td>
+      <td class="num">${fmtHM(subTotal("regularMinutes"))}</td><td class="num">${fmtHM(subTotal("ot50Minutes"))}</td><td class="num">${fmtHM(subTotal("ot100Minutes"))}</td><td class="num">${fmtHM(subTotal("returnNoBenefitMinutes"))}</td>
       <td class="num">${fmtHM(subTotal("paidMinutes"))}</td><td class="num">${fmtKm(subTotal("km"))}</td>
     </tr></tfoot>
   </table>` : "";
@@ -472,7 +475,7 @@ ${subSection}
     · Hors CCQ = retour à l'entrepôt sans avantages, ou toutes les heures d'un rôle hors CCQ (temps sup. compris).
     Souper et Stationnement = demandes acceptées ou en attente de la semaine (les refusées ne comptent pas), payées à part du talon.
     Heures : Rég. = régulier (retour avec avantages inclus) · 1,5× / 2× = temps supplémentaire · Retour s.a. = temps de retour
-    sans avantages · Total = temps payé. Les montants viennent du même calcul que les écrans Talons et DAS (taux du profil
+    sans avantages (« Retour » pour un sous-traitant : son temps de retour) · Total = temps payé. Les montants viennent du même calcul que les écrans Talons et DAS (taux du profil
     de l'employé, cumul de l'année comptabilisé). Coût employeur = salaire brut + 13 % CCQ + avantages sociaux CCQ + cotisations
     employeur (RRQ, AE, RQAP, FSS, CNT, CNESST, FDRCMO) + autres cotisations CCQ par heure (prélèvement, AECQ/ACQ, taxe
     d'assurance, fonds divers) + remboursements (km, souper, stationnement, cellulaire, entreposage, équipement de sécurité).

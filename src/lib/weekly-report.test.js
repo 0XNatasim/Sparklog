@@ -202,7 +202,10 @@ describe("sous-traitants", () => {
   it("prints a Sous-traitants table with one column each", () => {
     const html = buildWeeklyReportHtml(r);
     expect(html).toContain("<h3>Sous-traitants</h3>");
-    expect(html).toContain("Temps régulier</th><th class=\"num\">Sup. 1,5×</th><th class=\"num\">Sup. 2×</th>");
+    expect(html).toContain("Temps régulier</th><th class=\"num\">Sup. 1,5×</th><th class=\"num\">Sup. 2×</th><th class=\"num\">Retour</th>");
+    // A subcontractor has no « sans avantages » column: its return time is just « Retour ».
+    expect(html).not.toContain('<th class="num">Retour s.a.</th>');
+    expect(buildWeeklyReportHtml(report)).toContain('<th class="num">Retour s.a.</th>');
   });
 
   it("prints no such table when nobody is a subcontractor", () => {

@@ -1,11 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.212).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.213).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.213** : pour les **sous-traitants**, la colonne « Retour (sans av. soc.) » devient simplement **« Retour »** : le
+  nombre d'heures de retour. C'est le cas dans le rapport (Sommaire, fiche de chaque sous-traitant) et dans la vue semaine ;
+  le tableau « Sous-traitants » a aussi une colonne Retour, donc Régulier + 1,5× + 2× + Retour = Total.
 - ✅ **V2.4.212** : dans « À traiter », **« Pas soumis »** regarde d'abord la veille ; si tout le monde a soumis, il regarde
   l'avant-veille, et ainsi de suite **jusqu'au lundi de la semaine courante**. Il montre le jour le plus récent où il manque
   encore quelqu'un (la date est dans le titre) et le rappel vise ce jour-là. Le lundi, comme avant : seulement le vendredi.
