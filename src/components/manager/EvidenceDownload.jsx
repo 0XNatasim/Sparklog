@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
+import dayjs from "dayjs";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { MAX_FILES_PER_ZIP, downloadEvidenceZip, loadEvidenceCatalog, selectEvidence } from "@/lib/evidence-download";
+import { MAX_FILES_PER_ZIP, downloadEvidenceZip, evidenceWeeks, loadEvidenceCatalog, selectEvidence } from "@/lib/evidence-download";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { companyDate } from "@/lib/company-time";
+import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { useT } from "@/lib/use-t";
 import { supabase } from "@/supabaseClient";
 
@@ -18,8 +19,8 @@ export default function EvidenceDownload() {
   const [open, setOpen] = useState(false);
   const [catalog, setCatalog] = useState(null);
   const [loadError, setLoadError] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [fromWeek, setFromWeek] = useState(""); // Sunday of the first week, "" = from the start
+  const [toWeek, setToWeek] = useState(""); // Sunday of the last week, "" = up to the latest
   const [kinds, setKinds] = useState({ overtime: true, parking: true });
   const [includeDone, setIncludeDone] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,9 +36,14 @@ export default function EvidenceDownload() {
     return () => { cancelled = true; };
   }, [open, t]);
 
+  const weeks = useMemo(() => (catalog ? evidenceWeeks(catalog.files) : []), [catalog]);
   const picked = useMemo(() => (catalog
-    ? selectEvidence(catalog.files, { done: catalog.done, includeDone, from, to, kinds: Object.keys(kinds).filter((kind) => kinds[kind]) })
-    : null), [catalog, includeDone, from, to, kinds]);
+    ? selectEvidence(catalog.files, {
+      done: catalog.done, includeDone, from: fromWeek, to: toWeek ? addCalendarDays(toWeek, 6) : "",
+      kinds: Object.keys(kinds).filter((kind) => kinds[kind]),
+    })
+    : null), [catalog, includeDone, fromWeek, toWeek, kinds]);
+  const weekLabel = (week) => `${t("manager.weekShort")} ${week.number} · ${dayjs(week.start).format("D MMM")} → ${dayjs(week.end).format("D MMM")}`;
 
   async function run() {
     if (!picked?.chosen.length || busy) return;
@@ -78,10 +84,16 @@ export default function EvidenceDownload() {
           {loadError && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{loadError}</div>}
           <div className="grid grid-cols-2 gap-2">
             <label className="grid gap-1 text-sm font-medium">{t("evidence.download.from")}
-              <Input type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} disabled={busy} />
+              <Select value={fromWeek} onChange={(event) => setFromWeek(event.target.value)} disabled={busy}>
+                <option value="">{t("evidence.download.firstWeek")}</option>
+                {weeks.filter((week) => !toWeek || week.start <= toWeek).map((week) => <option key={week.start} value={week.start}>{weekLabel(week)}</option>)}
+              </Select>
             </label>
             <label className="grid gap-1 text-sm font-medium">{t("evidence.download.to")}
-              <Input type="date" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} disabled={busy} />
+              <Select value={toWeek} onChange={(event) => setToWeek(event.target.value)} disabled={busy}>
+                <option value="">{t("evidence.download.lastWeek")}</option>
+                {weeks.filter((week) => !fromWeek || week.start >= fromWeek).map((week) => <option key={week.start} value={week.start}>{weekLabel(week)}</option>)}
+              </Select>
             </label>
           </div>
           <div className="flex flex-wrap gap-4 text-sm">

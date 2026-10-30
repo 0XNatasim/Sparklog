@@ -1,11 +1,13 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.209).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.210).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.210** : dans « Télécharger les justificatifs », on choisit une **plage de semaines** (« De la semaine » / « À la
+  semaine », dimanche → samedi) au lieu de dates. Pas de soupers : il n'y a pas de photo pour ça.
 - ✅ **V2.4.209** : les **photos de reçus de stationnement** sont gardées **le même nombre de jours que les captures de temps
   supplémentaire** (le réglage de Configuration › Paramètres, 30 jours). Seules les photos sont retirées : le montant et
   l'approbation restent. Dans **Justificatifs**, un bouton **« Télécharger les justificatifs »** : on choisit la période et

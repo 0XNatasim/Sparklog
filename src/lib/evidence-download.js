@@ -1,6 +1,9 @@
 // « Télécharger les justificatifs » (migration 0126): the overtime screenshots and the parking receipt
 // pictures still kept in the app, put in one ZIP. Downloading removes nothing; evidence_downloads remembers
 // what was already taken (every manager, every device), so a second download only brings what is new.
+import dayjs from "dayjs";
+import { addCalendarDays } from "@/lib/company-time";
+import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { buildZip } from "@/lib/zip-store";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { withTimeout } from "@/lib/utils";
@@ -9,6 +12,16 @@ export const OVERTIME_BUCKET = "overtime-evidence";
 export const PARKING_BUCKET = "parking-receipts";
 // One ZIP stays small enough for a phone; the button is pressed again for the rest.
 export const MAX_FILES_PER_ZIP = 100;
+
+// Weeks (Sunday → Saturday, like the payroll week) that hold at least one kept picture, newest first.
+// Each: { start, end, number } — `number` is the CCQ week number (end-of-week Saturday).
+export function evidenceWeeks(files) {
+  const starts = [...new Set(files.map((file) => weekStartSundayD(file.date).format("YYYY-MM-DD")))].sort().reverse();
+  return starts.map((start) => {
+    const end = addCalendarDays(start, 6);
+    return { start, end, number: ccqWeekNumber(dayjs(end)) };
+  });
+}
 
 export const fileKey = (file) => `${file.bucket}/${file.path}`;
 
