@@ -30,6 +30,7 @@ import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-bud
 import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 import { loadManualEntryJobIds, onlyManualEntries } from "@/lib/entry-source";
+import EvidenceDownload from "@/components/manager/EvidenceDownload";
 import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import { filterReceiptJobs, receiptEmployees, receiptNeedsReview } from "@/lib/receipts-review";
 import ManualEntryStar from "@/components/ManualEntryStar";
@@ -1125,7 +1126,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       <div className="space-y-3">
         {activeSection === "notifications" && (
           <div className="space-y-3">
-            <Card><CardContent className="space-y-3 p-4"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select>
+            <Card><CardContent className="space-y-3 p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-semibold">{t("manager.notifications.title")}</h2><p className="mt-1 text-sm text-muted-foreground">{t("manager.notifications.description")}</p></div><EvidenceDownload /></div><Select value={notificationFilter} onChange={(event) => setNotificationFilter(event.target.value)} aria-label={t("manager.notifications.filterLabel")}><option value="all">{t("manager.notifications.all")}</option><option value="overtime">{t("manager.sections.overtime")}</option><option value="meals">{t("manager.sections.meals")}</option><option value="parking">{t("manager.sections.parking")}</option></Select>
               {reviewFilters && (
                 <div className="grid gap-2 sm:grid-cols-[auto,1fr,auto] sm:items-end">
                   <label className="flex h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium">

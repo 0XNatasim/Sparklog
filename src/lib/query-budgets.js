@@ -27,6 +27,8 @@ export const QUERY_BUDGETS = Object.freeze({
   managerNoteReplies: 2000,
   // Gestion › Registre d'accidents (0120): the most recent files.
   accidentLog: 500,
+  // Justificatifs › Télécharger (0126): the pictures still kept (30 days by default) and the ones already downloaded.
+  evidenceDownload: 1500,
 });
 
 // A narrowed timesheet search must be complete, not merely filtered from the

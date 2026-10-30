@@ -20,6 +20,12 @@ Deno.serve(async (req) => {
   }
 
   const failures: Array<{ phase: string; detail: string }> = [];
+  // A picture that is gone no longer needs its « already downloaded » mark (0126).
+  const forgetDownloads = async (bucket: string, paths: string[]) => {
+    if (!paths.length) return;
+    const { error } = await admin.from("evidence_downloads").delete().eq("bucket", bucket).in("storage_path", paths);
+    if (error) failures.push({ phase: `forget_downloads:${bucket}`, detail: error.message });
+  };
   let expiredDeleted = 0;
   let orphanedDeleted = 0;
 
@@ -38,12 +44,41 @@ Deno.serve(async (req) => {
     if (storageError) {
       failures.push({ phase: "delete_expired_objects", detail: storageError.message });
     } else {
+      await forgetDownloads("overtime-evidence", expired.map((row) => row.storage_path));
       const { error: deleteError } = await admin
         .from("overtime_evidence")
         .delete()
         .in("id", expired.map((row) => row.id));
       if (deleteError) failures.push({ phase: "delete_expired_rows", detail: deleteError.message });
       else expiredDeleted = expired.length;
+    }
+  }
+
+  // Parking receipt pictures follow the same retention window (0126). The claim (amount, review) stays: only the
+  // pictures go, then the row is emptied so nothing points at a deleted object.
+  const { data: expiredParking, error: expiredParkingError } = await admin
+    .from("parking_receipts")
+    .select("id, storage_path, extra_storage_paths")
+    .lte("expires_at", new Date().toISOString())
+    .not("storage_path", "is", null)
+    .limit(200);
+  if (expiredParkingError) failures.push({ phase: "load_expired_parking", detail: expiredParkingError.message });
+  for (const claim of expiredParking || []) {
+    const paths = [claim.storage_path, ...(claim.extra_storage_paths || [])].filter(Boolean) as string[];
+    const { error: storageError } = await admin.storage.from("parking-receipts").remove(paths);
+    if (storageError) {
+      failures.push({ phase: "delete_expired_parking_objects", detail: storageError.message });
+      continue;
+    }
+    const { error: updateError } = await admin
+      .from("parking_receipts")
+      .update({ storage_path: null, extra_storage_paths: [], pictures_purged_at: new Date().toISOString() })
+      .eq("id", claim.id);
+    if (updateError) {
+      failures.push({ phase: "purge_expired_parking_rows", detail: updateError.message });
+    } else {
+      await forgetDownloads("parking-receipts", paths);
+      expiredDeleted += 1;
     }
   }
 
