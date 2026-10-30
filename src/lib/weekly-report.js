@@ -112,7 +112,9 @@ export function buildWeeklyReport({
     const fixedHours = isFixedPayWeek(taxProfile, week.end) ? fixedWeeklyHours(taxProfile) : 0;
     if (!ujobs.length && !fixedHours) continue;
     const rounding = roundingFor(profile.id);
-    const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), messierMethod, holidayDates, rounding });
+    // A subcontractor is billed, not paid by the app: its return time stays apart from the regular time (the Messier
+    // method would fold it into the regular hours, as it does for the CCQ pay).
+    const entries = calculatePayrollEntries(ujobs, { ...overtimeOptionsFromProfile(profile), messierMethod: messierMethod && !isSubcontractorRole(profile.role), holidayDates, rounding });
     const rows = jobRows(ujobs, entries);
     const nonCcq = isNonCcqRole(profile.role);
     // Supper is a CCQ allowance (PeriodSummary/Coûts count it for CCQ employees only).

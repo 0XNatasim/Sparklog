@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.213 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.214 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,10 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.214 — Subcontractor return time is no longer folded into the regular time in the printable Sommaire.** The report
+  applied the « Messier » method (return converted to regular hours, like the CCQ pay) to subcontractors too, so their
+  « Retour » stayed empty and the return was inside « Régulier ». For a subcontractor the report now keeps the return apart
+  (same total, same pay-free billing). CCQ employees are unchanged.
 - **V2.4.213 — Subcontractors: « Retour » instead of « Retour sans av. soc. ».** In the weekly report (Sommaire) and in the
   week view, a subcontractor has no social benefits, so its return column is just « Retour » (the return time in hours). The
   Sous-traitants table gets a « Retour » column too, so Régulier + 1,5× + 2× + Retour = Total.
