@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import OtPresetSelect from "@/components/OtPresetSelect";
+import OtField from "@/components/OtField";
 import { usePresetWorkOrders } from "@/lib/preset-work-orders";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -273,8 +273,7 @@ export default function EmergencyTimesheet() {
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="em-ot">{t("form.ot")}</Label>
-              <Input id="em-ot" value={form.ot} onChange={setField("ot")} disabled={busy} className={invalid("ot") ? "border-destructive" : ""} />
-              <OtPresetSelect id="em-ot-preset" ot={form.ot} presets={presets} disabled={busy} className="h-9 text-sm" onPick={(label) => setForm((current) => ({ ...current, ot: label }))} />
+              <OtField id="em-ot" value={form.ot} presets={presets} disabled={busy} className={invalid("ot") ? "border-destructive" : ""} onChange={(value) => setForm((current) => ({ ...current, ot: value }))} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="em-depart">{t("form.depart")}</Label>

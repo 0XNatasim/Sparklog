@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-30, V2.4.207)
+## 6. À faire / à préciser (mis à jour 2026-10-30, V2.4.208)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.208 (technique).** `OtField.jsx` remplace `OtPresetSelect.jsx` : une seule case (`Input` + bouton flèche + liste
+`role="listbox"`) dans `JobEntryFields` et `EmergencyTimesheet` ; texte `form.otPresetPlaceholder` retiré. `apps-script-doPost.js` :
+`FIRST_TRIP_PAID_KM` / `FIRST_TRIP_PAID_FROM` (65 km, 2026-10-11) — la 1re fiche du jour de 65 km ou plus (`km_total` ou
+`km_aller + km_retour`) garde son trajet payé (minutes non payées 0). Le script se colle à la main dans Google : le propriétaire
+doit le redéployer. `push_approved_batch` envoie déjà `km_aller` / `km_retour`, pas de redéploiement de la fonction.
 
 **V2.4.207 (technique).** Premier trajet payé dès 65 km (décision de la propriétaire du 2026-10-30, **moteur 2.7.0**) :
 `FIRST_TRIP_PAID_FROM_KM` (65 km, depuis 2026-10-11) et `jobKilometres` (`km_total`, ou `km_aller + km_retour` si plus grand) dans
@@ -151,7 +157,7 @@ lu par le moteur (§6.1 D) : en attendant, l'option + ce seuil sont toute la rè
 `ot_reuse_for_jobs` (0108) ne regardent que les numéros ; unique sans casse) ; `jobs.ot` reste du texte libre, le libellé choisi y
 est écrit tel quel. `src/lib/preset-work-orders.js` (hook `usePresetWorkOrders` : copie locale `sparklog.presetWorkOrders`, repli sur
 `DEFAULT_PRESET_LABELS` si la lecture échoue, `PRESETS_EVENT` après un changement ; `matchPreset`, `cleanPresetLabel`,
-`moveChanges`) ; `OtPresetSelect.jsx` dans `JobEntryFields` et `EmergencyTimesheet` ; écran `PresetWorkOrdersManager.jsx`
+`moveChanges`) ; `OtPresetSelect.jsx` (remplacé en V2.4.208 par `OtField.jsx`) dans `JobEntryFields` et `EmergencyTimesheet` ; écran `PresetWorkOrdersManager.jsx`
 (onglet `ot-presets` de Configuration, règle de `config-settings`). L'arrivée et les km restent obligatoires comme pour tout OT
 (0 km accepté) : à revoir avec la propriétaire pour une formation sans déplacement.
 

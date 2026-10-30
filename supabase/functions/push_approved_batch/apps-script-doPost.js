@@ -28,6 +28,10 @@
 // earlier job of the same day is exported after a later one, the unpaid minutes move to
 // the earlier job.
 //
+// LONG FIRST TRIP: when that first job is 65 km or more (km_aller + km_retour, or km_total when
+// larger) on or after 2026-10-11, its trip is paid even with the option: unpaid minutes 0.
+// Same rule as SparkLog's payroll engine 2.7.0 (FIRST_TRIP_PAID_FROM_KM).
+//
 // IDEMPOTENCY: each row carries a job_id, stored under « JobID ». Before appending we
 // read every job_id already in that column and skip any incoming row that's already
 // there. So posting the same job twice — a retry, a double-click, or two managers
@@ -36,6 +40,9 @@
 //
 // After saving, do Deploy -> Manage deployments -> Edit -> New version -> Deploy.
 // Otherwise the web app keeps serving the old code.
+
+var FIRST_TRIP_PAID_KM = 65;
+var FIRST_TRIP_PAID_FROM = "2026-10-11";
 
 // [header label, field of the incoming row]. Order = layout of a brand-new sheet.
 var COLUMNS = [
@@ -135,7 +142,11 @@ function doPost(e) {
         }
         if (isFirst) {
           var arr = parseHM(row.arrivee), fin = parseHM(row.fin);
-          if (dep !== null && arr !== null) {
+          // Long first trip (owner decision 2026-10-30, engine 2.7.0): a first job of
+          // FIRST_TRIP_PAID_KM or more, on or after FIRST_TRIP_PAID_FROM, keeps its trip paid.
+          var longTrip = String(row.job_date || "").slice(0, 10) >= FIRST_TRIP_PAID_FROM
+            && Math.max(Number(row.km_total) || 0, (Number(row.km_aller) || 0) + (Number(row.km_retour) || 0)) >= FIRST_TRIP_PAID_KM;
+          if (dep !== null && arr !== null && !longTrip) {
             var span = spanMinutes(dep, fin);
             unpaid = Math.min(spanMinutes(dep, arr), span === null ? Infinity : span);
           }

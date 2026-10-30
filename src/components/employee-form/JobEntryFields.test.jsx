@@ -27,27 +27,33 @@ beforeEach(() => window.localStorage.clear());
 afterEach(cleanup);
 
 describe("JobEntryFields pre-made OT", () => {
-  it("offers the labels of the list and writes the one picked as the OT", async () => {
+  const arrow = () => screen.getByRole("button", { name: fr("form.otPreset") });
+  const labels = () => screen.getAllByRole("option").map((o) => o.textContent);
+
+  it("opens the labels of the list from the arrow of the OT box and writes the one picked", async () => {
     const onChange = setup({ tables: { preset_work_orders: [{ label: "PAUSE SÉCURITÉ" }, { label: "FORMATION BRITTON" }] } });
-    const select = screen.getByLabelText(fr("form.otPreset"));
-    await waitFor(() => expect([...select.querySelectorAll("option")].map((o) => o.textContent)).toEqual([fr("form.otPresetPlaceholder"), "PAUSE SÉCURITÉ", "FORMATION BRITTON"]));
-    fireEvent.change(select, { target: { value: "FORMATION BRITTON" } });
+    await waitFor(() => expect(arrow()).toBeTruthy());
+    fireEvent.click(arrow());
+    await waitFor(() => expect(labels()).toEqual(["PAUSE SÉCURITÉ", "FORMATION BRITTON"]));
+    fireEvent.click(screen.getByText("FORMATION BRITTON"));
     expect(onChange).toHaveBeenCalledWith("ot", "FORMATION BRITTON");
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 
-  it("shows the label when the OT typed is one of them, and nothing for a real number", async () => {
+  it("marks the label when the OT typed is one of them, and none for a real number", async () => {
     setup({ ot: "ok karine", tables: { preset_work_orders: [{ label: "OK KARINE" }] } });
-    await waitFor(() => expect(screen.getByLabelText(fr("form.otPreset")).value).toBe("OK KARINE"));
+    fireEvent.click(arrow());
+    await waitFor(() => expect(screen.getByRole("option").getAttribute("aria-selected")).toBe("true"));
     cleanup();
     setup({ ot: "190403", tables: { preset_work_orders: [{ label: "OK KARINE" }] } });
-    await waitFor(() => expect(screen.getByLabelText(fr("form.otPreset")).value).toBe(""));
+    fireEvent.click(arrow());
+    await waitFor(() => expect(screen.getByRole("option").getAttribute("aria-selected")).toBe("false"));
   });
 
-  it("keeps the drop-down with the five labels when the list cannot be read", async () => {
+  it("keeps the five labels when the list cannot be read", async () => {
     setup({ tables: { preset_work_orders: () => ({ error: { message: "offline" } }) } });
-    const select = screen.getByLabelText(fr("form.otPreset"));
-    expect(select.querySelectorAll("option")).toHaveLength(6); // placeholder + the five
-    await waitFor(() => expect(select.querySelectorAll("option")).toHaveLength(6));
+    fireEvent.click(arrow());
+    expect(labels()).toHaveLength(5);
   });
 
   it("types a number as before: the OT field is still free text", () => {
