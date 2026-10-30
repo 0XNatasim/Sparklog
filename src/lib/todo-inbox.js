@@ -96,7 +96,7 @@ function sumBy(list, fn) {
 
 // The last work day before `date` (YYYY-MM-DD): Monday looks back to Friday, and a CCQ
 // holiday (company_holidays) is skipped like a weekend. Kept here for existing imports.
-export { previousWorkday } from "./workdays";
+export { lookbackWorkdays, previousWorkday } from "./workdays";
 
 // push_approved_batch's per-job results → how many were approved and which ones changed
 // under the manager (edited since, already claimed…) and must be looked at again.

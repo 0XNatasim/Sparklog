@@ -1,11 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.211).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.212).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.212** : dans « À traiter », **« Pas soumis »** regarde d'abord la veille ; si tout le monde a soumis, il regarde
+  l'avant-veille, et ainsi de suite **jusqu'au lundi de la semaine courante**. Il montre le jour le plus récent où il manque
+  encore quelqu'un (la date est dans le titre) et le rappel vise ce jour-là. Le lundi, comme avant : seulement le vendredi.
 - ✅ **V2.4.211** : stock minimum, **une seule notification par entrepôt**. Le chiffre sur « Inventaire » (et sur le bouton
   « Minimums par entrepôt ») compte les entrepôts qui ont au moins un appareil sous le minimum, plus les avis de stock négatif.
   La carte rouge liste chaque entrepôt avec ses appareils bas **en rouge** (en stock · minimum).
