@@ -53,9 +53,10 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
-- **V2.4.208 — One box for the OT, and the Google Sheet follows the 65 km rule.** The pre-made work orders are no longer a
+- **V2.4.208 — One box for the OT, no « Inventaire du crew » button, and the Google Sheet follows the 65 km rule.** The pre-made work orders are no longer a
   second field: the OT box has a small arrow on its right that opens the list; picking a label fills the box, and a real
-  number is typed as before (time entry and manager's manual timesheet). The Apps Script `doPost`
+  number is typed as before (time entry and manager's manual timesheet). The « Inventaire du crew » button (team totals
+  window, defective products included) is removed from the Inventaire page. The Apps Script `doPost`
   (`supabase/functions/push_approved_batch/apps-script-doPost.js`, pasted by hand in Google) now keeps the first trip paid
   when the day's first job is 65 km or more, like the payroll engine 2.7.0 (to paste and redeploy as a new version).
 - **V2.4.207 — Unpaid first trip: paid from 65 km** (payroll engine 2.7.0, migration 0125). An employee with the « premier

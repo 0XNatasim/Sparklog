@@ -136,7 +136,9 @@ Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; 
 à **trancher** ou à **coder**, par priorité.
 
 **V2.4.208 (technique).** `OtField.jsx` remplace `OtPresetSelect.jsx` : une seule case (`Input` + bouton flèche + liste
-`role="listbox"`) dans `JobEntryFields` et `EmergencyTimesheet` ; texte `form.otPresetPlaceholder` retiré. `apps-script-doPost.js` :
+`role="listbox"`) dans `JobEntryFields` et `EmergencyTimesheet` ; texte `form.otPresetPlaceholder` retiré. Bouton et fenêtre « Inventaire du crew » retirés de `InventoryScreenshotsPanel.jsx` ; code mort
+supprimé : `sumCrewInventory`, `sumCrewDefective` (`inventory-items.js`), leurs tests et les textes `mgr.inventory.crew*`
+(la somme des produits défectueux de l'équipe n'existe plus dans l'app). `apps-script-doPost.js` :
 `FIRST_TRIP_PAID_KM` / `FIRST_TRIP_PAID_FROM` (65 km, 2026-10-11) — la 1re fiche du jour de 65 km ou plus (`km_total` ou
 `km_aller + km_retour`) garde son trajet payé (minutes non payées 0). Le script se colle à la main dans Google : le propriétaire
 doit le redéployer. `push_approved_batch` envoie déjà `km_aller` / `km_retour`, pas de redéploiement de la fonction.

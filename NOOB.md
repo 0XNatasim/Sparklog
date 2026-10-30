@@ -8,7 +8,7 @@
 
 - ✅ **V2.4.208** : les OT prédéfinis sont dans **la même case que l'OT** : une petite flèche à droite de la case ouvre la
   liste ; on choisit, ça s'écrit dedans, ou on tape un numéro comme avant. Aussi, le script du **Google Sheet** applique
-  maintenant la règle des 65 km (premier trajet payé). **À faire : coller le nouveau `doPost` dans Google Apps Script
+  maintenant la règle des 65 km (premier trajet payé). Le bouton **« Inventaire du crew »** est retiré de la page Inventaire. **À faire : coller le nouveau `doPost` dans Google Apps Script
   (fichier `apps-script-doPost.js`) et le redéployer en « Nouvelle version ».**
 - ✅ **V2.4.207** : **premier trajet non payé, mais payé dès 65 km**. Pour un employé qui a l'option « premier trajet non payé »,
   le premier trajet de la journée est maintenant **payé si la première fiche de la journée fait 65 km ou plus** (65 compte). En

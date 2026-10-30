@@ -109,41 +109,6 @@ export function compareInventory(todayItems, previousItems, { todayComplete = fa
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
 }
 
-// Crew-wide inventory: each employee's merged list for the day, summed per equipment code.
-// `holders` is how many employees have a quantity above 0. `unverified` names the employees whose
-// list is missing, still being read, unreadable or not matched to the app's total, so the
-// totals are never mistaken for complete when they are not.
-export function sumCrewInventory(entries) {
-  const byCode = new Map();
-  const unverified = [];
-  let counted = 0;
-  for (const entry of entries || []) {
-    if (entry.state !== "ok") unverified.push(entry.name);
-    if (!entry.items?.length) continue;
-    counted += 1;
-    for (const item of entry.items) {
-      const quantity = Number(item.quantity) || 0;
-      const current = byCode.get(item.code) || { code: item.code, name: item.name, total: 0, holders: 0 };
-      current.total = Math.round((current.total + quantity) * 100) / 100;
-      if (quantity > 0) current.holders += 1;
-      if (String(item.name || "").length > String(current.name || "").length) current.name = item.name;
-      byCode.set(item.code, current);
-    }
-  }
-  const rows = [...byCode.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
-  return { rows, counted, unverified };
-}
-
-// Crew-wide defective products: the same sum over each employee's defective list. An employee
-// with none to declare is not "unverified"; one whose picture is unread or unmatched is.
-export function sumCrewDefective(entries) {
-  return sumCrewInventory((entries || []).map((entry) => ({
-    name: entry.name,
-    state: ["ok", "none"].includes(entry.defective?.state) ? "ok" : "review",
-    items: entry.defective?.items || [],
-  })));
-}
-
 // Employees away all day (a full-day time-off row: congé, vacances, absence, maladie…) who sent no
 // screenshot are not « missing »: they get `off` (the time-off row) and go to the end of the list,
 // shown greyed. Someone away who still sent a list keeps their normal state. Partial days
