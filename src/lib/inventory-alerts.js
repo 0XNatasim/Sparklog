@@ -1,4 +1,5 @@
 import { supabase } from "@/supabaseClient";
+import { canonicalEquipmentName } from "@/lib/equipment-names";
 import { withTimeout } from "@/lib/utils";
 
 // The Inventory page and the sidebar badge both listen for this after a dismiss.
@@ -51,7 +52,7 @@ export function groupInventoryNegativeAlerts(rows) {
     if (!row.code || group.items.some((item) => item.code === row.code)) continue;
     group.items.push({
       code: row.code,
-      name: row.item_name || row.code,
+      name: canonicalEquipmentName(row.code, row.item_name || row.code),
       quantity: row.quantity,
     });
   }

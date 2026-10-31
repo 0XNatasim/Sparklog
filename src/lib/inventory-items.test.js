@@ -72,7 +72,8 @@ describe("parseInventoryText", () => {
   it("keeps digits in a name apart from the quantity and repairs OCR letter/digit mix-ups", () => {
     const third = parseInventoryText(SHOT_3);
     expect(third.items.map((item) => item.code)).toContain("EQ000048");
-    expect(third.items.find((item) => item.code === "EQ000040").name).toBe("Thermostat intelligent Hilo 3");
+    // A known code always gets its official name, whatever the reading returned (« …Hilo 3 », cut or garbled).
+    expect(third.items.find((item) => item.code === "EQ000040").name).toBe("Thermostat Plancher intelligent Hilo");
     expect(third.items.find((item) => item.code === "EQ000016").quantity).toBe(84);
   });
 
@@ -297,12 +298,12 @@ describe("negative quantities read from the capture (Field Service « -1,00 »)"
   it("reads the minus as part of the quantity, never in the name", () => {
     const stacked = parseInventoryText(`E-\nEQ000008 ...\nGradateur mural intelligent Jasco…\n-1,00\nE-\nEQ000025 ...\nInterrupteur auxiliaire (3 voies et …\n1,00\n`);
     expect(stacked.items.map((item) => [item.code, item.name, item.quantity])).toEqual([
-      ["EQ000008", "Gradateur mural intelligent Jasco", -1],
-      ["EQ000025", "Interrupteur auxiliaire (3 voies et", 1],
+      ["EQ000008", "Gradateur mural intelligent", -1],
+      ["EQ000025", "Interrupteur auxiliaire (3 voie)", 1],
     ]);
     const inline = parseInventoryText("E- EQ000008 ··· Gradateur mural intelligent Jasc… - 2,00\nE- EQ000049 ··· Calypso V1 −3,00");
     expect(inline.items.map((item) => item.quantity)).toEqual([-2, -3]);
-    expect(inline.items[0].name).toBe("Gradateur mural intelligent Jasc");
+    expect(inline.items[0].name).toBe("Gradateur mural intelligent");
   });
 
   it("keeps a dash inside a name (« Sinope - 3000W ») and positive quantities as they were", () => {
@@ -346,7 +347,7 @@ describe("lines read without their quantity (0117)", () => {
     expect(parsed.unparsed).toBe(1);
     expect(parsed.items).toEqual([
       { code: "EQ000049", name: "Calypso V1", quantity: 2, section: "inventory" },
-      { code: "EQ000041", name: "Module d'expansion pour planchers", quantity: null, section: "inventory" },
+      { code: "EQ000041", name: "Module d'expansion pour plancher", quantity: null, section: "inventory" },
     ]);
   });
 
@@ -420,5 +421,28 @@ describe("migration 0127: what the employee saw on the inventory step", () => {
     expect(sql).toContain("using (public.get_my_role() = 'manager')");
     expect(sql).toContain("grant select, insert on public.inventory_reading_log to authenticated");
     expect(sql).not.toMatch(/grant[^;]*(update|delete)[^;]*inventory_reading_log/);
+  });
+});
+
+describe("official equipment names", () => {
+  it("replaces a garbled or cut name by the official one of the code, and keeps an unknown code's name", () => {
+    const parsed = parseInventoryText("E- EQ000026 . . Contrôleur chauffe-eau Hi… 21,00\nE- EQ000099 Appareil inconnu 2,00\n1 - 2 de 2");
+    expect(parsed.items.map((item) => [item.code, item.name])).toEqual([
+      ["EQ000026", "Contrôleur chauffe-eau Hilo"],
+      ["EQ000099", "Appareil inconnu"],
+    ]);
+    expect(mergeInventoryItems([{ slot: 1, code: "EQ000041", name: "Module d'expansion pour pla", quantity: 1 }])[0].name).toBe("Module d'expansion pour plancher");
+  });
+});
+
+describe("migration 0128 keeps the stored names in step with the official list", () => {
+  it("has exactly the names of equipment_names.js, for the written lists and the ratios", async () => {
+    const { EQUIPMENT_NAMES } = await import("./equipment-names");
+    const sql = read("../../supabase/migrations/20261031180000_0128_official_equipment_names.sql");
+    const pairs = [...sql.matchAll(/\('(EQ\d{6})', '((?:[^']|'')*)'\)/g)].map((m) => [m[1], m[2].replace(/''/g, "'")]);
+    expect(pairs).toHaveLength(Object.keys(EQUIPMENT_NAMES).length * 2); // once per table
+    for (const [code, name] of pairs) expect(EQUIPMENT_NAMES[code]).toBe(name);
+    expect(sql).toContain("update public.inventory_items");
+    expect(sql).toContain("update public.inventory_min_ratios");
   });
 });

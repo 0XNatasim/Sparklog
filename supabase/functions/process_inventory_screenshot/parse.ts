@@ -7,6 +7,8 @@
 // (defective products). Rows under that title are returned with section "defective" and never
 // counted in the equipment list (V2.4.146); everything above it is section "inventory".
 
+import { canonicalEquipmentName } from "../_shared/equipment_names.js";
+
 export type InventorySection = "inventory" | "defective";
 // quantity can be negative: Field Service shows "-1,00" when more was used than the truck held.
 // It is null when the row's code was read but not its quantity (row cut at the edge of the
@@ -75,12 +77,12 @@ export function parseInventoryText(raw: string): ParsedInventory {
     if (!last) {
       // Code without quantity: keep the row (quantity unknown) so it can be named and retaken.
       unparsed += 1;
-      items.push({ code, name: cleanName(segment) || code, quantity: null, section: sectionAt(match.index!) });
+      items.push({ code, name: canonicalEquipmentName(code, cleanName(segment) || code), quantity: null, section: sectionAt(match.index!) });
       return;
     }
     const quantity = (last[1] ? -1 : 1) * Number(last[2].replace(",", "."));
     const name = cleanName(segment.slice(0, last.index));
-    items.push({ code, name: name || code, quantity, section: sectionAt(match.index!) });
+    items.push({ code, name: canonicalEquipmentName(code, name || code), quantity, section: sectionAt(match.index!) });
   });
 
   return { items, total, defectiveTotal, defectiveHeader: headerAt >= 0, unparsed };

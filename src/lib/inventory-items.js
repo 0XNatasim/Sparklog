@@ -1,6 +1,7 @@
 // Pure helpers behind the manager Inventory page: merge the rows read from the overlapping
 // screenshots (one to three) into one list, and summarize an employee's day.
 import { DEFECTIVE_SLOT } from "./inventory-screenshots";
+import { canonicalEquipmentName } from "./equipment-names";
 import { isOffOn } from "./timeoff";
 
 // Screenshots overlap (the last rows of one are the first of the next), so the same code can
@@ -20,7 +21,9 @@ export function mergeInventoryItems(rows) {
     const takeRow = knownQuantity(row) !== knownQuantity(current) ? knownQuantity(row) : Number(row.slot) >= Number(current.slot);
     byCode.set(row.code, takeRow ? { ...row, name } : { ...current, name });
   }
-  return [...byCode.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
+  // The name is the official one of the code (the reading often garbles or cuts it); unknown codes keep what was read.
+  return [...byCode.values()].map((item) => ({ ...item, name: canonicalEquipmentName(item.code, item.name) }))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
 }
 
 // A reading normally finishes within seconds. A screenshot still "pending" long after it was sent

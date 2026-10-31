@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.215 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.216 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,12 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.216 — Official names for the inventory devices** (migration 0128). The screenshot reading often stored garbled or cut
+  names (« E- Contrôleur… », « Module d'expansion pour pla », a leading dot, « Thermostat intelligent Hilo 3 »). Each of the 17 known
+  codes now always shows its official name (list given by the owner on 2026-10-31, `supabase/functions/_shared/equipment_names.js`):
+  in the reading itself, in every screen (written lists, comparison, minimums, alerts, the employee's step) and, through the
+  migration, in the names already stored. An unknown code keeps the name that was read. **The `process_inventory_screenshot`
+  function has to be redeployed** for new readings to store the official name (the screens already show it).
 - **V2.4.215 — Inventory step: nothing read is no longer silent, and what the employee saw is recorded** (migration 0127). When
   none of the list screenshots could be read (« Photos seulement »), the employee is now asked to retake or add a screenshot of
   the list (then « Continuer quand même », like for a missing line); before, only lines missing or unreadable were asked. Each

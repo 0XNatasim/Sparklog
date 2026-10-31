@@ -1,4 +1,5 @@
 import { supabase } from "@/supabaseClient";
+import { canonicalEquipmentName } from "@/lib/equipment-names";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { withTimeout } from "@/lib/utils";
 
@@ -63,13 +64,13 @@ export function knownEquipment(rows) {
     const current = byCode.get(row.code);
     if (!current || String(row.name || "").length > String(current.name || "").length) byCode.set(row.code, { code: row.code, name: row.name });
   }
-  return [...byCode.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
+  return [...byCode.values()].map((item) => ({ ...item, name: canonicalEquipmentName(item.code, item.name) })).sort((a, b) => String(a.name).localeCompare(String(b.name), "fr-CA") || a.code.localeCompare(b.code));
 }
 
 export async function fetchStockLevels() {
   const { data, error } = await withTimeout(supabase.rpc("inventory_stock_levels"), 12000);
   if (error) throw error;
-  return data || [];
+  return (data || []).map((row) => ({ ...row, item_name: canonicalEquipmentName(row.code, row.item_name) }));
 }
 
 // Which warehouses (groups) raise the alert: Map of group id -> boolean.
