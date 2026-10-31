@@ -109,7 +109,7 @@ export default function InventoryStep({ t, inventory, onContinue }) {
           type="button"
           variant={block === "override" ? "outline" : "default"}
           disabled={busy || !inventoryStepComplete(rows, defectiveAnswer) || block === "wait" || block === "retake"}
-          onClick={onContinue}
+          onClick={() => { inventory.recordContinue?.(block); onContinue(); }}
         >
           {block === "override" ? t("form.inventory.continueAnyway") : t("form.inventory.continue")}
         </Button>
@@ -123,9 +123,10 @@ export default function InventoryStep({ t, inventory, onContinue }) {
 function RetakeNote({ reading, t, busy, uploading, again, onRetake }) {
   const unreadable = reading?.unreadable || [];
   const probable = reading?.probable || [];
+  const nothingRead = reading?.state === "photos";
   return (
     <div className="space-y-2 rounded-md border border-warning/50 bg-warning/10 p-3 text-warning" role="alert">
-      <p className="font-medium">{t(again ? "form.inventory.retakeAgain" : "form.inventory.retakeTitle")}</p>
+      <p className="font-medium">{t(again ? "form.inventory.retakeAgain" : nothingRead ? "form.inventory.nothingRead" : "form.inventory.retakeTitle")}</p>
       {unreadable.length > 0 && (
         <div>
           <p>{t("form.inventory.unreadableLines")}</p>
@@ -150,7 +151,7 @@ function RetakeNote({ reading, t, busy, uploading, again, onRetake }) {
       <p className="text-xs">{t("form.inventory.retakeHint")}</p>
       <Button type="button" className="w-full" variant={again ? "outline" : "default"} disabled={busy} onClick={onRetake}>
         <Camera className="mr-2 h-4 w-4" aria-hidden="true" />
-        {uploading ? t("form.inventory.uploading") : t("form.inventory.retakeButton")}
+        {uploading ? t("form.inventory.uploading") : t(nothingRead ? "form.inventory.retakeListButton" : "form.inventory.retakeButton")}
       </Button>
     </div>
   );

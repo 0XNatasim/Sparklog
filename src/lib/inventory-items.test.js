@@ -401,7 +401,24 @@ describe("employee inventory step: retake the unreadable lines (0117)", () => {
     expect(inventoryReadingBlock({ state: "review", unreadable: [{ code: "EQ1" }], missing: 0 }, rows, { complementTried: true })).toBe("override");
   });
 
+  it("also asks when nothing at all could be read (every list screenshot failed), then lets the employee go on", () => {
+    expect(inventoryReadingBlock({ state: "photos", unreadable: [], missing: 0 }, rows)).toBe("retake");
+    expect(inventoryReadingBlock({ state: "photos", unreadable: [], missing: 0 }, [...rows, { slot: 5 }])).toBe("override");
+    expect(inventoryReadingBlock({ state: "photos", unreadable: [], missing: 0 }, rows, { complementTried: true })).toBe("override");
+  });
+
   it("names the probable missing lines from the previous list", () => {
     expect(probableMissingLines([{ code: "EQ1" }], [{ code: "EQ1", name: "A" }, { code: "EQ2", name: "B" }])).toEqual([{ code: "EQ2", name: "B" }]);
+  });
+});
+
+describe("migration 0127: what the employee saw on the inventory step", () => {
+  const sql = read("../../supabase/migrations/20261031150000_0127_inventory_reading_log.sql");
+  it("is written by the employee for themself and read by managers only, never edited", () => {
+    expect(sql).toContain("alter table public.inventory_reading_log enable row level security");
+    expect(sql).toContain("with check (user_id = auth.uid())");
+    expect(sql).toContain("using (public.get_my_role() = 'manager')");
+    expect(sql).toContain("grant select, insert on public.inventory_reading_log to authenticated");
+    expect(sql).not.toMatch(/grant[^;]*(update|delete)[^;]*inventory_reading_log/);
   });
 });

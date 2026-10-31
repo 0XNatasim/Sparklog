@@ -27,6 +27,7 @@ function setup({ rows = [{ slot: 1 }, { slot: 2 }], reading = reviewReading } = 
     inputRef: { current: null }, multiInputRef: { current: null },
     pickSlot: vi.fn(), pickFiles: vi.fn(), pickComplement: vi.fn(), handleFile: vi.fn(), handleFiles: vi.fn(),
   };
+  inventory.recordContinue = vi.fn();
   const onContinue = vi.fn();
   render(<InventoryStep t={fr} inventory={inventory} onContinue={onContinue} />);
   return { inventory, onContinue };
@@ -64,5 +65,27 @@ describe("InventoryStep — unreadable lines", () => {
     setup({ reading: { state: "review", count: 16, expected: 17, missing: 1, unreadable: [], probable: [{ code: "EQ000046", name: "Sinope - 3000W" }] } });
     expect(screen.getByText(fr("form.inventory.missingLines", { count: 1 }))).toBeTruthy();
     expect(screen.getByText(/Sinope - 3000W/)).toBeTruthy();
+  });
+});
+
+describe("InventoryStep — nothing read, and what is recorded", () => {
+  const nothing = { state: "photos", count: 0, expected: null, missing: 0, probable: [], unreadable: [] };
+
+  it("asks for the list again when no line could be read, holding « Continuer »", () => {
+    const { inventory } = setup({ reading: nothing });
+    expect(screen.getByText(fr("form.inventory.nothingRead"))).toBeTruthy();
+    expect(screen.getByRole("button", { name: fr("form.inventory.continue") }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: fr("form.inventory.retakeListButton") }));
+    expect(inventory.pickComplement).toHaveBeenCalledTimes(1);
+  });
+
+  it("records what the step asked when the employee continues anyway, and when all was read", () => {
+    const first = setup({ reading: nothing, rows: [{ slot: 1 }, { slot: 5 }] });
+    fireEvent.click(screen.getByRole("button", { name: fr("form.inventory.continueAnyway") }));
+    expect(first.inventory.recordContinue).toHaveBeenCalledWith("override");
+    cleanup();
+    const second = setup({ reading: { state: "ok", count: 17, expected: 17, missing: 0, unreadable: [], probable: [] } });
+    fireEvent.click(screen.getByRole("button", { name: fr("form.inventory.continue") }));
+    expect(second.inventory.recordContinue).toHaveBeenCalledWith(null);
   });
 });

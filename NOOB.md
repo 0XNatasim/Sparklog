@@ -1,11 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.214).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.215).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.215** : étape **Inventaire** de l'employé. (1) Quand **aucune ligne n'a pu être lue** (« Photos seulement »), l'employé
+  reçoit maintenant le message de reprendre ses captures ou d'en ajouter une (puis « Continuer quand même »). Avant, seul « il
+  manque des lignes » était demandé. (2) L'application **note ce que l'employé a vu** en quittant l'étape (lecture, lignes
+  manquantes, s'il a passé outre) pour pouvoir répondre « a-t-il eu le message ? ». **À faire : appliquer la migration 0127.**
 - ✅ **V2.4.214** : dans le **Sommaire imprimable**, le détail d'un **sous-traitant** sépare maintenant le **retour du
   régulier** (avant, le retour était ajouté au régulier et la colonne Retour restait vide). Le total ne change pas.
   Les employés CCQ sont inchangés.
