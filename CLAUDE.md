@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.215)
+## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.216)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.216 (technique).** `supabase/functions/_shared/equipment_names.js` (`EQUIPMENT_NAMES`, `canonicalEquipmentName(code, fallback)`, ré-exporté par
+`src/lib/equipment-names.js`) : nom officiel des 17 codes connus. Appliqué dans `parseInventoryText` (`process_inventory_screenshot/parse.ts` —
+**fonction à redéployer**, elle importe `_shared`), `mergeInventoryItems`, `knownEquipment`, `fetchStockLevels` (`item_name`) et
+`inventory-alerts`. Migration 0128 : réécrit `inventory_items.name` et `inventory_min_ratios.name` des codes connus (un test verrouille la
+migration contre `equipment_names.js`). Code inconnu = nom lu. Pour ajouter un appareil : la liste JS et la migration suivante.
 
 **V2.4.215 (technique).** `inventoryReadingBlock` : l'état `photos` (aucune ligne lue) compte comme un problème (« retake », puis « override » avec
 complément ou tentative) ; `InventoryStep.jsx` (`RetakeNote` : `form.inventory.nothingRead`, `retakeListButton`). Migration 0127 : table

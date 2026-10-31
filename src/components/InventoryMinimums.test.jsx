@@ -16,7 +16,7 @@ const { default: InventoryMinimums } = await import("./InventoryMinimums");
 
 const fr = (key, vars = {}) => Object.entries(vars).reduce((s, [k, v]) => s.replace(`{${k}}`, v), dictionaries.fr[key]);
 const level = (extra) => ({
-  group_id: "g1", group_name: "Entrepôt Alma", code: "EQ000016", item_name: "Thermostat Hilo 4", per_employee: 504, headcount: 3,
+  group_id: "g1", group_name: "Entrepôt Alma", code: "EQ000016", item_name: "Thermostat intelligent Hilo 4000", per_employee: 504, headcount: 3,
   minimum: 1512, on_hand: 1200, lists_counted: 2, is_low: true, alert_enabled: true, ...extra,
 });
 
@@ -49,7 +49,7 @@ describe("InventoryMinimums", () => {
 
   it("shows the minimum next to the employees' total for a counted warehouse, the low one marked", async () => {
     setup();
-    await screen.findAllByText("Thermostat Hilo 4");
+    await screen.findAllByText("Thermostat intelligent Hilo 4000");
     expect(screen.getByText(fr("mgr.inventory.ratios.lowBadge", { count: 1 }))).toBeTruthy();
     expect(screen.getByText(fr("mgr.inventory.ratios.total"))).toBeTruthy();
     const row = screen.getAllByText("EQ000016").map((el) => el.closest("tr")).find(Boolean);
@@ -59,7 +59,7 @@ describe("InventoryMinimums", () => {
 
   it("lists at the top the devices below their minimum, with their stock", async () => {
     setup();
-    await screen.findAllByText("Thermostat Hilo 4");
+    await screen.findAllByText("Thermostat intelligent Hilo 4000");
     expect(screen.getByText(fr("mgr.inventory.ratios.lowTitle", { count: 1 }))).toBeTruthy();
     const normalize = (text) => text.replace(/\s/g, " ");
     expect(screen.getByText(normalize(fr("mgr.inventory.ratios.lowLine", { onHand: "1 200", minimum: "1 512" })), { normalizer: normalize })).toBeTruthy();
@@ -69,7 +69,7 @@ describe("InventoryMinimums", () => {
     setup({ counted: false });
     await screen.findByText("Entrepôt Alma");
     expect(screen.queryByText(fr("mgr.inventory.ratios.lowTitle", { count: 1 }))).toBeNull(); // not counted: no alert
-    expect(screen.queryByText("Thermostat Hilo 4")).toBeNull();
+    expect(screen.queryByText("Thermostat intelligent Hilo 4000")).toBeNull();
     expect(screen.queryByLabelText(fr("mgr.inventory.ratios.perEmployee"))).toBeNull();
   });
 
