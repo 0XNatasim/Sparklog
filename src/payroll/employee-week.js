@@ -10,6 +10,8 @@
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 import { computeCcqBenefits, computeCcqLevies, vacationableWage, employeePensionRateFor, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { PAY_PERIODS_PER_YEAR } from "./rules/2026.js";
+import { getRules } from "./rules/index.js";
+import { payYearForWeek, resolveTaxYear } from "./rules/rule-overrides.js";
 import { printedPayLines } from "./earnings.js";
 import { engineYtdFromOpening } from "./ytd.js";
 import { calculatePayrollEntries, overtimeOptionsFromProfile, CONGES_INDEMNITY_RATES } from "@/lib/payroll-calculations";
@@ -153,7 +155,7 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
     retNb += e.returnNoBenefitMinutes; totalKm += e.totalKm;
   }
   const fixedHours = fixedWeeklyHours(taxProfile);
-  if (fixedHours) return computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includePhone, includeStorage, employer, taxProfile, opening });
+  if (fixedHours) return computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includePhone, includeStorage, employer, taxProfile, opening, payWeekDate });
   const regularHours = regMin / 60, ot150Hours = ot50 / 60, ot200Hours = ot100 / 60, returnNbHours = retNb / 60;
 
   const pay = {
@@ -201,14 +203,17 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
   const safety = ccqAmounts.safetyEquipment || 0;
   const reimb = { km: kmReimb, phone: phoneReimb, storage: storageReimb, safety, total: kmReimb + phoneReimb + storageReimb + safety };
 
-  const result = runEngine({ frequency, employer, taxProfile, earnings, opening, unionDuesFederalAnnual, baseAdjustments: ccqAmounts.baseAdjustments });
+  const result = runEngine({ frequency, employer, taxProfile, earnings, opening, unionDuesFederalAnnual, baseAdjustments: ccqAmounts.baseAdjustments, payWeekDate });
 
   return { result, ccqAmounts, reimb, pay, hours: { regularHours, ot150Hours, ot200Hours, returnNbHours, totalKm, totalHours } };
 }
 
-function runEngine({ frequency, employer, taxProfile, earnings, opening, unionDuesFederalAnnual = 0, baseAdjustments }) {
-  return calculatePayroll({
-    taxYear: 2026,
+function runEngine({ frequency, employer, taxProfile, earnings, opening, unionDuesFederalAnnual = 0, baseAdjustments, payWeekDate }) {
+  // Scale of the year the week is paid in (« Barèmes annuels »); a year without a scale yet uses the latest
+  // earlier one and says so in the result (`taxYearAssumedFrom`).
+  const { taxYear, assumedFrom } = resolveTaxYear(payYearForWeek(payWeekDate));
+  const result = calculatePayroll({
+    taxYear,
     provinceOfEmployment: "QC",
     payPeriod: { frequency },
     employee: {
@@ -227,13 +232,16 @@ function runEngine({ frequency, employer, taxProfile, earnings, opening, unionDu
     },
     earnings,
     baseAdjustments,
-    ytd: engineYtdFromOpening(opening),
+    ytd: engineYtdFromOpening(opening, getRules(taxYear, "QC").rules),
   });
+  if (!assumedFrom) return result;
+  // Shown with the other review reasons: the stub is estimated with last year's scale until the owner enters it.
+  return { ...result, taxYearAssumedFrom: assumedFrom, requiresReview: true, reviewReasons: [...(result.reviewReasons || []), `Barème ${assumedFrom} non saisi : le barème ${taxYear} est utilisé (Configuration › Barèmes annuels).`] };
 }
 
 // Fixed weekly pay: one « Régulier à taux horaire » line (the hours at the base rate, `baseOnlyHours`,
 // so the stub's 4 % « Vacances » record line follows it), statutory deductions only (no CCQ layer).
-function computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includePhone, includeStorage, employer, taxProfile, opening }) {
+function computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includePhone, includeStorage, employer, taxProfile, opening, payWeekDate }) {
   const base = Number(profile?.hourly_rate) || 0;
   const pay = {
     regularHours: 0, baseOnlyHours: fixedHours, baseRate: base, premium: 0, ccqPremium: 0, premiumOnOvertime: false,
@@ -246,7 +254,7 @@ function computeFixedPayWeek({ profile, fixedHours, totalKm, frequency, includeP
   const phoneReimb = includePhone ? weeklyPhoneAmount(profile) : 0;
   const storageReimb = includeStorage ? weeklyStorageAmount(profile) : 0;
   const reimb = { km: kmReimb, phone: phoneReimb, storage: storageReimb, safety: 0, total: kmReimb + phoneReimb + storageReimb };
-  const result = runEngine({ frequency, employer, taxProfile, earnings, opening });
+  const result = runEngine({ frequency, employer, taxProfile, earnings, opening, payWeekDate });
   return {
     result, ccqAmounts: null, reimb, pay, fixedPay: true,
     hours: { regularHours: fixedHours, ot150Hours: 0, ot200Hours: 0, returnNbHours: 0, totalKm, totalHours: fixedHours },

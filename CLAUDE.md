@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.223)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.224)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,19 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.224 (technique).** « Barèmes annuels » : migration 0131, table `statutory_rate_sets` (`tax_year` → `data` jsonb, 8 sections : `rrq`, `ei`, `rqap`,
+`federalTax`, `quebecTax`, `fss`, `labourStandards`, `workforceFund`), lecture gestionnaire, écriture seulement par `set_statutory_rate_set` /
+`delete_statutory_rate_set` (`is_privileged()`, forme vérifiée, audit `statutory_rates_set` / `statutory_rates_deleted`, on ne retire qu'une année
+pas commencée). `src/payroll/rules/rule-overrides.js` : `validateRuleData` (maximums = gains × taux à 0,06 $ près, paliers croissants, constantes K à
+1 $ près du calcul `bracketConstants`, 2e cotisation RRQ = limite basse = maximum des gains), `setRuleSetOverrides` (n'installe que les barèmes
+valides), `getRules` lit l'override avant le barème codé, `resolveTaxYear` (année sans barème = dernier précédent, `assumedFrom`), `payYearForWeek`
+(année de paie = début de semaine + 11 jours, comme `WeeklyReportButton`). `employee-week.js` n'écrit plus `taxYear: 2026` en dur : année de paie
+résolue, `ytd` avec le barème de cette année, et un talon sur barème de repli reçoit `taxYearAssumedFrom` + une raison de révision. Chargé avec
+les taux simples par `loadPayrollRates` (un échec = barème codé). `statutory-fields.js` (champs, texte ↔ nombre, K recalculés, `diffRuleData`),
+`StatutoryRatesManager.jsx` (onglet `statutory-rates`), `missingScaleAlert` (pastille de Configuration dès 28 jours avant le 1er janvier, puis tant que
+l'année manque). Limites : `PayrollEngineTester` garde `taxYear: 2026` ; les montants de la CNESST et du barème syndical ne sont pas ici ; règles
+de paie non signées par un spécialiste (ADR 0001).
 
 **V2.4.223 (technique).** Rappel avant un changement de taux : `upcomingRateChanges(today, overrides, 28)` (`src/lib/payroll-rates.js`) réunit les dates
 déjà dans le code (`MEDIC_RATES`, `MEDIC_TAX_RATES`) et les lignes `payroll_rates` pas encore en vigueur ; `rateAlertStage(jours)` = 4 (≥ 15 j),

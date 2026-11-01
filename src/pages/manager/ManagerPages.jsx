@@ -20,6 +20,7 @@ const FormsManager = lazyPanel(() => import("@/components/FormsManager"));
 const ReferencesManager = lazyPanel(() => import("@/components/ReferencesManager"));
 const PresetWorkOrdersManager = lazyPanel(() => import("@/components/PresetWorkOrdersManager"));
 const PayrollRatesManager = lazyPanel(() => import("@/components/PayrollRatesManager"));
+const StatutoryRatesManager = lazyPanel(() => import("@/components/StatutoryRatesManager"));
 const ContactsManager = lazyPanel(() => import("@/components/ContactsManager"));
 const MissingDaysPanel = lazyPanel(() => import("@/components/manager/MissingDaysPanel"));
 const GroupsManager = lazyPanel(() => import("@/components/GroupsManager"));
@@ -352,7 +353,7 @@ const REPORTS_TABS = {
 // No « Règles de temps » and no TD1 forms here: both are in each employee's card (Équipe › Employés).
 const CONFIG_TABS = {
   settings: () => <Narrow><SettingsPanel taxForms={false} /></Narrow>, "ccq-rates": CcqPage, "pay-rules": PayRulesPage,
-  forms: FormsPage, references: ReferencesPage, contacts: () => <ContactsManager />, "ot-presets": () => <Narrow><PresetWorkOrdersManager /></Narrow>, "payroll-rates": () => <Narrow><PayrollRatesManager /></Narrow>,
+  forms: FormsPage, references: ReferencesPage, contacts: () => <ContactsManager />, "ot-presets": () => <Narrow><PresetWorkOrdersManager /></Narrow>, "payroll-rates": () => <Narrow><PayrollRatesManager /></Narrow>, "statutory-rates": () => <Narrow><StatutoryRatesManager /></Narrow>,
 };
 
 export const TodoTabsPage = () => <TabbedPage itemId="todo" content={TODO_TABS} />;
