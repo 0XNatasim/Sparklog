@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.225)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.226)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.226 (technique).** Ménage de `NOOB.md` seulement (aucun code) : retrait des « À faire » faits (migrations 0120 à 0131 vérifiées appliquées dans la base le 2026-11-01 ;
+`classify_week` redéployée le 2026-10-30 avec le moteur 2.7.0 — `push_approved_batch` n'importe que `RETURN_WITH_BENEFITS`, rien à redéployer ; `cleanup_overtime_evidence`
+et `process_inventory_screenshot` redéployées ; entrepôts Alma, Charlevoix, Rimouski à « Oui »). Ajout : barèmes 2027 à saisir avant le 1er janvier.
 
 **V2.4.225 (technique).** Fiche employé guidée : `REQUIRED_EMPLOYEE_FIELDS` (`src/lib/employee-fields.js`, [colonne, clé de texte, onglet]), `getMissingEmployeeItems`
 (`{ field, label, tab }`), `getMissingEmployeeFields` (étiquettes, V2) et `missingCountByTab`. `components/employees/missing-fields.js` : contexte
