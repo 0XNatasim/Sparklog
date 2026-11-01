@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.219 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.220 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,8 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.220 — No more badge on the « Registre d'accidents » menu.** The number of open accident files is gone from the side
+  menu; an unfinished file keeps its orange « Ouvert » tag inside the register (and the « Ouverts (n) » filter) until « Fermer le dossier ».
 - **V2.4.219 — Alert for proofs not downloaded** (migration 0129). A red notice for the managers on À traiter and on
   Justificatifs: « N justificatif(s) pas encore téléchargé(s) ont 21 jours ou plus », with the split (overtime / parking) and the days left
   before the nearest one is deleted. It counts the pictures still kept and not downloaded (`evidence_downloads`) that are 21 days old or

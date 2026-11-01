@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import {
-  ACCIDENT_EVENT, ACCIDENT_KINDS, ACCIDENT_SEVERITIES, MAX_ACCIDENT, accidentToForm, accidentsCsv, createAccident, emptyAccident, fetchAccidents,
+  ACCIDENT_KINDS, ACCIDENT_SEVERITIES, MAX_ACCIDENT, accidentToForm, accidentsCsv, createAccident, emptyAccident, fetchAccidents,
   filterAccidents, openAccidentCount, updateAccident, validateAccident,
 } from "@/lib/accidents";
 import { accidentFileCount, uploadAccidentFile } from "@/lib/accident-files";
@@ -175,7 +175,6 @@ export default function AccidentRegister() {
         try { await uploadAccidentFile(saved.id, file); count += 1; } catch { failed += 1; }
       }
       setRows((current) => sortRows([{ ...saved, accident_files: [{ count }] }, ...current.filter((r) => r.id !== saved.id)]));
-      window.dispatchEvent(new Event(ACCIDENT_EVENT));
       if (failed) {
         // Back to the saved file, where the files can be added again.
         setEditing(accidentToForm(saved));

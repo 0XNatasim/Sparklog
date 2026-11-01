@@ -1,11 +1,13 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.219).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.220).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.220** : plus de **pastille sur « Registre d'accidents » dans le menu de gauche**. Un accident pas terminé garde sa
+  pastille orange **« Ouvert »** à l'intérieur de la page (et le filtre « Ouverts (n) ») tant que tu n'as pas cliqué « Fermer le dossier ».
 - ✅ **V2.4.219** : une **alerte rouge pour les gestionnaires** dans « À traiter » et dans « Justificatifs » : « N justificatif(s) pas
   encore téléchargé(s) ont 21 jours ou plus », avec le détail (temps supp / stationnement) et le nombre de jours avant que le plus
   pressé soit supprimé. Elle compte aussi ceux qui seront supprimés dans 3 jours ou moins, même si le délai de conservation est

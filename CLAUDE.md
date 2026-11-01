@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.219)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.220)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.220 (technique).** Pastille du menu « Registre d'accidents » retirée : `ManagerLayout.jsx` ne compte plus les dossiers ouverts ; code mort supprimé
+(`fetchOpenAccidentCount`, `ACCIDENT_EVENT` et son envoi par `AccidentRegister`). L'étiquette « Ouvert » et le filtre « Ouverts (n) » de la
+page restent (`openAccidentCount`). Remplace la pastille de V2.4.197.
 
 **V2.4.219 (technique).** Migration 0129 : RPC `evidence_download_alert(p_days default 21)` (security definer, `get_my_role() = 'manager'` sinon zéros ;
 exécution `authenticated` seulement) : photos gardées (`overtime_evidence`, `parking_receipts` + `extra_storage_paths`) absentes de
