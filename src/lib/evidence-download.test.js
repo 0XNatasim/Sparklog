@@ -45,12 +45,12 @@ describe("evidence download", () => {
 
   it("names the entries by day and person, safe and unique", () => {
     expect(zipEntryNames(files)).toEqual([
-      "2026-10-27_Sam Essai_OT PAUSE-SÉCURITÉ_stationnement-1.jpg",
-      "2026-10-27_Sam Essai_OT PAUSE-SÉCURITÉ_stationnement-2.jpg",
-      "2026-10-28_Alex Test_OT 190403_temps-supp.jpg",
+      "Stationnement/2026-10-27_Sam Essai_OT PAUSE-SÉCURITÉ_stationnement-1.jpg",
+      "Stationnement/2026-10-27_Sam Essai_OT PAUSE-SÉCURITÉ_stationnement-2.jpg",
+      "Temps supp/2026-10-28_Alex Test_OT 190403_temps-supp.jpg",
     ]);
     const twice = zipEntryNames([files[2], files[2]]);
-    expect(twice[1]).toBe("2026-10-28_Alex Test_OT 190403_temps-supp (2).jpg");
+    expect(twice[1]).toBe("Temps supp/2026-10-28_Alex Test_OT 190403_temps-supp (2).jpg");
   });
 });
 

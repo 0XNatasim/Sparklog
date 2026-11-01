@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.216 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.218 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,14 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.218 — « Télécharger les justificatifs »: one week at a time, in folders.** The two week menus become ONE week menu (the
+  latest week that holds pictures by default). The ZIP is named « justificatifs Sem43 » (the CCQ week number; « - partie 2 » for
+  the next ZIP of a week with more than 100 pictures) and holds two folders: « Stationnement » and « Temps supp ». Pictures already
+  downloaded are still remembered, so downloading the same week again brings only the new ones.
+- **V2.4.217 — Reference: Hilo training.** `docs/reference/formation-hilo-field-2024-08-20.md` keeps the text of the
+  « Formation installateurs » deck (Hilo, 2024-08-20: offer, peak challenges, installation rules, Field Service) next to the full PDF
+  `formation-hilo-field-2024-08-20.pdf` (109 pages, REV01, uploaded by the owner), and `docs/reference/explications-des-defis-hilo.pdf` is the 7-page guide « Explications des Défis Hilo »
+  (what a challenge is, how each device reacts, the three levels, what to tell the customer). No code change.
 - **V2.4.216 — Official names for the inventory devices** (migration 0128). The screenshot reading often stored garbled or cut
   names (« E- Contrôleur… », « Module d'expansion pour pla », a leading dot, « Thermostat intelligent Hilo 3 »). Each of the 17 known
   codes now always shows its official name (list given by the owner on 2026-10-31, `supabase/functions/_shared/equipment_names.js`):
