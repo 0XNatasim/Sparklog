@@ -53,9 +53,10 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
-- **V2.4.217 — Reference: Hilo installer training.** `docs/reference/formation-hilo-field-2024-08-20.md` keeps the text of the
-  « Formation installateurs » deck (Hilo, 2024-08-20: offer, peak challenges, installation rules, Field Service). The PDF stays in
-  the owner's Drive. No code change.
+- **V2.4.217 — Reference: Hilo training.** `docs/reference/formation-hilo-field-2024-08-20.md` keeps the text of the
+  « Formation installateurs » deck (Hilo, 2024-08-20: offer, peak challenges, installation rules, Field Service; the PDF stays in
+  the owner's Drive), and `docs/reference/explications-des-defis-hilo.pdf` is the 7-page guide « Explications des Défis Hilo »
+  (what a challenge is, how each device reacts, the three levels, what to tell the customer). No code change.
 - **V2.4.216 — Official names for the inventory devices** (migration 0128). The screenshot reading often stored garbled or cut
   names (« E- Contrôleur… », « Module d'expansion pour pla », a leading dot, « Thermostat intelligent Hilo 3 »). Each of the 17 known
   codes now always shows its official name (list given by the owner on 2026-10-31, `supabase/functions/_shared/equipment_names.js`):

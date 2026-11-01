@@ -137,7 +137,8 @@ Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; 
 
 **V2.4.217 (technique).** `docs/reference/formation-hilo-field-2024-08-20.md` : texte (sans images) du PDF « Formation Hilo.pdf » (Drive, « Talons paie »,
 formation installateurs Hilo du 2024-08-20). Le PDF (9,5 Mo) n'est pas copié : le connecteur Drive ne peut pas le transférer. Document tiers
-publié dans un dépôt public : à retirer si Hilo le demande. Aucun code changé.
+publié dans un dépôt public : à retirer si Hilo le demande. `docs/reference/explications-des-defis-hilo.pdf` : PDF de 7 pages (« guide pour
+installateur Hilo.pdf » du Drive, renommé « Explications des Défis Hilo »), copié tel quel. Aucun code changé.
 
 **V2.4.216 (technique).** `supabase/functions/_shared/equipment_names.js` (`EQUIPMENT_NAMES`, `canonicalEquipmentName(code, fallback)`, ré-exporté par
 `src/lib/equipment-names.js`) : nom officiel des 17 codes connus. Appliqué dans `parseInventoryText` (`process_inventory_screenshot/parse.ts` —
