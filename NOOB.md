@@ -7,7 +7,7 @@
 ## Où on en est
 
 - ✅ **V2.4.217** : deux documents Hilo sont rangés dans `docs/reference/` pour les retrouver facilement : le texte de la
-  **formation Hilo et Field** (installateurs, 20 août 2024 ; le PDF d'origine reste dans ton Drive) et le PDF
+  **formation Hilo et Field** (installateurs, 20 août 2024) avec son **PDF complet** (109 pages) à côté, et le PDF
   **« Explications des Défis Hilo »** (7 pages : ce qu'est un défi, ce que fait chaque appareil, les 3 niveaux, quoi dire au
   client). Rien ne change dans l'application.
 - ✅ **V2.4.216** : **noms officiels des appareils** de l'inventaire. Fini les noms déformés (« E- Contrôleur… », « Module d'expansion

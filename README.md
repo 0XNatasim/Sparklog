@@ -54,8 +54,8 @@ Roles are stored lowercase in `profiles.role`:
 ### Managers
 
 - **V2.4.217 — Reference: Hilo training.** `docs/reference/formation-hilo-field-2024-08-20.md` keeps the text of the
-  « Formation installateurs » deck (Hilo, 2024-08-20: offer, peak challenges, installation rules, Field Service; the PDF stays in
-  the owner's Drive), and `docs/reference/explications-des-defis-hilo.pdf` is the 7-page guide « Explications des Défis Hilo »
+  « Formation installateurs » deck (Hilo, 2024-08-20: offer, peak challenges, installation rules, Field Service) next to the full PDF
+  `formation-hilo-field-2024-08-20.pdf` (109 pages, REV01, uploaded by the owner), and `docs/reference/explications-des-defis-hilo.pdf` is the 7-page guide « Explications des Défis Hilo »
   (what a challenge is, how each device reacts, the three levels, what to tell the customer). No code change.
 - **V2.4.216 — Official names for the inventory devices** (migration 0128). The screenshot reading often stored garbled or cut
   names (« E- Contrôleur… », « Module d'expansion pour pla », a leading dot, « Thermostat intelligent Hilo 3 »). Each of the 17 known

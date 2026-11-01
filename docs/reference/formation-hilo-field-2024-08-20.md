@@ -2,8 +2,9 @@
 
 Texte de référence tiré du PDF « Formation Hilo.pdf » (présentation « Formation installateurs » de Hilo, filiale
 d'Hydro-Québec, du 20 août 2024 : l'offre Hilo, les défis de pointe, l'installation des appareils et l'application
-Field Service). Le PDF d'origine (9,5 Mo) reste dans le Drive du propriétaire (dossier « Talons paie ») : seul son texte
-est gardé ici, pour retrouver un nom d'appareil, une règle d'installation ou une étape de Field Service.
+Field Service). Le PDF complet (109 pages, images et schémas compris, version « REV01 ») est à côté :
+[`formation-hilo-field-2024-08-20.pdf`](./formation-hilo-field-2024-08-20.pdf). Le texte ci-dessous vient d'une version plus
+ancienne du PDF (Drive du propriétaire, dossier « Talons paie ») : en cas de différence, le PDF fait foi.
 
 Pour mémoire seulement : ce n'est pas une source de règles de paie (voir `docs/rules/`), et les images et schémas de
 la présentation n'y sont pas. Les codes d'appareils (EQ0000xx) lus dans l'inventaire sont décrits par
