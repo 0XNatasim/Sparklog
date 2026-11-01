@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/supabaseClient";
 import { withTimeout } from "@/lib/utils";
+import { companyDate } from "@/lib/company-time";
 import {
-  CCQ_CAISSE_EDUCATION_PER_HOUR, CCQ_ELECTRICIAN_IC_C3, CCQ_PRELEVEMENT_RATE, PAYROLL_RATE_KEYS,
-  medicRatesOn, medicTaxRateOn, setPayrollRateOverrides,
+  CCQ_CAISSE_EDUCATION_PER_HOUR, CCQ_ELECTRICIAN_IC_C3, CCQ_PRELEVEMENT_RATE, MEDIC_RATES, MEDIC_TAX_RATES, PAYROLL_RATE_KEYS,
+  getPayrollRateOverrides, medicRatesOn, medicTaxRateOn, setPayrollRateOverrides,
 } from "@/payroll/ccq-benefits";
 
 // « Taux et barèmes » (0130): the dated payroll rates the owner edits. The coded constants are the fallback, so a
@@ -50,6 +51,7 @@ export async function fetchPayrollRateRows() {
 export async function loadPayrollRates() {
   const rows = await fetchPayrollRateRows();
   setPayrollRateOverrides(rows.filter((r) => PAYROLL_RATE_KEYS.includes(r.key)));
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PAYROLL_RATES_EVENT));
   return rows;
 }
 
@@ -81,4 +83,43 @@ export function usePayrollRatesReady() {
     return () => { cancelled = true; };
   }, []);
   return ready;
+}
+
+// ── Reminder before a known change ────────────────────────────────────────────────────────────
+// A rate whose new value starts within the next 4 weeks raises a badge on Configuration and a note on the
+// « Taux » page: « 4 semaines » (15–28 days), « 2 semaines » (≤ 14 days) and « semaine précédente » (≤ 7 days).
+// Known changes = the dated values built into the code + the rows the owner entered that have not started.
+export const RATE_ALERT_DAYS = 28;
+
+const dayNumber = (iso) => Math.floor(Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`) / 86400000);
+
+export function rateAlertStage(daysLeft) {
+  return daysLeft <= 7 ? 1 : daysLeft <= 14 ? 2 : 4;
+}
+
+// today: YYYY-MM-DD (Montréal). overrides: rows { key, effectiveFrom }. Sorted by date.
+export function upcomingRateChanges(today, overrides = [], windowDays = RATE_ALERT_DAYS) {
+  const dates = new Map(); // `${key}|${date}` → { key, date }
+  const add = (key, date) => { if (date) dates.set(`${key}|${date}`, { key, date: String(date).slice(0, 10) }); };
+  for (const r of MEDIC_RATES) { add("medic_employee_per_hour", r.effectiveFrom); add("medic_employer_per_hour", r.effectiveFrom); }
+  for (const r of MEDIC_TAX_RATES) add("medic_tax_rate", r.effectiveFrom);
+  for (const r of overrides) add(r.key, r.effectiveFrom);
+  const now = dayNumber(today);
+  return [...dates.values()]
+    .map(({ key, date }) => ({ key, date, daysLeft: dayNumber(date) - now }))
+    .filter((c) => c.daysLeft > 0 && c.daysLeft <= windowDays)
+    .map((c) => ({ ...c, stage: rateAlertStage(c.daysLeft) }))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key));
+}
+
+// Number of known changes starting within the window (for the menu badge); refreshed after an owner edit.
+export function usePayrollRateAlerts() {
+  const [changes, setChanges] = useState(() => upcomingRateChanges(companyDate(), getPayrollRateOverrides()));
+  useEffect(() => {
+    const refresh = () => setChanges(upcomingRateChanges(companyDate(), getPayrollRateOverrides()));
+    refresh();
+    window.addEventListener(PAYROLL_RATES_EVENT, refresh);
+    return () => window.removeEventListener(PAYROLL_RATES_EVENT, refresh);
+  }, []);
+  return changes;
 }

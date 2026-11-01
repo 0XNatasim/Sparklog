@@ -8,7 +8,7 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import {
-  PAYROLL_RATES_EVENT, PAYROLL_RATE_DEFS, deletePayrollRate, loadPayrollRates, parseRateInput, rateInputText, savePayrollRate,
+  PAYROLL_RATES_EVENT, PAYROLL_RATE_DEFS, deletePayrollRate, loadPayrollRates, parseRateInput, rateInputText, savePayrollRate, usePayrollRateAlerts,
 } from "@/lib/payroll-rates";
 import { isOwnerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
@@ -32,6 +32,7 @@ export default function PayrollRatesManager() {
   const [form, setForm] = useState({}); // per key: { date, value, note }
   const [confirm, confirmDialog] = useConfirmDialog();
   const today = companyDate();
+  const alerts = usePayrollRateAlerts();
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +95,22 @@ export default function PayrollRatesManager() {
           {!isOwner && <p className="mt-1 text-xs font-medium text-muted-foreground">{t("payrollRates.readOnly")}</p>}
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        {alerts.length > 0 && (
+          <div className="space-y-1 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning" role="status">
+            <p className="font-medium">{t("payrollRates.alertTitle")}</p>
+            <ul className="ml-4 list-disc">
+              {alerts.map((a) => {
+                const def = PAYROLL_RATE_DEFS.find((d) => d.key === a.key);
+                return (
+                  <li key={`${a.key}|${a.date}`}>
+                    {t(`payrollRates.rate.${a.key}`)} : {fmt(payrollRateOn(a.key, a.date, def.coded(a.date)), def)} {t("payrollRates.alertFrom", { date: a.date })}
+                    {" "}— {t(`payrollRates.alertStage${a.stage}`, { days: a.daysLeft })}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         {loading && <p className="text-sm text-muted-foreground">{t("common.working")}</p>}
 
         <ul className="space-y-3">
