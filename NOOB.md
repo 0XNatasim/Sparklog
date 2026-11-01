@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.225).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.226).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -36,7 +36,7 @@
 - ✅ **V2.4.219** : une **alerte rouge pour les gestionnaires** dans « À traiter » et dans « Justificatifs » : « N justificatif(s) pas
   encore téléchargé(s) ont 21 jours ou plus », avec le détail (temps supp / stationnement) et le nombre de jours avant que le plus
   pressé soit supprimé. Elle compte aussi ceux qui seront supprimés dans 3 jours ou moins, même si le délai de conservation est
-  plus court. Elle disparaît dès que tout est téléchargé. **À faire : appliquer la migration 0129.**
+  plus court. Elle disparaît dès que tout est téléchargé.
 - ✅ **V2.4.218** : **Télécharger les justificatifs** se choisit maintenant **une semaine à la fois** (la plus récente est déjà
   choisie). Le fichier s'appelle **« justificatifs Sem43 »** (numéro de la semaine) et contient **deux dossiers** :
   « Stationnement » et « Temps supp ». Ce qui est déjà téléchargé n'est pas redonné si tu refais la même semaine. Si une semaine
@@ -48,12 +48,11 @@
 - ✅ **V2.4.216** : **noms officiels des appareils** de l'inventaire. Fini les noms déformés (« E- Contrôleur… », « Module d'expansion
   pour pla », points devant le nom) : chacun des 17 appareils connus s'affiche toujours avec son nom de ta liste, partout
   (listes, comparaison, minimums, alertes, écran de l'employé), y compris pour les anciens jours (migration 0128). Un appareil
-  inconnu garde le nom lu. **À faire : appliquer la migration 0128 ; redéployer la fonction `process_inventory_screenshot`** (je
-  peux le faire sur ton feu vert). Si un nom de ta liste change un jour, il se change dans `equipment_names.js`.
+  inconnu garde le nom lu. Si un nom de ta liste change un jour, il se change dans `equipment_names.js`.
 - ✅ **V2.4.215** : étape **Inventaire** de l'employé. (1) Quand **aucune ligne n'a pu être lue** (« Photos seulement »), l'employé
   reçoit maintenant le message de reprendre ses captures ou d'en ajouter une (puis « Continuer quand même »). Avant, seul « il
   manque des lignes » était demandé. (2) L'application **note ce que l'employé a vu** en quittant l'étape (lecture, lignes
-  manquantes, s'il a passé outre) pour pouvoir répondre « a-t-il eu le message ? ». **À faire : appliquer la migration 0127.**
+  manquantes, s'il a passé outre) pour pouvoir répondre « a-t-il eu le message ? ».
 - ✅ **V2.4.214** : dans le **Sommaire imprimable**, le détail d'un **sous-traitant** sépare maintenant le **retour du
   régulier** (avant, le retour était ajouté au régulier et la colonne Retour restait vide). Le total ne change pas.
   Les employés CCQ sont inchangés.
@@ -73,9 +72,8 @@
   l'approbation restent. Dans **Justificatifs**, un bouton **« Télécharger les justificatifs »** : on choisit la période et
   ce qu'on veut (temps supplémentaire, stationnement), et on reçoit un fichier ZIP (nom : jour, employé, OT). L'application
   retient ce qui est déjà téléchargé : en retélécharger plus tard ne redonne que les nouveaux (case « Inclure ceux déjà
-  téléchargés » pour tout reprendre). Les photos restent dans l'application jusqu'à la fin des 30 jours. **À faire :
-  appliquer la migration 0126 ; télécharger ce que tu veux garder AVANT que la fonction de nettoyage soit redéployée (les
-  reçus de plus de 30 jours disparaîtront à ce moment).**
+  téléchargés » pour tout reprendre). Les photos restent dans l'application jusqu'à la fin des 30 jours. Le nettoyage automatique
+  supprime les reçus de plus de 30 jours : télécharge ce que tu veux garder avant.
 - ✅ **V2.4.208** : les OT prédéfinis sont dans **la même case que l'OT** : une petite flèche à droite de la case ouvre la
   liste ; on choisit, ça s'écrit dedans, ou on tape un numéro comme avant. Aussi, le script du **Google Sheet** applique
   maintenant la règle des 65 km (premier trajet payé). Le bouton **« Inventaire du crew »** est retiré de la page Inventaire. **À faire : coller le nouveau `doPost` dans Google Apps Script
@@ -83,14 +81,12 @@
 - ✅ **V2.4.207** : **premier trajet non payé, mais payé dès 65 km**. Pour un employé qui a l'option « premier trajet non payé »,
   le premier trajet de la journée est maintenant **payé si la première fiche de la journée fait 65 km ou plus** (65 compte). En
   dessous de 65 km, il reste non payé. Depuis le 11 octobre. Le moteur de paie, le souper et l'exigence de la capture
-  d'écran de temps supplémentaire suivent la même règle. **À faire : appliquer la migration 0125 dans Supabase et
-  redéployer les fonctions Edge (`push_approved_batch`, `classify_week`), qui contiennent le moteur.** La règle n'a pas encore été signée par
+  d'écran de temps supplémentaire suivent la même règle. La règle n'a pas encore été signée par
   un spécialiste de la paie.
 - ✅ **V2.4.206** : des **OT prédéfinis**. Sous le champ OT de la fiche de temps, un menu « Ou choisir un OT prédéfini… » :
   PAUSE SÉCURITÉ, FORMATION HILO EMBAUCHE, FORMATION BRITTON, FORMATION HQ, OK KARINE. On choisit, le nom s'écrit tout seul
   dans le champ OT ; pour un vrai numéro d'OT, on le tape comme avant. La liste se gère dans **Configuration › OT
-  prédéfinis** (ajouter, renommer, monter / descendre, masquer, retirer). **À faire : appliquer la migration 0124 dans
-  Supabase** (en attendant, le menu offre déjà les 5 noms).
+  prédéfinis** (ajouter, renommer, monter / descendre, masquer, retirer).
 - ✅ **V2.4.205** : dans « Cette semaine » / « Semaine passée », un **filtre de semaine** en haut (menu déroulant et flèches ◀ ▶) :
   on choisit parmi les 13 dernières semaines (« Semaine 44 · 18 oct → 24 oct »). Les deux boutons ouvrent la même fenêtre,
   sur la semaine courante ou la semaine passée ; le filtre permet d'aller plus loin. Le titre devient « Snapshot de la semaine ».
@@ -112,36 +108,29 @@
 - ✅ **V2.4.200** : dans le **Registre d'accidents**, chaque dossier accepte des **fichiers** : photos, PDF, Word, Excel,
   texte (10 Mo chacun, 20 au plus). Bouton « Ajouter des fichiers » dans le dossier ; pour un nouveau dossier, les fichiers
   choisis partent quand on enregistre. On clique un fichier pour l'ouvrir, la corbeille le retire (avec confirmation).
-  Seuls les gestionnaires les voient ; le Journal note chaque ajout et chaque retrait. **À faire : appliquer la migration
-  0123 dans Supabase** (elle crée l'espace de stockage privé).
+  Seuls les gestionnaires les voient ; le Journal note chaque ajout et chaque retrait.
 - ✅ **V2.4.199** : dans Inventaire, le bouton **« Minimums par entrepôt »** ouvre sa propre page : la liste des
   entrepôts, avec **Oui / Non** (« Compter cet entrepôt ? »). Non = on n'ira pas plus loin avec cet entrepôt. Oui = la
   liste des appareils avec le **minimum** (ratio par employé × employés du groupe) et, à côté, le **total des
   inventaires** des employés de l'entrepôt ; en rouge, ce qui est sous le minimum. Seuls les entrepôts à « Oui » donnent
-  l'alerte. Les 74 minimums du tableau de Karine sont déjà saisis. **À faire : mettre « Oui » pour Alma (Saguenay),
-  Charlevoix et Rimouski.**
+  l'alerte. Les 74 minimums du tableau de Karine sont déjà saisis. Alma, Charlevoix et Rimouski sont à « Oui ».
 - ✅ **V2.4.198** : **stock minimum par entrepôt**. Dans Inventaire, bouton « Minimums » : choisissez l'entrepôt (un groupe),
   un appareil et un **ratio par employé** (ex. 0,5 thermostat par employé). Le minimum = ratio × nombre d'employés du
   groupe. Si le stock des derniers inventaires passe sous le minimum, l'appareil s'affiche en rouge en haut de la page
-  Inventaire et la pastille d'Inventaire s'allume. **À faire : appliquer la migration 0121 dans Supabase**, puis
-  vérifier que chaque entrepôt est bien un groupe avec ses employés (Équipe › Groupes).
+  Inventaire et la pastille d'Inventaire s'allume. Vérifier que chaque entrepôt est bien un groupe avec ses employés (Équipe › Groupes).
 - ✅ **V2.4.197** : nouveau **Registre d'accidents** (menu Équipe, gestionnaires seulement). « Nouveau dossier » : date,
   la personne, la gravité, ce qui s'est passé, les soins, les jours perdus, le numéro CNESST, les mesures correctives.
   Un dossier se ferme (ou se rouvre), il ne s'efface jamais. Le menu affiche le nombre de dossiers ouverts. Les employés
-  ne le voient pas. **À faire : appliquer la migration 0120 dans Supabase.**
+  ne le voient pas.
 - ✅ **V2.4.196** : les carrés « Cette semaine » / « Semaine passée » montrent les km du jour sous les heures. La feuille
   manuelle du gestionnaire demande les km (**0 est accepté, vide non**). Le Sommaire (et son impression) sépare le temps
   régulier et le temps supplémentaire des sous-traitants en colonnes différentes.
 
 - 🔴 **À faire en premier : la paie des semaines 43 et 44.** La semaine 43 (11 au 17 octobre) est la **première payée
-  par Sparklog**. Au 2026-10-27 : semaine 43, 328 fiches soumises mais pas approuvées (21 approuvées) ; semaine 44
-  (18 au 24 octobre), 440 soumises, aucune approuvée ; rien n'est encore comptabilisé. Dans l'ordre, une semaine à la
+  par Sparklog**. Au 2026-11-01, pour les semaines 43 et 44 ensemble (11 au 24 octobre) : 745 fiches soumises mais pas approuvées
+  et 44 approuvées ; rien n'est encore comptabilisé. Dans l'ordre, une semaine à la
   fois : **À traiter** (approuver) › **Paie › Paie de la semaine** (« Calculer et comptabiliser ») › imprimer les talons.
   La semaine 44 attend que la 43 soit comptabilisée (le cumul de l'année suit d'une semaine à l'autre).
-- 🕐 **Dimanche 1er novembre, changement d'heure** : de 1 h à 1 h 59 arrive deux fois. Un employé qui commence ou finit
-  dans cette heure-là reçoit un message : il envoie ses heures au gestionnaire. Karine (ou toi) entre la fiche dans
-  **Gestion › Admin › Feuille de temps d'urgence** et répond « 1re fois (avant de reculer) » ou « 2e fois (après) ».
-  Très rare (aucune fiche de nuit jusqu'ici). La paie compte l'heure affichée, pas le temps réel (étape 5).
 - ✅ L'app fonctionne et les heures sont bien classées. Toutes tes décisions de paie sont dans l'app.
 - ⚠️ **Les montants en dollars de la paie** (avantages CCQ, impôts, cotisations) sont **des estimations**.
   Ils restent « à réviser » tant que les étapes 1 à 4 ci-dessous ne sont pas faites.
@@ -347,9 +336,13 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 - [ ] **Assurance MÉDIC** : part salariale **0,68 $/h** et part patronale **2,93 $/h**, maintenues jusqu'au
   **24 avril 2027** (décision du CASIC). À partir du **25 avril 2027**, la convention prévoit **1,06 $** (salariale)
   et **3,31 $** (patronale). Confirmer auprès de la CCQ avant cette date que le gel n'est pas prolongé.
-  La taxe provinciale de 9 % s'ajoute aux deux parts. L'app passe **toute seule** à 1,06 $ dès la semaine du
+  La taxe provinciale s'ajoute aux deux parts (9 % jusqu'au 31 décembre 2026, 9,975 % ensuite : déjà dans l'app). L'app passe **toute seule** à 1,06 $ dès la semaine du
   25 avril 2027 ; si le gel est prolongé, le dire à Claude. À cette date, toute la grille de salaires CCQ change
-  aussi : fournir la nouvelle grille ACQ.
+  aussi : fournir la nouvelle grille ACQ. Une **pastille** sur Configuration t'avertit 4 semaines, 2 semaines et 1 semaine avant
+  (donc dès le 28 mars 2027) ; le nouveau montant se change dans **Configuration › Taux** sans passer par Claude.
+- [ ] **Barèmes 2027 (RRQ, assurance-emploi, RQAP, impôts, FSS, CNT, FDRCMO)** : à saisir dans **Configuration › Barèmes annuels**
+  avant le 1er janvier 2027, avec les documents officiels et ta comptable. Une pastille apparaît dès le 4 décembre ; sans
+  barème, les talons de 2027 utilisent celui de 2026 et l'écrivent dans leurs avertissements.
 
 ## Limites de l'app (capacité) 📏
 

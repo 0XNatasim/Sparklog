@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.225 (2026-11-01).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.226 (2026-11-01).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,9 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.226 — NOOB.md cleaned.** The « À faire » notes already done (migrations 0120–0129 applied, edge functions redeployed,
+  warehouses switched on, the 1 November time-change notice) are removed; the payroll-weeks 43–44 count, the MÉDIC reminder and the
+  2027 yearly scales are added to the owner's list.
 - **V2.4.225 — Employee cards guide you to what is missing.** On an open card (Gestion › Équipe › Employés), each required field that is
   still empty gets a **red outline** and « à remplir » beside its label; the tab that holds it shows a **red count**; the red banner at the
   top lists the fields as buttons that open the right tab. The collapsed card shows the count in red. Required fields (CCQ employees):
