@@ -16,6 +16,7 @@ import { isOffOn } from "@/lib/timeoff";
 import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
+import EvidenceAlertBanner from "@/components/manager/EvidenceAlertBanner";
 import { approvalOutcome, buildInbox, lookbackWorkdays } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
 import { DYNACOM_CUMULATIVE_END } from "@/lib/payroll-opening";
@@ -417,6 +418,7 @@ export default function TodoInbox() {
   return (
     <div className="space-y-4">
       {confirmDialog}
+      <EvidenceAlertBanner link />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

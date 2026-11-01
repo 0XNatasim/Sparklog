@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.218 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.219 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,11 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.219 — Alert for proofs not downloaded** (migration 0129). A red notice for the managers on À traiter and on
+  Justificatifs: « N justificatif(s) pas encore téléchargé(s) ont 21 jours ou plus », with the split (overtime / parking) and the days left
+  before the nearest one is deleted. It counts the pictures still kept and not downloaded (`evidence_downloads`) that are 21 days old or
+  more, or that will be deleted within 3 days whatever the retention is. It disappears once they are downloaded. One RPC
+  `evidence_download_alert` (managers only, counts only).
 - **V2.4.218 — « Télécharger les justificatifs »: one week at a time, in folders.** The two week menus become ONE week menu (the
   latest week that holds pictures by default). The ZIP is named « justificatifs Sem43 » (the CCQ week number; « - partie 2 » for
   the next ZIP of a week with more than 100 pictures) and holds two folders: « Stationnement » and « Temps supp ». Pictures already

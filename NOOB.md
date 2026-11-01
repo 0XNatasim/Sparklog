@@ -1,11 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.218).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.219).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.219** : une **alerte rouge pour les gestionnaires** dans « À traiter » et dans « Justificatifs » : « N justificatif(s) pas
+  encore téléchargé(s) ont 21 jours ou plus », avec le détail (temps supp / stationnement) et le nombre de jours avant que le plus
+  pressé soit supprimé. Elle compte aussi ceux qui seront supprimés dans 3 jours ou moins, même si le délai de conservation est
+  plus court. Elle disparaît dès que tout est téléchargé. **À faire : appliquer la migration 0129.**
 - ✅ **V2.4.218** : **Télécharger les justificatifs** se choisit maintenant **une semaine à la fois** (la plus récente est déjà
   choisie). Le fichier s'appelle **« justificatifs Sem43 »** (numéro de la semaine) et contient **deux dossiers** :
   « Stationnement » et « Temps supp ». Ce qui est déjà téléchargé n'est pas redonné si tu refais la même semaine. Si une semaine

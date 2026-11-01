@@ -70,3 +70,14 @@ describe("migration 0126", () => {
     expect(sql.match(/get_my_role\(\) = 'manager'/g)).toHaveLength(2);
   });
 });
+
+describe("migration 0129", () => {
+  const sql = readFileSync(new URL("../../supabase/migrations/20261101140000_0129_evidence_download_alert.sql", import.meta.url), "utf8");
+  it("answers managers only, with counts, and is not callable by anonymous users", () => {
+    expect(sql).toContain("public.get_my_role() is distinct from 'manager'");
+    expect(sql).toContain("revoke all on function public.evidence_download_alert(integer) from public, anon");
+    expect(sql).toContain("grant execute on function public.evidence_download_alert(integer) to authenticated");
+    expect(sql).toContain("evidence_downloads");
+    expect(sql).toContain("interval '3 days'");
+  });
+});
