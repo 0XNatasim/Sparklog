@@ -57,7 +57,7 @@ export default function EmployeeCardHeader({ profile: p, status, expanded, onTog
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[status] || "bg-muted-foreground/15 text-muted-foreground"}`}>{label}</span>
           {missingCount > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning">
+            <span className="flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive">
               <TriangleAlert className="h-3.5 w-3.5" />{t("employees.missingCount", { count: missingCount })}
             </span>
           )}

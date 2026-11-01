@@ -16,7 +16,7 @@ import { Search, Star } from "lucide-react";
 import { useT } from "@/lib/use-t";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { withTimeout } from "@/lib/utils";
-import { getMissingEmployeeFields } from "@/lib/employee-fields";
+import { getMissingEmployeeItems } from "@/lib/employee-fields";
 import { companyDate } from "@/lib/company-time";
 import { mfaBadge } from "@/lib/mfa";
 import { ccqRateFor, defaultAnnex, employeeCounts, filterEmployees, lacksPush, matchesEmployeeSearch, rateSuggestionsFor, ratesFromSnapshots, sortEmployees } from "@/lib/employees-panel";
@@ -441,13 +441,14 @@ export default function EmployeesPanel({ tabbed = false }) {
 
       {!loading && visibleProfiles.map((p) => {
         // Non-CCQ roles (administration + owner) skip the CCQ "missing fields" check.
-        const missingFields = isNonCcqRole(p.role) ? [] : getMissingEmployeeFields(p, t);
+        const missingItems = isNonCcqRole(p.role) ? [] : getMissingEmployeeItems(p, t);
+        const missingFields = missingItems.map((item) => item.label);
         const expanded = expandedIds.has(p.id);
         const mfa = mfaBadge(p.role, mfaSet.has(p.id));
         const pushOn = Boolean(pushSet?.has(p.id));
         const pushOff = lacksPush(p, pushSet, pendingById, today);
         return (
-          <Card key={p.id} className={p.is_paused && !isNewHire(p, today) ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-warning/40" : ""}>
+          <Card key={p.id} className={p.is_paused && !isNewHire(p, today) ? "border-muted-foreground/30 bg-muted/70 text-muted-foreground shadow-none" : missingFields.length ? "border-destructive/50" : ""}>
             <EmployeeCardHeader
               profile={p}
               status={employeeStatus(p, pendingById, today)}
@@ -460,7 +461,7 @@ export default function EmployeesPanel({ tabbed = false }) {
               t={t}
             />
             {expanded && (tabbed
-              ? <EmployeeTabs profile={p} missingFields={missingFields} panel={panel} status={{ mfa, pushOn, pushOff }} />
+              ? <EmployeeTabs profile={p} missingFields={missingItems} panel={panel} status={{ mfa, pushOn, pushOff }} />
               : <EmployeeDetails profile={p} missingFields={missingFields} panel={panel} />)}
           </Card>
         );

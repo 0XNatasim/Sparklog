@@ -1,11 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.224).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.225).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.225** : dans **Équipe › Employés**, la fiche d'un employé **te guide** : chaque champ obligatoire encore vide a un **contour
+  rouge** et la mention « à remplir », l'onglet qui le contient affiche un **nombre rouge**, et le bandeau rouge en haut liste les champs :
+  **un clic dessus ouvre le bon onglet**. Une fiche complète n'a plus rien de rouge. Rien d'autre à faire que de remplir les champs.
 - ✅ **V2.4.224** : nouvel onglet **Gestion › Configuration › Barèmes annuels**. C'est ici que **tu** entres, chaque janvier, les
   chiffres officiels de l'année : RRQ, assurance-emploi, RQAP, paliers d'impôt (fédéral et Québec), FSS, Normes du travail et
   FDRCMO. L'écran part de l'année précédente, **te montre tous les changements avant d'enregistrer** et refuse un barème qui ne
@@ -26,8 +29,8 @@
   nouveau taux, l'ajouter ici avec sa date et la source en note.
 - ✅ **V2.4.221** : la **taxe sur la prime d'assurance MÉDIC** (retenue sur la paie) passe de **9 % à 9,975 %** au **1er janvier 2027**,
   comme la CCQ l'a annoncé le 28 octobre. L'application change de taux toute seule : 9 % jusqu'à la paie du 26 décembre 2026,
-  9,975 % à partir de la semaine du 3 janvier 2027. Rien à faire de ton côté. **À confirmer avec la CCQ** : comment est facturée
-  la semaine qui chevauche le jour de l'An (27 déc. → 2 janv.).
+  9,975 % à partir de la semaine du 3 janvier 2027. Rien à faire de ton côté. Rien à confirmer pour la
+  semaine du jour de l'An : c'est le congé de la construction, sans heures travaillées.
 - ✅ **V2.4.220** : plus de **pastille sur « Registre d'accidents » dans le menu de gauche**. Un accident pas terminé garde sa
   pastille orange **« Ouvert »** à l'intérieur de la page (et le filtre « Ouverts (n) ») tant que tu n'as pas cliqué « Fermer le dossier ».
 - ✅ **V2.4.219** : une **alerte rouge pour les gestionnaires** dans « À traiter » et dans « Justificatifs » : « N justificatif(s) pas

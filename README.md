@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.224 (2026-11-01).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.225 (2026-11-01).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,10 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.225 — Employee cards guide you to what is missing.** On an open card (Gestion › Équipe › Employés), each required field that is
+  still empty gets a **red outline** and « à remplir » beside its label; the tab that holds it shows a **red count**; the red banner at the
+  top lists the fields as buttons that open the right tab. The collapsed card shows the count in red. Required fields (CCQ employees):
+  employee number, phone, e-mail, birth date, CCQ card expiry, level, region, union, wage schedule, hourly rate, km rate.
 - **V2.4.224 — « Barèmes annuels » (Configuration › Barèmes annuels).** What changes every January is now entered in the app by
   the owner: QPP/RRQ, employment insurance, QPIP, federal and Québec income-tax brackets (with their K constants), HSF (FSS),
   labour standards and the workforce-skills fund. One complete scale per tax year; the screen starts from the previous year,
@@ -74,7 +78,7 @@ Roles are stored lowercase in `profiles.role`:
 - **V2.4.221 — Insurance tax on MÉDIC dated (9 % → 9,975 % on 2027-01-01).** The Québec tax on insurance premiums that is added to
   the MÉDIC withholding follows the QST: 9 % until 2026-12-31, 9,975 % from the pay week of 2027-01-01 (CCQ notice to employers of
   2026-10-28: contributions unchanged, only the tax). Dated like the MÉDIC rates (`MEDIC_TAX_RATES`); the Règles de paie sheet shows it.
-  Confirm with the CCQ how the week straddling the new year is billed.
+  The construction holiday covers that week (no hours worked), so nothing is billed across the new year.
 - **V2.4.220 — No more badge on the « Registre d'accidents » menu.** The number of open accident files is gone from the side
   menu; an unfinished file keeps its orange « Ouvert » tag inside the register (and the « Ouverts (n) » filter) until « Fermer le dossier ».
 - **V2.4.219 — Alert for proofs not downloaded** (migration 0129). A red notice for the managers on À traiter and on

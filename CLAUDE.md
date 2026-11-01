@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.224)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.225)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,13 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.225 (technique).** Fiche employé guidée : `REQUIRED_EMPLOYEE_FIELDS` (`src/lib/employee-fields.js`, [colonne, clé de texte, onglet]), `getMissingEmployeeItems`
+(`{ field, label, tab }`), `getMissingEmployeeFields` (étiquettes, V2) et `missingCountByTab`. `components/employees/missing-fields.js` : contexte
+`MissingFieldsContext` (Set des colonnes vides) + `useIsMissing` ; `EmployeeField` reçoit `name` et se met en rouge (`MISSING_CONTROL`, « à remplir »),
+`PayOptionsFields` fait de même pour `km_rate`. `EmployeeTabs` fournit le contexte, affiche un compteur rouge par onglet (`aria-hidden`, pas dans le nom de
+l'onglet) et `MissingFieldsAlert` (rouge) ouvre l'onglet au clic (`onGo`). Les rôles non CCQ restent exemptés. Retiré : le point ouvert sur la
+facturation MÉDIC de la semaine du Nouvel An (congé de la construction).
 
 **V2.4.224 (technique).** « Barèmes annuels » : migration 0131, table `statutory_rate_sets` (`tax_year` → `data` jsonb, 8 sections : `rrq`, `ei`, `rqap`,
 `federalTax`, `quebecTax`, `fss`, `labourStandards`, `workforceFund`), lecture gestionnaire, écriture seulement par `set_statutory_rate_set` /
@@ -171,7 +178,7 @@ explicites. Pas de fonction Edge touchée (les montants ne sont pas dans le mote
 d'assurance de la retenue MÉDIC, 9 % jusqu'au 2026-12-31 puis 9,975 % dès 2027-01-01 (avis CCQ du 2026-10-28). `computeCcqBenefits` : `medicProvincialTaxRate`
 vaut `null` par défaut (= taux daté de la semaine de paie) et la taxe est arrondie avec 5 décimales (9,975 % ne devient pas 9,98 %) ;
 un taux explicite reste respecté (banc d'essai, vieux talons). Fiche des règles de paie et `docs/rules/compensation-rules.md` à jour.
-Point ouvert : confirmer auprès de la CCQ la facturation de la semaine du 27 déc. 2026 au 2 janv. 2027 (ici : le taux suit le début de la semaine de paie).
+Pas de point ouvert pour la semaine du 27 déc. 2026 au 2 janv. 2027 : congé de la construction, aucune heure travaillée (décision de la propriétaire du 2026-11-01).
 
 **V2.4.220 (technique).** Pastille du menu « Registre d'accidents » retirée : `ManagerLayout.jsx` ne compte plus les dossiers ouverts ; code mort supprimé
 (`fetchOpenAccidentCount`, `ACCIDENT_EVENT` et son envoi par `AccidentRegister`). L'étiquette « Ouvert » et le filtre « Ouverts (n) » de la

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { BellOff, BellRing, ShieldAlert, ShieldCheck } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ import { EmployeeDeleteBlock } from "./EmployeeDetails";
 import PayOptionsFields from "./PayOptionsFields";
 import EmployeeTaxTab from "./EmployeeTaxTab";
 import Field from "./EmployeeField";
+import { MissingFieldsContext } from "./missing-fields";
+import { missingCountByTab } from "@/lib/employee-fields";
 
 const BOX = "space-y-3 rounded-lg border p-3";
 
@@ -28,15 +30,25 @@ export default function EmployeeTabs({ profile: p, missingFields, panel, status 
   const tabs = employeeCardTabs(p, role);
   const [tab, setTab] = useState(tabs[0]);
   const active = tabs.includes(tab) ? tab : tabs[0];
+  // `missingFields` = items { field, label, tab }: outline each field in red, badge its tab, and let the alert
+  // jump to it.
+  const missingSet = useMemo(() => new Set(missingFields.map((item) => item.field)), [missingFields]);
+  const counts = missingCountByTab(missingFields.filter((item) => tabs.includes(item.tab)));
   return (
     <CardContent className="space-y-3 border-t p-4">
       <EmployeeTypeGate profile={p} panel={panel} />
-      <MissingFieldsAlert missingFields={missingFields} t={t} />
+      <MissingFieldsAlert missingFields={missingFields.filter((item) => tabs.includes(item.tab))} t={t} onGo={setTab} />
       <Tabs value={active} onValueChange={setTab}>
         <TabsList className="h-auto max-w-full flex-wrap justify-start">
-          {tabs.map((key) => <TabsTrigger key={key} value={key}>{t(`employees.tab.${key}`)}</TabsTrigger>)}
+          {tabs.map((key) => (
+            <TabsTrigger key={key} value={key} className={counts[key] ? "text-destructive" : undefined}>
+              {t(`employees.tab.${key}`)}
+              {counts[key] > 0 && <span className="ms-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-semibold text-destructive-foreground" aria-hidden="true" title={t("employees.missingCount", { count: counts[key] })}>{counts[key]}</span>}
+            </TabsTrigger>
+          ))}
         </TabsList>
       </Tabs>
+      <MissingFieldsContext.Provider value={missingSet}>
       <div className="space-y-3">
         {active === "identity" && <IdentityTab profile={p} panel={panel} />}
         {active === "ccq" && <CcqDataFields profile={p} panel={panel} className={`${BOX} space-y-4`} />}
@@ -44,6 +56,7 @@ export default function EmployeeTabs({ profile: p, missingFields, panel, status 
         {active === "tax" && <div className={BOX}><EmployeeTaxTab profile={p} t={t} /></div>}
         {active === "access" && <AccessTab profile={p} panel={panel} status={status} />}
       </div>
+      </MissingFieldsContext.Provider>
     </CardContent>
   );
 }
