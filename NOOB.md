@@ -1,11 +1,13 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.216).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.217).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.217** : le texte de la **formation Hilo et Field** (présentation aux installateurs du 20 août 2024) est rangé dans
+  `docs/reference/` pour le retrouver facilement. Le PDF d'origine reste dans ton Drive. Rien ne change dans l'application.
 - ✅ **V2.4.216** : **noms officiels des appareils** de l'inventaire. Fini les noms déformés (« E- Contrôleur… », « Module d'expansion
   pour pla », points devant le nom) : chacun des 17 appareils connus s'affiche toujours avec son nom de ta liste, partout
   (listes, comparaison, minimums, alertes, écran de l'employé), y compris pour les anciens jours (migration 0128). Un appareil

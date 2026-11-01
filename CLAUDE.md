@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-10-31, V2.4.216)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.217)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.217 (technique).** `docs/reference/formation-hilo-field-2024-08-20.md` : texte (sans images) du PDF « Formation Hilo.pdf » (Drive, « Talons paie »,
+formation installateurs Hilo du 2024-08-20). Le PDF (9,5 Mo) n'est pas copié : le connecteur Drive ne peut pas le transférer. Document tiers
+publié dans un dépôt public : à retirer si Hilo le demande. Aucun code changé.
 
 **V2.4.216 (technique).** `supabase/functions/_shared/equipment_names.js` (`EQUIPMENT_NAMES`, `canonicalEquipmentName(code, fallback)`, ré-exporté par
 `src/lib/equipment-names.js`) : nom officiel des 17 codes connus. Appliqué dans `parseInventoryText` (`process_inventory_screenshot/parse.ts` —

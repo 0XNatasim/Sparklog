@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.216 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.217 (2026-10-30).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,9 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.217 — Reference: Hilo installer training.** `docs/reference/formation-hilo-field-2024-08-20.md` keeps the text of the
+  « Formation installateurs » deck (Hilo, 2024-08-20: offer, peak challenges, installation rules, Field Service). The PDF stays in
+  the owner's Drive. No code change.
 - **V2.4.216 — Official names for the inventory devices** (migration 0128). The screenshot reading often stored garbled or cut
   names (« E- Contrôleur… », « Module d'expansion pour pla », a leading dot, « Thermostat intelligent Hilo 3 »). Each of the 17 known
   codes now always shows its official name (list given by the owner on 2026-10-31, `supabase/functions/_shared/equipment_names.js`):
