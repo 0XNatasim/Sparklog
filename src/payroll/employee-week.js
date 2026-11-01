@@ -8,7 +8,7 @@
 // Import the engine modules directly, not through ./index.js: index.js re-exports this
 // file, and the cycle breaks chunk ordering once pages are code-split.
 import { calculatePayroll } from "./engine/calculatePayroll.js";
-import { computeCcqBenefits, computeCcqLevies, vacationableWage, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeCcqLevies, vacationableWage, employeePensionRateFor, CCQ_ELECTRICIAN_IC_C3 } from "./ccq-benefits.js";
 import { PAY_PERIODS_PER_YEAR } from "./rules/2026.js";
 import { printedPayLines } from "./earnings.js";
 import { engineYtdFromOpening } from "./ytd.js";
@@ -176,8 +176,9 @@ export function computeEmployeeWeekTalon({ profile, jobs, opening = {}, frequenc
     hours: totalHours, hourlyWage: base, overtime150Hours: ot150Hours, overtime200Hours: ot200Hours,
     vacationHolidaySickRate: CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
     ccqPremiumPay: printed.ccqPremiumPay,
+    date: payWeekDate,
   });
-  const pensionRate = CCQ_ELECTRICIAN_IC_C3.levels[status]?.employeePensionRate ?? CCQ_ELECTRICIAN_IC_C3.levels.journeyman.employeePensionRate;
+  const pensionRate = employeePensionRateFor(status, payWeekDate);
   const ccqAmounts = computeCcqBenefits({
     hours: totalHours,
     safetyEquipmentHours: totalHours + returnNbHours, // équipement de sécurité on return time too

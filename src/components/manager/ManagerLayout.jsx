@@ -30,6 +30,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
 import PushPrompt from "@/components/PushPrompt";
 import { PanelLoading } from "@/components/LazyLoading";
+import { usePayrollRatesReady } from "@/lib/payroll-rates";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const COMPANY_NAME = "Messier Connexion";
@@ -58,7 +59,7 @@ const ICONS = {
 const TAB_ICONS = {
   stubs: Receipt, das: Landmark, roe: FileCheck, calcul: Calculator,
   costs: Coins, period: CalendarDays, grid: LayoutGrid, ccq: FileDown,
-  settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact, "ot-presets": ListChecks,
+  settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact, "ot-presets": ListChecks, "payroll-rates": Percent,
 };
 
 const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
@@ -274,6 +275,8 @@ export default function ManagerLayout() {
   const [collapsed, setCollapsed] = useState(() => readFlag(COLLAPSE_KEY));
   const [navHidden, setNavHidden] = useState(() => readFlag(HIDDEN_KEY));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Owner-edited payroll rates (0130) are installed before the first page computes anything.
+  const payrollRatesReady = usePayrollRatesReady();
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
   const [pendingSignups, setPendingSignups] = useState(0);
   const [dueNotes, setDueNotes] = useState(0);
@@ -515,7 +518,7 @@ export default function ManagerLayout() {
             {/* A crashing page keeps the sidebar, so the manager can move on. */}
             <ErrorBoundary resetKey={location.pathname}>
               <Suspense fallback={<PanelLoading />}>
-                <Outlet />
+                {payrollRatesReady ? <Outlet /> : <PanelLoading />}
               </Suspense>
             </ErrorBoundary>
           </main>
