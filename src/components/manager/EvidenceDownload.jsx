@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MAX_FILES_PER_ZIP, downloadEvidenceZip, evidenceWeeks, loadEvidenceCatalog, selectEvidence } from "@/lib/evidence-download";
+import { EVIDENCE_ALERT_EVENT } from "@/lib/evidence-alert";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { useT } from "@/lib/use-t";
 import { supabase } from "@/supabaseClient";
@@ -64,6 +65,7 @@ export default function EvidenceDownload() {
       if (outcome.markError) parts.push(t("evidence.download.markFailed"));
       setResult(parts.join(" "));
       setCatalog(await loadEvidenceCatalog(supabase));
+      window.dispatchEvent(new Event(EVIDENCE_ALERT_EVENT));
     } catch (error) {
       setResult(friendlyErrorMessage(error, t, "evidence.download.failed"));
     } finally {
