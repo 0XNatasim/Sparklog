@@ -137,7 +137,8 @@ Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; 
 
 **V2.4.217 (technique).** `docs/reference/formation-hilo-field-2024-08-20.md` : texte (sans images) du PDF « Formation Hilo.pdf » (Drive, « Talons paie »,
 formation installateurs Hilo du 2024-08-20). Le PDF complet (12 Mo, 109 pages, REV01) `formation-hilo-field-2024-08-20.pdf` a été téléversé par le propriétaire sur GitHub ; son renommage dans
-l'éditeur web de GitHub l'avait réduit à 2 octets : rétabli depuis le commit d'origine (`cb73850`) — ne pas renommer un PDF dans l'éditeur web. Document tiers
+l'éditeur web de GitHub l'avait réduit à 2 octets (rétabli une première fois depuis le commit d'origine `cb73850`, puis re-téléversé par le
+propriétaire sous son nom final) — ne pas renommer un PDF dans l'éditeur web. Document tiers
 publié dans un dépôt public : à retirer si Hilo le demande. `docs/reference/explications-des-defis-hilo.pdf` : PDF de 7 pages (« guide pour
 installateur Hilo.pdf » du Drive, renommé « Explications des Défis Hilo »), copié tel quel. Aucun code changé.
 
