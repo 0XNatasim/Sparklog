@@ -55,7 +55,9 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   // Indemnité de congés annuels + fériés + maladie (6 + 5,5 + 1,5 %).
   vacationHolidaySickRate: 0.13,
   // MÉDIC Construction employee premium + Québec insurance tax (net withholding). The rate
-  // in force for this annex window (0,68 $/h); dated rates are in MEDIC_RATES below.
+  // in force for this annex window (0,68 $/h); dated rates are in MEDIC_RATES below. The tax rate
+  // is dated too (MEDIC_TAX_RATES: 9 % until 2026-12-31, 9,975 % after); this value is the one
+  // of the annex window's start, kept for reference.
   medicEmployeePerHour: 0.68,
   medicProvincialTaxRate: 0.09,
 
@@ -310,8 +312,24 @@ export const MEDIC_RATES = Object.freeze([
   Object.freeze({ effectiveFrom: "2027-04-25", effectiveTo: null, employeePerHour: 1.06, employerPerHour: 3.31, source: "Convention ICI 2025-2029, 27.03 A) 2)" }),
 ]);
 
+// Québec tax on insurance premiums, applied to the MÉDIC premium. It follows the QST: 9 % until
+// 2026-12-31, then 9,975 % from 2027-01-01 (budget 2025-2026; CCQ notice to employers of 2026-10-28:
+// « aucun changement à la cotisation, mais la taxe sur les cotisations facturées à compter du
+// 1er janvier 2027 »). Applied by pay week like MEDIC_RATES: the pay week that starts on or after
+// 2027-01-01 takes the new rate. Confirm with the CCQ how the week of Dec 27 – Jan 2 is billed.
+export const MEDIC_TAX_RATES = Object.freeze([
+  Object.freeze({ effectiveFrom: "2000-01-01", effectiveTo: "2026-12-31", rate: 0.09, source: "Taxe sur les primes d'assurance, 9 %" }),
+  Object.freeze({ effectiveFrom: "2027-01-01", effectiveTo: null, rate: 0.09975, source: "CCQ 2026-10-28 (budget Québec 2025-2026)" }),
+]);
+
 // Today's date in Montréal (YYYY-MM-DD), for callers that give no pay week.
 const montrealToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+// The insurance tax rate in force on `date` (YYYY-MM-DD, the pay week); no date = today.
+export function medicTaxRateOn(date) {
+  const d = String(date || montrealToday()).slice(0, 10);
+  return (MEDIC_TAX_RATES.find((r) => d >= r.effectiveFrom && (!r.effectiveTo || d <= r.effectiveTo)) || MEDIC_TAX_RATES[0]).rate;
+}
 
 // The MÉDIC rates in force on `date` (YYYY-MM-DD, the pay week); no date = today. A date before
 // the first window takes the first one (older stubs are reproduced with explicit test rates).
@@ -337,7 +355,8 @@ export function computeCcqBenefits({
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
   // null = the dated rate in force for `date` (MEDIC_RATES).
   medicEmployeePerHour = null,
-  medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
+  // null = the dated tax rate in force for `date` (MEDIC_TAX_RATES).
+  medicProvincialTaxRate = null,
   safetyEquipmentPerHour = CCQ_ELECTRICIAN_IC_C3.safetyEquipmentPerHour,
   // Hours the safety-equipment allowance is paid on. Defaults to `hours`, but the
   // caller can pass more: the équipement de sécurité is a per-hour INDEMNITY (like KM),
@@ -399,7 +418,9 @@ export function computeCcqBenefits({
   // 25,50 × 9 % = 2,295 → 2,30 (stub S17: 25,50 + 2,30 = 27,80, not 27,795).
   const medicRate = medicEmployeePerHour == null ? medicRatesOn(date).employeePerHour : Number(medicEmployeePerHour) || 0;
   const medicPremiumCents = Math.round(h * medicRate * 100);
-  const medicTaxCents = Math.round((medicPremiumCents * Math.round(medicProvincialTaxRate * 1e4)) / 1e4);
+  const taxRate = medicProvincialTaxRate == null ? medicTaxRateOn(date) : Number(medicProvincialTaxRate) || 0;
+  // 5 decimals: 9,975 % must not be rounded to 9,98 %.
+  const medicTaxCents = Math.round((medicPremiumCents * Math.round(taxRate * 1e5)) / 1e5);
   const medicWithholding = (medicPremiumCents + medicTaxCents) / 100;
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax
   // deduction (U1); a Québec credit (not a base deduction).
