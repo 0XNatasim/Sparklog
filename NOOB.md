@@ -1,11 +1,16 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.222).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.223).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.223** : **rappel avant un changement de taux**. Quand un taux dont on connaît la date change dans les 4 semaines
+  (la taxe MÉDIC le 1er janvier 2027, la prime MÉDIC le 25 avril 2027, ou un changement que tu as ajouté), une **pastille** apparaît
+  sur **Configuration** dans le menu, et l'onglet **Taux** dit quel taux, quelle nouvelle valeur et quelle date. Trois étapes :
+  4 semaines, 2 semaines, dernière semaine ; la pastille disparaît le jour du changement. **À faire** : quand elle apparaît,
+  vérifier que la valeur annoncée est la bonne.
 - ✅ **V2.4.222** : nouvel onglet **Gestion › Configuration › Taux**. Quand un taux de paie change (prime MÉDIC et sa taxe,
   prélèvement CCQ, caisse d'éducation, cotisation retraite, avantages sociaux patronaux), **tu l'ajoutes toi-même** avec la date
   où il commence : plus besoin de passer par le code. Les semaines avant cette date gardent l'ancienne valeur. **Toi seule**

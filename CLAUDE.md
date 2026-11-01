@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.222)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.223)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.223 (technique).** Rappel avant un changement de taux : `upcomingRateChanges(today, overrides, 28)` (`src/lib/payroll-rates.js`) réunit les dates
+déjà dans le code (`MEDIC_RATES`, `MEDIC_TAX_RATES`) et les lignes `payroll_rates` pas encore en vigueur ; `rateAlertStage(jours)` = 4 (≥ 15 j),
+2 (8–14 j), 1 (≤ 7 j). Hook `usePayrollRateAlerts` (rafraîchi par `PAYROLL_RATES_EVENT`, aussi envoyé après la 1re lecture) : pastille
+`v3-config` dans `ManagerLayout` (gestionnaires et propriétaire) et encadré en tête de `PayrollRatesManager`. Aucune notification téléphone.
+Pour qu'une nouvelle date connue du code déclenche le rappel, elle doit être dans une de ces listes ou saisie dans la table.
 
 **V2.4.222 (technique).** « Taux et barèmes » : migration 0130, table `payroll_rates` (`rate_key` × `effective_from` → `value`, 9 clés
 verrouillées par un check et par `payroll_rate_max`), lecture `get_my_role() = 'manager'`, écriture seulement par `set_payroll_rate` /

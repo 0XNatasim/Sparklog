@@ -30,7 +30,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
 import PushPrompt from "@/components/PushPrompt";
 import { PanelLoading } from "@/components/LazyLoading";
-import { usePayrollRatesReady } from "@/lib/payroll-rates";
+import { usePayrollRateAlerts, usePayrollRatesReady } from "@/lib/payroll-rates";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const COMPANY_NAME = "Messier Connexion";
@@ -277,6 +277,7 @@ export default function ManagerLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Owner-edited payroll rates (0130) are installed before the first page computes anything.
   const payrollRatesReady = usePayrollRatesReady();
+  const rateChangeCount = usePayrollRateAlerts().length;
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
   const [pendingSignups, setPendingSignups] = useState(0);
   const [dueNotes, setDueNotes] = useState(0);
@@ -287,7 +288,9 @@ export default function ManagerLayout() {
     inventory: isManagerRole(role) ? inventoryNegatives : 0,
     "v3-team": isManagerRole(role) ? pendingSignups : 0,
     notes: isManagerRole(role) ? dueNotes + repliedNotes : 0,
-  }), [inventoryNegatives, pendingSignups, dueNotes, repliedNotes, todoCount, role]);
+    // A known payroll-rate change starts within 4 weeks (Configuration › Taux).
+    "v3-config": isManagerRole(role) ? rateChangeCount : 0,
+  }), [rateChangeCount, inventoryNegatives, pendingSignups, dueNotes, repliedNotes, todoCount, role]);
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath);
