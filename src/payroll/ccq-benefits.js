@@ -55,7 +55,9 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
   // Indemnité de congés annuels + fériés + maladie (6 + 5,5 + 1,5 %).
   vacationHolidaySickRate: 0.13,
   // MÉDIC Construction employee premium + Québec insurance tax (net withholding). The rate
-  // in force for this annex window (0,68 $/h); dated rates are in MEDIC_RATES below.
+  // in force for this annex window (0,68 $/h); dated rates are in MEDIC_RATES below. The tax rate
+  // is dated too (MEDIC_TAX_RATES: 9 % until 2026-12-31, 9,975 % after); this value is the one
+  // of the annex window's start, kept for reference.
   medicEmployeePerHour: 0.68,
   medicProvincialTaxRate: 0.09,
 
@@ -81,10 +83,57 @@ export const CCQ_ELECTRICIAN_IC_C3 = {
 // Ordered level keys, for building a picker.
 export const CCQ_LEVELS = Object.keys(CCQ_ELECTRICIAN_IC_C3.levels);
 
-// Employer avantages-sociaux rate per worked hour for a level (unknown level → compagnon).
-export function employerSocialBenefitRateFor(level) {
+// Today's date in Montréal (YYYY-MM-DD), for callers that give no pay week.
+const montrealToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+// ── Rates the owner can change in the app (« Taux et barèmes », migration 0130) ─────────────
+// Dated overrides loaded from `payroll_rates`; the constants in this file are the fallback, so an empty
+// table (or a failed read) changes nothing. A row applies from its `effectiveFrom` (YYYY-MM-DD, the pay
+// week) until a later row of the same key.
+export const PAYROLL_RATE_KEYS = Object.freeze([
+  "medic_employee_per_hour", "medic_employer_per_hour", "medic_tax_rate",
+  "ccq_prelevement_rate", "caisse_education_per_hour",
+  "pension_rate_journeyman", "pension_rate_apprentice",
+  "social_benefit_journeyman", "social_benefit_apprentice",
+]);
+
+let rateOverrides = [];
+
+// Replace the loaded overrides (rows: { key, effective_from | effectiveFrom, value }). Unknown keys and
+// non-numeric values are ignored.
+export function setPayrollRateOverrides(rows = []) {
+  rateOverrides = (Array.isArray(rows) ? rows : [])
+    .map((r) => ({ key: r?.key, effectiveFrom: String(r?.effectiveFrom ?? r?.effective_from ?? "").slice(0, 10), value: Number(r?.value) }))
+    .filter((r) => PAYROLL_RATE_KEYS.includes(r.key) && /^\d{4}-\d{2}-\d{2}$/.test(r.effectiveFrom) && Number.isFinite(r.value))
+    .sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? -1 : a.effectiveFrom > b.effectiveFrom ? 1 : 0));
+}
+
+export function getPayrollRateOverrides() {
+  return rateOverrides.map((r) => ({ ...r }));
+}
+
+// The value of `key` for the pay week `date`: the latest override that has started, else `fallback`.
+export function payrollRateOn(key, date, fallback) {
+  const d = String(date || montrealToday()).slice(0, 10);
+  let found = null;
+  for (const r of rateOverrides) if (r.key === key && r.effectiveFrom <= d) found = r;
+  return found ? found.value : fallback;
+}
+
+const levelGroup = (level) => (level === "journeyman" || !CCQ_ELECTRICIAN_IC_C3.levels[level] ? "journeyman" : "apprentice");
+
+// Employee pension rate for a level on a pay week (9 % compagnon / 4,5 % apprenti unless changed).
+export function employeePensionRateFor(level, date) {
   const levels = CCQ_ELECTRICIAN_IC_C3.levels;
-  return (levels[level] ?? levels.journeyman).employerSocialBenefitPerHour;
+  const base = (levels[level] ?? levels.journeyman).employeePensionRate;
+  return payrollRateOn(`pension_rate_${levelGroup(level)}`, date, base);
+}
+
+// Employer avantages-sociaux rate per worked hour for a level (unknown level → compagnon).
+export function employerSocialBenefitRateFor(level, date) {
+  const levels = CCQ_ELECTRICIAN_IC_C3.levels;
+  const base = (levels[level] ?? levels.journeyman).employerSocialBenefitPerHour;
+  return payrollRateOn(`social_benefit_${levelGroup(level)}`, date, base);
 }
 
 // ── Union dues (cotisation syndicale) by union ─────────────────────────────────
@@ -247,12 +296,16 @@ export function computeCcqLevies({
   overtime150Hours = 0,
   overtime200Hours = 0,
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
-  prelevementRate = CCQ_PRELEVEMENT_RATE,
-  caisseEducationPerHour = CCQ_CAISSE_EDUCATION_PER_HOUR,
+  // null = the rate in force on `date` (owner-editable, « Taux et barèmes »), else the coded one.
+  prelevementRate = null,
+  caisseEducationPerHour = null,
+  date,
   // CCQ team-leader premium paid this period (dollars): in the 13 % and prélèvement bases.
   ccqPremiumPay = 0,
 } = {}) {
   const round2 = (x) => Math.round(x * 100) / 100;
+  prelevementRate = prelevementRate ?? payrollRateOn("ccq_prelevement_rate", date, CCQ_PRELEVEMENT_RATE);
+  caisseEducationPerHour = caisseEducationPerHour ?? payrollRateOn("caisse_education_per_hour", date, CCQ_CAISSE_EDUCATION_PER_HOUR);
   const h = Math.max(0, Number(hours) || 0);
   const wage = Number(hourlyWage) || 0;
   // Prélèvement base = the vacationable wage (base + OT rates + CCQ premium) + the 13 % indemnity.
@@ -310,14 +363,33 @@ export const MEDIC_RATES = Object.freeze([
   Object.freeze({ effectiveFrom: "2027-04-25", effectiveTo: null, employeePerHour: 1.06, employerPerHour: 3.31, source: "Convention ICI 2025-2029, 27.03 A) 2)" }),
 ]);
 
-// Today's date in Montréal (YYYY-MM-DD), for callers that give no pay week.
-const montrealToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+// Québec tax on insurance premiums, applied to the MÉDIC premium. It follows the QST: 9 % until
+// 2026-12-31, then 9,975 % from 2027-01-01 (budget 2025-2026; CCQ notice to employers of 2026-10-28:
+// « aucun changement à la cotisation, mais la taxe sur les cotisations facturées à compter du
+// 1er janvier 2027 »). Applied by pay week like MEDIC_RATES: the pay week that starts on or after
+// 2027-01-01 takes the new rate. Confirm with the CCQ how the week of Dec 27 – Jan 2 is billed.
+export const MEDIC_TAX_RATES = Object.freeze([
+  Object.freeze({ effectiveFrom: "2000-01-01", effectiveTo: "2026-12-31", rate: 0.09, source: "Taxe sur les primes d'assurance, 9 %" }),
+  Object.freeze({ effectiveFrom: "2027-01-01", effectiveTo: null, rate: 0.09975, source: "CCQ 2026-10-28 (budget Québec 2025-2026)" }),
+]);
+
+// The insurance tax rate in force on `date` (YYYY-MM-DD, the pay week); no date = today.
+export function medicTaxRateOn(date) {
+  const d = String(date || montrealToday()).slice(0, 10);
+  const coded = (MEDIC_TAX_RATES.find((r) => d >= r.effectiveFrom && (!r.effectiveTo || d <= r.effectiveTo)) || MEDIC_TAX_RATES[0]).rate;
+  return payrollRateOn("medic_tax_rate", d, coded);
+}
 
 // The MÉDIC rates in force on `date` (YYYY-MM-DD, the pay week); no date = today. A date before
 // the first window takes the first one (older stubs are reproduced with explicit test rates).
 export function medicRatesOn(date) {
   const d = String(date || montrealToday()).slice(0, 10);
-  return MEDIC_RATES.find((r) => d >= r.effectiveFrom && (!r.effectiveTo || d <= r.effectiveTo)) || MEDIC_RATES[0];
+  const coded = MEDIC_RATES.find((r) => d >= r.effectiveFrom && (!r.effectiveTo || d <= r.effectiveTo)) || MEDIC_RATES[0];
+  return {
+    ...coded,
+    employeePerHour: payrollRateOn("medic_employee_per_hour", d, coded.employeePerHour),
+    employerPerHour: payrollRateOn("medic_employer_per_hour", d, coded.employerPerHour),
+  };
 }
 
 // Compute the CCQ benefit amounts, engine base adjustments and net withholdings
@@ -337,7 +409,8 @@ export function computeCcqBenefits({
   vacationHolidaySickRate = CCQ_ELECTRICIAN_IC_C3.vacationHolidaySickRate,
   // null = the dated rate in force for `date` (MEDIC_RATES).
   medicEmployeePerHour = null,
-  medicProvincialTaxRate = CCQ_ELECTRICIAN_IC_C3.medicProvincialTaxRate,
+  // null = the dated tax rate in force for `date` (MEDIC_TAX_RATES).
+  medicProvincialTaxRate = null,
   safetyEquipmentPerHour = CCQ_ELECTRICIAN_IC_C3.safetyEquipmentPerHour,
   // Hours the safety-equipment allowance is paid on. Defaults to `hours`, but the
   // caller can pass more: the équipement de sécurité is a per-hour INDEMNITY (like KM),
@@ -399,7 +472,9 @@ export function computeCcqBenefits({
   // 25,50 × 9 % = 2,295 → 2,30 (stub S17: 25,50 + 2,30 = 27,80, not 27,795).
   const medicRate = medicEmployeePerHour == null ? medicRatesOn(date).employeePerHour : Number(medicEmployeePerHour) || 0;
   const medicPremiumCents = Math.round(h * medicRate * 100);
-  const medicTaxCents = Math.round((medicPremiumCents * Math.round(medicProvincialTaxRate * 1e4)) / 1e4);
+  const taxRate = medicProvincialTaxRate == null ? medicTaxRateOn(date) : Number(medicProvincialTaxRate) || 0;
+  // 5 decimals: 9,975 % must not be rounded to 9,98 %.
+  const medicTaxCents = Math.round((medicPremiumCents * Math.round(taxRate * 1e5)) / 1e5);
   const medicWithholding = (medicPremiumCents + medicTaxCents) / 100;
   // Union dues (per the member's union) — withheld from pay AND a federal income-tax
   // deduction (U1); a Québec credit (not a base deduction).
@@ -413,7 +488,7 @@ export function computeCcqBenefits({
   const safetyEquipment = round2(safetyHours * safetyEquipmentPerHour);
   // Employer avantages-sociaux contribution — imputed gain shown then reversed (a
   // display wash: not cash, not taxed). Used only for the gross-up presentation.
-  const socialRate = employerSocialBenefitPerHour ?? employerSocialBenefitRateFor(level);
+  const socialRate = employerSocialBenefitPerHour ?? employerSocialBenefitRateFor(level, date);
   const employerSocialBenefit = round2(h * socialRate);
   const prelevement = Number(prelevementCcq) || 0;
   const caisse = Number(caisseEducationSyndicale) || 0;

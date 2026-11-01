@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCcqBenefits, computeUnionDuesAsPrinted, computeUnionDues, unionDuesRuleFor, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, medicRatesOn } from "./ccq-benefits.js";
+import { computeCcqBenefits, computeUnionDuesAsPrinted, computeUnionDues, unionDuesRuleFor, computeCcqLevies, employerSocialBenefitRateFor, CCQ_ELECTRICIAN_IC_C3, medicRatesOn, medicTaxRateOn, MEDIC_TAX_RATES } from "./ccq-benefits.js";
 import { calculatePayroll } from "./engine/calculatePayroll.js";
 
 const c = (d) => Math.round(d * 100);
@@ -391,8 +391,32 @@ describe("MÉDIC rate by pay week (CASIC freeze, then the agreement on 2027-04-2
   });
   it("the withholding follows the pay week unless a rate is given", () => {
     const med = (date, extra = {}) => computeCcqBenefits({ hours: 40, hourlyWage: 50.79, date, ...extra }).medicWithholding;
-    expect(med("2027-04-18")).toBe(29.65); // 40 × 0,68 = 27,20 + 9 % 2,45
-    expect(med("2027-04-25")).toBe(46.22); // 40 × 1,06 = 42,40 + 9 % 3,82
-    expect(med("2027-04-25", { medicEmployeePerHour: 0.68 })).toBe(29.65);
+    // From 2027-01-01 the insurance tax is 9,975 % (it was 9 %).
+    expect(med("2027-04-18")).toBe(29.91); // 40 × 0,68 = 27,20 + 9,975 % 2,71
+    expect(med("2027-04-25")).toBe(46.63); // 40 × 1,06 = 42,40 + 9,975 % 4,23
+    expect(med("2027-04-25", { medicEmployeePerHour: 0.68 })).toBe(29.91);
+    expect(med("2026-12-26")).toBe(29.65); // 40 × 0,68 = 27,20 + 9 % 2,45 (last week at 9 %)
+  });
+});
+
+describe("MÉDIC insurance tax follows the QST (9 % → 9,975 % on 2027-01-01)", () => {
+  it("is dated by pay week", () => {
+    expect(medicTaxRateOn("2026-10-11")).toBe(0.09);
+    expect(medicTaxRateOn("2026-12-31")).toBe(0.09);
+    expect(medicTaxRateOn("2027-01-01")).toBe(0.09975);
+    expect(medicTaxRateOn("2027-04-25")).toBe(0.09975);
+    expect(MEDIC_TAX_RATES.at(-1).effectiveTo).toBeNull();
+  });
+
+  it("keeps the printed amounts before 2027 and applies 9,975 % from the first pay week of 2027", () => {
+    // 37,5 h × 0,68 = 25,50 ; tax 9 % = 2,295 → 2,30 (the printed rounding) ; 9,975 % = 2,5436 → 2,54.
+    const before = computeCcqBenefits({ hours: 37.5, hourlyWage: 45.36, date: "2026-10-11" });
+    const after = computeCcqBenefits({ hours: 37.5, hourlyWage: 45.36, date: "2027-01-03" });
+    expect(before.medicWithholding).toBeCloseTo(27.8, 2);
+    expect(after.medicWithholding).toBeCloseTo(28.04, 2);
+  });
+
+  it("still honours an explicit rate (bench and old stubs)", () => {
+    expect(computeCcqBenefits({ hours: 37.5, hourlyWage: 45.36, medicEmployeePerHour: 0.68, medicProvincialTaxRate: 0.09, date: "2027-02-01" }).medicWithholding).toBeCloseTo(27.8, 2);
   });
 });

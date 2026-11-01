@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.220)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.222)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,25 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.222 (technique).** « Taux et barèmes » : migration 0130, table `payroll_rates` (`rate_key` × `effective_from` → `value`, 9 clés
+verrouillées par un check et par `payroll_rate_max`), lecture `get_my_role() = 'manager'`, écriture seulement par `set_payroll_rate` /
+`delete_payroll_rate` (`is_privileged()` = propriétaire + aal2 ; bornes par clé ; audit `payroll_rate_set` / `payroll_rate_deleted` ; on ne
+retire qu'une ligne pas encore en vigueur). Code : registre de surcharges datées dans `ccq-benefits.js` (`setPayrollRateOverrides`,
+`payrollRateOn(key, date, fallback)`, `PAYROLL_RATE_KEYS`) ; les constantes du code restent la valeur de repli (table vide = aucun
+changement). `medicRatesOn`, `medicTaxRateOn`, `employerSocialBenefitRateFor(level, date)`, `employeePensionRateFor(level, date)` et
+`computeCcqLevies({ date })` les lisent ; `employee-week.js` passe la date de la semaine. `src/lib/payroll-rates.js` (lecture, RPC, hook
+`usePayrollRatesReady`) ; `ManagerLayout` attend la 1re lecture avant d'afficher une page (un échec = valeurs du code) ;
+`PayrollRatesManager.jsx` (onglet `payroll-rates` de Configuration, règle `config-settings`, propriétaire seul pour écrire). Hors
+périmètre : salaires par niveau (déjà `ccq_rate_snapshots`), avantage imposable 3,377 $ et équipement de sécurité 0,80 $/h, barèmes
+syndicaux, CNESST/FSS/FDRCMO (déjà dans `payroll_employer_settings`). Les pages d'ancien talon / banc d'essai gardent leurs taux
+explicites. Pas de fonction Edge touchée (les montants ne sont pas dans le moteur d'heures).
+
+**V2.4.221 (technique).** `MEDIC_TAX_RATES` / `medicTaxRateOn(date)` (`src/payroll/ccq-benefits.js`, exportés par `src/payroll/index.js`) : taxe sur les primes
+d'assurance de la retenue MÉDIC, 9 % jusqu'au 2026-12-31 puis 9,975 % dès 2027-01-01 (avis CCQ du 2026-10-28). `computeCcqBenefits` : `medicProvincialTaxRate`
+vaut `null` par défaut (= taux daté de la semaine de paie) et la taxe est arrondie avec 5 décimales (9,975 % ne devient pas 9,98 %) ;
+un taux explicite reste respecté (banc d'essai, vieux talons). Fiche des règles de paie et `docs/rules/compensation-rules.md` à jour.
+Point ouvert : confirmer auprès de la CCQ la facturation de la semaine du 27 déc. 2026 au 2 janv. 2027 (ici : le taux suit le début de la semaine de paie).
 
 **V2.4.220 (technique).** Pastille du menu « Registre d'accidents » retirée : `ManagerLayout.jsx` ne compte plus les dossiers ouverts ; code mort supprimé
 (`fetchOpenAccidentCount`, `ACCIDENT_EVENT` et son envoi par `AccidentRegister`). L'étiquette « Ouvert » et le filtre « Ouverts (n) » de la

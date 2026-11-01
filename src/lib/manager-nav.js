@@ -88,6 +88,8 @@ const MENU_ONLY_ITEMS = Object.freeze([
     tab("contacts", "references", "mgr.nav3.tab.contacts"),
     // OT prédéfinis (0124): the drop-down of the time entry. Manager / owner only, like Paramètres.
     tab("ot-presets", "config-settings", "mgr.nav3.tab.otPresets"),
+    // Taux et barèmes (0130): everyone with Paramètres reads, the owner edits.
+    tab("payroll-rates", "config-settings", "mgr.nav3.tab.payrollRates"),
   ] },
 ].map((item) => Object.freeze({ ...item, ...(item.tabs ? { tabs: Object.freeze(item.tabs) } : {}) })));
 
