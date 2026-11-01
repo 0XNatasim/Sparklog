@@ -15,7 +15,7 @@ export default function EmployeeContactSection({ profile: p, panel }) {
     <>
       {/* Ligne : téléphone · courriel · carte CCQ */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Field label={t("manager.tbl.phone")}>
+        <Field label={t("manager.tbl.phone")} name="phone">
           <div className="flex items-center gap-1">
             <Input
               value={p.phone || ""}
@@ -30,7 +30,7 @@ export default function EmployeeContactSection({ profile: p, panel }) {
             )}
           </div>
         </Field>
-        <Field label={t("manager.tbl.email")}>
+        <Field label={t("manager.tbl.email")} name="email">
           <div className="flex h-9 items-center text-sm">
             {p.email ? (
               <a href={`mailto:${p.email}`} className="inline-flex items-center gap-1.5 truncate text-primary hover:underline">
@@ -62,7 +62,7 @@ export default function EmployeeContactSection({ profile: p, panel }) {
 
       {/* Ligne : date de naissance · NAS · date d'embauche · date de réembauche (0119) · dernier jour travaillé (0115). */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label={t("employees.birthDate")}>
+        <Field label={t("employees.birthDate")} name="birth_date">
           <Input type="date" value={p.birth_date || ""} onChange={(e) => setLocal(p.id, "birth_date", e.target.value)} onBlur={(e) => saveField(p.id, "birth_date", e.target.value)} className="h-9" />
         </Field>
         {!isSubcontractorRole(p.role) && (

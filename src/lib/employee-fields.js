@@ -1,19 +1,35 @@
-export function getMissingEmployeeFields(profile, t) {
-  const required = [
-    ["employee_number", t("employees.employeeNumber")],
-    ["phone", t("manager.tbl.phone")],
-    ["email", t("manager.tbl.email")],
-    ["ccq_expiration_date", t("employees.ccqExpirationDate")],
-    ["birth_date", t("employees.birthDate")],
-    ["apprentice_level", t("employees.level")],
-    ["km_rate", t("employees.kmRate")],
-    ["work_region", t("employees.workRegion")],
-    ["union_association", t("employees.unionAssociation")],
-    ["wage_schedule", t("employees.wageSchedule")],
-    ["hourly_rate", t("employees.hourlyRate")],
-  ];
+// The fields an employee card must have filled (CCQ employees): [profile column, label key, card tab].
+// The tab says where the field lives, so the card can send the manager there (red outline, tab badge).
+export const REQUIRED_EMPLOYEE_FIELDS = Object.freeze([
+  ["employee_number", "employees.employeeNumber", "identity"],
+  ["phone", "manager.tbl.phone", "identity"],
+  ["email", "manager.tbl.email", "identity"],
+  ["birth_date", "employees.birthDate", "identity"],
+  ["ccq_expiration_date", "employees.ccqExpirationDate", "ccq"],
+  ["apprentice_level", "employees.level", "ccq"],
+  ["work_region", "employees.workRegion", "ccq"],
+  ["union_association", "employees.unionAssociation", "ccq"],
+  ["wage_schedule", "employees.wageSchedule", "ccq"],
+  ["hourly_rate", "employees.hourlyRate", "ccq"],
+  ["km_rate", "employees.kmRate", "pay"],
+]);
 
-  return required
-    .filter(([field]) => profile[field] == null || String(profile[field]).trim() === "")
-    .map(([, label]) => label);
+const isEmpty = (profile, field) => profile[field] == null || String(profile[field]).trim() === "";
+
+// Missing fields as [{ field, label, tab }].
+export function getMissingEmployeeItems(profile, t) {
+  return REQUIRED_EMPLOYEE_FIELDS
+    .filter(([field]) => isEmpty(profile, field))
+    .map(([field, labelKey, tab]) => ({ field, label: t(labelKey), tab }));
+}
+
+export function getMissingEmployeeFields(profile, t) {
+  return getMissingEmployeeItems(profile, t).map((item) => item.label);
+}
+
+// { identity: 2, ccq: 1 } — how many missing fields each tab holds.
+export function missingCountByTab(items) {
+  const counts = {};
+  for (const item of items) counts[item.tab] = (counts[item.tab] || 0) + 1;
+  return counts;
 }

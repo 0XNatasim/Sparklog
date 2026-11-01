@@ -24,7 +24,7 @@ export function CcqDataFields({ profile: p, panel, className = "space-y-4 border
     <div className={className}>
       {/* Classification */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label={t("employees.level")}>
+        <Field label={t("employees.level")} name="apprentice_level">
           <Select
             value={p.apprentice_level || ""}
             onChange={(e) => saveClassification(p, "apprentice_level", e.target.value)}
@@ -44,22 +44,22 @@ export function CcqDataFields({ profile: p, panel, className = "space-y-4 border
           <Field label={t("employees.tradeCode")}>
             <Input value="220" readOnly className="h-9 bg-muted" />
           </Field>
-          <Field label={t("employees.ccqExpirationDate")}>
+          <Field label={t("employees.ccqExpirationDate")} name="ccq_expiration_date">
             <Input type="date" value={p.ccq_expiration_date || ""} onChange={(e) => setLocal(p.id, "ccq_expiration_date", e.target.value)} onBlur={(e) => saveField(p.id, "ccq_expiration_date", e.target.value)} className="h-9" />
           </Field>
-          <Field label={t("employees.workRegion")}>
+          <Field label={t("employees.workRegion")} name="work_region">
             <Select value={p.work_region || ""} onChange={(e) => { setLocal(p.id, "work_region", e.target.value); saveField(p.id, "work_region", e.target.value); }} className="h-9">
               <option value="">—</option>
               {QUEBEC_REGIONS.map((region) => <option key={region.code} value={region.code}>{region.code} — {region.name}</option>)}
             </Select>
           </Field>
-          <Field label={t("employees.unionAssociation")}>
+          <Field label={t("employees.unionAssociation")} name="union_association">
             <Select value={p.union_association || ""} onChange={(e) => { setLocal(p.id, "union_association", e.target.value); saveField(p.id, "union_association", e.target.value); }} className="h-9">
               <option value="">—</option>
               {UNION_ASSOCIATIONS.map((association) => <option key={association.code} value={association.code}>{association.name}</option>)}
             </Select>
           </Field>
-          <Field label={t("employees.wageSchedule")}>
+          <Field label={t("employees.wageSchedule")} name="wage_schedule">
             {available.length > 0 ? (
               <Select value={p.wage_schedule || ""} onChange={(e) => saveAnnex(p, e.target.value)} className="h-9">
                 <option value="">—</option>
@@ -76,7 +76,7 @@ export function CcqDataFields({ profile: p, panel, className = "space-y-4 border
           </Field>
           {subcontractor ? (
             <>
-              <Field label={t("employees.simpleHourlyRate")}>
+              <Field label={t("employees.simpleHourlyRate")} name="hourly_rate">
                 <div className="flex h-9 items-center gap-1">
                   <span className="text-sm text-muted-foreground">$</span>
                   <Input type="number" step="0.01" min="0" inputMode="decimal" value={p.hourly_rate ?? ""} onChange={(e) => setLocal(p.id, "hourly_rate", e.target.value)} onBlur={(e) => saveField(p.id, "hourly_rate", e.target.value)} placeholder="0.00" className="h-9" />
@@ -93,7 +93,7 @@ export function CcqDataFields({ profile: p, panel, className = "space-y-4 border
               </Field>
             </>
           ) : (
-            <Field label={t("employees.hourlyRate")}>
+            <Field label={t("employees.hourlyRate")} name="hourly_rate">
               <Input type="number" value={p.hourly_rate ?? ""} readOnly className="h-9 bg-muted" />
               <span className="text-xs text-muted-foreground">{t("employees.hourlyRateAutomatic")}</span>
             </Field>

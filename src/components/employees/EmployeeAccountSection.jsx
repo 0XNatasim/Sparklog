@@ -54,12 +54,24 @@ export function ViewAsButton({ profile: p, panel }) {
   );
 }
 
-export function MissingFieldsAlert({ missingFields, t }) {
+// `missingFields`: labels, or items { field, label, tab }. With `onGo`, each item is a button that opens the tab
+// holding the field (the field itself is outlined in red there).
+export function MissingFieldsAlert({ missingFields, t, onGo }) {
   if (!missingFields.length) return null;
   return (
-    <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning" role="alert">
+    <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-      <div><b>{t("employees.missingTitle")}</b><div className="mt-1 text-xs">{missingFields.join(" · ")}</div></div>
+      <div>
+        <b>{t("employees.missingTitle")}</b>
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs">
+          {missingFields.map((item) => {
+            const label = typeof item === "string" ? item : item.label;
+            return onGo && item.tab
+              ? <button key={item.field} type="button" className="rounded underline underline-offset-2 hover:bg-destructive/10" title={t("employees.missingGo")} onClick={() => onGo(item.tab)}>{label}</button>
+              : <span key={label}>{label}</span>;
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -67,7 +79,7 @@ export function MissingFieldsAlert({ missingFields, t }) {
 export function EmployeeNumberField({ profile: p, panel }) {
   const { t, setLocal, saveField } = panel;
   return (
-    <Field label={t("employees.employeeNumber")}>
+    <Field label={t("employees.employeeNumber")} name="employee_number">
       <Input
         value={p.employee_number || ""}
         onChange={(e) => setLocal(p.id, "employee_number", e.target.value)}

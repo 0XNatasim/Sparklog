@@ -367,7 +367,7 @@ export const MEDIC_RATES = Object.freeze([
 // 2026-12-31, then 9,975 % from 2027-01-01 (budget 2025-2026; CCQ notice to employers of 2026-10-28:
 // « aucun changement à la cotisation, mais la taxe sur les cotisations facturées à compter du
 // 1er janvier 2027 »). Applied by pay week like MEDIC_RATES: the pay week that starts on or after
-// 2027-01-01 takes the new rate. Confirm with the CCQ how the week of Dec 27 – Jan 2 is billed.
+// 2027-01-01 takes the new rate. The week of Dec 27 – Jan 2 is the construction holiday (no hours worked), so it bills nothing.
 export const MEDIC_TAX_RATES = Object.freeze([
   Object.freeze({ effectiveFrom: "2000-01-01", effectiveTo: "2026-12-31", rate: 0.09, source: "Taxe sur les primes d'assurance, 9 %" }),
   Object.freeze({ effectiveFrom: "2027-01-01", effectiveTo: null, rate: 0.09975, source: "CCQ 2026-10-28 (budget Québec 2025-2026)" }),

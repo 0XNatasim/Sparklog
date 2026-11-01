@@ -149,7 +149,30 @@ describe("EmployeesPanel", () => {
 // Gestion V3 › Équipe › Employés: the same panel with a search box, a team-leader filter and one card
 // with tabs (it also holds Règles de temps and the TD1 forms). The V2 tests above lock the V2 card.
 describe("EmployeesPanel (V3, one card with tabs)", () => {
-  const tabNames = (card) => within(card).getAllByRole("tab").map((tab) => tab.textContent);
+  const tabNames = (card) => within(card).getAllByRole("tab").map((tab) => {
+    // The red count badge of a tab with missing fields is decoration (aria-hidden): not part of its name.
+    const copy = tab.cloneNode(true);
+    copy.querySelectorAll("[aria-hidden]").forEach((node) => node.remove());
+    return copy.textContent;
+  });
+  it("outlines in red what is missing, badges its tab and jumps to it from the alert", async () => {
+    setup({ tabbed: true });
+    await screen.findByText("Zoé Tremblay");
+    const card = await openCard("Zoé Tremblay");
+    const alert = within(card).getByRole("alert");
+    const goto = within(alert).getAllByRole("button");
+    expect(goto.length).toBeGreaterThan(0);
+    expect(within(card).getAllByRole("tab")[0].querySelector("[aria-hidden]")).not.toBeNull();
+    fireEvent.click(within(alert).getByRole("button", { name: fr("employees.ccqExpirationDate") }));
+    const label = await waitFor(() => {
+      const found = [...card.querySelectorAll("label")].find((node) => node.textContent.includes(fr("employees.ccqExpirationDate")));
+      if (!found) throw new Error("field not shown yet");
+      return found;
+    });
+    expect(label.className).toMatch(/border-destructive/);
+    expect(label.textContent).toContain(fr("employees.toFill"));
+  });
+
   const openTab = async (card, key) => {
     const tab = within(card).getByRole("tab", { name: fr(`employees.tab.${key}`) });
     fireEvent.mouseDown(tab);
