@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.217)
+## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.218)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,11 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.218 (technique).** `EvidenceDownload.jsx` : un seul menu de semaine (`week` = choix ou la plus récente de `evidenceWeeks`), plus de plage ;
+`zipEntryNames(files, labels, folders)` met chaque photo dans un dossier par type (`evidence.download.folderOvertime` / `folderParking`) ;
+nom du fichier `evidence.download.zipFile` (« justificatifs Sem{numéro CCQ} ») + `zipPart` (« - partie N », N = déjà téléchargés ÷ 100 + 1,
+seulement si la semaine dépasse `MAX_FILES_PER_ZIP`). Textes `evidence.download.from / to / firstWeek / lastWeek / zipName` retirés.
 
 **V2.4.217 (technique).** `docs/reference/formation-hilo-field-2024-08-20.md` : texte (sans images) du PDF « Formation Hilo.pdf » (Drive, « Talons paie »,
 formation installateurs Hilo du 2024-08-20). Le PDF complet (12 Mo, 109 pages, REV01) `formation-hilo-field-2024-08-20.pdf` a été téléversé par le propriétaire sur GitHub ; son renommage dans

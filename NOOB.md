@@ -1,11 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.217).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-10-30 (V2.4.218).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.218** : **Télécharger les justificatifs** se choisit maintenant **une semaine à la fois** (la plus récente est déjà
+  choisie). Le fichier s'appelle **« justificatifs Sem43 »** (numéro de la semaine) et contient **deux dossiers** :
+  « Stationnement » et « Temps supp ». Ce qui est déjà téléchargé n'est pas redonné si tu refais la même semaine. Si une semaine
+  a plus de 100 photos, il y a plusieurs fichiers (« - partie 2 », etc.).
 - ✅ **V2.4.217** : deux documents Hilo sont rangés dans `docs/reference/` pour les retrouver facilement : le texte de la
   **formation Hilo et Field** (installateurs, 20 août 2024) avec son **PDF complet** (109 pages) à côté, et le PDF
   **« Explications des Défis Hilo »** (7 pages : ce qu'est un défi, ce que fait chaque appareil, les 3 niveaux, quoi dire au

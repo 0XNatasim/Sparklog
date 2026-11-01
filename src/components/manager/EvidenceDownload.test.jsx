@@ -31,15 +31,24 @@ describe("EvidenceDownload", () => {
     await screen.findByText(/2 photo\(s\) téléchargée\(s\)/);
   });
 
-  it("limits the download to a range of weeks", async () => {
+  it("downloads one week at a time: the latest by default, the one picked otherwise, with the week number in the file name", async () => {
     const files = [file("a.jpg", "2026-10-20"), file("b.jpg", "2026-10-28"), file("c.jpg", "2026-11-03")];
     loadEvidenceCatalog.mockResolvedValue({ files, done: new Set() });
+    downloadEvidenceZip.mockResolvedValue({ saved: 1, skipped: 0, remaining: 0 });
     render(<EvidenceDownload />);
     fireEvent.click(screen.getByRole("button", { name: /Télécharger les justificatifs/ }));
-    await screen.findByText(/3 nouveaux · 0 déjà téléchargés · 3 dans le ZIP/);
-    fireEvent.change(screen.getByLabelText(/De la semaine/), { target: { value: "2026-10-25" } });
-    fireEvent.change(screen.getByLabelText(/À la semaine/), { target: { value: "2026-10-25" } });
+    await screen.findByText(/1 nouveaux · 0 déjà téléchargés · 1 dans le ZIP/); // the latest week only
+    fireEvent.click(screen.getByRole("button", { name: /Télécharger le ZIP/ }));
+    await waitFor(() => expect(downloadEvidenceZip).toHaveBeenCalledTimes(1));
+    expect(downloadEvidenceZip.mock.calls[0][1].map((f) => f.path)).toEqual(["c.jpg"]);
+    expect(downloadEvidenceZip.mock.calls[0][2].filename).toMatch(/^justificatifs Sem\d+\.zip$/);
+    expect(downloadEvidenceZip.mock.calls[0][2].folders).toEqual({ overtime: "Temps supp", parking: "Stationnement" });
+    await screen.findByText(/photo\(s\) téléchargée/);
+    fireEvent.change(screen.getByLabelText(/Semaine/), { target: { value: "2026-10-25" } });
     await screen.findByText(/1 nouveaux · 0 déjà téléchargés · 1 dans le ZIP/);
+    fireEvent.click(screen.getByRole("button", { name: /Télécharger le ZIP/ }));
+    await waitFor(() => expect(downloadEvidenceZip).toHaveBeenCalledTimes(2));
+    expect(downloadEvidenceZip.mock.calls[1][1].map((f) => f.path)).toEqual(["b.jpg"]);
   });
 
   it("offers the ones already downloaded again when asked", async () => {

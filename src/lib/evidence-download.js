@@ -53,15 +53,17 @@ export function selectEvidence(files, { done = new Set(), includeDone = false, f
   return { inScope, fresh, alreadyDone: inScope.length - fresh.length, chosen: includeDone ? inScope : fresh };
 }
 
-// Names inside the ZIP: date first so the folder sorts by day. `labels`: { overtime, parking } words.
-export function zipEntryNames(files, labels = { overtime: "temps-supp", parking: "stationnement" }) {
+// Names inside the ZIP: one folder per kind (`folders`: { overtime, parking }), then the date first so a folder sorts
+// by day. `labels`: { overtime, parking } words ended on the file name.
+export function zipEntryNames(files, labels = { overtime: "temps-supp", parking: "stationnement" }, folders = { overtime: "Temps supp", parking: "Stationnement" }) {
   const used = new Map();
   return files.map((file) => {
     const suffix = file.kind === "parking" && file.count > 1 ? `${labels.parking}-${file.index}` : labels[file.kind];
     const base = [cleanPart(file.date, "date"), cleanPart(file.employee, "employe"), file.ot ? `OT ${cleanPart(file.ot)}` : "", suffix].filter(Boolean).join("_");
-    const seen = used.get(base) || 0;
-    used.set(base, seen + 1);
-    return `${base}${seen ? ` (${seen + 1})` : ""}.jpg`;
+    const path = `${cleanPart(folders[file.kind], file.kind)}/${base}`;
+    const seen = used.get(path) || 0;
+    used.set(path, seen + 1);
+    return `${path}${seen ? ` (${seen + 1})` : ""}.jpg`;
   });
 }
 
@@ -101,9 +103,9 @@ function saveBlob(bytes, filename) {
 
 // Downloads `files` (at most MAX_FILES_PER_ZIP), saves the ZIP, then marks as downloaded the pictures that are in
 // it. A picture that cannot be read is skipped and NOT marked, so the next download brings it again.
-export async function downloadEvidenceZip(client, files, { labels, onProgress, filename } = {}) {
+export async function downloadEvidenceZip(client, files, { labels, folders, onProgress, filename } = {}) {
   const batch = files.slice(0, MAX_FILES_PER_ZIP);
-  const names = zipEntryNames(batch, labels);
+  const names = zipEntryNames(batch, labels, folders);
   const entries = [];
   const saved = [];
   let skipped = 0;
