@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/supabaseClient";
 import { withTimeout } from "@/lib/utils";
 import { companyDate } from "@/lib/company-time";
+import { availableRuleYears, setRuleSetOverrides, validateRuleData } from "@/payroll/rules/rule-overrides";
 import {
   CCQ_CAISSE_EDUCATION_PER_HOUR, CCQ_ELECTRICIAN_IC_C3, CCQ_PRELEVEMENT_RATE, MEDIC_RATES, MEDIC_TAX_RATES, PAYROLL_RATE_KEYS,
   getPayrollRateOverrides, medicRatesOn, medicTaxRateOn, setPayrollRateOverrides,
@@ -49,6 +50,8 @@ export async function fetchPayrollRateRows() {
 
 // Reads the rows and installs them in the payroll code. Returns the rows; throws on a read error.
 export async function loadPayrollRates() {
+  // The yearly scales load alongside; a failure there never blocks the simple rates (coded 2026 applies).
+  await loadStatutorySets().catch((error) => { console.warn("statutory scales not loaded, coded scale applies", error?.message || error); });
   const rows = await fetchPayrollRateRows();
   setPayrollRateOverrides(rows.filter((r) => PAYROLL_RATE_KEYS.includes(r.key)));
   if (typeof window !== "undefined") window.dispatchEvent(new Event(PAYROLL_RATES_EVENT));
@@ -122,4 +125,62 @@ export function usePayrollRateAlerts() {
     return () => window.removeEventListener(PAYROLL_RATES_EVENT, refresh);
   }, []);
   return changes;
+}
+
+// ── Yearly statutory scales (« Barèmes annuels », 0131) ───────────────────────────────────────
+export async function fetchStatutorySets() {
+  const { data, error } = await withTimeout(
+    supabase.from("statutory_rate_sets").select("tax_year, data, note, updated_at").order("tax_year").limit(50),
+    10000,
+  );
+  if (error) throw error;
+  return data || [];
+}
+
+// Reads and installs the sets that validate; returns { sets, rejected } (rejected = [{ year, problems }]).
+export async function loadStatutorySets() {
+  const sets = await fetchStatutorySets();
+  const rejected = setRuleSetOverrides(sets);
+  if (rejected.length) console.warn("statutory scales rejected", rejected.map((r) => r.year).join(", "));
+  return { sets, rejected };
+}
+
+export async function saveStatutorySet({ taxYear, data, note }) {
+  const problems = validateRuleData(data);
+  if (problems.length) throw new Error(problems[0]);
+  const { error } = await withTimeout(
+    supabase.rpc("set_statutory_rate_set", { p_tax_year: taxYear, p_data: data, p_note: note || null }),
+    12000,
+  );
+  if (error) throw error;
+}
+
+export async function deleteStatutorySet(taxYear) {
+  const { error } = await withTimeout(supabase.rpc("delete_statutory_rate_set", { p_tax_year: taxYear }), 12000);
+  if (error) throw error;
+}
+
+// The pay year whose scale is missing soon: from 28 days before 1 January until the owner enters it (and
+// after 1 January while it is still missing). null = nothing to do.
+export function missingScaleAlert(today = companyDate(), years = availableRuleYears()) {
+  const thisYear = Number(today.slice(0, 4));
+  const jan1 = dayNumber(`${thisYear + 1}-01-01`);
+  const now = dayNumber(today);
+  if (!years.includes(thisYear)) return { year: thisYear, daysLeft: 0, stage: 1 };
+  if (!years.includes(thisYear + 1) && jan1 - now <= RATE_ALERT_DAYS) {
+    const daysLeft = jan1 - now;
+    return { year: thisYear + 1, daysLeft, stage: rateAlertStage(daysLeft) };
+  }
+  return null;
+}
+
+export function useMissingScaleAlert() {
+  const [alert, setAlert] = useState(() => missingScaleAlert());
+  useEffect(() => {
+    const refresh = () => setAlert(missingScaleAlert());
+    refresh();
+    window.addEventListener(PAYROLL_RATES_EVENT, refresh);
+    return () => window.removeEventListener(PAYROLL_RATES_EVENT, refresh);
+  }, []);
+  return alert;
 }

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.223 (2026-11-01).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.224 (2026-11-01).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,13 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.224 — « Barèmes annuels » (Configuration › Barèmes annuels).** What changes every January is now entered in the app by
+  the owner: QPP/RRQ, employment insurance, QPIP, federal and Québec income-tax brackets (with their K constants), HSF (FSS),
+  labour standards and the workforce-skills fund. One complete scale per tax year; the screen starts from the previous year,
+  lists every change before saving and refuses an incoherent scale (maximum ≠ rate × earnings, brackets out of order, K not
+  following the brackets). A pay week is taxed in the year it is paid; a year without a scale uses the latest earlier one and
+  the stub says « Barème non saisi » in its review reasons. A badge appears on Configuration from 4 weeks before 1 January until
+  the next scale is entered. Managers read; only the owner (two-factor) saves, and every save is written to the Journal.
 - **V2.4.223 — Reminder before a rate change.** When a payroll rate whose start date is known changes within 4 weeks (the MÉDIC tax
   on 2027-01-01, the MÉDIC premium on 2027-04-25, or any future row the owner entered), a badge appears on **Configuration** in the
   menu and a note on the **Taux** page names the rate, the new value and the date. It goes through three stages: 4 weeks, 2 weeks

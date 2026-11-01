@@ -95,6 +95,7 @@ export default function PayrollRatesManager() {
           {!isOwner && <p className="mt-1 text-xs font-medium text-muted-foreground">{t("payrollRates.readOnly")}</p>}
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        <p className="text-xs text-muted-foreground">{t("payrollRates.statutoryPointer")}</p>
         {alerts.length > 0 && (
           <div className="space-y-1 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning" role="status">
             <p className="font-medium">{t("payrollRates.alertTitle")}</p>

@@ -30,7 +30,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
 import PushPrompt from "@/components/PushPrompt";
 import { PanelLoading } from "@/components/LazyLoading";
-import { usePayrollRateAlerts, usePayrollRatesReady } from "@/lib/payroll-rates";
+import { useMissingScaleAlert, usePayrollRateAlerts, usePayrollRatesReady } from "@/lib/payroll-rates";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const COMPANY_NAME = "Messier Connexion";
@@ -59,7 +59,7 @@ const ICONS = {
 const TAB_ICONS = {
   stubs: Receipt, das: Landmark, roe: FileCheck, calcul: Calculator,
   costs: Coins, period: CalendarDays, grid: LayoutGrid, ccq: FileDown,
-  settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact, "ot-presets": ListChecks, "payroll-rates": Percent,
+  settings: Wrench, "ccq-rates": Percent, "pay-rules": Scale, forms: FileText, references: BookOpen, contacts: Contact, "ot-presets": ListChecks, "payroll-rates": Percent, "statutory-rates": Landmark,
 };
 
 const GROUP_ICONS = { payroll: Wallet, config: SlidersHorizontal, advanced: ShieldCheck };
@@ -277,7 +277,8 @@ export default function ManagerLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Owner-edited payroll rates (0130) are installed before the first page computes anything.
   const payrollRatesReady = usePayrollRatesReady();
-  const rateChangeCount = usePayrollRateAlerts().length;
+  const missingScale = useMissingScaleAlert();
+  const rateChangeCount = usePayrollRateAlerts().length + (missingScale ? 1 : 0);
   const [inventoryNegatives, setInventoryNegatives] = useState(0);
   const [pendingSignups, setPendingSignups] = useState(0);
   const [dueNotes, setDueNotes] = useState(0);

@@ -90,6 +90,8 @@ const MENU_ONLY_ITEMS = Object.freeze([
     tab("ot-presets", "config-settings", "mgr.nav3.tab.otPresets"),
     // Taux et barèmes (0130): everyone with Paramètres reads, the owner edits.
     tab("payroll-rates", "config-settings", "mgr.nav3.tab.payrollRates"),
+    // Barèmes annuels (0131): RRQ, AE, RQAP, impôts, FSS… one set per tax year; the owner enters next year's.
+    tab("statutory-rates", "config-settings", "mgr.nav3.tab.statutoryRates"),
   ] },
 ].map((item) => Object.freeze({ ...item, ...(item.tabs ? { tabs: Object.freeze(item.tabs) } : {}) })));
 

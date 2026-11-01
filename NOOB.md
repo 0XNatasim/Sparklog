@@ -1,11 +1,18 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.223).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.224).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.224** : nouvel onglet **Gestion › Configuration › Barèmes annuels**. C'est ici que **tu** entres, chaque janvier, les
+  chiffres officiels de l'année : RRQ, assurance-emploi, RQAP, paliers d'impôt (fédéral et Québec), FSS, Normes du travail et
+  FDRCMO. L'écran part de l'année précédente, **te montre tous les changements avant d'enregistrer** et refuse un barème qui ne
+  tient pas debout (un maximum qui ne correspond pas à son taux, des paliers dans le désordre). Si tu n'as rien saisi pour
+  l'année en cours, le talon utilise le barème précédent et **l'écrit dans ses avertissements**. Une **pastille** sur
+  Configuration apparaît 4 semaines avant le 1er janvier. **À faire avant le 1er janvier 2027** : saisir le barème 2027 avec les
+  documents officiels (TP-1015.F, T4127, avis de la CCQ) ; à valider avec ta comptable.
 - ✅ **V2.4.223** : **rappel avant un changement de taux**. Quand un taux dont on connaît la date change dans les 4 semaines
   (la taxe MÉDIC le 1er janvier 2027, la prime MÉDIC le 25 avril 2027, ou un changement que tu as ajouté), une **pastille** apparaît
   sur **Configuration** dans le menu, et l'onglet **Taux** dit quel taux, quelle nouvelle valeur et quelle date. Trois étapes :
