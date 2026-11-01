@@ -6,7 +6,6 @@ import { withTimeout } from "@/lib/utils";
 export const ACCIDENT_KINDS = Object.freeze(["injury", "near_miss", "property", "vehicle"]);
 export const ACCIDENT_SEVERITIES = Object.freeze(["first_aid", "medical", "lost_time", "critical"]);
 // Sent after a save so the menu badge (open files) refreshes without a reload.
-export const ACCIDENT_EVENT = "sparklog:accidents-changed";
 export const ACCIDENT_STATUSES = Object.freeze(["open", "closed"]);
 
 export const ACCIDENT_COLUMNS = "id, occurred_on, occurred_time, employee_id, person_name, kind, severity, location, description, witnesses, treatment, lost_days, cnesst_claim, corrective_actions, status, closed_at, created_at, updated_at";
@@ -111,16 +110,6 @@ export async function fetchAccidents() {
   );
   if (error) throw error;
   return data || [];
-}
-
-// Side-menu badge: only the number of open files.
-export async function fetchOpenAccidentCount() {
-  const { count, error } = await withTimeout(
-    supabase.from("accident_log").select("id", { count: "exact", head: true }).eq("status", "open"),
-    12000,
-  );
-  if (error) throw error;
-  return count || 0;
 }
 
 export async function createAccident(form) {
