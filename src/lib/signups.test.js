@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/supabaseClient", () => ({ supabase: { rpc: vi.fn() } }));
 
-import { NEW_HIRE, employeeStatus, employmentChoice, employmentUpdate, groupBadgeTotal, isNewHire, pendingSignupCount } from "./signups";
+import { NEW_HIRE, employeeStatus, employmentChoice, employmentUpdate, groupBadgeTotal, isNewHire, pendingSignupCount, startsToday } from "./signups";
 
 const pending = new Map([
   ["new-ok", { user_id: "new-ok", email_confirmed: true }],
@@ -73,6 +73,11 @@ describe("new hire and first day of work (0110)", () => {
     expect(isNewHire({}, today)).toBe(false);
     expect(employmentChoice({ start_date: "2026-10-27" }, today)).toBe(NEW_HIRE);
     expect(employmentChoice({ start_date: "2026-10-01" }, today)).toBe("");
+    // First day = today: already on the boards, but the picker still shows « Nouvel(le) employé(e) » with the date.
+    expect(employmentChoice({ start_date: "2026-10-22" }, today)).toBe(NEW_HIRE);
+    expect(employmentChoice({ start_date: "2026-10-22", departure_status: "depart" }, today)).toBe("depart");
+    expect(startsToday({ start_date: "2026-10-22" }, today)).toBe(true);
+    expect(startsToday({ start_date: "2026-10-23" }, today)).toBe(false);
     expect(employmentChoice({ departure_status: "mise_a_pied" }, today)).toBe("mise_a_pied");
   });
 

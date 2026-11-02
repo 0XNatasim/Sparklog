@@ -29,9 +29,15 @@ export function isNewHire(profile, today) {
 }
 
 // Value of the « Embauche / départ » picker: a former-employee mark, « new_hire », or "" (none).
+// A first day of work that is today still shows « Nouvel(le) employé(e) » (V2.4.232): the person is already on the
+// boards (isNewHire stays false) but the manager can see and change the date they just entered.
+export function startsToday(profile, today) {
+  return Boolean(profile && !profile.departure_status && profile.start_date && today && profile.start_date === today);
+}
+
 export function employmentChoice(profile, today) {
   if (DEPARTURE_STATUSES.includes(profile?.departure_status)) return profile.departure_status;
-  return isNewHire(profile, today) ? NEW_HIRE : "";
+  return isNewHire(profile, today) || startsToday(profile, today) ? NEW_HIRE : "";
 }
 
 // Columns written when the picker changes from `previous` to `choice`. A new hire needs a date

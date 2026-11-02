@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { isManagerRole } from "@/lib/roles";
-import { addCalendarDays } from "@/lib/company-time";
 import { canSetEmployment, roleName } from "@/lib/employees-panel";
-import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, NEW_HIRE, employmentChoice, isNewHire } from "@/lib/signups";
+import { DEPARTURE_STATUSES, MAX_DEPARTURE_NOTE, NEW_HIRE, employmentChoice, startsToday } from "@/lib/signups";
 import Field from "./EmployeeField";
 
 // Pieces of the top of an open employee card, used by the V2 card (EmployeeAccountSection below) and
@@ -157,20 +156,22 @@ export function EmployeeEmploymentField({ profile: p, panel }) {
         <option value={NEW_HIRE}>{t("employees.newHire.option")}</option>
         {DEPARTURE_STATUSES.map((status) => <option key={status} value={status}>{t(`employees.status.${status}`)}</option>)}
       </Select>
-      {(newHireDraft.has(p.id) || isNewHire(p, today)) && (
+      {(newHireDraft.has(p.id) || employmentChoice(p, today) === NEW_HIRE) && (
         <label className="mt-2 block text-xs">
           <span className="text-muted-foreground">{t("employees.newHire.startDate")}</span>
           <Input
             type="date"
             className="mt-1 h-9"
-            min={addCalendarDays(today, 1)}
+            min={today}
             required
-            value={isNewHire(p, today) ? p.start_date : ""}
-            // Only a day after today: someone starting today is simply on the boards.
-            onChange={(e) => { if (e.target.value > today) saveEmployment(p, NEW_HIRE, e.target.value); }}
+            value={employmentChoice(p, today) === NEW_HIRE ? p.start_date : ""}
+            // Today or later. Today = starting now: the person is already on the boards.
+            onChange={(e) => { if (e.target.value >= today) saveEmployment(p, NEW_HIRE, e.target.value); }}
           />
           <span className="mt-1 block text-muted-foreground">
-            {newHireDraft.has(p.id) ? t("employees.newHire.needDate") : t("employees.newHire.hint")}
+            {newHireDraft.has(p.id)
+              ? t("employees.newHire.needDate")
+              : startsToday(p, today) ? t("employees.newHire.today") : t("employees.newHire.hint")}
           </span>
         </label>
       )}
