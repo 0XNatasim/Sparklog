@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.229 (2026-11-02).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.230 (2026-11-02).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,8 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.230 — Clear password errors.** Sign-up and password reset now say the real reason a password was refused (missing lowercase / uppercase /
+  number / symbol, too short, or found in a data leak), show the rule under the field, and drop the old error as soon as a field is edited.
 - **V2.4.229 — Privacy policy draft.** `docs/governance/politique-confidentialite.md`: plain-French privacy policy (Law 25) built from what
   the app really does: data collected by category, purposes, who sees what (per role), providers and where data is hosted (outside
   Québec), protection measures, retention table (30 days for proof photos; the rest to confirm), rights and the 30-day request

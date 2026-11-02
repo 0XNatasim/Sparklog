@@ -1,11 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.229).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.230).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.230** : à l'inscription et au changement de mot de passe, le message d'erreur dit maintenant **la vraie raison** (il manque une minuscule, une
+  majuscule, un chiffre ou un symbole ; trop court ; ou mot de passe connu dans une fuite). La règle est écrite sous le champ, et l'ancien message
+  **disparaît dès qu'on modifie un champ**. Rien à faire de ta part.
 - ✅ **V2.4.229** : la **politique de confidentialité** est préparée : `docs/governance/politique-confidentialite.md`. Elle dit en mots
   simples ce que l'app garde sur les employés, pourquoi, qui y a accès, où c'est hébergé (États-Unis, donc à signaler), combien de
   temps, comment protéger, comment demander à voir ou corriger ses renseignements (réponse en 30 jours), et quoi faire en cas

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.229)
+## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.230)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.230 (technique).** Mots de passe : le projet Supabase exige une minuscule, une majuscule, un chiffre et un symbole (`!@#$%^&*()_+-=[]{};'\:"|<>?,./`~`) et active la
+vérification des mots de passe divulgués (lu dans `auth_logs`, 2026-11-02). `authErrorKey` (`src/lib/mfa.js`) distingue maintenant `auth.passwordCharacters`
+(raison `characters` ou message « at least one character of each »), `auth.passwordLeaked` (`pwned` / « known to be weak »), `auth.passwordShort` (`length`) puis
+`auth.passwordWeak` ; priorité aux caractères manquants. `Login.jsx` (`clearError` à chaque saisie) et `ResetPassword.jsx` effacent l'ancienne erreur dès qu'un champ
+change ; `auth.passwordRequirement` (règle complète) est affiché sous le champ à l'inscription. Aucun changement de base ni de fonction Edge.
 
 **V2.4.229 (technique).** Ajout de `docs/governance/politique-confidentialite.md` (brouillon, Loi 25) ; aucun code changé. Faits vérifiés dans le code pour le rédiger : aucune géolocalisation ni
 outil d'analyse / publicité (`package.json`, `src/`) ; photos recompressées (EXIF / GPS retirés, `evidence-file.js`) ; conservation des preuves 30 jours par défaut

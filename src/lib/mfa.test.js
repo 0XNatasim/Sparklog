@@ -53,7 +53,13 @@ describe("two-factor authentication: input and messages", () => {
 
   it("explains a leaked or weak password and a wrong code in plain words", () => {
     expect(authErrorKey({ code: "weak_password", reasons: ["pwned"] })).toBe("auth.passwordLeaked");
-    expect(authErrorKey({ code: "weak_password", reasons: ["length"] })).toBe("auth.passwordWeak");
+    expect(authErrorKey({ code: "weak_password", reasons: ["length"] })).toBe("auth.passwordShort");
+    expect(authErrorKey({ code: "weak_password", reasons: ["characters"] })).toBe("auth.passwordCharacters");
+    expect(authErrorKey({ code: "weak_password", reasons: ["characters", "pwned"] })).toBe("auth.passwordCharacters");
+    expect(authErrorKey({ code: "weak_password" })).toBe("auth.passwordWeak");
+    expect(authErrorKey({ message: "Password should contain at least one character of each: abc, ABC, 0123, !@#." })).toBe("auth.passwordCharacters");
+    expect(authErrorKey({ message: "Password is known to be weak and easy to guess, please choose a different one." })).toBe("auth.passwordLeaked");
+    expect(authErrorKey({ message: "Password should be at least 8 characters." })).toBe("auth.passwordShort");
     expect(authErrorKey({ code: "mfa_verification_failed", message: "Invalid TOTP code entered" })).toBe("mfa.invalidCode");
     expect(authErrorKey({ code: "mfa_challenge_expired" })).toBe("mfa.expired");
     expect(authErrorKey({ code: "mfa_totp_enroll_not_enabled" })).toBe("mfa.disabled");

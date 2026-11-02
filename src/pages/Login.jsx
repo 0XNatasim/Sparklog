@@ -54,6 +54,9 @@ export default function Login() {
     searchParams.get("passwordReset") === "success" ? t("auth.passwordResetSuccess") : ""
   );
 
+  // A stale error must not stay on screen once the person edits a field to fix it.
+  const clearError = () => { if (errorMsg) setErrorMsg(""); };
+
   const isSignup = mode === "signup";
   const isForgotPassword = mode === "forgot";
 
@@ -185,7 +188,7 @@ export default function Login() {
                   <Input
                     id="fullName"
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => { setFullName(e.target.value); clearError(); }}
                     placeholder={t("auth.fullNamePlaceholder")}
                     autoComplete="name"
                   />
@@ -211,7 +214,7 @@ export default function Login() {
               <Input
                 id="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); clearError(); }}
                 placeholder={t("auth.emailPlaceholder")}
                 type="email"
                 autoComplete="email"
@@ -224,7 +227,7 @@ export default function Login() {
                 <Input
                   id="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); clearError(); }}
                   placeholder="••••••••"
                   type={showPassword ? "text" : "password"}
                   autoComplete={isSignup ? "new-password" : "current-password"}
@@ -239,6 +242,7 @@ export default function Login() {
                   {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </button>
               </div>
+              {isSignup && <span className="text-xs text-muted-foreground">{t("auth.passwordRequirement")}</span>}
             </div>}
 
             {isSignup && (
@@ -248,7 +252,7 @@ export default function Login() {
                   <Input
                     id="confirm"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => { setConfirmPassword(e.target.value); clearError(); }}
                     placeholder="••••••••"
                     type={showConfirm ? "text" : "password"}
                     autoComplete="new-password"
