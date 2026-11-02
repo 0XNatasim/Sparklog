@@ -2486,6 +2486,20 @@ const en = {
   "common.week": "Week",
   "common.outboundShort": "O",
   "common.returnShort": "R",
+  "health.title": "Automatic checks",
+  "health.allOk": "All good: no automatic task is failing.",
+  "health.problems": "{count} item(s) to look at.",
+  "health.check.cron_failed": "Scheduled tasks that failed",
+  "health.check.cron_stale": "Scheduled tasks that stopped (over 36 h)",
+  "health.check.evidence_overdue": "Photos kept past their deletion date",
+  "health.check.export_stuck": "Approved jobs not sent to the Google Sheet",
+  "health.check.rates_stale": "Age of the CCQ rates (hours)",
+  "health.hint.cron_failed": "Open the Supabase logs (Cron) and run the task again.",
+  "health.hint.cron_stale": "The task no longer runs: check Supabase › Cron.",
+  "health.hint.evidence_overdue": "Run the cleanup_overtime_evidence function again (see NOOB.md).",
+  "health.hint.export_stuck": "Reopen the job and approve it again, then check the Google script.",
+  "health.hint.rates_stale": "The daily CCQ rates sync is no longer working.",
+  "health.value": "Measured: {value}",
 };
 
 export default en;

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { withRetry } from "@/lib/utils";
 import { useT } from "@/lib/use-t";
+import { healthSummary, normalizeHealthChecks } from "@/lib/system-health";
 
 const TONES = {
   good: "text-success",
@@ -30,6 +31,7 @@ export default function InfraHealthCard() {
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState(null);
   const [host, setHost] = useState(null); // live CPU/memory/disk/network/IOPS
+  const [checks, setChecks] = useState([]); // silent-failure checks (system_health_checks)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,6 +46,13 @@ export default function InfraHealthCard() {
       setStats(data || null);
     } catch (e) {
       setError(e?.message || String(e));
+    }
+    try {
+      const { data, error: checksError } = await withRetry(() => supabase.rpc("system_health_checks"), 8000);
+      if (checksError) throw checksError;
+      setChecks(normalizeHealthChecks(data));
+    } catch {
+      setChecks([]); // the checks are an extra; the figures above still show
     }
     try {
       const { data, error: fnError } = await supabase.functions.invoke("infra_metrics", { body: {} });
@@ -133,6 +142,21 @@ export default function InfraHealthCard() {
                 <div key={r.label} className="rounded-lg border p-3">
                   <div className="text-xs text-muted-foreground">{r.label}</div>
                   <div className={`mt-0.5 text-sm font-semibold tabular-nums ${TONES[r.tone]}`}>{r.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {checks.length > 0 && (
+            <div className="space-y-2" data-testid="health-checks">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("health.title")}</div>
+              <p className={`text-sm font-medium ${healthSummary(checks).ok ? TONES.good : TONES.bad}`}>
+                {healthSummary(checks).ok ? t("health.allOk") : t("health.problems", { count: healthSummary(checks).bad + healthSummary(checks).warn })}
+              </p>
+              {checks.filter((c) => c.status !== "ok").map((c) => (
+                <div key={c.id} className="rounded-lg border p-3">
+                  <div className={`text-sm font-semibold ${c.status === "bad" ? TONES.bad : TONES.warn}`}>{t(`health.check.${c.id}`)}{c.value != null ? ` — ${t("health.value", { value: c.value })}` : ""}</div>
+                  <div className="text-xs text-muted-foreground">{t(`health.hint.${c.id}`)}</div>
                 </div>
               ))}
             </div>

@@ -2477,6 +2477,20 @@ const fr = {
   "common.week": "Semaine",
   "common.outboundShort": "A",
   "common.returnShort": "R",
+  "health.title": "Vérifications automatiques",
+  "health.allOk": "Tout va bien : aucune tâche automatique en échec.",
+  "health.problems": "{count} point(s) à regarder.",
+  "health.check.cron_failed": "Tâches planifiées en échec",
+  "health.check.cron_stale": "Tâches planifiées arrêtées (plus de 36 h)",
+  "health.check.evidence_overdue": "Photos gardées après leur date de suppression",
+  "health.check.export_stuck": "Fiches approuvées mais pas envoyées au Google Sheet",
+  "health.check.rates_stale": "Âge des taux CCQ (heures)",
+  "health.hint.cron_failed": "Ouvrir les journaux Supabase (Cron) et relancer la tâche.",
+  "health.hint.cron_stale": "La tâche ne s'exécute plus : vérifier Supabase › Cron.",
+  "health.hint.evidence_overdue": "Relancer la fonction cleanup_overtime_evidence (voir NOOB.md).",
+  "health.hint.export_stuck": "Rouvrir la fiche et refaire l'approbation, puis vérifier le script Google.",
+  "health.hint.rates_stale": "La synchronisation quotidienne des taux CCQ ne passe plus.",
+  "health.value": "Mesure : {value}",
 };
 
 export default fr;
