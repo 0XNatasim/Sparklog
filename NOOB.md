@@ -1,14 +1,17 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.227).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.228).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
-- ✅ **V2.4.227** : le point « coller le `doPost` dans Google » est retiré (fait le 2 novembre). Nouvelle section **« Loi 25 »** plus bas :
+- ✅ **V2.4.228** : le point « coller le `doPost` dans Google » est retiré (fait le 2 novembre). Nouvelle section **« Loi 25 »** plus bas :
   ce que la loi demande, ce que l'app fait déjà, et la liste de ce qui reste à faire pour être en règle (personne responsable,
   politique de confidentialité, registre d'incidents, hébergement hors Québec, durées de conservation).
+- ✅ **V2.4.227** : une **lettre de consentement** pour utiliser Sparklog comme punch est dans `docs/governance/consentement-sparklog-punch.md`.
+  **À faire :** remplir les passages entre crochets, vérifier les renvois à l'AECQ et à l'Annexe N contre le texte officiel, puis la faire signer
+  à chaque employé.
 - ✅ **V2.4.225** : dans **Équipe › Employés**, la fiche d'un employé **te guide** : chaque champ obligatoire encore vide a un **contour
   rouge** et la mention « à remplir », l'onglet qui le contient affiche un **nombre rouge**, et le bandeau rouge en haut liste les champs :
   **un clic dessus ouvre le bon onglet**. Une fiche complète n'a plus rien de rouge. Rien d'autre à faire que de remplir les champs.
@@ -394,7 +397,8 @@ formulaires d'impôt (TD1, TP-1015.3), salaire, heures, trajets, **registre d'ac
 - [ ] 👤 💻 **Publier une politique de confidentialité** en langage simple. Claude peut préparer un premier texte à partir de ce que
   fait l'app (à faire relire par un conseiller).
 - [ ] 👤 **Avis aux employés à l'embauche** : quels renseignements on garde, pourquoi, qui y a accès, combien de temps, à qui
-  écrire. Un accusé de réception signé (ou une case à cocher dans l'app, que Claude peut ajouter).
+  écrire. **La lettre de consentement est déjà préparée** :
+  `docs/governance/consentement-sparklog-punch.md` (à remplir, à valider, à faire signer). Un accusé de réception signé (ou une case à cocher dans l'app, que Claude peut ajouter).
 - [ ] 👤 **Registre des incidents** : un simple tableau (date, ce qui s'est passé, qui est touché, risque de préjudice sérieux ?,
   mesures prises, CAI avisée oui/non). Claude peut en faire un petit écran dans l'app, comme le Registre d'accidents.
 - [ ] 👤 🧾 **ÉFVP : les renseignements sortent du Québec.** La base de données de Sparklog est hébergée **aux États-Unis**
