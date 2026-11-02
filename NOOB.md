@@ -1,11 +1,23 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.226).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.227).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.227** : gros ménage et filet de sécurité, **rien ne change pour la paie**.
+  - **Deux gestionnaires, une même fiche** : si une fiche a été modifiée depuis que le gestionnaire l'a ouverte (par l'employé ou par
+    l'autre gestionnaire), l'approbation est **refusée** et l'app demande de la relire. Avant, seul le double envoi était bloqué.
+  - **Santé du système** : dans **Gestion › Santé**, une nouvelle section « Vérifications automatiques » dit si une tâche
+    automatique a échoué ou s'est arrêtée, si des photos sont gardées trop longtemps, si une fiche approuvée n'est jamais partie vers
+    le Google Sheet, ou si les taux CCQ ne se mettent plus à jour. Rouge = un geste à faire (la ligne le dit).
+  - **Français d'abord, anglais à la demande** : l'app s'ouvre plus vite ; l'anglais ne se télécharge que si quelqu'un le choisit.
+  - **Ménage** : deux fonctions serveur jamais utilisées, quatre fichiers d'écran morts et trois paquets inutilisés sont retirés du code.
+  - **Procédures** : restauration (`docs/ops/restore-procedure.md`), contrôle de fin d'année, nouveau Google Sheet par année,
+    vérification de la clé de lecture des captures, tests automatiques de bout en bout (`npm run e2e`). Détails aux étapes 7 et 8.
+  - **À faire de ta part** : appliquer la migration 0132 (Supabase › SQL ou `supabase db push`) pour que la section « Vérifications
+    automatiques » s'affiche, et **redéployer** `push_approved_batch` (la protection « fiche modifiée » vit dans cette fonction).
 - ✅ **V2.4.225** : dans **Équipe › Employés**, la fiche d'un employé **te guide** : chaque champ obligatoire encore vide a un **contour
   rouge** et la mention « à remplir », l'onglet qui le contient affiche un **nombre rouge**, et le bandeau rouge en haut liste les champs :
   **un clic dessus ouvre le bon onglet**. Une fiche complète n'a plus rien de rouge. Rien d'autre à faire que de remplir les champs.
@@ -175,6 +187,15 @@ d'avril.
   employé (peut-être appliqué par paie : 1 980,77 $ par semaine, à vérifier). *Où la trouver :* ton comptable, ou donner à Claude quelques talons d'une même semaine (voir étape 5).
   Demander aussi au comptable si la **paie de Karine** (propriétaire, plus de 40 % des actions) est cotisable à la
   CNESST : aujourd'hui l'app la cotise comme les autres.
+  **Pour finir ce point, il faut (rien d'autre) :**
+  1. le **relevé CNESST** (ou l'état de compte du trimestre) d'**une période complète** ; il montre « salaire admissible » et « excédent »
+     pour la même période que les talons ;
+  2. les **talons des mêmes semaines** (ceux de la semaine 43 à 45 conviennent) pour 3 employés : un à salaire modeste, un à salaire élevé, un
+     chef d'équipe ;
+  3. la réponse du **comptable** à une question : *« le plafond de 103 000 $ s'applique-t-il par année, ou la CNESST le répartit-elle par
+     paie ? »* (et si la paie de la propriétaire est cotisable) ;
+  4. ensuite Claude compare : si le plafond par paie (1 980,77 $/semaine) redonne au cent près le « salaire admissible » du relevé,
+     la règle est confirmée et le code se corrige en une demi-journée (calcul + fiche des règles + test de parité).
 
 ## Étape 2 — Infos de chaque employé 👤
 
@@ -209,6 +230,8 @@ semaine 42) :
 
 ## Étape 3 — Valider avec de vrais talons de paie 👤 🧾
 
+> 📅 **À faire cette semaine** (décision du 2026-11-02).
+
 - [ ] Fournir **3 à 5 vrais talons** de paie récents :
   - un apprenti ;
   - une semaine avec du temps sup. ;
@@ -223,6 +246,7 @@ Aujourd'hui, un seul talon a été vérifié (un compagnon).
 
 ## Étape 4 — Faire approuver 🧾
 
+- 📌 **Toujours gardé, à faire à la fin** (décision du 2026-11-02) : tant que ceci n'est pas fait, la paie reste « brouillon / à réviser ».
 - [ ] Un **spécialiste de la paie ou de la CCQ, nommé** (comptable ou firme de paie), relit les règles et
   les résultats et donne son accord par écrit.
 - [ ] Ensuite seulement, Claude fait passer le moteur de paie de « brouillon » à « validé ». Les
@@ -235,23 +259,21 @@ Claude peut les faire quand tu veux. Ça ne bloque pas la paie.
 - [ ] **CNESST sur le salaire admissible (trou du calcul)** : l'app calcule la CNESST (3,17 %) sur tout le
   salaire, alors que le vrai relevé ne la calcule que sur un « salaire admissible ». Le coût CNESST est donc
   **trop élevé** dans DAS, Calcul et Coûts. À corriger dès que la règle de l'excédent est connue (étape 1).
-- [ ] **Heures payées la nuit d'un changement d'heure** : la paie compte l'heure affichée. Quelqu'un qui travaille
-  pendant l'heure répétée de l'automne est payé 1 h de moins (au printemps, 1 h de trop). À corriger seulement si ça
-  arrive, avec l'accord du comptable.
-- [ ] **Optimisations proposées** (le 2026-10-27, rien ne change pour la paie ; dis lequel tu veux) :
-  - **Ménage des fonctions serveur** : 3 fonctions encore en ligne chez Supabase ne sont plus dans le code (`send_sms`,
-    une vieille copie de la lecture des preuves, une purge ponctuelle de septembre) et 4 du code ne sont plus appelées
-    par l'app (`push_approved_to_sheet`, `send_announcement`, `classify_week`, `reset_employee_password` : à vérifier).
-    Moins de portes ouvertes sur le serveur.
-  - **Ménage de l'écran** : le code de l'ancienne V2 qui reste caché derrière des options (fiche employé, feuilles de
-    temps, déblocage, paramètres, rapport CCQ), 2 vieux écrans jamais affichés (annonces, soupers) et 2 paquets
-    inutilisés. App plus légère, moins de risques d'erreur.
-  - **Notification sur le téléphone** quand Karine répond à une note partagée ou quand un rappel arrive (aujourd'hui :
-    dans l'app seulement).
-  - **Deux gestionnaires approuvent la même fiche en même temps** : prévenir le second que la fiche a changé depuis
-    qu'il l'a ouverte.
-  - **Une seule langue téléchargée** (français ou anglais) : app un peu plus rapide à ouvrir.
-  - **Colonne inutile** dans la base (`return_overtime_no_benefits`, remplacée en octobre) : la retirer.
+- 📝 **Heures payées la nuit d'un changement d'heure** : **ne s'applique pas** chez nous (décision du 2026-11-02 : on ne travaille pas
+  pendant le changement d'heure). Note gardée : la paie compte l'heure affichée ; quelqu'un qui travaillerait pendant l'heure répétée
+  de l'automne serait payé 1 h de moins (1 h de trop au printemps). Si ça arrivait un jour, en parler au comptable avant de toucher au moteur.
+- ✅ **Fait en V2.4.227** : approbation refusée si la fiche a changé ; une seule langue téléchargée au départ ; ménage de 2 fonctions
+  serveur et de 4 fichiers/paquets morts ; surveillance des échecs silencieux.
+- 📝 **Gardés volontairement** (vérifiés le 2026-11-02) :
+  - la colonne `return_overtime_no_benefits` (53 fiches, toutes à « oui ») : **aucune fonction, vue ni règle ne la lit**, mais elle
+    contient une donnée de l'ancien réglage ; on ne la supprime pas sans ton accord (suppression impossible à défaire) ;
+  - les fonctions `classify_week` (moteur de paie côté serveur, cité par la fiche des règles) et `reset_employee_password`
+    (réinitialiser un mot de passe : aucun bouton ne l'appelle encore, mais la capacité existe).
+- [ ] **À supprimer chez Supabase par toi** (Edge Functions › supprimer) : `send_sms`, `quick-handler` (vieille copie de la lecture des
+  preuves) et `purge_reset_evidence_20260928`. Elles n'ont plus de code dans le dépôt ; Claude ne peut pas les supprimer d'ici.
+  Aussi : `send_announcement` et `push_approved_to_sheet` (retirées du code en V2.4.227, encore en ligne chez Supabase).
+- [ ] **Notification sur le téléphone** quand Karine répond à une note partagée ou quand un rappel arrive (aujourd'hui : dans
+  l'app seulement). Voir « Plus tard ».
 
 ## Étape 6 — Temps de trajet, km et frais : une option par employé 👤 💻
 
@@ -399,7 +421,7 @@ Le forfait Pro coûte environ 25 $ US par mois, plus le serveur Small (environ 1
 | Temps total des déclencheurs | ≈ **90 minutes par jour** (compte Gmail) | « Stats » se refait aux 15 minutes s'il y a du nouveau ; avec 40 000+ lignes, ça peut manquer de temps |
 | Appels externes | ≈ 20 000 par jour | correct |
 
-👉 **Conseil :** commencer **un nouveau fichier Google Sheet chaque année**, ou archiver « Data » en janvier. La
+👉 **Décision (2026-11-02) : un fichier Google Sheet par année**, un onglet par semaine. Marche à suivre à l'étape 7. La
 paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils lisent la base de Sparklog.
 
 ### Lecture automatique des captures (OCR.space)
@@ -411,7 +433,7 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
 | Taille d'une image | 1 Mo | l'app envoie ≈ 80–100 Ko : correct |
 
 - Si aucune clé n'est enregistrée, l'app utilise la clé de démonstration publique « helloworld », **très
-  limitée**. **À vérifier** dans Supabase › Edge Functions › Secrets : `OCR_SPACE_API_KEY` doit exister.
+  limitée**. **Il y a deux endroits où la clé doit exister** : voir la marche à suivre à l'étape 8 (« Vérifier la clé OCR.space »).
 - Si la limite est atteinte, rien ne se perd : la photo est gardée, la liste reste « à vérifier » et un
   gestionnaire peut relancer la lecture. Une clé payante (300 000 lectures par mois) règle le problème.
 
@@ -447,6 +469,123 @@ paie, les talons et les rapports ne dépendent **pas** de la Google Sheet : ils 
 
 - [ ] **Google Sheet** : prévoir un nouveau fichier en janvier 2027.
 - [ ] **Vérifier** la clé OCR et le forfait Vercel (voir plus haut).
+
+## Étape 7 — Fin d'année et janvier 2027 👤
+
+À faire **dans cet ordre**. Un contrôle prêt à l'emploi existe : `docs/ops/year-end-control.sql` (lecture seule, ne renvoie que des
+nombres). Supabase › SQL editor › coller le fichier › Run. Refais-le début décembre, puis avant la première paie de janvier.
+
+**Résultat du contrôle du 2026-11-02** (nombres seulement) : 47 employés actifs ; **46 sans NAS** ; **3 sans date d'embauche** ;
+**47 sans montants TD1 / TP-1015.3** ; **aucun barème 2027** ; **1 183 fiches soumises depuis la semaine 43 pas encore approuvées** ;
+dernière ligne du cumul au 10 octobre (aucune semaine comptabilisée par Sparklog). Tout est à zéro à la fin quand c'est prêt.
+
+- [ ] **1. Approuver puis comptabiliser** les semaines 43 et suivantes, **une semaine à la fois** (À traiter › approuver, puis Paie de la
+  semaine › Comptabiliser). Sans ça, le cumul de l'année (RRQ, AE, impôt) ne suit pas et les relevés de fin d'année seront faux.
+- [ ] **2. NAS** de chaque employé actif (propriétaire seulement, Employés › fiche › NAS). Sans NAS : pas de Relevé 1, pas de relevé
+  d'emploi, pas de rapport mensuel CCQ. Un NAS refusé = chiffre de contrôle invalide : revérifier sur la carte.
+- [ ] **3. Dates d'embauche** manquantes (Employés › fiche). Elles servent aux cases 10 et 11 du relevé d'emploi.
+- [ ] **4. TD1 et TP-1015.3** : montants dans Employés › fiche › Impôts. Les formulaires de **2027** sortent en décembre : faire signer les
+  nouveaux à tout le monde en janvier (un employé qui n'en remet pas garde le montant de base).
+- [ ] **5. Remplacer l'estimation de la masse salariale** par le vrai total (case A des relevés 1) quand le comptable le confirme
+  (Configuration › Paramètres › Paie).
+- [ ] **6. Barèmes 2027** (ci-dessous).
+- [ ] **7. Nouveau Google Sheet 2027** (ci-dessous).
+- [ ] **8. Vacances de la construction** : aucune heure travaillée du 27 déc. 2026 au 2 janv. 2027 ; rien à saisir.
+- [ ] **9. Le comptable** fait les relevés (Relevé 1, T4, sommaire) : lui donner le cumul de l'app **après** l'étape 1.
+
+### Barèmes 2027 (dans l'app : Configuration › Barèmes annuels)
+
+L'écran part de 2026, te montre tous les changements et refuse un barème incohérent. Il te faut **huit séries de chiffres**. Aucun taux
+2027 n'était encore publié le 2 novembre 2026 : ils sortent surtout **en novembre et décembre**. À chaque fois, vérifier avec ta comptable.
+
+| Série | Où trouver le chiffre officiel | Quand |
+|---|---|---|
+| RRQ (taux, maximum des gains, 2e cotisation) | Revenu Québec › Employeur › [Cotisations au RRQ](https://www.revenuquebec.ca/fr/entreprises/retenues-a-la-source-et-cotisations-de-lemployeur/calcul-des-retenues-et-des-cotisations/cotisations-au-rrq/cotisations-au-rrq-ce-que-vous-devez-savoir/) ; la page « Employeur : principaux changements 2027 » apparaît en décembre | nov.–déc. |
+| RQAP (taux employé et employeur, maximum) | Revenu Québec › [Table des cotisations au RQAP (TP-1015.TA)](https://www.revenuquebec.ca/fr/services-en-ligne/formulaires-et-publications/details-courant/tp-1015-ta/) | nov.–déc. |
+| Assurance-emploi (taux, maximum assurable) | Canada.ca › « Taux de cotisation à l'assurance-emploi » ; confirmer dans la **T4127** de janvier (ARC) | nov.–déc. |
+| Impôt fédéral (paliers, constantes K) | ARC › **T4127 « Guide des formules de calcul des retenues »**, édition de **janvier 2027** | déc. (à jour fin déc.) |
+| Impôt du Québec (paliers) | Revenu Québec › **TP-1015.F** (édition 2027-01) et le guide **TP-1015.G** | déc. |
+| FSS (taux selon la masse salariale) | Revenu Québec › [Seuil de la masse salariale totale et taux de cotisation au FSS](https://www.revenuquebec.ca/fr/entreprises/retenues-a-la-source-et-cotisations-de-lemployeur/calcul-des-retenues-et-des-cotisations/cotisation-de-lemployeur-fss/seuil-de-la-masse-salariale-totale-et-taux-de-cotisation-au-fss/) | déc. |
+| Normes du travail (CNT, plafond) | Revenu Québec › Employeur › principaux changements 2027 (CNT : 0,06 % jusqu'au plafond) | déc. |
+| FDRCMO (seuil 2 M$, 1 %) | Guide **RLZ-1.S.G** (Sommaire 1) de Revenu Québec | déc. |
+
+Marche à suivre : Configuration › **Barèmes annuels** › choisir 2027 › l'écran propose le barème 2026 › corriger chaque série › lire la liste
+des changements › Enregistrer. Une pastille rouge te rappelle dès 28 jours avant le 1er janvier, et tant que 2027 manque. Les outils pour
+**comparer au cent près** : WebRAS (Revenu Québec) et PDOC (ARC). Tant qu'un barème n'est pas saisi, le talon utilise celui de 2026 et l'écrit.
+
+### Taxe MÉDIC et grille ACQ (changent en 2027)
+
+- **Taxe sur la prime MÉDIC : 9 % → 9,975 % le 1er janvier 2027.** Déjà dans l'app (rien à faire). Source : page CCQ
+  [Salaire et taux](https://www.ccq.org/avantages-sociaux/salaire-taux), qui précise que la cotisation patronale et la retenue
+  salariale ne changent pas, seulement la taxe appliquée dessus.
+- **Prime MÉDIC et cotisation patronale : à confirmer avant le 25 avril 2027** (0,68 $ / 2,93 $ aujourd'hui, 1,06 $ / 3,31 $ prévus dans la
+  convention). Où : [Salaire et taux](https://www.ccq.org/avantages-sociaux/salaire-taux), [MÉDIC Construction › Assurance de base](https://www.ccq.org/fr-CA/avantages-sociaux/medic-construction/assurance-de-base)
+  et la [section 26 de la convention (résidentiel)](https://www.ccq.org/fr-CA/loi-r20/conventions-collectives/conventions-collectives/residentiel/section-26) ;
+  l'**avis d'assurabilité** de chaque employé (janvier et juillet) donne les montants réels. En cas de doute : téléphoner à la CCQ,
+  service aux employeurs. L'app te prévient 4, 2 et 1 semaine avant ; le changement se fait dans **Configuration › Taux**.
+- **Nouvelle grille ACQ (salaires et avantages par niveau)** : l'ACQ (Association de la construction du Québec) publie la grille ICI à
+  chaque changement (la dernière dans l'app : `docs/reference/acq-grilles-taux-ici-2026-04-26.pdf`). La nouvelle grille d'avril 2027 est
+  attendue **en mars–avril 2027** : la demander à l'ACQ ou la chercher dans l'extranet de l'ACQ, puis la donner à Claude pour mise à jour
+  de la grille (les salaires par niveau suivent déjà les taux de la CCQ tout seuls).
+
+### Nouveau Google Sheet de l'année (un fichier par année, un onglet par semaine)
+
+1. Début janvier, ouvrir le Sheet de 2026 › menu **Sparklog › Préparer le Sheet de l'année suivante** (script
+   `supabase/functions/push_approved_batch/apps-script-rotate-year.js` : à coller une fois dans Extensions › Apps Script, comme le `doPost`).
+   Il fait une **copie** nommée « … 2027 » avec seulement les en-têtes ; le Sheet de 2026 n'est **jamais** touché.
+2. Dans la copie › Extensions › Apps Script › Paramètres du projet › Propriétés du script : créer **`TOKEN`** (la même valeur que le secret
+   Supabase `APPS_SCRIPT_TOKEN`).
+3. Déployer › **Nouveau déploiement** › Application Web (exécuter en tant que moi, accès : tout le monde) › copier l'adresse `/exec`.
+4. Supabase › Edge Functions › Secrets › remplacer **`APPS_SCRIPT_URL`** par cette adresse.
+5. Approuver **une** fiche de test et vérifier qu'elle apparaît dans le Sheet 2027 (onglet Data). Les onglets « SemXX » se recréent avec Stats.
+- ⚠️ Entre 3 et 5, les approbations iraient encore vers l'ancien Sheet : le faire un dimanche ou en dehors des heures d'approbation.
+- Ce script n'a pas pu être essayé sur Google d'ici (pas d'accès à ton Drive) : essaie-le d'abord sur une **copie** du Sheet.
+
+## Étape 8 — Outils de sécurité et procédures 💻
+
+### Restauration (si la base est perdue ou abîmée)
+Procédure complète : **`docs/ops/restore-procedure.md`**. Contrôle automatique : **`supabase/tests/restore-check.sql`** (lecture seule ; toutes
+les lignes doivent dire `ok = true` ; essayé le 2026-11-02 sur la vraie base : tout `ok`).
+- [ ] **Vérifier ton forfait Supabase** (Billing) : seul le forfait **Pro** garde des sauvegardes quotidiennes. Sinon, faire la copie manuelle
+  de l'étape 2 de la procédure chaque semaine.
+- [ ] **Faire un essai de restauration** sur un projet jetable (≈ 1 h), puis **chaque trimestre** et avant la première paie de janvier.
+- [ ] Garder dans ton gestionnaire de mots de passe : les secrets Supabase (`APPS_SCRIPT_URL`, `APPS_SCRIPT_TOKEN`, clés d'envoi des
+  notifications) et les variables Vercel (`VITE_*`). **Aucune sauvegarde ne les contient.**
+- Les **photos** ne sont pas dans la sauvegarde de la base : les télécharger (Justificatifs) avant leur suppression automatique.
+
+### Surveillance (Gestion › Santé › Vérifications automatiques)
+Rouge = geste à faire (la ligne le dit). Elle n'envoie **pas** de message sur le téléphone : l'ouvrir une fois par semaine.
+Si tu veux un message automatique (SMS ou courriel) en cas de rouge, c'est possible : dis-le à Claude.
+
+### Vérifier la clé OCR.space (lecture des captures)
+Il y a **deux** clés à contrôler, parce que la lecture se fait à deux endroits :
+1. **Supabase › Edge Functions › Secrets** : le nom `OCR_SPACE_API_KEY` doit être dans la liste (utilisée pour l'inventaire et les preuves de
+   temps sup.). Si le nom manque : l'ajouter avec ta clé.
+2. **Vercel › Settings › Environment Variables** : `VITE_OCR_SPACE_API_KEY` (utilisée par le remplissage automatique de la fiche de
+   temps). Si elle manque, ajouter la clé puis **redéployer** le site. Cette clé est visible dans le code du site : c'est normal pour
+   OCR.space, mais n'y mets jamais une clé qui paie à l'usage sans limite.
+3. **Test** : sur ton compte, prendre une capture de la fiche de temps et vérifier qu'elle se lit. Une clé absente donne, en période
+   chargée, des lectures « à vérifier » en série ou l'erreur « limit reached » dans le texte d'erreur.
+4. **Vercel** : Settings › Billing : le forfait **Hobby interdit l'usage commercial** ; passer à **Pro** (≈ 20 $/mois) si ce n'est pas déjà fait.
+La clé gratuite permet 25 000 lectures par mois (≈ 4 000–5 000 chez nous).
+
+### Tests automatiques de bout en bout (Playwright)
+`npm run e2e` ouvre le site construit dans un vrai navigateur (téléphone et ordinateur) et vérifie : l'ouverture en français, la
+redirection d'un visiteur non connecté, l'anglais téléchargé seulement quand on le choisit, un mauvais mot de passe. Les 8 tests passent
+(2026-11-02). Avec un compte **de test** (jamais un vrai employé) : `E2E_EMAIL=… E2E_PASSWORD=… npm run e2e` ajoute la connexion.
+Ils **n'enregistrent ni n'approuvent** rien. Prochaine étape possible : parcours employé complet sur une base de test (à décider).
+
+## Plus tard (notes gardées, on y reviendra) 📝
+
+Idées proposées le 2026-11-02, **pas demandées pour l'instant** :
+- **Détection d'anomalies** pour le gestionnaire : fiches en double, journées de plus de 12 h, km incohérents, employé sans fiche un jour
+  ouvrable.
+- **Talon consultable par l'employé** (lecture seule) une fois la paie validée.
+- **Notifications téléphone pour les notes** (réponse et rappel dû) : `send_push` existe déjà.
+- **Journal d'audit consultable** avec filtres (qui a changé quoi) : les données existent, l'écran de lecture est limité.
+- **Rapport « Chargé à Britton »** par semaine (dépend de la paie qui lira les options de trajets, étape 6).
+- **Mode hors-ligne** : soumission mise en file d'attente avec reprise automatique, pour les chantiers sans réseau (les brouillons
+  sont déjà gardés 30 jours sur le téléphone).
 
 ## Comment demander à Claude
 

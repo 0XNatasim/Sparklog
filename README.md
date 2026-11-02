@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.226 (2026-11-01).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.227 (2026-11-02).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,14 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.227 — Safety net and cleanup.** (1) *Stale approval refused*: approving a job sends the `updated_at` the manager saw
+  (`expected_updated_at`); `push_approved_batch` answers `version_changed` for a job edited since, and the screens ask for a re-read.
+  (2) *System checks*: Management › Health shows « Automatic checks » from the read-only `system_health_checks()` RPC (migration 0132:
+  failed or stopped scheduled jobs, evidence kept past retention, approved-but-not-exported jobs, stale CCQ rates). (3) *French first*:
+  `i18n-fr.js` ships with the app, `i18n-en.js` is its own chunk fetched when English is chosen. (4) Removed: edge functions
+  `send_announcement` and `push_approved_to_sheet`, unused components and packages. (5) Playwright end-to-end tests (`npm run e2e`).
+  (6) Restore procedure and checks (`docs/ops/restore-procedure.md`, `supabase/tests/restore-check.sql`), year-end control
+  (`docs/ops/year-end-control.sql`), yearly Google Sheet rotation script (`apps-script-rotate-year.js`).
 - **V2.4.226 — NOOB.md cleaned.** The « À faire » notes already done (migrations 0120–0129 applied, edge functions redeployed,
   warehouses switched on, the 1 November time-change notice) are removed; the payroll-weeks 43–44 count, the MÉDIC reminder and the
   2027 yearly scales are added to the owner's list.

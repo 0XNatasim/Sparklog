@@ -111,7 +111,7 @@ No open item. The interval, overlap, timezone and repeated-autumn-hour invariant
 
 | Persona | Scenario | Found Behavior | Expected | Patch |
 |---|---|---|---|---|
-| Manager | Two managers approve same job | Atomic claim prevents double-export; no reviewed-version check | Explicit conflict on stale version | S-4 (add version/hash) |
+| Manager | Two managers approve same job | Atomic claim prevents double-export; `expected_updated_at` refuses a job edited since it was read (`version_changed`, V2.4.227) | — | closed |
 
 ---
 
@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.226)
+## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.227)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,24 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.227 (technique).** Lot « audit » en 7 volets (branche `claude/audit-remediation-v2-4-227`, aucune règle de paie touchée).
+**S-4 fermé** : `expectedVersions(ids, rows)` (`todo-inbox.js`) → corps `expected_updated_at` de `push_approved_batch` (TodoInbox, approbation d'une fiche et de la semaine
+dans `ManagerDashboard`) ; la fonction lit `updated_at`, exclut la fiche dont la version diffère et répond `outcome: "version_changed"` (comptée « périmée » par `approvalOutcome`) ;
+un corps sans la carte garde l'ancien comportement. Les RPC de retour / révision avaient déjà `p_expected_updated_at`. Limite connue : la comparaison se fait avant le claim
+atomique (fenêtre de quelques ms), le claim reste `status='submitted' AND exported_to_sheet=false`. **À redéployer : `push_approved_batch`.**
+**Surveillance** : migration 0132 `system_health_checks()` (lecture seule, `get_my_role() = 'manager'`, sinon liste vide ; `cron_failed`, `cron_stale`, `evidence_overdue`,
+`export_stuck`, `rates_stale`), `src/lib/system-health.js`, section dans `InfraHealthCard` (textes `health.*` FR/EN). Les requêtes ont été essayées en lecture sur la base le 2026-11-02 (tout vert).
+**i18n** : `i18n.js` (agrégat pour tests) éclaté en `i18n-fr.js` (livré) et `i18n-en.js` (chunk dynamique via `i18n-loader.js`), `languages.js` ; `use-t.js` n'a plus de repli vers
+l'anglais (clés identiques FR/EN verrouillées par `i18n.test.js`) ; `LanguageProvider` charge l'anglais à la demande (`englishReady`). **Ménage** : retirés `send_announcement`,
+`push_approved_to_sheet` (code ; encore déployées chez Supabase, à supprimer par la propriétaire avec `send_sms`, `quick-handler`, `purge_reset_evidence_20260928`),
+`ManagerAnnouncePanel`, `MealClaimsManager`, `ui/separator`, `ui/sonner`, `@radix-ui/react-separator`, `sonner`, `@testing-library/user-event` ; `classify_week` et
+`reset_employee_password` gardées volontairement. `profiles.return_overtime_no_benefits` : vérifiée sans lecteur (aucune fonction, vue, politique ni déclencheur ; 53 lignes à `true`) et
+**conservée** (suppression irréversible, accord de la propriétaire requis). **Playwright** : `playwright.config.js`, `e2e/public-screens.spec.js` (8 tests, téléphone + ordinateur ; `npm run e2e`,
+`E2E_CHROMIUM` pour un Chromium déjà installé, `E2E_EMAIL` / `E2E_PASSWORD` pour la connexion), exclu de vitest. **Procédures** : `docs/ops/restore-procedure.md` + `supabase/tests/restore-check.sql` (essayé sur la
+base réelle : tout `ok`) + `restore-procedure.test.js` ; `docs/ops/year-end-control.sql` (nombres seulement) ; `apps-script-rotate-year.js` (copie seulement, jamais de suppression de l'original ; non essayé
+sur Google). OCR : la clé existe à deux endroits (secret Edge `OCR_SPACE_API_KEY` : inventaire et preuves ; `VITE_OCR_SPACE_API_KEY` chez Vercel : fiche de temps), marche à suivre dans NOOB.md étape 8.
+Décisions de la propriétaire du 2026-11-02 : heures de nuit d'un changement d'heure **non applicables** (on ne travaille pas), 3 à 5 talons réels **cette semaine**, signature du spécialiste **à la fin**, un Google Sheet par année.
 
 **V2.4.226 (technique).** Ménage de `NOOB.md` seulement (aucun code) : retrait des « À faire » faits (migrations 0120 à 0131 vérifiées appliquées dans la base le 2026-11-01 ;
 `classify_week` redéployée le 2026-10-30 avec le moteur 2.7.0 — `push_approved_batch` n'importe que `RETURN_WITH_BENEFITS`, rien à redéployer ; `cleanup_overtime_evidence`
@@ -468,27 +486,18 @@ Ce qui est fait est dans l'historique Git (V2.4.104 → V2.4.195). Ouvert, du pl
   l'excédent est connue (§6.1 A). Toucher aussi la fiche des règles (`pay-rules-reference.js`).
 - [ ] **Moteur de paie qui lit `travel_pay_rules`** (§6.1 D) + rapport « Chargé à Britton » ; une fixture de parité par
   ligne avant de coder (règle « Payroll logic forks »).
-- [ ] **Ménage des fonctions Edge** (constaté le 2026-10-27) : déployées sans source dans le dépôt — `send_sms`,
-  `quick-handler` (ancienne copie nommée `process_overtime_evidence`), `purge_reset_evidence_20260928` (ponctuelle) ;
-  dans le dépôt mais jamais appelées par `src/` — `push_approved_to_sheet` (remplacée par `push_approved_batch`),
-  `send_announcement` (seul appelant : `ManagerAnnouncePanel.jsx`, jamais importé), `classify_week` (moteur 2.3.0,
-  citée seulement par la fiche des règles), `reset_employee_password` (aucun `invoke` trouvé : vérifier avant de
-  retirer). Supprimer après confirmation (chaque fonction est une surface exposée avec `verify_jwt`).
-- [ ] **Code mort côté écran** (`npx knip`) : props qui choisissaient le rendu V3 et le rendu V2 qu'elles désactivent
-  (`EmployeesPanel tabbed`, `EmployeeDetails`, `ManagerDashboard nameFirst / manualFilter / plainWords / reviewFilters`,
-  `UnlockDayManager plainWords`, `SettingsPanel taxForms`, `CcqJsonExport lastFinishedMonth`) ; fichiers jamais importés
-  `ManagerAnnouncePanel.jsx`, `MealClaimsManager.jsx`, `ui/separator.jsx`, `ui/sonner.jsx` ; dépendances
-  `@radix-ui/react-separator`, `sonner`, `@testing-library/user-event`. Les tests d'écran existants couvrent la V3.
-- [ ] **S-4** : conflit explicite quand deux gestionnaires approuvent la même fiche (version / `updated_at` attendu
-  passé à `push_approved_batch` et aux RPC de retour / révision).
+- [ ] **Ménage des fonctions Edge** : code retiré en V2.4.227 (`send_announcement`, `push_approved_to_sheet`). Reste à supprimer **chez Supabase**, par la
+  propriétaire : `send_sms`, `quick-handler`, `purge_reset_evidence_20260928`, `send_announcement`, `push_approved_to_sheet`. Gardées : `classify_week`,
+  `reset_employee_password` (aucun appelant, mais capacité réelle ; à retirer seulement sur décision).
+- [ ] **Code mort côté écran** : fichiers et paquets inutilisés retirés en V2.4.227. Restent, **non touchés faute de preuve que l'écran ne change pas** : les props
+  qui choisissaient le rendu V3 et le rendu V2 qu'elles désactivent (`EmployeesPanel tabbed`, `EmployeeDetails`,
+  `ManagerDashboard nameFirst / manualFilter / plainWords / reviewFilters`, `UnlockDayManager plainWords`, `SettingsPanel taxForms`, `CcqJsonExport lastFinishedMonth`).
+  Les retirer un écran à la fois, avec son test d'écran.
 - [ ] **Notifications téléphone pour les notes** : réponse à une note partagée et rappel dû (`send_push` existe ;
   aujourd'hui badge dans l'app seulement).
-- [ ] **Migration** : retirer `profiles.return_overtime_no_benefits` (dépréciée depuis 0081 ; vérifier qu'aucune
-  fonction ni vue ne la lit).
-- [ ] **Google Sheet** : nouveau fichier en janvier 2027 (200 onglets max, un « SemXX » par semaine). Le propriétaire doit
-  aussi coller le `doPost` de `apps-script-doPost.js` (V2.4.138) et déployer une nouvelle version, si ce n'est pas fait.
-- [ ] **Vérifier** `OCR_SPACE_API_KEY` dans les secrets Edge (sinon clé « helloworld ») et le forfait Vercel (Hobby =
-  usage commercial interdit).
+- [ ] **Migration** : `profiles.return_overtime_no_benefits` n'a plus aucun lecteur (vérifié le 2026-11-02) ; la retirer seulement avec l'accord de la propriétaire (donnée de l'ancien réglage, irréversible).
+- [ ] **Google Sheet** : un fichier par année (décision du 2026-11-02) ; script `apps-script-rotate-year.js` et marche à suivre dans NOOB.md étape 7. Coller aussi le `doPost` de V2.4.138 si ce n'est pas fait.
+- [ ] **Vérifier** `OCR_SPACE_API_KEY` (secret Edge) **et** `VITE_OCR_SPACE_API_KEY` (Vercel), puis le forfait Vercel (Hobby = usage commercial interdit) : marche à suivre dans NOOB.md étape 8.
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2.
 
 ---
