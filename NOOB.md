@@ -1,11 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.226).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-01 (V2.4.227).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.227** : le point « coller le `doPost` dans Google » est retiré (fait le 2 novembre). Nouvelle section **« Loi 25 »** plus bas :
+  ce que la loi demande, ce que l'app fait déjà, et la liste de ce qui reste à faire pour être en règle (personne responsable,
+  politique de confidentialité, registre d'incidents, hébergement hors Québec, durées de conservation).
 - ✅ **V2.4.225** : dans **Équipe › Employés**, la fiche d'un employé **te guide** : chaque champ obligatoire encore vide a un **contour
   rouge** et la mention « à remplir », l'onglet qui le contient affiche un **nombre rouge**, et le bandeau rouge en haut liste les champs :
   **un clic dessus ouvre le bon onglet**. Une fiche complète n'a plus rien de rouge. Rien d'autre à faire que de remplir les champs.
@@ -76,8 +79,7 @@
   supprime les reçus de plus de 30 jours : télécharge ce que tu veux garder avant.
 - ✅ **V2.4.208** : les OT prédéfinis sont dans **la même case que l'OT** : une petite flèche à droite de la case ouvre la
   liste ; on choisit, ça s'écrit dedans, ou on tape un numéro comme avant. Aussi, le script du **Google Sheet** applique
-  maintenant la règle des 65 km (premier trajet payé). Le bouton **« Inventaire du crew »** est retiré de la page Inventaire. **À faire : coller le nouveau `doPost` dans Google Apps Script
-  (fichier `apps-script-doPost.js`) et le redéployer en « Nouvelle version ».**
+  maintenant la règle des 65 km (premier trajet payé). Le bouton **« Inventaire du crew »** est retiré de la page Inventaire. (Le script Google a été mis à jour et redéployé le 2 novembre 2026.)
 - ✅ **V2.4.207** : **premier trajet non payé, mais payé dès 65 km**. Pour un employé qui a l'option « premier trajet non payé »,
   le premier trajet de la journée est maintenant **payé si la première fiche de la journée fait 65 km ou plus** (65 compte). En
   dessous de 65 km, il reste non payé. Depuis le 11 octobre. Le moteur de paie, le souper et l'exigence de la capture
@@ -319,10 +321,6 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 
 ## À surveiller 👤
 
-- [ ] **Apps Script (export Google Sheet)** : coller le nouveau code
-  (`supabase/functions/push_approved_batch/apps-script-doPost.js`) dans la feuille › **Extensions › Apps Script**, à
-  la place de tout le `doPost`, Enregistrer, puis **Déployer › Gérer les déploiements › crayon › Nouvelle version ›
-  Déployer**. Garder le **même** déploiement (sinon l'adresse change et l'envoi ne marche plus).
 - [ ] **Courriels d'inscription (SMTP)** : si « Confirm email » a été désactivé pour une arrivée en groupe, le
   réactiver. Un **SMTP** est un service d'envoi de courriels (Brevo, Resend, SendGrid, Google Workspace…) : le brancher
   dans Supabase › Authentication › Emails enlève la limite de quelques courriels par heure du service intégré.
@@ -343,6 +341,79 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
 - [ ] **Barèmes 2027 (RRQ, assurance-emploi, RQAP, impôts, FSS, CNT, FDRCMO)** : à saisir dans **Configuration › Barèmes annuels**
   avant le 1er janvier 2027, avec les documents officiels et ta comptable. Une pastille apparaît dès le 4 décembre ; sans
   barème, les talons de 2027 utilisent celui de 2026 et l'écrivent dans leurs avertissements.
+
+## Loi 25 — protection des renseignements personnels 🔒 👤 🧾 💻
+
+> Résumé en mots simples, pour savoir quoi faire. **Ce n'est pas un avis juridique** : à valider avec un avocat ou un conseiller
+> en protection des renseignements personnels. Sources officielles : Commission d'accès à l'information (cai.gouv.qc.ca) et
+> quebec.ca (rechercher « Loi 25 »). La loi a été mise en application par étapes de septembre 2022 à septembre 2024 : **tout
+> est maintenant en vigueur**.
+
+### C'est quoi, et est-ce que ça nous concerne ?
+La **Loi 25** (ancien projet de loi 64, adopté en 2021) change les règles de la protection des **renseignements personnels** (tout
+ce qui permet d'identifier une personne) dans les entreprises du Québec. Elle vise **toutes les entreprises, même petites**, donc
+Messier Connexion. Ici, les personnes concernées sont surtout **les employés** (et leurs proches si on en garde).
+
+Ce que Sparklog et Messier gardent : nom, courriel, téléphone, date de naissance, **NAS** (très sensible), carte CCQ et sa photo,
+formulaires d'impôt (TD1, TP-1015.3), salaire, heures, trajets, **registre d'accidents** (santé : sensible), photos de preuves
+(temps supplémentaire, stationnement), notes des gestionnaires.
+
+### Ce que la loi demande (les 10 points)
+1. **Une personne responsable** de la protection des renseignements. Par défaut, c'est la personne qui dirige l'entreprise ; elle
+   peut désigner quelqu'un **par écrit**. Son **titre et ses coordonnées doivent être publiés** (site de l'entreprise).
+2. **Une politique de confidentialité** publiée en **langage simple** : quels renseignements, pourquoi, qui y a accès, combien
+   de temps on les garde, comment demander à les voir ou à les corriger, à qui écrire.
+3. **Ne prendre que le nécessaire** et **dire pourquoi** à la personne (un avis à l'embauche suffit pour ce qui est nécessaire à
+   l'emploi). Pour le reste (ex. : une photo utilisée autrement), un **consentement clair, libre et éclairé**.
+4. **Incidents de confidentialité** (courriel envoyé à la mauvaise personne, téléphone perdu avec l'app ouverte, compte piraté,
+   talon vu par quelqu'un qui n'y a pas droit) : **tenir un registre** de tous les incidents, et, s'il y a un **risque sérieux de
+   préjudice**, **aviser la Commission (CAI) et les personnes touchées « avec diligence »**.
+5. **Évaluation des facteurs relatifs à la vie privée (ÉFVP)** : une analyse écrite **avant** d'acheter ou de changer un système
+   informatique qui contient des renseignements personnels, et **avant d'envoyer des renseignements hors du Québec** (on doit
+   vérifier qu'ils seront bien protégés et avoir une **entente écrite**).
+6. **Garder seulement le temps nécessaire**, puis **détruire ou anonymiser** (sauf si une autre loi oblige à garder : paie,
+   relevés d'emploi, CNESST, CCQ…).
+7. **Les droits des personnes** : voir leurs renseignements, les faire corriger, savoir à qui ils sont communiqués, et, depuis
+   septembre 2024, **les obtenir dans un format utilisable (portabilité)**. **Réponse dans les 30 jours.**
+8. **Décision prise uniquement par un traitement automatisé** : la personne doit en être informée. Nos calculs de paie sont
+   revus par un humain, donc probablement non visés (à confirmer).
+9. **Sécurité proportionnelle à la sensibilité** des renseignements (le NAS et la santé demandent plus).
+10. **Sanctions** (d'après l'aperçu que tu as trouvé) : sanctions administratives jusqu'à **10 M$ ou 2 % du chiffre d'affaires
+    mondial**, amendes pénales jusqu'à **25 M$ ou 4 %**, et un employé peut poursuivre en dommages.
+
+### Ce que l'app fait déjà pour toi ✅
+- **NAS chiffré** dans un coffre, visible seulement par la propriétaire, chaque consultation notée au Journal.
+- **Authentification à deux étapes** obligatoire pour les gestionnaires et la propriétaire.
+- **Chaque employé ne voit que sa propre fiche** ; les gestionnaires voient seulement ce que leur rôle permet.
+- **Les photos de preuves sont supprimées automatiquement après 30 jours.**
+- **Un Journal** des actions sensibles (changements de rôle, de taux, accès au NAS…).
+- Les comptes en pause ne peuvent plus rien écrire.
+
+### Ce qu'il reste à faire pour être en règle
+- [ ] 👤 **Nommer par écrit la personne responsable** et **publier son titre et son courriel** (page du site de l'entreprise).
+- [ ] 👤 💻 **Publier une politique de confidentialité** en langage simple. Claude peut préparer un premier texte à partir de ce que
+  fait l'app (à faire relire par un conseiller).
+- [ ] 👤 **Avis aux employés à l'embauche** : quels renseignements on garde, pourquoi, qui y a accès, combien de temps, à qui
+  écrire. Un accusé de réception signé (ou une case à cocher dans l'app, que Claude peut ajouter).
+- [ ] 👤 **Registre des incidents** : un simple tableau (date, ce qui s'est passé, qui est touché, risque de préjudice sérieux ?,
+  mesures prises, CAI avisée oui/non). Claude peut en faire un petit écran dans l'app, comme le Registre d'accidents.
+- [ ] 👤 🧾 **ÉFVP : les renseignements sortent du Québec.** La base de données de Sparklog est hébergée **aux États-Unis**
+  (Supabase, région « us-west-2 »). Les autres services qui touchent des renseignements : Vercel (le site), Google (Sheets et
+  Apps Script), OCR.space (lecture des captures d'écran), le service de courriels. Il faut **une analyse écrite et des ententes
+  avec ces fournisseurs**. Option à discuter avec Claude : déplacer la base dans une région canadienne (Montréal).
+- [ ] 👤 🧾 **Durées de conservation** : demander à la comptable combien de temps garder les talons, relevés d'emploi, dossiers
+  CNESST et CCQ, puis **détruire** le reste (ex. : fiches d'un ancien employé). Claude peut préparer une purge.
+- [ ] 👤 **Procédure de demande d'accès / correction** : à qui l'employé écrit, qui sort le dossier, réponse sous 30 jours.
+- [ ] 👤 **Expliquer aux gestionnaires** les bons réflexes : pas de talons ni de NAS par courriel ordinaire, verrouiller le
+  téléphone, signaler tout incident tout de suite.
+- [ ] 💻 **Idées d'ajouts à l'app** (sur demande) : bouton « Exporter mes renseignements » pour un employé (portabilité), registre
+  d'incidents, case d'accusé de réception de la politique, purge des anciens employés.
+
+### Si un incident arrive (4 réflexes)
+1. **Arrêter la fuite** (changer le mot de passe, retirer l'accès, rappeler le courriel).
+2. **Le noter dans le registre** le jour même.
+3. **Évaluer le risque** : le NAS, la santé ou des données bancaires sont des cas sérieux.
+4. Si le risque est sérieux : **aviser la CAI et les personnes touchées sans tarder**, puis corriger la cause.
 
 ## Limites de l'app (capacité) 📏
 
