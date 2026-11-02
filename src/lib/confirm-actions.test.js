@@ -19,7 +19,6 @@ function handlerBody(source, name) {
 const HANDLERS = {
   "../components/manager/TodoInbox.jsx": ["approve", "returnDay", "reviewMeal", "reviewParking"],
   "../pages/ManagerDashboard.jsx": ["approve", "reviewParking", "unlock", "approveWeekAll"],
-  "../components/MealClaimsManager.jsx": ["review"],
   "../components/UnlockDayManager.jsx": ["removeUnlock"],
   "../components/TimeOffControls.jsx": ["remove"],
   "../components/CongesManager.jsx": ["remove"],

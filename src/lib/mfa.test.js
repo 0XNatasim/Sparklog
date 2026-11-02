@@ -79,7 +79,8 @@ describe("two-factor authentication: server side", () => {
         return /Forbidden: manager/.test(src) && !/caller\.rpc\("get_my_role"\)/.test(src);
       } catch { return false; }
     });
-    expect(managerOnly.length).toBeGreaterThanOrEqual(10);
+    // 10 until V2.4.227 removed the two unused ones (send_announcement, push_approved_to_sheet).
+    expect(managerOnly.length).toBeGreaterThanOrEqual(8);
     for (const name of managerOnly) {
       const src = readFileSync(`${dir}/${name}/index.ts`, "utf8");
       expect(src, name).toContain('import { isAal2 } from "../_shared/mfa.js";');

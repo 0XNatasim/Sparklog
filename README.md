@@ -496,9 +496,7 @@ Employees can upload only under their own user-ID folder. Managers receive read 
 Deploy the functions used by your environment:
 
 ```bash
-supabase functions deploy push_approved_to_sheet
 supabase functions deploy push_approved_batch
-supabase functions deploy send_announcement
 supabase functions deploy ccq_rates
 supabase functions deploy ccq_rates_daily_sync
 supabase functions deploy cleanup_overtime_evidence
@@ -513,9 +511,7 @@ supabase functions deploy delete_inventory_screenshots
 
 | Function | Purpose |
 |---|---|
-| `push_approved_to_sheet` | Approves/exports one job through Google Apps Script. |
 | `push_approved_batch` | Approves/exports a group of jobs. |
-| `send_announcement` | Persists and emails manager announcements. |
 | `ccq_rates` | Authenticated proxy/cache for CCQ commercial electrician rates. |
 | `ccq_rates_daily_sync` | Service-role-only refresh of commercial rate snapshots. |
 | `classify_week` | Authoritative payroll classification (M4): reads an employee's jobs server-side and returns the versioned `computeWeek()` result (per-job trace, per-week regular/OT50/OT100, engine version, warnings). Manager-only. Shares one engine with the client via `supabase/functions/_shared/payroll_engine.js` (parity-tested). |

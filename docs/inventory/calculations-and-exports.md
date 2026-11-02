@@ -65,13 +65,12 @@ Rate extraction from the CCQ rate JSON (`extractRegularHourlyRate`, `extractRate
 
 | Function | Trigger | What it does | Sensitive config |
 |---|---|---|---|
-| `push_approved_to_sheet` | Manager action, one job | Pushes an approved job's **raw fields** (depart/arrivee/fin/km/ot) to Google Sheets via Apps Script; marks `exported_to_sheet` only on `success:true` | `APPS_SCRIPT_URL`, `APPS_SCRIPT_TOKEN` |
 | `push_approved_batch` | Manager action, many jobs | Batch counterpart; idempotent dedup | same |
 | `ccq_rates` | On-demand | Fetches CCQ rate table | CCQ endpoint |
 | `ccq_rates_daily_sync` | **pg_cron**, each morning | Syncs CCQ rates | CCQ endpoint |
 | `process_overtime_evidence` | On new evidence | OCR via `api.ocr.space` (external) | OCR key |
 | `cleanup_overtime_evidence` | Retention | Deletes expired evidence + storage | — |
-| `delete_user`, `send_announcement` | Manager actions | Not calculators/exports of pay | — |
+| `delete_user` | Manager actions | Not calculators/exports of pay | — |
 
 **Scheduled jobs (pg_cron):** `ccq-card-renewals` (daily 12:00, migration 0009);
 CCQ daily rate sync (function `ccq_rates_daily_sync`; scheduling migration currently in
