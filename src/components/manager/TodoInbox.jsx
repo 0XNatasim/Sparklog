@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, CheckCheck, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, CheckCheck, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../contexts/AuthContext";
@@ -16,6 +16,7 @@ import { isOffOn } from "@/lib/timeoff";
 import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
+import { unseenAnomalies, useSeenAnomalies } from "@/lib/anomaly-seen";
 import EvidenceAlertBanner from "@/components/manager/EvidenceAlertBanner";
 import { approvalOutcome, buildInbox, lookbackWorkdays } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
@@ -52,6 +53,8 @@ export default function TodoInbox() {
   const { user } = useAuth();
   const [confirm, confirmDialog] = useConfirmDialog();
   const [state, setState] = useState(null);
+  // « J'ai vu » alerts (this browser only) no longer put a day under « À regarder d'abord ».
+  const { seen: seenAnomalies, mark: markAnomalySeen } = useSeenAnomalies(user?.id);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
@@ -142,12 +145,12 @@ export default function TodoInbox() {
     return buildInbox({
       submittedJobs: state.raw.submitted,
       profiles: state.profiles,
-      anomalies: state.anomalies,
+      anomalies: unseenAnomalies(state.anomalies, seenAnomalies),
       evidenceRows: state.raw.evidence,
       meals: state.raw.meals,
       parking: state.raw.parking,
     });
-  }, [state]);
+  }, [state, seenAnomalies]);
 
   const nameOf = (userId) => {
     const p = state?.profiles.get(userId);
@@ -221,7 +224,7 @@ export default function TodoInbox() {
 
   // Every approval asks first (V2.4.147); a day with an anomaly lists it in the question.
   function approveDay(day) {
-    const hits = anomaliesForJobs(state.anomalies, day.jobs.map((job) => job.id));
+    const hits = anomaliesForJobs(unseenAnomalies(state.anomalies, seenAnomalies), day.jobs.map((job) => job.id));
     const question = hits.length
       ? t("todo.confirm.approveAnomaly", { list: hits.map((a) => `• ${describeAnomaly(a)}`).join("\n") })
       : t("todo.confirm.approveDay", { name: nameOf(day.userId), date: dayjs(day.date).format("ddd D MMM"), count: day.jobs.length });
@@ -365,7 +368,13 @@ export default function TodoInbox() {
             </div>
           ))}
           {anomaly && day.anomalies.map((a) => (
-            <div key={a.key} className="flex items-start gap-1.5 text-sm text-warning"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{describeAnomaly(a)}</div>
+            <div key={a.key} className="flex items-start gap-1.5 text-sm text-warning">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1">{describeAnomaly(a)}</span>
+              <Button type="button" size="sm" variant="outline" className="h-6 shrink-0 gap-1 px-2 text-xs" onClick={() => markAnomalySeen(a)}>
+                <Check className="h-3 w-3" />{t("manager.anomalies.seen")}
+              </Button>
+            </div>
           ))}
           {day.meals.length > 0 && (
             <div className="text-xs text-muted-foreground">

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.230)
+## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.231)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.231 (technique).** « À vérifier avant d'approuver » : `src/lib/anomaly-seen.js` (`seenId` = clé de l'anomalie, plus les jobs « autres » pour `ot_reused` afin qu'une
+3e job sur le même OT ré-alerte ; `readSeen` / `unseenAnomalies` / `seenCount`, hooks `useSeenAnomalies(userId)` → `localStorage` `sparklog.seenAnomalies.<userId>`, entrées de plus de 90 jours
+retirées, et `useAnomaliesFolded` → `sparklog.anomaliesFolded`). `ManagerDashboard.jsx` : titre cliquable (`aria-expanded`) qui replie l'encadré, bouton « J'ai vu » par ligne,
+« Réafficher les alertes vues », et `anomalyWarning` (confirmation d'approbation) n'utilise que les alertes non vues ; `TodoInbox.jsx` filtre aussi (`buildInbox`, `approveDay`) et a le même bouton.
+Choix : stockage navigateur (aucune migration) — un « vu » partagé entre gestionnaires demanderait une table. Les anomalies détectées (`job-anomalies.js`) ne changent pas.
 
 **V2.4.230 (technique).** Mots de passe : le projet Supabase exige une minuscule, une majuscule, un chiffre et un symbole (`!@#$%^&*()_+-=[]{};'\:"|<>?,./`~`) et active la
 vérification des mots de passe divulgués (lu dans `auth_logs`, 2026-11-02). `authErrorKey` (`src/lib/mfa.js`) distingue maintenant `auth.passwordCharacters`
