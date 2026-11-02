@@ -43,10 +43,13 @@ export function deviceName(now = new Date()) {
 export function authErrorKey(error) {
   const code = error?.code || "";
   const message = String(error?.message || "");
-  if (code === "weak_password" || /weak|pwned|leaked|compromised/i.test(message)) {
-    return (error?.reasons || []).includes("pwned") || /pwned|leaked|compromised/i.test(message)
-      ? "auth.passwordLeaked"
-      : "auth.passwordWeak";
+  if (code === "weak_password" || /weak|pwned|leaked|compromised|at least one character of each|at least \d+ characters/i.test(message)) {
+    const reasons = error?.reasons || [];
+    // Most actionable first: a missing character group, then a leaked password, then a short one.
+    if (reasons.includes("characters") || /at least one character of each/i.test(message)) return "auth.passwordCharacters";
+    if (reasons.includes("pwned") || /pwned|leaked|compromised|known to be weak/i.test(message)) return "auth.passwordLeaked";
+    if (reasons.includes("length") || /at least \d+ characters/i.test(message)) return "auth.passwordShort";
+    return "auth.passwordWeak";
   }
   if (code === "mfa_verification_failed" || /invalid totp code|code.*(invalid|expired)/i.test(message)) return "mfa.invalidCode";
   if (code === "mfa_challenge_expired") return "mfa.expired";

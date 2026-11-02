@@ -74,7 +74,7 @@ export default function ResetPassword() {
                   id="new-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => { setPassword(event.target.value); setErrorMsg(""); }}
                   autoComplete="new-password"
                   minLength={6}
                   className="pr-10"
