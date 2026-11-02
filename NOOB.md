@@ -1,11 +1,16 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.228).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.229).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.229** : la **politique de confidentialité** est préparée : `docs/governance/politique-confidentialite.md`. Elle dit en mots
+  simples ce que l'app garde sur les employés, pourquoi, qui y a accès, où c'est hébergé (États-Unis, donc à signaler), combien de
+  temps, comment protéger, comment demander à voir ou corriger ses renseignements (réponse en 30 jours), et quoi faire en cas
+  d'incident. **À faire :** remplir les passages entre crochets (surtout **la personne responsable**, **les durées de conservation**
+  à confirmer avec la comptable et **les fournisseurs**), faire relire par un conseiller, puis publier sur le site de l'entreprise.
 - ✅ **V2.4.228** : le point « coller le `doPost` dans Google » est retiré (fait le 2 novembre). Nouvelle section **« Loi 25 »** plus bas :
   ce que la loi demande, ce que l'app fait déjà, et la liste de ce qui reste à faire pour être en règle (personne responsable,
   politique de confidentialité, registre d'incidents, hébergement hors Québec, durées de conservation).
@@ -394,8 +399,10 @@ formulaires d'impôt (TD1, TP-1015.3), salaire, heures, trajets, **registre d'ac
 
 ### Ce qu'il reste à faire pour être en règle
 - [ ] 👤 **Nommer par écrit la personne responsable** et **publier son titre et son courriel** (page du site de l'entreprise).
-- [ ] 👤 💻 **Publier une politique de confidentialité** en langage simple. Claude peut préparer un premier texte à partir de ce que
-  fait l'app (à faire relire par un conseiller).
+- [ ] 👤 **Publier la politique de confidentialité** : **le brouillon est prêt** dans `docs/governance/politique-confidentialite.md`
+  (écrit à partir de ce que fait vraiment l'app). Remplir les passages entre crochets (nom de l'entreprise, personne
+  responsable, durées de conservation avec la comptable, ententes avec les fournisseurs), la faire relire par un conseiller,
+  puis la publier sur le site de l'entreprise.
 - [ ] 👤 **Avis aux employés à l'embauche** : quels renseignements on garde, pourquoi, qui y a accès, combien de temps, à qui
   écrire. **La lettre de consentement est déjà préparée** :
   `docs/governance/consentement-sparklog-punch.md` (à remplir, à valider, à faire signer). Un accusé de réception signé (ou une case à cocher dans l'app, que Claude peut ajouter).
