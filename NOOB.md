@@ -1,11 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.231).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.232).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.232** : dans **Équipe › Employés**, quand tu choisis **« Nouvel(le) employé(e) »**, le **premier jour de travail peut maintenant être aujourd'hui**
+  (avant, il fallait demain ou plus tard). Si c'est aujourd'hui, la personne est tout de suite dans Équipe en direct et la vue semaine ; la date est gardée
+  comme date d'embauche. Rien d'autre à faire.
 - ✅ **V2.4.231** : dans la feuille de temps, l'encadré rouge **« À vérifier avant d'approuver »** peut maintenant être **replié** d'un clic sur son titre
   (il reste replié la prochaine fois). Chaque alerte a un bouton **« J'ai vu »** qui la fait disparaître : pratique pour les formations où deux employés sont
   sur le même OT. Si une autre job utilise plus tard ce même OT, l'alerte revient toute seule. Un lien **« Réafficher les alertes vues »** les ramène. C'est

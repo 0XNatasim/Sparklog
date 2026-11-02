@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.231)
+## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.232)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,11 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.232 (technique).** Sélecteur « Embauche / départ » (`EmployeeEmploymentField`) : la date du premier jour accepte aujourd'hui (`min={today}`, `>= today`) ; avant, `min` = demain et
+une date d'aujourd'hui était ignorée. `signups.js` : `startsToday` ; `employmentChoice` renvoie `NEW_HIRE` aussi quand `start_date === today` (le sélecteur garde la date visible et « Aucun » efface
+encore la date). `isNewHire` / `employeeStatus` ne changent pas (strictement futur) : ce jour-là la personne est « active » ou en attente d'activation, déjà sur les listes (`live-crew.js`), et
+`pending_signups` la recompte (0110 : `start_date <= aujourd'hui`). Texte `employees.newHire.today`. Aucun changement de base.
 
 **V2.4.231 (technique).** « À vérifier avant d'approuver » : `src/lib/anomaly-seen.js` (`seenId` = clé de l'anomalie, plus les jobs « autres » pour `ot_reused` afin qu'une
 3e job sur le même OT ré-alerte ; `readSeen` / `unseenAnomalies` / `seenCount`, hooks `useSeenAnomalies(userId)` → `localStorage` `sparklog.seenAnomalies.<userId>`, entrées de plus de 90 jours

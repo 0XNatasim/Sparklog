@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.231 (2026-11-02).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.232 (2026-11-02).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,8 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.232 — New hire can start today.** In Employés › « Nouvel(le) employé(e) », the first day of work can now be **today** (it used to require tomorrow or later).
+  Starting today means the person is already in Live crew and the week view; the date is saved as the hiring date and the picker keeps showing it that day.
 - **V2.4.231 — « Check before approving » can be collapsed, with « Seen » per alert.** On the timesheet view the red box can be folded to its title bar
   (remembered in this browser). Each alert has a **Seen** button that hides it — meant for harmless cases such as two employees on the same OT during a training.
   An alert comes back by itself if another job later uses the same OT; « Show the seen alerts again » restores them. The same choice applies to the « À traiter » inbox
