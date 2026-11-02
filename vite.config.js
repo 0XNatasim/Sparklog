@@ -20,6 +20,8 @@ function versionManifest() {
 }
 
 export default defineConfig({
+  // Playwright specs (e2e/) run with `npm run e2e`, not with vitest.
+  test: { exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"] },
   plugins: [
     react(),
     versionManifest(),

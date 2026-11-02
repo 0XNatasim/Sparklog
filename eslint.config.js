@@ -37,7 +37,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['*.config.js', 'scripts/**/*.{js,mjs}', '**/*.test.{js,jsx}', 'src/test/**/*.{js,jsx}'],
+    files: ['*.config.js', 'e2e/**/*.js', 'scripts/**/*.{js,mjs}', '**/*.test.{js,jsx}', 'src/test/**/*.{js,jsx}'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {
