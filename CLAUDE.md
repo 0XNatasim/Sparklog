@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.228)
+## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.229)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,11 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.229 (technique).** Ajout de `docs/governance/politique-confidentialite.md` (brouillon, Loi 25) ; aucun code changé. Faits vérifiés dans le code pour le rédiger : aucune géolocalisation ni
+outil d'analyse / publicité (`package.json`, `src/`) ; photos recompressées (EXIF / GPS retirés, `evidence-file.js`) ; conservation des preuves 30 jours par défaut
+(`overtime_settings.evidence_retention_days`, 1–365) ; brouillons locaux 30 jours (`draft-store.js`) ; lecture des captures par OCR.space depuis le navigateur (`ocr.js`) ;
+courriels d'annonces Resend / Brevo (README) ; base Supabase `us-west-2`. À compléter par la propriétaire : responsable, durées (comptable), fournisseurs / ententes.
 
 **V2.4.228 (technique).** Documentation seulement : section « Loi 25 » de `NOOB.md` (obligations, ce que l'app couvre déjà, reste à faire) ; le `doPost` Google est collé
 et redéployé (2026-11-02), point retiré. Constats utiles pour la conformité : base Supabase en région `us-west-2` (hors Québec → ÉFVP et entente écrite à prévoir),
