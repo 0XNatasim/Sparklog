@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
 import "dayjs/locale/fr";
-import { SUPPORTED_LANGUAGES } from "@/lib/i18n";
+import { SUPPORTED_LANGUAGES } from "@/lib/languages";
+import { getEnglish, loadEnglish } from "@/lib/i18n-loader";
 import { LanguageContext } from "@/components/language-provider";
 
 const STORAGE_KEY = "language";
@@ -18,6 +19,15 @@ function detectInitial() {
 
 export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(detectInitial);
+  const [englishReady, setEnglishReady] = useState(Boolean(getEnglish()));
+
+  // English is fetched on demand (separate chunk); French shows until it arrives.
+  useEffect(() => {
+    if (language !== "en" || englishReady) return undefined;
+    let alive = true;
+    loadEnglish().then(() => { if (alive) setEnglishReady(true); }).catch(() => {});
+    return () => { alive = false; };
+  }, [language, englishReady]);
 
   useEffect(() => {
     dayjs.locale(language);
@@ -35,7 +45,7 @@ export function LanguageProvider({ children }) {
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage }}>
+    <LanguageContext.Provider value={{ language, setLanguage, englishReady }}>
       {children}
     </LanguageContext.Provider>
   );
