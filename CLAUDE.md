@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.227)
+## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.228)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -135,6 +135,11 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
 
+**V2.4.228 (technique).** Documentation seulement : section « Loi 25 » de `NOOB.md` (obligations, ce que l'app couvre déjà, reste à faire) ; le `doPost` Google est collé
+et redéployé (2026-11-02), point retiré. Constats utiles pour la conformité : base Supabase en région `us-west-2` (hors Québec → ÉFVP et entente écrite à prévoir),
+sous-traitants qui reçoivent des renseignements : Vercel, Google Sheets / Apps Script, OCR.space, service de courriel, notifications push. Ajouts possibles à coder sur
+demande : export « Mes renseignements » (portabilité), registre des incidents, accusé de réception de la politique, purge des anciens employés, déplacement de la base
+dans une région canadienne.
 **V2.4.227 (technique).** Ajout de `docs/governance/consentement-sparklog-punch.md` : modèle de lettre de consentement à l'utilisation de Sparklog comme punch
 (recommandation AECQ / Annexe N : références à valider contre le texte officiel, entre crochets). Aucun code changé ; seule la version change.
 
@@ -264,8 +269,7 @@ jamais de mise à jour ni de suppression côté navigateur). `src/lib/evidence-d
 supprimé : `sumCrewInventory`, `sumCrewDefective` (`inventory-items.js`), leurs tests et les textes `mgr.inventory.crew*`
 (la somme des produits défectueux de l'équipe n'existe plus dans l'app). `apps-script-doPost.js` :
 `FIRST_TRIP_PAID_KM` / `FIRST_TRIP_PAID_FROM` (65 km, 2026-10-11) — la 1re fiche du jour de 65 km ou plus (`km_total` ou
-`km_aller + km_retour`) garde son trajet payé (minutes non payées 0). Le script se colle à la main dans Google : le propriétaire
-doit le redéployer. `push_approved_batch` envoie déjà `km_aller` / `km_retour`, pas de redéploiement de la fonction.
+`km_aller + km_retour`) garde son trajet payé (minutes non payées 0). Le script se colle à la main dans Google (fait le 2026-11-02). `push_approved_batch` envoie déjà `km_aller` / `km_retour`, pas de redéploiement de la fonction.
 
 **V2.4.207 (technique).** Premier trajet payé dès 65 km (décision de la propriétaire du 2026-10-30, **moteur 2.7.0**) :
 `FIRST_TRIP_PAID_FROM_KM` (65 km, depuis 2026-10-11) et `jobKilometres` (`km_total`, ou `km_aller + km_retour` si plus grand) dans
@@ -488,8 +492,8 @@ Ce qui est fait est dans l'historique Git (V2.4.104 → V2.4.195). Ouvert, du pl
   aujourd'hui badge dans l'app seulement).
 - [ ] **Migration** : retirer `profiles.return_overtime_no_benefits` (dépréciée depuis 0081 ; vérifier qu'aucune
   fonction ni vue ne la lit).
-- [ ] **Google Sheet** : nouveau fichier en janvier 2027 (200 onglets max, un « SemXX » par semaine). Le propriétaire doit
-  aussi coller le `doPost` de `apps-script-doPost.js` (V2.4.138) et déployer une nouvelle version, si ce n'est pas fait.
+- [ ] **Google Sheet** : nouveau fichier en janvier 2027 (200 onglets max, un « SemXX » par semaine). Le `doPost` de
+  `apps-script-doPost.js` (65 km) a été collé et redéployé par la propriétaire le 2026-11-02.
 - [ ] **Vérifier** `OCR_SPACE_API_KEY` dans les secrets Edge (sinon clé « helloworld ») et le forfait Vercel (Hobby =
   usage commercial interdit).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2.

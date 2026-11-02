@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.227 (2026-11-02).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.228 (2026-11-02).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,10 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.228 — Law 25 checklist in NOOB.md.** A plain-French section explains Québec's privacy law (Law 25) for the owner: the ten
+  obligations, what the app already does (encrypted SIN vault, two-factor authentication, per-role access, 30-day deletion of proofs,
+  audit log) and what remains (responsible person, privacy policy, incident register, hosting outside Québec, retention periods).
+  The Google Apps Script `doPost` item is closed (pasted and redeployed on 2026-11-02). Documentation only, not legal advice.
 - **V2.4.227 — Consent letter template.** `docs/governance/consentement-sparklog-punch.md`: French template employees sign to consent to
   using Sparklog as their time-sheet punch (data collected, purposes, retention, rights, voluntary nature, signatures). No code change.
 - **V2.4.226 — NOOB.md cleaned.** The « À faire » notes already done (migrations 0120–0129 applied, edge functions redeployed,
