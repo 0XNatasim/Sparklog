@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-01, V2.4.226)
+## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.227)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,9 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.227 (technique).** Ajout de `docs/governance/consentement-sparklog-punch.md` : modèle de lettre de consentement à l'utilisation de Sparklog comme punch
+(recommandation AECQ / Annexe N : références à valider contre le texte officiel, entre crochets). Aucun code changé ; seule la version change.
 
 **V2.4.226 (technique).** Ménage de `NOOB.md` seulement (aucun code) : retrait des « À faire » faits (migrations 0120 à 0131 vérifiées appliquées dans la base le 2026-11-01 ;
 `classify_week` redéployée le 2026-10-30 avec le moteur 2.7.0 — `push_approved_batch` n'importe que `RETURN_WITH_BENEFITS`, rien à redéployer ; `cleanup_overtime_evidence`
