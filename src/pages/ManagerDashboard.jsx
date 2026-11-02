@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Image, ImageOff, Radio, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Image, ImageOff, Radio, TriangleAlert } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -16,6 +16,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
 import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
+import { seenCount, unseenAnomalies, useAnomaliesFolded, useSeenAnomalies } from "@/lib/anomaly-seen";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
 import { loadOtReuse } from "@/lib/ot-reuse";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
@@ -116,6 +117,10 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const [anomalies, setAnomalies] = useState([]);
   const [anomaliesFailed, setAnomaliesFailed] = useState(false);
   const [showAllAnomalies, setShowAllAnomalies] = useState(false);
+  // « J'ai vu » (alerts the manager does not want back) and the folded state of the box: this browser only.
+  const { seen: seenAnomalies, mark: markAnomalySeen, clear: clearSeenAnomalies } = useSeenAnomalies(user?.id);
+  const [anomaliesFolded, toggleAnomaliesFolded] = useAnomaliesFolded();
+  const activeAnomalies = unseenAnomalies(anomalies, seenAnomalies);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
@@ -799,7 +804,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
 
   // Non-blocking warning: returns "" when the batch is clean, otherwise the text to confirm.
   function anomalyWarning(jobIds) {
-    const hits = anomaliesForJobs(anomalies, jobIds);
+    const hits = anomaliesForJobs(activeAnomalies, jobIds);
     if (hits.length === 0) return "";
     const lines = hits.slice(0, 5).map((anomaly) => `• ${employeeLabel(anomaly.userId)} · ${dayjs(anomaly.jobDate).format("DD MMM")} · ${describeAnomaly(anomaly)}`);
     if (hits.length > 5) lines.push("…");
@@ -1333,7 +1338,9 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         </Dialog>
 
         {(() => {
-          const visible = anomalies.filter((anomaly) => employeeId === "all" || anomaly.userId === employeeId);
+          const inScope = (anomaly) => employeeId === "all" || anomaly.userId === employeeId;
+          const visible = activeAnomalies.filter(inScope);
+          const seenHere = seenCount(anomalies.filter(inScope), seenAnomalies);
           if (anomaliesFailed) {
             return (
               <div className="rounded-md border-2 border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -1341,34 +1348,69 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
               </div>
             );
           }
-          if (visible.length === 0) return null;
+          if (visible.length === 0 && seenHere === 0) return null;
+          if (visible.length === 0) {
+            return (
+              <p className="text-xs text-muted-foreground">
+                {t("manager.anomalies.allSeen", { count: seenHere })}{" "}
+                <button type="button" className="underline" onClick={clearSeenAnomalies}>{t("manager.anomalies.showSeen")}</button>
+              </p>
+            );
+          }
           const shown = showAllAnomalies ? visible : visible.slice(0, 8);
           return (
             <section className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-destructive" aria-live="polite">
-              <div className="flex items-center gap-2 font-semibold">
+              <button
+                type="button"
+                onClick={toggleAnomaliesFolded}
+                aria-expanded={!anomaliesFolded}
+                aria-label={anomaliesFolded ? t("manager.anomalies.unfold") : t("manager.anomalies.fold")}
+                className="flex w-full items-center gap-2 text-left font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+              >
                 <TriangleAlert className="h-5 w-5 shrink-0" />
-                {t("manager.anomalies.title", { count: visible.length })}
-              </div>
-              <p className="mt-1 text-xs opacity-80">{t("manager.anomalies.hint")}</p>
-              <ul className="mt-2 divide-y divide-destructive/30">
-                {shown.map((anomaly) => (
-                  <li key={anomaly.key}>
-                    <button
-                      type="button"
-                      onClick={() => openAnomaly(anomaly)}
-                      className="flex w-full flex-wrap items-baseline gap-x-2 py-1.5 text-left text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
-                    >
-                      <b>{employeeLabel(anomaly.userId)}</b>
-                      <span className="tabular-nums">{dayjs(anomaly.jobDate).format("DD MMM YYYY")}</span>
-                      <span>{describeAnomaly(anomaly)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {visible.length > 8 && (
-                <Button type="button" size="sm" variant="ghost" className="mt-1 h-7 px-2 text-xs text-destructive hover:bg-destructive/10" onClick={() => setShowAllAnomalies((value) => !value)}>
-                  {showAllAnomalies ? t("manager.anomalies.showLess") : t("manager.anomalies.showAll", { count: visible.length })}
-                </Button>
+                <span className="flex-1">{t("manager.anomalies.title", { count: visible.length })}</span>
+                {anomaliesFolded ? <ChevronDown className="h-5 w-5 shrink-0" /> : <ChevronUp className="h-5 w-5 shrink-0" />}
+              </button>
+              {!anomaliesFolded && (
+                <>
+                  <p className="mt-1 text-xs opacity-80">{t("manager.anomalies.hint")}</p>
+                  <ul className="mt-2 divide-y divide-destructive/30">
+                    {shown.map((anomaly) => (
+                      <li key={anomaly.key} className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openAnomaly(anomaly)}
+                          className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 py-1.5 text-left text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+                        >
+                          <b>{employeeLabel(anomaly.userId)}</b>
+                          <span className="tabular-nums">{dayjs(anomaly.jobDate).format("DD MMM YYYY")}</span>
+                          <span>{describeAnomaly(anomaly)}</span>
+                        </button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="my-1 h-7 shrink-0 gap-1 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive/10"
+                          onClick={() => markAnomalySeen(anomaly)}
+                        >
+                          <Check className="h-3.5 w-3.5" />{t("manager.anomalies.seen")}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {visible.length > 8 && (
+                      <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10" onClick={() => setShowAllAnomalies((value) => !value)}>
+                        {showAllAnomalies ? t("manager.anomalies.showLess") : t("manager.anomalies.showAll", { count: visible.length })}
+                      </Button>
+                    )}
+                    {seenHere > 0 && (
+                      <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10" onClick={clearSeenAnomalies}>
+                        {t("manager.anomalies.showSeenCount", { count: seenHere })}
+                      </Button>
+                    )}
+                  </div>
+                </>
               )}
             </section>
           );

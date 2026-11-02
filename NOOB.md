@@ -1,11 +1,15 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.230).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-02 (V2.4.231).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.231** : dans la feuille de temps, l'encadré rouge **« À vérifier avant d'approuver »** peut maintenant être **replié** d'un clic sur son titre
+  (il reste replié la prochaine fois). Chaque alerte a un bouton **« J'ai vu »** qui la fait disparaître : pratique pour les formations où deux employés sont
+  sur le même OT. Si une autre job utilise plus tard ce même OT, l'alerte revient toute seule. Un lien **« Réafficher les alertes vues »** les ramène. C'est
+  retenu **dans ce navigateur seulement** (sur un autre appareil il faut recliquer) ; ça ne change rien aux jobs ni à l'approbation. Même chose dans « À traiter ».
 - ✅ **V2.4.230** : à l'inscription et au changement de mot de passe, le message d'erreur dit maintenant **la vraie raison** (il manque une minuscule, une
   majuscule, un chiffre ou un symbole ; trop court ; ou mot de passe connu dans une fuite). La règle est écrite sous le champ, et l'ancien message
   **disparaît dès qu'on modifie un champ**. Rien à faire de ta part.
