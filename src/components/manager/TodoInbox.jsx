@@ -17,7 +17,7 @@ import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
 import EvidenceAlertBanner from "@/components/manager/EvidenceAlertBanner";
-import { approvalOutcome, buildInbox, lookbackWorkdays } from "@/lib/todo-inbox";
+import { approvalOutcome, buildInbox, expectedVersions, lookbackWorkdays } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
 import { DYNACOM_CUMULATIVE_END } from "@/lib/payroll-opening";
 import { TODO_EVENT } from "@/lib/todo-count";
@@ -206,7 +206,7 @@ export default function TodoInbox() {
       if (!token) throw new Error(t("manager.errors.noSession"));
       const timeoutMs = jobIds.length > 1 ? 60000 : 30000;
       const { data, error } = await Promise.race([
-        supabase.functions.invoke("push_approved_batch", { body: { job_ids: jobIds }, headers: { Authorization: `Bearer ${token}` } }),
+        supabase.functions.invoke("push_approved_batch", { body: { job_ids: jobIds, expected_updated_at: expectedVersions(jobIds, state?.raw?.submitted) }, headers: { Authorization: `Bearer ${token}` } }),
         new Promise((_, reject) => setTimeout(() => reject(new Error(t("todo.timeout"))), timeoutMs)),
       ]);
       if (error) throw new Error(await functionError(error) || t("manager.errors.approveFailed"));

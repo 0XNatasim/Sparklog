@@ -66,6 +66,13 @@ serve(async (req) => {
     if (job_ids.length > 500) {
       return json({ ok: false, error: "Batch too large (max 500)" }, 400);
     }
+    // S-4: the `updated_at` of each job as the manager SAW it. A job changed since (employee
+    // edit, another manager's correction) is refused as `version_changed` and must be re-read.
+    // Optional: an older client that sends none keeps the previous behaviour.
+    const expected: Record<string, string> =
+      body?.expected_updated_at && typeof body.expected_updated_at === "object" && !Array.isArray(body.expected_updated_at)
+        ? body.expected_updated_at
+        : {};
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -115,28 +122,31 @@ serve(async (req) => {
     const { data: jobs, error: jobsErr } = await admin
       .from("jobs")
       .select(
-        "id,user_id,job_date,ot,depart,arrivee,fin,km_aller,return_time_minutes,km_retour,status,exported_to_sheet"
+        "id,user_id,job_date,ot,depart,arrivee,fin,km_aller,return_time_minutes,km_retour,status,exported_to_sheet,updated_at"
       )
       .in("id", job_ids);
     if (jobsErr) return json({ ok: false, error: jobsErr.message }, 500);
 
+    const versionChanged = (j: { id: string; updated_at?: string | null }) =>
+      typeof expected[j.id] === "string" && expected[j.id] !== j.updated_at;
     const eligible = (jobs || []).filter(
-      (j) => j.status === "submitted" && !j.exported_to_sheet
+      (j) => j.status === "submitted" && !j.exported_to_sheet && !versionChanged(j)
     );
     const alreadySkipped = (jobs || []).filter(
-      (j) => j.status !== "submitted" || j.exported_to_sheet
+      (j) => j.status !== "submitted" || j.exported_to_sheet || versionChanged(j)
     );
 
     // Per-job typed outcome for the client, so a single-job approval can tell an
     // ALREADY-EXPORTED (benign) job apart from one whose STATE CHANGED (e.g. the
     // employee edited it → 'updated'): the latter must NOT be force-approved (C-2).
-    //   exported | already_exported | state_changed | already_claimed | not_found
+    //   exported | already_exported | state_changed | version_changed | already_claimed | not_found
     const jobMap = new Map((jobs || []).map((j) => [j.id, j]));
     const buildResults = (claimedSet: Set<string>) => job_ids.map((id) => {
       const j = jobMap.get(id);
       if (!j) return { job_id: id, outcome: "not_found" };
       if (claimedSet.has(id)) return { job_id: id, outcome: "exported" };
       if (j.exported_to_sheet) return { job_id: id, outcome: "already_exported" };
+      if (j.status === "submitted" && versionChanged(j)) return { job_id: id, outcome: "version_changed" };
       if (j.status === "submitted") return { job_id: id, outcome: "already_claimed" };
       return { job_id: id, outcome: "state_changed" };
     });

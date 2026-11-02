@@ -35,6 +35,7 @@ import EvidenceDownload from "@/components/manager/EvidenceDownload";
 import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import { filterReceiptJobs, receiptEmployees, receiptNeedsReview } from "@/lib/receipts-review";
 import ManualEntryStar from "@/components/ManualEntryStar";
+import { expectedVersions } from "@/lib/todo-inbox";
 
 dayjs.extend(isoWeek);
 
@@ -853,7 +854,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       // single-job function can be absent from older deployments, which makes
       // the Functions client return only a generic non-2xx error.
       const { data, error: fnErr } = await invokeWithTimeout("push_approved_batch", {
-        body: { job_ids: [jobId] },
+        body: { job_ids: [jobId], expected_updated_at: expectedVersions([jobId], [target]) },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (fnErr) throw new Error(await getFunctionErrorMessage(fnErr));
@@ -971,7 +972,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       const { data, error: fnErr } = await invokeWithTimeout(
         "push_approved_batch",
         {
-          body: { job_ids: list.map((j) => j.id) },
+          body: { job_ids: list.map((j) => j.id), expected_updated_at: expectedVersions(list.map((j) => j.id), list) },
           headers: { Authorization: `Bearer ${accessToken}` },
         },
         60000

@@ -98,6 +98,18 @@ function sumBy(list, fn) {
 // holiday (company_holidays) is skipped like a weekend. Kept here for existing imports.
 export { lookbackWorkdays, previousWorkday } from "./workdays";
 
+// S-4: the `updated_at` each job had when the manager looked at it, sent to push_approved_batch so
+// a job edited since (employee or another manager) comes back as `version_changed` instead of
+// being approved on the strength of a stale screen. Rows without `updated_at` are left out.
+export function expectedVersions(jobIds, rows) {
+  const wanted = new Set(jobIds);
+  const out = {};
+  for (const row of rows || []) {
+    if (wanted.has(row.id) && typeof row.updated_at === "string" && row.updated_at) out[row.id] = row.updated_at;
+  }
+  return out;
+}
+
 // push_approved_batch's per-job results → how many were approved and which ones changed
 // under the manager (edited since, already claimed…) and must be looked at again.
 export function approvalOutcome(data, jobIds) {
