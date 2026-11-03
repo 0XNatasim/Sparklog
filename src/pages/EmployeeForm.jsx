@@ -14,6 +14,7 @@ import { statusBadgeVariant } from "@/lib/status";
 import { isAdminEmployee, isManagerRole } from "@/lib/roles";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
+import { matchPreset, usePresetWorkOrders } from "@/lib/preset-work-orders";
 import { withRetry, withTimeout } from "@/lib/utils";
 import { buildJobSaveRpcArgs, buildJobSaveWithEvidenceRpcArgs, kilometreFieldValue, requiresEvidenceBeforeSave } from "@/lib/job-submission";
 import { validateJobSubmissionContract } from "@/lib/job-contract";
@@ -130,6 +131,7 @@ export default function EmployeeForm() {
   // Problems found on the last Field Service screenshot (workOrderIssues). While any remain, the
   // new entry cannot be saved: the employee fixes the work order and retakes the screenshot.
   const [workOrderProblems, setWorkOrderProblems] = useState([]);
+  const presetLabels = usePresetWorkOrders();
   const [showWorkOrderCheck, setShowWorkOrderCheck] = useState(false);
   // Raw text of the last screenshot read, shown on demand in the check dialog so a misread can be
   // reported exactly (kept in memory only, never saved).
@@ -1060,7 +1062,10 @@ export default function EmployeeForm() {
   // two fields are not required to complete the form for them.
   const formComplete = Boolean(job_date) && Boolean(ot) && Boolean(depart) && Boolean(fin)
     && (officeEmployee || (Boolean(arrivee) && String(km_aller).trim() !== "")) && parkingComplete;
-  const workOrderBlocked = !editId && workOrderProblems.length > 0;
+  // A preset OT (formation, réunion…) is entered by hand: there is no Field Service work order, so a
+  // stale screenshot problem (kept in the restored draft) must never block it.
+  const presetOt = Boolean(matchPreset(ot, presetLabels));
+  const workOrderBlocked = !editId && !presetOt && workOrderProblems.length > 0;
 
   // Names of the required fields still empty, shown next to the disabled Save button.
   const missingFields = [
@@ -1266,7 +1271,7 @@ export default function EmployeeForm() {
 
       <WorkOrderCheckDialog
         t={t}
-        open={showWorkOrderCheck && workOrderProblems.length > 0}
+        open={showWorkOrderCheck && !presetOt && workOrderProblems.length > 0}
         onOpenChange={setShowWorkOrderCheck}
         problems={workOrderProblems}
         ocrText={lastOcrText}
