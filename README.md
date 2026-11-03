@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.234 (2026-11-03).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.235 (2026-11-03).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.235 — Hand-entered cards never blocked by an old screenshot check.** The « Field Service work order incomplete » block now only applies to the screenshot read in the current session; a restored draft no longer brings it back, whatever the OT text.
 - **V2.4.234 — KM field starts empty.** The kilometres box of the job card (and of the emergency timesheet) no longer shows a grey « 0 » that looked filled in; it is still required (0 accepted). Test added for the preset-OT case.
 - **V2.4.233 — Preset OT no longer blocked by an old screenshot.** A job card with a preset OT (formation…) is entered by hand; the « Field Service work order incomplete » block left by an earlier Auto-fill (kept in the restored draft) no longer disables Save for it.
 - **V2.4.232 — New hire can start today.** In Employés › « Nouvel(le) employé(e) », the first day of work can now be **today** (it used to require tomorrow or later).

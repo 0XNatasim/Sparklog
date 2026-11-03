@@ -152,7 +152,7 @@ describe("EmployeeForm — new entry", () => {
     expect(field("fin").value).toBe("12:00");
   });
 
-  it("does not block a preset OT (formation) with a screenshot problem kept in the restored draft", async () => {
+  it("never brings back a Field Service screenshot problem from a restored draft", async () => {
     const draft = (ot) => ({ userId: "emp-1", submissionKey: "k", updatedAt: new Date().toISOString(), data: { job_date: TODAY, ot, depart: "06:29", arrivee: "07:00", fin: "14:29", km_aller: "0", fromScreenshot: true, workOrderProblems: [{ code: "km" }] } });
     state.drafts.set("emp-1:new", draft("FORMATION BRITTON"));
     setup();
@@ -160,12 +160,12 @@ describe("EmployeeForm — new entry", () => {
     expect(saveButton().disabled).toBe(false);
     expect(screen.queryByText(fr("form.workOrderCheck.blocked"))).toBeNull();
     cleanup();
-    // The same leftover problem still blocks a real work-order number.
-    state.drafts.set("emp-1:new", draft("200451"));
+    // Typed by hand (not a preset, e.g. "FORMATION HILO"): an old draft problem does not block it either.
+    state.drafts.set("emp-1:new", draft("FORMATION HILO"));
     setup();
     await screen.findByText(fr("form.toasts.draftRestored"));
-    expect(saveButton().disabled).toBe(true);
-    expect(screen.getByText(fr("form.workOrderCheck.blocked"))).toBeTruthy();
+    expect(saveButton().disabled).toBe(false);
+    expect(screen.queryByText(fr("form.workOrderCheck.blocked"))).toBeNull();
   });
 
   it("leaves the kilometres empty (no grey 0) and still requires them", async () => {
