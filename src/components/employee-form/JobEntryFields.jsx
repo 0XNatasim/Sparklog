@@ -53,7 +53,7 @@ export default function JobEntryFields({ t, values, onChange, disabled, officeEm
         {!officeEmployee && (
           <div className={TIME_FIELDS}>
             <Label htmlFor="km" className="text-xs sm:text-sm"><span className="sm:hidden">{t("history.km")}</span><span className="hidden sm:inline">{t("form.kmTotal")}</span></Label>
-            {input("km", "km_aller", { type: "number", placeholder: "0" })}
+            {input("km", "km_aller", { type: "number" })}
           </div>
         )}
       </div>
