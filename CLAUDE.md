@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-02, V2.4.232)
+## 6. À faire / à préciser (mis à jour 2026-11-03, V2.4.233)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.233 (technique).** `EmployeeForm.jsx` : `workOrderBlocked` et `WorkOrderCheckDialog` ignorent `workOrderProblems` quand l'OT est un OT prédéfini (`matchPreset(ot, usePresetWorkOrders())`) ; avant, le brouillon restauré (`draft.workOrderProblems`) gardait le blocage d'une ancienne capture Auto-fill et Save restait désactivé pour une fiche manuelle. Les km restent obligatoires (0 accepté). Aucun changement de base.
 
 **V2.4.232 (technique).** Sélecteur « Embauche / départ » (`EmployeeEmploymentField`) : la date du premier jour accepte aujourd'hui (`min={today}`, `>= today`) ; avant, `min` = demain et
 une date d'aujourd'hui était ignorée. `signups.js` : `startsToday` ; `employmentChoice` renvoie `NEW_HIRE` aussi quand `start_date === today` (le sélecteur garde la date visible et « Aucun » efface
