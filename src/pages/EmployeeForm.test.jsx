@@ -46,6 +46,7 @@ function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", sa
       inventory_screenshots: inventoryShots,
       inventory_items: inventoryItems,
       parking_receipts: parking,
+      preset_work_orders: [{ id: "p1", label: "FORMATION BRITTON", sort_order: 1, active: true }],
     },
     rpcs: {
       save_own_job: saveJob || ((call) => [{ id: "job-new", status: call.args.p_submit ? "submitted" : "saved", locked: false }]),
@@ -149,6 +150,32 @@ describe("EmployeeForm — new entry", () => {
     await screen.findByText(fr("form.toasts.draftRestored"));
     expect(field("ot").value).toBe("777");
     expect(field("fin").value).toBe("12:00");
+  });
+
+  it("does not block a preset OT (formation) with a screenshot problem kept in the restored draft", async () => {
+    const draft = (ot) => ({ userId: "emp-1", submissionKey: "k", updatedAt: new Date().toISOString(), data: { job_date: TODAY, ot, depart: "06:29", arrivee: "07:00", fin: "14:29", km_aller: "0", fromScreenshot: true, workOrderProblems: [{ code: "km" }] } });
+    state.drafts.set("emp-1:new", draft("FORMATION BRITTON"));
+    setup();
+    await screen.findByText(fr("form.toasts.draftRestored"));
+    expect(saveButton().disabled).toBe(false);
+    expect(screen.queryByText(fr("form.workOrderCheck.blocked"))).toBeNull();
+    cleanup();
+    // The same leftover problem still blocks a real work-order number.
+    state.drafts.set("emp-1:new", draft("200451"));
+    setup();
+    await screen.findByText(fr("form.toasts.draftRestored"));
+    expect(saveButton().disabled).toBe(true);
+    expect(screen.getByText(fr("form.workOrderCheck.blocked"))).toBeTruthy();
+  });
+
+  it("leaves the kilometres empty (no grey 0) and still requires them", async () => {
+    setup();
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "profiles")).toBe(true));
+    expect(field("km").getAttribute("placeholder")).toBeNull();
+    fill({ km: "" });
+    expect(saveButton().disabled).toBe(true);
+    fireEvent.change(field("km"), { target: { value: "0" } });
+    expect(saveButton().disabled).toBe(false);
   });
 
   it("shows the office timesheet without arrival nor kilometres", async () => {
