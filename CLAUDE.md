@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-03, V2.4.235)
+## 6. À faire / à préciser (mis à jour 2026-11-04, V2.4.236)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.236 (technique).** `TodoInbox.jsx` : le titre de la carte « À regarder d'abord » (`todo.anomaliesTitle`, avec le nombre de jours) est un bouton `aria-expanded` qui replie la liste ; il utilise `useAnomaliesFolded` (`anomaly-seen.js`, clé `sparklog.anomaliesFolded`, donc le même état que l'encadré de `ManagerDashboard`) et les textes `manager.anomalies.fold` / `unfold`. Test du hook : `anomaly-folded.test.js`. Aucun changement de base.
 
 **V2.4.235 (technique).** `EmployeeForm.jsx` : `workOrderProblems` n'est plus enregistré dans le brouillon ni restauré (`restoreLocalDraft` le remet à `[]`) ; le blocage Field Service ne vient que de la capture lue pendant la session (`handleExtractFromImage`). L'exemption des OT prédéfinis (V2.4.233) reste. Test mis à jour (brouillon restauré, OT prédéfini ou tapé : Save actif).
 
