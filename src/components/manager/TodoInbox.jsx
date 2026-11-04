@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, Check, CheckCheck, RefreshCw } from "lucide-react";
+import { AlertTriangle, Check, CheckCheck, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../contexts/AuthContext";
@@ -16,7 +16,7 @@ import { isOffOn } from "@/lib/timeoff";
 import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
-import { unseenAnomalies, useSeenAnomalies } from "@/lib/anomaly-seen";
+import { unseenAnomalies, useAnomaliesFolded, useSeenAnomalies } from "@/lib/anomaly-seen";
 import EvidenceAlertBanner from "@/components/manager/EvidenceAlertBanner";
 import { approvalOutcome, buildInbox, lookbackWorkdays } from "@/lib/todo-inbox";
 import { loadHolidayDates } from "@/lib/company-holidays";
@@ -55,6 +55,7 @@ export default function TodoInbox() {
   const [state, setState] = useState(null);
   // « J'ai vu » alerts (this browser only) no longer put a day under « À regarder d'abord ».
   const { seen: seenAnomalies, mark: markAnomalySeen } = useSeenAnomalies(user?.id);
+  const [anomaliesFolded, toggleAnomaliesFolded] = useAnomaliesFolded();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
@@ -472,10 +473,22 @@ export default function TodoInbox() {
 
       {inbox && inbox.anomalyDays.length > 0 && (
         <section className="overflow-hidden rounded-xl border border-warning/40 bg-warning/10">
-          <h3 className="px-4 pb-1 pt-3 text-sm font-semibold text-warning">{t("todo.anomaliesTitle")}</h3>
-          <div className="m-3 mt-2 overflow-hidden rounded-lg border bg-card">
-            {inbox.anomalyDays.map((day) => renderDay(day, true))}
-          </div>
+          <button
+            type="button"
+            onClick={toggleAnomaliesFolded}
+            aria-expanded={!anomaliesFolded}
+            aria-label={anomaliesFolded ? t("manager.anomalies.unfold") : t("manager.anomalies.fold")}
+            className="flex w-full items-center gap-2 px-4 pb-1 pt-3 text-left text-sm font-semibold text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning"
+          >
+            <span className="flex-1">{t("todo.anomaliesTitle")} ({inbox.anomalyDays.length})</span>
+            {anomaliesFolded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronUp className="h-4 w-4 shrink-0" />}
+          </button>
+          {!anomaliesFolded && (
+            <div className="m-3 mt-2 overflow-hidden rounded-lg border bg-card">
+              {inbox.anomalyDays.map((day) => renderDay(day, true))}
+            </div>
+          )}
+          {anomaliesFolded && <div className="pb-2" />}
         </section>
       )}
 

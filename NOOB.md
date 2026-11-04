@@ -1,11 +1,12 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-03 (V2.4.235).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-03 (V2.4.236).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.236** : dans **À traiter**, la carte **« À regarder d'abord »** se **plie et se déplie** en touchant son titre (le nombre de jours à regarder reste affiché). Le choix est gardé sur ton appareil, et c'est le même réglage que l'encadré « À vérifier avant d'approuver » des fiches.
 - ✅ **V2.4.235** : le message rouge « ordre de travail Field Service incomplet » ne revient plus d'un ancien brouillon : il n'apparaît que juste après une capture lue pendant la session en cours. Une fiche saisie à la main n'est jamais bloquée, même si l'OT est tapé (ex. « FORMATION HILO »). Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.234** : la case **KM** de la fiche est maintenant **vide** (plus de « 0 » gris qui faisait croire qu'elle était remplie). Elle reste **obligatoire** : taper 0 s'il n'y a pas de km.
 - ✅ **V2.4.233** : une fiche **avec un OT de la liste (formation, etc.)** ne peut plus être bloquée par le message rouge « ordre de travail Field Service incomplet ». Ce message restait collé dans le brouillon après un ancien essai de capture. Il faut seulement taper **0** dans KM si la case est vide (le 0 gris est un exemple, pas une valeur).
