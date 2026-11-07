@@ -162,11 +162,10 @@ export function EmployeeEmploymentField({ profile: p, panel }) {
           <Input
             type="date"
             className="mt-1 h-9"
-            min={today}
             required
             value={employmentChoice(p, today) === NEW_HIRE ? p.start_date : ""}
-            // Today or later. Today = starting now: the person is already on the boards.
-            onChange={(e) => { if (e.target.value >= today) saveEmployment(p, NEW_HIRE, e.target.value); }}
+            // Any date (V2.4.236): a past date is just a forgotten hiring date, saved in the « Date d'embauche » field.
+            onChange={(e) => { if (e.target.value) saveEmployment(p, NEW_HIRE, e.target.value); }}
           />
           <span className="mt-1 block text-muted-foreground">
             {newHireDraft.has(p.id)
