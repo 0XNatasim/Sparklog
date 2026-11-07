@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarBlocks, daysUntil, reminderBlock, upcomingBlocks } from "./ccq-calendar";
+import { blockKey, calendarBlocks, daysUntil, reminderBlock, upcomingBlocks } from "./ccq-calendar";
 
 const row = (holiday_date, label) => ({ holiday_date, label });
 const winter = ["2026-12-20", "2026-12-21", "2026-12-22"].map((d) => row(d, "Vacances — hiver"));
@@ -34,5 +34,14 @@ describe("ccq calendar", () => {
 
   it("does not remind for a block already under way", () => {
     expect(reminderBlock(calendarBlocks(winter), "2026-12-21")).toBeNull();
+  });
+});
+
+describe("dismissed reminders", () => {
+  it("skips a dismissed block and shows the next one in the window", () => {
+    const blocks = calendarBlocks([row("2026-11-13", "A"), row("2026-11-14", "B")]);
+    expect(reminderBlock(blocks, "2026-11-10").label).toBe("A");
+    expect(reminderBlock(blocks, "2026-11-10", 7, new Set([blockKey(blocks[0])])).label).toBe("B");
+    expect(reminderBlock(blocks, "2026-11-10", 7, new Set(blocks.map(blockKey)))).toBeNull();
   });
 });

@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { BellRing, CalendarDays } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 import { useT } from "@/lib/use-t";
-import { daysUntil, formatBlockRange, reminderBlock, upcomingBlocks } from "@/lib/ccq-calendar";
+import { REMINDER_DAYS, daysUntil, dismissBlock, formatBlockRange, readDismissed, reminderBlock, upcomingBlocks } from "@/lib/ccq-calendar";
+import { useCcqCalendar } from "@/lib/use-ccq-calendar";
 
 const SHOWN = 8;
 
@@ -11,17 +14,25 @@ function startsIn(t, days) {
   return days === 1 ? t("ccqCalendar.startsTomorrow") : t("ccqCalendar.startsIn", { days });
 }
 
-// Reminder the week before a holiday / construction vacation. Shown at the top of the Profile.
-export function CcqCalendarReminder({ blocks, today }) {
+// Reminder the week before a holiday / construction vacation, shown on every page like the update banner.
+// « OK » hides it for good for that holiday (this browser, this account).
+export function CcqCalendarBanner() {
   const t = useT();
-  const block = reminderBlock(blocks, today);
+  const { user } = useAuth();
+  const { blocks, today } = useCcqCalendar();
+  const [dismissed, setDismissed] = useState(null);
+  const userId = user?.id;
+  const seen = dismissed || readDismissed(userId, today);
+  const block = userId ? reminderBlock(blocks, today, REMINDER_DAYS, seen) : null;
   if (!block) return null;
   return (
-    <div role="status" className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4 text-sm">
-      <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-      <div>
-        <div className="font-semibold">{block.label} — {startsIn(t, daysUntil(block, today))}</div>
-        <div className="text-muted-foreground">{formatBlockRange(block)}{block.days > 1 ? ` · ${t("ccqCalendar.days", { count: block.days })}` : ""}</div>
+    <div className="sticky top-0 z-40 border-b-2 border-primary bg-primary/10 px-4 py-3 text-primary" role="status">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-3 text-sm font-semibold sm:text-base">
+        <BellRing className="h-5 w-5 shrink-0" />
+        <span>
+          {block.label} — {startsIn(t, daysUntil(block, today))} ({formatBlockRange(block)}{block.days > 1 ? ` · ${t("ccqCalendar.days", { count: block.days })}` : ""})
+        </span>
+        <Button type="button" size="sm" onClick={() => setDismissed(dismissBlock(userId, block, today))}>{t("ccqCalendar.ok")}</Button>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import { CcqCalendarBanner } from "@/components/CcqCalendarCard";
 import PushPrompt from "@/components/PushPrompt";
 import EmployeeNotificationsBell from "@/components/EmployeeNotificationsBell";
 import { useViewMode } from "@/contexts/ViewModeContext";
@@ -121,6 +122,7 @@ export default function AppShell({ children }) {
     <div className="min-h-screen bg-background text-foreground">
       <OfflineBanner />
       <UpdateBanner />
+      {!isViewMode && <CcqCalendarBanner />}
       {!isViewMode && <RegionOnboarding />}
       {!isViewMode && <BroadcastPopup />}
       {!isViewMode && <PushPrompt />}

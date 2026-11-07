@@ -1,11 +1,12 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-07 (V2.4.237).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-07 (V2.4.238).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.238** : le rappel d'un congé (une semaine avant) s'affiche maintenant en **bandeau sur toutes les pages**, comme celui de la mise à jour, avec un bouton **OK**. Quand l'employé clique OK, le bandeau ne revient plus pour ce congé. L'OK est gardé dans le navigateur de l'appareil : sur un autre appareil, le bandeau s'affichera encore une fois. La carte « Calendrier CCQ » reste dans le Profil. Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.237** : dans l'onglet **Profil**, les employés voient maintenant une carte **« Calendrier CCQ »** avec les prochains congés fériés et les vacances de la construction (les dates viennent de la liste déjà en place, rien à saisir). Une semaine avant un congé, un **bandeau** apparaît en haut du Profil (« commence dans 7 jours »). Pas de notification sur le téléphone pour l'instant : seulement ce bandeau quand l'employé ouvre son Profil. Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.236** : tu peux maintenant entrer une date d'embauche **passée** (ex. le 2 novembre) dans la fiche de l'employé, au choix « Nouvel(le) employé(e) ». Avant, seules les dates d'aujourd'hui ou à venir étaient acceptées. Une date passée s'enregistre dans « Date d'embauche ». Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.235** : le message rouge « ordre de travail Field Service incomplet » ne revient plus d'un ancien brouillon : il n'apparaît que juste après une capture lue pendant la session en cours. Une fiche saisie à la main n'est jamais bloquée, même si l'OT est tapé (ex. « FORMATION HILO »). Fermer et rouvrir l'application pour recevoir la mise à jour.

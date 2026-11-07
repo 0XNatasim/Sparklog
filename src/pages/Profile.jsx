@@ -19,7 +19,7 @@ import { TwoFactorSettings } from "@/components/TwoFactor";
 import { isOwnerRole } from "@/lib/roles";
 import { requiresMfa } from "@/lib/mfa";
 import { Radio } from "lucide-react";
-import { CcqCalendarCard, CcqCalendarReminder } from "@/components/CcqCalendarCard";
+import { CcqCalendarCard } from "@/components/CcqCalendarCard";
 import { useCcqCalendar } from "@/lib/use-ccq-calendar";
 
 // The profile shown (the employee viewed), the forms the signed-in account may open and the published
@@ -103,7 +103,6 @@ export default function Profile() {
         {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
         {!loading && !error && (
           <>
-            <CcqCalendarReminder blocks={calendar.blocks} today={calendar.today} />
             <CollapsibleCard icon={UserRound} title={t("profile.information")}>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label={t("auth.fullName")} value={profile?.full_name} icon={UserRound} />
