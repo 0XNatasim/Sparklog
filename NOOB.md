@@ -1,11 +1,12 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-07 (V2.4.236).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-07 (V2.4.237).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.237** : dans l'onglet **Profil**, les employés voient maintenant une carte **« Calendrier CCQ »** avec les prochains congés fériés et les vacances de la construction (les dates viennent de la liste déjà en place, rien à saisir). Une semaine avant un congé, un **bandeau** apparaît en haut du Profil (« commence dans 7 jours »). Pas de notification sur le téléphone pour l'instant : seulement ce bandeau quand l'employé ouvre son Profil. Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.236** : tu peux maintenant entrer une date d'embauche **passée** (ex. le 2 novembre) dans la fiche de l'employé, au choix « Nouvel(le) employé(e) ». Avant, seules les dates d'aujourd'hui ou à venir étaient acceptées. Une date passée s'enregistre dans « Date d'embauche ». Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.235** : le message rouge « ordre de travail Field Service incomplet » ne revient plus d'un ancien brouillon : il n'apparaît que juste après une capture lue pendant la session en cours. Une fiche saisie à la main n'est jamais bloquée, même si l'OT est tapé (ex. « FORMATION HILO »). Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.234** : la case **KM** de la fiche est maintenant **vide** (plus de « 0 » gris qui faisait croire qu'elle était remplie). Elle reste **obligatoire** : taper 0 s'il n'y a pas de km.

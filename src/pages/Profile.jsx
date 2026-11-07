@@ -19,6 +19,8 @@ import { TwoFactorSettings } from "@/components/TwoFactor";
 import { isOwnerRole } from "@/lib/roles";
 import { requiresMfa } from "@/lib/mfa";
 import { Radio } from "lucide-react";
+import { CcqCalendarCard, CcqCalendarReminder } from "@/components/CcqCalendarCard";
+import { useCcqCalendar } from "@/lib/use-ccq-calendar";
 
 // The profile shown (the employee viewed), the forms the signed-in account may open and the published
 // references. { error } when one of them cannot be read.
@@ -52,6 +54,7 @@ export default function Profile() {
   const [error, setError] = useState("");
 
   const signedInId = user?.id;
+  const calendar = useCcqCalendar();
 
   const formName = (form) => (language === "en" ? form.name_en || form.name_fr : form.name_fr || form.name_en) || "—";
   const quickReferences = references.filter((reference) => reference.section === "quick");
@@ -100,6 +103,7 @@ export default function Profile() {
         {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
         {!loading && !error && (
           <>
+            <CcqCalendarReminder blocks={calendar.blocks} today={calendar.today} />
             <CollapsibleCard icon={UserRound} title={t("profile.information")}>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label={t("auth.fullName")} value={profile?.full_name} icon={UserRound} />
@@ -131,6 +135,8 @@ export default function Profile() {
                 <TwoFactorSettings bare />
               </CollapsibleCard>
             )}
+
+            <CcqCalendarCard blocks={calendar.blocks} today={calendar.today} loaded={calendar.loaded} />
 
             <QuickReferenceCard references={quickReferences} />
 

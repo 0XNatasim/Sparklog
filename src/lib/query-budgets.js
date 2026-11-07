@@ -21,6 +21,8 @@ export const QUERY_BUDGETS = Object.freeze({
   emergencyEntries: 50,
   managedForms: 100,
   profileReferences: 200,
+  // Profile › Calendrier CCQ: upcoming days of company_holidays (vacations are one row per day).
+  ccqCalendar: 200,
   // Gestion › Notes: one person's own notes (and the side-menu badge's open reminders).
   managerNotes: 500,
   // Replies of the notes shown (0118), per request of up to inListChunk notes.
