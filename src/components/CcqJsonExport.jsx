@@ -17,6 +17,7 @@ import { useHolidayDates } from "@/lib/company-holidays";
 import { useAuth } from "@/contexts/AuthContext";
 import { companyDate } from "@/lib/company-time";
 import { lastFinishedReportMonth, reportMonthPeriod } from "@/lib/monthly-report-period";
+import { aecqOctoberReminder } from "@/lib/aecq-dues";
 
 // On screen the NAS is only a mask. The real values are read at download time through
 // export_ccq_nas (migration 0084): owner only, written reason, password re-entry,
@@ -94,6 +95,7 @@ export default function CcqJsonExport({ lastFinishedMonth = false }) {
 
   const incomplete = records.filter((record) => missingCcqFields(record).length > 0);
   const monthPeriod = reportMonthPeriod(month);
+  const aecqReminder = aecqOctoberReminder(month);
 
   async function confirmExport() {
     setExportBusy(true);
@@ -167,6 +169,13 @@ export default function CcqJsonExport({ lastFinishedMonth = false }) {
             </Select>
             <Input type="month" value={month} onChange={(event) => setMonth(event.target.value)} aria-label={t("manager.download.reportingMonth")} />
           </div>
+          {aecqReminder && (
+            <p role="note" className="rounded-md border border-warning bg-warning/10 p-3 text-sm text-warning-foreground">
+              {aecqReminder.amount != null
+                ? t("manager.download.aecqReminder", { year: aecqReminder.year, amount: aecqReminder.amount })
+                : t("manager.download.aecqReminderUnknown", { year: aecqReminder.year })}
+            </p>
+          )}
           {lastFinishedMonth && monthPeriod && (
             <p className="text-xs text-muted-foreground">{t("manager.download.periodHint", { start: monthPeriod.start, end: monthPeriod.end })}</p>
           )}
