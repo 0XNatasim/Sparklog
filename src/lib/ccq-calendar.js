@@ -37,12 +37,43 @@ export function daysUntil(block, today) {
   return dayNumber(block.start) - dayNumber(today);
 }
 
-// The next block that starts within `windowDays` days (today included): the reminder shown the week before.
-export function reminderBlock(blocks, today, windowDays = REMINDER_DAYS) {
+// One holiday / vacation = one key: once an employee presses OK the reminder never comes back for it.
+export const blockKey = (block) => `${block.start}|${block.label}`;
+
+// The next block that starts within `windowDays` days (today included) and was not dismissed:
+// the reminder shown the week before. `dismissed` = Set of blockKey.
+export function reminderBlock(blocks, today, windowDays = REMINDER_DAYS, dismissed = new Set()) {
   return upcomingBlocks(blocks, today).find((block) => {
     const days = daysUntil(block, today);
-    return days >= 0 && days <= windowDays;
+    return days >= 0 && days <= windowDays && !dismissed.has(blockKey(block));
   }) || null;
+}
+
+// Dismissed reminders live in this browser, per account (no migration): « OK » on one device does not
+// hide it on another. Entries whose block ended more than 30 days ago are dropped.
+const storageKey = (userId) => `sparklog.ccqCalendarSeen.${userId}`;
+function storage() {
+  try { return window.localStorage || null; } catch { return null; }
+}
+
+export function readDismissed(userId, today) {
+  const store = storage();
+  if (!store || !userId) return new Set();
+  try {
+    const list = JSON.parse(store.getItem(storageKey(userId)) || "[]");
+    const keep = (Array.isArray(list) ? list : []).filter((key) => typeof key === "string"
+      && dayNumber(String(key).slice(0, 10)) >= dayNumber(today) - 30);
+    return new Set(keep);
+  } catch { return new Set(); }
+}
+
+export function dismissBlock(userId, block, today) {
+  const next = readDismissed(userId, today).add(blockKey(block));
+  const store = storage();
+  if (store && userId) {
+    try { store.setItem(storageKey(userId), JSON.stringify([...next])); } catch { /* private mode: dismissed for this visit only */ }
+  }
+  return next;
 }
 
 // Uses the global dayjs locale (set by LanguageProvider).

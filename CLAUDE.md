@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-07, V2.4.237)
+## 6. À faire / à préciser (mis à jour 2026-11-07, V2.4.238)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.238 (technique).** Rappel du calendrier CCQ en bandeau global : `CcqCalendarBanner` (`CcqCalendarCard.jsx`) monté dans `AppShell` après `UpdateBanner` (pas en mode « vue employé », `sticky z-40`), bouton « OK » ; `blockKey` (`début|libellé`), `reminderBlock(..., dismissed)` saute les blocs fermés, `readDismissed` / `dismissBlock` → `localStorage` `sparklog.ccqCalendarSeen.<userId>` (entrées finies depuis plus de 30 jours retirées ; aucune migration : un « OK » ne suit pas l'employé d'un appareil à l'autre). `use-ccq-calendar.js` met la lecture en cache (une par jour et par chargement de page). Le rappel est retiré du haut de `Profile.jsx`, la carte reste.
 
 **V2.4.237 (technique).** Calendrier CCQ du Profil : `src/lib/ccq-calendar.js` (logique pure : `calendarBlocks` regroupe les jours consécutifs de même libellé de `company_holidays` en un bloc, `upcomingBlocks`, `daysUntil`, `reminderBlock` = prochain bloc qui commence dans 0 à `REMINDER_DAYS` = 7 jours, `formatBlockRange`), `use-ccq-calendar.js` (lecture `company_holidays` à partir d'aujourd'hui, budget `ccqCalendar` = 200, un échec = liste vide), `components/CcqCalendarCard.jsx` (`CcqCalendarReminder` en tête et `CcqCalendarCard` dans `Profile.jsx`), textes `ccqCalendar.*`. Aucune migration : la table est lisible par tout compte connecté et couvre 2026-2028 (0098). Pas de notification téléphone (il faudrait une tâche planifiée + `send_push`). Pour les années suivantes : une nouvelle migration de dates.
 
