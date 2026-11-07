@@ -1,11 +1,12 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-07 (V2.4.238).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-07 (V2.4.239).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.239** : quand tu prépares le **rapport mensuel CCQ d'octobre** (Gestion › Rapport CCQ, mois = octobre), un encadré te rappelle d'**ajouter la cotisation annuelle de base à l'AECQ** au paiement (240 $ avant taxes en 2026, 245 $ en 2027). La CCQ la facture à part : site de la CCQ › État de compte › Factures manuelles. Sparklog ne la paie pas et ne l'ajoute pas au fichier : c'est un rappel. Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.238** : le rappel d'un congé (une semaine avant) s'affiche maintenant en **bandeau sur toutes les pages**, comme celui de la mise à jour, avec un bouton **OK**. Quand l'employé clique OK, le bandeau ne revient plus pour ce congé. L'OK est gardé dans le navigateur de l'appareil : sur un autre appareil, le bandeau s'affichera encore une fois. La carte « Calendrier CCQ » reste dans le Profil. Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.237** : dans l'onglet **Profil**, les employés voient maintenant une carte **« Calendrier CCQ »** avec les prochains congés fériés et les vacances de la construction (les dates viennent de la liste déjà en place, rien à saisir). Une semaine avant un congé, un **bandeau** apparaît en haut du Profil (« commence dans 7 jours »). Pas de notification sur le téléphone pour l'instant : seulement ce bandeau quand l'employé ouvre son Profil. Fermer et rouvrir l'application pour recevoir la mise à jour.
 - ✅ **V2.4.236** : tu peux maintenant entrer une date d'embauche **passée** (ex. le 2 novembre) dans la fiche de l'employé, au choix « Nouvel(le) employé(e) ». Avant, seules les dates d'aujourd'hui ou à venir étaient acceptées. Une date passée s'enregistre dans « Date d'embauche ». Fermer et rouvrir l'application pour recevoir la mise à jour.
@@ -353,8 +354,10 @@ ce que l'option vaudra au départ pour tout le monde (rien ne change tant que tu
   bloqué »), il touche **(Détails) › Voir le texte lu sur la capture › Copier le texte** et te l'envoie ;
   donne ce texte à Claude pour corriger la lecture. Bonne pratique : capture de l'onglet **Bilan** avec
   « Heure de début » visible en haut et les deux distances (miles et km) en bas.
-- [ ] **Cotisation annuelle AECQ 2027** : 245 $ (avant : 240 $), plus taxes. Ajoutée automatiquement au rapport
-  mensuel CCQ d'**octobre 2026**. Rien à faire dans l'app.
+- [ ] **Cotisation annuelle AECQ** : 240 $ en 2026, 245 $ en 2027 (avant taxes), facturée par la CCQ à part avec le rapport
+  d'octobre (site de la CCQ › État de compte › Factures manuelles). **Celle de 2026 n'est pas payée** (oubli avec le
+  changement du site de la CCQ) : à payer. Sparklog ne l'ajoute pas automatiquement : il affiche un rappel dans le rapport
+  CCQ d'octobre (V2.4.239).
 - [ ] **Assurance MÉDIC** : part salariale **0,68 $/h** et part patronale **2,93 $/h**, maintenues jusqu'au
   **24 avril 2027** (décision du CASIC). À partir du **25 avril 2027**, la convention prévoit **1,06 $** (salariale)
   et **3,31 $** (patronale). Confirmer auprès de la CCQ avant cette date que le gel n'est pas prolongé.

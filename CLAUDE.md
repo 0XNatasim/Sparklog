@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-07, V2.4.238)
+## 6. À faire / à préciser (mis à jour 2026-11-07, V2.4.239)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.239 (technique).** Rappel de la cotisation annuelle de base à l'AECQ : `src/lib/aecq-dues.js` (`AECQ_BASE_DUES` = montant avant taxes par année du rapport, 2026 : 240, 2027 : 245 ; `aecqOctoberReminder(mois)` renvoie `{ year, amount }` seulement pour un mois `AAAA-10`, `amount` nul si l'année n'est pas dans la table). `CcqJsonExport.jsx` affiche l'encadré (`manager.download.aecqReminder` / `aecqReminderUnknown`) sous le sélecteur de mois ; rien n'est ajouté au JSON ni au moteur de paie. Cette cotisation est la facture manuelle de la CCQ, distincte des 0,03 $/h de `ccq-benefits.js`. Chaque année : ajouter le montant publié dans la table. Corrige la note de NOOB qui disait « ajoutée automatiquement ».
 
 **V2.4.238 (technique).** Rappel du calendrier CCQ en bandeau global : `CcqCalendarBanner` (`CcqCalendarCard.jsx`) monté dans `AppShell` après `UpdateBanner` (pas en mode « vue employé », `sticky z-40`), bouton « OK » ; `blockKey` (`début|libellé`), `reminderBlock(..., dismissed)` saute les blocs fermés, `readDismissed` / `dismissBlock` → `localStorage` `sparklog.ccqCalendarSeen.<userId>` (entrées finies depuis plus de 30 jours retirées ; aucune migration : un « OK » ne suit pas l'employé d'un appareil à l'autre). `use-ccq-calendar.js` met la lecture en cache (une par jour et par chargement de page). Le rappel est retiré du haut de `Profile.jsx`, la carte reste.
 

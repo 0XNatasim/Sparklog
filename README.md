@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.238 (2026-11-07).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.239 (2026-11-07).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.239 — AECQ annual contribution reminder.** In the CCQ monthly report screen, choosing **October** shows a notice: add the AECQ annual base contribution (billed by the CCQ as a manual invoice, 240 $ before taxes for 2026, 245 $ for 2027) when paying the October report. Nothing is added to the export itself.
 - **V2.4.238 — CCQ reminder shown everywhere, with an OK button.** The week-before reminder is no longer only at the top of the Profile: it is a banner on every page (like the update banner) with an « OK » button. Pressing OK hides it for good for that holiday (kept in this browser, per account). The « CCQ calendar » card stays in the Profile.
 - **V2.4.237 — CCQ calendar in the Profile.** New « CCQ calendar » card (Profile) lists the upcoming statutory holidays and mandatory construction vacations (read from `company_holidays`), and a banner appears at the top of the Profile from 7 days before the next one. No database change; no phone notification yet.
 - **V2.4.236 — Hiring date can be in the past.** The « Embauche / départ » picker (« Nouvel(le) employé(e) ») now accepts any first-day date, including one before today, so a forgotten hiring date can be filled in. A past date is saved as the hiring date (shown in « Date d'embauche »); the person stays on the boards.
@@ -826,7 +827,7 @@ official tables before any dollar figure is trusted.
 | Contribution sectorielle ($0.02/h) | CCQ | |
 | Fonds d'indemnisation ($0.02/h) | CCQ | |
 | Fonds de formation ($0.20/h) | CCQ | |
-| AECQ ($0.03/h + $225 annual, October) | AECQ | |
+| AECQ ($0.03/h + annual base contribution billed by the CCQ with the October report: $240 in 2026, $245 in 2027, before taxes) | AECQ | |
 | TPS / TVQ | Federal / Québec (TVQ is 9.975 %) | |
 | **Union dues — per union / local** | Table des taux de cotisation syndicale | |
 
