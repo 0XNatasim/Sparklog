@@ -100,13 +100,15 @@ export function parseExtractedText(text) {
 // parseExtractedText(text). Codes: ot, depart, arrivee, fin, km (missing or empty on the
 // screenshot) and kmMismatch (Miles Traveled ≠ Distance réelle parcourue, compared in whole km
 // like the form).
-export function workOrderIssues(parsed) {
+// `kmOptional` (profiles.km_apart_from_capture): the employee types the km by hand, so km missing from the
+// screenshot is not a problem. Two km that disagree on the screenshot still are.
+export function workOrderIssues(parsed, { kmOptional = false } = {}) {
   const issues = [];
   for (const field of ["ot", "depart", "arrivee", "fin"]) {
     if (!parsed?.[field]) issues.push({ code: field });
   }
   const hasKm = parsed?.km_aller !== null && parsed?.km_aller !== undefined;
-  if (!hasKm) issues.push({ code: "km" });
+  if (!hasKm && !kmOptional) issues.push({ code: "km" });
   const hasMiles = parsed?.miles_traveled !== null && parsed?.miles_traveled !== undefined;
   if (hasKm && hasMiles && Math.round(parsed.miles_traveled) !== parsed.km_aller) {
     issues.push({ code: "kmMismatch", miles: parsed.miles_traveled, km: parsed.km_aller });

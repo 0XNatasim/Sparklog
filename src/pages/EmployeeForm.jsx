@@ -131,6 +131,8 @@ export default function EmployeeForm() {
   // Problems found on the last Field Service screenshot (workOrderIssues). While any remain, the
   // new entry cannot be saved: the employee fixes the work order and retakes the screenshot.
   const [workOrderProblems, setWorkOrderProblems] = useState([]);
+  // profiles.km_apart_from_capture: this employee's km are typed by hand, not required on the screenshot.
+  const [kmApartFromCapture, setKmApartFromCapture] = useState(false);
   const presetLabels = usePresetWorkOrders();
   const [showWorkOrderCheck, setShowWorkOrderCheck] = useState(false);
   // Raw text of the last screenshot read, shown on demand in the check dialog so a misread can be
@@ -407,13 +409,14 @@ export default function EmployeeForm() {
 
   useEffect(() => {
     if (!effectiveUserId) return;
-    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled, first_trip_unpaid").eq("id", effectiveUserId).single().then(({ data, error }) => {
+    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled, first_trip_unpaid, km_apart_from_capture").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
         setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.errors.failedLoad"));
         return;
       }
       setOfficeEmployee(isAdminEmployee(data?.role));
       setFirstTripUnpaid(Boolean(data?.first_trip_unpaid));
+      setKmApartFromCapture(Boolean(data?.km_apart_from_capture));
       setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled));
       const enabled = Boolean(data?.parking_receipts_enabled);
       setParkingReceiptsEnabled(enabled);
@@ -1040,7 +1043,7 @@ export default function EmployeeForm() {
       // or Miles Traveled ≠ Distance réelle parcourue: tell the employee to fix the work order.
       // Blocks Save until a new screenshot shows a complete work order.
       setFromScreenshot(true);
-      const problems = workOrderIssues(d);
+      const problems = workOrderIssues(d, { kmOptional: kmApartFromCapture });
       setWorkOrderProblems(problems);
       setShowWorkOrderCheck(problems.length > 0);
       // Auto-fill populated the form — mark dirty so Save appears
