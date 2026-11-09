@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-07, V2.4.239)
+## 6. À faire / à préciser (mis à jour 2026-11-09, V2.4.240)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.240 (technique).** Spec seulement : `docs/rules/ccq-electricien-4-secteurs.md` (règles électricien des conventions 2025-2029 IC / Industriel / Résidentiel léger-lourd / GCV, articles cités, ⚠ = à vérifier au PDF) et `src/payroll/multi-sector.todo.test.js` (14 `it.todo`, cas d'homologation). Aucun changement au moteur. Pour coder : `sector` par fiche (`IC | I | I_LOURDE | R_LEGER | R_LOURD | GCV`), compteurs jour / semaine globaux à l'employé (cumul, GCV 1.01 17.1 — pas trouvé en IC / I, à confirmer CCQ), taux OT du secteur de l'heure, primes après l'OT ; une fixture de parité par cas avant le code (« Payroll logic forks »).
 
 **V2.4.239 (technique).** Rappel de la cotisation annuelle de base à l'AECQ : `src/lib/aecq-dues.js` (`AECQ_BASE_DUES` = montant avant taxes par année du rapport, 2026 : 240, 2027 : 245 ; `aecqOctoberReminder(mois)` renvoie `{ year, amount }` seulement pour un mois `AAAA-10`, `amount` nul si l'année n'est pas dans la table). `CcqJsonExport.jsx` affiche l'encadré (`manager.download.aecqReminder` / `aecqReminderUnknown`) sous le sélecteur de mois ; rien n'est ajouté au JSON ni au moteur de paie. Cette cotisation est la facture manuelle de la CCQ, distincte des 0,03 $/h de `ccq-benefits.js`. Chaque année : ajouter le montant publié dans la table. Corrige la note de NOOB qui disait « ajoutée automatiquement ».
 
@@ -463,6 +465,7 @@ détail article par article est dans `docs/rules/compensation-rules.md` (« Prim
 **D. Règles non encore spécifiées (ne pas deviner)**
 - [ ] Fériés et vacances payés en dehors de l'indemnité de 13 % (si applicable).
 - [ ] Primes autres que chef d'équipe.
+- [ ] **Multi-secteurs (homologation CCQ)** : moteur pour Industriel, Résidentiel, GCV et cumul inter-secteurs — spec `docs/rules/ccq-electricien-4-secteurs.md` (§9 : 6 points à faire confirmer par la CCQ avant de coder).
 - [ ] **Trajets, km et frais par employé** (décision du 2026-10-18) : chaque trajet (temps et km), l'indemnité de
   plus de 65 km, le traversier, le stationnement et le souper deviennent une option dans la fiche de l'employé,
   avec « Chargé à Britton ». Grille et décisions : `NOOB.md` étape 6 (le champ de plus dans la fiche de temps n'est plus prévu, décision du 2026-10-26 ; retour maison
