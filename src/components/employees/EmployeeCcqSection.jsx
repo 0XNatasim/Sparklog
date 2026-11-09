@@ -124,6 +124,15 @@ export function CcqOptionsFields({ profile: p, panel, className = "space-y-3 bor
             <input type="checkbox" checked={Boolean(p.inventory_screenshots_enabled)} onChange={toggle("inventory_screenshots_enabled")} className="h-5 w-5 rounded border-input accent-primary" />
           </label>
         )}
+        {!isAdminEmployee(p.role) && (
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/20 px-3 py-3 md:col-span-2">
+            <span>
+              <span className="block text-sm font-medium">{t("employees.kmApartFromCapture")}</span>
+              <span className="block text-xs text-muted-foreground">{t("employees.kmApartFromCaptureHint")}</span>
+            </span>
+            <input type="checkbox" checked={Boolean(p.km_apart_from_capture)} onChange={toggle("km_apart_from_capture")} className="h-5 w-5 shrink-0 rounded border-input accent-primary" />
+          </label>
+        )}
         {subcontractor && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs md:col-span-2">
             <div className="font-semibold text-primary">{t("employees.subcontractorRuleTitle")}</div>

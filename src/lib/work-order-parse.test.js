@@ -196,3 +196,20 @@ describe("cut screenshot with icons read as characters", () => {
     expect(workOrderIssues(parsed)).toEqual([]);
   });
 });
+
+describe("workOrderIssues with km typed by hand (km_apart_from_capture)", () => {
+  // Bilan screen of a short phone (OT-201258): times and arrival visible, the Déplacement block is below.
+  const SHORT_SCREEN = "OT-201258\nHeure de début\n09/11/2026\n08:22\nHeure de fin\n09/11/2026\n10:47\nDurée 2,42 heures\nHeure d'arrivée (info)\n09/11/2026\n08:39";
+
+  it("blocks a screenshot without km by default, and lets it through for this employee", () => {
+    const parsed = parseExtractedText(SHORT_SCREEN);
+    expect(workOrderIssues(parsed).map((i) => i.code)).toEqual(["km"]);
+    expect(workOrderIssues(parsed, { kmOptional: true })).toEqual([]);
+  });
+
+  it("still reports the other missing values and two km that disagree", () => {
+    expect(workOrderIssues({}, { kmOptional: true }).map((i) => i.code)).toEqual(["ot", "depart", "arrivee", "fin"]);
+    expect(workOrderIssues({ ot: "1", depart: "08:00", arrivee: "08:10", fin: "10:00", km_aller: 30, miles_traveled: 34.29 }, { kmOptional: true }))
+      .toEqual([{ code: "kmMismatch", miles: 34.29, km: 30 }]);
+  });
+});
