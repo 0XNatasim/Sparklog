@@ -216,6 +216,19 @@ serve(async (req) => {
       })
     );
 
+    // Foreman (contremaître, engine 2.8.0): paid at least 8 h on a weekday that is not a holiday.
+    const jobDates = [...new Set(claimedJobs.map((j) => String(j.job_date || "").slice(0, 10)).filter(Boolean))];
+    const holidayDates = new Set<string>();
+    if (claimedJobs.some((j) => profileMap.get(j.user_id)?.role === "foreman") && jobDates.length) {
+      const { data: holidays } = await admin.from("company_holidays").select("holiday_date").in("holiday_date", jobDates);
+      for (const h of holidays || []) holidayDates.add(String(h.holiday_date).slice(0, 10));
+    }
+    const foremanDayMinimum = (j: { job_date?: string | null }, prof?: { role?: string | null }) => {
+      const date = String(j.job_date || "").slice(0, 10);
+      const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+      return prof?.role === "foreman" && weekday >= 1 && weekday <= 5 && !holidayDates.has(date) ? 480 : 0;
+    };
+
     const rows = claimedJobs.map((j) => {
       const prof = profileMap.get(j.user_id);
       const depart = j.depart ? String(j.depart).slice(0, 5) : "";
@@ -250,10 +263,12 @@ serve(async (req) => {
         // without social benefits; when true, it keeps its benefits while the week's regular
         // time (work + return) stays within 40 h, minus 8 h per weekday holiday (engine 2.6.0) —
         // only for days from RETURN_WITH_BENEFITS.startDate (week 42). Subcontractors: always false.
-        employee_return_with_benefits_to_8h: prof?.role !== "subcontractor_1" && Boolean(prof?.return_with_benefits_to_8h)
+        employee_return_with_benefits_to_8h: prof?.role !== "subcontractor_1" && prof?.role !== "foreman" && Boolean(prof?.return_with_benefits_to_8h)
           && String(j.job_date || "") >= RETURN_WITH_BENEFITS.startDate,
         // When true, Départ→Arrivée of the employee's first job of the day is unpaid travel.
-        employee_first_trip_unpaid: Boolean(prof?.first_trip_unpaid),
+        employee_first_trip_unpaid: prof?.role !== "foreman" && Boolean(prof?.first_trip_unpaid),
+        // Foreman: minimum paid minutes of this weekday (480), else 0; the Google script adds the shortfall.
+        employee_day_minimum_minutes: foremanDayMinimum(j, prof),
         approved_at: approved_at_label,
         approved_by: approved_by_value,
       };
