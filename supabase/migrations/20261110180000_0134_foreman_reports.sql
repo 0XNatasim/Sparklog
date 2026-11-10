@@ -56,6 +56,7 @@ create policy "foreman_reports: foreman inserts own" on public.foreman_reports
     and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'foreman' and not coalesce(p.is_paused, false))
   );
 
-revoke all on public.foreman_reports from anon, public;
+-- authenticated gets Supabase's default table grants (update, delete, truncate…): remove them, then grant only what is used.
+revoke all on public.foreman_reports from anon, public, authenticated;
 grant select, insert on public.foreman_reports to authenticated;
 revoke all on function public.foreman_reports_guard() from public, anon, authenticated;

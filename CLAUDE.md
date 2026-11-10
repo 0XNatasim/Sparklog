@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-10, V2.4.243)
+## 6. À faire / à préciser (mis à jour 2026-11-10, V2.4.244)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.244 (technique).** Fichier de la migration 0134 : `revoke all on public.foreman_reports from anon, public, authenticated` (Supabase donne par défaut update / delete / truncate… à `authenticated` sur une nouvelle table ; `grant select, insert` seul ne les retirait pas, les politiques RLS bloquaient déjà update / delete). Même correction appliquée à la base le 2026-11-10 (vérifié : `authenticated` = INSERT, SELECT). À reprendre pour toute nouvelle table : retirer aussi `authenticated` avant de donner les droits voulus. Aucun changement de code.
 
 **V2.4.243 (technique).** Notes du contremaître. Migration 0134 : table `foreman_reports` (`user_id` défaut `auth.uid()`, `submission_key` unique par auteur, `report_date`, `audited_name` texte libre ≤ 120 — l'employé ne lit pas les autres profils, donc pas de lien —, `body` 1–5000 ; trigger `foreman_reports_guard` : heure du serveur, texte nettoyé). RLS : lecture par l'auteur ou `get_my_role() = 'manager'` (aal2), insertion seulement par un profil `foreman` non en pause et pour lui-même ; droits `select, insert` seulement (jamais modifié ni supprimé). `src/lib/foreman-reports.js` (`isForemanOt` via `matchPreset`, `cleanReport`, `submitForemanReport` : un doublon 23505 = même rapport, `fetchForemanReports` : budget `foremanReports` = 300, noms lus dans `profiles`, `filterReports`). `EmployeeForm.jsx` : avec `foremanEmployee` et l'OT « CONTREMAÎTRE », le bouton Remplir auto est remplacé par « Notes du contremaître » (`ForemanNotesDialog.jsx`, clé de soumission créée à l'ouverture, bloqué en « vue employé »). Gestion : l'entrée `notes` devient une page à onglets (`mine` = `NotesPanel`, `foreman` = `ForemanReportsPanel.jsx`, règle gestionnaire / propriétaire), route `NotesTabsPage`. Pas de pastille ni de notification téléphone ; pas de photo ; pas de « lu » par la gestion. **Appliquer la migration 0134 avant de déployer le code.**
 

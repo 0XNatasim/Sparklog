@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.243 (2026-11-10).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.244 (2026-11-10).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.244 — Migration 0134 file.** The migration file now also revokes the default table grants of `authenticated` on `foreman_reports` (only select and insert remain), as already done in the database. No behaviour change.
 - **V2.4.243 — Foreman notes.** When a foreman picks the « CONTREMAÎTRE » work order, the « Auto-fill » button of the time entry becomes « Notes du contremaître »: a short report (optional audited employee, free text) sent to the managers, who read them in Gestion › Notes › Contremaître (the former notes are the « Mes notes » tab). A foreman only writes and reads his own reports; reports cannot be edited or deleted. Migration 0134.
 - **V2.4.242 — Google Sheet knows the foreman.** The Apps Script `doPost` and `push_approved_batch` now handle a foreman: no first-trip or return rule, and a new « Minimum 8 h (min) » column completes a weekday worked to 8 h on the day's first job (« Heures payées » includes it). Saturday, Sunday and holidays get no minimum. The script must be pasted again in Google (a column is added by itself).
 - **V2.4.241 — Foreman role (contremaître).** New role « Contremaître » (assigned by the owner in the employee card, like Subcontractor). A foreman is paid at least 8 h for every weekday worked; overtime beyond 8 h applies as for everyone (same proof), with no return-time rule and no unpaid first trip. The time entry has no manual-entry star and no mandatory Field Service capture (a capture can still be added as proof). The work-order menu gets a « CONTREMAÎTRE » choice. Migration 0133, payroll engine 2.8.0.
