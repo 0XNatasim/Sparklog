@@ -1,4 +1,4 @@
-import { isAdminEmployee, isManagerRole, isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
+import { isAdminEmployee, isForemanRole, isManagerRole, isNonCcqRole, isSubcontractorRole } from "@/lib/roles";
 
 // Per-employee pay options (profiles columns): Règles de temps (V2) and the « Paie et options » tab
 // of the V3 employee card read the same list, so both show and lock the same boxes.
@@ -16,6 +16,8 @@ export function payRuleToggles(p) {
     { field: "first_trip_unpaid", labelKey: "settings.firstTrip.title", hintKey: "settings.firstTrip.help", locked: false },
     { field: "return_with_benefits_to_8h", labelKey: "employees.returnWithBenefits", hintKey: "employees.returnWithBenefitsHint", locked: fixed, lockedValue: false },
     { field: "overtime_first_hour_double", labelKey: "employees.otFirstHourDouble", hintKey: "employees.otFirstHourDoubleHint", locked: fixed, lockedValue: true },
+    // « 4 jours de 10 h » (0135, engine 2.9.0): overtime after 10 h of work in the day. Not for subcontractors nor foremen.
+    { field: "ten_hour_days", labelKey: "employees.tenHourDays", hintKey: "employees.tenHourDaysHint", locked: fixed || isForemanRole(p.role), lockedValue: false },
     ...(isTeamLeader(p)
       ? [{ field: "team_leader_premium_overtime", labelKey: "employees.premiumOnOvertime", hintKey: "employees.premiumOnOvertimeHint", locked: fixed, lockedValue: false }]
       : []),

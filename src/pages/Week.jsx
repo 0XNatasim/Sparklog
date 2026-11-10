@@ -12,7 +12,7 @@ import { cn, withTimeout } from "@/lib/utils";
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
-import { calculateDailyTotals } from "@/lib/payroll-calculations";
+import { calculateDailyTotals, dailyRegularMinutesFor } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { companyDate } from "@/lib/company-time";
@@ -60,7 +60,7 @@ async function fetchWeeks(userId) {
   );
   if (error) throw error;
   const { data: profile } = await supabase
-    .from("profiles").select("overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").eq("id", userId).maybeSingle();
+    .from("profiles").select("role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, ten_hour_days").eq("id", userId).maybeSingle();
   const counters = await loadDayRounding({ userIds: [userId], profiles: [{ id: userId, first_trip_unpaid: Boolean(profile?.first_trip_unpaid) }] });
   return { jobs: data || [], profile, rounding: roundingFor(counters, userId) };
 }
@@ -80,6 +80,7 @@ export default function Week() {
   const [returnWithBenefitsTo8h, setReturnWithBenefitsTo8h] = useState(false);
   const holidayDates = useHolidayDates();
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
+  const [dailyRegularMinutes, setDailyRegularMinutes] = useState(480); // 600 with « 4 jours de 10 h »
   const [rounding, setRounding] = useState(null); // day-rounding counter (15 min)
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -91,6 +92,7 @@ export default function Week() {
     setOtFirstHourDouble(Boolean(prof?.overtime_first_hour_double));
     setReturnWithBenefitsTo8h(Boolean(prof?.return_with_benefits_to_8h));
     setFirstTripUnpaid(Boolean(prof?.first_trip_unpaid));
+    setDailyRegularMinutes(dailyRegularMinutesFor(prof));
     setRounding(nextRounding);
   }
   function failWeeks(e) {
@@ -130,7 +132,7 @@ export default function Week() {
   }, [effectiveUserId]);
 
   const { weekly, dailyByKey } = useMemo(() => {
-    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, holidayDates, rounding });
+    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, dailyRegularMinutes, holidayDates, rounding });
     const dailyMap = new Map([...calculatedDays].map(([dayKey, totals]) => [dayKey, {
       ...totals,
       date: parseJobDate(dayKey),
@@ -181,7 +183,7 @@ export default function Week() {
 
     weeklyArr.sort((a, b) => (a.start.isAfter(b.start) ? -1 : 1));
     return { weekly: weeklyArr, dailyByKey: dailyMap };
-  }, [jobs, otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, holidayDates, rounding]);
+  }, [jobs, otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, dailyRegularMinutes, holidayDates, rounding]);
 
   function toggleWeek(weekKey) {
     setOpenWeekKey((prev) => (prev === weekKey ? null : weekKey));

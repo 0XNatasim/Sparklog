@@ -222,3 +222,16 @@ cent by `src/payroll/employee-week.test.js`.
 - CCQ primary-source citations (document + section + effective dates) for every rule above.
 - Statutory holidays, vacation pay, and any premium other than team-leader.
 - Apprentice-level rate steps (only "all trade 220 / sector C" is confirmed today).
+
+## TEN_HOUR_DAYS — « 4 jours de 10 h » (owner decision 2026-11-10, engine 2.9.0)
+
+- Per-employee option (`profiles.ten_hour_days`, migration 0135, off by default; set by managers in the employee card ›
+  Paie et options, never by the employee). Not applied to subcontractors (simple rate up to 8 h) nor foremen (8 h minimum).
+- With the option, the **regular day is 10 h**: overtime starts after 10 h of work in the day (`dailyRegularMinutes` = 600,
+  `dailyRegularMinutesFor(profile)`), instead of 8 h. Everything else is unchanged: first overtime hour of the week at 1.5×
+  then 2× (or 2× with its option), Saturday all overtime, Sunday and holidays 2×, return time, first trip, rounding.
+- The two gates follow the threshold, in the app and in the database (`validate_job_submission_contract`,
+  `reconcile_overtime_meal`): overtime proof after 10 h of paid time; supper (30 $) after 2 h 15 of overtime = 12 h 15 of paid work.
+- Not decided (do not guess): a 5th day in the week (the CCQ export already moves regular hours beyond 40 h/week to overtime;
+  the other screens do not), and the 8 h removed from the week's regular cap by a weekday holiday.
+- Not signed off by a payroll specialist (ADR 0001).

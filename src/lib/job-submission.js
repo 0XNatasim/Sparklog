@@ -24,10 +24,10 @@ function workedMinutes(job) {
 }
 
 // Evidence is one-per-day. Include saved/updated jobs in the total so submitting
-// from History cannot bypass the same >8 h rule enforced by the main form. For an employee
+// from History cannot bypass the same >8 h rule (10 h for « 4 jours de 10 h », `dailyRegularMinutes`) enforced by the main form. For an employee
 // with the "first trip unpaid" option the threshold counts PAID time (the unpaid first trip
 // is removed), exactly like the database gate; `grossMinutes` keeps the full span.
-export function dailyOvertimeEvidenceRequirement(candidate, jobs, { firstTripUnpaid = false } = {}) {
+export function dailyOvertimeEvidenceRequirement(candidate, jobs, { firstTripUnpaid = false, dailyRegularMinutes = 8 * 60 } = {}) {
   const dayJobs = (jobs || []).filter((job) =>
     job?.job_date === candidate?.job_date
     && job.id !== candidate?.id
@@ -38,7 +38,7 @@ export function dailyOvertimeEvidenceRequirement(candidate, jobs, { firstTripUnp
   const totalMinutes = grossMinutes - unpaidTrip;
   const hasEvidence = Boolean(candidate?.overtime_evidence_captured)
     || dayJobs.some((job) => job.overtime_evidence_captured);
-  return { totalMinutes, grossMinutes, required: totalMinutes > 8 * 60 && !hasEvidence };
+  return { totalMinutes, grossMinutes, required: totalMinutes > dailyRegularMinutes && !hasEvidence };
 }
 
 // Keep the client-to-RPC contract explicit. Ownership, status and lock state are

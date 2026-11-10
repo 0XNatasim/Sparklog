@@ -9,7 +9,7 @@ import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { employerFromSettings, loadEmployerSettings, loadTaxProfiles } from "@/lib/payroll-settings";
 import { COST_JOB_STATUSES, openingLookup, taxYearsFor } from "@/lib/employer-cost";
 
-const PROFILE_COLUMNS = "id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
+const PROFILE_COLUMNS = "id, full_name, email, role, hourly_rate, hourly_rate_double, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, ten_hour_days";
 const JOB_COLUMNS = "id, user_id, job_date, ot, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, hourly_rate_snapshot, team_leader_premium_snapshot, km_rate_snapshot, status";
 
 const unwrap = ({ data, error }) => {

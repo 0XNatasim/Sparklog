@@ -11,7 +11,7 @@ import { loadHolidayDates } from "@/lib/company-holidays";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { useT } from "@/lib/use-t";
 
-const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
+const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, ten_hour_days";
 
 const unwrap = ({ data, error }) => {
   if (error) throw error;

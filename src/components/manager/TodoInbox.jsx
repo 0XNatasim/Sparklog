@@ -23,7 +23,7 @@ import { loadHolidayDates } from "@/lib/company-holidays";
 import { DYNACOM_CUMULATIVE_END } from "@/lib/payroll-opening";
 import { TODO_EVENT } from "@/lib/todo-count";
 import { notifyBroadcastPush, pushOutcome } from "@/lib/push";
-import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { dailyRegularMinutesFor, getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
 import { loadManualEntryJobIds } from "@/lib/entry-source";
 import { loadOtReuse } from "@/lib/ot-reuse";
@@ -73,7 +73,7 @@ export default function TodoInbox() {
       const [submittedRes, peopleRes, mealsRes, parkingRes, settingsRes, timeOffRes, prevJobsRes] = await Promise.all([
         // Weeks paid by Dynacom (up to the imported cumulative, end of week 42) are closed: their jobs are not listed.
         withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "submitted").gt("job_date", DYNACOM_CUMULATIVE_END).order("job_date", { ascending: true }).order("id").limit(QUERY_BUDGETS.todoSubmittedJobs), 12000),
-        withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date, apprentice_level, first_trip_unpaid"), 12000),
+        withRetry(() => supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date, apprentice_level, first_trip_unpaid, ten_hour_days"), 12000),
         withRetry(() => supabase.from("meal_claims").select("id, job_id, user_id, job_date, amount, status").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         withRetry(() => supabase.from("parking_receipts").select("job_id, user_id, job_date, amount, status, storage_path, extra_storage_paths").eq("status", "pending").order("job_date").limit(QUERY_BUDGETS.reviewQueue), 12000),
         supabase.from("company_time_settings").select("*").eq("id", true).maybeSingle(),
@@ -100,7 +100,10 @@ export default function TodoInbox() {
         ...detectJobAnomalies(
           [...submitted, ...(peersRes.data || [])],
           anomalyLimitsFromSettings(settingsRes.data),
-          { firstTripUnpaidUsers: new Set(people.filter((p) => p.first_trip_unpaid).map((p) => p.id)) },
+          {
+            firstTripUnpaidUsers: new Set(people.filter((p) => p.first_trip_unpaid).map((p) => p.id)),
+            tenHourUsers: new Set(people.filter((p) => dailyRegularMinutesFor(p) > 480).map((p) => p.id)),
+          },
         ),
         ...otReuseAnomalies(otReuse, submitted),
       ]);

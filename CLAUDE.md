@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-10, V2.4.245)
+## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.246)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.246 (technique).** Règle « 4 jours de 10 h » (moteur 2.9.0). Migration 0135 : colonne `profiles.ten_hour_days` (booléen, défaut faux ; écrite par les gestionnaires via la politique de profil, l'employé reste hors de la liste blanche) ; `validate_job_submission_contract` (seuil de la preuve de temps supp. : 480 → 600 min) et `reconcile_overtime_meal` (souper : 615 → 735 min) recréées, corps de 0125, seuls les deux seuils changent ; sans effet pour `foreman` / `subcontractor_1`. Moteur : `DAILY_REGULAR_MINUTES` (480), `TEN_HOUR_DAY_MINUTES` (600), `dailyRegularMinutesFor(profile)`, option `dailyRegularMinutes` de `calculatePayrollEntries` (journée régulière et plafond de la semaine pour le retour), renvoyée par `overtimeOptionsFromProfile` ; `isMealEligible({ dailyRegularMinutes })`. Écrans : la colonne est lue partout où l'on lit `overtime_first_hour_double` (Talons, DAS, Paie de la semaine, Calcul, Rapports, Coûts, RE, Export CCQ, `classify_week`) et `Week.jsx` / `History.jsx` / `EmployeeForm.jsx` (preuve de temps supp.), `meal-claim-request.js` / `mealDecision` (souper), `ManagerDashboard` + `TodoInbox` + `detectJobAnomalies({ tenHourUsers })` (« temps supp. sans preuve » après 10 h). Case dans `pay-options.js` (verrouillée à faux pour sous-traitant et contremaître), fiche des règles de paie et `docs/rules/compensation-rules.md` (TEN_HOUR_DAYS) à jour. `push_approved_batch` et la feuille Google ne changent pas (la feuille ne calcule pas le temps supp.). Ouvert : 5e journée de la semaine (l'export CCQ ramène déjà en temps supp. les heures régulières au-delà de 40 h / semaine ; les autres écrans non) et férié en semaine (retire encore 8 h du plafond de la semaine). Règle non signée par un spécialiste (ADR 0001). Migration 0135 appliquée à la base le 2026-11-11 (fichier ajouté à `main` avant le code ; vérifié : colonne, seuils 600 / 735 min, déclencheur présent) ; **à faire :** redéployer `classify_week`.
 
 **V2.4.245 (technique).** Documents seulement : `docs/governance/reunions-securite/` reçoit les PDF des rencontres d'équipe (1 : consignes générales Hilo / Messier Connexion, 2 : pause sécurité, non-conformités avec photos de chantier). Dépôt public : aucune donnée personnelle ni nom de client dans les fichiers ; à retirer si une photo permet de reconnaître un client. Aucun code changé, seule la version change.
 

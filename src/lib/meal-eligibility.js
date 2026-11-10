@@ -1,10 +1,10 @@
-import { dayWorkMinutesWithoutReturn, getKilometreBreakdown, isMealEligible, minutesBetween } from "./payroll-calculations";
+import { dailyRegularMinutesFor, dayWorkMinutesWithoutReturn, getKilometreBreakdown, isMealEligible, minutesBetween } from "./payroll-calculations";
 
 // Supper (30 $): 2 h 15 of overtime in the day (1.5× or 2×, both count) = at least 10 h 15
-// of paid work on a weekday, return time never counted. Decided from the day's jobs.
+// of paid work on a weekday (12 h 15 for « 4 jours de 10 h »), return time never counted. Decided from the day's jobs.
 export function mealDecision(dayJobs, jobDate, profile) {
   const dailyWorkMinutes = dayWorkMinutesWithoutReturn(dayJobs, { firstTripUnpaid: Boolean(profile?.first_trip_unpaid) });
-  return { dailyWorkMinutes, eligible: isMealEligible({ jobDate, dailyWorkMinutes }) };
+  return { dailyWorkMinutes, eligible: isMealEligible({ jobDate, dailyWorkMinutes, dailyRegularMinutes: dailyRegularMinutesFor(profile) }) };
 }
 
 // What a manager needs to check a supper: the day's presence (Départ→Fin), the return time and

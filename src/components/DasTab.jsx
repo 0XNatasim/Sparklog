@@ -60,7 +60,7 @@ export default function DasTab({ messier = false }) {
       try {
         const since = dayjs().subtract(14, "month").format("YYYY-MM-DD");
         const [{ data: profs, error: pErr }, { data: jobs, error: jErr }, { data: seeds }, { data: ledgers }, rounding] = await Promise.all([
-          supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid").order("full_name", { ascending: true }),
+          supabase.from("profiles").select("id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, ten_hour_days").order("full_name", { ascending: true }),
           fetchAllRows(() => supabase.from("jobs").select("id, user_id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes, status").gte("job_date", since).order("id")),
           supabase.from("payroll_ytd").select("*").eq("tax_year", 2026),
           fetchAllRows(() => supabase.from("payroll_period_ledger").select("*").eq("tax_year", 2026).order("period_end", { ascending: true }).order("user_id")),

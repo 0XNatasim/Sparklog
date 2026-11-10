@@ -11,7 +11,7 @@ export async function shouldRequestMealClaim(client, { userId, jobDate, jobId })
       10000
     ),
     withTimeout(
-      client.from("profiles").select("first_trip_unpaid").eq("id", userId).maybeSingle(),
+      client.from("profiles").select("role, first_trip_unpaid, ten_hour_days").eq("id", userId).maybeSingle(),
       10000
     ),
   ]);

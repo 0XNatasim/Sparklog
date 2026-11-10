@@ -22,7 +22,7 @@ import { loadOtReuse } from "@/lib/ot-reuse";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import LiveCrew from "@/components/LiveCrew";
 import WeekSnapshot from "@/components/WeekSnapshot";
-import { dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
+import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import JobCard from "@/components/manager/JobCard";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -230,16 +230,20 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     // select("*") so the scan keeps working with default limits if the threshold
     // columns are not deployed yet.
     const { data: settings } = await supabase.from("company_time_settings").select("*").eq("id", true).abortSignal(signal).maybeSingle();
-    // Employees with "first trip unpaid" reach the 8 h overtime-proof threshold on paid time.
+    // Employees with "first trip unpaid" reach the overtime-proof threshold on paid time; those on « 4 jours de 10 h »
+    // reach it after 10 h instead of 8 h.
     const { data: tripUnpaid } = userIds.length
-      ? await supabase.from("profiles").select("id").eq("first_trip_unpaid", true).in("id", userIds).abortSignal(signal)
+      ? await supabase.from("profiles").select("id, first_trip_unpaid, ten_hour_days, role").or("first_trip_unpaid.eq.true,ten_hour_days.eq.true").in("id", userIds).abortSignal(signal)
       : { data: [] };
     const otReuse = await loadOtReuse(rows.map((row) => row.id), signal);
     return sortAnomalies([
       ...detectJobAnomalies(
         [...rows, ...(approved || [])],
         anomalyLimitsFromSettings(settings),
-        { firstTripUnpaidUsers: new Set((tripUnpaid || []).map((row) => row.id)) },
+        {
+          firstTripUnpaidUsers: new Set((tripUnpaid || []).filter((row) => row.first_trip_unpaid).map((row) => row.id)),
+          tenHourUsers: new Set((tripUnpaid || []).filter((row) => dailyRegularMinutesFor(row) > 480).map((row) => row.id)),
+        },
       ),
       ...otReuseAnomalies(otReuse, rows),
     ]);
@@ -369,7 +373,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     (async () => {
       try {
         const { data } = await withRetry(
-          () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, is_paused, show_on_boards, first_trip_unpaid"),
+          () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, is_paused, show_on_boards, first_trip_unpaid, ten_hour_days"),
           12000
         );
         if (!cancelled) setProfiles((current) => {
@@ -418,7 +422,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
         if (missingProfileIds.length) {
           const { data: profileRows, error: profileError } = await withRetry(
-            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds),
+            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid, ten_hour_days").in("id", missingProfileIds),
             12000
           );
           if (profileError) throw profileError;
@@ -482,7 +486,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         const missingProfileIds = [...new Set(orderedJobs.map((job) => job.user_id).filter((id) => !profiles.has(id)))];
         if (missingProfileIds.length) {
           const { data: profileRows, error: profileError } = await withRetry(
-            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds),
+            () => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid, ten_hour_days").in("id", missingProfileIds),
             12000
           );
           if (profileError) throw profileError;
@@ -528,7 +532,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         const orderedRows = (rows || []).sort((a, b) => order.get(a.id) - order.get(b.id));
         const missingProfileIds = [...new Set(orderedRows.map((job) => job.user_id).filter((id) => !profilesRef.current.has(id)))];
         const { data: people } = missingProfileIds.length
-          ? await withRetry(() => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid").in("id", missingProfileIds), 12000)
+          ? await withRetry(() => supabase.from("profiles").select("id, role, full_name, phone, email, ccq_number, first_trip_unpaid, ten_hour_days").in("id", missingProfileIds), 12000)
           : { data: [] };
         // Every job of each supper's day: the check shows the day's work, return time and km.
         const users = [...new Set(orderedRows.map((job) => job.user_id))];
@@ -1021,7 +1025,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     for (const [key, v] of totals) {
       const userId = key.slice(0, key.indexOf("|"));
       const unpaidTrip = profiles.get(userId)?.first_trip_unpaid ? dayFirstTripUnpaidMinutes(v.dayJobs) : 0;
-      if (v.minutes - unpaidTrip > 480 && !v.hasEvidence) flagged.add(key);
+      if (v.minutes - unpaidTrip > dailyRegularMinutesFor(profiles.get(userId)) && !v.hasEvidence) flagged.add(key);
     }
     return flagged;
   }, [jobs, profiles]);
