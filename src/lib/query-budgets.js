@@ -29,6 +29,8 @@ export const QUERY_BUDGETS = Object.freeze({
   managerNoteReplies: 2000,
   // Gestion › Registre d'accidents (0120): the most recent files.
   accidentLog: 500,
+  // Gestion › Notes › Contremaître (0134): the most recent foreman reports.
+  foremanReports: 300,
   // Justificatifs › Télécharger (0126): the pictures still kept (30 days by default) and the ones already downloaded.
   evidenceDownload: 1500,
 });
