@@ -45,6 +45,7 @@ const PayRulesReference = lazyPanel(() => import("@/components/PayRulesReference
 const TravelRulesManager = lazyPanel(() => import("@/components/manager/TravelRulesManager"));
 const AccidentRegister = lazyPanel(() => import("@/components/manager/AccidentRegister"));
 const NotesPanel = lazyPanel(() => import("@/components/manager/NotesPanel"));
+const ForemanReportsPanel = lazyPanel(() => import("@/components/manager/ForemanReportsPanel"));
 const ManagerDashboard = lazyPanel(() => import("@/pages/ManagerDashboard"));
 const CcqJsonExport = lazyPanel(() => import("@/components/CcqJsonExport"));
 
@@ -356,6 +357,8 @@ const CONFIG_TABS = {
   forms: FormsPage, references: ReferencesPage, contacts: () => <ContactsManager />, "ot-presets": () => <Narrow><PresetWorkOrdersManager /></Narrow>, "payroll-rates": () => <Narrow><PayrollRatesManager /></Narrow>, "statutory-rates": () => <Narrow><StatutoryRatesManager /></Narrow>,
 };
 
+const NOTES_TABS = { mine: NotesPage, foreman: () => <ForemanReportsPanel /> };
+export const NotesTabsPage = () => <TabbedPage itemId="notes" content={NOTES_TABS} />;
 export const TodoTabsPage = () => <TabbedPage itemId="todo" content={TODO_TABS} />;
 export const TimeHubPage = () => <TabbedPage itemId="v3-time" content={TIME_TABS} />;
 export const PayHistoryPage = () => <TabbedPage itemId="v3-pay-history" content={PAY_HISTORY_TABS} />;

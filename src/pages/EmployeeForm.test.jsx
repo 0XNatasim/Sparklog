@@ -33,7 +33,7 @@ function Where() {
   return <div data-testid="where">{location.pathname}{location.search}</div>;
 }
 
-function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [], inventoryItems = [], parking = [] } = {}) {
+function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [], inventoryItems = [], parking = [], reports = [] } = {}) {
   state.auth = { user: { id: "emp-1" }, role: "employee" };
   state.fake = createFakeSupabase({
     tables: {
@@ -47,6 +47,7 @@ function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", sa
       inventory_items: inventoryItems,
       parking_receipts: parking,
       preset_work_orders: [{ id: "p1", label: "FORMATION BRITTON", sort_order: 1, active: true }],
+      foreman_reports: reports,
     },
     rpcs: {
       save_own_job: saveJob || ((call) => [{ id: "job-new", status: call.args.p_submit ? "submitted" : "saved", locked: false }]),
@@ -185,6 +186,32 @@ describe("EmployeeForm — new entry", () => {
     expect(field("km")).toBeNull();
     fill();
     expect(saveButton().disabled).toBe(false);
+  });
+
+  it("gives a foreman « Notes du contremaître » instead of Auto-fill once the work order is CONTREMAÎTRE", async () => {
+    setup({ profile: { role: "foreman" } });
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "profiles")).toBe(true));
+    expect(screen.getByRole("button", { name: fr("form.buttons.autofill") })).toBeTruthy();
+    fireEvent.change(field("ot"), { target: { value: "CONTREMAÎTRE" } });
+    expect(screen.queryByRole("button", { name: fr("form.buttons.autofill") })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: fr("foremanNotes.button") }));
+    const send = await screen.findByRole("button", { name: fr("foremanNotes.send") });
+    expect(send.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(fr("foremanNotes.audited")), { target: { value: "Paul Roy" } });
+    fireEvent.change(screen.getByLabelText(fr("foremanNotes.report")), { target: { value: "Casque oublié, rappel fait." } });
+    fireEvent.click(send);
+    await screen.findByText(fr("foremanNotes.sent"));
+    const writes = state.fake.writes("foreman_reports");
+    expect(writes).toHaveLength(1);
+    expect(JSON.stringify(writes[0])).toContain("Casque oublié, rappel fait.");
+  });
+
+  it("keeps Auto-fill for another employee, even on the CONTREMAÎTRE work order", async () => {
+    setup();
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "profiles")).toBe(true));
+    fireEvent.change(field("ot"), { target: { value: "CONTREMAÎTRE" } });
+    expect(screen.getByRole("button", { name: fr("form.buttons.autofill") })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: fr("foremanNotes.button") })).toBeNull();
   });
 
   it("closes the day after the deadline", async () => {

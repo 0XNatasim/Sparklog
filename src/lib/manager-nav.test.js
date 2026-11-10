@@ -10,7 +10,7 @@ const ids = (role, adminSections) => visibleManagerNav(role, adminSections).flat
 const entries = MANAGER_NAV.flatMap((group) => group.items);
 const byId = (id) => MANAGER_NAV_ITEMS.find((item) => item.id === id);
 const sourceOf = (t) => (t.from ? byId(t.from) : t);
-const ROLES = ["employee", "subcontractor_1", "manager", "owner"];
+const ROLES = ["employee", "foreman", "subcontractor_1", "manager", "owner"];
 const ADMIN_GRANTS = [[], ...GRANTABLE_ADMIN_SECTIONS.map((s) => [s]), [...GRANTABLE_ADMIN_SECTIONS]];
 const personas = [...ROLES.map((role) => [role, []]), ...ADMIN_GRANTS.map((grants) => ["admin", grants])];
 
@@ -33,6 +33,14 @@ describe("Gestion menu", () => {
     expect(firstAllowedPath("manager", [])).toBe("todo");
   });
 
+  it("Notes has two tabs, My notes and Foreman (0134), for the managers only", () => {
+    const notes = byId("notes");
+    expect(notes.tabs.map((t) => t.key)).toEqual(["mine", "foreman"]);
+    expect(visibleTabs(notes, "manager", []).map((t) => t.key)).toEqual(["mine", "foreman"]);
+    for (const role of ["employee", "foreman", "subcontractor_1"]) expect(visibleTabs(notes, role, [])).toEqual([]);
+    expect(visibleTabs(notes, "admin", [...GRANTABLE_ADMIN_SECTIONS])).toEqual([]);
+  });
+
   it("opens only Aujourd'hui and Paie by default", () => {
     expect(MANAGER_NAV.filter((group) => group.open).map((group) => group.id)).toEqual(["today", "payroll"]);
   });
@@ -41,7 +49,7 @@ describe("Gestion menu", () => {
     const reached = reachable("owner", []);
     const unique = [...new Set(reached)];
     expect(unique.filter((id) => !id.startsWith("inline:")).sort())
-      .toEqual(MANAGER_PAGES.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "notes", "accidents").sort());
+      .toEqual(MANAGER_PAGES.map((item) => item.id).concat("payroll-week", "advanced-travel-rules", "accidents").sort());
     expect(reached.filter((id) => id === "reports-period")).toHaveLength(2); // Semaine / Mois · Sommaire
     expect(reached.filter((id) => id === "references")).toHaveLength(2); // Références · Contacts (same rows)
     expect(reached.filter((id) => id === "employees")).toHaveLength(2); // Employés · Groupes (same rule, 0114)

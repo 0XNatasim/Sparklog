@@ -48,7 +48,11 @@ const MENU_ONLY_ITEMS = Object.freeze([
   ] },
   { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
   // My own notes and reminders (0111): private to each manager / owner.
-  { id: "notes", path: "notes", grant: null, labelKey: "mgr.nav3.notes" },
+  // Notes › Contremaître (0134): the short reports of the foremen, read by the managers.
+  { id: "notes", path: "notes", grant: null, labelKey: "mgr.nav3.notes", tabs: [
+    Object.freeze({ key: "mine", grant: null, labelKey: "mgr.nav3.tab.myNotes" }),
+    Object.freeze({ key: "foreman", grant: null, labelKey: "mgr.nav3.tab.foreman" }),
+  ] },
   // Trajets, km et frais: one setting per employee and per line (NOOB.md étape 6). Manager / owner only.
   // Registre d'accidents (0120): managers / owner only; a badge counts the open files.
   { id: "accidents", path: "accidents", grant: null, labelKey: "mgr.nav3.accidents" },

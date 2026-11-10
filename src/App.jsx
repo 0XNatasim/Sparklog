@@ -22,10 +22,10 @@ const AuditPage = managerPage("AuditPage");
 const EmergencyPage = managerPage("EmergencyPage");
 const HealthPage = managerPage("HealthPage");
 const TravelRulesPage = managerPage("TravelRulesPage");
-const NotesPage = managerPage("NotesPage");
 const AccidentsPage = managerPage("AccidentsPage");
 const LivePage = managerPage("LivePage");
 const TodoTabsPage = managerPage("TodoTabsPage");
+const NotesTabsPage = managerPage("NotesTabsPage");
 const TimeHubPage = managerPage("TimeHubPage");
 const PayHistoryPage = managerPage("PayHistoryPage");
 const TeamHubPage = managerPage("TeamHubPage");
@@ -158,7 +158,7 @@ export default function App() {
           <Route path="advanced/audit" element={<AuditPage />} />
           <Route path="advanced/health" element={<HealthPage />} />
           <Route path="advanced/travel-rules" element={<TravelRulesPage />} />
-          <Route path="notes" element={<NotesPage />} />
+          <Route path="notes" element={<NotesTabsPage />} />
           <Route path="accidents" element={<AccidentsPage />} />
           <Route path="advanced/emergency" element={<EmergencyPage />} />
           {/* Old paths (the V2 menu, removed in V2.4.186) → the page and tab that hold them now */}

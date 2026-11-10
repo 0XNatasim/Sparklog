@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
-import { Camera } from "lucide-react";
+import { Camera, ClipboardList } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { hoursBetween, formatHours } from "../lib/time";
@@ -43,6 +43,8 @@ import AutofillTipDialog from "@/components/employee-form/AutofillTipDialog";
 import EndOfShiftDialog from "@/components/employee-form/EndOfShiftDialog";
 import WorkOrderCheckDialog from "@/components/employee-form/WorkOrderCheckDialog";
 import ManualEntryCheckDialog from "@/components/employee-form/ManualEntryCheckDialog";
+import ForemanNotesDialog from "@/components/employee-form/ForemanNotesDialog";
+import { isForemanOt } from "@/lib/foreman-reports";
 
 dayjs.locale("en");
 
@@ -170,6 +172,7 @@ export default function EmployeeForm() {
   const [officeEmployee, setOfficeEmployee] = useState(false);
   // Foreman: paid 8 h per day worked; the Field Service capture is optional (proof, no manual-entry star).
   const [foremanEmployee, setForemanEmployee] = useState(false);
+  const [showForemanNotes, setShowForemanNotes] = useState(false);
   // "First trip unpaid" employees reach the 8 h overtime-screenshot threshold on PAID time.
   // Until the profile loads this stays false, i.e. the stricter gross-time rule applies.
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
@@ -1131,6 +1134,18 @@ export default function EmployeeForm() {
 
             {!locked && !editId && !officeEmployee && (
               <>
+                {/* Work order « CONTREMAÎTRE »: no Field Service capture to read, the button opens the foreman's notes. */}
+                {foremanEmployee && isForemanOt(ot) ? (
+                  <Button
+                    type="button"
+                    className="h-12 w-full text-base font-semibold"
+                    disabled={disableInputs}
+                    onClick={() => setShowForemanNotes(true)}
+                  >
+                    <ClipboardList className="mr-2 h-5 w-5" />
+                    {t("foremanNotes.button")}
+                  </Button>
+                ) : (
                 <Button
                   type="button"
                   className="h-12 w-full text-base font-semibold"
@@ -1140,6 +1155,7 @@ export default function EmployeeForm() {
                   <Camera className="mr-2 h-5 w-5" />
                   {extracting ? t("common.extracting") : t("form.buttons.autofill")}
                 </Button>
+                )}
                 <input
                   ref={imageInputRef}
                   type="file"
@@ -1284,6 +1300,7 @@ export default function EmployeeForm() {
         problems={workOrderProblems}
         ocrText={lastOcrText}
       />
+      <ForemanNotesDialog t={t} open={showForemanNotes} onOpenChange={setShowForemanNotes} userId={user?.id} reportDate={job_date} />
       <ManualEntryCheckDialog
         t={t}
         open={showManualEntryCheck}
