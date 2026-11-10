@@ -1,4 +1,7 @@
-import { dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "./payroll-calculations";
+import { TEN_HOUR_DAY_MINUTES, DAILY_REGULAR_MINUTES, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "./payroll-calculations";
+
+// « 4 jours de 10 h »: overtime, hence its proof, starts 2 h later.
+const TEN_HOUR_EXTRA_MINUTES = TEN_HOUR_DAY_MINUTES - DAILY_REGULAR_MINUTES;
 
 // Default thresholds for the manager's "À vérifier" box. These only flag a job for a
 // second look before approval; the database contract still decides what is accepted.
@@ -56,8 +59,9 @@ export function anomalyLimitsFromSettings(settings) {
 // Pure detection over submitted/approved jobs. Only anomalies that touch at least one
 // submitted job are returned: approved days are already settled.
 // `firstTripUnpaidUsers` (Set of user ids with the "first trip unpaid" option) makes the
-// overtime-proof threshold count paid time, like the employee screens and the database.
-export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS, { firstTripUnpaidUsers = new Set() } = {}) {
+// overtime-proof threshold count paid time, like the employee screens and the database. `tenHourUsers` (« 4 jours de
+// 10 h ») have a threshold 2 h higher: overtime starts after 10 h of work.
+export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS, { firstTripUnpaidUsers = new Set(), tenHourUsers = new Set() } = {}) {
   const days = new Map();
   for (const job of jobs || []) {
     if (!REVIEWABLE.has(job.status) || !job.user_id || !job.job_date || !job.depart || !job.fin) continue;
@@ -96,7 +100,7 @@ export function detectJobAnomalies(jobs, limits = ANOMALY_LIMITS, { firstTripUnp
     const worked = dayJobs.reduce((sum, job) => sum + minutesBetween(job.depart, job.fin), 0);
     if (worked > limits.longDayMinutes) add("long_day", dayJobs, { minutes: worked });
     const paidWorked = worked - (firstTripUnpaidUsers.has(dayJobs[0].user_id) ? dayFirstTripUnpaidMinutes(dayJobs) : 0);
-    if (paidWorked > limits.overtimeMinutes && !dayJobs.some((job) => job.overtime_evidence_captured)) {
+    if (paidWorked > limits.overtimeMinutes + (tenHourUsers.has(dayJobs[0].user_id) ? TEN_HOUR_EXTRA_MINUTES : 0) && !dayJobs.some((job) => job.overtime_evidence_captured)) {
       add("overtime_no_evidence", dayJobs, { minutes: paidWorked });
     }
 

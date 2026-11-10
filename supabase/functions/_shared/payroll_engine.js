@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.8.0";
+export const ENGINE_VERSION = "2.9.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -53,6 +53,16 @@ export function payrollWeekKey(jobDate) {
 // Minimum paid minutes of a foreman's weekday worked (8 h).
 export const FOREMAN_DAY_MINUTES = 480;
 
+// Regular minutes of a weekday: overtime starts after them. 8 h by default; 10 h for an employee with the
+// « 4 jours de 10 h » option (profiles.ten_hour_days, engine 2.9.0). The option does not apply to subcontractors
+// (simple rate up to 8 h) nor foremen (8 h minimum), whatever the stored box says.
+export const DAILY_REGULAR_MINUTES = 480;
+export const TEN_HOUR_DAY_MINUTES = 600;
+export function dailyRegularMinutesFor(profile) {
+  const ownRules = profile?.role === "subcontractor_1" || profile?.role === "foreman";
+  return !ownRules && profile?.ten_hour_days ? TEN_HOUR_DAY_MINUTES : DAILY_REGULAR_MINUTES;
+}
+
 // Map an employee profile row to the per-employee overtime options used by the
 // calculation. Keeps every caller in sync as policies are added.
 export function overtimeOptionsFromProfile(profile) {
@@ -71,6 +81,7 @@ export function overtimeOptionsFromProfile(profile) {
     firstOtHourDouble: Boolean(profile?.overtime_first_hour_double),
     returnWithBenefitsTo8h: Boolean(profile?.return_with_benefits_to_8h),
     firstTripUnpaid: Boolean(profile?.first_trip_unpaid),
+    dailyRegularMinutes: dailyRegularMinutesFor(profile),
   };
 }
 
@@ -267,7 +278,7 @@ function roundingAdjustments(sortedJobs, paidSpan, rounding) {
   return adjust;
 }
 
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, returnWithBenefitsFrom = RETURN_WITH_BENEFITS.startDate, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null, minDayMinutes = 0, noReturn = false } = {}) {
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, returnWithBenefitsFrom = RETURN_WITH_BENEFITS.startDate, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null, minDayMinutes = 0, noReturn = false, dailyRegularMinutes = DAILY_REGULAR_MINUTES } = {}) {
   if (noReturn) {
     jobs = jobs.map((job) => ({ ...job, return_time_minutes: 0 }));
     firstTripUnpaid = false;
@@ -300,7 +311,7 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
   for (const [date, work] of dayWorkTotal) {
     if (dayKind(date) !== "regular") continue;
     const wk = payrollWeekKey(date);
-    weekRegularWork.set(wk, (weekRegularWork.get(wk) || 0) + Math.min(480, Math.max(0, work)));
+    weekRegularWork.set(wk, (weekRegularWork.get(wk) || 0) + Math.min(dailyRegularMinutes, Math.max(0, work)));
   }
   const weekCapMinutes = (wk) => {
     let holidaysInWeek = 0;
@@ -343,7 +354,7 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     if (returnWithBenefitMinutes) weekRoom.set(wk, (weekRoom.get(wk) || 0) - returnWithBenefitMinutes);
     let returnNoBenefitMinutes = returnMinutes - returnWithBenefitMinutes;
 
-    const regularRoom = kind === "regular" ? Math.max(0, 480 - priorDayWork) : 0;
+    const regularRoom = kind === "regular" ? Math.max(0, dailyRegularMinutes - priorDayWork) : 0;
     const workRegularMinutes = Math.min(workMinutes, regularRoom);
     const overtimeWorkMinutes = workMinutes - workRegularMinutes;
     // Return time with benefits is paid as regular time; the pre-pass keeps it within the week's cap.
@@ -442,9 +453,9 @@ export function calculateDailyTotals(jobs, options) {
 // reconcile_overtime_meal (migration 0086).
 export const MEAL_OVERTIME_MINUTES = 135;
 export const MEAL_AFTER_DAILY_WORK_MINUTES = 480 + MEAL_OVERTIME_MINUTES;
-export function isMealEligible({ jobDate, dailyWorkMinutes }) {
+export function isMealEligible({ jobDate, dailyWorkMinutes, dailyRegularMinutes = DAILY_REGULAR_MINUTES }) {
   const weekday = dayOfWeek(jobDate);
-  return weekday !== null && weekday !== 0 && weekday !== 6 && (Number(dailyWorkMinutes) || 0) >= MEAL_AFTER_DAILY_WORK_MINUTES;
+  return weekday !== null && weekday !== 0 && weekday !== 6 && (Number(dailyWorkMinutes) || 0) >= dailyRegularMinutes + MEAL_OVERTIME_MINUTES;
 }
 
 // The day's paid work without return time: each job's Départ→Fin span minus its return

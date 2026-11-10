@@ -20,7 +20,7 @@ const fixtures = [
 describe("engine parity: app copy === Edge Function copy", () => {
   it("ENGINE_VERSION matches", () => {
     expect(app.ENGINE_VERSION).toBe(shared.ENGINE_VERSION);
-    expect(app.ENGINE_VERSION).toBe("2.8.0");
+    expect(app.ENGINE_VERSION).toBe("2.9.0");
     expect(app.computeWeek).toBe(shared.computeWeek);
     expect(app.calculatePayrollEntries).toBe(shared.calculatePayrollEntries);
   });
@@ -38,6 +38,7 @@ describe("engine parity: app copy === Edge Function copy", () => {
     { firstOtHourDouble: false, returnWithBenefitsTo8h: false, messierMethod: true },
     { firstOtHourDouble: false, returnWithBenefitsTo8h: true, messierMethod: false, firstTripUnpaid: true },
     { firstOtHourDouble: false, returnWithBenefitsTo8h: true, messierMethod: false, holidayDates: ["2026-06-03"] },
+    { firstOtHourDouble: false, returnWithBenefitsTo8h: true, messierMethod: false, dailyRegularMinutes: 600 },
   ])("produces the same versioned result for policy options %o", (options) => {
     for (const jobs of fixtures) {
       expect(strip(app.computeWeek(jobs, options))).toEqual(strip(shared.computeWeek(jobs, options)));
@@ -55,7 +56,11 @@ describe("engine parity: app copy === Edge Function copy", () => {
       role: "employee",
       overtime_first_hour_double: false,
       return_with_benefits_to_8h: true,
-    })).toEqual({ firstOtHourDouble: false, returnWithBenefitsTo8h: true, firstTripUnpaid: false });
+    })).toEqual({ firstOtHourDouble: false, returnWithBenefitsTo8h: true, firstTripUnpaid: false, dailyRegularMinutes: 480 });
+    // « 4 jours de 10 h »: overtime after 10 h, except for the roles with their own rules.
+    expect(app.overtimeOptionsFromProfile({ role: "employee", ten_hour_days: true }).dailyRegularMinutes).toBe(600);
+    expect(app.overtimeOptionsFromProfile({ role: "subcontractor_1", ten_hour_days: true }).dailyRegularMinutes).toBeUndefined();
+    expect(app.overtimeOptionsFromProfile({ role: "foreman", ten_hour_days: true }).dailyRegularMinutes).toBeUndefined();
   });
 });
 

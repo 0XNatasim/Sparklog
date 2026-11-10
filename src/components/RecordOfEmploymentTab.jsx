@@ -85,7 +85,7 @@ export default function RecordOfEmploymentTab() {
       try {
         const { data, error: e } = await supabase
           .from("profiles")
-          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, start_date, last_work_date, rehire_date")
+          .select("id, full_name, employee_number, ccq_number, role, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, ten_hour_days, start_date, last_work_date, rehire_date")
           .eq("role", "employee")
           .order("full_name", { ascending: true });
         if (e) throw e;

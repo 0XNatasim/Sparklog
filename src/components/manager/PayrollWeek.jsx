@@ -22,7 +22,7 @@ import { openTalonsPrint } from "@/lib/talon-print";
 import { formatRoundingMinutes, loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
 import { TAX_YEAR, lastCompletedWeekEnd, planPayrollWeek, postPayrollWeek, weekBounds } from "@/lib/payroll-week";
 
-const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid";
+const PROFILE_COLUMNS = "id, full_name, role, hourly_rate, km_rate, team_leader_premium, team_leader_premium_ccq, team_leader_premium_overtime, apprentice_level, union_association, employee_number, ccq_number, phone_data_reimbursement, storage_compensation, storage_compensation_amount, overtime_first_hour_double, return_with_benefits_to_8h, first_trip_unpaid, ten_hour_days";
 const LEDGER_COLUMNS = ["user_id", "period_end", "period_start", "talon_seq", "boss_approved", ...[...YTD_COLUMN_TO_KEY, ...YTD_CCQ_COLUMN_TO_KEY].map(([, col]) => col)].join(", ");
 const WEEKS_BACK = 12;
 

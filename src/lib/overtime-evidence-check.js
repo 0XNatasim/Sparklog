@@ -10,7 +10,7 @@ import { makeDayjsFromJob } from "@/lib/employee-form-helpers";
 // 8 h of paid time — not this job's running total. Returns { needed, paidDayMinutes }; paidDayMinutes
 // is null when the job already carries its proof (nothing computed). Fails closed: without the other
 // jobs we cannot prove that the day is at or below 8 h, so a load error is thrown.
-export async function overtimeEvidenceNeeded(client, { userId, jobDate, editId, thisMinutes, current, hasOvertimeEvidence, firstTripUnpaid }) {
+export async function overtimeEvidenceNeeded(client, { userId, jobDate, editId, thisMinutes, current, hasOvertimeEvidence, firstTripUnpaid, dailyRegularMinutes = 480 }) {
   // Retry (with a session refresh + backoff) so a Supabase cold start doesn't fail the check on the
   // first slow attempt.
   const { data: dayJobs } = await withRetry(
@@ -38,7 +38,7 @@ export async function overtimeEvidenceNeeded(client, { userId, jobDate, editId, 
   // If another job today already has the authorization, don't ask again for this one. The manager
   // also sees an "8h+, no evidence" flag at approval for jobs entered out of order.
   if (others.some((job) => job.overtime_evidence_captured)) return { needed: false, paidDayMinutes };
-  return { needed: paidDayMinutes > 480, paidDayMinutes };
+  return { needed: paidDayMinutes > dailyRegularMinutes, paidDayMinutes };
 }
 
 // Uploads the screenshot; on an expired session, timeout or network drop it refreshes the session and

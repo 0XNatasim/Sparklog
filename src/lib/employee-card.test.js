@@ -32,9 +32,9 @@ describe("matchesEmployeeSearch", () => {
 
 describe("pay options (same list as Règles de temps)", () => {
   it("locks the subcontractor boxes and adds the premium box for a team leader only", () => {
-    expect(payRuleToggles({ role: "employee" }).map((r) => r.field)).toEqual(["first_trip_unpaid", "return_with_benefits_to_8h", "overtime_first_hour_double"]);
+    expect(payRuleToggles({ role: "employee" }).map((r) => r.field)).toEqual(["first_trip_unpaid", "return_with_benefits_to_8h", "overtime_first_hour_double", "ten_hour_days"]);
     const sub = payRuleToggles({ role: "subcontractor_1", team_leader_premium: 1 });
-    expect(sub.map((r) => [r.field, r.locked])).toEqual([["first_trip_unpaid", false], ["return_with_benefits_to_8h", true], ["overtime_first_hour_double", true], ["team_leader_premium_overtime", true]]);
+    expect(sub.map((r) => [r.field, r.locked])).toEqual([["first_trip_unpaid", false], ["return_with_benefits_to_8h", true], ["overtime_first_hour_double", true], ["ten_hour_days", true], ["team_leader_premium_overtime", true]]);
     expect(reimbursements("admin")).toEqual({ km: false, storage: false });
     expect(reimbursements("employee")).toEqual({ km: true, storage: true });
     expect(reimbursements("subcontractor_1")).toEqual({ km: true, storage: false });

@@ -45,6 +45,7 @@ import WorkOrderCheckDialog from "@/components/employee-form/WorkOrderCheckDialo
 import ManualEntryCheckDialog from "@/components/employee-form/ManualEntryCheckDialog";
 import ForemanNotesDialog from "@/components/employee-form/ForemanNotesDialog";
 import { isForemanOt } from "@/lib/foreman-reports";
+import { dailyRegularMinutesFor } from "@/lib/payroll-calculations";
 
 dayjs.locale("en");
 
@@ -176,6 +177,7 @@ export default function EmployeeForm() {
   // "First trip unpaid" employees reach the 8 h overtime-screenshot threshold on PAID time.
   // Until the profile loads this stays false, i.e. the stricter gross-time rule applies.
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
+  const [dailyRegularMinutes, setDailyRegularMinutes] = useState(480); // 600 with « 4 jours de 10 h »
   const [entryBlockedReason, setEntryBlockedReason] = useState("");
   const [pendingSaveMode, setPendingSaveMode] = useState("draft");
   const [draftReady, setDraftReady] = useState(false);
@@ -414,7 +416,7 @@ export default function EmployeeForm() {
 
   useEffect(() => {
     if (!effectiveUserId) return;
-    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled, first_trip_unpaid, km_apart_from_capture").eq("id", effectiveUserId).single().then(({ data, error }) => {
+    supabase.from("profiles").select("role, parking_receipts_enabled, inventory_screenshots_enabled, first_trip_unpaid, ten_hour_days, km_apart_from_capture").eq("id", effectiveUserId).single().then(({ data, error }) => {
       if (error) {
         setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.errors.failedLoad"));
         return;
@@ -422,6 +424,7 @@ export default function EmployeeForm() {
       setOfficeEmployee(isAdminEmployee(data?.role));
       setForemanEmployee(isForemanRole(data?.role));
       setFirstTripUnpaid(Boolean(data?.first_trip_unpaid));
+      setDailyRegularMinutes(dailyRegularMinutesFor(data));
       setKmApartFromCapture(Boolean(data?.km_apart_from_capture));
       setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled));
       const enabled = Boolean(data?.parking_receipts_enabled);
@@ -876,7 +879,7 @@ export default function EmployeeForm() {
     if (officeEmployee) return false;
     try {
       const { needed, paidDayMinutes } = await overtimeEvidenceNeeded(supabase, {
-        userId: user.id, jobDate: job_date, editId, hasOvertimeEvidence, firstTripUnpaid,
+        userId: user.id, jobDate: job_date, editId, hasOvertimeEvidence, firstTripUnpaid, dailyRegularMinutes,
         // Known locally without any network call.
         thisMinutes: Math.round(hoursDecimal * 60),
         // The first job of the day of 65 km or more has its first trip paid: its job_date and km count.

@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { isAdminEmployee } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
-import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { dailyRegularMinutesFor, getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
@@ -74,6 +74,7 @@ export default function History() {
   const [inventoryEnabled, setInventoryEnabled] = useState(false);
   // Paid-time threshold for the overtime screenshot (stricter gross rule until loaded).
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
+  const [dailyRegularMinutes, setDailyRegularMinutes] = useState(480); // 600 with « 4 jours de 10 h »
   const [inventoryCounts, setInventoryCounts] = useState(null);
   const [inventoryViewDate, setInventoryViewDate] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -174,11 +175,12 @@ export default function History() {
   useEffect(() => {
     if (!effectiveUserId) return;
     let cancelled = false;
-    supabase.from("profiles").select("role, inventory_screenshots_enabled, first_trip_unpaid").eq("id", effectiveUserId).maybeSingle()
+    supabase.from("profiles").select("role, inventory_screenshots_enabled, first_trip_unpaid, ten_hour_days").eq("id", effectiveUserId).maybeSingle()
       .then(({ data }) => {
         if (cancelled) return;
         setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled) && !isAdminEmployee(data?.role));
         setFirstTripUnpaid(Boolean(data?.first_trip_unpaid));
+        setDailyRegularMinutes(dailyRegularMinutesFor(data));
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
@@ -329,7 +331,7 @@ export default function History() {
     setErr(""); setInfo("");
     try {
       if (!job) throw new Error(t("history.errors.submitFailed"));
-      if (!isAdminEmployee(role) && dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid }).required) {
+      if (!isAdminEmployee(role) && dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required) {
         // Over 8 h without proof: open the work form, which shows the screenshot pop-up.
         navigate(`/form?edit=${job.id}&submit=1${managerEntry ? `&confirmed=${job.id}` : ""}`);
         return;
@@ -366,7 +368,7 @@ export default function History() {
     try {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
-      if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid }).required)) {
+      if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required)) {
         // Proof is one per day: open the day's last job so the form asks for the screenshot.
         const lastJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
         navigate(`/form?edit=${lastJob.id}&submit=1${hasManagerEntry ? `&confirmed=${ids.join(",")}` : ""}`);
