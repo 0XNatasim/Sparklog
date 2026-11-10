@@ -869,8 +869,8 @@ export default function EmployeeForm() {
   }
 
   async function requiresOvertimeEvidence() {
-    // CCQ overtime authorization (the screenshot) does not apply to office staff, nor to a foreman (flat 8 h day).
-    if (officeEmployee || foremanEmployee) return false;
+    // CCQ overtime authorization (the screenshot) does not apply to office staff.
+    if (officeEmployee) return false;
     try {
       const { needed, paidDayMinutes } = await overtimeEvidenceNeeded(supabase, {
         userId: user.id, jobDate: job_date, editId, hasOvertimeEvidence, firstTripUnpaid,

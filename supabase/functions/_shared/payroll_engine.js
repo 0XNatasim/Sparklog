@@ -50,7 +50,7 @@ export function payrollWeekKey(jobDate) {
   return d.toISOString().slice(0, 10);
 }
 
-// Paid minutes of a foreman's day worked (8 h).
+// Minimum paid minutes of a foreman's weekday worked (8 h).
 export const FOREMAN_DAY_MINUTES = 480;
 
 // Map an employee profile row to the per-employee overtime options used by the
@@ -62,9 +62,11 @@ export function overtimeOptionsFromProfile(profile) {
   if (profile?.role === "subcontractor_1") {
     return { firstOtHourDouble: true, returnWithBenefitsTo8h: false, firstTripUnpaid: Boolean(profile?.first_trip_unpaid) };
   }
-  // A foreman (contremaître) is paid FOREMAN_DAY_MINUTES for every day worked, whatever the hours entered
-  // (engine 2.8.0): no overtime, return time or first-trip rule applies.
-  if (profile?.role === "foreman") return { flatDayMinutes: FOREMAN_DAY_MINUTES };
+  // A foreman (contremaître, engine 2.8.0): at least FOREMAN_DAY_MINUTES paid for every weekday worked; overtime
+  // beyond 8 h works as for anyone (same proof); no return-time treatment and no unpaid first trip.
+  if (profile?.role === "foreman") {
+    return { minDayMinutes: FOREMAN_DAY_MINUTES, noReturn: true, firstOtHourDouble: Boolean(profile?.overtime_first_hour_double) };
+  }
   return {
     firstOtHourDouble: Boolean(profile?.overtime_first_hour_double),
     returnWithBenefitsTo8h: Boolean(profile?.return_with_benefits_to_8h),
@@ -265,34 +267,12 @@ function roundingAdjustments(sortedJobs, paidSpan, rounding) {
   return adjust;
 }
 
-// Flat day pay (foreman): the first job of each day carries the whole day's regular paid minutes, the others
-// carry none, so a day is paid once however many jobs it holds. Same entry shape as calculatePayrollEntries.
-function flatDayEntries(jobs, flatDayMinutes) {
-  const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
-  const seenDays = new Set();
-  const entries = new Map();
-  for (const job of sorted) {
-    const paid = seenDays.has(job.job_date) ? 0 : flatDayMinutes;
-    seenDays.add(job.job_date);
-    entries.set(job.id, {
-      job,
-      regularWorkMinutes: paid,
-      overtime50Minutes: 0,
-      overtime100Minutes: 0,
-      overtimeWorkMinutes: 0,
-      returnRegularMinutes: 0,
-      returnNoBenefitMinutes: 0,
-      regularPaidMinutes: paid,
-      totalPaidMinutes: paid,
-      roundingMinutes: 0,
-      ...getKilometreBreakdown(job),
-    });
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, returnWithBenefitsFrom = RETURN_WITH_BENEFITS.startDate, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null, minDayMinutes = 0, noReturn = false } = {}) {
+  if (noReturn) {
+    jobs = jobs.map((job) => ({ ...job, return_time_minutes: 0 }));
+    firstTripUnpaid = false;
+    returnWithBenefitsTo8h = false;
   }
-  return entries;
-}
-
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, returnWithBenefitsFrom = RETURN_WITH_BENEFITS.startDate, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null, flatDayMinutes = 0 } = {}) {
-  if (flatDayMinutes > 0) return flatDayEntries(jobs, flatDayMinutes);
   const holidays = new Set([...(holidayDates || [])].map((d) => String(d).slice(0, 10)));
   // "regular" Monday–Friday; "saturday" all overtime; "double" Sunday / holiday at 2×.
   const dayKind = (jobDate) => {
@@ -403,6 +383,25 @@ export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, retur
     dayWorkMinutes.set(job.job_date, priorDayWork + workMinutes);
     // Sunday/holiday double time does not use the week's 1.5× hour.
     weekOvertimeMinutes.set(wk, priorWeekOvertime + (kind === "double" ? 0 : overtimeWorkMinutes));
+  }
+  // Minimum day (foreman): a weekday worked is paid at least `minDayMinutes` as regular time; the shortfall goes
+  // to the day's first job. Saturday, Sunday and holidays keep their overtime rules (no top-up).
+  if (minDayMinutes > 0) {
+    const paidByDay = new Map();
+    const firstOfDay = new Map();
+    for (const job of sorted) {
+      const entry = entries.get(job.id);
+      paidByDay.set(job.job_date, (paidByDay.get(job.job_date) || 0) + entry.totalPaidMinutes);
+      if (!firstOfDay.has(job.job_date)) firstOfDay.set(job.job_date, entry);
+    }
+    for (const [date, paid] of paidByDay) {
+      if (dayKind(date) !== "regular" || paid >= minDayMinutes) continue;
+      const entry = firstOfDay.get(date);
+      const extra = minDayMinutes - paid;
+      entry.regularWorkMinutes += extra;
+      entry.regularPaidMinutes += extra;
+      entry.totalPaidMinutes += extra;
+    }
   }
   return entries;
 }
