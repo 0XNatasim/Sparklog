@@ -50,10 +50,10 @@ describe("JobEntryFields pre-made OT", () => {
     await waitFor(() => expect(screen.getByRole("option").getAttribute("aria-selected")).toBe("false"));
   });
 
-  it("keeps the five labels when the list cannot be read", async () => {
+  it("keeps the six labels when the list cannot be read", async () => {
     setup({ tables: { preset_work_orders: () => ({ error: { message: "offline" } }) } });
     fireEvent.click(arrow());
-    expect(labels()).toHaveLength(5);
+    expect(labels()).toHaveLength(6);
   });
 
   it("types a number as before: the OT field is still free text", () => {

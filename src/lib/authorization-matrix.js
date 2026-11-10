@@ -10,6 +10,7 @@ import { requiresMfa } from "./mfa";
 
 export const APPLICATION_ROLES = Object.freeze([
   "employee",
+  "foreman",
   "subcontractor_1",
   "admin",
   "manager",

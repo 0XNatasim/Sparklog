@@ -15,14 +15,15 @@ export const LEVELS = [
 
 // Ordering of the employees list: owner first, then administration, then managers,
 // then employees. Within each group the list stays alphabetical (paused sink last).
-const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, employee: 3, subcontractor_1: 4 };
-const roleRank = (role) => (role in ROLE_ORDER ? ROLE_ORDER[role] : 4);
+const ROLE_ORDER = { owner: 0, admin: 1, manager: 2, foreman: 3, employee: 4, subcontractor_1: 5 };
+const roleRank = (role) => (role in ROLE_ORDER ? ROLE_ORDER[role] : 5);
 
 // Read-only display name for a role (used when the viewer may not reassign roles).
 export function roleName(role, t) {
   if (role === "owner") return t("manager.bossLabel");
   if (role === "admin") return t("manager.adminLabel");
   if (role === "manager") return t("manager.roleLabel");
+  if (role === "foreman") return t("manager.foremanLabel");
   if (role === "subcontractor_1") return t("manager.subcontractor1Label");
   return t("manager.employee");
 }
