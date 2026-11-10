@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-09, V2.4.240)
+## 6. À faire / à préciser (mis à jour 2026-11-10, V2.4.241)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.241 (technique).** Rôle `foreman` (contremaître), migration 0133 : contrainte `profiles_role_check`, `get_my_role()` (niveau employé, aal2 inchangé pour les gestionnaires), `is_active_employee()`, `create_job_for_employee` (saisie par un gestionnaire) et `validate_job_submission_contract` (pas de preuve de temps supp. pour `foreman`) recréées ; ligne `CONTREMAÎTRE` ajoutée à `preset_work_orders` (et à `DEFAULT_PRESET_LABELS`). **Moteur 2.8.0** : `overtimeOptionsFromProfile` renvoie `{ flatDayMinutes: FOREMAN_DAY_MINUTES }` (480) pour `foreman`, et `calculatePayrollEntries` passe par `flatDayEntries` : la 1re fiche de chaque date porte 480 min régulières, les autres 0, sans temps supp., retour, arrondi ni 1er trajet (tous les appelants passent par `overtimeOptionsFromProfile`). Règle : 8 h tous les jours travaillés, y compris samedi, dimanche ou férié (à confirmer, ADR 0001 : règle non signée par un spécialiste). `src/lib/roles.js` (`isForemanRole`, employé CCQ : pas `isNonCcqRole`), `EmployeeForm.jsx` (`foremanEmployee` : pas de `ManualEntryCheckDialog`, pas d'étoile `job_entry_sources` sauf si une capture est utilisée, `workOrderBlocked` et preuve de temps supp. ignorés), sélecteur de rôle / type de compte, `ROLE_ORDER`, `FIELD_ROLES`, `EmergencyTimesheet`, matrice d'autorisation, textes `manager.foremanLabel` / `employees.typeForeman`. **À faire côté déploiement :** appliquer 0133 avant le code ; redéployer `push_approved_batch` et `classify_week` (moteur) ; **le script Apps Script / la feuille Google ne connaît pas le rôle** (`employee_pay_basis` vaut `ccq` pour lui : la feuille calculerait ses heures réelles) — à adapter avant d'exporter la paie d'un contremaître. Le souper (`reconcile_overtime_meal`) n'a pas été modifié.
 
 **V2.4.240 (technique).** Option « Km saisis à la main » : migration 0132, colonne `profiles.km_apart_from_capture` (booléen, défaut faux ; écrite par les gestionnaires via la politique de profil existante, l'employé reste hors de la liste blanche, comme `first_trip_unpaid`). `workOrderIssues(parsed, { kmOptional })` (`work-order-parse.js`) : avec l'option, l'absence de km sur la capture n'est plus un problème (`code: "km"`) ; les autres champs manquants et `kmMismatch` (miles ≠ km, quand les deux sont lus) restent bloquants. `EmployeeForm.jsx` lit la colonne avec le profil (`kmApartFromCapture`) et la passe à `handleExtractFromImage` ; le champ km reste obligatoire (`formComplete`). `EmployeeCcqSection.jsx` (`CcqOptionsFields`) : case + texte `employees.kmApartFromCapture*` ; `EmployeesPanel` charge la colonne. Cause : sur un écran court, le bloc « Déplacement » de l'onglet Bilan sort de la capture, donc aucun km n'était lu. **Appliquer la migration 0132 avant de déployer le code** (le profil lit la nouvelle colonne).
 

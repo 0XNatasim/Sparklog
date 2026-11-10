@@ -6,7 +6,7 @@ import { withTimeout } from "@/lib/utils";
 // written to jobs.ot as plain text, like a typed OT. The same list is the fallback when it cannot be read (offline,
 // before the migration): the time entry must never lose its drop-down.
 export const DEFAULT_PRESET_LABELS = Object.freeze([
-  "PAUSE SÉCURITÉ", "FORMATION HILO EMBAUCHE", "FORMATION BRITTON", "FORMATION HQ", "OK KARINE",
+  "PAUSE SÉCURITÉ", "FORMATION HILO EMBAUCHE", "FORMATION BRITTON", "FORMATION HQ", "OK KARINE", "CONTREMAÎTRE",
 ]);
 export const MAX_PRESET_LABEL = 60;
 const CACHE_KEY = "sparklog.presetWorkOrders";

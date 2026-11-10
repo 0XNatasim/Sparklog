@@ -63,6 +63,8 @@ describe("migration 0124", () => {
   });
   it("refuses a label that looks like a real OT number, and seeds the five of the owner", () => {
     expect(sql).toContain("!~ '^[0-9]{4,}$'");
-    for (const label of DEFAULT_PRESET_LABELS) expect(sql).toContain(`'${label}'`);
+    // CONTREMAÎTRE is seeded later, by migration 0133 (foreman role).
+    const foreman = readFileSync(new URL("../../supabase/migrations/20261110120000_0133_foreman_role.sql", import.meta.url), "utf8");
+    for (const label of DEFAULT_PRESET_LABELS) expect(sql + foreman).toContain(`'${label}'`);
   });
 });

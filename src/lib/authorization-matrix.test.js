@@ -21,11 +21,11 @@ const encryptedNasMigration = migration("20261019120000_0102_nas_encrypted_in_va
 describe("application authorization matrix", () => {
   it("covers every persisted application role", () => {
     expect(APPLICATION_ROLES).toEqual([
-      "employee", "subcontractor_1", "admin", "manager", "owner",
+      "employee", "foreman", "subcontractor_1", "admin", "manager", "owner",
     ]);
   });
 
-  it.each(["employee", "subcontractor_1"])("keeps %s on own-time only", (role) => {
+  it.each(["employee", "foreman", "subcontractor_1"])("keeps %s on own-time only", (role) => {
     const permissions = authorizationFor({ role });
     expect(permissions.canLogOwnTime).toBe(true);
     expect(permissions.canManageAny).toBe(false);
@@ -111,6 +111,7 @@ describe("application authorization matrix", () => {
 
   it("keeps employee and manager CCQ treatment separate from non-CCQ roles", () => {
     expect(authorizationFor({ role: "employee" }).includedInCcqPayroll).toBe(true);
+    expect(authorizationFor({ role: "foreman" }).includedInCcqPayroll).toBe(true);
     expect(authorizationFor({ role: "manager" }).includedInCcqPayroll).toBe(true);
     for (const role of ["admin", "owner", "subcontractor_1"]) {
       expect(authorizationFor({ role }).includedInCcqPayroll, role).toBe(false);

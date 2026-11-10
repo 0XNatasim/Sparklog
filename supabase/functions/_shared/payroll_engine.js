@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.7.0";
+export const ENGINE_VERSION = "2.8.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -50,6 +50,9 @@ export function payrollWeekKey(jobDate) {
   return d.toISOString().slice(0, 10);
 }
 
+// Paid minutes of a foreman's day worked (8 h).
+export const FOREMAN_DAY_MINUTES = 480;
+
 // Map an employee profile row to the per-employee overtime options used by the
 // calculation. Keeps every caller in sync as policies are added.
 export function overtimeOptionsFromProfile(profile) {
@@ -59,6 +62,9 @@ export function overtimeOptionsFromProfile(profile) {
   if (profile?.role === "subcontractor_1") {
     return { firstOtHourDouble: true, returnWithBenefitsTo8h: false, firstTripUnpaid: Boolean(profile?.first_trip_unpaid) };
   }
+  // A foreman (contremaître) is paid FOREMAN_DAY_MINUTES for every day worked, whatever the hours entered
+  // (engine 2.8.0): no overtime, return time or first-trip rule applies.
+  if (profile?.role === "foreman") return { flatDayMinutes: FOREMAN_DAY_MINUTES };
   return {
     firstOtHourDouble: Boolean(profile?.overtime_first_hour_double),
     returnWithBenefitsTo8h: Boolean(profile?.return_with_benefits_to_8h),
@@ -259,7 +265,34 @@ function roundingAdjustments(sortedJobs, paidSpan, rounding) {
   return adjust;
 }
 
-export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, returnWithBenefitsFrom = RETURN_WITH_BENEFITS.startDate, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null } = {}) {
+// Flat day pay (foreman): the first job of each day carries the whole day's regular paid minutes, the others
+// carry none, so a day is paid once however many jobs it holds. Same entry shape as calculatePayrollEntries.
+function flatDayEntries(jobs, flatDayMinutes) {
+  const sorted = [...jobs].sort((a, b) => `${a.job_date}${a.depart || ""}${a.id || ""}`.localeCompare(`${b.job_date}${b.depart || ""}${b.id || ""}`));
+  const seenDays = new Set();
+  const entries = new Map();
+  for (const job of sorted) {
+    const paid = seenDays.has(job.job_date) ? 0 : flatDayMinutes;
+    seenDays.add(job.job_date);
+    entries.set(job.id, {
+      job,
+      regularWorkMinutes: paid,
+      overtime50Minutes: 0,
+      overtime100Minutes: 0,
+      overtimeWorkMinutes: 0,
+      returnRegularMinutes: 0,
+      returnNoBenefitMinutes: 0,
+      regularPaidMinutes: paid,
+      totalPaidMinutes: paid,
+      roundingMinutes: 0,
+      ...getKilometreBreakdown(job),
+    });
+  }
+  return entries;
+}
+
+export function calculatePayrollEntries(jobs, { firstOtHourDouble = false, returnWithBenefitsTo8h = false, returnWithBenefitsFrom = RETURN_WITH_BENEFITS.startDate, messierMethod = false, firstTripUnpaid = false, holidayDates = [], rounding = null, flatDayMinutes = 0 } = {}) {
+  if (flatDayMinutes > 0) return flatDayEntries(jobs, flatDayMinutes);
   const holidays = new Set([...(holidayDates || [])].map((d) => String(d).slice(0, 10)));
   // "regular" Monday–Friday; "saturday" all overtime; "double" Sunday / holiday at 2×.
   const dayKind = (jobDate) => {

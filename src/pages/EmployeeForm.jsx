@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
-import { isAdminEmployee, isManagerRole } from "@/lib/roles";
+import { isAdminEmployee, isForemanRole, isManagerRole } from "@/lib/roles";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { useT } from "@/lib/use-t";
 import { matchPreset, usePresetWorkOrders } from "@/lib/preset-work-orders";
@@ -168,6 +168,8 @@ export default function EmployeeForm() {
   // Administration (office, non-CCQ) employees log a simplified timesheet: no
   // auto-fill, no Arrivée, "Départ" is labelled "Début", and no kilometres.
   const [officeEmployee, setOfficeEmployee] = useState(false);
+  // Foreman: paid 8 h per day worked; the Field Service capture is optional (proof, no manual-entry star).
+  const [foremanEmployee, setForemanEmployee] = useState(false);
   // "First trip unpaid" employees reach the 8 h overtime-screenshot threshold on PAID time.
   // Until the profile loads this stays false, i.e. the stricter gross-time rule applies.
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
@@ -415,6 +417,7 @@ export default function EmployeeForm() {
         return;
       }
       setOfficeEmployee(isAdminEmployee(data?.role));
+      setForemanEmployee(isForemanRole(data?.role));
       setFirstTripUnpaid(Boolean(data?.first_trip_unpaid));
       setKmApartFromCapture(Boolean(data?.km_apart_from_capture));
       setInventoryEnabled(Boolean(data?.inventory_screenshots_enabled));
@@ -463,7 +466,7 @@ export default function EmployeeForm() {
   // order of the day. Submitting the day happens at the end of that flow (or from History).
   function saveDraft() {
     if (workOrderBlocked) { setShowWorkOrderCheck(true); return; }
-    if (!editId && !officeEmployee && !fromScreenshot) { setShowManualEntryCheck(true); return; }
+    if (!editId && !officeEmployee && !foremanEmployee && !fromScreenshot) { setShowManualEntryCheck(true); return; }
     startSaveFlow();
   }
 
@@ -611,7 +614,7 @@ export default function EmployeeForm() {
       const savedJobId = data.id;
       // New field entry: remember whether it came from the Field Service screenshot or was typed
       // by hand (red star for managers). Best effort, never delays or fails the save.
-      if (!editId && !officeEmployee) {
+      if (!editId && !officeEmployee && (!foremanEmployee || fromScreenshot)) {
         recordEntrySource(supabase, { jobId: savedJobId, userId: user.id, source: fromScreenshot ? ENTRY_SOURCES.screenshot : ENTRY_SOURCES.manual });
       }
       setInfo(editId
@@ -866,8 +869,8 @@ export default function EmployeeForm() {
   }
 
   async function requiresOvertimeEvidence() {
-    // CCQ overtime authorization (the screenshot) does not apply to office staff.
-    if (officeEmployee) return false;
+    // CCQ overtime authorization (the screenshot) does not apply to office staff, nor to a foreman (flat 8 h day).
+    if (officeEmployee || foremanEmployee) return false;
     try {
       const { needed, paidDayMinutes } = await overtimeEvidenceNeeded(supabase, {
         userId: user.id, jobDate: job_date, editId, hasOvertimeEvidence, firstTripUnpaid,
@@ -1070,7 +1073,7 @@ export default function EmployeeForm() {
   // A preset OT (formation, réunion…) is entered by hand: there is no Field Service work order, so a
   // stale screenshot problem (kept in the restored draft) must never block it.
   const presetOt = Boolean(matchPreset(ot, presetLabels));
-  const workOrderBlocked = !editId && !presetOt && workOrderProblems.length > 0;
+  const workOrderBlocked = !editId && !presetOt && !foremanEmployee && workOrderProblems.length > 0;
 
   // Names of the required fields still empty, shown next to the disabled Save button.
   const missingFields = [
@@ -1276,7 +1279,7 @@ export default function EmployeeForm() {
 
       <WorkOrderCheckDialog
         t={t}
-        open={showWorkOrderCheck && !presetOt && workOrderProblems.length > 0}
+        open={showWorkOrderCheck && !presetOt && !foremanEmployee && workOrderProblems.length > 0}
         onOpenChange={setShowWorkOrderCheck}
         problems={workOrderProblems}
         ocrText={lastOcrText}

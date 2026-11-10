@@ -65,7 +65,7 @@ export function groupMembers(group, profiles) {
 // Field people who should belong to a group (warehouse) but are in none: crew and subcontractors (not
 // office admins, managers or the owner), active or waiting to start, never a paused or former account.
 // In name order.
-const FIELD_ROLES = new Set(["employee", "subcontractor_1"]);
+const FIELD_ROLES = new Set(["employee", "foreman", "subcontractor_1"]);
 export function ungroupedPeople(groups, people, today) {
   const grouped = new Set((groups || []).flatMap((group) => group.memberIds || []));
   return (people || [])

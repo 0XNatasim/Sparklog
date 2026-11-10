@@ -1,4 +1,4 @@
-// Role helpers. Roles are stored lowercase: 'employee', 'subcontractor_1', 'manager',
+// Role helpers. Roles are stored lowercase: 'employee', 'foreman', 'subcontractor_1', 'manager',
 // 'admin', 'owner'.
 //
 // Tiers:
@@ -36,6 +36,12 @@ export function isAdminEmployee(role) {
 // and CCQ reporting populations.
 export function isSubcontractorRole(role) {
   return role === "subcontractor_1";
+}
+
+// A foreman (contremaître) records time like an employee but is paid 8 h for every day worked, whatever
+// the hours entered (payroll engine 2.8.0). The Field Service capture is optional for them.
+export function isForemanRole(role) {
+  return role === "foreman";
 }
 
 // True when the role is NOT a CCQ tradesperson: administration/office staff and the

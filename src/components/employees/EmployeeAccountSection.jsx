@@ -23,12 +23,15 @@ export function EmployeeTypeGate({ profile: p, panel }) {
       </div>
       <p className="text-xs text-muted-foreground">{t("employees.chooseTypeHint")}</p>
       {privileged ? (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
           <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "employee")}>
             {t("employees.typeCcq")}
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "admin")}>
             {t("employees.typeAdmin")}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "foreman")}>
+            {t("employees.typeForeman")}
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => chooseType(p.id, "subcontractor_1")}>
             {t("employees.typeSubcontractor1")}
@@ -104,6 +107,7 @@ export function EmployeeRoleField({ profile: p, panel }) {
           className="h-9"
         >
           <option value="employee">{t("manager.employee")}</option>
+          <option value="foreman">{t("manager.foremanLabel")}</option>
           <option value="subcontractor_1">{t("manager.subcontractor1Label")}</option>
           {p.role === "manager" && <option value="manager">{t("manager.roleLabel")}</option>}
           <option value="admin">{t("manager.adminLabel")}</option>

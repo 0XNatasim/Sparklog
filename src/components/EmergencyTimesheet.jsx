@@ -28,7 +28,7 @@ import { useT } from "@/lib/use-t";
 import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
 import { withRetry, withTimeout } from "@/lib/utils";
 
-const ELIGIBLE_ROLES = ["employee", "admin", "subcontractor_1"];
+const ELIGIBLE_ROLES = ["employee", "foreman", "admin", "subcontractor_1"];
 const EMPTY_FORM = { employeeId: "", jobDate: "", ot: "", depart: "", arrivee: "", fin: "", km: "", note: "", departFold: null, finFold: null };
 const STATE_VARIANT = { pending: "warning", submitted: "success", approved: "neutral" };
 

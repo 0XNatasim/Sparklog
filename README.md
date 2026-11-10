@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.240 (2026-11-09).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.241 (2026-11-10).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.241 — Foreman role (contremaître).** New role « Contremaître » (assigned by the owner in the employee card, like Subcontractor). A foreman is paid 8 h for every day worked, whatever hours are entered (no overtime, return time or first-trip rule). The time entry has no manual-entry star and no mandatory Field Service capture (a capture can still be added as proof), and no overtime proof is asked. The work-order menu gets a « CONTREMAÎTRE » choice. Migration 0133, payroll engine 2.8.0.
 - **V2.4.240 — Km typed by hand, per employee.** New option in the employee card (Équipe › Employés › fiche › Avantages): « Km saisis à la main (pas exigés sur la capture) ». For a phone whose Field Service Bilan screen is too short to show the km in the same screenshot, the missing km no longer blocks Save; the employee types the km (the field stays required). Two km that disagree on the screenshot are still reported. Off by default: other employees are unchanged. Migration 0132.
 - **V2.4.239 — AECQ annual contribution reminder.** In the CCQ monthly report screen, choosing **October** shows a notice: add the AECQ annual base contribution (billed by the CCQ as a manual invoice, 240 $ before taxes for 2026, 245 $ for 2027) when paying the October report. Nothing is added to the export itself.
 - **V2.4.238 — CCQ reminder shown everywhere, with an OK button.** The week-before reminder is no longer only at the top of the Profile: it is a banner on every page (like the update banner) with an « OK » button. Pressing OK hides it for good for that holiday (kept in this browser, per account). The « CCQ calendar » card stays in the Profile.
