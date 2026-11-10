@@ -14,7 +14,7 @@
 // case and extra spaces do not matter):
 //   Date · Employé · Courriel · Téléphone · OT · Départ · Arrivée · Fin · Heures · KM ·
 //   Approuvé par · Approuvé le · JobID (dedup key — can be hidden) ·
-//   Trajet non payé (min) · Heures payées
+//   Trajet non payé (min) · Heures payées · Minimum 8 h (min)
 // On an empty sheet, row 1 is created in that order. Other columns (your own notes,
 // formulas) are left alone. Do not give two columns the same header: the first one wins.
 // The « Stats » script (Feuille3) also finds the columns by header, so both stay in step.
@@ -31,6 +31,13 @@
 // LONG FIRST TRIP: when that first job is 65 km or more (km_aller + km_retour, or km_total when
 // larger) on or after 2026-10-11, its trip is paid even with the option: unpaid minutes 0.
 // Same rule as SparkLog's payroll engine 2.7.0 (FIRST_TRIP_PAID_FROM_KM).
+//
+// FOREMAN (contremaître, engine 2.8.0): a row carries employee_day_minimum_minutes = 480 for a foreman on a
+// weekday that is not a holiday (the function decides; Saturday, Sunday and holidays get 0). The day is paid at
+// least that long: « Minimum 8 h (min) » holds the shortfall (480 minus the day's paid minutes, all of that
+// employee's jobs of the day) on the day's FIRST job, 0 on the others, and « Heures payées » includes it.
+// When another job of the day is exported later the shortfall is recomputed. Overtime beyond 8 h, the return
+// time and the first trip are not touched here (the function sends no first trip option for a foreman).
 //
 // IDEMPOTENCY: each row carries a job_id, stored under « JobID ». Before appending we
 // read every job_id already in that column and skip any incoming row that's already
@@ -61,6 +68,7 @@ var COLUMNS = [
   ["JobID", "job_id"],
   ["Trajet non payé (min)", "_unpaid"],
   ["Heures payées", "_paid"],
+  ["Minimum 8 h (min)", "_min"],
 ];
 
 function doPost(e) {
@@ -107,6 +115,7 @@ function doPost(e) {
           depart: parseHM(disp[i][col["Départ"] - 1]),
           id: String(v == null ? "" : v),
           unpaid: Number(vals[i][col["Trajet non payé (min)"] - 1]) || 0,
+          top: Number(vals[i][col["Minimum 8 h (min)"] - 1]) || 0,
           heures: disp[i][col["Heures"] - 1],
         });
       }
@@ -129,11 +138,13 @@ function doPost(e) {
     // far (already in the sheet + earlier incoming rows).
     var clears = []; // existing rows that lose their unpaid minutes
     var out = [];
+    var dayMinimums = {}; // employee|day -> minimum paid minutes (foreman weekdays)
     for (var k = 0; k < toWrite.length; k++) {
       var row = toWrite[k].d;
       var dep = parseHM(row.depart);
       var key = empKey(row.employee_name, row.employee_email) + "|" + dateKey(row.job_date, tz);
-      var me = { key: key, depart: dep, id: toWrite[k].jobId };
+      var me = { key: key, depart: dep, id: toWrite[k].jobId, heures: row.heures, top: 0 };
+      if ((Number(row.employee_day_minimum_minutes) || 0) > 0) dayMinimums[key] = Number(row.employee_day_minimum_minutes);
       var unpaid = 0;
       if (row.employee_first_trip_unpaid === true) {
         var isFirst = true;
@@ -169,12 +180,37 @@ function doPost(e) {
       out.push(rowFrom(row, toWrite[k].jobId, unpaid, col, width));
     }
 
+    // Foreman minimum: complete each affected day to its minimum on the day's first job.
+    var topUpdates = []; // existing rows whose shortfall changed
+    for (var dayKey in dayMinimums) {
+      var peers = [];
+      for (var p = 0; p < sheetJobs.length; p++) if (sheetJobs[p].key === dayKey) peers.push(sheetJobs[p]);
+      peers.sort(function (a, b) { return jobBefore(a, b) ? -1 : jobBefore(b, a) ? 1 : 0; });
+      var worked = 0;
+      for (var q = 0; q < peers.length; q++) worked += Math.max(0, hoursToMinutes(peers[q].heures) - (peers[q].unpaid || 0));
+      var shortfall = Math.max(0, dayMinimums[dayKey] - worked);
+      for (var r = 0; r < peers.length; r++) {
+        var top = r === 0 ? shortfall : 0;
+        if (peers[r].row) {
+          if (top !== peers[r].top) topUpdates.push({ row: peers[r].row, top: top, heures: peers[r].heures, unpaid: peers[r].unpaid || 0 });
+        } else {
+          out[peers[r].outIdx][col["Minimum 8 h (min)"] - 1] = top;
+          out[peers[r].outIdx][col["Heures payées"] - 1] = paidHours(peers[r].heures, (peers[r].unpaid || 0) - top);
+        }
+        peers[r].top = top;
+      }
+    }
+
     if (out.length > 0) {
       var startRow = sheet.getLastRow() + 1;
       sheet.getRange(startRow, 1, out.length, width).setValues(out);
       for (var x = 0; x < clears.length; x++) {
         sheet.getRange(clears[x].row, col["Trajet non payé (min)"]).setValue(0);
         sheet.getRange(clears[x].row, col["Heures payées"]).setValue(clears[x].heures);
+      }
+      for (var y = 0; y < topUpdates.length; y++) {
+        sheet.getRange(topUpdates[y].row, col["Minimum 8 h (min)"]).setValue(topUpdates[y].top);
+        sheet.getRange(topUpdates[y].row, col["Heures payées"]).setValue(paidHours(topUpdates[y].heures, topUpdates[y].unpaid - topUpdates[y].top));
       }
     }
 
@@ -235,7 +271,7 @@ function maxCol(col) {
 function rowFrom(d, jobId, unpaid, col, width) {
   var cells = [];
   for (var i = 0; i < width; i++) cells.push("");
-  var values = { _unpaid: unpaid, _paid: paidHours(d.heures, unpaid), job_id: jobId };
+  var values = { _unpaid: unpaid, _paid: paidHours(d.heures, unpaid), _min: 0, job_id: jobId };
   for (var c = 0; c < COLUMNS.length; c++) {
     var field = COLUMNS[c][1];
     var value = field in values ? values[field] : d[field];
@@ -273,6 +309,12 @@ function jobBefore(a, b) {
   var da = a.depart === null ? 1e9 : a.depart, db = b.depart === null ? 1e9 : b.depart;
   if (da !== db) return da < db;
   return String(a.id) < String(b.id);
+}
+
+// "8h30" -> 510 (0 when the text is not in that format).
+function hoursToMinutes(heures) {
+  var m = /^(\d+)h(\d{2})$/.exec(String(heures || ""));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
 }
 
 // "8h30" minus unpaid minutes -> "7h45" (same format as the Heures column).
