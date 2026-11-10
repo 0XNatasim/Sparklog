@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-10, V2.4.244)
+## 6. À faire / à préciser (mis à jour 2026-11-10, V2.4.245)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.245 (technique).** Documents seulement : `docs/governance/reunions-securite/` reçoit les PDF des rencontres d'équipe (1 : consignes générales Hilo / Messier Connexion, 2 : pause sécurité, non-conformités avec photos de chantier). Dépôt public : aucune donnée personnelle ni nom de client dans les fichiers ; à retirer si une photo permet de reconnaître un client. Aucun code changé, seule la version change.
 
 **V2.4.244 (technique).** Fichier de la migration 0134 : `revoke all on public.foreman_reports from anon, public, authenticated` (Supabase donne par défaut update / delete / truncate… à `authenticated` sur une nouvelle table ; `grant select, insert` seul ne les retirait pas, les politiques RLS bloquaient déjà update / delete). Même correction appliquée à la base le 2026-11-10 (vérifié : `authenticated` = INSERT, SELECT). À reprendre pour toute nouvelle table : retirer aussi `authenticated` avant de donner les droits voulus. Aucun changement de code.
 

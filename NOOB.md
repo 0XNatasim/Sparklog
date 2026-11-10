@@ -1,11 +1,12 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-10 (V2.4.244).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-10 (V2.4.245).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.245** : rien de nouveau à l'écran. Les 3 présentations des rencontres d'équipe (consignes générales, pause sécurité, non-conformités) sont rangées en PDF dans `docs/governance/reunions-securite/`. Les photos viennent de chantiers : le dépôt est public, à retirer si un client est reconnaissable.
 - ✅ **V2.4.244** : rien de nouveau à l'écran. Le fichier de la migration 0134 (notes du contremaître) retire aussi les droits par défaut de Supabase sur la table, comme c'est déjà fait dans votre base. Rien à faire.
 - ✅ **V2.4.243** : **notes du contremaître**. Quand un contremaître choisit l'OT **CONTREMAÎTRE**, le bouton « Remplir auto » devient **« Notes du contremaître »** : il écrit un petit rapport (nom de l'employé audité, facultatif, et un texte) qui part à la gestion. Vous les lisez dans **Gestion › Notes › Contremaître** (vos notes habituelles sont dans l'onglet « Mes notes »). Un rapport envoyé ne peut plus être modifié ni supprimé, et le contremaître ne voit que les siens. **À faire :** appliquer la migration 0134 avant de déployer le code.
 - ✅ **V2.4.242** : la feuille Google connaît maintenant le **contremaître**. Une nouvelle colonne **« Minimum 8 h (min) »** (ajoutée toute seule) complète une journée de semaine à 8 h sur la 1re fiche du jour, et « Heures payées » en tient compte. Pas de complément le samedi, le dimanche ni les fériés. **À faire :** recoller le script `apps-script-doPost.js` dans Google (Déployer › Gérer les déploiements › Modifier › Nouvelle version) et redéployer la fonction `push_approved_batch`.
