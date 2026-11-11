@@ -3,7 +3,7 @@
 // « Débloquer ». Both write the same thing.
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { dictionaries } from "@/lib/i18n";
 import { createFakeSupabase } from "@/test/fake-supabase";
 
@@ -45,5 +45,34 @@ describe("UnlockDayManager wording", () => {
         expect(dictionaries.fr[key] && dictionaries.en[key], key).toBeTruthy();
       }
     }
+  });
+});
+
+describe("UnlockDayManager bulk actions", () => {
+  const two = [{ id: "zoe", full_name: "Zoé", is_paused: false }, { id: "max", full_name: "Max", is_paused: false }];
+
+  it("reopens one day for every active employee with a single write", async () => {
+    state.fake = createFakeSupabase({ tables: { profiles: two, job_entry_unlocks: [] } });
+    render(<UnlockDayManager plainWords />);
+    const select = await screen.findByRole("combobox");
+    await waitFor(() => expect(screen.getByRole("option", { name: "Zoé" })).toBeTruthy());
+    fireEvent.change(select, { target: { value: "__all__" } });
+    fireEvent.click(screen.getByRole("button", { name: fr("timeRules.unlockDay.plain") }));
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "job_entry_unlocks" && c.op === "upsert")).toBe(true));
+    const write = state.fake.calls.find((c) => c.table === "job_entry_unlocks" && c.op === "upsert");
+    expect(write.payload.map((row) => row.user_id).sort()).toEqual(["max", "zoe"]);
+    expect(write.payload.every((row) => row.unlocked_until === null)).toBe(true);
+  });
+
+  it("closes every reopened day with one delete after confirmation", async () => {
+    state.fake = createFakeSupabase({ tables: { profiles: two, job_entry_unlocks: [
+      { id: "u1", user_id: "zoe", job_date: "2026-11-10" }, { id: "u2", user_id: "max", job_date: "2026-11-10" },
+    ] } });
+    render(<UnlockDayManager plainWords />);
+    fireEvent.click(await screen.findByRole("button", { name: fr("timeRules.removeAll.plain") }));
+    fireEvent.click(await screen.findByRole("button", { name: fr("common.yes") }));
+    await waitFor(() => expect(screen.getByText(fr("timeRules.allUnlocksRemoved.plain"))).toBeTruthy());
+    const del = state.fake.calls.find((c) => c.table === "job_entry_unlocks" && c.op === "delete");
+    expect(del.filters).toEqual([["in", "id", ["u1", "u2"]]]);
   });
 });

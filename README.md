@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.247 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.248 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.248 — reopen a day for everyone.** In the day-reopening screen (Gestion › Feuilles de temps), the employee list now starts with « Tous les employés »: one click reopens the chosen day for every active employee (and offers to return the already-submitted jobs for correction in one question). A « Tout refermer » button closes every reopened day at once, after a confirmation.
 - **V2.4.247 — clearer error for a 0-minute entry.** A job with the same Départ and Fin (e.g. 6:30 → 6:30) was reported as overlapping the day's first job; it now gets the « Invalid hours » message (an entry must last more than 0 minutes). No rule changed.
 - **V2.4.246 — « 4 days of 10 h » time rule.** New per-employee option (employee card › Paie et options): overtime starts after 10 h of work in the day instead of 8 h. The overtime proof is then asked after 10 h and the supper after 12 h 15; all other rules are unchanged. Off by default, not for subcontractors or foremen. Migration 0135, payroll engine 2.9.0.
 - **V2.4.245 — Safety-meeting decks (PDF).** `docs/governance/reunions-securite/`: three PDFs used for the crew meetings: meeting 1 (general Hilo / Messier Connexion directives), meeting 2 (safety break) and the non-conformities photo deck. Documents only, no app change.

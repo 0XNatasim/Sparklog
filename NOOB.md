@@ -1,11 +1,12 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-11 (V2.4.247).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-11 (V2.4.248).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.248** : **rouvrir une journée pour tout le monde**. Dans l'écran « Rouvrir une journée », la liste des employés commence maintenant par **« Tous les employés »** : un seul clic rouvre la journée choisie pour tous les employés actifs (l'app demande une seule fois si vous voulez aussi retourner pour correction les fiches déjà soumises). Un bouton **« Tout refermer »**, au-dessus de la liste des journées rouvertes, les referme toutes d'un coup (avec une confirmation). Rien à faire de votre côté, aucune migration.
 - ✅ **V2.4.247** : si un employé met le même départ et la même fin (ex. 6 h 30 → 6 h 30), l'app disait à tort que sa fiche chevauchait la première. Elle affiche maintenant « Heures invalides » : une fiche doit durer au moins 1 minute (ex. 6 h 29 → 6 h 30). Aucune règle de paie changée, rien à faire.
 - ✅ **V2.4.246** : nouvelle règle de temps **« 4 jours de 10 h »**. Dans la fiche d'un employé (Équipe › Employés › fiche › Paie et options), cochez **« 4 jours de 10 h »** : son temps supplémentaire commence alors après **10 h** de travail dans la journée au lieu de 8 h. La preuve de temps supp. est demandée après 10 h, et le souper après 12 h 15. Les autres règles (taux, samedi, dimanche, fériés) ne changent pas. Fonctionne pour tous les employés ; pas pour les sous-traitants ni les contremaîtres. **À décider :** une 5e journée dans la semaine (les 40 h) et un férié en semaine. La migration 0135 est appliquée dans votre base (2026-11-11). **À faire :** redéployer `classify_week` (moteur 2.9.0), puis cocher la case pour Sabrina.
 - ✅ **V2.4.245** : rien de nouveau à l'écran. Les 3 présentations des rencontres d'équipe (consignes générales, pause sécurité, non-conformités) sont rangées en PDF dans `docs/governance/reunions-securite/`. Les photos viennent de chantiers : le dépôt est public, à retirer si un client est reconnaissable.
