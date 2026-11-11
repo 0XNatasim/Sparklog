@@ -11,6 +11,8 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 // Temps › Débloquer journée: let one employee enter or edit a closed day (job_entry_unlocks).
 // plainWords (Gestion V3): « rouvrir / refermer une journée » and « retourner pour correction » instead of
 // « déverrouiller ». The V2 page keeps its words.
+const ALL = "__all__"; // « Tous les employés » in the picker
+
 export default function UnlockDayManager({ plainWords = false }) {
   const t = useT();
   const word = (key) => (plainWords ? `${key}.plain` : key);
@@ -51,18 +53,62 @@ export default function UnlockDayManager({ plainWords = false }) {
       return;
     }
     setBusy(true);
-    // unlocked_until null = open until the manager removes it. Upsert so a
-    // second unlock for the same employee/day is a no-op instead of an error.
-    const { error } = await supabase
-      .from("job_entry_unlocks")
-      .upsert({ user_id: unlockEmployee, job_date: unlockDate, unlocked_until: null }, { onConflict: "user_id,job_date" });
+    try {
+      if (unlockEmployee === ALL) {
+        await unlockAll();
+        return;
+      }
+      // unlocked_until null = open until the manager removes it. Upsert so a
+      // second unlock for the same employee/day is a no-op instead of an error.
+      const { error } = await supabase
+        .from("job_entry_unlocks")
+        .upsert({ user_id: unlockEmployee, job_date: unlockDate, unlocked_until: null }, { onConflict: "user_id,job_date" });
+      if (error) {
+        setMessage(error.message);
+      } else {
+        setMessage(await reopenSubmittedJobs(unlockEmployee, unlockDate));
+        await load();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // One day for every active employee: one upsert, then one question for all the already-submitted jobs.
+  async function unlockAll() {
+    const rows = employees.map((employee) => ({ user_id: employee.id, job_date: unlockDate, unlocked_until: null }));
+    if (!rows.length) return;
+    const { error } = await supabase.from("job_entry_unlocks").upsert(rows, { onConflict: "user_id,job_date" });
     if (error) {
       setMessage(error.message);
-    } else {
-      setMessage(await reopenSubmittedJobs(unlockEmployee, unlockDate));
-      await load();
+      return;
     }
-    setBusy(false);
+    const { data: submitted, error: submittedError } = await supabase
+      .from("jobs")
+      .select("id, updated_at")
+      .in("user_id", employees.map((employee) => employee.id))
+      .eq("job_date", unlockDate)
+      .eq("status", "submitted");
+    const base = t(word("timeRules.allUnlocked"), { count: rows.length });
+    if (submittedError || !submitted?.length) {
+      setMessage(base);
+    } else if (!(await confirm(t(word("timeRules.reopenAllSubmittedConfirm"), { count: rows.length, jobs: submitted.length, date: unlockDate })))) {
+      setMessage(base);
+    } else {
+      setMessage(await returnJobs(submitted));
+    }
+    await load();
+  }
+
+  async function returnJobs(submitted) {
+    const results = await Promise.all(submitted.map((job) => supabase.rpc("return_job_for_correction", {
+      p_job_id: job.id,
+      p_expected_updated_at: job.updated_at,
+    })));
+    const failed = results.filter((result) => result.error).length;
+    return failed
+      ? t(word("timeRules.reopenSubmittedPartial"), { done: submitted.length - failed, failed })
+      : t(word("timeRules.reopenSubmittedDone"), { count: submitted.length });
   }
 
   // Unlocking a day does not reopen jobs already submitted that day; offer to return them.
@@ -76,14 +122,22 @@ export default function UnlockDayManager({ plainWords = false }) {
     if (error || !submitted?.length) return t(word("timeRules.dayUnlocked"));
     const ok = await confirm(t(word("timeRules.reopenSubmittedConfirm"), { name: employeeName(userId), count: submitted.length, date: jobDate }));
     if (!ok) return t(word("timeRules.dayUnlocked"));
-    const results = await Promise.all(submitted.map((job) => supabase.rpc("return_job_for_correction", {
-      p_job_id: job.id,
-      p_expected_updated_at: job.updated_at,
-    })));
-    const failed = results.filter((result) => result.error).length;
-    return failed
-      ? t(word("timeRules.reopenSubmittedPartial"), { done: submitted.length - failed, failed })
-      : t(word("timeRules.reopenSubmittedDone"), { count: submitted.length });
+    return returnJobs(submitted);
+  }
+
+  async function removeAllUnlocks() {
+    if (!unlocks.length || !(await confirm(t(word("confirm.removeAllUnlocks"), { count: unlocks.length })))) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("job_entry_unlocks").delete().in("id", unlocks.map((row) => row.id));
+      if (error) setMessage(error.message);
+      else {
+        setMessage(t(word("timeRules.allUnlocksRemoved")));
+        setUnlocks([]);
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function removeUnlock(row) {
@@ -109,6 +163,7 @@ export default function UnlockDayManager({ plainWords = false }) {
             <span className="text-xs text-muted-foreground">{t("notifications.employee")}</span>
             <Select value={unlockEmployee} onChange={(e) => setUnlockEmployee(e.target.value)}>
               <option value="">{t("timeRules.chooseEmployee")}</option>
+              <option value={ALL}>{t(word("timeRules.allEmployees"))}</option>
               {employees.map((employee) => (
                 <option key={employee.id} value={employee.id}>{employee.full_name || employee.email}</option>
               ))}
@@ -122,7 +177,12 @@ export default function UnlockDayManager({ plainWords = false }) {
         </div>
 
         <div className="space-y-1">
-          <span className="text-xs font-medium">{t(word("timeRules.activeUnlocks"))}</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium">{t(word("timeRules.activeUnlocks"))}</span>
+            {unlocks.length > 0 && (
+              <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-destructive" disabled={busy} onClick={removeAllUnlocks}>{t(word("timeRules.removeAll"))}</Button>
+            )}
+          </div>
           {unlocks.length === 0 ? (
             <p className="text-xs text-muted-foreground">{t(word("timeRules.noUnlocks"))}</p>
           ) : (

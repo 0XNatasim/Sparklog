@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.247)
+## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.248)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.248 (technique).** `UnlockDayManager.jsx` : option `__all__` (« Tous les employés ») du sélecteur → un seul `upsert` de `job_entry_unlocks` pour tous les profils actifs (non en pause), puis une seule requête des fiches `submitted` du jour (`.in("user_id", …)`) et une seule confirmation pour les retourner (`returnJobs`, `return_job_for_correction` par fiche, comme pour un employé) ; bouton « Tout refermer » (`removeAllUnlocks` : un `delete().in("id", …)` de toutes les lignes affichées, après confirmation). Textes `timeRules.allEmployees / allUnlocked / reopenAllSubmittedConfirm / removeAll / allUnlocksRemoved`, `confirm.removeAllUnlocks` (+ `.plain`). Tests dans `UnlockDayManager.test.jsx`. Aucune migration (RLS de `job_entry_unlocks` inchangée).
 
 **V2.4.247 (technique).** `findJobOverlap` / `interval` (`src/lib/job-overlap.js`) : une fiche dont Départ = Fin (0 minute) renvoie `null` au lieu d'être comptée comme 24 h (`end <= start` → `end < start`) ; avant, le message « chevauche » masquait « Heures invalides » (`job-contract.js` compte aussi 0 comme 1440 min, refusé > 16 h). Test ajouté. Aucun changement de base.
 
