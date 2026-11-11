@@ -33,4 +33,11 @@ describe("job overlap details", () => {
       .toContain('"firstOt":"100"');
     expect(jobOverlapMessage({ message: "invalid_job_interval" }, candidate, [other], t)).toBeNull();
   });
+
+  it("ignores a 0-minute entry (same Départ and Fin) instead of treating it as 24 h", () => {
+    const zero = { id: "zero", ot: "ENTREPÔT", job_date: "2026-09-29", depart: "06:30", fin: "06:30", status: "saved" };
+    expect(findJobOverlap(zero, [
+      { id: "first", job_date: "2026-09-29", depart: "06:30", fin: "15:00", status: "saved" },
+    ])).toBeNull();
+  });
 });

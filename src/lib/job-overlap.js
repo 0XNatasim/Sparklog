@@ -5,7 +5,10 @@ function interval(job) {
   const start = Date.parse(`${job.job_date}T${String(job.depart).slice(0, 5)}:00Z`);
   let end = Date.parse(`${job.job_date}T${String(job.fin).slice(0, 5)}:00Z`);
   if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-  if (end <= start) end += 24 * 60 * 60 * 1000;
+  // Same Départ and Fin = a 0-minute entry, not a 24 h night shift: it is refused as invalid hours elsewhere,
+  // and must not be reported as overlapping the day's other jobs.
+  if (end === start) return null;
+  if (end < start) end += 24 * 60 * 60 * 1000;
   return { start, end };
 }
 
