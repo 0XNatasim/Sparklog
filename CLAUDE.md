@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.248)
+## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.249)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.249 (technique).** Textes `form.return.askTitle` / `askDescription` (« Retour facturable ? ») et `form.return.kmBreakdown` (« retour » sans « à l'entrepôt ») ; la logique du retour (`EndOfShiftDialog`, `return_time_minutes`, `km_retour`) ne change pas. `EmployeeForm.jsx` : à l'enregistrement, Départ = Fin (même HH:mm) est refusé avec `form.errors.invalidInterval` avant tout appel `save_own_job` (avant : une fiche 6 h 30 → 6 h 30 était stockée en 24 h — `started_at` / `ended_at` à +24 h —, chevauchait les autres fiches du jour et bloquait « Soumettre la journée » ; V2.4.247 n'avait corrigé que le message du chevauchement). Test ajouté. Aucune migration. Note : en « Vue en tant que… » (lecture seule) la soumission échoue par conception (le RPC `save_own_job` tourne avec le compte du gestionnaire).
 
 **V2.4.248 (technique).** `UnlockDayManager.jsx` : option `__all__` (« Tous les employés ») du sélecteur → un seul `upsert` de `job_entry_unlocks` pour tous les profils actifs (non en pause), puis une seule requête des fiches `submitted` du jour (`.in("user_id", …)`) et une seule confirmation pour les retourner (`returnJobs`, `return_job_for_correction` par fiche, comme pour un employé) ; bouton « Tout refermer » (`removeAllUnlocks` : un `delete().in("id", …)` de toutes les lignes affichées, après confirmation). Textes `timeRules.allEmployees / allUnlocked / reopenAllSubmittedConfirm / removeAll / allUnlocksRemoved`, `confirm.removeAllUnlocks` (+ `.plain`). Tests dans `UnlockDayManager.test.jsx`. Aucune migration (RLS de `job_entry_unlocks` inchangée).
 
