@@ -114,6 +114,18 @@ describe("EmployeeForm — new entry", () => {
     expect(field("ot").value).toBe("");
   });
 
+  it("refuses a 0-minute entry (same Départ and Fin) instead of saving it as a 24 h job", async () => {
+    setup();
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
+    fill({ depart: "06:30", arrivee: "06:30", fin: "06:30" });
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
+    await screen.findByText(fr("form.last.title"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
+    await screen.findByText(fr("form.errors.invalidInterval"));
+    expect(state.fake.rpcCalls("save_own_job")).toHaveLength(0);
+  });
+
   it("sends one save when « Non » is tapped twice in a row", async () => {
     let release;
     const gate = new Promise((resolve) => { release = resolve; });

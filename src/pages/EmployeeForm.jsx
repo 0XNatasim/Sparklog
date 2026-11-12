@@ -520,6 +520,14 @@ export default function EmployeeForm() {
       return false;
     }
 
+    // Same Départ and Fin = 0 minute. It used to be saved as a 24 h job and only refused (or flagged as an
+    // overlap) at submission, so it is refused here with the right message.
+    if (depart && fin && String(depart).slice(0, 5) === String(fin).slice(0, 5)) {
+      lastSaveErrorRef.current = t("form.errors.invalidInterval");
+      setErr(lastSaveErrorRef.current);
+      return false;
+    }
+
     let overlapWarning = null;
     try {
       const fromDate = dayjs(job_date).subtract(1, "day").format("YYYY-MM-DD");
