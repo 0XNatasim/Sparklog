@@ -6,7 +6,7 @@ export const MAX_JOB_DURATION_MINUTES = 16 * 60;
 // Product choices shown in the return-time dialog. Every value must remain inside
 // the broader database contract above.
 export const RETURN_TIME_OPTIONS = Object.freeze([
-  5, 10, 15, 20, 25, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180,
+  0, 5, 10, 15, 20, 25, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180,
 ]);
 
 export function isValidReturnMinutes(value) {
