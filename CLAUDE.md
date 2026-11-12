@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.250)
+## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.251)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.251 (technique).** `History.jsx` : `isOwner(job)` compare `job.user_id` à `effectiveUserId` (l'employé vu en « Vue en tant que »), plus à `user.id` du gestionnaire ; en `isViewMode`, les boutons Ouvrir / Supprimer / Soumettre / Soumettre la journée sont affichés `disabled`, et `submitJob` / `deleteJob` / `submitDay` sortent tout de suite. Test : `src/pages/History.test.jsx`. Reste : `Week.jsx`, `Profile.jsx` et `EmployeeForm.jsx` (champs déjà désactivés par `disableInputs`) n'ont pas été revus bouton par bouton.
 
 **V2.4.250 (technique).** `RETURN_TIME_OPTIONS` (`job-contract.js`) commence par `0` (0 est déjà accepté par `isValidReturnMinutes` et la base : `return_time_minutes` 0, 5, 10, …) ; le bouton « 0 min » mène à l'étape des km comme les autres. `form.return.askDescription` raccourci (sans « entrepôt, maison ou ailleurs »). Aucune migration.
 

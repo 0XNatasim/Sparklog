@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.250 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.251 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.251 — « View as employee » shows the employee's buttons.** On the Historique page, a manager viewing the app as an employee now sees the same buttons (Ouvrir, Supprimer, Soumettre, Soumettre la journée), greyed out and not clickable, instead of not seeing them.
 - **V2.4.250 — return pop-up.** The question is now « Y a-t-il du temps et du kilométrage de retour à facturer ? » and the return-time list starts with **0 min** (kilometres only).
 - **V2.4.249 — « Billable return? » and 0-minute entries.** The end-of-day pop-up now asks « Retour facturable ? » (return time and kilometres to bill: warehouse, home or elsewhere) instead of « Retour à l'entrepôt ? ». An entry with the same Départ and Fin is refused when saved (« Invalid hours ») instead of being stored as a 24 h job that blocks the day's submission later.
 - **V2.4.248 — reopen a day for everyone.** In the day-reopening screen (Gestion › Feuilles de temps), the employee list now starts with « Tous les employés »: one click reopens the chosen day for every active employee (and offers to return the already-submitted jobs for correction in one question). A « Tout refermer » button closes every reopened day at once, after a confirmation.
