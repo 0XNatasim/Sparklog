@@ -18,6 +18,12 @@ import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
 // time, the number of ORs and a colour for saved (orange) / submitted (green) / missing (red).
 // +7 / −7 (minutes; the unit is in the legend and the tooltip).
+const FOREMAN_MIN_HOURS = 8;
+// A counted weekday (Mon–Fri, not a holiday) under 8 h worked: the foreman is paid 8 h (display only, the pay is the engine's).
+function foremanDayTopUp(date, jobCount, hours, holidays) {
+  const weekday = dayjs(date).day();
+  return jobCount > 0 && weekday >= 1 && weekday <= 5 && !holidays.has(date) && hours < FOREMAN_MIN_HOURS;
+}
 const signed = (minutes) => `${minutes > 0 ? "+" : minutes < 0 ? "−" : ""}${Math.abs(Math.round(minutes))}`;
 
 // Weeks offered by the week filter, counting the current one (about three months back).
@@ -95,6 +101,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
         return {
           date, hours, km, off, holiday: holidays.has(date),
+          // Foreman: a weekday (Mon–Fri, not a holiday) is paid 8 h at least (engine 2.8.0): shown next to the worked hours.
+          foremanTopUp: employee.role === "foreman" && foremanDayTopUp(date, dayJobs.length, hours, holidays),
           // Days before the first day of work: nothing was expected (never « Rien d'entré »).
           notStarted: notStartedOn(employee, date),
           firstDay: employee.start_date === date,
@@ -105,6 +113,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
         employee, cells, total: cells.reduce((sum, c) => sum + c.hours, 0), totalKm: cells.reduce((sum, c) => sum + c.km, 0),
         round: weekRoundingSummary(roundingFor(rounding, employee.id), weekStart, days[6]),
         hasDraft: cells.some((c) => c.status === "saved"),
+        foremanPaid: employee.role === "foreman" && cells.some((c) => c.foremanTopUp)
+          ? cells.reduce((sum, c) => sum + (c.foremanTopUp ? FOREMAN_MIN_HOURS : c.hours), 0) : null,
       };
     }).sort((a, b) => (a.employee.full_name || a.employee.email || "").localeCompare(b.employee.full_name || b.employee.email || ""));
   }, [people, jobs, timeOff, days, holidays, rounding, weekStart]);
@@ -181,7 +191,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ employee, cells, total, totalKm, round, hasDraft }) => (
+              {rows.map(({ employee, cells, total, totalKm, round, hasDraft, foremanPaid }) => (
                 <tr key={employee.id}>
                   <td className="max-w-[180px] truncate px-1 text-sm font-semibold">{employee.full_name || employee.email}</td>
                   {cells.filter((cell) => visibleDays.includes(cell.date)).map((cell) => (
@@ -195,6 +205,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                           <>
                             <span className="font-mono text-sm font-semibold">{formatHM(cell.hours)}</span>
                             <span className="text-[11px] opacity-80">{Math.round(cell.km)} km</span>
+                            {cell.foremanTopUp && <span className="w-full text-[11px] font-semibold" title={t("live.week.foremanMinTitle")}>{t("live.week.foremanMin")}</span>}
                           </>
                         ) : (
                           <span className="text-sm">{cell.off ? t("live.week.off") : cell.holiday ? t("live.week.holiday") : cell.firstDay ? t("live.week.firstDay") : "—"}</span>
@@ -205,6 +216,11 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                   <td className="whitespace-nowrap px-1 text-right">
                     <span className="font-mono text-sm font-bold">{formatHM(total)}</span>
                     <span className="ms-1 text-[11px] text-muted-foreground">{Math.round(totalKm)} km</span>
+                    {foremanPaid !== null && (
+                      <div className="text-[11px] leading-tight text-muted-foreground" title={t("live.week.foremanMinTitle")}>
+                        {t("live.week.foremanPaid", { time: formatHM(foremanPaid) })}
+                      </div>
+                    )}
                     {round.days > 0 && (
                       <div className="text-[11px] leading-tight text-muted-foreground" title={t("rounding.help")}>
                         {t("rounding.week.paid", { time: formatHM(round.paid / 60) })}{hasDraft ? "*" : ""} · {t("rounding.week.line", { delta: signed(round.delta), counter: signed(round.counter) })}

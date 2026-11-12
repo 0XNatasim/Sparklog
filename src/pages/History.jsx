@@ -252,7 +252,8 @@ export default function History() {
   }
 
   function isOwner(job) {
-    return Boolean(user?.id) && job.user_id === user.id;
+    // « Vue en tant que » (lecture seule): the manager sees the buttons the employee sees, greyed out.
+    return Boolean(effectiveUserId) && job.user_id === effectiveUserId;
   }
   function canOpen(job) {
     return isOwner(job) && (job.status === "saved" || job.status === "updated") && job.locked === false;
@@ -283,6 +284,7 @@ export default function History() {
   }
 
   async function deleteJob(jobId) {
+    if (isViewMode) return;
     const ok = await confirm(t("history.confirm.delete"));
     if (!ok) return;
     setActionLoadingKey(jobId);
@@ -314,6 +316,7 @@ export default function History() {
   }
 
   async function submitJob(jobId) {
+    if (isViewMode) return;
     const job = jobs.find((row) => row.id === jobId);
     const managerEntry = isPendingManagerEntry(job);
     const ok = await confirm(managerEntry
@@ -356,7 +359,7 @@ export default function History() {
   }
 
   async function submitDay(dateKey, ids) {
-    if (!ids || ids.length === 0) return;
+    if (isViewMode || !ids || ids.length === 0) return;
     const hasManagerEntry = ids.some((id) => isPendingManagerEntry(jobs.find((job) => job.id === id)));
     const ok = await confirm(t(hasManagerEntry ? "history.confirm.managerEntryDay" : "history.confirm.submitDay",
       { date: dayjs(dateKey).format("DD MMM YYYY") }));
@@ -464,7 +467,7 @@ export default function History() {
                     type="button"
                     variant="success"
                     size="sm"
-                    disabled={dayBusy}
+                    disabled={dayBusy || isViewMode}
                     onClick={() => submitDay(g.date, g.submittableIds)}
                     title={t("history.submitDayTitle")}
                   >
@@ -539,17 +542,17 @@ export default function History() {
                         {(showOpen || showDelete || showSubmit) && (
                           <div className="flex flex-wrap gap-1.5">
                             {showOpen && (
-                              <Button size="sm" variant="secondary" disabled={busy} onClick={() => openJob(j)}>
+                              <Button size="sm" variant="secondary" disabled={busy || isViewMode} onClick={() => openJob(j)}>
                                 {busy ? "…" : t("history.open")}
                               </Button>
                             )}
                             {showSubmit && (
-                              <Button size="sm" variant="success" disabled={busy} onClick={() => submitJob(j.id)}>
+                              <Button size="sm" variant="success" disabled={busy || isViewMode} onClick={() => submitJob(j.id)}>
                                 {busy ? "…" : t("history.submit")}
                               </Button>
                             )}
                             {showDelete && (
-                              <Button size="sm" variant="destructive" disabled={busy} onClick={() => deleteJob(j.id)}>
+                              <Button size="sm" variant="destructive" disabled={busy || isViewMode} onClick={() => deleteJob(j.id)}>
                                 {busy ? "…" : t("history.delete")}
                               </Button>
                             )}

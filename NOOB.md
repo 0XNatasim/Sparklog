@@ -1,11 +1,13 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-11 (V2.4.250).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-11 (V2.4.252).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
+- ✅ **V2.4.252** : le **8 h minimum du contremaître** est maintenant visible dans « Cette semaine » (snapshot) : un jour de semaine sous 8 h travaillées affiche **« min. 8 h »** sous les heures, et le total de la semaine ajoute **« Payé … (min. 8 h/jour) »**. Les heures travaillées restent affichées telles quelles (2 h = 2 h) ; c'est un affichage, la paie (talons, Calcul, export Google) appliquait déjà le minimum. Rien à faire de votre côté, aucune migration.
+- ✅ **V2.4.251** : en **« Voir comme l'employé »**, la page Historique affiche maintenant les mêmes boutons que l'employé (Ouvrir, Supprimer, Soumettre, Soumettre la journée), mais **grisés** : on les voit, on ne peut pas appuyer. Rien à faire de votre côté, aucune migration.
 - ✅ **V2.4.250** : fenêtre « Retour facturable ? » : le texte est maintenant « Y a-t-il du temps et du kilométrage de retour à facturer ? » et la liste du temps de retour commence par **0 min** (pour un retour avec des km mais sans temps à facturer). Rien à faire de votre côté, aucune migration.
 - ✅ **V2.4.249** : (1) la fenêtre de fin de journée demande maintenant **« Retour facturable ? »** (« Y a-t-il du temps et du kilométrage de retour à facturer (entrepôt, maison ou ailleurs) ? ») au lieu de « Retour à l'entrepôt ? », pour que ceux qui rentrent chez eux répondent aussi correctement ; (2) une fiche avec le **même départ et la même fin** (ex. 6 h 30 → 6 h 30) est refusée dès l'enregistrement (« Heures invalides ») : avant, elle s'enregistrait comme une fiche de 24 h et bloquait la soumission de la journée. Rien à faire de votre côté, aucune migration.
 - ✅ **V2.4.248** : **rouvrir une journée pour tout le monde**. Dans l'écran « Rouvrir une journée », la liste des employés commence maintenant par **« Tous les employés »** : un seul clic rouvre la journée choisie pour tous les employés actifs (l'app demande une seule fois si vous voulez aussi retourner pour correction les fiches déjà soumises). Un bouton **« Tout refermer »**, au-dessus de la liste des journées rouvertes, les referme toutes d'un coup (avec une confirmation). Rien à faire de votre côté, aucune migration.
