@@ -105,3 +105,20 @@ describe("WeekSnapshot week filter", () => {
     expect(screen.getByRole("button", { name: fr("live.week.later") }).disabled).toBe(false);
   });
 });
+
+describe("WeekSnapshot foreman minimum", () => {
+  it("flags a weekday under 8 h worked and shows the paid total with the minimum", async () => {
+    // Mon 2 h, Tue 9 h: Monday is topped up to 8 h, Tuesday is left alone → paid 17 h.
+    setup([job("a", "2026-10-19", "07:00", "09:00"), job("b", "2026-10-20", "07:00", "16:00")], { role: "foreman" });
+    await screen.findByText("Employé Test");
+    expect(screen.getAllByText(fr("live.week.foremanMin")).length).toBe(1);
+    expect(screen.getByText(fr("live.week.foremanPaid").replace("{time}", "17h00"))).toBeTruthy();
+  });
+
+  it("shows nothing extra for another role", async () => {
+    setup([job("a", "2026-10-19", "07:00", "09:00")]);
+    await screen.findByText("Employé Test");
+    expect(screen.queryByText(fr("live.week.foremanMin"))).toBeNull();
+  });
+});
+
