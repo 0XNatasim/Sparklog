@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.255 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.256 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.256 — documentation only.** The open hardening of the « returned » label of the foreman notes is written down (CLAUDE.md §6.3, NOOB.md), not coded yet.
 - **V2.4.255 — returning a foreman's sheet with a reason.** In Notes › Contremaître, « Retourner la fiche » now opens a window with an optional reason. The note keeps who returned the sheet, when and why: the other managers see « Returned by … » (a « Returned » tag on the work sheet and a block in the note), and the foreman reads the reason on his own sheet. The tag disappears once the foreman submits the sheet again (a muted « already returned once » stays in the notes list). Migration 0140.
 - **V2.4.254 — the owner submits an emergency timesheet for an employee.** In the emergency timesheet (Avancé › Feuille de temps d'urgence), a « Submit it for the employee » box creates the sheet already submitted: nothing for the employee to confirm, no message to them, straight to the managers' review (useful for someone who is leaving, even if their account is already paused). A draft the employee has not confirmed also gets a « Submit for the employee » button. The overtime proof and the inventory screenshots are not required in this case; the action is kept in the audit log in the owner's name. Migration 0137.
   Same version, also: the foreman note icon on the work sheets is bigger and **red until a manager opens it, blue afterwards** (each manager has his own state; a note edited later is unread again), and always blue for the foreman who wrote it; the overtime-proof pop-up has no « × » (no outside click, no Escape) and has a « I don't have it yet » button that saves the sheet as a draft (not submitted) and says to give the proof today; the week snapshot outlines in red the saved days over the threshold with no proof yet. Migration 0138.
