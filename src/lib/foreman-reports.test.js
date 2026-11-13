@@ -87,4 +87,11 @@ describe("migration 0136", () => {
     expect(sql).toContain("new.user_id := old.user_id");
     expect(sql).toContain("new.job_id := old.job_id");
   });
+  it("attaches the notes written before to the foreman's CONTREMAÎTRE sheet of the day, merging several notes of one sheet", () => {
+    expect(sql).toContain("upper(btrim(j.ot)) = 'CONTREMAÎTRE'");
+    expect(sql).toContain("having count(*) = 1");
+    expect(sql).toContain("string_agg(btrim(n.body)");
+    // The backfill runs before the update guard, which freezes job_id.
+    expect(sql.indexOf("do $$")).toBeLessThan(sql.indexOf("create trigger foreman_reports_guard_update"));
+  });
 });

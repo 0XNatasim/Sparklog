@@ -6,12 +6,58 @@
 --   * returning the job for correction leaves the note, and the foreman can edit it while the job is editable
 --     (status saved / updated), like the job itself;
 --   * a manager can delete a note on its own (Notes › Contremaître), and exports the notes as a CSV.
--- Reports written before this migration have no job (job_id null) and stay as they are.
+-- Reports written before this migration are attached to their sheet when it can be found (see the backfill below).
 
 alter table public.foreman_reports
   add column if not exists job_id uuid references public.jobs(id) on delete cascade;
 
 create unique index if not exists foreman_reports_job_uniq on public.foreman_reports (job_id) where job_id is not null;
+
+-- Notes written before this migration follow the work sheet too: each one is attached to the same foreman's
+-- CONTREMAÎTRE sheet of the day, when that day has exactly one such sheet (otherwise it stays without a sheet).
+-- A sheet has one note: when a foreman wrote several notes for the same sheet, the later ones are appended to the
+-- first (oldest first, blank line between) and removed, unless the result would exceed 5000 characters (then only the
+-- first is attached and the others stay as they are). Done before the update guard below, which freezes job_id.
+do $$
+declare
+  r record;
+  ids uuid[];
+  merged text;
+begin
+  for r in
+    with one_job as (
+      select j.user_id, j.job_date, (array_agg(j.id))[1] as job_id
+        from public.jobs j
+       where upper(btrim(j.ot)) = 'CONTREMAÎTRE'
+       group by j.user_id, j.job_date
+      having count(*) = 1
+    )
+    select o.job_id,
+           array_agg(n.id order by n.created_at, n.id) as note_ids,
+           string_agg(btrim(n.body), E'\n\n' order by n.created_at, n.id) as merged_body
+      from public.foreman_reports n
+      join one_job o on o.user_id = n.user_id and o.job_date = n.report_date
+     where n.job_id is null
+     group by o.job_id
+  loop
+    ids := r.note_ids;
+    merged := r.merged_body;
+    if char_length(merged) <= 5000 then
+      update public.foreman_reports
+         set job_id = r.job_id,
+             body = merged,
+             audited_name = coalesce(audited_name, (select n2.audited_name from public.foreman_reports n2
+                                                      where n2.id = any (ids) and n2.audited_name is not null
+                                                      order by n2.created_at, n2.id limit 1))
+       where id = ids[1];
+      if array_length(ids, 1) > 1 then
+        delete from public.foreman_reports where id = any (ids[2:array_length(ids, 1)]);
+      end if;
+    else
+      update public.foreman_reports set job_id = r.job_id where id = ids[1];
+    end if;
+  end loop;
+end $$;
 
 -- On update only the text can change: the author, the job, the date, the key and the time stay.
 create or replace function public.foreman_reports_guard_update()
