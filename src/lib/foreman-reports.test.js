@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
-import { MAX_AUDITED_NAME, MAX_REPORT, cleanReport, filterReports, isForemanOt, submitForemanReport } from "./foreman-reports";
+import { MAX_AUDITED_NAME, MAX_REPORT, cleanReport, filterReports, foremanReportsCsv, isForemanOt, saveJobNote } from "./foreman-reports";
 
 describe("foreman reports", () => {
   it("recognises the CONTREMAÎTRE work order, whatever the case or spaces", () => {
@@ -22,14 +22,36 @@ describe("foreman reports", () => {
     expect(cleanReport({ auditedName: "n".repeat(MAX_AUDITED_NAME + 1), body: "x" })).toBeNull();
   });
 
-  it("sends one report, treats a repeated submission key as the same report, and rethrows other errors", async () => {
-    const args = { userId: "u", submissionKey: "k", reportDate: "2026-11-10", auditedName: "", body: "texte" };
+  it("attaches a new note to its job, edits the existing one, and treats a repeated key as the same note", async () => {
+    const args = { userId: "u", jobId: "j1", submissionKey: "k", reportDate: "2026-11-10", auditedName: "", body: "texte" };
     const insert = vi.fn().mockResolvedValue({ error: null });
-    await submitForemanReport({ from: () => ({ insert }) }, args);
-    expect(insert).toHaveBeenCalledWith({ user_id: "u", submission_key: "k", report_date: "2026-11-10", audited_name: null, body: "texte" });
-    await expect(submitForemanReport({ from: () => ({ insert: async () => ({ error: { code: "23505" } }) }) }, args)).resolves.toBeUndefined();
-    await expect(submitForemanReport({ from: () => ({ insert: async () => ({ error: { code: "42501", message: "no" } }) }) }, args)).rejects.toMatchObject({ code: "42501" });
-    await expect(submitForemanReport({ from: () => ({ insert }) }, { ...args, body: " " })).rejects.toThrow("foreman_report_invalid");
+    const noNote = { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }), insert };
+    await saveJobNote({ from: () => noNote }, args);
+    expect(insert).toHaveBeenCalledWith({ user_id: "u", job_id: "j1", submission_key: "k", report_date: "2026-11-10", audited_name: null, body: "texte" });
+
+    const update = vi.fn(() => ({ eq: async () => ({ error: null }) }));
+    const hasNote = { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "r1" }, error: null }) }) }), update };
+    await saveJobNote({ from: () => hasNote }, { ...args, auditedName: "Paul", body: "corrigé" });
+    expect(update).toHaveBeenCalledWith({ audited_name: "Paul", body: "corrigé" });
+
+    const dup = { ...noNote, insert: async () => ({ error: { code: "23505" } }) };
+    await expect(saveJobNote({ from: () => dup }, args)).resolves.toBeUndefined();
+    const refused = { ...noNote, insert: async () => ({ error: { code: "42501", message: "no" } }) };
+    await expect(saveJobNote({ from: () => refused }, args)).rejects.toMatchObject({ code: "42501" });
+    await expect(saveJobNote({ from: () => noNote }, { ...args, body: " " })).rejects.toThrow("foreman_report_invalid");
+    await expect(saveJobNote({ from: () => noNote }, { ...args, jobId: null })).rejects.toThrow("foreman_report_invalid");
+  });
+
+  it("exports the notes with the work sheet they follow, protected against spreadsheet formulas", () => {
+    const labels = { columns: { date: "d", author: "a", ot: "o", workDate: "w", times: "t", status: "s", audited: "u", note: "n" }, status: { submitted: "soumis" } };
+    const csv = foremanReportsCsv([
+      { created_at: "2026-11-10T20:00:00Z", author: "Éric", report_date: "2026-11-10", audited_name: "Paul", body: "=cmd\nligne 2", job: { ot: "CONTREMAÎTRE", job_date: "2026-11-10", depart: "06:30:00", fin: "15:00:00", status: "submitted" } },
+      { created_at: "2026-11-09T20:00:00Z", author: "Luc", report_date: "2026-11-09", audited_name: null, body: "x", job: null },
+    ], labels);
+    const lines = csv.split("\r\n");
+    expect(lines[0]).toBe("d;a;o;w;t;s;u;n");
+    expect(csv).toContain("2026-11-10;Éric;CONTREMAÎTRE;2026-11-10;06:30-15:00;soumis;Paul;\"'=cmd\nligne 2\"");
+    expect(lines.at(-1)).toBe("2026-11-09;Luc;;2026-11-09;;;;x");
   });
 
   it("searches author, audited person and text without caring for accents or case", () => {
@@ -45,12 +67,24 @@ describe("foreman reports", () => {
 
 describe("migration 0134", () => {
   const sql = readFileSync(new URL("../../supabase/migrations/20261110180000_0134_foreman_reports.sql", import.meta.url), "utf8");
-  it("lets a foreman insert and read his own, the managers read all, and nobody edits or deletes", () => {
+  it("lets a foreman insert and read his own and the managers read all (0136 adds edit and delete)", () => {
     expect(sql).toContain("enable row level security");
     expect(sql).toMatch(/using \(user_id = auth\.uid\(\) or public\.get_my_role\(\) = 'manager'\)/);
     expect(sql).toMatch(/p\.role = 'foreman'/);
     expect(sql).toContain("grant select, insert on public.foreman_reports to authenticated");
-    expect(sql).not.toMatch(/for (update|delete)/);
     expect(sql).toContain("foreman_reports_user_key_uniq unique (user_id, submission_key)");
+  });
+});
+
+describe("migration 0136", () => {
+  const sql = readFileSync(new URL("../../supabase/migrations/20261113120000_0136_foreman_report_on_job.sql", import.meta.url), "utf8");
+  it("links a note to its job (deleted with it), one per job, and gives the author the text only while the job is editable", () => {
+    expect(sql).toContain("job_id uuid references public.jobs(id) on delete cascade");
+    expect(sql).toContain("create unique index if not exists foreman_reports_job_uniq");
+    expect(sql).toMatch(/j\.status in \('saved', 'updated'\)/);
+    expect(sql).toContain("grant update (body, audited_name) on public.foreman_reports to authenticated");
+    expect(sql).toMatch(/for delete to authenticated\s+using \(public\.get_my_role\(\) = 'manager'\)/);
+    expect(sql).toContain("new.user_id := old.user_id");
+    expect(sql).toContain("new.job_id := old.job_id");
   });
 });
