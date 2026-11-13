@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { deleteForemanReport, fetchForemanReports, filterReports, foremanReportsCsv, returnReportedJob } from "@/lib/foreman-reports";
+import { deleteForemanReport, fetchForemanReports, fetchNoteReads, filterReports, foremanReportsCsv, isNoteUnread, markNoteRead, returnReportedJob } from "@/lib/foreman-reports";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 
@@ -25,6 +25,8 @@ export default function ForemanReportsPanel() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [busyId, setBusyId] = useState(null);
+  // This manager's readings (0138): { report id → read_at }. A note is unread for him until he opens it.
+  const [reads, setReads] = useState(() => new Map());
   const [query, setQuery] = useState("");
 
   const [reloads, setReloads] = useState(0);
@@ -32,7 +34,10 @@ export default function ForemanReportsPanel() {
   useEffect(() => {
     let cancelled = false;
     fetchForemanReports(supabase)
-      .then((list) => { if (!cancelled) { setReports(list); setError(""); } })
+      .then(async (list) => {
+        const readMap = await fetchNoteReads(supabase, list.map((report) => report.id)).catch(() => new Map());
+        if (!cancelled) { setReports(list); setReads(readMap); setError(""); }
+      })
       .catch((e) => { if (!cancelled) { setReports((current) => current ?? []); setError(friendlyErrorMessage(e, t, "foremanNotes.errors.loadFailed")); } });
     return () => { cancelled = true; };
   }, [t, reloads]);
@@ -52,6 +57,11 @@ export default function ForemanReportsPanel() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function markRead(report) {
+    setReads((current) => new Map(current).set(report.id, new Date().toISOString()));
+    markNoteRead(supabase, report.id).catch(() => setReads((current) => { const next = new Map(current); next.delete(report.id); return next; }));
   }
 
   async function remove(report) {
@@ -98,7 +108,10 @@ export default function ForemanReportsPanel() {
           <Card key={report.id}>
             <CardContent className="space-y-2 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <div className="font-semibold">{report.author || t("foremanNotes.unknownAuthor")}</div>
+                <div className="flex items-center gap-2 font-semibold">
+                  {report.author || t("foremanNotes.unknownAuthor")}
+                  {isNoteUnread(report, reads.get(report.id)) && <Badge variant="destructive" className="uppercase tracking-wide">{t("foremanNotes.unread")}</Badge>}
+                </div>
                 <div className="text-xs text-muted-foreground">{dayjs(report.created_at).format("ddd D MMM YYYY · HH:mm")}</div>
               </div>
               {job ? (
@@ -114,6 +127,9 @@ export default function ForemanReportsPanel() {
               {report.audited_name && <div className="text-sm"><span className="text-muted-foreground">{t("foremanNotes.audited")} : </span><b>{report.audited_name}</b></div>}
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{report.body}</p>
               <div className="flex flex-wrap justify-end gap-2">
+                {isNoteUnread(report, reads.get(report.id)) && (
+                  <Button type="button" size="sm" variant="outline" onClick={() => markRead(report)}>{t("foremanNotes.markRead")}</Button>
+                )}
                 {job?.status === "submitted" && (
                   <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => giveBack(report)}>{t("foremanNotes.returnSheet")}</Button>
                 )}

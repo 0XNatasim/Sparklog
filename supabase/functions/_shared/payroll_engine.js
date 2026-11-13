@@ -4,7 +4,7 @@
 // in the browser (as a preview) and in the Supabase Edge Function (as the authority) —
 // one implementation, no client/server drift. Bump ENGINE_VERSION on any change that can
 // alter a classified value; approval snapshots record the version they were computed with.
-export const ENGINE_VERSION = "2.9.0";
+export const ENGINE_VERSION = "2.10.0";
 
 export function minutesBetween(depart, fin) {
   if (!depart || !fin) return 0;
@@ -453,8 +453,10 @@ export function calculateDailyTotals(jobs, options) {
 // reconcile_overtime_meal (migration 0086).
 export const MEAL_OVERTIME_MINUTES = 135;
 export const MEAL_AFTER_DAILY_WORK_MINUTES = 480 + MEAL_OVERTIME_MINUTES;
+// « 4 jours de 10 h » (regular day above 8 h, engine 2.10.0, owner decision 2026-11-13): no supper at all.
 export function isMealEligible({ jobDate, dailyWorkMinutes, dailyRegularMinutes = DAILY_REGULAR_MINUTES }) {
   const weekday = dayOfWeek(jobDate);
+  if (dailyRegularMinutes > DAILY_REGULAR_MINUTES) return false;
   return weekday !== null && weekday !== 0 && weekday !== 6 && (Number(dailyWorkMinutes) || 0) >= dailyRegularMinutes + MEAL_OVERTIME_MINUTES;
 }
 

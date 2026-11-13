@@ -231,7 +231,7 @@ cent by `src/payroll/employee-week.test.js`.
   `dailyRegularMinutesFor(profile)`), instead of 8 h. Everything else is unchanged: first overtime hour of the week at 1.5×
   then 2× (or 2× with its option), Saturday all overtime, Sunday and holidays 2×, return time, first trip, rounding.
 - The two gates follow the threshold, in the app and in the database (`validate_job_submission_contract`,
-  `reconcile_overtime_meal`): overtime proof after 10 h of paid time; supper (30 $) after 2 h 15 of overtime = 12 h 15 of paid work.
+  `reconcile_overtime_meal`): overtime proof after 10 h of paid time. **No supper at all** (owner decision 2026-11-13, engine 2.10.0, migration 0139; migration 0135 had put it at 12 h 15): `isMealEligible` is false and `reconcile_overtime_meal` removes any supper claim not reviewed yet.
 - Not decided (do not guess): a 5th day in the week (the CCQ export already moves regular hours beyond 40 h/week to overtime;
   the other screens do not), and the 8 h removed from the week's regular cap by a weekday holiday.
 - Not signed off by a payroll specialist (ADR 0001).

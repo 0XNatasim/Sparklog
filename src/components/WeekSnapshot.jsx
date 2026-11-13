@@ -9,7 +9,7 @@ import { useHolidayDates } from "@/lib/company-holidays";
 import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
-import { getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,13 @@ import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
 // time, the number of ORs and a colour for saved (orange) / submitted (green) / missing (red).
 // +7 / −7 (minutes; the unit is in the legend and the tooltip).
+// The day's paid minutes as the database gate counts them: the Départ→Fin spans, minus the unpaid first trip for an
+// employee with that option (dayFirstTripUnpaidMinutes, twin of validate_job_submission_contract).
+function paidMinutes(dayJobs, firstTripUnpaid) {
+  const gross = dayJobs.reduce((sum, job) => sum + (job.depart && job.fin ? minutesBetween(job.depart, job.fin) : 0), 0);
+  return gross - (firstTripUnpaid ? dayFirstTripUnpaidMinutes(dayJobs) : 0);
+}
+
 const FOREMAN_MIN_HOURS = 8;
 // A counted weekday (Mon–Fri, not a holiday) under 8 h worked: the foreman is paid 8 h (display only, the pay is the engine's).
 function foremanDayTopUp(date, jobCount, hours, holidays) {
@@ -64,8 +71,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     let alive = true;
     const weekEnd = days[6];
     Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
-      supabase.from("jobs").select("id, user_id, status, depart, fin, job_date, km_total, km_aller, km_retour").gte("job_date", weekStart).lte("job_date", weekEnd),
+      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date, ten_hour_days, first_trip_unpaid").order("full_name"),
+      supabase.from("jobs").select("id, user_id, status, depart, arrivee, fin, job_date, km_total, km_aller, km_retour, overtime_evidence_captured").gte("job_date", weekStart).lte("job_date", weekEnd),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
       // The rounding counters (15 min per day): without them the squares still show, only the paid line is missing.
       loadDayRounding({ untilDate: weekEnd }).catch(() => new Map()),
@@ -98,9 +105,13 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
           job.fin ? dayjs(`${job.job_date}T${job.fin}`) : null,
         ) || 0), 0);
         const km = dayJobs.reduce((sum, job) => sum + getKilometreBreakdown(job).totalKm, 0);
+        // Overtime proof not given yet (« Je ne l'ai pas encore »): a saved day over the daily threshold with no proof.
+        const proofMissing = employee.role !== "admin" && dayJobs.some((job) => job.status === "saved" || job.status === "updated")
+          && !dayJobs.some((job) => job.overtime_evidence_captured)
+          && paidMinutes(dayJobs, employee.first_trip_unpaid) > dailyRegularMinutesFor(employee);
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
         return {
-          date, hours, km, off, holiday: holidays.has(date),
+          date, hours, km, off, proofMissing, holiday: holidays.has(date),
           // Foreman: a weekday (Mon–Fri, not a holiday) is paid 8 h at least (engine 2.8.0): shown next to the worked hours.
           foremanTopUp: employee.role === "foreman" && foremanDayTopUp(date, dayJobs.length, hours, holidays),
           // Days before the first day of work: nothing was expected (never « Rien d'entré »).
@@ -152,6 +163,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
             <span className="rounded-full bg-success/15 px-2 py-0.5 text-success">{t("live.week.legendSubmitted")}</span>
             <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-destructive">{t("live.week.legendMissing")}</span>
             <span className="rounded-full bg-info/10 px-2 py-0.5 text-info">{t("live.week.legendOff")}</span>
+            <span className="rounded-full px-2 py-0.5 text-red-600 ring-2 ring-inset ring-red-600" title={t("live.week.proofMissingTitle")}>{t("live.week.legendProofMissing")}</span>
           </div>
         </div>
 
@@ -199,7 +211,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
                       <button
                         type="button"
                         onClick={() => onSelectEmployee?.(employee.id, cell.date)}
-                        className={cn("flex min-h-8 w-full flex-wrap items-center justify-center gap-x-1.5 rounded-md border px-1 py-0.5 leading-tight hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", cellClass(cell))}
+                        className={cn("flex min-h-8 w-full flex-wrap items-center justify-center gap-x-1.5 rounded-md border px-1 py-0.5 leading-tight hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", cellClass(cell), cell.proofMissing && "ring-2 ring-inset ring-red-600")}
+                        title={cell.proofMissing ? t("live.week.proofMissingTitle") : undefined}
                       >
                         {cell.count > 0 ? (
                           <>

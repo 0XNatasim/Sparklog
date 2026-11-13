@@ -71,7 +71,7 @@ describe("buildCreateJobForEmployeeArgs", () => {
     expect(args).toEqual({
       p_employee_id: "emp-1", p_submission_key: "key-1", p_job_date: "2026-10-07", p_ot: "190403",
       p_depart: "08:00", p_arrivee: "08:30", p_fin: "16:00", p_km_aller: 3.2, p_note: "Phone lost",
-      p_depart_fold: null, p_fin_fold: null,
+      p_depart_fold: null, p_fin_fold: null, p_submit: false,
     });
   });
 });
@@ -156,6 +156,38 @@ describe("migration 0075 database contract", () => {
       expect(migrationSql).toContain(`revoke all on function public.${signature}`);
       expect(migrationSql).toContain(`grant execute on function public.${signature}`);
     }
+  });
+});
+
+describe("migration 0137 owner submits for the employee", () => {
+  const sql = readFileSync(fileURLToPath(new URL(
+    "../../supabase/migrations/20261113180000_0137_owner_submits_for_employee.sql", import.meta.url
+  )), "utf8");
+
+  it("sends p_submit only when the owner ticks the box", () => {
+    expect(buildCreateJobForEmployeeArgs(valid, "key").p_submit).toBe(false);
+    expect(buildCreateJobForEmployeeArgs({ ...valid, submit: true }, "key").p_submit).toBe(true);
+  });
+
+  it("submits straight away without a message or an unlock, keeps the employee unconfirmed and audits it", () => {
+    expect(sql).toContain("p_submit boolean default false");
+    expect(sql).toContain("case when coalesce(p_submit, false) then 'submitted' else 'saved' end");
+    expect(sql).toContain("if not coalesce(p_submit, false) then");
+    expect(sql).toContain("job_created_submitted_by_owner");
+    expect(sql).toContain("job_submitted_by_owner");
+    expect(sql).not.toContain("employee_confirmed_at = now()");
+    expect(sql).toMatch(/grant execute on function public\.submit_manager_entry_for_employee\(uuid\)\s+to authenticated/);
+  });
+
+  it("skips only the overtime proof and the inventory check, behind a flag only the two definer functions set", () => {
+    expect(sql).toContain("current_setting('sparklog.owner_submit', true)");
+    expect(sql.match(/if not owner_submit\n/g)).toHaveLength(2);
+    // Interval, overlap and kilometre checks are still there.
+    for (const message of ["invalid_job_interval", "overlapping_job_interval", "invalid_job_kilometres", "overtime_evidence_required", "inventory_screenshots_required"]) {
+      expect(sql).toContain(message);
+    }
+    expect(sql.match(/set_config\('sparklog\.owner_submit', 'on', true\)/g)).toHaveLength(2);
+    expect(sql.match(/set_config\('sparklog\.owner_submit', 'off', true\)/g)).toHaveLength(2);
   });
 });
 

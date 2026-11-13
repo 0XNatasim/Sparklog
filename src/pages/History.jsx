@@ -29,6 +29,8 @@ import { friendlyErrorMessage, isOfflineError } from "@/lib/error-messages";
 import { jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { parkingReceiptPaths } from "@/lib/parking-receipts";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import ForemanNoteIcon from "@/components/ForemanNoteIcon";
+import { isForemanOt } from "@/lib/foreman-reports";
 
 dayjs.locale("en");
 
@@ -81,6 +83,17 @@ export default function History() {
   const [hasMore, setHasMore] = useState(false);
   const [confirm, confirmDialog] = useConfirmDialog();
   const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
+  // The foreman's own notes (0136) on the CONTREMAÎTRE sheets shown: a blue icon that opens the text, kept for reference.
+  const [foremanNotes, setForemanNotes] = useState(() => new Map());
+  useEffect(() => {
+    const ids = jobs.filter((j) => isForemanOt(j.ot)).map((j) => j.id);
+    if (!ids.length) return undefined;
+    let alive = true;
+    supabase.from("foreman_reports").select("job_id, audited_name, body, created_at").in("job_id", ids)
+      .then(({ data }) => { if (alive && data) setForemanNotes(new Map(data.map((row) => [row.job_id, row]))); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [jobs]);
 
   function showError(error, fallbackKey, candidate = null) {
     const overlapMessage = candidate ? jobOverlapMessage(error, candidate, jobs, t) : null;
@@ -503,6 +516,7 @@ export default function History() {
                           <div className="flex items-center gap-1.5 text-sm font-bold">
                             <span>{j.ot}</span>
                             <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+                            {foremanNotes.has(j.id) && <ForemanNoteIcon note={foremanNotes.get(j.id)} subtitle={`${j.ot} · ${dayjs(j.job_date).format("DD MMM")}`} />}
                           </div>
                           <div className="flex items-center gap-1.5">
                             {isPendingManagerEntry(j) && (

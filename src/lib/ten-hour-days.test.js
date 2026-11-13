@@ -67,10 +67,11 @@ describe("gates follow the threshold", () => {
     expect(dailyOvertimeEvidenceRequirement(nineHours, [], { dailyRegularMinutes: 600 }).required).toBe(false);
   });
 
-  it("owes the supper after 12 h 15 of work, not 10 h 15", () => {
+  it("owes no supper at all to an employee on 4 days of 10 h (engine 2.10.0)", () => {
     expect(isMealEligible({ jobDate: "2026-11-03", dailyWorkMinutes: 615 })).toBe(true);
     expect(isMealEligible({ jobDate: "2026-11-03", dailyWorkMinutes: 615, dailyRegularMinutes: 600 })).toBe(false);
-    expect(isMealEligible({ jobDate: "2026-11-03", dailyWorkMinutes: 735, dailyRegularMinutes: 600 })).toBe(true);
+    expect(isMealEligible({ jobDate: "2026-11-03", dailyWorkMinutes: 735, dailyRegularMinutes: 600 })).toBe(false);
+    expect(isMealEligible({ jobDate: "2026-11-03", dailyWorkMinutes: 900, dailyRegularMinutes: 600 })).toBe(false);
     const eleven = [job("a", "2026-11-03", "06:00", "17:00")];
     expect(mealDecision(eleven, "2026-11-03", { role: "employee" }).eligible).toBe(true);
     expect(mealDecision(eleven, "2026-11-03", { role: "employee", ten_hour_days: true }).eligible).toBe(false);
@@ -97,3 +98,15 @@ describe("migration 0135", () => {
     expect((sql.match(/not in \('foreman', 'subcontractor_1'\)/g) || []).length).toBe(2);
   });
 });
+
+describe("migration 0139", () => {
+  const sql = readFileSync(new URL("../../supabase/migrations/20261114180000_0139_no_supper_ten_hour_days.sql", import.meta.url), "utf8");
+  it("makes an employee on 4 days of 10 h never eligible to the supper, except a subcontractor or a foreman", () => {
+    expect(sql).toContain("and not exists (select 1 from public.profiles p");
+    expect(sql).toContain("p.ten_hour_days");
+    expect(sql).toContain("not in ('foreman', 'subcontractor_1')");
+    expect(sql).toContain(">= 615");
+    expect(sql).not.toContain("735");
+  });
+});
+

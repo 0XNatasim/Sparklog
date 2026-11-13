@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
-import { MAX_AUDITED_NAME, MAX_REPORT, cleanReport, filterReports, foremanReportsCsv, isForemanOt, saveJobNote } from "./foreman-reports";
+import { MAX_AUDITED_NAME, MAX_REPORT, cleanReport, filterReports, foremanReportsCsv, isForemanOt, isNoteUnread, saveJobNote } from "./foreman-reports";
 
 describe("foreman reports", () => {
   it("recognises the CONTREMAÎTRE work order, whatever the case or spaces", () => {
@@ -95,3 +95,23 @@ describe("migration 0136", () => {
     expect(sql.indexOf("do $$")).toBeLessThan(sql.indexOf("create trigger foreman_reports_guard_update"));
   });
 });
+
+describe("note read state (0138)", () => {
+  const note = { created_at: "2026-11-10T20:00:00Z", updated_at: "2026-11-11T10:00:00Z" };
+  it("is unread until the manager opened it, and again after the foreman edited it", () => {
+    expect(isNoteUnread(note, undefined)).toBe(true);
+    expect(isNoteUnread(note, "2026-11-11T12:00:00Z")).toBe(false);
+    expect(isNoteUnread(note, "2026-11-10T21:00:00Z")).toBe(true);
+    expect(isNoteUnread(null, undefined)).toBe(false);
+  });
+
+  const sql = readFileSync(new URL("../../supabase/migrations/20261114120000_0138_foreman_note_reads.sql", import.meta.url), "utf8");
+  it("keeps each manager's readings private and the time on the server", () => {
+    expect(sql).toContain("primary key (report_id, manager_id)");
+    expect(sql).toMatch(/for select to authenticated\s+using \(manager_id = auth\.uid\(\) and public\.get_my_role\(\) = 'manager'\)/);
+    expect(sql).toContain("new.read_at := now()");
+    expect(sql).toContain("new.updated_at := now()");
+    expect(sql).toContain("grant update (read_at) on public.foreman_report_reads to authenticated");
+  });
+});
+

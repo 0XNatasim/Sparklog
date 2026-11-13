@@ -29,7 +29,7 @@ import { extractWorkOrderText, parseExtractedText } from "@/lib/work-order-ocr";
 import { withRetry, withTimeout } from "@/lib/utils";
 
 const ELIGIBLE_ROLES = ["employee", "foreman", "admin", "subcontractor_1"];
-const EMPTY_FORM = { employeeId: "", jobDate: "", ot: "", depart: "", arrivee: "", fin: "", km: "", note: "", departFold: null, finFold: null };
+const EMPTY_FORM = { employeeId: "", jobDate: "", ot: "", depart: "", arrivee: "", fin: "", km: "", note: "", departFold: null, finFold: null, submit: false };
 const STATE_VARIANT = { pending: "warning", submitted: "success", approved: "neutral" };
 
 const hhmm = (value) => String(value || "").slice(0, 5);
@@ -47,6 +47,7 @@ export default function EmergencyTimesheet() {
   const [busy, setBusy] = useState(false);
   const [remindingId, setRemindingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [submittingId, setSubmittingId] = useState(null);
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
   const [error, setError] = useState("");
@@ -61,7 +62,8 @@ export default function EmergencyTimesheet() {
   // Night of the fall time change (0116): départ / fin in the 1:00-1:59 that happens twice.
   const repeated = repeatedHourFields(form);
   const nameById = useMemo(() => new Map(people.map((p) => [p.id, p.full_name])), [people]);
-  const activePeople = useMemo(() => people.filter((p) => !p.is_paused), [people]);
+  // Submitting for the employee also works for someone already paused (left the company); a draft does not.
+  const activePeople = useMemo(() => people.filter((p) => form.submit || !p.is_paused), [people, form.submit]);
   const totalLabel = useMemo(() => {
     if (!form.depart || !form.fin) return "—";
     const base = form.jobDate || companyDate();
@@ -116,7 +118,7 @@ export default function EmergencyTimesheet() {
       return;
     }
     const employeeName = nameById.get(form.employeeId) || "";
-    const ok = await confirm(t("emergency.confirm", {
+    const ok = await confirm(t(form.submit ? "emergency.confirmSubmit" : "emergency.confirm", {
       name: employeeName,
       date: form.jobDate,
       from: form.depart,
@@ -133,10 +135,14 @@ export default function EmergencyTimesheet() {
       );
       if (rpcError) throw rpcError;
       // Phone push (the entry and its in-app message are saved either way); a refusal is said, not hidden.
-      const push = data?.broadcast_id ? pushOutcome(await notifyBroadcastPush(data.broadcast_id)) : null;
-      setInfo(push?.tone === "warning"
-        ? `${t("emergency.created", { name: employeeName })} ${t(push.key, push.params)}`
-        : t("emergency.created", { name: employeeName }));
+      if (form.submit) {
+        setInfo(t("emergency.createdSubmitted", { name: employeeName }));
+      } else {
+        const push = data?.broadcast_id ? pushOutcome(await notifyBroadcastPush(data.broadcast_id)) : null;
+        setInfo(push?.tone === "warning"
+          ? `${t("emergency.created", { name: employeeName })} ${t(push.key, push.params)}`
+          : t("emergency.created", { name: employeeName }));
+      }
       setForm({ ...EMPTY_FORM, jobDate: companyDate() });
       setShowErrors(false);
       submissionKeyRef.current = crypto.randomUUID();
@@ -204,6 +210,26 @@ export default function EmergencyTimesheet() {
       setError(friendlyErrorMessage(remindError, t, "emergency.errors.remind"));
     } finally {
       setRemindingId(null);
+    }
+  }
+
+  // The owner submits a draft the employee has not confirmed (0137): it goes straight to the managers' review.
+  async function submitFor(entry) {
+    if (submittingId) return;
+    setError("");
+    setInfo("");
+    const name = nameById.get(entry.user_id) || "";
+    if (!(await confirm(t("emergency.submitConfirm", { name, date: entry.job_date })))) return;
+    setSubmittingId(entry.id);
+    try {
+      const { error: rpcError } = await withTimeout(supabase.rpc("submit_manager_entry_for_employee", { p_job_id: entry.id }), 12000);
+      if (rpcError) throw rpcError;
+      setInfo(t("emergency.submittedFor", { name }));
+    } catch (submitError) {
+      setError(friendlyErrorMessage(submitError, t, "emergency.errors.submit"));
+    } finally {
+      setSubmittingId(null);
+      await loadEntries().catch(() => undefined);
     }
   }
 
@@ -329,10 +355,23 @@ export default function EmergencyTimesheet() {
               {invalid("note") && <p className="text-xs text-destructive">{t("emergency.errors.note")}</p>}
             </div>
             <div className="sm:col-span-2">
+              <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-md border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-primary"
+                  checked={form.submit}
+                  disabled={busy}
+                  onChange={(event) => setForm((current) => ({ ...current, submit: event.target.checked }))}
+                />
+                <span>
+                  <span className="font-semibold">{t("emergency.submitNow")}</span>
+                  <span className="block text-xs text-muted-foreground">{t("emergency.submitNowHint")}</span>
+                </span>
+              </label>
               <Button type="submit" className="h-11 w-full text-base font-semibold" disabled={busy}>
-                {busy ? t("common.saving") : t("emergency.create")}
+                {busy ? t("common.saving") : t(form.submit ? "emergency.createSubmit" : "emergency.create")}
               </Button>
-              <p className="mt-2 text-center text-xs text-muted-foreground">{t("emergency.draftNote")}</p>
+              <p className="mt-2 text-center text-xs text-muted-foreground">{t(form.submit ? "emergency.submitNote" : "emergency.draftNote")}</p>
             </div>
           </form>
         </CardContent>
@@ -366,11 +405,14 @@ export default function EmergencyTimesheet() {
                       <Badge variant={STATE_VARIANT[state] || "secondary"} className="uppercase tracking-wide">{t(`emergency.state.${state}`)}</Badge>
                       {state === "pending" && (
                         <>
-                          <Button type="button" size="sm" variant="outline" disabled={Boolean(remindingId || deletingId)} onClick={() => remind(entry)}>
+                          <Button type="button" size="sm" variant="secondary" disabled={Boolean(remindingId || deletingId || submittingId)} onClick={() => submitFor(entry)}>
+                            {submittingId === entry.id ? t("common.saving") : t("emergency.submitFor")}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" disabled={Boolean(remindingId || deletingId || submittingId)} onClick={() => remind(entry)}>
                             <BellRing className="mr-1 h-4 w-4" aria-hidden="true" />
                             {remindingId === entry.id ? t("common.saving") : t("emergency.remind")}
                           </Button>
-                          <Button type="button" size="sm" variant="outline" className="text-destructive" disabled={Boolean(remindingId || deletingId)} onClick={() => remove(entry)}>
+                          <Button type="button" size="sm" variant="outline" className="text-destructive" disabled={Boolean(remindingId || deletingId || submittingId)} onClick={() => remove(entry)}>
                             <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />
                             {deletingId === entry.id ? t("common.saving") : t("emergency.delete")}
                           </Button>

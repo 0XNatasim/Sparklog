@@ -79,5 +79,7 @@ export function buildCreateJobForEmployeeArgs(values, submissionKey) {
     // Only in the repeated hour; the database clears a choice anywhere else.
     p_depart_fold: repeatedHourFields(values).depart ? values.departFold : null,
     p_fin_fold: repeatedHourFields(values).fin ? values.finFold : null,
+    // true: the owner submits the sheet for the employee (0137), nothing left for the employee to confirm.
+    p_submit: Boolean(values.submit),
   };
 }

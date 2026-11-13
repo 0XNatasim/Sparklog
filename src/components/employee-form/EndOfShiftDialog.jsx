@@ -16,8 +16,14 @@ export default function EndOfShiftDialog({ t, step, onStep, busy, onClose, saveE
   const total = normalizeNumber(kmTotal) || 0;
   const returnKm = normalizeNumber(km);
   return (
-    <Dialog open={step !== "closed"} onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
-      <DialogContent className="max-w-md">
+    <Dialog open={step !== "closed"} onOpenChange={(open) => { if (!open && !busy && step !== "evidence") onClose(); }}>
+      {/* The overtime proof step has no « × », no outside click and no Escape: the employee gives the proof or taps « Je ne l'ai pas encore ». */}
+      <DialogContent
+        className="max-w-md"
+        hideClose={step === "evidence"}
+        onInteractOutside={step === "evidence" ? (event) => event.preventDefault() : undefined}
+        onEscapeKeyDown={step === "evidence" ? (event) => event.preventDefault() : undefined}
+      >
         {saveError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
             {saveError}
@@ -140,6 +146,17 @@ export default function EndOfShiftDialog({ t, step, onStep, busy, onClose, saveE
             <p className="text-sm text-muted-foreground">{t("form.day.submittedDescription")}</p>
             <DialogFooter>
               <Button type="button" onClick={onClose}>{t("common.ok")}</Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {step === "evidenceLater" && (
+          <>
+            <DialogHeader><DialogTitle>{t("form.evidence.laterTitle")}</DialogTitle></DialogHeader>
+            <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm font-medium text-warning" role="status">{t("form.evidence.laterDescription")}</p>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={onClose}>{t("common.ok")}</Button>
+              <Button type="button" onClick={day.onReview}>{t("form.evidence.laterGoHistory")}</Button>
             </DialogFooter>
           </>
         )}
