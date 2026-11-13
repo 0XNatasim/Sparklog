@@ -34,12 +34,33 @@ describe("ForemanReportsPanel", () => {
     expect(screen.getByRole("button", { name: fr("foremanNotes.export") })).toBeTruthy();
   });
 
-  it("returns the work sheet for correction after a confirmation", async () => {
+  it("returns the work sheet with an optional reason", async () => {
     setup([report()]);
     fireEvent.click(await screen.findByRole("button", { name: fr("foremanNotes.returnSheet") }));
-    fireEvent.click(await screen.findByRole("button", { name: fr("common.yes") }));
-    await waitFor(() => expect(state.fake.rpcCalls("return_job_for_correction")).toHaveLength(1));
-    expect(state.fake.rpcCalls("return_job_for_correction")[0].args).toEqual({ p_job_id: "j1", p_expected_updated_at: "2026-11-10T21:00:00Z" });
+    fireEvent.change(await screen.findByLabelText(fr("foremanNotes.returnReasonLabel")), { target: { value: "  Casque : précisez le nom  " } });
+    fireEvent.click(screen.getByRole("button", { name: fr("foremanNotes.returnConfirm") }));
+    await waitFor(() => expect(state.fake.rpcCalls("return_foreman_note_sheet")).toHaveLength(1));
+    expect(state.fake.rpcCalls("return_foreman_note_sheet")[0].args).toEqual({
+      p_report_id: "r1", p_expected_updated_at: "2026-11-10T21:00:00Z", p_reason: "Casque : précisez le nom",
+    });
+  });
+
+  it("returns it without a reason too", async () => {
+    setup([report()]);
+    fireEvent.click(await screen.findByRole("button", { name: fr("foremanNotes.returnSheet") }));
+    fireEvent.click(await screen.findByRole("button", { name: fr("foremanNotes.returnConfirm") }));
+    await waitFor(() => expect(state.fake.rpcCalls("return_foreman_note_sheet")).toHaveLength(1));
+    expect(state.fake.rpcCalls("return_foreman_note_sheet")[0].args.p_reason).toBeNull();
+  });
+
+  it("shows the other managers that a sheet was returned, by whom and why, until it is submitted again", async () => {
+    const returned = { returned_at: "2026-11-11T15:00:00Z", returned_by_name: "Marie", return_reason: "Date à vérifier" };
+    setup([report({ ...returned, job: { id: "j1", ot: "CONTREMAÎTRE", job_date: "2026-11-10", depart: "06:30:00", fin: "15:00:00", status: "updated" } })]);
+    expect(await screen.findByText(/Retournée par Marie/)).toBeTruthy();
+    expect(screen.getByText(/Date à vérifier/)).toBeTruthy();
+    cleanup();
+    setup([report({ ...returned })]);
+    expect(await screen.findByText(/Déjà retournée une fois, par Marie/)).toBeTruthy();
   });
 
   it("deletes the note alone, and offers no return for a sheet that is not submitted", async () => {

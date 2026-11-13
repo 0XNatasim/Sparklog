@@ -39,6 +39,11 @@ function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCapt
       <>
         <span>{manualEntry && <ManualEntryStar className="mr-0.5" />}<span className="text-success">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
         <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeCaptured, meal_claim_captured: j.meal_claim_captured || mealCaptured }} />
+        {foremanNote && foremanNote.returned_at && (j.status === "saved" || j.status === "updated") && (
+          <span className="inline-flex items-center rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning" title={t("foremanNotes.returnedBy", { name: foremanNote.returned_by_name || "—" })}>
+            {t("foremanNotes.returnedBadge")}
+          </span>
+        )}
         {foremanNote && <ForemanNoteIcon note={foremanNote} unread={foremanNote.unread} subtitle={`${employeeName} · ${j.ot} · ${dayjs(j.job_date).format("DD MMM")}`} onOpen={() => onNoteRead?.(foremanNote, j.id)} />}
         {dayOvertimeNoEvidence && (
           <span

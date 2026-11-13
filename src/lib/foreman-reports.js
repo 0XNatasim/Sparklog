@@ -70,20 +70,30 @@ export async function deleteForemanReport(client, id) {
   if (error) throw error;
 }
 
-// A manager returns the job of a note for correction: the foreman edits the job and its note.
-export async function returnReportedJob(client, job) {
+export const MAX_RETURN_REASON = 500;
+
+// A manager returns the work sheet of a note for correction, with an optional reason (0140): the foreman edits the job
+// and its note, and the other managers see that it was returned, by whom and why.
+export async function returnReportedJob(client, report, reason = "") {
   const { error } = await withTimeout(
-    client.rpc("return_job_for_correction", { p_job_id: job.id, p_expected_updated_at: job.updated_at || null }),
+    client.rpc("return_foreman_note_sheet", {
+      p_report_id: report.id,
+      p_expected_updated_at: report.job?.updated_at || null,
+      p_reason: String(reason ?? "").trim().slice(0, MAX_RETURN_REASON) || null,
+    }),
     12000,
   );
   if (error) throw error;
 }
 
+// The sheet of a note is « returned » from the return until the foreman submits it again.
+export const isNoteReturned = (note, jobStatus) => Boolean(note?.returned_at) && (jobStatus === "saved" || jobStatus === "updated");
+
 // The managers' list: newest first, each report with its author's name. Throws on a read error.
 export async function fetchForemanReports(client) {
   const { data, error } = await withTimeout(
     client.from("foreman_reports")
-      .select("id, user_id, job_id, report_date, audited_name, body, created_at, updated_at, job:jobs(id, ot, job_date, depart, fin, status, updated_at)")
+      .select("id, user_id, job_id, report_date, audited_name, body, created_at, updated_at, returned_at, returned_by_name, return_reason, job:jobs(id, ot, job_date, depart, fin, status, updated_at)")
       .order("created_at", { ascending: false })
       .limit(QUERY_BUDGETS.foremanReports),
     12000,

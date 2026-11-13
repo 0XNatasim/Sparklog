@@ -89,7 +89,7 @@ export default function History() {
     const ids = jobs.filter((j) => isForemanOt(j.ot)).map((j) => j.id);
     if (!ids.length) return undefined;
     let alive = true;
-    supabase.from("foreman_reports").select("job_id, audited_name, body, created_at").in("job_id", ids)
+    supabase.from("foreman_reports").select("job_id, audited_name, body, created_at, returned_at, returned_by_name, return_reason").in("job_id", ids)
       .then(({ data }) => { if (alive && data) setForemanNotes(new Map(data.map((row) => [row.job_id, row]))); })
       .catch(() => undefined);
     return () => { alive = false; };

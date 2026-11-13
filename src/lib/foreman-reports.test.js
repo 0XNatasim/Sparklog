@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 
-import { MAX_AUDITED_NAME, MAX_REPORT, cleanReport, filterReports, foremanReportsCsv, isForemanOt, isNoteUnread, saveJobNote } from "./foreman-reports";
+import { MAX_AUDITED_NAME, MAX_REPORT, cleanReport, filterReports, foremanReportsCsv, isForemanOt, isNoteReturned, isNoteUnread, saveJobNote } from "./foreman-reports";
 
 describe("foreman reports", () => {
   it("recognises the CONTREMAÎTRE work order, whatever the case or spaces", () => {
@@ -112,6 +112,31 @@ describe("note read state (0138)", () => {
     expect(sql).toContain("new.read_at := now()");
     expect(sql).toContain("new.updated_at := now()");
     expect(sql).toContain("grant update (read_at) on public.foreman_report_reads to authenticated");
+  });
+});
+
+describe("migration 0140", () => {
+  const sql = readFileSync(new URL("../../supabase/migrations/20261115120000_0140_foreman_note_return_reason.sql", import.meta.url), "utf8");
+  it("returns the sheet like return_job_for_correction, keeps who and why on the note, and does not turn it unread", () => {
+    expect(sql).toContain("public.get_my_role() <> 'manager'");
+    expect(sql).toContain("current_job.status <> 'submitted' or not current_job.locked");
+    expect(sql).toContain("set status = 'updated', locked = false");
+    expect(sql).toContain("return_reason = clean_reason");
+    expect(sql).toContain("returned_by_name = actor_name");
+    expect(sql).toContain("'job_returned_for_correction'");
+    expect(sql).toContain("char_length(btrim(return_reason)) between 1 and 500");
+    expect(sql).toContain("if new.body is distinct from old.body or new.audited_name is distinct from old.audited_name then");
+    expect(sql).toMatch(/grant execute on function public\.return_foreman_note_sheet\(uuid, timestamptz, text\) to authenticated/);
+  });
+});
+
+describe("isNoteReturned", () => {
+  it("is returned from the return until the sheet is submitted again", () => {
+    const note = { returned_at: "2026-11-11T15:00:00Z" };
+    expect(isNoteReturned(note, "updated")).toBe(true);
+    expect(isNoteReturned(note, "saved")).toBe(true);
+    expect(isNoteReturned(note, "submitted")).toBe(false);
+    expect(isNoteReturned({}, "updated")).toBe(false);
   });
 });
 

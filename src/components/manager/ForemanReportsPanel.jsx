@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
-import { deleteForemanReport, fetchForemanReports, fetchNoteReads, filterReports, foremanReportsCsv, isNoteUnread, markNoteRead, returnReportedJob } from "@/lib/foreman-reports";
+import { deleteForemanReport, fetchForemanReports, fetchNoteReads, filterReports, foremanReportsCsv, isNoteReturned, isNoteUnread, markNoteRead, MAX_RETURN_REASON, returnReportedJob } from "@/lib/foreman-reports";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 
@@ -28,6 +29,9 @@ export default function ForemanReportsPanel() {
   // This manager's readings (0138): { report id → read_at }. A note is unread for him until he opens it.
   const [reads, setReads] = useState(() => new Map());
   const [query, setQuery] = useState("");
+  // The note whose sheet is being returned, and the optional reason typed for it.
+  const [returning, setReturning] = useState(null);
+  const [returnReason, setReturnReason] = useState("");
 
   const [reloads, setReloads] = useState(0);
 
@@ -69,9 +73,16 @@ export default function ForemanReportsPanel() {
     await act(report, () => deleteForemanReport(supabase, report.id), "foremanNotes.deleted");
   }
 
-  async function giveBack(report) {
-    if (!(await confirm(t("foremanNotes.confirmReturn")))) return;
-    await act(report, () => returnReportedJob(supabase, report.job), "foremanNotes.returned");
+  function giveBack(report) {
+    setReturnReason("");
+    setReturning(report);
+  }
+
+  async function confirmReturn() {
+    const report = returning;
+    if (!report) return;
+    setReturning(null);
+    await act(report, () => returnReportedJob(supabase, report, returnReason), "foremanNotes.returned");
   }
 
   function exportCsv() {
@@ -124,6 +135,14 @@ export default function ForemanReportsPanel() {
               ) : (
                 <div className="text-xs text-muted-foreground">{t("foremanNotes.noSheet")}</div>
               )}
+              {report.returned_at && (
+                <div className={`rounded-md border px-3 py-2 text-sm ${isNoteReturned(report, job?.status) ? "border-warning/40 bg-warning/10 text-warning" : "border-muted bg-muted/40 text-muted-foreground"}`} role="status">
+                  <div className="font-semibold">
+                    {t(isNoteReturned(report, job?.status) ? "foremanNotes.returnedNow" : "foremanNotes.returnedBefore", { name: report.returned_by_name || "—", date: dayjs(report.returned_at).format("D MMM HH:mm") })}
+                  </div>
+                  {report.return_reason && <p className="mt-1 whitespace-pre-wrap">{t("foremanNotes.returnReasonShown", { reason: report.return_reason })}</p>}
+                </div>
+              )}
               {report.audited_name && <div className="text-sm"><span className="text-muted-foreground">{t("foremanNotes.audited")} : </span><b>{report.audited_name}</b></div>}
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{report.body}</p>
               <div className="flex flex-wrap justify-end gap-2">
@@ -139,6 +158,28 @@ export default function ForemanReportsPanel() {
           </Card>
         );
       })}
+      <Dialog open={Boolean(returning)} onOpenChange={(open) => { if (!open) setReturning(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("foremanNotes.returnTitle")}</DialogTitle>
+            <DialogDescription>{t("foremanNotes.returnHint")}</DialogDescription>
+          </DialogHeader>
+          <label className="block space-y-1 text-sm font-medium">
+            <span>{t("foremanNotes.returnReasonLabel")}</span>
+            <textarea
+              className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-base leading-relaxed shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={returnReason}
+              maxLength={MAX_RETURN_REASON}
+              placeholder={t("foremanNotes.returnReasonPlaceholder")}
+              onChange={(e) => setReturnReason(e.target.value)}
+            />
+          </label>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setReturning(null)}>{t("common.cancel")}</Button>
+            <Button type="button" onClick={confirmReturn}>{t("foremanNotes.returnConfirm")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {confirmDialog}
     </div>
   );
