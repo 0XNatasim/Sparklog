@@ -1,175 +1,22 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-11 (V2.4.257).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-13 (V2.4.258).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
-- 📋 **V2.4.257** : le **plan officiel de conformité** est écrit dans **`OFFICIEL.md`** (à la racine du dépôt). Il rassemble : les règles de la convention collective (résidentiel, art. 18.01 2) b : numéro d'employé seulement, données anonymisées et **conservées au Québec**, fournisseurs **certifiés**, **consentement exprès**, pas de géolocalisation en continu), la Loi R-20 (à valider) et la Loi 25 ; ce que Sparklog fait aujourd'hui (base aux États-Unis, beaucoup de renseignements) ; l'architecture visée en **deux côtés** (côté 1 = pointage par numéro, hébergé au Québec, ce dépôt ; côté 2 = noms et paie, **nouveau dépôt privé**) ; les changements à faire ; et un plan en 7 phases (P0 à P6). **Première étape pour vous (P0) :** un avis juridique / AECQ sur les points marqués « À VALIDER », nommer le responsable de la protection des renseignements, choisir l'hébergeur au Québec et lui demander ses certificats. Rien n'a changé dans l'app.
-- 📝 **V2.4.256** (note, rien n'a changé dans l'app) : **petite faille à fermer plus tard** sur les notes de contremaître. Un contremaître qui sait faire une requête à la main pourrait créer **sa propre note** avec une fausse étiquette « Retournée par … » (et une fausse raison). Effet : une étiquette trompeuse sur sa note, rien d'autre (il ne touche ni aux fiches, ni aux heures, ni à la paie, et le journal d'audit n'est pas faussé). **Solution prête :** une petite migration qui vide ces quatre champs à chaque ajout par un contremaître (seule la fonction de retour du gestionnaire pourra les remplir) + un test. Faible risque ; à faire quand vous voulez.
-- ✅ **V2.4.255** : **retourner la fiche d'un contremaître avec une raison**. Dans Notes › Contremaître, « Retourner la fiche » ouvre une fenêtre où vous pouvez écrire une **raison** (facultative). La note garde **qui** a retourné la fiche, **quand** et **pourquoi** : les autres gestionnaires voient une étiquette **« Retournée »** sur la fiche (et « Retournée par … » dans la note), et le contremaître lit la raison sur sa fiche (icône bleue dans Historique). L'étiquette disparaît quand le contremaître soumet de nouveau sa fiche (la note garde « Déjà retournée une fois… »). **À faire :** appliquer la migration **0140** avant de fusionner le code.
-- ✅ **V2.4.254** : **soumettre une fiche d'urgence pour un employé**. Dans « Feuille de temps d'urgence », une case **« La soumettre pour l'employé »** crée la fiche **déjà soumise** : l'employé n'a rien à confirmer et ne reçoit aucun message ; elle va directement à votre révision (pratique pour quelqu'un qui part, même si son compte est déjà en pause). Une fiche en brouillon que l'employé n'a pas confirmée a aussi un bouton **« Soumettre pour l'employé »**. Dans ce cas la preuve de temps supp. et les captures d'inventaire ne sont pas exigées (seul l'employé peut les fournir) ; l'action est gardée au Journal à votre nom. **À faire :** appliquer la migration 0137 (dites-moi, ou collez-la dans le SQL Editor) **avant** de fusionner le code. Dans la même version : **(1)** l'icône de note du contremaître sur les fiches est **plus grosse**, **rouge tant que vous ne l'avez pas ouverte, bleue ensuite** (chaque gestionnaire a son propre état : si un la lit, elle reste rouge pour l'autre ; une note modifiée plus tard redevient rouge) ; le contremaître la voit toujours **bleue** sur ses fiches dans Historique, pour référence. **(2)** La fenêtre de la preuve de temps supp. n'a **plus de petit « × »** (ni clic à côté, ni Échap) : l'employé fournit la preuve ou appuie sur **« Je ne l'ai pas encore »**, qui enregistre la fiche en brouillon (**pas soumise**) et dit de fournir la preuve aujourd'hui. **(3)** Dans « Cette semaine » (snapshot), les journées enregistrées au-delà du seuil **sans preuve** ont un **contour rouge** autour de leur tuile. **(4)** Un employé avec **« 4 jours de 10 h »** n'a **plus aucun souper** (la règle du souper à 12 h 15 est retirée), et le contour rouge du snapshot compte le **temps payé** (le premier déplacement non payé est retiré) et utilise **10 h** pour ces employés. **À faire :** appliquer aussi les migrations **0138** (notes lues / non lues) et **0139** (pas de souper pour « 4 jours de 10 h »).
-- ✅ **V2.4.253** : **la note du contremaître suit la fiche de travail**. Quand l'OT est « CONTREMAÎTRE », le contremaître peut joindre une note **facultative** à sa fiche (bouton « Notes du contremaître » puis « Joindre à la fiche ») ; elle part avec la fiche quand il enregistre, et il peut la corriger tant que la fiche est modifiable (par exemple après un retour pour correction). Dans Notes › Contremaître, chaque note montre sa fiche (OT, date, heures, état) ; vous pouvez **retourner la fiche** au contremaître, **supprimer la note** seule, ou **exporter** toutes les notes en fichier **CSV**. Supprimer la fiche supprime aussi sa note. Sur la fiche de travail que vous révisez (Temps › Feuilles de temps), la note apparaît comme une **petite icône cliquable** (presse-papier) à côté de l'OT : un clic ouvre le texte. **Les anciennes notes** sont rattachées par la migration à la fiche CONTREMAÎTRE du même contremaître le même jour (deux notes pour une même fiche sont fusionnées en une, la plus ancienne d'abord) : en retournant la fiche pour correction, le contremaître retrouve sa note et peut la modifier. Une ancienne note sans fiche ce jour-là reste telle quelle, sans fiche. **À faire :** appliquer la migration 0136 (dites-moi, ou collez-la dans le SQL Editor) **avant** de fusionner le code. Les anciennes notes (sans fiche) restent telles quelles.
-- ✅ **V2.4.252** : le **8 h minimum du contremaître** est maintenant visible dans « Cette semaine » (snapshot) : un jour de semaine sous 8 h travaillées affiche **« min. 8 h »** sous les heures, et le total de la semaine ajoute **« Payé … (min. 8 h/jour) »**. Les heures travaillées restent affichées telles quelles (2 h = 2 h) ; c'est un affichage, la paie (talons, Calcul, export Google) appliquait déjà le minimum. Rien à faire de votre côté, aucune migration.
-- ✅ **V2.4.251** : en **« Voir comme l'employé »**, la page Historique affiche maintenant les mêmes boutons que l'employé (Ouvrir, Supprimer, Soumettre, Soumettre la journée), mais **grisés** : on les voit, on ne peut pas appuyer. Rien à faire de votre côté, aucune migration.
-- ✅ **V2.4.250** : fenêtre « Retour facturable ? » : le texte est maintenant « Y a-t-il du temps et du kilométrage de retour à facturer ? » et la liste du temps de retour commence par **0 min** (pour un retour avec des km mais sans temps à facturer). Rien à faire de votre côté, aucune migration.
-- ✅ **V2.4.249** : (1) la fenêtre de fin de journée demande maintenant **« Retour facturable ? »** (« Y a-t-il du temps et du kilométrage de retour à facturer (entrepôt, maison ou ailleurs) ? ») au lieu de « Retour à l'entrepôt ? », pour que ceux qui rentrent chez eux répondent aussi correctement ; (2) une fiche avec le **même départ et la même fin** (ex. 6 h 30 → 6 h 30) est refusée dès l'enregistrement (« Heures invalides ») : avant, elle s'enregistrait comme une fiche de 24 h et bloquait la soumission de la journée. Rien à faire de votre côté, aucune migration.
-- ✅ **V2.4.248** : **rouvrir une journée pour tout le monde**. Dans l'écran « Rouvrir une journée », la liste des employés commence maintenant par **« Tous les employés »** : un seul clic rouvre la journée choisie pour tous les employés actifs (l'app demande une seule fois si vous voulez aussi retourner pour correction les fiches déjà soumises). Un bouton **« Tout refermer »**, au-dessus de la liste des journées rouvertes, les referme toutes d'un coup (avec une confirmation). Rien à faire de votre côté, aucune migration.
-- ✅ **V2.4.247** : si un employé met le même départ et la même fin (ex. 6 h 30 → 6 h 30), l'app disait à tort que sa fiche chevauchait la première. Elle affiche maintenant « Heures invalides » : une fiche doit durer au moins 1 minute (ex. 6 h 29 → 6 h 30). Aucune règle de paie changée, rien à faire.
-- ✅ **V2.4.246** : nouvelle règle de temps **« 4 jours de 10 h »**. Dans la fiche d'un employé (Équipe › Employés › fiche › Paie et options), cochez **« 4 jours de 10 h »** : son temps supplémentaire commence alors après **10 h** de travail dans la journée au lieu de 8 h. La preuve de temps supp. est demandée après 10 h, et le souper après 12 h 15. Les autres règles (taux, samedi, dimanche, fériés) ne changent pas. Fonctionne pour tous les employés ; pas pour les sous-traitants ni les contremaîtres. **À décider :** une 5e journée dans la semaine (les 40 h) et un férié en semaine. La migration 0135 est appliquée dans votre base (2026-11-11). **À faire :** redéployer `classify_week` (moteur 2.9.0), puis cocher la case pour Sabrina.
-- ✅ **V2.4.245** : rien de nouveau à l'écran. Les 3 présentations des rencontres d'équipe (consignes générales, pause sécurité, non-conformités) sont rangées en PDF dans `docs/governance/reunions-securite/`. Les photos viennent de chantiers : le dépôt est public, à retirer si un client est reconnaissable.
-- ✅ **V2.4.244** : rien de nouveau à l'écran. Le fichier de la migration 0134 (notes du contremaître) retire aussi les droits par défaut de Supabase sur la table, comme c'est déjà fait dans votre base. Rien à faire.
-- ✅ **V2.4.243** : **notes du contremaître**. Quand un contremaître choisit l'OT **CONTREMAÎTRE**, le bouton « Remplir auto » devient **« Notes du contremaître »** : il écrit un petit rapport (nom de l'employé audité, facultatif, et un texte) qui part à la gestion. Vous les lisez dans **Gestion › Notes › Contremaître** (vos notes habituelles sont dans l'onglet « Mes notes »). Un rapport envoyé ne peut plus être modifié ni supprimé, et le contremaître ne voit que les siens. **À faire :** appliquer la migration 0134 avant de déployer le code.
-- ✅ **V2.4.242** : la feuille Google connaît maintenant le **contremaître**. Une nouvelle colonne **« Minimum 8 h (min) »** (ajoutée toute seule) complète une journée de semaine à 8 h sur la 1re fiche du jour, et « Heures payées » en tient compte. Pas de complément le samedi, le dimanche ni les fériés. **À faire :** recoller le script `apps-script-doPost.js` dans Google (Déployer › Gérer les déploiements › Modifier › Nouvelle version) et redéployer la fonction `push_approved_batch`.
-- ✅ **V2.4.241** : nouveau rôle **Contremaître**. Dans la fiche de l'employé (Équipe › Employés › fiche), le propriétaire choisit le rôle « Contremaître ». Cette personne est **payée au moins 8 h dès qu'elle travaille une journée de semaine** ; au-delà de 8 h, le temps supplémentaire compte comme pour les autres et la **preuve de temps supp. est exigée** comme pour les autres. Pas de temps de retour ni de premier trajet non payé. Dans sa feuille de temps, plus d'étoile rouge « fait à la main » et la capture des ordres de travail n'est plus obligatoire (elle peut quand même en déposer une comme preuve). Dans le menu du numéro d'OT, il y a maintenant le choix **CONTREMAÎTRE**. **À faire :** appliquer la migration 0133 avant de déployer le code, redéployer `push_approved_batch` et `classify_week` (nouveau moteur 2.8.0), et ajuster le script Google (la feuille Google ne connaît pas encore le rôle : voir CLAUDE §6).
-- ✅ **V2.4.240** : nouvelle case dans la fiche de l'employé (Équipe › Employés › fiche › Avantages) : **« Km saisis à la main (pas exigés sur la capture) »**. À cocher pour un employé dont le téléphone est trop petit pour montrer les km dans la même capture que les heures (ex. : un nouvel iPhone). Pour lui, des km absents de la capture ne bloquent plus l'enregistrement : il tape les km lui-même (le champ reste obligatoire). Pour tous les autres, rien ne change. Fermer et rouvrir l'application pour recevoir la mise à jour.
-- ✅ **V2.4.239** : quand tu prépares le **rapport mensuel CCQ d'octobre** (Gestion › Rapport CCQ, mois = octobre), un encadré te rappelle d'**ajouter la cotisation annuelle de base à l'AECQ** au paiement (240 $ avant taxes en 2026, 245 $ en 2027). La CCQ la facture à part : site de la CCQ › État de compte › Factures manuelles. Sparklog ne la paie pas et ne l'ajoute pas au fichier : c'est un rappel. Fermer et rouvrir l'application pour recevoir la mise à jour.
-- ✅ **V2.4.238** : le rappel d'un congé (une semaine avant) s'affiche maintenant en **bandeau sur toutes les pages**, comme celui de la mise à jour, avec un bouton **OK**. Quand l'employé clique OK, le bandeau ne revient plus pour ce congé. L'OK est gardé dans le navigateur de l'appareil : sur un autre appareil, le bandeau s'affichera encore une fois. La carte « Calendrier CCQ » reste dans le Profil. Fermer et rouvrir l'application pour recevoir la mise à jour.
-- ✅ **V2.4.237** : dans l'onglet **Profil**, les employés voient maintenant une carte **« Calendrier CCQ »** avec les prochains congés fériés et les vacances de la construction (les dates viennent de la liste déjà en place, rien à saisir). Une semaine avant un congé, un **bandeau** apparaît en haut du Profil (« commence dans 7 jours »). Pas de notification sur le téléphone pour l'instant : seulement ce bandeau quand l'employé ouvre son Profil. Fermer et rouvrir l'application pour recevoir la mise à jour.
-- ✅ **V2.4.236** : tu peux maintenant entrer une date d'embauche **passée** (ex. le 2 novembre) dans la fiche de l'employé, au choix « Nouvel(le) employé(e) ». Avant, seules les dates d'aujourd'hui ou à venir étaient acceptées. Une date passée s'enregistre dans « Date d'embauche ». Fermer et rouvrir l'application pour recevoir la mise à jour.
-- ✅ **V2.4.235** : le message rouge « ordre de travail Field Service incomplet » ne revient plus d'un ancien brouillon : il n'apparaît que juste après une capture lue pendant la session en cours. Une fiche saisie à la main n'est jamais bloquée, même si l'OT est tapé (ex. « FORMATION HILO »). Fermer et rouvrir l'application pour recevoir la mise à jour.
-- ✅ **V2.4.234** : la case **KM** de la fiche est maintenant **vide** (plus de « 0 » gris qui faisait croire qu'elle était remplie). Elle reste **obligatoire** : taper 0 s'il n'y a pas de km.
-- ✅ **V2.4.233** : une fiche **avec un OT de la liste (formation, etc.)** ne peut plus être bloquée par le message rouge « ordre de travail Field Service incomplet ». Ce message restait collé dans le brouillon après un ancien essai de capture. Il faut seulement taper **0** dans KM si la case est vide (le 0 gris est un exemple, pas une valeur).
-- ✅ **V2.4.232** : dans **Équipe › Employés**, quand tu choisis **« Nouvel(le) employé(e) »**, le **premier jour de travail peut maintenant être aujourd'hui**
-  (avant, il fallait demain ou plus tard). Si c'est aujourd'hui, la personne est tout de suite dans Équipe en direct et la vue semaine ; la date est gardée
-  comme date d'embauche. Rien d'autre à faire.
-- ✅ **V2.4.231** : dans la feuille de temps, l'encadré rouge **« À vérifier avant d'approuver »** peut maintenant être **replié** d'un clic sur son titre
-  (il reste replié la prochaine fois). Chaque alerte a un bouton **« J'ai vu »** qui la fait disparaître : pratique pour les formations où deux employés sont
-  sur le même OT. Si une autre job utilise plus tard ce même OT, l'alerte revient toute seule. Un lien **« Réafficher les alertes vues »** les ramène. C'est
-  retenu **dans ce navigateur seulement** (sur un autre appareil il faut recliquer) ; ça ne change rien aux jobs ni à l'approbation. Même chose dans « À traiter ».
-- ✅ **V2.4.230** : à l'inscription et au changement de mot de passe, le message d'erreur dit maintenant **la vraie raison** (il manque une minuscule, une
-  majuscule, un chiffre ou un symbole ; trop court ; ou mot de passe connu dans une fuite). La règle est écrite sous le champ, et l'ancien message
-  **disparaît dès qu'on modifie un champ**. Rien à faire de ta part.
-- ✅ **V2.4.229** : la **politique de confidentialité** est préparée : `docs/governance/politique-confidentialite.md`. Elle dit en mots
-  simples ce que l'app garde sur les employés, pourquoi, qui y a accès, où c'est hébergé (États-Unis, donc à signaler), combien de
-  temps, comment protéger, comment demander à voir ou corriger ses renseignements (réponse en 30 jours), et quoi faire en cas
-  d'incident. **À faire :** remplir les passages entre crochets (surtout **la personne responsable**, **les durées de conservation**
-  à confirmer avec la comptable et **les fournisseurs**), faire relire par un conseiller, puis publier sur le site de l'entreprise.
-- ✅ **V2.4.228** : le point « coller le `doPost` dans Google » est retiré (fait le 2 novembre). Nouvelle section **« Loi 25 »** plus bas :
-  ce que la loi demande, ce que l'app fait déjà, et la liste de ce qui reste à faire pour être en règle (personne responsable,
-  politique de confidentialité, registre d'incidents, hébergement hors Québec, durées de conservation).
-- ✅ **V2.4.227** : une **lettre de consentement** pour utiliser Sparklog comme punch est dans `docs/governance/consentement-sparklog-punch.md`.
-  **À faire :** remplir les passages entre crochets, vérifier les renvois à l'AECQ et à l'Annexe N contre le texte officiel, puis la faire signer
-  à chaque employé.
-- ✅ **V2.4.225** : dans **Équipe › Employés**, la fiche d'un employé **te guide** : chaque champ obligatoire encore vide a un **contour
-  rouge** et la mention « à remplir », l'onglet qui le contient affiche un **nombre rouge**, et le bandeau rouge en haut liste les champs :
-  **un clic dessus ouvre le bon onglet**. Une fiche complète n'a plus rien de rouge. Rien d'autre à faire que de remplir les champs.
-- ✅ **V2.4.224** : nouvel onglet **Gestion › Configuration › Barèmes annuels**. C'est ici que **tu** entres, chaque janvier, les
-  chiffres officiels de l'année : RRQ, assurance-emploi, RQAP, paliers d'impôt (fédéral et Québec), FSS, Normes du travail et
-  FDRCMO. L'écran part de l'année précédente, **te montre tous les changements avant d'enregistrer** et refuse un barème qui ne
-  tient pas debout (un maximum qui ne correspond pas à son taux, des paliers dans le désordre). Si tu n'as rien saisi pour
-  l'année en cours, le talon utilise le barème précédent et **l'écrit dans ses avertissements**. Une **pastille** sur
-  Configuration apparaît 4 semaines avant le 1er janvier. **À faire avant le 1er janvier 2027** : saisir le barème 2027 avec les
-  documents officiels (TP-1015.F, T4127, avis de la CCQ) ; à valider avec ta comptable.
-- ✅ **V2.4.223** : **rappel avant un changement de taux**. Quand un taux dont on connaît la date change dans les 4 semaines
-  (la taxe MÉDIC le 1er janvier 2027, la prime MÉDIC le 25 avril 2027, ou un changement que tu as ajouté), une **pastille** apparaît
-  sur **Configuration** dans le menu, et l'onglet **Taux** dit quel taux, quelle nouvelle valeur et quelle date. Trois étapes :
-  4 semaines, 2 semaines, dernière semaine ; la pastille disparaît le jour du changement. **À faire** : quand elle apparaît,
-  vérifier que la valeur annoncée est la bonne.
-- ✅ **V2.4.222** : nouvel onglet **Gestion › Configuration › Taux**. Quand un taux de paie change (prime MÉDIC et sa taxe,
-  prélèvement CCQ, caisse d'éducation, cotisation retraite, avantages sociaux patronaux), **tu l'ajoutes toi-même** avec la date
-  où il commence : plus besoin de passer par le code. Les semaines avant cette date gardent l'ancienne valeur. **Toi seule**
-  peux modifier (avec le code à deux étapes) ; les gestionnaires voient seulement. Les salaires par niveau n'y sont pas : ils
-  suivent déjà les taux de la CCQ tout seuls. Tant que tu n'ajoutes rien, rien ne change. **À faire** : quand la CCQ annonce un
-  nouveau taux, l'ajouter ici avec sa date et la source en note.
-- ✅ **V2.4.221** : la **taxe sur la prime d'assurance MÉDIC** (retenue sur la paie) passe de **9 % à 9,975 %** au **1er janvier 2027**,
-  comme la CCQ l'a annoncé le 28 octobre. L'application change de taux toute seule : 9 % jusqu'à la paie du 26 décembre 2026,
-  9,975 % à partir de la semaine du 3 janvier 2027. Rien à faire de ton côté. Rien à confirmer pour la
-  semaine du jour de l'An : c'est le congé de la construction, sans heures travaillées.
-- ✅ **V2.4.220** : plus de **pastille sur « Registre d'accidents » dans le menu de gauche**. Un accident pas terminé garde sa
-  pastille orange **« Ouvert »** à l'intérieur de la page (et le filtre « Ouverts (n) ») tant que tu n'as pas cliqué « Fermer le dossier ».
-- ✅ **V2.4.219** : une **alerte rouge pour les gestionnaires** dans « À traiter » et dans « Justificatifs » : « N justificatif(s) pas
-  encore téléchargé(s) ont 21 jours ou plus », avec le détail (temps supp / stationnement) et le nombre de jours avant que le plus
-  pressé soit supprimé. Elle compte aussi ceux qui seront supprimés dans 3 jours ou moins, même si le délai de conservation est
-  plus court. Elle disparaît dès que tout est téléchargé.
-- ✅ **V2.4.218** : **Télécharger les justificatifs** se choisit maintenant **une semaine à la fois** (la plus récente est déjà
-  choisie). Le fichier s'appelle **« justificatifs Sem43 »** (numéro de la semaine) et contient **deux dossiers** :
-  « Stationnement » et « Temps supp ». Ce qui est déjà téléchargé n'est pas redonné si tu refais la même semaine. Si une semaine
-  a plus de 100 photos, il y a plusieurs fichiers (« - partie 2 », etc.).
-- ✅ **V2.4.217** : deux documents Hilo sont rangés dans `docs/reference/` pour les retrouver facilement : le texte de la
-  **formation Hilo et Field** (installateurs, 20 août 2024) avec son **PDF complet** (109 pages) à côté, et le PDF
-  **« Explications des Défis Hilo »** (7 pages : ce qu'est un défi, ce que fait chaque appareil, les 3 niveaux, quoi dire au
-  client). Rien ne change dans l'application.
-- ✅ **V2.4.216** : **noms officiels des appareils** de l'inventaire. Fini les noms déformés (« E- Contrôleur… », « Module d'expansion
-  pour pla », points devant le nom) : chacun des 17 appareils connus s'affiche toujours avec son nom de ta liste, partout
-  (listes, comparaison, minimums, alertes, écran de l'employé), y compris pour les anciens jours (migration 0128). Un appareil
-  inconnu garde le nom lu. Si un nom de ta liste change un jour, il se change dans `equipment_names.js`.
-- ✅ **V2.4.215** : étape **Inventaire** de l'employé. (1) Quand **aucune ligne n'a pu être lue** (« Photos seulement »), l'employé
-  reçoit maintenant le message de reprendre ses captures ou d'en ajouter une (puis « Continuer quand même »). Avant, seul « il
-  manque des lignes » était demandé. (2) L'application **note ce que l'employé a vu** en quittant l'étape (lecture, lignes
-  manquantes, s'il a passé outre) pour pouvoir répondre « a-t-il eu le message ? ».
-- ✅ **V2.4.214** : dans le **Sommaire imprimable**, le détail d'un **sous-traitant** sépare maintenant le **retour du
-  régulier** (avant, le retour était ajouté au régulier et la colonne Retour restait vide). Le total ne change pas.
-  Les employés CCQ sont inchangés.
-- ✅ **V2.4.213** : pour les **sous-traitants**, la colonne « Retour (sans av. soc.) » devient simplement **« Retour »** : le
-  nombre d'heures de retour. C'est le cas dans le rapport (Sommaire, fiche de chaque sous-traitant) et dans la vue semaine ;
-  le tableau « Sous-traitants » a aussi une colonne Retour, donc Régulier + 1,5× + 2× + Retour = Total.
-- ✅ **V2.4.212** : dans « À traiter », **« Pas soumis »** regarde d'abord la veille ; si tout le monde a soumis, il regarde
-  l'avant-veille, et ainsi de suite **jusqu'au lundi de la semaine courante**. Il montre le jour le plus récent où il manque
-  encore quelqu'un (la date est dans le titre) et le rappel vise ce jour-là. Le lundi, comme avant : seulement le vendredi.
-- ✅ **V2.4.211** : stock minimum, **une seule notification par entrepôt**. Le chiffre sur « Inventaire » (et sur le bouton
-  « Minimums par entrepôt ») compte les entrepôts qui ont au moins un appareil sous le minimum, plus les avis de stock négatif.
-  La carte rouge liste chaque entrepôt avec ses appareils bas **en rouge** (en stock · minimum).
-- ✅ **V2.4.210** : dans « Télécharger les justificatifs », on choisit une **plage de semaines** (« De la semaine » / « À la
-  semaine », dimanche → samedi) au lieu de dates. Pas de soupers : il n'y a pas de photo pour ça.
-- ✅ **V2.4.209** : les **photos de reçus de stationnement** sont gardées **le même nombre de jours que les captures de temps
-  supplémentaire** (le réglage de Configuration › Paramètres, 30 jours). Seules les photos sont retirées : le montant et
-  l'approbation restent. Dans **Justificatifs**, un bouton **« Télécharger les justificatifs »** : on choisit la période et
-  ce qu'on veut (temps supplémentaire, stationnement), et on reçoit un fichier ZIP (nom : jour, employé, OT). L'application
-  retient ce qui est déjà téléchargé : en retélécharger plus tard ne redonne que les nouveaux (case « Inclure ceux déjà
-  téléchargés » pour tout reprendre). Les photos restent dans l'application jusqu'à la fin des 30 jours. Le nettoyage automatique
-  supprime les reçus de plus de 30 jours : télécharge ce que tu veux garder avant.
-- ✅ **V2.4.208** : les OT prédéfinis sont dans **la même case que l'OT** : une petite flèche à droite de la case ouvre la
-  liste ; on choisit, ça s'écrit dedans, ou on tape un numéro comme avant. Aussi, le script du **Google Sheet** applique
-  maintenant la règle des 65 km (premier trajet payé). Le bouton **« Inventaire du crew »** est retiré de la page Inventaire. (Le script Google a été mis à jour et redéployé le 2 novembre 2026.)
-- ✅ **V2.4.207** : **premier trajet non payé, mais payé dès 65 km**. Pour un employé qui a l'option « premier trajet non payé »,
-  le premier trajet de la journée est maintenant **payé si la première fiche de la journée fait 65 km ou plus** (65 compte). En
-  dessous de 65 km, il reste non payé. Depuis le 11 octobre. Le moteur de paie, le souper et l'exigence de la capture
-  d'écran de temps supplémentaire suivent la même règle. La règle n'a pas encore été signée par
-  un spécialiste de la paie.
-- ✅ **V2.4.206** : des **OT prédéfinis**. Sous le champ OT de la fiche de temps, un menu « Ou choisir un OT prédéfini… » :
-  PAUSE SÉCURITÉ, FORMATION HILO EMBAUCHE, FORMATION BRITTON, FORMATION HQ, OK KARINE. On choisit, le nom s'écrit tout seul
-  dans le champ OT ; pour un vrai numéro d'OT, on le tape comme avant. La liste se gère dans **Configuration › OT
-  prédéfinis** (ajouter, renommer, monter / descendre, masquer, retirer).
-- ✅ **V2.4.205** : dans « Cette semaine » / « Semaine passée », un **filtre de semaine** en haut (menu déroulant et flèches ◀ ▶) :
-  on choisit parmi les 13 dernières semaines (« Semaine 44 · 18 oct → 24 oct »). Les deux boutons ouvrent la même fenêtre,
-  sur la semaine courante ou la semaine passée ; le filtre permet d'aller plus loin. Le titre devient « Snapshot de la semaine ».
-- ✅ **V2.4.204** : « Cette semaine » et « Semaine passée » sont plus **compactes**. Le **samedi et le dimanche** n'apparaissent
-  que si quelqu'un a une fiche ces jours-là. Dans chaque carré, les heures et les km sont sur **une seule ligne**. À droite,
-  le total et les km sont ensemble, avec une seule petite ligne : « payé 16h15 · arr. +1 · cpt +1 » (arr. = arrondi de la
-  semaine, cpt = compteur, en minutes ; une note sous le tableau l'explique).
-- ✅ **V2.4.203** : le **chiffre** à côté d'« Inventaire » dans le menu est expliqué. Il additionne les avis de stock négatif
-  et les appareils **sous leur minimum** (le survol de la pastille le dit). En haut de la page Inventaire, une ligne rouge
-  donne le détail : « 8 appareils sous le stock minimum — Entrepôt Rimouski (8) », avec un lien. La page Minimums par
-  entrepôt liste chaque appareil sous son minimum, avec son stock, tout en haut.
-- ✅ **V2.4.202** : le bouton **« Entrepôt »** de la page Inventaire est retiré. Les **Minimums par entrepôt** le remplacent :
-  le total de chaque appareil par entrepôt, à côté de son minimum, est dans Inventaire › Minimums par entrepôt. Le bouton
-  « Équipe » (total de toute l'équipe) reste.
-- ✅ **V2.4.201** : l'**arrondi** est visible. Dans « Cette semaine » et « Semaine passée », sous le total de chaque
-  employé : « payé 39h45 » (arrondi au 15 minutes), puis « arrondi −7 min · compteur −7 min ». Le * veut dire qu'un
-  brouillon n'est pas compté. Les carrés restent à la minute (le temps saisi). Dans **Paie de la semaine**, une colonne
-  « Arrondi » donne l'écart de la semaine et le compteur à la fin de la semaine, à côté des heures déjà arrondies.
-- ✅ **V2.4.200** : dans le **Registre d'accidents**, chaque dossier accepte des **fichiers** : photos, PDF, Word, Excel,
-  texte (10 Mo chacun, 20 au plus). Bouton « Ajouter des fichiers » dans le dossier ; pour un nouveau dossier, les fichiers
-  choisis partent quand on enregistre. On clique un fichier pour l'ouvrir, la corbeille le retire (avec confirmation).
-  Seuls les gestionnaires les voient ; le Journal note chaque ajout et chaque retrait.
-- ✅ **V2.4.199** : dans Inventaire, le bouton **« Minimums par entrepôt »** ouvre sa propre page : la liste des
-  entrepôts, avec **Oui / Non** (« Compter cet entrepôt ? »). Non = on n'ira pas plus loin avec cet entrepôt. Oui = la
-  liste des appareils avec le **minimum** (ratio par employé × employés du groupe) et, à côté, le **total des
-  inventaires** des employés de l'entrepôt ; en rouge, ce qui est sous le minimum. Seuls les entrepôts à « Oui » donnent
-  l'alerte. Les 74 minimums du tableau de Karine sont déjà saisis. Alma, Charlevoix et Rimouski sont à « Oui ».
-- ✅ **V2.4.198** : **stock minimum par entrepôt**. Dans Inventaire, bouton « Minimums » : choisissez l'entrepôt (un groupe),
-  un appareil et un **ratio par employé** (ex. 0,5 thermostat par employé). Le minimum = ratio × nombre d'employés du
-  groupe. Si le stock des derniers inventaires passe sous le minimum, l'appareil s'affiche en rouge en haut de la page
-  Inventaire et la pastille d'Inventaire s'allume. Vérifier que chaque entrepôt est bien un groupe avec ses employés (Équipe › Groupes).
-- ✅ **V2.4.197** : nouveau **Registre d'accidents** (menu Équipe, gestionnaires seulement). « Nouveau dossier » : date,
-  la personne, la gravité, ce qui s'est passé, les soins, les jours perdus, le numéro CNESST, les mesures correctives.
-  Un dossier se ferme (ou se rouvre), il ne s'efface jamais. Le menu affiche le nombre de dossiers ouverts. Les employés
-  ne le voient pas.
-- ✅ **V2.4.196** : les carrés « Cette semaine » / « Semaine passée » montrent les km du jour sous les heures. La feuille
-  manuelle du gestionnaire demande les km (**0 est accepté, vide non**). Le Sommaire (et son impression) sépare le temps
-  régulier et le temps supplémentaire des sous-traitants en colonnes différentes.
+### À faire maintenant (par vous)
+
+- [ ] **Conformité (convention collective, Loi R-20, Loi 25) — étape P0 de `OFFICIEL.md`** : un **avis juridique / AECQ** sur les points marqués « À VALIDER » ; **nommer le
+  responsable** de la protection des renseignements ; **choisir l'hébergeur au Québec** et lui demander ses certificats (ISO 27001, SOC 2 Type 1 et 2, ou « Cybersécuritaire Canada »).
+  Ensuite on commence la P1 (consentement exprès, avis à l'employé pour la feuille d'urgence, politique de confidentialité).
+- [ ] **Redéployer `classify_week`** (moteur 2.10.0, aucun changement de calcul, seulement le numéro de version affiché) et, si ce n'est pas fait, **recoller le script Google**
+  `apps-script-doPost.js` (colonne « Minimum 8 h (min) » du contremaître : Déployer › Gérer les déploiements › Modifier › Nouvelle version).
+- [ ] **Petite faille à fermer quand vous voulez** (faible risque) : un contremaître qui sait faire une requête à la main pourrait créer **sa propre note** avec une fausse étiquette
+  « Retournée par … ». Effet : une étiquette trompeuse, rien d'autre (ni fiches, ni heures, ni paie, ni journal). **Solution prête** (détail dans `CLAUDE.md` §6.3) : une petite migration + un test.
+- [ ] **À décider** (règle « 4 jours de 10 h ») : une 5e journée dans la semaine (les 40 h) et un férié en semaine.
+- [ ] **À confirmer** (règle du contremaître) : le minimum de 8 h seulement du lundi au vendredi, sans complément le samedi, le dimanche ni les fériés.
 
 - 🔴 **À faire en premier : la paie des semaines 43 et 44.** La semaine 43 (11 au 17 octobre) est la **première payée
   par Sparklog**. Au 2026-11-01, pour les semaines 43 et 44 ensemble (11 au 24 octobre) : 745 fiches soumises mais pas approuvées
