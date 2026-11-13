@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.255)
+## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.257)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.257 (technique).** Documentation seulement : `OFFICIEL.md` (racine) = plan directeur de conformité (convention collective résidentiel art. 18.01 2) b, Loi R-20 à valider, Loi 25) : exigences C1–C16 / L1–L9, inventaire des données (base Supabase `us-west-2`, 8 buckets, OCR.space, Google Apps Script, Resend / Brevo, Web Push), écarts E1–E14, architecture cible en deux côtés (côté 1 = ce dépôt allégé, pointage par `employee_number`, hébergé au Québec ; côté 2 = nouveau dépôt **privé** `sparklog-gestion`, noms / paie), modifications M1–M13 et H1–H6, phases P0–P6, matrice de traçabilité, décisions D1–D7. Aucun code ni migration. Les PR de conformité cochent ses cases et mettent à jour sa section 10.
+
+**V2.4.256 (technique).** Documentation seulement : le point ouvert de §6.3 « Fermer le faux « Retournée par » » est noté ; aucun code ni migration.
 
 **V2.4.255 (technique).** Retour d'une fiche de contremaître avec raison. Migration 0140 : `foreman_reports.returned_at / returned_by / returned_by_name / return_reason` (≤ 500 caractères) ; RPC `return_foreman_note_sheet(p_report_id, p_expected_updated_at, p_reason)` (`get_my_role() = 'manager'`, même transition et même contrôle d'état périmé que `return_job_for_correction` : `submitted` + verrouillée → `updated` + déverrouillée, audit `job_returned_for_correction` avec `foreman_note` et `reason`) qui écrit seule les colonnes `returned_*` (le droit de colonne du contremaître reste `body` / `audited_name`) ; `foreman_reports_guard_update` ne bouge `updated_at` que si le texte change (un retour ne remet pas la note « non lue »). `foreman-reports.js` : `returnReportedJob(client, report, reason)` (remplace l'appel direct à `return_job_for_correction`), `isNoteReturned(note, statutFiche)` (retournée tant que la fiche est `saved` / `updated`). `ForemanReportsPanel.jsx` : fenêtre de raison (facultative), bloc « Retournée par … le … / Raison » (atténué « Déjà retournée une fois » après la nouvelle soumission) ; `JobCard.jsx` : étiquette « Retournée » ; `ForemanNoteIcon.jsx` : bloc de retour dans le texte de la note (gestionnaires et contremaître, `History.jsx` lit les colonnes). Seul ce chemin enregistre la raison : un retour fait depuis la carte de revue (`ManagerDashboard`) ne la demande pas. **Appliquer la migration 0140 avant de déployer le code.**
 
@@ -538,6 +542,15 @@ Déjà tranché et codé (référence ; détail et historique dans `docs/rules/c
 ### 6.3 Technique (code) — ouvert
 
 Ce qui est fait est dans l'historique Git (V2.4.104 → V2.4.195). Ouvert, du plus utile au moins utile :
+
+- [ ] **Fermer le faux « Retournée par » des notes de contremaître** (constaté le 2026-11-13, faible risque) : la politique d'insertion de
+  `foreman_reports` (0136) laisse un contremaître écrire n'importe quelle colonne de **sa propre** nouvelle note, donc `returned_at`,
+  `returned_by`, `returned_by_name` et `return_reason` (0140) par une requête faite à la main (le droit `update` est limité à `body` /
+  `audited_name`, et seule `return_foreman_note_sheet` fait un vrai retour). Effet : une fausse étiquette « Retournée par … » sur sa note ;
+  aucun effet sur les fiches, les heures, la paie ni l'audit. **Solution prête :** migration qui ajoute un trigger `before insert` sur
+  `foreman_reports` mettant ces quatre colonnes à `null` (comme `foreman_reports_guard` fixe déjà l'heure et nettoie le texte), ou, de façon
+  équivalente, `revoke insert` global puis `grant insert (user_id, job_id, submission_key, report_date, audited_name, body)` ; test dans
+  `foreman-reports.test.js` (le SQL contient le `null` des quatre colonnes) ; mentionner la migration dans README / NOOB / CLAUDE.
 
 - [ ] **CNESST sur le salaire admissible** (`calculateCnesst`, `src/payroll/employer/cnesst.js`) : dès que la règle de
   l'excédent est connue (§6.1 A). Toucher aussi la fiche des règles (`pay-rules-reference.js`).
