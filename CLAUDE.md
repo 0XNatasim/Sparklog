@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.256)
+## 6. À faire / à préciser (mis à jour 2026-11-11, V2.4.257)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -134,6 +134,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.257 (technique).** Documentation seulement : `OFFICIEL.md` (racine) = plan directeur de conformité (convention collective résidentiel art. 18.01 2) b, Loi R-20 à valider, Loi 25) : exigences C1–C16 / L1–L9, inventaire des données (base Supabase `us-west-2`, 8 buckets, OCR.space, Google Apps Script, Resend / Brevo, Web Push), écarts E1–E14, architecture cible en deux côtés (côté 1 = ce dépôt allégé, pointage par `employee_number`, hébergé au Québec ; côté 2 = nouveau dépôt **privé** `sparklog-gestion`, noms / paie), modifications M1–M13 et H1–H6, phases P0–P6, matrice de traçabilité, décisions D1–D7. Aucun code ni migration. Les PR de conformité cochent ses cases et mettent à jour sa section 10.
 
 **V2.4.256 (technique).** Documentation seulement : le point ouvert de §6.3 « Fermer le faux « Retournée par » » est noté ; aucun code ni migration.
 
