@@ -1039,7 +1039,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     if (!ids.length) return undefined;
     let alive = true;
     (async () => {
-      const { data } = await supabase.from("foreman_reports").select("id, job_id, audited_name, body, created_at, updated_at").in("job_id", ids);
+      const { data } = await supabase.from("foreman_reports").select("id, job_id, audited_name, body, created_at, updated_at, returned_at, returned_by_name, return_reason").in("job_id", ids);
       if (!alive || !data) return;
       const reads = await fetchNoteReads(supabase, data.map((row) => row.id)).catch(() => new Map());
       if (alive) setForemanNotes(new Map(data.map((row) => [row.job_id, { ...row, unread: isNoteUnread(row, reads.get(row.id)) }])));

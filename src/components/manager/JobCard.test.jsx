@@ -27,4 +27,16 @@ describe("JobCard foreman note", () => {
     expect(screen.getByText("Casque oublié")).toBeTruthy();
     expect(screen.getByText("Paul Roy")).toBeTruthy();
   });
+
+  it("tells the managers a returned sheet was returned, until it is submitted again", () => {
+    const returned = { audited_name: null, body: "x", returned_at: "2026-11-11T15:00:00Z", returned_by_name: "Marie", return_reason: "Date à vérifier" };
+    render(<JobCard {...props} job={{ ...job, status: "updated" }} foremanNote={returned} />);
+    expect(screen.getByText(fr("foremanNotes.returnedBadge"))).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: fr("foremanNotes.cardIcon") }));
+    expect(screen.getByText(/Retournée par Marie/)).toBeTruthy();
+    expect(screen.getByText(/Date à vérifier/)).toBeTruthy();
+    cleanup();
+    render(<JobCard {...props} job={{ ...job, status: "submitted" }} foremanNote={returned} />);
+    expect(screen.queryByText(fr("foremanNotes.returnedBadge"))).toBeNull();
+  });
 });
