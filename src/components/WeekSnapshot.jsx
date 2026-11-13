@@ -9,7 +9,7 @@ import { useHolidayDates } from "@/lib/company-holidays";
 import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
-import { dailyRegularMinutesFor, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
+import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,13 @@ import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
 // time, the number of ORs and a colour for saved (orange) / submitted (green) / missing (red).
 // +7 / −7 (minutes; the unit is in the legend and the tooltip).
+// The day's paid minutes as the database gate counts them: the Départ→Fin spans, minus the unpaid first trip for an
+// employee with that option (dayFirstTripUnpaidMinutes, twin of validate_job_submission_contract).
+function paidMinutes(dayJobs, firstTripUnpaid) {
+  const gross = dayJobs.reduce((sum, job) => sum + (job.depart && job.fin ? minutesBetween(job.depart, job.fin) : 0), 0);
+  return gross - (firstTripUnpaid ? dayFirstTripUnpaidMinutes(dayJobs) : 0);
+}
+
 const FOREMAN_MIN_HOURS = 8;
 // A counted weekday (Mon–Fri, not a holiday) under 8 h worked: the foreman is paid 8 h (display only, the pay is the engine's).
 function foremanDayTopUp(date, jobCount, hours, holidays) {
@@ -64,8 +71,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     let alive = true;
     const weekEnd = days[6];
     Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date, ten_hour_days").order("full_name"),
-      supabase.from("jobs").select("id, user_id, status, depart, fin, job_date, km_total, km_aller, km_retour, overtime_evidence_captured").gte("job_date", weekStart).lte("job_date", weekEnd),
+      supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date, ten_hour_days, first_trip_unpaid").order("full_name"),
+      supabase.from("jobs").select("id, user_id, status, depart, arrivee, fin, job_date, km_total, km_aller, km_retour, overtime_evidence_captured").gte("job_date", weekStart).lte("job_date", weekEnd),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
       // The rounding counters (15 min per day): without them the squares still show, only the paid line is missing.
       loadDayRounding({ untilDate: weekEnd }).catch(() => new Map()),
@@ -101,7 +108,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
         // Overtime proof not given yet (« Je ne l'ai pas encore »): a saved day over the daily threshold with no proof.
         const proofMissing = employee.role !== "admin" && dayJobs.some((job) => job.status === "saved" || job.status === "updated")
           && !dayJobs.some((job) => job.overtime_evidence_captured)
-          && dayJobs.reduce((sum, job) => sum + (job.depart && job.fin ? minutesBetween(job.depart, job.fin) : 0), 0) > dailyRegularMinutesFor(employee);
+          && paidMinutes(dayJobs, employee.first_trip_unpaid) > dailyRegularMinutesFor(employee);
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
         return {
           date, hours, km, off, proofMissing, holiday: holidays.has(date),

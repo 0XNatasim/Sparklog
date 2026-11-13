@@ -140,3 +140,30 @@ describe("WeekSnapshot overtime proof missing", () => {
   });
 });
 
+describe("WeekSnapshot overtime proof with the unpaid first trip and 4 days of 10 h", () => {
+  const dayJobs = (extra) => [job("a", "2026-10-19", "06:00", "14:30", { status: "saved", arrivee: "06:45", overtime_evidence_captured: false, ...extra })];
+  const outlined = () => document.querySelectorAll('button[title="' + fr("live.week.proofMissingTitle") + '"]').length;
+
+  it("counts paid time: 8 h 30 with a 45-minute unpaid first trip is under 8 h, so not outlined", async () => {
+    setup(dayJobs(), { first_trip_unpaid: true });
+    await screen.findByText("Employé Test");
+    expect(outlined()).toBe(0);
+  });
+
+  it("outlines the same day without that option (8 h 30 paid)", async () => {
+    setup(dayJobs(), { first_trip_unpaid: false });
+    await screen.findByText("Employé Test");
+    expect(outlined()).toBe(1);
+  });
+
+  it("uses 10 h for « 4 jours de 10 h »: 9 h is not outlined, 11 h is", async () => {
+    setup([job("a", "2026-10-19", "06:00", "15:00", { status: "saved", overtime_evidence_captured: false })], { ten_hour_days: true });
+    await screen.findByText("Employé Test");
+    expect(outlined()).toBe(0);
+    cleanup();
+    setup([job("a", "2026-10-19", "06:00", "17:00", { status: "saved", overtime_evidence_captured: false })], { ten_hour_days: true });
+    await screen.findByText("Employé Test");
+    expect(outlined()).toBe(1);
+  });
+});
+

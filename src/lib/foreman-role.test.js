@@ -8,7 +8,7 @@ const sum = (entries, key) => [...entries.values()].reduce((total, entry) => tot
 
 describe("foreman pay (engine 2.8.0)", () => {
   it("pays at least 8 h for a weekday worked", () => {
-    expect(ENGINE_VERSION).toBe("2.9.0");
+    expect(ENGINE_VERSION).toBe("2.10.0");
     expect(options).toMatchObject({ minDayMinutes: FOREMAN_DAY_MINUTES, noReturn: true });
     const short = calculatePayrollEntries([job("a", "2026-11-03", "08:00", "11:00")], options);
     expect(sum(short, "regularPaidMinutes")).toBe(480);
