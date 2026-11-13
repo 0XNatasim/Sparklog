@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.253 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.254 (2026-11-11).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.254 — the owner submits an emergency timesheet for an employee.** In the emergency timesheet (Avancé › Feuille de temps d'urgence), a « Submit it for the employee » box creates the sheet already submitted: nothing for the employee to confirm, no message to them, straight to the managers' review (useful for someone who is leaving, even if their account is already paused). A draft the employee has not confirmed also gets a « Submit for the employee » button. The overtime proof and the inventory screenshots are not required in this case; the action is kept in the audit log in the owner's name. Migration 0137.
 - **V2.4.253 — the foreman note follows the work sheet.** When the work order is « CONTREMAÎTRE », the foreman can attach an optional note to the work sheet itself (button « Notes du contremaître » → « Joindre à la fiche »); it is sent with the job when he saves, and he can edit it while the job is editable. In Notes › Contremaître each note shows its work sheet; a manager can return the sheet for correction, delete the note alone, or export all the notes as a CSV. Deleting the work sheet deletes its note. The note also shows as a clickable icon on the work sheet in the managers' review, and the notes written before are attached to their sheet by the migration (so they can be edited once the sheet is returned for correction). Migration 0136.
 - **V2.4.252 — foreman's 8 h in the week snapshot.** In « Cette semaine », a foreman's weekday under 8 h worked now carries « min. 8 h » (the 8 h minimum already applied to pay, talons and the Google export), and the weekly total shows « Payé … (min. 8 h/jour) ». Display only.
 - **V2.4.251 — « View as employee » shows the employee's buttons.** On the Historique page, a manager viewing the app as an employee now sees the same buttons (Ouvrir, Supprimer, Soumettre, Soumettre la journée), greyed out and not clickable, instead of not seeing them.
