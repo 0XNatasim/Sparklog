@@ -1,9 +1,9 @@
-import React, { memo, useState } from "react";
-import { ClipboardList, TriangleAlert } from "lucide-react";
+import React, { memo } from "react";
+import { TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ForemanNoteIcon from "@/components/ForemanNoteIcon";
 import { Badge } from "@/components/ui/badge";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import ManualEntryStar from "@/components/ManualEntryStar";
@@ -20,9 +20,8 @@ import { getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculation
 // nameFirst (Gestion V3): the employee's full name heads the card with the OT number and the
 // date under it, in a fixed-width column the pills and buttons cannot squeeze. Without it, the
 // V2 card, unchanged.
-function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, manualEntry, foremanNote = null, focused, focusedEvidence, busy, onApprove, onUnlock, nameFirst = false, plainWords = false }) {
+function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCaptured, mealCaptured, manualEntry, foremanNote = null, onNoteRead, focused, focusedEvidence, busy, onApprove, onUnlock, nameFirst = false, plainWords = false }) {
   const t = useT();
-  const [noteOpen, setNoteOpen] = useState(false);
     const employeeName = employee?.full_name || employee?.email || `User ${String(j.user_id).slice(0, 8)}…`;
 
     // Worked hours from the authoritative interval calc, which wraps past
@@ -40,17 +39,7 @@ function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCapt
       <>
         <span>{manualEntry && <ManualEntryStar className="mr-0.5" />}<span className="text-success">{j.ot}</span> • {dayjs(j.job_date).format("DD MMM")}</span>
         <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeCaptured, meal_claim_captured: j.meal_claim_captured || mealCaptured }} />
-        {foremanNote && (
-          <button
-            type="button"
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary hover:bg-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title={t("foremanNotes.cardIcon")}
-            aria-label={t("foremanNotes.cardIcon")}
-            onClick={(e) => { e.stopPropagation(); setNoteOpen(true); }}
-          >
-            <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        )}
+        {foremanNote && <ForemanNoteIcon note={foremanNote} unread={foremanNote.unread} subtitle={`${employeeName} · ${j.ot} · ${dayjs(j.job_date).format("DD MMM")}`} onOpen={() => onNoteRead?.(foremanNote, j.id)} />}
         {dayOvertimeNoEvidence && (
           <span
             className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning"
@@ -175,18 +164,6 @@ function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCapt
             </div>
           )}
         </CardContent>
-        {foremanNote && (
-          <Dialog open={noteOpen} onOpenChange={setNoteOpen}>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5" />{t("foremanNotes.title")}</DialogTitle>
-                <DialogDescription>{employeeName} · {j.ot} · {dayjs(j.job_date).format("DD MMM")}</DialogDescription>
-              </DialogHeader>
-              {foremanNote.audited_name && <div className="text-sm"><span className="text-muted-foreground">{t("foremanNotes.audited")} : </span><b>{foremanNote.audited_name}</b></div>}
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{foremanNote.body}</p>
-            </DialogContent>
-          </Dialog>
-        )}
       </Card>
     );
 }

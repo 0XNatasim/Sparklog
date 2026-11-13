@@ -144,6 +144,17 @@ export default function EndOfShiftDialog({ t, step, onStep, busy, onClose, saveE
           </>
         )}
 
+        {step === "evidenceLater" && (
+          <>
+            <DialogHeader><DialogTitle>{t("form.evidence.laterTitle")}</DialogTitle></DialogHeader>
+            <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm font-medium text-warning" role="status">{t("form.evidence.laterDescription")}</p>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={onClose}>{t("common.ok")}</Button>
+              <Button type="button" onClick={day.onReview}>{t("form.evidence.laterGoHistory")}</Button>
+            </DialogFooter>
+          </>
+        )}
+
         {step === "success" && (
           <>
             <DialogHeader><DialogTitle>{t("form.return.savedTitle")}</DialogTitle></DialogHeader>

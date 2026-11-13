@@ -122,3 +122,21 @@ describe("WeekSnapshot foreman minimum", () => {
   });
 });
 
+describe("WeekSnapshot overtime proof missing", () => {
+  it("outlines a saved day over 8 h that has no proof, and not one that has it", async () => {
+    // Mon 9 h saved without proof → outlined; Tue 9 h saved with proof → not.
+    setup([
+      job("a", "2026-10-19", "06:00", "15:00", { status: "saved", overtime_evidence_captured: false }),
+      job("b", "2026-10-20", "06:00", "15:00", { status: "saved", overtime_evidence_captured: true }),
+    ]);
+    await screen.findByText("Employé Test");
+    expect(document.querySelectorAll('button[title="' + fr("live.week.proofMissingTitle") + '"]')).toHaveLength(1);
+  });
+
+  it("does not outline a submitted day", async () => {
+    setup([job("a", "2026-10-19", "06:00", "15:00", { status: "submitted", overtime_evidence_captured: true })]);
+    await screen.findByText("Employé Test");
+    expect(document.querySelectorAll('button[title="' + fr("live.week.proofMissingTitle") + '"]')).toHaveLength(0);
+  });
+});
+

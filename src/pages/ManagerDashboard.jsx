@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { isForemanOt } from "@/lib/foreman-reports";
+import { fetchNoteReads, isForemanOt, isNoteUnread, markNoteRead } from "@/lib/foreman-reports";
 import { Check, ChevronDown, ChevronUp, Image, ImageOff, Radio, TriangleAlert } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -1031,17 +1031,32 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     return flagged;
   }, [jobs, profiles]);
 
-  // The foreman's note on a work sheet (0136): one small read for the CONTREMAÎTRE jobs on screen, shown as a clickable icon.
+  // The foreman's note on a work sheet (0136): a small read for the CONTREMAÎTRE jobs on screen, shown as a clickable icon,
+  // red while this manager has not opened it (0138), blue after. Each manager has his own state.
   const [foremanNotes, setForemanNotes] = useState(() => new Map());
   useEffect(() => {
     const ids = jobs.filter((j) => isForemanOt(j.ot)).map((j) => j.id);
     if (!ids.length) return undefined;
     let alive = true;
-    supabase.from("foreman_reports").select("job_id, audited_name, body").in("job_id", ids)
-      .then(({ data }) => { if (alive && data) setForemanNotes(new Map(data.map((row) => [row.job_id, row]))); })
-      .catch(() => undefined);
+    (async () => {
+      const { data } = await supabase.from("foreman_reports").select("id, job_id, audited_name, body, created_at, updated_at").in("job_id", ids);
+      if (!alive || !data) return;
+      const reads = await fetchNoteReads(supabase, data.map((row) => row.id)).catch(() => new Map());
+      if (alive) setForemanNotes(new Map(data.map((row) => [row.job_id, { ...row, unread: isNoteUnread(row, reads.get(row.id)) }])));
+    })().catch(() => undefined);
     return () => { alive = false; };
   }, [jobs]);
+  // Opening the icon records this manager's reading (turns it blue for him only).
+  const noteReadStable = useCallback((note, jobId) => {
+    if (!note?.unread) return;
+    setForemanNotes((current) => {
+      const next = new Map(current);
+      const known = next.get(jobId);
+      if (known) next.set(jobId, { ...known, unread: false });
+      return next;
+    });
+    markNoteRead(supabase, note.id).catch(() => undefined);
+  }, []);
 
   const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
   const dateBands = useMemo(() => dateBandMap(filtered.map((j) => j.job_date)), [filtered]);
@@ -1057,6 +1072,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       mealCaptured: mealJobIds.has(j.id),
       manualEntry: manualEntryIds.has(j.id),
       foremanNote: foremanNotes.get(j.id) || null,
+      onNoteRead: noteReadStable,
       focused: focusedJobId === j.id,
       focusedEvidence: focusedJobId === j.id ? focusedEvidence : null,
       busy: actionLoadingId === j.id,

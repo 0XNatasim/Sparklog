@@ -83,7 +83,7 @@ export async function returnReportedJob(client, job) {
 export async function fetchForemanReports(client) {
   const { data, error } = await withTimeout(
     client.from("foreman_reports")
-      .select("id, user_id, job_id, report_date, audited_name, body, created_at, job:jobs(id, ot, job_date, depart, fin, status, updated_at)")
+      .select("id, user_id, job_id, report_date, audited_name, body, created_at, updated_at, job:jobs(id, ot, job_date, depart, fin, status, updated_at)")
       .order("created_at", { ascending: false })
       .limit(QUERY_BUDGETS.foremanReports),
     12000,
@@ -132,4 +132,30 @@ export function foremanReportsCsv(reports, labels) {
     ].map(csvCell).join(";"));
   }
   return lines.join("\r\n");
+}
+
+// Read / unread state of the notes for the signed-in manager (0138). A note is unread until he opened it, and again
+// once the foreman edited it after that.
+export function isNoteUnread(note, readAt) {
+  if (!note) return false;
+  if (!readAt) return true;
+  const changed = new Date(note.updated_at || note.created_at || 0).getTime();
+  return new Date(readAt).getTime() < changed;
+}
+
+// { reportId → read_at } for these notes (RLS: only the caller's own readings come back).
+export async function fetchNoteReads(client, reportIds) {
+  const ids = [...new Set((reportIds || []).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const { data, error } = await withTimeout(client.from("foreman_report_reads").select("report_id, read_at").in("report_id", ids), 12000);
+  if (error) throw error;
+  return new Map((data || []).map((row) => [row.report_id, row.read_at]));
+}
+
+export async function markNoteRead(client, reportId) {
+  const { error } = await withTimeout(
+    client.from("foreman_report_reads").upsert({ report_id: reportId }, { onConflict: "report_id,manager_id" }),
+    12000,
+  );
+  if (error) throw error;
 }

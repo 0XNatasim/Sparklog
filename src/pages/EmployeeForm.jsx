@@ -948,6 +948,30 @@ export default function EmployeeForm() {
     }
   }
 
+  // « Je ne l'ai pas encore »: the sheet is saved as a draft without the proof (it is NOT submitted: the database still
+  // refuses a day over the threshold without it), and the employee is told to give the proof today. The managers see
+  // those days with a red outline in the week snapshot.
+  async function skipEvidenceForNow() {
+    if (!pendingReturn || evidenceBusy) return;
+    setEvidenceBusy(true);
+    setErr("");
+    try {
+      const savedJobId = await saveJob("draft", pendingReturn);
+      if (!savedJobId) {
+        setErr(lastSaveErrorRef.current || t("form.evidence.jobSaveFailed"));
+        return;
+      }
+      setPendingReturn(null);
+      if (!editId) submissionKeyRef.current = null;
+      endShiftRef.current = false;
+      endShiftDateRef.current = null;
+      setReturnStep("evidenceLater");
+      navigate("/form", { replace: true });
+    } finally {
+      setEvidenceBusy(false);
+    }
+  }
+
   function handleOvertimeEvidence(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1333,6 +1357,7 @@ export default function EmployeeForm() {
           canRetry: Boolean(failedEvidenceFile),
           onRetry: () => processEvidenceFile(failedEvidenceFile),
           busy: evidenceBusy,
+          onSkip: skipEvidenceForNow,
         }}
         inventory={inventory}
         day={{

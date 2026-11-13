@@ -4,7 +4,7 @@ import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // The overtime authorization the day needs (> 8 h): what the SMS screenshot must show, an example,
 // and the picker. « Réessayer » reuses the picture kept in memory after a failure.
-export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationError, error, canRetry, onRetry, busy }) {
+export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationError, error, canRetry, onRetry, busy, onSkip }) {
   const [showExample, setShowExample] = useState(false);
   return (
     <>
@@ -53,7 +53,12 @@ export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationEr
           onChange={onFile}
         />
       </div>
-      <DialogFooter>
+      <DialogFooter className="gap-2 sm:gap-0">
+        {onSkip && (
+          <Button type="button" variant="outline" disabled={busy} onClick={onSkip}>
+            {t("form.evidence.notYet")}
+          </Button>
+        )}
         {canRetry && !busy && (
           <Button type="button" variant="outline" onClick={onRetry}>
             {t("form.evidence.retry")}
