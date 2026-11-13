@@ -2,8 +2,9 @@ import { matchPreset } from "@/lib/preset-work-orders";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { withTimeout } from "@/lib/utils";
 
-// Foreman reports (0134): a foreman auditing the other employees writes a short report from his time entry
-// when the work order is « CONTREMAÎTRE »; the managers read them in Notes › Contremaître.
+// Foreman notes (0134, attached to the work sheet by 0136): a foreman auditing the other employees may add a short
+// note to his time entry when the work order is « CONTREMAÎTRE ». The note follows the job (deleted with it, kept when
+// the job is returned for correction); the managers read, delete and export the notes in Notes › Contremaître.
 export const FOREMAN_OT_LABEL = "CONTREMAÎTRE";
 export const MAX_REPORT = 5000;
 export const MAX_AUDITED_NAME = 120;
@@ -21,14 +22,28 @@ export function cleanReport({ auditedName, body }) {
   return { auditedName: name || null, body: text };
 }
 
-// Sends one report. `submissionKey` is created once per report, so a retry after a lost response (the unique key
-// answers 23505) is the same report, not a second one.
-export async function submitForemanReport(client, { userId, submissionKey, reportDate, auditedName, body }) {
+// Attaches the note to its job: one note per job, created the first time and edited afterwards. `submissionKey` is
+// created once per note, so a retry after a lost response is the same note, not a second one.
+export async function saveJobNote(client, { userId, jobId, submissionKey, reportDate, auditedName, body }) {
   const clean = cleanReport({ auditedName, body });
-  if (!clean || !userId || !submissionKey || !reportDate) throw new Error("foreman_report_invalid");
+  if (!clean || !userId || !jobId || !submissionKey || !reportDate) throw new Error("foreman_report_invalid");
+  const { data: existing, error: readError } = await withTimeout(
+    client.from("foreman_reports").select("id").eq("job_id", jobId).maybeSingle(),
+    12000,
+  );
+  if (readError) throw readError;
+  if (existing?.id) {
+    const { error } = await withTimeout(
+      client.from("foreman_reports").update({ audited_name: clean.auditedName, body: clean.body }).eq("id", existing.id),
+      12000,
+    );
+    if (error) throw error;
+    return;
+  }
   const { error } = await withTimeout(
     client.from("foreman_reports").insert({
       user_id: userId,
+      job_id: jobId,
       submission_key: submissionKey,
       report_date: reportDate,
       audited_name: clean.auditedName,
@@ -39,11 +54,36 @@ export async function submitForemanReport(client, { userId, submissionKey, repor
   if (error && error.code !== "23505") throw error;
 }
 
+// The note of a job (to edit it from the work sheet), or null.
+export async function fetchJobNote(client, jobId) {
+  const { data, error } = await withTimeout(
+    client.from("foreman_reports").select("audited_name, body").eq("job_id", jobId).maybeSingle(),
+    12000,
+  );
+  if (error) throw error;
+  return data ? { auditedName: data.audited_name || "", body: data.body || "" } : null;
+}
+
+// A manager deletes a note on its own (the job stays).
+export async function deleteForemanReport(client, id) {
+  const { error } = await withTimeout(client.from("foreman_reports").delete().eq("id", id), 12000);
+  if (error) throw error;
+}
+
+// A manager returns the job of a note for correction: the foreman edits the job and its note.
+export async function returnReportedJob(client, job) {
+  const { error } = await withTimeout(
+    client.rpc("return_job_for_correction", { p_job_id: job.id, p_expected_updated_at: job.updated_at || null }),
+    12000,
+  );
+  if (error) throw error;
+}
+
 // The managers' list: newest first, each report with its author's name. Throws on a read error.
 export async function fetchForemanReports(client) {
   const { data, error } = await withTimeout(
     client.from("foreman_reports")
-      .select("id, user_id, report_date, audited_name, body, created_at")
+      .select("id, user_id, job_id, report_date, audited_name, body, created_at, job:jobs(id, ot, job_date, depart, fin, status, updated_at)")
       .order("created_at", { ascending: false })
       .limit(QUERY_BUDGETS.foremanReports),
     12000,
@@ -64,5 +104,32 @@ const fold = (value) => String(value ?? "").normalize("NFD").replace(/[̀-ͯ]/g,
 export function filterReports(reports, query) {
   const needle = fold(query).trim();
   if (!needle) return reports;
-  return (reports || []).filter((report) => fold(`${report.author} ${report.audited_name} ${report.body}`).includes(needle));
+  return (reports || []).filter((report) => fold(`${report.author} ${report.audited_name} ${report.body} ${report.job?.ot ?? ""}`).includes(needle));
+}
+
+const csvCell = (value) => {
+  const text = String(value ?? "");
+  // A leading = + - @ would be run as a formula by a spreadsheet.
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return /[",\r\n;]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
+
+// The notes as a CSV (; separated, like the accident register): one line per note with the work sheet it follows.
+export function foremanReportsCsv(reports, labels) {
+  const header = ["date", "author", "ot", "workDate", "times", "status", "audited", "note"];
+  const lines = [header.map((key) => csvCell(labels.columns[key])).join(";")];
+  for (const report of reports || []) {
+    const job = report.job;
+    lines.push([
+      String(report.created_at || "").slice(0, 10),
+      report.author,
+      job?.ot ?? "",
+      job?.job_date ?? report.report_date ?? "",
+      job?.depart && job?.fin ? `${String(job.depart).slice(0, 5)}-${String(job.fin).slice(0, 5)}` : "",
+      job ? (labels.status[job.status] || job.status) : "",
+      report.audited_name,
+      report.body,
+    ].map(csvCell).join(";"));
+  }
+  return lines.join("\r\n");
 }

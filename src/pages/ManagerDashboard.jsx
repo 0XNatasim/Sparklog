@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { isForemanOt } from "@/lib/foreman-reports";
 import { Check, ChevronDown, ChevronUp, Image, ImageOff, Radio, TriangleAlert } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -1030,6 +1031,18 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     return flagged;
   }, [jobs, profiles]);
 
+  // The foreman's note on a work sheet (0136): one small read for the CONTREMAÎTRE jobs on screen, shown as a clickable icon.
+  const [foremanNotes, setForemanNotes] = useState(() => new Map());
+  useEffect(() => {
+    const ids = jobs.filter((j) => isForemanOt(j.ot)).map((j) => j.id);
+    if (!ids.length) return undefined;
+    let alive = true;
+    supabase.from("foreman_reports").select("job_id, audited_name, body").in("job_id", ids)
+      .then(({ data }) => { if (alive && data) setForemanNotes(new Map(data.map((row) => [row.job_id, row]))); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [jobs]);
+
   const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
   const dateBands = useMemo(() => dateBandMap(filtered.map((j) => j.job_date)), [filtered]);
 
@@ -1043,6 +1056,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       overtimeCaptured: overtimeMarkerIds.has(j.id),
       mealCaptured: mealJobIds.has(j.id),
       manualEntry: manualEntryIds.has(j.id),
+      foremanNote: foremanNotes.get(j.id) || null,
       focused: focusedJobId === j.id,
       focusedEvidence: focusedJobId === j.id ? focusedEvidence : null,
       busy: actionLoadingId === j.id,

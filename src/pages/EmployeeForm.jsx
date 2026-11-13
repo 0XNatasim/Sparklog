@@ -44,7 +44,7 @@ import EndOfShiftDialog from "@/components/employee-form/EndOfShiftDialog";
 import WorkOrderCheckDialog from "@/components/employee-form/WorkOrderCheckDialog";
 import ManualEntryCheckDialog from "@/components/employee-form/ManualEntryCheckDialog";
 import ForemanNotesDialog from "@/components/employee-form/ForemanNotesDialog";
-import { isForemanOt } from "@/lib/foreman-reports";
+import { fetchJobNote, isForemanOt, saveJobNote } from "@/lib/foreman-reports";
 import { dailyRegularMinutesFor } from "@/lib/payroll-calculations";
 
 dayjs.locale("en");
@@ -174,6 +174,18 @@ export default function EmployeeForm() {
   // Foreman: paid 8 h per day worked; the Field Service capture is optional (proof, no manual-entry star).
   const [foremanEmployee, setForemanEmployee] = useState(false);
   const [showForemanNotes, setShowForemanNotes] = useState(false);
+  // The foreman's optional note on this work sheet (0136): { auditedName, body, saved }. Sent with the job when it is saved.
+  const [foremanNote, setForemanNote] = useState(null);
+  const foremanNoteKeyRef = useRef(null);
+  // An existing job: its note, to edit it with the job.
+  useEffect(() => {
+    if (!editId || !foremanEmployee || isViewMode) return undefined;
+    let alive = true;
+    fetchJobNote(supabase, editId)
+      .then((note) => { if (alive && note) setForemanNote({ ...note, saved: true }); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [editId, foremanEmployee, isViewMode]);
   // "First trip unpaid" employees reach the 8 h overtime-screenshot threshold on PAID time.
   // Until the profile loads this stays false, i.e. the stricter gross-time rule applies.
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
@@ -328,6 +340,8 @@ export default function EmployeeForm() {
   function resetNewJobState() {
     setJobDate(companyDate());
     setOt("");
+    setForemanNote(null);
+    foremanNoteKeyRef.current = null;
     setDepart("");
     setArrivee("");
     setFin("");
@@ -639,6 +653,19 @@ export default function EmployeeForm() {
       setDirty(false);
       setWarning(overlapWarning || "");
 
+      // The foreman's note follows the job: sent once the job is saved. A failure keeps the note on the form
+      // for the next save and never fails the job.
+      if (foremanEmployee && foremanNote && !foremanNote.saved && isForemanOt(ot)) {
+        try {
+          if (!foremanNoteKeyRef.current) foremanNoteKeyRef.current = crypto.randomUUID();
+          await saveJobNote(supabase, { userId: user.id, jobId: savedJobId, submissionKey: foremanNoteKeyRef.current, reportDate: job_date, auditedName: foremanNote.auditedName, body: foremanNote.body });
+          foremanNoteKeyRef.current = null;
+          setForemanNote(editId ? { ...foremanNote, saved: true } : null);
+        } catch {
+          setWarning(t("foremanNotes.errors.attachFailed"));
+        }
+      }
+
       if (!editId && !returnValues) navigate(`/form?edit=${savedJobId}`, { replace: true });
       if (parkingRequested && parkingFiles.length > 0) {
         const count = await uploadParkingReceipt(savedJobId, parkingFiles, parkingAmountNumber, parkingFilesMode);
@@ -805,6 +832,8 @@ export default function EmployeeForm() {
     } else {
       setJobDate(companyDate());
       setOt("");
+      setForemanNote(null);
+      foremanNoteKeyRef.current = null;
       setDepart("");
       setArrivee("");
       setFin("");
@@ -1143,6 +1172,17 @@ export default function EmployeeForm() {
               </Badge>
             </div>
 
+            {/* Foreman, existing job: the note is edited with the job (new job: the button below replaces Auto-fill). */}
+            {foremanEmployee && editId && !locked && isForemanOt(ot) && (
+              <Button type="button" variant="outline" className="h-12 w-full text-base font-semibold" disabled={disableInputs} onClick={() => setShowForemanNotes(true)}>
+                <ClipboardList className="mr-2 h-5 w-5" />
+                {t("foremanNotes.button")}
+              </Button>
+            )}
+            {foremanEmployee && foremanNote && isForemanOt(ot) && (
+              <p className="text-sm font-medium text-success" role="status">{t(foremanNote.saved ? "foremanNotes.attachedSaved" : "foremanNotes.attached")}</p>
+            )}
+
             {!locked && !editId && !officeEmployee && (
               <>
                 {/* Work order « CONTREMAÎTRE »: no Field Service capture to read, the button opens the foreman's notes. */}
@@ -1311,7 +1351,13 @@ export default function EmployeeForm() {
         problems={workOrderProblems}
         ocrText={lastOcrText}
       />
-      <ForemanNotesDialog t={t} open={showForemanNotes} onOpenChange={setShowForemanNotes} userId={user?.id} reportDate={job_date} />
+      <ForemanNotesDialog
+        t={t}
+        open={showForemanNotes}
+        onOpenChange={setShowForemanNotes}
+        note={foremanNote}
+        onSave={(note) => { setForemanNote({ ...note, saved: false }); setDirty(true); }}
+      />
       <ManualEntryCheckDialog
         t={t}
         open={showManualEntryCheck}

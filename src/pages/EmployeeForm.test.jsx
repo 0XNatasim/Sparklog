@@ -207,15 +207,23 @@ describe("EmployeeForm — new entry", () => {
     fireEvent.change(field("ot"), { target: { value: "CONTREMAÎTRE" } });
     expect(screen.queryByRole("button", { name: fr("form.buttons.autofill") })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: fr("foremanNotes.button") }));
-    const send = await screen.findByRole("button", { name: fr("foremanNotes.send") });
-    expect(send.disabled).toBe(true);
+    const attach = await screen.findByRole("button", { name: fr("foremanNotes.attach") });
+    expect(attach.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText(fr("foremanNotes.audited")), { target: { value: "Paul Roy" } });
     fireEvent.change(screen.getByLabelText(fr("foremanNotes.report")), { target: { value: "Casque oublié, rappel fait." } });
-    fireEvent.click(send);
-    await screen.findByText(fr("foremanNotes.sent"));
-    const writes = state.fake.writes("foreman_reports");
-    expect(writes).toHaveLength(1);
-    expect(JSON.stringify(writes[0])).toContain("Casque oublié, rappel fait.");
+    fireEvent.click(attach);
+    // Nothing is sent yet: the note waits for the work sheet.
+    await screen.findByText(fr("foremanNotes.attached"));
+    expect(state.fake.writes("foreman_reports")).toHaveLength(0);
+    fill({ ot: "CONTREMAÎTRE", depart: "07:00", arrivee: "07:00", fin: "15:00", km: "0" });
+    fireEvent.click(saveButton());
+    await screen.findByText(fr("form.last.title"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
+    await screen.findByText(fr("form.return.savedTitle"));
+    // The note is sent with the job, linked to it.
+    await waitFor(() => expect(state.fake.writes("foreman_reports")).toHaveLength(1));
+    const note = state.fake.writes("foreman_reports")[0].payload;
+    expect(note).toMatchObject({ job_id: "job-new", audited_name: "Paul Roy", body: "Casque oublié, rappel fait." });
   });
 
   it("keeps Auto-fill for another employee, even on the CONTREMAÎTRE work order", async () => {
