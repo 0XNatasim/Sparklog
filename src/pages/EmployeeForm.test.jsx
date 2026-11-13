@@ -175,6 +175,25 @@ describe("EmployeeForm — new entry", () => {
     expect(state.fake.rpcCalls("save_own_job_with_overtime_evidence")).toHaveLength(0);
   });
 
+  it("gives the proof step no way to close it: no ×, only the proof or « Je ne l'ai pas encore »", async () => {
+    setup();
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
+    fill({ depart: "06:00", fin: "15:30" });
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
+    await screen.findByText(fr("form.last.title"));
+    // Earlier steps still close with the ×.
+    expect(document.querySelector('[role="dialog"] button.absolute')).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: fr("common.yes") }));
+    await screen.findByText(fr("form.return.askTitle"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
+    await screen.findByText(fr("form.evidence.title"));
+    expect(document.querySelector('[role="dialog"] button.absolute')).toBeNull();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.getByText(fr("form.evidence.title"))).toBeTruthy();
+    expect(screen.getByRole("button", { name: fr("form.evidence.notYet") })).toBeTruthy();
+  });
+
   it("restores the entry kept on the device", async () => {
     state.drafts.set("emp-1:new", { userId: "emp-1", submissionKey: "kept-key", updatedAt: new Date().toISOString(), data: { job_date: TODAY, ot: "777", depart: "08:00", arrivee: "08:30", fin: "12:00", km_aller: "5" } });
     setup();
