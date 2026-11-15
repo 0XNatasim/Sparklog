@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.259 (2026-11-15).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.261 (2026-11-15).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,7 +53,8 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
-- **V2.4.259 — overtime proof is now a screenshot of the request form.** The employee dialog that appears when a day passes 8 h now asks for a screenshot of the filled-in overtime request form (name, company, OT number, minutes at the client, return-to-shop minutes, justification) instead of the SMS; the example image and all texts (FR/EN) are updated, and manager-side labels say « proof » instead of « SMS proof » (older SMS proofs stay readable). Still one picture per day, still not read automatically.
+- **V2.4.261 — overtime proof is now a screenshot of the request form.** The employee dialog that appears when a day passes 8 h now asks for a screenshot of the filled-in overtime request form (name, company, OT number, minutes at the client, return-to-shop minutes, justification) instead of the SMS; the example image and all texts (FR/EN) are updated, and manager-side labels say « proof » instead of « SMS proof » (older SMS proofs stay readable). Still one picture per day, still not read automatically.
+- **V2.4.260 — « À regarder d'abord » is collapsible.** In Gérer › À traiter, the « À regarder d'abord » card folds / unfolds (title is a button with the day count); the choice is remembered in the browser and shared with the « À vérifier avant d'approuver » box.
 - **V2.4.258 — documentation refresh only.** `NOOB.md` (what is left to do) and `CLAUDE.md` §6 are brought up to date: current to-do list for the owner, condensed recent changes, migrations 0135–0140 marked as applied, pointer to `OFFICIEL.md` for the compliance plan.
 - **V2.4.257 — compliance master plan (`OFFICIEL.md`).** New reference document at the repository root: the requirements of the construction collective agreement (residential, art. 18.01 2) b — mobile time-clock apps: employee number only, anonymised, kept in Québec, certified providers, express consent, no continuous geolocation), Loi R-20 (to be validated) and Loi 25, the gaps of Sparklog, the target two-sided architecture (side 1 = time clock by employee number, hosted in Québec; side 2 = names / pay in a second private repository), the changes to make, a phased plan and a traceability matrix. Documentation only.
 - **V2.4.256 — documentation only.** The open hardening of the « returned » label of the foreman notes is written down (CLAUDE.md §6.3, NOOB.md), not coded yet.
