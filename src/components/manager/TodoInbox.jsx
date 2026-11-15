@@ -16,6 +16,7 @@ import { isOffOn } from "@/lib/timeoff";
 import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
+import { proofAnomalies, proofDetailsText } from "@/lib/overtime-proof-check";
 import { unseenAnomalies, useAnomaliesFolded, useSeenAnomalies } from "@/lib/anomaly-seen";
 import EvidenceAlertBanner from "@/components/manager/EvidenceAlertBanner";
 import { approvalOutcome, buildInbox, lookbackWorkdays } from "@/lib/todo-inbox";
@@ -92,7 +93,7 @@ export default function TodoInbox() {
           ? withRetry(() => supabase.from("jobs").select(JOB_COLUMNS).eq("status", "approved").in("user_id", userIds).in("job_date", dates).limit(QUERY_BUDGETS.todoApprovedPeers), 12000)
           : { data: [] },
         ids.length
-          ? selectInChunks(ids, (part) => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes").in("job_id", part))
+          ? selectInChunks(ids, (part) => supabase.from("overtime_evidence").select("job_id, storage_path, daily_minutes, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at").in("job_id", part))
           : { data: [] },
         loadManualEntryJobIds(supabase, ids),
         loadOtReuse(ids),
@@ -107,6 +108,10 @@ export default function TodoInbox() {
           },
         ),
         ...otReuseAnomalies(otReuse, submitted),
+        ...proofAnomalies(evidenceRes.data || [], [...submitted, ...(peersRes.data || [])], {
+          firstTripUnpaidUsers: new Set(people.filter((p) => p.first_trip_unpaid).map((p) => p.id)),
+          tenHourUsers: new Set(people.filter((p) => dailyRegularMinutesFor(p) > 480).map((p) => p.id)),
+        }),
       ]);
       const missingOn = (day) => {
         const dayJobs = (prevJobsRes.data || []).filter((job) => job.job_date === day);
@@ -169,6 +174,7 @@ export default function TodoInbox() {
       depart: String(anomaly.depart || "").slice(0, 5),
       fin: String(anomaly.fin || "").slice(0, 5),
       others: otReuseOthersText(anomaly.others, { t, formatDate: (d) => dayjs(d).format("DD MMM") }),
+      details: proofDetailsText(anomaly, t),
     });
   }
 

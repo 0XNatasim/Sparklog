@@ -19,6 +19,7 @@ import { cn, withRetry } from "@/lib/utils";
 import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { seenCount, unseenAnomalies, useAnomaliesFolded, useSeenAnomalies } from "@/lib/anomaly-seen";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
+import { proofAnomalies, proofDetailsText } from "@/lib/overtime-proof-check";
 import { loadOtReuse } from "@/lib/ot-reuse";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import LiveCrew from "@/components/LiveCrew";
@@ -61,7 +62,7 @@ function weekKeyFromDate(dateStr) {
   return ccqWeek(dateStr).key;
 }
 
-const ANOMALY_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, overtime_evidence_captured";
+const ANOMALY_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, started_at, ended_at, km_total, km_aller, km_retour, return_time_minutes, overtime_evidence_captured";
 
 const NOTIFICATION_FILTERS = ["overtime", "meals", "parking"];
 
@@ -237,6 +238,16 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       ? await supabase.from("profiles").select("id, first_trip_unpaid, ten_hour_days, role").or("first_trip_unpaid.eq.true,ten_hour_days.eq.true").in("id", userIds).abortSignal(signal)
       : { data: [] };
     const otReuse = await loadOtReuse(rows.map((row) => row.id), signal);
+    // The overtime request form read from each proof picture (OT, minutes at the client, return minutes): compared with the day.
+    const proofRows = [];
+    for (let i = 0; i < rows.length; i += QUERY_BUDGETS.inListChunk) {
+      const { data: part } = await supabase
+        .from("overtime_evidence")
+        .select("job_id, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at")
+        .in("job_id", rows.slice(i, i + QUERY_BUDGETS.inListChunk).map((row) => row.id))
+        .abortSignal(signal);
+      proofRows.push(...(part || []));
+    }
     return sortAnomalies([
       ...detectJobAnomalies(
         [...rows, ...(approved || [])],
@@ -247,6 +258,10 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         },
       ),
       ...otReuseAnomalies(otReuse, rows),
+      ...proofAnomalies(proofRows, [...rows, ...(approved || [])], {
+        firstTripUnpaidUsers: new Set((tripUnpaid || []).filter((row) => row.first_trip_unpaid).map((row) => row.id)),
+        tenHourUsers: new Set((tripUnpaid || []).filter((row) => dailyRegularMinutesFor(row) > 480).map((row) => row.id)),
+      }),
     ]);
   }
 
@@ -804,6 +819,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       depart: String(anomaly.depart || "").slice(0, 5),
       fin: String(anomaly.fin || "").slice(0, 5),
       others: otReuseOthersText(anomaly.others, { t, formatDate: (d) => dayjs(d).format("DD MMM") }),
+      details: proofDetailsText(anomaly, t),
     });
   }
 
