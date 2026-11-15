@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-13 (V2.4.258).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-15 (V2.4.260).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -23,6 +23,7 @@
   et 44 approuvées ; rien n'est encore comptabilisé. Dans l'ordre, une semaine à la
   fois : **À traiter** (approuver) › **Paie › Paie de la semaine** (« Calculer et comptabiliser ») › imprimer les talons.
   La semaine 44 attend que la 43 soit comptabilisée (le cumul de l'année suit d'une semaine à l'autre).
+- ✅ **V2.4.260** : dans **À traiter**, la carte **« À regarder d'abord »** se **plie et se déplie** en touchant son titre (le nombre de jours reste affiché). Le choix est gardé sur ton appareil, et c'est le même réglage que l'encadré « À vérifier avant d'approuver » des fiches.
 - ✅ L'app fonctionne et les heures sont bien classées. Toutes tes décisions de paie sont dans l'app.
 - ⚠️ **Les montants en dollars de la paie** (avantages CCQ, impôts, cotisations) sont **des estimations**.
   Ils restent « à réviser » tant que les étapes 1 à 4 ci-dessous ne sont pas faites.
