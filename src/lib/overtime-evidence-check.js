@@ -1,4 +1,4 @@
-// The overtime request (screenshot of the request form) of the employee time entry: whether the day needs one,
+// The overtime authorization (SMS screenshot) of the employee time entry: whether the day needs one,
 // and the upload of the picture.
 import { hoursBetween } from "@/lib/time";
 import { evidenceUploadFailure } from "@/lib/evidence-file";
