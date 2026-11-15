@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-// The overtime authorization the day needs (> 8 h): what the SMS screenshot must show, an example,
+// The overtime authorization the day needs (> 8 h): what the screenshot of the overtime request form must show, an example,
 // and the picker. « Réessayer » reuses the picture kept in memory after a failure.
 export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationError, error, canRetry, onRetry, busy, onSkip }) {
   const [showExample, setShowExample] = useState(false);
@@ -36,7 +36,7 @@ export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationEr
           {showExample && (
             <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
               <img
-                src="/overtime-evidence-example.webp"
+                src="/overtime-form-example.webp"
                 alt={t("form.evidence.exampleAlt")}
                 className="max-h-96 w-full rounded object-contain"
               />
