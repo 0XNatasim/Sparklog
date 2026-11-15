@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-13, V2.4.258)
+## 6. À faire / à préciser (mis à jour 2026-11-15, V2.4.259)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.259 (technique).** Preuve de temps supplémentaire = capture du formulaire de demande (au lieu du SMS) : `OvertimeEvidenceStep.jsx` affiche `public/overtime-form-example.webp` (remplace `overtime-evidence-example.webp`, supprimée) ; textes `form.evidence.title / description / choose / fileMissing / requiredApproval / requiredDuration / requiredCrop / exampleAlt / invalid` réécrits (FR / EN) ; libellés côté gestionnaire rendus neutres (« preuve » au lieu de « preuve SMS » : `manager.overtime.originalScreenshot`, `notifications.overtime*`, `history.overtimeIndicator`, `notifications.evidence*`, `manager.sections.overtimeDescription`, `audit.fileContext.overtime`) pour couvrir aussi les anciennes preuves. Aucun changement de logique : seuil de 8 h payées, une photo par jour, `save_own_job_with_overtime_evidence` et nettoyage à 30 jours inchangés ; la photo n'est pas lue ni validée (`ocr_text` reste vide, `form.evidence.invalid` n'est affiché nulle part). Aucune migration ni fonction Edge.
 
 **V2.4.258 (technique).** Documentation seulement : `NOOB.md` réécrit en tête (« À faire maintenant » + « Fait récemment » condensé, plus de « appliquer la migration » déjà faite), en-tête de §6 mis à jour (date, pointeur vers `OFFICIEL.md`, migrations 0135–0140 appliquées), nouveau point ouvert §6.3 « Conformité ». Aucun code ni migration.
 
