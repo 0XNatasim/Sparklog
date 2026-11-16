@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.262 (2026-11-16).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.263 (2026-11-16).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.263 — « Conditions de paie » table.** New tab Gestion › Configuration › Conditions de paie: one table, a row per employee, that gathers the « Pay and options » of every employee card (time rules, team-leader premiums, flat rate, km rate, phone, storage, entry options) and the « Travel and expenses » lines. Tick a box, type an amount or pick a travel choice: it is saved at once to the same place as the card or the Travel page (nothing else changes). Search, warehouse filter, show/hide groups of columns, and « All / None / For all… » above a column (with a confirmation). Travel lines are still not read by the payroll engine.
 - **V2.4.262 — the overtime proof is checked against the day.** The overtime-request-form screenshot is read automatically (OCR) and only three numbers are kept: the OT, the minutes at the client and the return minutes. In « À vérifier avant d'approuver », an alert appears when the form does not match what Sparklog calculates for the day (OT = last job of the day; minutes at the client = paid minutes beyond 8 h, return left out; return = the billable return entered at the end of the day), or when the picture could not be read. Alert only: nothing is blocked. Migration 0141 and a redeploy of `process_overtime_evidence` are needed.
 - **V2.4.261 — overtime proof is now a screenshot of the request form.** The employee dialog that appears when a day passes 8 h now asks for a screenshot of the filled-in overtime request form (name, company, OT number, minutes at the client, return-to-shop minutes, justification) instead of the SMS; the example image and all texts (FR/EN) are updated, and manager-side labels say « proof » instead of « SMS proof » (older SMS proofs stay readable). Still one picture per day, still not read automatically.
 - **V2.4.260 — « À regarder d'abord » is collapsible.** In Gérer › À traiter, the « À regarder d'abord » card folds / unfolds (title is a button with the day count); the choice is remembered in the browser and shared with the « À vérifier avant d'approuver » box.
