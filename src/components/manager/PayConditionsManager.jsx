@@ -3,6 +3,7 @@ import { RefreshCw, Table2 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { companyDate } from "@/lib/company-time";
@@ -32,6 +33,7 @@ export default function PayConditionsManager() {
   const [showPaused, setShowPaused] = useState(false);
   const [hidden, setHidden] = useState(() => new Set());
   const [drafts, setDrafts] = useState({});
+  const [info, setInfo] = useState(null); // the column whose explanation is open
   const [reloadKey, setReloadKey] = useState(0);
   const today = companyDate();
 
@@ -141,6 +143,21 @@ export default function PayConditionsManager() {
     if (done === targets.length) say(t("payConditions.saved", { count: done }));
   }
 
+  // What a rule does, in plain words: the hint of the employee card when there is one, else the text written for this table;
+  // a travel line adds its default, the choices and the agreement article.
+  function columnDescription(column) {
+    const lines = [t(column.hintKey || `payConditions.desc.${column.key}`)];
+    if (column.kind === "toggle") lines.push(t("payConditions.toggleHelp"));
+    if (column.kind === "travel") {
+      const rule = column.rule;
+      lines.push(t("travel.defaultIs", { choice: choiceLabel(rule.defaultChoice) }) + " · " + rule.choices.map(choiceLabel).join(" / "));
+      lines.push(t("travel.convention", { ref: rule.convention }));
+      if (rule.conventionRequired) lines.push(t("travel.conventionRequired"));
+      if (rule.thresholdKm != null) lines.push(t("payConditions.desc.threshold", { km: rule.thresholdKm }));
+    }
+    return lines;
+  }
+
   const toggleGroup = (id) => setHidden((set) => { const next = new Set(set); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   function renderCell(column, person) {
@@ -173,7 +190,7 @@ export default function PayConditionsManager() {
           value={shown}
           onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
           onBlur={(e) => saveAmount(column, person, e.target.value)}
-          className="h-8 w-20 px-1 text-right font-mono text-xs"
+          className="h-8 w-[4.5rem] px-1 text-right font-mono text-xs"
         />
       );
     }
@@ -183,7 +200,7 @@ export default function PayConditionsManager() {
         aria-label={name}
         value={chosen}
         onChange={(e) => saveTravel(column, person, e.target.value)}
-        className={`h-8 max-w-[7.5rem] rounded border bg-background px-1 text-xs ${chosen ? "" : "text-muted-foreground"}`}
+        className={`h-8 w-[5.5rem] rounded border bg-background px-0.5 text-[11px] ${chosen ? "" : "text-muted-foreground"}`}
       >
         <option value="" disabled>{t("payConditions.defaultChoice", { choice: choiceLabel(column.rule.defaultChoice) })}</option>
         {column.rule.choices.map((choice) => <option key={choice} value={choice}>{choiceLabel(choice)}</option>)}
@@ -194,7 +211,7 @@ export default function PayConditionsManager() {
   function renderBulk(column) {
     if (column.kind === "toggle") {
       return (
-        <span className="mt-1 flex justify-center gap-1">
+        <span className="mt-1 flex flex-col items-center gap-0.5">
           <button type="button" className="rounded border bg-background px-1 text-[10px] font-medium hover:bg-accent" aria-label={`${label(column)} · ${t("payConditions.allOn")}`} onClick={() => bulkToggle(column, true)}>{t("payConditions.allOn")}</button>
           <button type="button" className="rounded border bg-background px-1 text-[10px] font-medium hover:bg-accent" aria-label={`${label(column)} · ${t("payConditions.allOff")}`} onClick={() => bulkToggle(column, false)}>{t("payConditions.allOff")}</button>
         </span>
@@ -202,7 +219,7 @@ export default function PayConditionsManager() {
     }
     if (column.kind === "travel") {
       return (
-        <select aria-label={`${label(column)} · ${t("payConditions.forAll")}`} value="" onChange={(e) => bulkTravel(column, e.target.value)} className="mt-1 h-6 max-w-[7.5rem] rounded border bg-background px-1 text-[10px] font-normal">
+        <select aria-label={`${label(column)} · ${t("payConditions.forAll")}`} value="" onChange={(e) => bulkTravel(column, e.target.value)} className="mt-1 h-6 w-[5.5rem] rounded border bg-background px-0.5 text-[10px] font-normal">
           <option value="">{t("payConditions.forAll")}</option>
           {column.rule.choices.map((choice) => <option key={choice} value={choice}>{choiceLabel(choice)}</option>)}
         </select>
@@ -265,9 +282,17 @@ export default function PayConditionsManager() {
                 </tr>
                 <tr>
                   {visibleGroups.flatMap((group) => group.columns).map((column) => (
-                    <th key={column.key} title={column.hintKey ? t(column.hintKey) : undefined} className={`${HEAD} min-w-[6.5rem] max-w-[9rem] font-medium`}>
-                      <span className="block leading-tight">{label(column)}</span>
-                      {column.unitKey && <span className="block text-[10px] font-normal text-muted-foreground">{t(column.unitKey)}</span>}
+                    <th key={column.key} className={`${HEAD} w-12 min-w-[3rem] px-1 font-medium`}>
+                      {/* Short title written upwards (a narrow column); a click opens the full name and what the rule does. */}
+                      <button
+                        type="button"
+                        title={label(column)}
+                        aria-label={`${label(column)} — ${t("payConditions.moreInfo")}`}
+                        onClick={() => setInfo(column)}
+                        className="mx-auto block rounded px-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span className="block h-32 whitespace-nowrap text-[11px] leading-tight underline decoration-dotted underline-offset-2 [writing-mode:vertical-rl] rotate-180">{t(column.shortKey)}</span>
+                      </button>
                       {renderBulk(column)}
                     </th>
                   ))}
@@ -293,6 +318,24 @@ export default function PayConditionsManager() {
           </div>
         </CardContent>
       </Card>
+      <Dialog open={Boolean(info)} onOpenChange={(open) => { if (!open) setInfo(null); }}>
+        <DialogContent>
+          {info && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{label(info)}</DialogTitle>
+                <DialogDescription className="sr-only">{t("payConditions.moreInfo")}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                {columnDescription(info).map((line) => <p key={line}>{line}</p>)}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setInfo(null)}>{t("payConditions.close")}</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
       {confirmDialog}
     </div>
   );
