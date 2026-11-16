@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.265 (2026-11-16).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.266 (2026-11-16).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.266 — « Hier à 23 h 58 » removed.** The yesterday snapshot button and its window are gone from the manager's Live Crew board (the weekly snapshots stay). No database change.
 - **V2.4.265 — employee card from the week snapshot.** In the « Cette semaine » / « Semaine passée » snapshot, an employee's name is now a link: clicking it opens that employee's card (all its tabs, same fields and saves as Équipe › Employés) in the same pop-up, with a « Retour au snapshot » button that brings back the table on the same week, refreshed.
 - **V2.4.264 — « Conditions de paie » is more compact.** The column titles of the table are short (« 1st trip unpaid », « Return w/ benefits ≤ 40 h », « 1st OT hour 2× »…) and written upwards, so each column is narrow; the full name shows when the pointer rests on a title, and **clicking a title opens a plain-words explanation of what the rule does** (for a travel line: its default, its choices and the agreement article). Nothing else changes.
 - **V2.4.263 — « Conditions de paie » table.** New tab Gestion › Configuration › Conditions de paie: one table, a row per employee, that gathers the « Pay and options » of every employee card (time rules, team-leader premiums, flat rate, km rate, phone, storage, entry options) and the « Travel and expenses » lines. Tick a box, type an amount or pick a travel choice: it is saved at once to the same place as the card or the Travel page (nothing else changes). Search, warehouse filter, show/hide groups of columns, and « All / None / For all… » above a column (with a confirmation). Travel lines are still not read by the payroll engine.

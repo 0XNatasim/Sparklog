@@ -28,7 +28,7 @@ import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes, getKilometreBreakdow
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import JobCard from "@/components/manager/JobCard";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { addCalendarDays, companyDate } from "@/lib/company-time";
+import { companyDate } from "@/lib/company-time";
 import { QUERY_BUDGETS, shouldLoadAllMatchingManagerJobs } from "@/lib/query-budgets";
 import { isAbortError, useLatestRequest } from "@/lib/latest-request";
 import { mealBreakdownText, mealDayBreakdown } from "@/lib/meal-eligibility";
@@ -136,7 +136,6 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const [manualOnly, setManualOnly] = useState(manualFilter && searchParams.get("manual") === "1");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
-  const [yesterdaySnapshotOpen, setYesterdaySnapshotOpen] = useState(false);
   const [weekSnapshotOpen, setWeekSnapshotOpen] = useState(false);
   const [lastWeekSnapshotOpen, setLastWeekSnapshotOpen] = useState(false);
 
@@ -1244,9 +1243,6 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
                 <Button type="button" size="sm" variant="outline" onClick={() => setLastWeekSnapshotOpen(true)}>
                   <Radio className="mr-1.5 h-4 w-4" />{t("live.week.openLast")}
                 </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => setYesterdaySnapshotOpen(true)}>
-                  <Radio className="mr-1.5 h-4 w-4" />{t("live.snapshot.open")}
-                </Button>
               </div>
             </div>
 
@@ -1365,22 +1361,6 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
               weekOffset={-1}
               onSelectEmployee={(userId, date) => {
                 setLastWeekSnapshotOpen(false);
-                openEmployeeTimesheet(userId, date);
-              }}
-            />
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={yesterdaySnapshotOpen} onOpenChange={setYesterdaySnapshotOpen}>
-          <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{t("live.snapshot.dialogTitle")}</DialogTitle>
-            </DialogHeader>
-            <LiveCrew
-              targetDate={addCalendarDays(companyDate(), -1)}
-              snapshot
-              onSelectEmployee={(userId, date) => {
-                setYesterdaySnapshotOpen(false);
                 openEmployeeTimesheet(userId, date);
               }}
             />

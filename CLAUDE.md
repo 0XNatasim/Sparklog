@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-16, V2.4.265)
+## 6. À faire / à préciser (mis à jour 2026-11-16, V2.4.266)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.266 (technique).** Snapshot d'hier retiré : `ManagerDashboard.jsx` (état `yesterdaySnapshotOpen`, bouton et fenêtre) ; `LiveCrew.jsx` perd les props `snapshot` / `targetDate` (toujours le jour courant) ; textes `live.snapshot.*` supprimés. Aucune migration.
 
 **V2.4.265 (technique).** Fiche employé depuis le snapshot de la semaine. `WeekSnapshot.jsx` : le nom de l'employé est un bouton (`live.week.openCard`) qui met `ficheId` ; tant que `ficheId` est posé, le composant rend à la place du tableau un bouton « Retour au snapshot » (`live.week.backToSnapshot`) et `<EmployeesPanel tabbed onlyId={ficheId} />` (chargé à la demande par `lazyPanel`) ; « Retour » remet `ficheId` à nul et incrémente `reloadKey` (le chargement des fiches et des profils repart : un changement fait dans la carte, ex. une option de paie, se voit) ; la semaine choisie, le filtre et les états sont gardés (le composant reste monté, un seul dialogue de `ManagerDashboard`, pas de fenêtre dans la fenêtre). `EmployeesPanel.jsx` : nouvelle prop `onlyId` (une seule carte, déjà ouverte, sans `AddEmployeeCard`, recherche ni filtres, malgré le filtre d'état) ; les écritures sont celles de la carte (`savePayToggle`, `saveField`…). Aucune migration. Tests : `WeekSnapshot.test.jsx` (clic sur le nom, retour, semaine gardée), `EmployeesPanel.test.jsx` (`onlyId`).
 
