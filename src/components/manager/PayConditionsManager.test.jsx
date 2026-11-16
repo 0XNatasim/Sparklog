@@ -114,4 +114,24 @@ describe("PayConditionsManager", () => {
     expect(screen.queryByText("Marc Roy")).toBeNull();
     expect(screen.getByText("Zoé Tremblay")).toBeTruthy();
   });
+
+  it("opens the explanation of a rule when its title is clicked", async () => {
+    setup();
+    await screen.findByText("Zoé Tremblay");
+    fireEvent.click(screen.getByRole("button", { name: `${fr("employees.otFirstHourDouble")} — ${fr("payConditions.moreInfo")}` }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(fr("employees.otFirstHourDoubleHint"))).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: fr("payConditions.close") }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("explains a travel line with its default, its choices and the agreement article", async () => {
+    setup();
+    await screen.findByText("Zoé Tremblay");
+    fireEvent.click(screen.getByRole("button", { name: `${fr("travel.rule.time_client_to_home")} — ${fr("payConditions.moreInfo")}` }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain(fr("travel.defaultIs", { choice: fr("travel.choice.unpaid") }));
+    expect(dialog.textContent).toContain(fr("travel.convention", { ref: "23.04 1)" }));
+    expect(dialog.textContent).toContain("65");
+  });
 });

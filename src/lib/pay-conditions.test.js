@@ -96,3 +96,15 @@ describe("short column titles", () => {
     }
   });
 });
+
+describe("explanations", () => {
+  it("has a plain-words explanation for every column that has no hint of the employee card", async () => {
+    const { dictionaries } = await import("./i18n");
+    for (const language of ["fr", "en"]) {
+      for (const column of PAY_CONDITION_COLUMNS.filter((c) => c.kind !== "travel")) {
+        const key = column.hintKey || `payConditions.desc.${column.key}`;
+        expect(dictionaries[language][key], `${language} ${column.key}`).toBeTruthy();
+      }
+    }
+  });
+});
