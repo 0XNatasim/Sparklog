@@ -12,8 +12,12 @@ import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { lazyPanel } from "@/components/lazy-panel";
 import { Button } from "@/components/ui/button";
 import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
+
+// The employee card, loaded only when a name is clicked.
+const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 
 // Compact current-week (Sunday → Saturday) overview: per employee and per day, the total
 // time, the number of ORs and a colour for saved (orange) / submitted (green) / missing (red).
@@ -46,6 +50,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
   const [rounding, setRounding] = useState(new Map());
   const [loadedWeek, setLoadedWeek] = useState(null); // week the rows shown belong to
   const [error, setError] = useState("");
+  const [ficheId, setFicheId] = useState(null); // employee whose card is open in place of the table
+  const [reloadKey, setReloadKey] = useState(0); // bumped when coming back, so a change made in the card shows
 
   const today = companyDate();
   // CCQ non-worked days (jours fériés chômés, construction vacation): nobody is expected to work.
@@ -86,7 +92,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
       setLoadedWeek(weekStart);
     });
     return () => { alive = false; };
-  }, [days, weekStart]);
+  }, [days, weekStart, reloadKey]);
 
   const rows = useMemo(() => {
     const byKey = new Map();
@@ -148,6 +154,22 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     return "border-transparent bg-muted/30 text-muted-foreground";
   }
 
+  // An employee's card, in place of the table; « Retour » brings the table back on the same week.
+  if (ficheId) {
+    const fiche = people.find((p) => p.id === ficheId);
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" variant="outline" onClick={() => { setFicheId(null); setReloadKey((k) => k + 1); }}>
+            <ChevronLeft className="mr-1 h-4 w-4" />{t("live.week.backToSnapshot")}
+          </Button>
+          <span className="text-sm text-muted-foreground">{fiche?.full_name || fiche?.email || ""}</span>
+        </div>
+        <EmployeesPanel tabbed onlyId={ficheId} />
+      </div>
+    );
+  }
+
   return (
     <Card>
       <CardContent className="space-y-3 p-4">
@@ -205,7 +227,16 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
             <tbody>
               {rows.map(({ employee, cells, total, totalKm, round, hasDraft, foremanPaid }) => (
                 <tr key={employee.id}>
-                  <td className="max-w-[180px] truncate px-1 text-sm font-semibold">{employee.full_name || employee.email}</td>
+                  <td className="max-w-[180px] truncate px-1 text-sm font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setFicheId(employee.id)}
+                      title={t("live.week.openCard")}
+                      className="max-w-full truncate text-left underline decoration-dotted underline-offset-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      {employee.full_name || employee.email}
+                    </button>
+                  </td>
                   {cells.filter((cell) => visibleDays.includes(cell.date)).map((cell) => (
                     <td key={cell.date} className="p-0">
                       <button

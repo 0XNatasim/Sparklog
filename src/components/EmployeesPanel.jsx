@@ -78,7 +78,8 @@ async function fetchPendingMap() {
 // `tabbed` (Gestion V3 › Équipe › Employés): a search box and a « Chefs d'équipe » filter above the list,
 // and each open card shows tabs (Identité, CCQ, Paie et options, Impôts, Congés, Accès) that also hold
 // Règles de temps and the TD1 forms of Paramètres. Without it (V2) the page is unchanged.
-export default function EmployeesPanel({ tabbed = false }) {
+// `onlyId` (the week snapshot's pop-up): only that employee's card, already open, without the add / search bars.
+export default function EmployeesPanel({ tabbed = false, onlyId = null }) {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
   const { user, role } = useAuth();
@@ -102,7 +103,7 @@ export default function EmployeesPanel({ tabbed = false }) {
   const [loading, setLoading]   = useState(true);
   const [err, setErr]           = useState("");
   const [info, setInfo]         = useState("");
-  const [expandedIds, setExpandedIds] = useState(new Set());
+  const [expandedIds, setExpandedIds] = useState(() => new Set(onlyId ? [onlyId] : []));
   const [rates, setRates] = useState(new Map());
   const [annexes, setAnnexes] = useState(new Map());
   const [rateSuggestions, setRateSuggestions] = useState(new Map()); // id → { rate, annex, current } (dry-run, P-6)
@@ -371,8 +372,10 @@ export default function EmployeesPanel({ tabbed = false }) {
   }
 
   const counts = employeeCounts(profiles, { pending: pendingById, pushSet, today, t });
-  const visibleProfiles = filterEmployees(profiles, statusFilter, { pending: pendingById, pushSet, today })
-    .filter((p) => !tabbed || ((!leadersOnly || isTeamLeader(p)) && matchesEmployeeSearch(p, search)));
+  const visibleProfiles = onlyId
+    ? profiles.filter((p) => p.id === onlyId)
+    : filterEmployees(profiles, statusFilter, { pending: pendingById, pushSet, today })
+      .filter((p) => !tabbed || ((!leadersOnly || isTeamLeader(p)) && matchesEmployeeSearch(p, search)));
   // State and actions the card pieces read (EmployeeDetails and its sections).
   const panel = {
     t, user, role, privileged, today, nasSet, annexes, newHireDraft, mgmtOpen, cardViews,
@@ -403,11 +406,11 @@ export default function EmployeesPanel({ tabbed = false }) {
         </div>
       )}
 
-      {isManagerRole(role) && (
+      {!onlyId && isManagerRole(role) && (
         <AddEmployeeCard counts={counts} statusFilter={statusFilter} onFilter={setStatusFilter} onCreated={load} onError={setErr} onInfo={setInfo} />
       )}
 
-      {tabbed && !loading && profiles.length > 0 && (
+      {tabbed && !onlyId && !loading && profiles.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {/* Full width on a phone (the placeholder is long), next to the filter from sm. */}
           <label className="relative w-full min-w-0 sm:w-auto sm:flex-1">
@@ -431,7 +434,7 @@ export default function EmployeesPanel({ tabbed = false }) {
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("common.loading")}</CardContent></Card>
       )}
 
-      {tabbed && !loading && profiles.length > 0 && visibleProfiles.length === 0 && (
+      {tabbed && !onlyId && !loading && profiles.length > 0 && visibleProfiles.length === 0 && (
         <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">{t("employees.noMatch")}</CardContent></Card>
       )}
 
