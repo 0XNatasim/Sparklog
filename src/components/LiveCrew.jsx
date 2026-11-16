@@ -21,10 +21,10 @@ const montrealDate = companyDate;
 
 const fmtHM = formatHM;
 
-// The board of `targetDate` (default today, Montréal): who is expected, their jobs in order, who is
+// The board of the day (today, Montréal): who is expected, their jobs in order, who is
 // on leave or an exception to their usual pattern, and who did not submit the previous workday.
-async function fetchLiveCrew(targetDate) {
-  const today = targetDate || montrealDate();
+async function fetchLiveCrew() {
+  const today = montrealDate();
   const yesterday = dayjs(today).subtract(1, "day").format("YYYY-MM-DD");
   const [{ data: people }, { data: jobs }, { data: timeOff }, { data: yJobs }, holidays] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date").order("full_name"),
@@ -70,7 +70,7 @@ async function fetchLiveCrew(targetDate) {
   return { today, yesterday, onLeaveList, exceptionToday, notSubmittedList, employees: activePeople, jobsByUser: map };
 }
 
-export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot = false }) {
+export default function LiveCrew({ onSelectEmployee }) {
   const t = useT();
   const [employees, setEmployees] = useState([]);
   const [jobsByUser, setJobsByUser] = useState(new Map());
@@ -99,15 +99,14 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
 
   const load = useCallback(async () => {
     setLoading(true);
-    applyCrew(await fetchLiveCrew(targetDate));
+    applyCrew(await fetchLiveCrew());
     setLoading(false);
-  }, [applyCrew, targetDate]);
+  }, [applyCrew]);
 
   // Poll only while the tab is visible; refresh as soon as it is shown again.
   useEffect(() => {
     let alive = true;
-    fetchLiveCrew(targetDate).then((crew) => { if (alive) applyCrew(crew); });
-    if (snapshot) return () => { alive = false; };
+    fetchLiveCrew().then((crew) => { if (alive) applyCrew(crew); });
     const refreshIfVisible = () => { if (!document.hidden) load(); };
     const id = setInterval(refreshIfVisible, REFRESH_MS);
     document.addEventListener("visibilitychange", refreshIfVisible);
@@ -116,7 +115,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
       clearInterval(id);
       document.removeEventListener("visibilitychange", refreshIfVisible);
     };
-  }, [applyCrew, load, snapshot, targetDate]);
+  }, [applyCrew, load]);
 
   const rows = employees
     .map((employee) => {
@@ -156,7 +155,7 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
       onClick: onLeaveCount > 0 ? () => setLeaveOpen(true) : null,
       title: t("live.leave.open"),
     },
-    !snapshot && {
+    {
       label: t("live.recap.notSubmittedYesterday"),
       value: notSubmittedCount,
       cls: notSubmittedCount > 0 ? "text-destructive" : "text-foreground",
@@ -193,9 +192,9 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
               </span>
-              {snapshot ? t("live.snapshot.title") : t("live.title")} · {dayjs(todayDate || montrealDate()).format("DD MMM YYYY")}
+              {t("live.title")} · {dayjs(todayDate || montrealDate()).format("DD MMM YYYY")}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">{t(snapshot ? "live.snapshot.description" : "live.description")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("live.description")}</p>
           </div>
           {/* Day recap — centered, compact */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center">
@@ -215,11 +214,9 @@ export default function LiveCrew({ onSelectEmployee, targetDate = "", snapshot =
           </div>
           <div className="flex items-center gap-3">
             {updatedAt && <span className="text-xs text-muted-foreground">{t("live.updated", { time: dayjs(updatedAt).format("HH:mm:ss") })}</span>}
-            {!snapshot && (
-              <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
-                <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
-              </Button>
-            )}
+            <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />{t("live.refresh")}
+            </Button>
           </div>
         </CardContent>
       </Card>
