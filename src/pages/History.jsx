@@ -17,6 +17,7 @@ import { useT } from "@/lib/use-t";
 import { dailyRegularMinutesFor, getKilometreBreakdown } from "@/lib/payroll-calculations";
 import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import MonthEndInventoryBanner from "@/components/MonthEndInventoryBanner";
 import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
 import { dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
 import { submitSavedJob } from "@/lib/submit-job";
@@ -420,6 +421,7 @@ export default function History() {
   return (
     <AppShell>
       <div className="space-y-3">
+        {!isViewMode && <MonthEndInventoryBanner userId={user?.id} />}
         {loading && (
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
         )}

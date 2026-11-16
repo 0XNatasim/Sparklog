@@ -40,6 +40,7 @@ const AuditLog = lazyPanel(() => import("@/components/AuditLog"));
 const EmployeeActivityLog = lazyPanel(() => import("@/components/EmployeeActivityLog"));
 const InfraHealthCard = lazyPanel(() => import("@/components/InfraHealthCard"));
 const InventoryMinimums = lazyPanel(() => import("@/components/InventoryMinimums"));
+const MonthEndInventory = lazyPanel(() => import("@/components/MonthEndInventory"));
 const InventoryScreenshotsPanel = lazyPanel(() => import("@/components/InventoryScreenshotsPanel"));
 const EmergencyTimesheet = lazyPanel(() => import("@/components/EmergencyTimesheet"));
 const PayRulesReference = lazyPanel(() => import("@/components/PayRulesReference"));
@@ -93,6 +94,7 @@ export const PayrollWeekPage = () => <PayrollPage Component={PayrollWeek} writes
 
 export const InventoryPage = () => <InventoryScreenshotsPanel />;
 export const InventoryMinimumsPage = () => <InventoryMinimums />;
+export const MonthEndInventoryPage = () => <MonthEndInventory />;
 export const AbsencesPage = () => <CongesManager />;
 export const FormsPage = () => <FormsManager collapsible={false} />;
 export const ReferencesPage = () => <ReferencesManager />;

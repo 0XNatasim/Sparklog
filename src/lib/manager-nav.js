@@ -122,9 +122,10 @@ export const MANAGER_NAV = Object.freeze([
 ]);
 
 // Pages opened from a button of another page, not listed in the menu: title and access rule only
-// (Inventaire › Minimums par entrepôt, from the Inventaire page).
+// (Inventaire › Minimums par entrepôt and Inventaire fin de mois, from the Inventaire page).
 export const MANAGER_SUBPAGES = Object.freeze([
   Object.freeze({ id: "inventory-minimums", path: "inventory/minimums", grant: null, labelKey: "mgr.inventory.ratios.pageTitle", parent: "inventory" }),
+  Object.freeze({ id: "inventory-month-end", path: "inventory/month-end", grant: null, labelKey: "monthEnd.manager.pageTitle", parent: "inventory" }),
 ]);
 
 // The access rule a tab carries: its source page, or its inline rule.
