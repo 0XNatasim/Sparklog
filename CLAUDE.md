@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-16, V2.4.263)
+## 6. À faire / à préciser (mis à jour 2026-11-16, V2.4.264)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.264 (technique).** « Conditions de paie » plus compact : chaque colonne de `PAY_CONDITION_COLUMNS` a un `shortKey` (`payConditions.short.<clé>`, FR / EN, 26 caractères au plus : test dans `pay-conditions.test.js`) affiché à la verticale dans l'en-tête (`[writing-mode:vertical-rl] rotate-180`, `h-32`, colonne `w-12`) ; le libellé complet et l'aide passent dans le `title` de l'en-tête ; boutons « Tous / Aucun » empilés, listes de trajet à `w-[5.5rem]`. Le sens des cases ne change pas (« 1er dépl. non payé » = `first_trip_unpaid`, coché = non payé). Aucune migration, aucun changement de données.
 
 **V2.4.263 (technique).** Onglet « Conditions de paie » (Gestion › Configuration, onglet `pay-conditions`, règle de `config-settings`, `PayConditionsManager.jsx`). Aucune migration, aucune nouvelle colonne : le tableau ne stocke rien. `src/lib/pay-conditions.js` : `PAY_CONDITION_GROUPS` / `PAY_CONDITION_COLUMNS` (règles de temps, primes de chef d'équipe, taux et remboursements dont `hourly_rate` du personnel de bureau, options de saisie, puis une colonne par ligne de `TRAVEL_RULE_SECTIONS`), `cellState(colonne, profil)` (réutilise `payRuleToggles`, `hasPayRules`, `reimbursements`, `isNonCcqRole`, `travelRuleEmployees` : « — » quand l'option ne s'applique pas, verrouillée selon le rôle, ex. sous-traitant), `parseConditionAmount` (même règle que `parsePayAmount`, taux km ≤ 9,99), `payConditionRows` (tri par numéro d'employé, comptes en pause cachés, recherche, groupe), `bulkTargets`. L'écran lit `profiles` (colonnes de `PAY_CONDITION_PROFILE_COLUMNS`), `employee_groups` + membres et `travel_pay_rules` par pages (`fetchAllRows`, plus de 1 000 lignes possibles). Une case ou un montant s'enregistre par `profiles.update(...).in("id", ...)` comme `savePayToggle` / `savePayAmount` de `EmployeesPanel` (mise à jour optimiste, retour en arrière si la base refuse) ; une ligne de trajet par `set_travel_pay_rule` pour un seul employé, avec la date d'effet de la semaine en cours et le `billed_to_britton` / seuil km déjà enregistrés (jamais écrasés) ; les changements « Tous / Aucun / Pour tous… » demandent une confirmation et ne touchent que les cellules affichées, applicables et non verrouillées (le travel en boucle, un employé à la fois, pour garder le « Britton » de chacun). Les anciens écrans (fiche employé, Trajets et frais, Règles de paie) ne changent pas. Le moteur de paie ne lit toujours pas `travel_pay_rules` (§6.1 D). Tests : `pay-conditions.test.js`, `PayConditionsManager.test.jsx`.
 

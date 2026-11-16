@@ -83,3 +83,16 @@ describe("typed amounts and the list", () => {
     expect(bulkTargets(col("overtime_first_hour_double"), [worker, sub, owner]).map((p) => p.id)).toEqual(["w"]);
   });
 });
+
+describe("short column titles", () => {
+  it("gives every column a short title that is shorter than its full label", async () => {
+    const { dictionaries } = await import("./i18n");
+    for (const language of ["fr", "en"]) {
+      for (const column of PAY_CONDITION_COLUMNS) {
+        const short = dictionaries[language][column.shortKey];
+        expect(short, `${language} ${column.key}`).toBeTruthy();
+        expect(short.length, `${language} ${column.key}`).toBeLessThanOrEqual(26);
+      }
+    }
+  });
+});

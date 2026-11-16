@@ -15,8 +15,8 @@ export const PAY_CONDITION_PROFILE_COLUMNS = Object.freeze([
   "parking_receipts_enabled", "inventory_screenshots_enabled", "km_apart_from_capture", "hourly_rate",
 ]);
 
-const toggle = (field, labelKey, hintKey) => Object.freeze({ key: field, field, kind: "toggle", labelKey, hintKey });
-const amount = (field, labelKey, unitKey, hintKey) => Object.freeze({ key: field, field, kind: "amount", labelKey, unitKey, hintKey });
+const toggle = (field, labelKey, hintKey) => Object.freeze({ key: field, field, kind: "toggle", labelKey, hintKey, shortKey: `payConditions.short.${field}` });
+const amount = (field, labelKey, unitKey, hintKey) => Object.freeze({ key: field, field, kind: "amount", labelKey, unitKey, hintKey, shortKey: `payConditions.short.${field}` });
 
 // The groups of columns, in the order of the employee card. `travel` columns come from the travel rules (one per line).
 export const PAY_CONDITION_GROUPS = Object.freeze([
@@ -48,7 +48,7 @@ export const PAY_CONDITION_GROUPS = Object.freeze([
     labelKey: `payConditions.group.travel_${section.id}`,
     travel: true,
     columns: Object.freeze(section.rows.filter((rule) => !rule.fixed).map((rule) => Object.freeze({
-      key: rule.key, kind: "travel", labelKey: `travel.rule.${rule.key}`, rule,
+      key: rule.key, kind: "travel", labelKey: `travel.rule.${rule.key}`, shortKey: `payConditions.short.${rule.key}`, rule,
     }))),
   })),
 ]);

@@ -173,7 +173,7 @@ export default function PayConditionsManager() {
           value={shown}
           onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
           onBlur={(e) => saveAmount(column, person, e.target.value)}
-          className="h-8 w-20 px-1 text-right font-mono text-xs"
+          className="h-8 w-[4.5rem] px-1 text-right font-mono text-xs"
         />
       );
     }
@@ -183,7 +183,7 @@ export default function PayConditionsManager() {
         aria-label={name}
         value={chosen}
         onChange={(e) => saveTravel(column, person, e.target.value)}
-        className={`h-8 max-w-[7.5rem] rounded border bg-background px-1 text-xs ${chosen ? "" : "text-muted-foreground"}`}
+        className={`h-8 w-[5.5rem] rounded border bg-background px-0.5 text-[11px] ${chosen ? "" : "text-muted-foreground"}`}
       >
         <option value="" disabled>{t("payConditions.defaultChoice", { choice: choiceLabel(column.rule.defaultChoice) })}</option>
         {column.rule.choices.map((choice) => <option key={choice} value={choice}>{choiceLabel(choice)}</option>)}
@@ -194,7 +194,7 @@ export default function PayConditionsManager() {
   function renderBulk(column) {
     if (column.kind === "toggle") {
       return (
-        <span className="mt-1 flex justify-center gap-1">
+        <span className="mt-1 flex flex-col items-center gap-0.5">
           <button type="button" className="rounded border bg-background px-1 text-[10px] font-medium hover:bg-accent" aria-label={`${label(column)} · ${t("payConditions.allOn")}`} onClick={() => bulkToggle(column, true)}>{t("payConditions.allOn")}</button>
           <button type="button" className="rounded border bg-background px-1 text-[10px] font-medium hover:bg-accent" aria-label={`${label(column)} · ${t("payConditions.allOff")}`} onClick={() => bulkToggle(column, false)}>{t("payConditions.allOff")}</button>
         </span>
@@ -202,7 +202,7 @@ export default function PayConditionsManager() {
     }
     if (column.kind === "travel") {
       return (
-        <select aria-label={`${label(column)} · ${t("payConditions.forAll")}`} value="" onChange={(e) => bulkTravel(column, e.target.value)} className="mt-1 h-6 max-w-[7.5rem] rounded border bg-background px-1 text-[10px] font-normal">
+        <select aria-label={`${label(column)} · ${t("payConditions.forAll")}`} value="" onChange={(e) => bulkTravel(column, e.target.value)} className="mt-1 h-6 w-[5.5rem] rounded border bg-background px-0.5 text-[10px] font-normal">
           <option value="">{t("payConditions.forAll")}</option>
           {column.rule.choices.map((choice) => <option key={choice} value={choice}>{choiceLabel(choice)}</option>)}
         </select>
@@ -265,9 +265,9 @@ export default function PayConditionsManager() {
                 </tr>
                 <tr>
                   {visibleGroups.flatMap((group) => group.columns).map((column) => (
-                    <th key={column.key} title={column.hintKey ? t(column.hintKey) : undefined} className={`${HEAD} min-w-[6.5rem] max-w-[9rem] font-medium`}>
-                      <span className="block leading-tight">{label(column)}</span>
-                      {column.unitKey && <span className="block text-[10px] font-normal text-muted-foreground">{t(column.unitKey)}</span>}
+                    <th key={column.key} title={[label(column), column.hintKey && t(column.hintKey)].filter(Boolean).join(" — ")} className={`${HEAD} w-12 min-w-[3rem] px-1 font-medium`}>
+                      {/* Short title written upwards: a narrow column. The full name and the hint are in the tooltip. */}
+                      <span className="mx-auto block h-32 whitespace-nowrap text-[11px] leading-tight [writing-mode:vertical-rl] rotate-180">{t(column.shortKey)}</span>
                       {renderBulk(column)}
                     </th>
                   ))}
