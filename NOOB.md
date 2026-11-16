@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-15 (V2.4.261).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-16 (V2.4.262).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -23,6 +23,8 @@
   et 44 approuvées ; rien n'est encore comptabilisé. Dans l'ordre, une semaine à la
   fois : **À traiter** (approuver) › **Paie › Paie de la semaine** (« Calculer et comptabiliser ») › imprimer les talons.
   La semaine 44 attend que la 43 soit comptabilisée (le cumul de l'année suit d'une semaine à l'autre).
+- [ ] **À faire pour la V2.4.262 (preuve vérifiable)** : appliquer la **migration 0141** à la base **puis** redéployer la fonction **`process_overtime_evidence`** (avant de mettre le code en ligne, sinon la page des gestionnaires cherche des colonnes qui n'existent pas encore). Ensuite, essayer avec une vraie capture du formulaire.
+- ✅ **V2.4.262 — preuve vérifiable** : l'app **lit la capture du formulaire** de temps supplémentaire et garde seulement trois chiffres : le **numéro d'OT**, les **minutes chez le client** et les **minutes de retour**. Dans **À vérifier avant d'approuver**, une alerte s'affiche si ça **ne concorde pas** avec la journée : l'OT doit être **celui de la dernière fiche** de la journée ; les minutes chez le client = le temps payé **au-delà de 8 h** (sans le retour, à 15 minutes près) ; le retour = le **retour facturable** saisi en fin de journée. Une capture **illisible** donne aussi une alerte. **Rien n'est bloqué** : c'est une alerte, tu peux quand même approuver. **À savoir :** la lecture passe par OCR.space (service hors Québec, déjà utilisé pour les autres captures ; le plan `OFFICIEL.md` prévoit de le retirer). Les km du retour ne sont pas comparés (non lus sur la capture). Si ta définition des « minutes chez le client » est différente, c'est un seul endroit à changer (`overtime-proof-check.js`).
 - ✅ **V2.4.261 — preuve de temps supplémentaire** : quand une journée dépasse 8 h, l'employé doit maintenant joindre une **capture du formulaire de demande de temps supplémentaire** (Microsoft Forms) **au lieu du SMS**. La fenêtre et l'image d'exemple sont mises à jour. **À savoir :** l'app ne lit pas la capture, donc rien ne vérifie que c'est le bon formulaire ; les anciennes preuves SMS restent visibles. Prévenir les employés avant la mise en ligne.
 - ✅ **V2.4.260** : dans **À traiter**, la carte **« À regarder d'abord »** se **plie et se déplie** en touchant son titre (le nombre de jours reste affiché). Le choix est gardé sur ton appareil, et c'est le même réglage que l'encadré « À vérifier avant d'approuver » des fiches.
 - ✅ L'app fonctionne et les heures sont bien classées. Toutes tes décisions de paie sont dans l'app.

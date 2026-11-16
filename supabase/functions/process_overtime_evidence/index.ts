@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { overtimeFormFound, parseOvertimeForm } from "../_shared/overtime_form.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,19 +52,29 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     }
 
     const text = (result?.ParsedResults || []).map((item: { ParsedText?: string }) => item?.ParsedText || "").join("\n").trim();
-    const status = text && validatesOvertimeSms(text) ? "processed" : "needs_review";
+    // The proof is now the overtime request form: keep its three numbers (OT, minutes at the client, return minutes).
+    // An older app version may still send the SMS screenshot, which is classified as before.
+    const form = parseOvertimeForm(text);
+    const status = text && (overtimeFormFound(form) || validatesOvertimeSms(text)) ? "processed" : "needs_review";
     const { error: updateError } = await admin
       .from("overtime_evidence")
-      // Persist only the classification. Raw message text can contain names, phone
-      // numbers and unrelated conversation metadata and is not needed by the UI.
-      .update({ ocr_text: null, ocr_status: status })
+      // Persist only the classification and the three numbers. Raw text can contain names, phone
+      // numbers and unrelated metadata and is not needed by the UI.
+      .update({
+        ocr_text: null,
+        ocr_status: status,
+        proof_ot: form.ot,
+        proof_client_minutes: form.clientMinutes,
+        proof_return_minutes: form.returnMinutes,
+        proof_read_at: new Date().toISOString(),
+      })
       .eq("id", evidence.id);
     if (updateError) throw updateError;
   } catch (error) {
     console.error("[process_overtime_evidence]", error);
     await admin
       .from("overtime_evidence")
-      .update({ ocr_status: "failed" })
+      .update({ ocr_status: "failed", proof_read_at: new Date().toISOString() })
       .eq("id", evidence.id);
   }
 }
