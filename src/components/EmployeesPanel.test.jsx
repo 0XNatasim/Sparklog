@@ -30,7 +30,7 @@ const SNAPSHOT = {
   raw_json: { Annexes: [{ cd_annexe: "C3", desc_annexe: "Commercial" }], AnnexesRates: { "Taux horaire": [{ Name: "Régulier", Rates: { C3: "45,50" } }] } },
 };
 
-function setup({ role = "owner", profiles = PROFILES, tabbed = false, taxProfiles = [] } = {}) {
+function setup({ role = "owner", profiles = PROFILES, tabbed = false, taxProfiles = [], onlyId = null } = {}) {
   state.auth = { user: { id: "owner-1" }, role };
   state.fake = createFakeSupabase({
     tables: { profiles: structuredClone(profiles), ccq_rate_snapshots: [SNAPSHOT], employee_time_off: [], employee_tax_profiles: taxProfiles },
@@ -41,7 +41,7 @@ function setup({ role = "owner", profiles = PROFILES, tabbed = false, taxProfile
       nas_presence: [],
     },
   });
-  return render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EmployeesPanel tabbed={tabbed} /></MemoryRouter>);
+  return render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><EmployeesPanel tabbed={tabbed} onlyId={onlyId} /></MemoryRouter>);
 }
 
 const cardButtons = () => screen.getAllByRole("button").filter((button) => button.hasAttribute("aria-expanded") && button.closest(".rounded-lg, .rounded-xl"));
@@ -171,6 +171,15 @@ describe("EmployeesPanel (V3, one card with tabs)", () => {
     });
     expect(label.className).toMatch(/border-destructive/);
     expect(label.textContent).toContain(fr("employees.toFill"));
+  });
+
+  it("shows only the card asked for, already open, without the add and search bars (the week snapshot's pop-up)", async () => {
+    setup({ tabbed: true, onlyId: "zoe" });
+    await screen.findByText("Zoé Tremblay");
+    expect(screen.queryByText("Bob Ancien")).toBeNull();
+    expect(screen.queryByText("Karine Propriétaire")).toBeNull();
+    expect(screen.queryByPlaceholderText(fr("employees.search"))).toBeNull();
+    expect(screen.getAllByRole("tab").length).toBeGreaterThan(0); // the card is open: its tabs are there
   });
 
   const openTab = async (card, key) => {

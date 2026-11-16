@@ -3,7 +3,7 @@
 // day; under the weekly total, what is paid after the 15-minute rounding, the week's difference and the counter.
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { dictionaries } from "@/lib/i18n";
 import { createFakeSupabase } from "@/test/fake-supabase";
 
@@ -11,6 +11,9 @@ const state = vi.hoisted(() => ({ fake: null }));
 vi.mock("@/supabaseClient", () => ({ get supabase() { return state.fake.client; } }));
 vi.mock("../supabaseClient", () => ({ get supabase() { return state.fake.client; } }));
 vi.mock("@/lib/company-holidays", () => ({ useHolidayDates: () => [] }));
+
+// The employee card is the real EmployeesPanel (tested apart): here a stand-in shows what it was given.
+vi.mock("@/components/EmployeesPanel", () => ({ default: ({ onlyId, tabbed }) => <div data-testid="fiche">fiche {onlyId} {tabbed ? "tabbed" : ""}</div> }));
 
 const { default: WeekSnapshot } = await import("./WeekSnapshot");
 
@@ -167,3 +170,27 @@ describe("WeekSnapshot overtime proof with the unpaid first trip and 4 days of 1
   });
 });
 
+describe("WeekSnapshot employee card", () => {
+  it("opens the employee's card when the name is clicked, and « Retour » brings the table back on the same week", async () => {
+    setup([job("j1", "2026-10-20", "07:00", "15:00")]);
+    await screen.findAllByText("8h00");
+    fireEvent.click(screen.getByRole("button", { name: "Employé Test" }));
+    const card = await screen.findByTestId("fiche");
+    expect(card.textContent).toContain("fiche e1 tabbed");
+    expect(screen.queryByRole("table")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: fr("live.week.backToSnapshot") }));
+    await waitFor(() => expect(screen.getByRole("table")).toBeTruthy());
+    expect(screen.queryByTestId("fiche")).toBeNull();
+    expect(screen.getAllByText("8h00").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the week chosen when coming back from a card", async () => {
+    setup([job("j1", "2026-10-13", "07:00", "13:00")]);
+    await screen.findByText("Employé Test");
+    fireEvent.click(screen.getByLabelText(fr("live.week.earlier")));
+    await waitFor(() => expect(screen.getAllByText("6h00").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: "Employé Test" }));
+    fireEvent.click(await screen.findByRole("button", { name: fr("live.week.backToSnapshot") }));
+    await waitFor(() => expect(screen.getAllByText("6h00").length).toBeGreaterThan(0));
+  });
+});

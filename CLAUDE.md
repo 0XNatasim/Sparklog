@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-16, V2.4.264)
+## 6. À faire / à préciser (mis à jour 2026-11-16, V2.4.265)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.265 (technique).** Fiche employé depuis le snapshot de la semaine. `WeekSnapshot.jsx` : le nom de l'employé est un bouton (`live.week.openCard`) qui met `ficheId` ; tant que `ficheId` est posé, le composant rend à la place du tableau un bouton « Retour au snapshot » (`live.week.backToSnapshot`) et `<EmployeesPanel tabbed onlyId={ficheId} />` (chargé à la demande par `lazyPanel`) ; « Retour » remet `ficheId` à nul et incrémente `reloadKey` (le chargement des fiches et des profils repart : un changement fait dans la carte, ex. une option de paie, se voit) ; la semaine choisie, le filtre et les états sont gardés (le composant reste monté, un seul dialogue de `ManagerDashboard`, pas de fenêtre dans la fenêtre). `EmployeesPanel.jsx` : nouvelle prop `onlyId` (une seule carte, déjà ouverte, sans `AddEmployeeCard`, recherche ni filtres, malgré le filtre d'état) ; les écritures sont celles de la carte (`savePayToggle`, `saveField`…). Aucune migration. Tests : `WeekSnapshot.test.jsx` (clic sur le nom, retour, semaine gardée), `EmployeesPanel.test.jsx` (`onlyId`).
 
 **V2.4.264 (technique).** « Conditions de paie » plus compact : chaque colonne de `PAY_CONDITION_COLUMNS` a un `shortKey` (`payConditions.short.<clé>`, FR / EN, 26 caractères au plus : test dans `pay-conditions.test.js`) affiché à la verticale dans l'en-tête (`[writing-mode:vertical-rl] rotate-180`, `h-32`, colonne `w-12`) ; le titre est un bouton (`aria-label` « libellé complet — Voir l'explication ») qui ouvre une fenêtre : libellé complet, explication (`hintKey` de la fiche employé quand il existe, sinon `payConditions.desc.<clé>`), phrase sur la case, et pour une ligne de trajet défaut / choix / article de convention / seuil km (`columnDescription` de `PayConditionsManager.jsx`) ; le libellé complet reste aussi dans le `title` ; boutons « Tous / Aucun » empilés, listes de trajet à `w-[5.5rem]`. Le sens des cases ne change pas (« 1er dépl. non payé » = `first_trip_unpaid`, coché = non payé). Aucune migration, aucun changement de données.
 
