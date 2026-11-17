@@ -410,7 +410,13 @@ export default function History() {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
       if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required)) {
-        // Proof is one per day: open the day's last job so the form asks for the screenshot.
+        // From 2026-11-17 each work order past the line has its own proof: say which ones are missing (red clock with a +).
+        const missing = selectedJobs.filter((job) => proofPerJob(job.job_date) && dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required);
+        if (missing.length > 0) {
+          setErr(t("proofs.submitDayMissing", { count: missing.length, hours: dailyRegularMinutes / 60 }));
+          return;
+        }
+        // Before that date proof is one per day: open the day's last job so the form asks for the screenshot.
         const lastJob = [...selectedJobs].sort((a, b) => String(a.fin || "").localeCompare(String(b.fin || ""))).pop();
         navigate(`/form?edit=${lastJob.id}&submit=1${hasManagerEntry ? `&confirmed=${ids.join(",")}` : ""}`);
         return;

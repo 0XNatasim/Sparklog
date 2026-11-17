@@ -15,6 +15,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { lazyPanel } from "@/components/lazy-panel";
 import { Button } from "@/components/ui/button";
 import { liveRoster, notStartedOn, weekCellSummary } from "@/lib/live-crew";
+import { overtimeLineJobIds, proofPerJob } from "@/lib/overtime-proof-rules";
 
 // The employee card, loaded only when a name is clicked.
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
@@ -112,9 +113,16 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
         ) || 0), 0);
         const km = dayJobs.reduce((sum, job) => sum + getKilometreBreakdown(job).totalKm, 0);
         // Overtime proof not given yet (« Je ne l'ai pas encore »): a saved day over the daily threshold with no proof.
+        // From 2026-11-17 each work order past the line needs its own proof: red when one of them has none yet.
         const proofMissing = employee.role !== "admin" && dayJobs.some((job) => job.status === "saved" || job.status === "updated")
-          && !dayJobs.some((job) => job.overtime_evidence_captured)
-          && paidMinutes(dayJobs, employee.first_trip_unpaid) > dailyRegularMinutesFor(employee);
+          && (proofPerJob(date)
+            ? [...overtimeLineJobIds(dayJobs, {
+              minutesOf: (job) => (job.depart && job.fin ? minutesBetween(job.depart, job.fin) : 0),
+              thresholdMinutes: dailyRegularMinutesFor(employee),
+              unpaidTripMinutes: employee.first_trip_unpaid ? dayFirstTripUnpaidMinutes(dayJobs) : 0,
+            })].some((id) => !dayJobs.find((job) => job.id === id)?.overtime_evidence_captured)
+            : (!dayJobs.some((job) => job.overtime_evidence_captured)
+              && paidMinutes(dayJobs, employee.first_trip_unpaid) > dailyRegularMinutesFor(employee)));
         const off = timeOff.some((row) => row.user_id === employee.id && !row.start_time && isOffOn(row, date));
         return {
           date, hours, km, off, proofMissing, holiday: holidays.has(date),
