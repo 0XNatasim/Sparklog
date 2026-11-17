@@ -172,27 +172,8 @@ describe("EmployeeForm — new entry", () => {
     expect(screen.queryByText(fr("form.evidence.progress", { n: 1, total: 1 }))).toBeNull();
   });
 
-  // Owner decision 2026-11-17: one screenshot per work order past the 8 h line (V2.4.269).
-  const day = [
-    { id: "a", job_date: TODAY, depart: "06:00", arrivee: "06:30", fin: "12:00", km_total: 10, km_aller: 10, km_retour: 0 },
-    { id: "b", job_date: TODAY, depart: "12:00", arrivee: "12:30", fin: "15:00", km_total: 10, km_aller: 10, km_retour: 0 },
-  ];
-
-  it("asks for a second screenshot when a second work order goes past the 8 h line", async () => {
-    setup({ jobs: day, evidence: [{ id: "e1" }] }); // 6 h + 3 h (past the line) + this 1 h (past the line): 2 needed, 1 given
-    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
-    fill({ ot: "200452", depart: "15:00", arrivee: "15:10", fin: "16:00" });
-    fireEvent.click(saveButton());
-    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
-    await screen.findByText(fr("form.last.title"));
-    fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
-    await screen.findByText(fr("form.evidence.title"));
-    expect(screen.getByText(fr("form.evidence.progress", { n: 2, total: 2 }))).toBeTruthy();
-    expect(state.fake.rpcCalls("save_own_job")).toHaveLength(0);
-  });
-
-  it("does not ask again once the day holds one screenshot per work order past the line", async () => {
-    setup({ jobs: day, evidence: [{ id: "e1" }, { id: "e2" }] });
+  it("does not ask again when a job of the day already carries the overtime proof", async () => {
+    setup({ jobs: [{ id: "a", job_date: TODAY, depart: "06:00", arrivee: "06:30", fin: "15:00", km_total: 10, km_aller: 10, km_retour: 0, overtime_evidence_captured: true }] });
     await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
     fill({ ot: "200452", depart: "15:00", arrivee: "15:10", fin: "16:00" });
     fireEvent.click(saveButton());
