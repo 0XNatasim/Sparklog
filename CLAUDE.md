@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-16, V2.4.266)
+## 6. À faire / à préciser (mis à jour 2026-11-17, V2.4.267)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.267 (technique).** Preuve de temps supp. seulement au dernier OT. `EmployeeForm.saveWithReturn` : `needsEvidence` n'appelle `requiresOvertimeEvidence()` que si `requestedMode === "submit"` ou `endShiftRef.current` (réponse « Oui » à « Dernier OT de la journée ? », ou journée soumise depuis l'Historique, `?submit=1`) ; avant, tout enregistrement en brouillon d'une fiche faisant dépasser le seuil de la journée (déjà compté avec les fiches existantes + celle-ci) ouvrait l'étape `evidence`, même au milieu de la journée. La base n'est pas touchée : `validate_job_submission_contract` ne demande la preuve qu'à la transition vers `submitted`, jamais à un brouillon. Effet de bord corrigé : le contrôle réseau qui tenait `checking` à vrai laissait passer un double « Non » dans le même instant ; `saveWithReturn` est maintenant enveloppée d'un verrou synchrone (`saveFlowBusyRef`, corps dans `runSaveWithReturn`). Tests : `EmployeeForm.test.jsx` (un OT de 9 h 30 non dernier : ni étape de preuve ni `save_own_job_with_overtime_evidence`) ; « un seul enregistrement si « Non » est touché deux fois » repasse. Aucune migration.
 
 **V2.4.266 (technique).** Snapshot d'hier retiré : `ManagerDashboard.jsx` (état `yesterdaySnapshotOpen`, bouton et fenêtre) ; `LiveCrew.jsx` perd les props `snapshot` / `targetDate` (toujours le jour courant) ; textes `live.snapshot.*` supprimés. Aucune migration.
 
