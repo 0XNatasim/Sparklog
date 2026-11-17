@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-16 (V2.4.266).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.267).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -23,6 +23,7 @@
   et 44 approuvées ; rien n'est encore comptabilisé. Dans l'ordre, une semaine à la
   fois : **À traiter** (approuver) › **Paie › Paie de la semaine** (« Calculer et comptabiliser ») › imprimer les talons.
   La semaine 44 attend que la 43 soit comptabilisée (le cumul de l'année suit d'une semaine à l'autre).
+- ✅ **V2.4.267 — preuve de temps supp. seulement au dernier OT** : quand vous entrez vos heures et que vous avez déjà dépassé 8 h mais qu'il vous reste d'autres OT à saisir, l'app **ne demande plus** la capture au milieu de la journée. Elle la demande au **dernier OT de la journée** (quand vous répondez « Oui » à « Dernier OT de la journée ? »), ou quand vous soumettez la journée depuis l'Historique. La règle de la base n'a pas changé : sans la preuve, la journée ne peut pas être soumise.
 - ✅ **V2.4.266 — snapshot d'hier retiré** : le bouton « Hier à 23 h 58 » n'existe plus ; les snapshots « Cette semaine » et « Semaine passée » restent. Rien à faire de votre côté.
 - ✅ **V2.4.265 — fiche de l'employé depuis le snapshot** : dans le **snapshot de la semaine** (« Cette semaine » / « Semaine passée »), le **nom d'un employé est cliquable** : un clic ouvre **sa fiche** (tous les onglets : Identité, CCQ, Paie et options, Impôts, Congés, Accès), au même endroit dans la fenêtre. Le bouton **« Retour au snapshot »** ramène le tableau, **sur la même semaine** et mis à jour si tu as changé quelque chose dans la fiche. Les modifications faites dans la fiche s'enregistrent comme dans Équipe › Employés.
 - ✅ **V2.4.264 — tableau plus compact** : dans **Conditions de paie**, les **titres de colonnes sont raccourcis** (« 1er dépl. non payé », « Retour av. soc. ≤ 40 h », « 1re h supp. 2× », « Prime CCQ $/h »…) et **écrits à la verticale**, pour que le tableau prenne moins de place. Le nom complet s'affiche en laissant la souris sur un titre, et **en cliquant (ou touchant) un titre, une fenêtre explique en mots simples ce que fait la règle** (pour une ligne de trajet : sa valeur par défaut, les choix possibles et l'article de la convention). **Attention :** « 1er dépl. non payé » garde le sens de la case de la fiche employé (**cochée = le premier déplacement n'est PAS payé**). Rien d'autre ne change.

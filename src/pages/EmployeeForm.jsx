@@ -789,14 +789,30 @@ export default function EmployeeForm() {
     setAutoResend({ minutes, km, mode, attempt, fieldsKey: entryFieldsKey });
   }
 
-  async function saveWithReturn(minutes, km, requestedMode = pendingSaveMode, resendAttempt = 0) {
+  // One save flow at a time: a second tap in the same instant is ignored. (saveJob's own guard only closes after its first
+  // await, and the overtime check that used to take this time is now skipped on a job that is not the day's last.)
+  const saveFlowBusyRef = useRef(false);
+  async function saveWithReturn(...args) {
+    if (saveFlowBusyRef.current) return undefined;
+    saveFlowBusyRef.current = true;
+    try {
+      return await runSaveWithReturn(...args);
+    } finally {
+      saveFlowBusyRef.current = false;
+    }
+  }
+
+  async function runSaveWithReturn(minutes, km, requestedMode = pendingSaveMode, resendAttempt = 0) {
     setAutoResend(null);
     setReturnSaveError("");
     setReturnCheckBusy(true);
     const returnValues = { minutes, km };
     let needsEvidence;
     try {
-      needsEvidence = requiresEvidenceBeforeSave(requestedMode)
+      // The proof is asked only on the LAST work order of the day (« Dernier OT de la journée ? » = Oui, or a day submitted
+      // from History): an earlier job saved mid-day may already pass 8 h with the jobs still to come, and the database only
+      // needs the proof when the day is submitted.
+      needsEvidence = requiresEvidenceBeforeSave(requestedMode) && (requestedMode === "submit" || endShiftRef.current)
         ? await requiresOvertimeEvidence()
         : false;
     } catch (error) {
