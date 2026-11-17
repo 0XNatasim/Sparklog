@@ -57,10 +57,18 @@ export function proofAnomalies(evidenceRows, jobs, { firstTripUnpaidUsers = new 
   const reviewable = (jobs || []).filter((job) => REVIEWABLE.has(job.status) && job.user_id && job.job_date);
   const byId = new Map(reviewable.map((job) => [job.id, job]));
   const anomalies = [];
+  // A day with several proofs (one per work order past 8 h, 0143) is not compared: the expected values below are those of the
+  // day's last work order, which would flag the other proofs wrongly. Compared per proof in a later step.
+  const proofsPerDay = new Map();
+  for (const row of evidenceRows || []) {
+    const job = byId.get(row.job_id);
+    if (job) proofsPerDay.set(`${job.user_id}|${job.job_date}`, (proofsPerDay.get(`${job.user_id}|${job.job_date}`) || 0) + 1);
+  }
   for (const row of evidenceRows || []) {
     if (!row?.proof_read_at) continue;
     const job = byId.get(row.job_id);
     if (!job || job.status !== "submitted") continue;
+    if ((proofsPerDay.get(`${job.user_id}|${job.job_date}`) || 0) > 1) continue;
     const base = { userId: job.user_id, jobDate: job.job_date, jobIds: [job.id] };
     const found = { ot: row.proof_ot ?? null, clientMinutes: row.proof_client_minutes ?? null, returnMinutes: row.proof_return_minutes ?? null };
     if (found.ot === null && found.clientMinutes === null && found.returnMinutes === null) {

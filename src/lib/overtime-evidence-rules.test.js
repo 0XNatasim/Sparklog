@@ -63,3 +63,19 @@ describe("overtime evidence is mandatory at every submission boundary", () => {
     expect(requiredOnSubmitSql).toContain("message = 'overtime_evidence_required'");
   });
 });
+
+// Phase 9a (0143): a day may carry several proofs, one per work order past the 8 h line.
+describe("several overtime proofs on one day (0143)", () => {
+  const sql = readFileSync(fileURLToPath(new URL("../../supabase/migrations/20261117180000_0143_overtime_evidence_several_per_day.sql", import.meta.url)), "utf8");
+
+  it("drops the one-proof-per-job constraint and keeps the lookups indexed", () => {
+    expect(sql).toContain("drop constraint if exists overtime_evidence_job_id_key");
+    expect(sql).toContain("create index if not exists overtime_evidence_job_id_idx on public.overtime_evidence (job_id)");
+  });
+
+  it("leaves the day-level rules alone: still attached to the last job, still at least one proof to submit", () => {
+    expect(sql).not.toMatch(/create or replace function/i);
+    expect(lastJobSql).toContain("set job_id = last_job");
+    expect(requiredOnSubmitSql).toContain("message = 'overtime_evidence_required'");
+  });
+});

@@ -159,6 +159,8 @@ export default function EmployeeForm() {
   const [returnCheckBusy, setReturnCheckBusy] = useState(false);
   const [overtimeDailyMinutes, setOvertimeDailyMinutes] = useState(0);
   const [hasOvertimeEvidence, setHasOvertimeEvidence] = useState(false);
+  // Which screenshot the proof step asks for when the day has several work orders past the 8 h line: { n, total }.
+  const [evidenceProgress, setEvidenceProgress] = useState(null);
   const [parkingRequested, setParkingRequested] = useState(false);
   // Parcomètre pictures picked but not saved yet (several at once, migration 0095), and whether they
   // are added to the saved ones or replace them.
@@ -812,10 +814,8 @@ export default function EmployeeForm() {
     const returnValues = { minutes, km };
     let needsEvidence;
     try {
-      // The proof is asked only on the LAST work order of the day (« Dernier OT de la journée ? » = Oui, or a day submitted
-      // from History): an earlier job saved mid-day may already pass 8 h with the jobs still to come, and the database only
-      // needs the proof when the day is submitted.
-      needsEvidence = requiresEvidenceBeforeSave(requestedMode) && (requestedMode === "submit" || endShiftRef.current)
+      // One screenshot per work order past the 8 h line: asked on each save while the day holds fewer proofs than such work orders.
+      needsEvidence = requiresEvidenceBeforeSave(requestedMode)
         ? await requiresOvertimeEvidence()
         : false;
     } catch (error) {
@@ -946,14 +946,15 @@ export default function EmployeeForm() {
     // CCQ overtime authorization (the screenshot) does not apply to office staff.
     if (officeEmployee) return false;
     try {
-      const { needed, paidDayMinutes } = await overtimeEvidenceNeeded(supabase, {
-        userId: user.id, jobDate: job_date, editId, hasOvertimeEvidence, firstTripUnpaid, dailyRegularMinutes,
+      const { needed, paidDayMinutes, required, proofCount } = await overtimeEvidenceNeeded(supabase, {
+        userId: user.id, jobDate: job_date, editId, firstTripUnpaid, dailyRegularMinutes,
         // Known locally without any network call.
         thisMinutes: Math.round(hoursDecimal * 60),
         // The first job of the day of 65 km or more has its first trip paid: its job_date and km count.
         current: { job_date, depart, arrivee, fin, km_total: normalizeNumber(km_aller) ?? 0 },
       });
       if (paidDayMinutes != null) setOvertimeDailyMinutes(paidDayMinutes);
+      setEvidenceProgress(needed && required > 1 ? { n: proofCount + 1, total: required } : null);
       return needed;
     } catch (error) {
       // Submission must fail closed: without the other jobs we cannot prove that
@@ -1389,6 +1390,7 @@ export default function EmployeeForm() {
           onRetry: () => processEvidenceFile(failedEvidenceFile),
           busy: evidenceBusy,
           onSkip: skipEvidenceForNow,
+          progress: evidenceProgress,
         }}
         inventory={inventory}
         monthEnd={{

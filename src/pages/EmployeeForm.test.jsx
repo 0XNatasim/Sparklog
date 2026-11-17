@@ -33,7 +33,7 @@ function Where() {
   return <div data-testid="where">{location.pathname}{location.search}</div>;
 }
 
-function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [], inventoryItems = [], parking = [], reports = [] } = {}) {
+function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", saveJob, inventoryShots = [], inventoryItems = [], parking = [], reports = [], evidence = [] } = {}) {
   state.auth = { user: { id: "emp-1" }, role: "employee" };
   state.fake = createFakeSupabase({
     tables: {
@@ -42,6 +42,7 @@ function setup({ profile = {}, jobs = [], deadline = "23:59", path = "/form", sa
       company_holidays: [],
       job_entry_unlocks: [],
       jobs,
+      overtime_evidence: evidence,
       meal_claims: [],
       inventory_screenshots: inventoryShots,
       inventory_items: inventoryItems,
@@ -157,7 +158,7 @@ describe("EmployeeForm — new entry", () => {
     expect(state.fake.rpcCalls("save_own_job")).toHaveLength(0);
   });
 
-  it("does not ask for the overtime proof on a job that is not the last of the day, even over 8 h", async () => {
+  it("asks for the proof on a job that takes the day over 8 h, even when it is not the last of the day", async () => {
     setup();
     await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
     fill({ depart: "06:00", fin: "15:30" });
@@ -165,10 +166,42 @@ describe("EmployeeForm — new entry", () => {
     fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
     await screen.findByText(fr("form.last.title"));
     fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
+    await screen.findByText(fr("form.evidence.title"));
+    expect(state.fake.rpcCalls("save_own_job")).toHaveLength(0);
+    // One work order past the line: no « 1 of 2 ».
+    expect(screen.queryByText(fr("form.evidence.progress", { n: 1, total: 1 }))).toBeNull();
+  });
+
+  // Owner decision 2026-11-17: one screenshot per work order past the 8 h line (V2.4.269).
+  const day = [
+    { id: "a", job_date: TODAY, depart: "06:00", arrivee: "06:30", fin: "12:00", km_total: 10, km_aller: 10, km_retour: 0 },
+    { id: "b", job_date: TODAY, depart: "12:00", arrivee: "12:30", fin: "15:00", km_total: 10, km_aller: 10, km_retour: 0 },
+  ];
+
+  it("asks for a second screenshot when a second work order goes past the 8 h line", async () => {
+    setup({ jobs: day, evidence: [{ id: "e1" }] }); // 6 h + 3 h (past the line) + this 1 h (past the line): 2 needed, 1 given
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
+    fill({ ot: "200452", depart: "15:00", arrivee: "15:10", fin: "16:00" });
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
+    await screen.findByText(fr("form.last.title"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
+    await screen.findByText(fr("form.evidence.title"));
+    expect(screen.getByText(fr("form.evidence.progress", { n: 2, total: 2 }))).toBeTruthy();
+    expect(state.fake.rpcCalls("save_own_job")).toHaveLength(0);
+  });
+
+  it("does not ask again once the day holds one screenshot per work order past the line", async () => {
+    setup({ jobs: day, evidence: [{ id: "e1" }, { id: "e2" }] });
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
+    fill({ ot: "200452", depart: "15:00", arrivee: "15:10", fin: "16:00" });
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
+    await screen.findByText(fr("form.last.title"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
     await screen.findByText(fr("form.return.savedTitle"));
     expect(screen.queryByText(fr("form.evidence.title"))).toBeNull();
     expect(state.fake.rpcCalls("save_own_job")).toHaveLength(1);
-    expect(state.fake.rpcCalls("save_own_job_with_overtime_evidence")).toHaveLength(0);
   });
 
   it("saves the sheet as a draft, not submitted, when the proof is not there yet", async () => {
