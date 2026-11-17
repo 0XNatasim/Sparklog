@@ -410,7 +410,7 @@ export default function History() {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
       if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required)) {
-        // From 2026-11-17 each work order past the line has its own proof: say which ones are missing (red clock with a +).
+        // From 2026-11-16 each work order past the line has its own proof: say which ones are missing (red clock with a +).
         const missing = selectedJobs.filter((job) => proofPerJob(job.job_date) && dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required);
         if (missing.length > 0) {
           setErr(t("proofs.submitDayMissing", { count: missing.length, hours: dailyRegularMinutes / 60 }));

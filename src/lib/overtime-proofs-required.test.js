@@ -43,10 +43,10 @@ import { overtimeMarkerJobIds } from "./timesheet-layout";
 import { dailyOvertimeEvidenceRequirement } from "./job-submission";
 
 describe("per work order, from the cut-over date", () => {
-  it("applies from 2026-11-17; earlier days keep the day-level rule", () => {
-    expect(PER_JOB_PROOF_FROM).toBe("2026-11-17");
-    expect(proofPerJob("2026-11-16")).toBe(false);
-    expect(proofPerJob("2026-11-17")).toBe(true);
+  it("applies from 2026-11-16; earlier days keep the day-level rule", () => {
+    expect(PER_JOB_PROOF_FROM).toBe("2026-11-16");
+    expect(proofPerJob("2026-11-15")).toBe(false);
+    expect(proofPerJob("2026-11-16")).toBe(true);
   });
 
   it("names the jobs past the line, in time order", () => {
@@ -56,9 +56,9 @@ describe("per work order, from the cut-over date", () => {
 
   it("puts the clock on each job that carries its own proof (from the cut-over), and on the day's last job before it", () => {
     const jobs = [
-      { id: "n1", job_date: "2026-11-17", fin: "12:00", overtime_evidence_captured: true },
-      { id: "n2", job_date: "2026-11-17", fin: "17:00", overtime_evidence_captured: true },
-      { id: "n3", job_date: "2026-11-17", fin: "18:00", overtime_evidence_captured: false },
+      { id: "n1", job_date: "2026-11-16", fin: "12:00", overtime_evidence_captured: true },
+      { id: "n2", job_date: "2026-11-16", fin: "17:00", overtime_evidence_captured: true },
+      { id: "n3", job_date: "2026-11-16", fin: "18:00", overtime_evidence_captured: false },
       { id: "o1", job_date: "2026-11-10", fin: "12:00", overtime_evidence_captured: false },
       { id: "o2", job_date: "2026-11-10", fin: "17:00", overtime_evidence_captured: true },
     ];
@@ -74,7 +74,7 @@ describe("per work order, from the cut-over date", () => {
     expect(dailyOvertimeEvidenceRequirement(b, jobs).required).toBe(false);  // b has its own
     expect(dailyOvertimeEvidenceRequirement(a, jobs).required).toBe(false);  // a is under the line
     // Before the cut-over: one proof per day.
-    const old = jobs.map((job) => ({ ...job, job_date: "2026-11-16" }));
+    const old = jobs.map((job) => ({ ...job, job_date: "2026-11-15" }));
     expect(dailyOvertimeEvidenceRequirement(old[2], old).required).toBe(false);
   });
 });
@@ -83,7 +83,7 @@ import { overtimeEvidenceNeeded } from "./overtime-evidence-check";
 import { createFakeSupabase } from "@/test/fake-supabase";
 
 describe("overtimeEvidenceNeeded (per work order, from 2026-11-17)", () => {
-  const D = "2026-11-17";
+  const D = "2026-11-16";
   const row = (id, depart, fin) => ({ id, job_date: D, depart, arrivee: null, fin, km_total: 0, km_aller: 0, km_retour: 0, overtime_evidence_captured: false });
   const ask = (jobs, args) => overtimeEvidenceNeeded(createFakeSupabase({ tables: { jobs } }).client, { userId: "u", jobDate: D, firstTripUnpaid: false, ...args });
 
@@ -100,9 +100,9 @@ describe("overtimeEvidenceNeeded (per work order, from 2026-11-17)", () => {
   });
 
   it("keeps the day-level rule before the cut-over date", async () => {
-    const old = (job) => ({ ...job, job_date: "2026-11-16" });
+    const old = (job) => ({ ...job, job_date: "2026-11-15" });
     const fake = createFakeSupabase({ tables: { jobs: [old(row("a", "06:00", "12:00")), { ...old(row("b", "12:00", "15:00")), overtime_evidence_captured: true }] } });
-    const result = await overtimeEvidenceNeeded(fake.client, { userId: "u", jobDate: "2026-11-16", editId: null, thisMinutes: 60, current: { job_date: "2026-11-16", depart: "15:00", fin: "16:00" }, firstTripUnpaid: false });
+    const result = await overtimeEvidenceNeeded(fake.client, { userId: "u", jobDate: "2026-11-15", editId: null, thisMinutes: 60, current: { job_date: "2026-11-15", depart: "15:00", fin: "16:00" }, firstTripUnpaid: false });
     expect(result.needed).toBe(false); // another job of the day already has the proof
   });
 });

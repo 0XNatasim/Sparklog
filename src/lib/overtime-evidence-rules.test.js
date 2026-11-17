@@ -111,7 +111,10 @@ describe("overtime proof required per work order (0145)", () => {
 
   it("checks the proof of THIS job, from the same cut-over date as the app", async () => {
     const { PER_JOB_PROOF_FROM } = await import("./overtime-proof-rules");
-    expect(sql).toContain(`new.job_date >= date '${PER_JOB_PROOF_FROM}'`);
+    // 0146 moved the cut-over date (2026-11-17 -> 2026-11-16): the app date must match the latest body.
+    const latest = readFileSync(fileURLToPath(new URL("../../supabase/migrations/20261118200000_0146_overtime_proof_rule_from_nov_16.sql", import.meta.url)), "utf8");
+    expect(latest).toContain(`new.job_date >= date '${PER_JOB_PROOF_FROM}'`);
+    expect(latest).not.toContain("date '2026-11-17'");
     expect(sql).toContain("before_minutes + duration_minutes - coalesce(unpaid_trip_minutes, 0) > daily_regular_minutes");
     expect(sql).toContain("not exists (select 1 from public.overtime_evidence e where e.job_id = new.id)");
     expect(sql).toContain("message = 'overtime_evidence_required'");

@@ -2,8 +2,8 @@
 // (owner decision 2026-11-17, V2.4.271, migration 0144): the job that crosses the line and every job after it, taken in time
 // order, each carries its own proof. Pure rules, no network.
 
-// First work date of the per-job rule (owner decision 2026-11-17: it starts the same day). Earlier days keep the old day-level rule (one proof per day, kept wherever it sits).
-export const PER_JOB_PROOF_FROM = "2026-11-17";
+// First work date of the per-job rule (owner decision 2026-11-16, Montréal date: it starts the same day). Earlier days keep the old day-level rule (one proof per day, kept wherever it sits).
+export const PER_JOB_PROOF_FROM = "2026-11-16";
 export const proofPerJob = (jobDate) => String(jobDate || "").slice(0, 10) >= PER_JOB_PROOF_FROM;
 
 // Chronological order of a day's jobs: Départ (HH:MM), then id (same tie-break as the database: byte order).
