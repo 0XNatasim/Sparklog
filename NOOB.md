@@ -1,12 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.268).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.269).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
 ### À faire maintenant (par vous)
+
+- [ ] **Migration 0143** (preuve par OT, V2.4.269) : à appliquer **avant** de dire aux employés de mettre à jour. Elle enlève la limite « une seule preuve par fiche ».
 
 - [ ] **Inventaire fin de mois (V2.4.268)** : appliquer la **migration 0142**, **redéployer `cleanup_overtime_evidence`**, puis planifier le premier jour dans Inventaire › Inventaire fin de mois.
   À confirmer : 5 à 10 captures (ce qu'on a décidé), et le délai de 60 jours pour les garder.
@@ -26,6 +28,7 @@
   et 44 approuvées ; rien n'est encore comptabilisé. Dans l'ordre, une semaine à la
   fois : **À traiter** (approuver) › **Paie › Paie de la semaine** (« Calculer et comptabiliser ») › imprimer les talons.
   La semaine 44 attend que la 43 soit comptabilisée (le cumul de l'année suit d'une semaine à l'autre).
+- ✅ **V2.4.269 — une preuve de temps supp. par OT au-delà de 8 h (Phase 9a)** : si votre journée a **plusieurs OT qui dépassent 8 h** (10 h avec « 4 jours de 10 h »), l'app demande **une capture du formulaire pour chacun** : « Capture 1 sur 2 », puis « Capture 2 sur 2 ». Ça compte l'OT qui franchit la ligne des 8 h et tous ceux d'après, dans l'ordre des heures. Elle redemande à chaque enregistrement tant qu'il manque une capture. Côté gestion, toutes les captures de la journée s'affichent sur la fiche. **La base accepte encore de soumettre la journée avec une seule capture** : la refuser quand il en manque sera la Phase 9b. **À faire : appliquer la migration 0143 AVANT que les employés utilisent cette version**, sinon l'ajout de la 2e capture donne une erreur.
 - ✅ **V2.4.268 — inventaire de fin de mois des sous-traitants (Phase 8)** : dans **Inventaire › « Inventaire fin de mois »** (vous seuls, les gestionnaires), vous choisissez le **jour** et les
   **personnes** qui gèrent un entrepôt. Ce jour-là, à la fin de leur journée (ou depuis l'**Historique**), elles envoient de **5 à 10 captures** du formulaire rempli. **Tant que ce n'est pas fait,
   leurs fiches de temps de ce jour ou après ne peuvent pas être soumises** (elles restent en brouillon). « Je ne l'ai pas encore » est permis : la fiche attend. Vous voyez qui a envoyé (Reçu / En retard),

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.268 (2026-11-17).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.269 (2026-11-17).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.269 — one overtime proof per work order past 8 h (Phase 9a).** A day that has several work orders past the 8 h line (10 h with « 4 jours de 10 h ») now asks one screenshot of the overtime request form for **each** of them (« Capture 2 sur 2 »): the first work order that crosses the line and every one after it, taken in time order. The proof is asked again on each save until the day holds as many proofs as work orders past the line. Managers see every proof of the day on the job. The database still requires at least one proof to submit the day (refusing a day with fewer proofs than work orders is the next step, Phase 9b). Migration 0143.
 - **V2.4.268 — month-end subcontractor inventory (Phase 8).** In Inventory › « Inventaire fin de mois » (managers only) a manager schedules
   the day of the month-end inventory form (a Microsoft form Sparklog cannot read) for the chosen people (the ones who run a warehouse). That day, at the end of their
   shift (and from a banner in History), they send **5 to 10 screenshots** of the filled form; the pictures are sent as they are picked. Until the proof is sent the database

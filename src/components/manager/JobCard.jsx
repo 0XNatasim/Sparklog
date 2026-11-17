@@ -165,7 +165,11 @@ function JobCard({ job: j, employee, shaded, dayOvertimeNoEvidence, overtimeCapt
           {focused && focusedEvidence && (
             <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
               <div className="mb-2 text-sm font-semibold">{t("notifications.evidence")}</div>
-              {focusedEvidence.imageUrl && <img src={focusedEvidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-80 w-full rounded-md border object-contain" />}
+              <div className="space-y-2">
+                {(focusedEvidence.imageUrls?.length ? focusedEvidence.imageUrls : [focusedEvidence.imageUrl].filter(Boolean)).map((url) => (
+                  <img key={url} src={url} alt={t("notifications.evidenceAlt")} className="max-h-80 w-full rounded-md border object-contain" />
+                ))}
+              </div>
             </div>
           )}
         </CardContent>

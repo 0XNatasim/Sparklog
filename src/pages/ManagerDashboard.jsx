@@ -408,10 +408,12 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     supabase.from("jobs").select("user_id").eq("id", focusedJobId).single().then(({ data }) => {
       if (data?.user_id) setEmployeeId(data.user_id);
     });
-    supabase.from("overtime_evidence").select("storage_path, daily_minutes, created_at").eq("job_id", focusedJobId).maybeSingle().then(async ({ data }) => {
-      if (!data) return;
-      const { data: signed } = await supabase.storage.from("overtime-evidence").createSignedUrl(data.storage_path, 600);
-      setFocusedEvidence({ ...data, imageUrl: signed?.signedUrl || "" });
+    // A day may carry several proofs (one per work order past 8 h, 0143): they all sit on the day's last job.
+    supabase.from("overtime_evidence").select("storage_path, daily_minutes, created_at").eq("job_id", focusedJobId).order("created_at", { ascending: true }).then(async ({ data }) => {
+      if (!data?.length) return;
+      const signed = await Promise.all(data.map((row) => supabase.storage.from("overtime-evidence").createSignedUrl(row.storage_path, 600)));
+      const imageUrls = signed.map((result) => result.data?.signedUrl).filter(Boolean);
+      setFocusedEvidence({ ...data[0], imageUrl: imageUrls[0] || "", imageUrls });
     });
   }, [focusedJobId]);
 
@@ -449,19 +451,25 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         }
         if (!cancelled) {
           setOvertimeJobs(orderedJobs);
-          const evidenceMap = new Map((evidenceRows || []).map((row) => [row.job_id, row]));
+          // One entry per job; its other proofs (a day can carry several, 0143) are kept in `paths`, the first one stays the main row.
+          const evidenceMap = new Map();
+          for (const row of [...(evidenceRows || [])].reverse()) {
+            const known = evidenceMap.get(row.job_id);
+            evidenceMap.set(row.job_id, known ? { ...known, paths: [...known.paths, row.storage_path] } : { ...row, paths: [row.storage_path] });
+          }
           setOvertimeEvidence(evidenceMap);
           // Coming from a manager notification (?job=…): auto-open that job's
           // proof and load its screenshot so the panel is not empty.
           const focused = focusedJobId ? evidenceMap.get(focusedJobId) : null;
           if (focused) {
             setVisibleProof(new Set([focusedJobId]));
-            if (focused.storage_path) {
-              const { data: signed } = await supabase.storage.from("overtime-evidence").createSignedUrl(focused.storage_path, 600);
-              if (!cancelled && signed?.signedUrl) {
+            if (focused.paths?.length) {
+              const urls = (await Promise.all(focused.paths.map((path) => supabase.storage.from("overtime-evidence").createSignedUrl(path, 600))))
+                .map((result) => result.data?.signedUrl).filter(Boolean);
+              if (!cancelled && urls.length) {
                 setOvertimeEvidence((current) => {
                   const next = new Map(current);
-                  next.set(focusedJobId, { ...focused, imageUrl: signed.signedUrl });
+                  next.set(focusedJobId, { ...focused, imageUrl: urls[0], imageUrls: urls });
                   return next;
                 });
               }
@@ -584,11 +592,13 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     if (evidence?.storage_path && !evidence.imageUrl) {
       setEvidenceImageLoading(jobId);
       try {
-        const { data, error } = await supabase.storage.from("overtime-evidence").createSignedUrl(evidence.storage_path, 600);
-        if (error) throw error;
+        const results = await Promise.all((evidence.paths?.length ? evidence.paths : [evidence.storage_path]).map((path) => supabase.storage.from("overtime-evidence").createSignedUrl(path, 600)));
+        const failed = results.find((result) => result.error);
+        if (failed) throw failed.error;
+        const urls = results.map((result) => result.data?.signedUrl).filter(Boolean);
         setOvertimeEvidence((current) => {
           const next = new Map(current);
-          next.set(jobId, { ...evidence, imageUrl: data?.signedUrl || "" });
+          next.set(jobId, { ...evidence, imageUrl: urls[0] || "", imageUrls: urls });
           return next;
         });
       } catch (error) {
@@ -1148,7 +1158,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         {isParkingVisible && <div className="space-y-3 rounded-lg border p-3">{receipt?.imageUrls?.some(Boolean) ? receipt.imageUrls.map((url, index) => url
           ? <div key={url}>{receipt.imageUrls.length > 1 && <div className="mb-1 text-xs font-semibold text-muted-foreground">{t("manager.parking.pictureOf", { n: index + 1, total: receipt.imageUrls.length })}</div>}<img src={url} alt={t("manager.parking.receiptAlt")} className="max-h-[32rem] w-full rounded-md object-contain" /></div>
           : <p key={`missing-${index}`} className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>) : <p className="text-sm text-muted-foreground">{t("manager.parking.imageUnavailable")}</p>}</div>}
-        {isProofVisible && <div className="rounded-xl border bg-muted/30 p-2"><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>{evidence?.imageUrl ? <img src={evidence.imageUrl} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" /> : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}</div>}
+        {isProofVisible && <div className="rounded-xl border bg-muted/30 p-2"><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("manager.overtime.originalScreenshot")}</div>{evidence?.imageUrl ? <div className="space-y-2">{(evidence.imageUrls?.length ? evidence.imageUrls : [evidence.imageUrl]).map((url) => <img key={url} src={url} alt={t("notifications.evidenceAlt")} className="max-h-[32rem] w-full rounded-lg object-contain" />)}</div> : <p className="py-4 text-center text-xs text-muted-foreground">{evidenceImageLoading === job.id ? t("common.loading") : t("manager.overtime.imageUnavailable")}</p>}</div>}
       </CardContent>
     </Card>;
   }
