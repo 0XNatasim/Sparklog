@@ -25,21 +25,22 @@ export function overtimeProofsRequired(jobs, { minutesOf, thresholdMinutes = 480
   return required;
 }
 
-// A screenshot per work order past the line. Returns { needed, paidDayMinutes, required, proofCount }: `needed` is true while
-// the day holds fewer proofs than work orders past the line. The proofs of the day are counted in overtime_evidence (they all
-// sit on the day's last job). Fails closed: without the other jobs we cannot know how many the day needs, so a load error is
-// thrown.
-export async function overtimeEvidenceNeeded(client, { userId, jobDate, editId, thisMinutes, current, firstTripUnpaid, dailyRegularMinutes = 480 }) {
+// Whether the day needs its overtime screenshot: one per day once the WHOLE day (all of the employee's jobs, this one
+// included) passes 8 h of paid time (10 h with « 4 jours de 10 h »). Returns { needed, paidDayMinutes }; paidDayMinutes is
+// null when the job already carries its proof. Fails closed: without the other jobs we cannot prove that the day is at or
+// below the line, so a load error is thrown.
+// (V2.4.270: the proofs-per-work-order count of V2.4.269 is withdrawn here — an employee cannot read overtime_evidence rows
+// (only managers can), so the count was always 0 for them. overtimeProofsRequired is kept for the per-work-order rule, which
+// needs a readable source for the count: see migration 0144.)
+export async function overtimeEvidenceNeeded(client, { userId, jobDate, editId, thisMinutes, current, hasOvertimeEvidence, firstTripUnpaid, dailyRegularMinutes = 480 }) {
   // Retry (with a session refresh + backoff) so a Supabase cold start doesn't fail the check on the
   // first slow attempt.
-  const [{ data: dayJobs }, { data: proofs }] = await Promise.all([
-    withRetry(
-      () => client.from("jobs").select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour").eq("user_id", userId).eq("job_date", jobDate),
-      8000,
-      { retries: 2 }
-    ),
-    withRetry(() => client.from("overtime_evidence").select("id").eq("user_id", userId).eq("job_date", jobDate), 8000, { retries: 2 }),
-  ]);
+  const { data: dayJobs } = await withRetry(
+    () => client.from("jobs").select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, overtime_evidence_captured").eq("user_id", userId).eq("job_date", jobDate),
+    8000,
+    { retries: 2 }
+  );
+  if (editId && hasOvertimeEvidence) return { needed: false, paidDayMinutes: null };
   const workedMinutes = (job) => {
     const start = makeDayjsFromJob(jobDate, job.depart);
     const end = makeDayjsFromJob(jobDate, job.fin);
@@ -49,19 +50,17 @@ export async function overtimeEvidenceNeeded(client, { userId, jobDate, editId, 
   // Return-to-storage time is deliberately excluded: it is always paid at the regular rate and never
   // creates overtime or supper eligibility.
   const fullDayMinutes = others.reduce((total, job) => total + workedMinutes(job), 0) + thisMinutes;
-  const thisJob = { id: editId || "current", ...current };
   // With the "first trip unpaid" option the day's first Départ→Arrivée trip is not paid: supper
   // eligibility, the overtime threshold and the stored daily total all use PAID time (same rule as
   // the payroll and the database).
-  const unpaidTrip = firstTripUnpaid ? dayFirstTripUnpaidMinutes([...others, thisJob]) : 0;
+  const unpaidTrip = firstTripUnpaid
+    ? dayFirstTripUnpaidMinutes([...others, { id: editId || "current", ...current }])
+    : 0;
   const paidDayMinutes = fullDayMinutes - unpaidTrip;
-  const required = overtimeProofsRequired([...others, thisJob], {
-    minutesOf: (job) => (job.id === thisJob.id ? thisMinutes : workedMinutes(job)),
-    thresholdMinutes: dailyRegularMinutes,
-    unpaidTripMinutes: unpaidTrip,
-  });
-  const proofCount = (proofs || []).length;
-  return { needed: required > proofCount, paidDayMinutes, required, proofCount };
+  // If another job today already has the authorization, don't ask again for this one. The manager
+  // also sees an "8h+, no evidence" flag at approval for jobs entered out of order.
+  if (others.some((job) => job.overtime_evidence_captured)) return { needed: false, paidDayMinutes };
+  return { needed: paidDayMinutes > dailyRegularMinutes, paidDayMinutes };
 }
 
 // Uploads the screenshot; on an expired session, timeout or network drop it refreshes the session and
