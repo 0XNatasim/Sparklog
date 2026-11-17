@@ -1,4 +1,5 @@
 import { dayFirstTripUnpaidMinutes } from "./payroll-calculations";
+import { overtimeLineJobIds, proofPerJob } from "./overtime-proof-rules";
 
 // Total-km field value when reopening a saved job; a real 0 km must stay "0", not blank.
 export function kilometreFieldValue(job) {
@@ -6,13 +7,13 @@ export function kilometreFieldValue(job) {
   return String(total);
 }
 
-// Overtime proof (screenshot) is requested when the day exceeds 8 h, when saving or submitting. The work form only asks it
-// on the last work order of the day (EmployeeForm.saveWithReturn), not on an earlier job saved mid-day.
+// Overtime proof (screenshot) is requested when saving or submitting a work order past the day's 8 h line (10 h with
+// « 4 jours de 10 h »): see overtime-proof-rules.js.
 export function requiresEvidenceBeforeSave(mode) {
   return mode === "submit" || mode === "draft";
 }
 
-function workedMinutes(job) {
+export function workedMinutes(job) {
   if (!job?.depart || !job?.fin) return 0;
   const [startHour, startMinute] = String(job.depart).slice(0, 5).split(":").map(Number);
   const [endHour, endMinute] = String(job.fin).slice(0, 5).split(":").map(Number);
@@ -23,7 +24,7 @@ function workedMinutes(job) {
   return end - start;
 }
 
-// Evidence is one-per-day. Include saved/updated jobs in the total so submitting
+// Include saved/updated jobs in the total so submitting
 // from History cannot bypass the same >8 h rule (10 h for « 4 jours de 10 h », `dailyRegularMinutes`) enforced by the main form. For an employee
 // with the "first trip unpaid" option the threshold counts PAID time (the unpaid first trip
 // is removed), exactly like the database gate; `grossMinutes` keeps the full span.
@@ -36,6 +37,11 @@ export function dailyOvertimeEvidenceRequirement(candidate, jobs, { firstTripUnp
   const grossMinutes = workedMinutes(candidate) + dayJobs.reduce((sum, job) => sum + workedMinutes(job), 0);
   const unpaidTrip = firstTripUnpaid ? dayFirstTripUnpaidMinutes([candidate, ...dayJobs]) : 0;
   const totalMinutes = grossMinutes - unpaidTrip;
+  // From 2026-11-18 each work order past the line needs its own proof; earlier days keep one proof per day.
+  if (proofPerJob(candidate?.job_date)) {
+    const overLine = overtimeLineJobIds([candidate, ...dayJobs], { minutesOf: workedMinutes, thresholdMinutes: dailyRegularMinutes, unpaidTripMinutes: unpaidTrip });
+    return { totalMinutes, grossMinutes, required: overLine.has(candidate.id) && !candidate.overtime_evidence_captured };
+  }
   const hasEvidence = Boolean(candidate?.overtime_evidence_captured)
     || dayJobs.some((job) => job.overtime_evidence_captured);
   return { totalMinutes, grossMinutes, required: totalMinutes > dailyRegularMinutes && !hasEvidence };

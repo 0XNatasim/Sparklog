@@ -1,12 +1,14 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.270).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.271).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
 ## Où on en est
 
 ### À faire maintenant (par vous)
+
+- [ ] **Migration 0144** (preuve par OT, V2.4.271) : à appliquer. Elle fait que chaque capture reste sur son OT et donne à l'employé le droit de voir, remplacer, retirer ou ajouter la capture de ses propres fiches non soumises.
 
 - [ ] **Migration 0143** (preuve par OT, V2.4.269) : à appliquer **avant** de dire aux employés de mettre à jour. Elle enlève la limite « une seule preuve par fiche ».
 
@@ -28,6 +30,7 @@
   et 44 approuvées ; rien n'est encore comptabilisé. Dans l'ordre, une semaine à la
   fois : **À traiter** (approuver) › **Paie › Paie de la semaine** (« Calculer et comptabiliser ») › imprimer les talons.
   La semaine 44 attend que la 43 soit comptabilisée (le cumul de l'année suit d'une semaine à l'autre).
+- ✅ **V2.4.271 — une preuve de temps supp. par OT, qui reste sur son OT (Phase 10)** : à partir du **18 novembre 2026**, chaque OT qui dépasse la ligne des 8 h (10 h si « 4 jours de 10 h » est coché) a **sa propre capture**, et elle **reste sur l'OT où vous l'avez ajoutée** (3 OT au-delà = 3 captures). Dans l'**Historique**, l'**horloge** de l'OT est maintenant un bouton : elle ouvre la capture et, tant que la fiche n'est pas soumise, vous pouvez la **remplacer, la retirer ou l'ajouter** si elle manque (une horloge **rouge avec un +** = OT au-delà de la ligne sans capture). Une fiche soumise ne se change que par la gestion (elle vous la retourne). Les journées d'avant le 18 novembre gardent une capture par journée. **À faire : appliquer la migration 0144** (sans elle, les captures continuent de se ranger sur la dernière fiche et le bouton d'ajout échoue). La base accepte encore de soumettre une journée avec une seule capture : la refuser quand il en manque sera l'étape suivante.
 - ✅ **V2.4.270 — correction : la preuve de temps supp. n'est plus redemandée sans arrêt** : la V2.4.269 comptait les preuves de la journée dans une table que **seuls les gestionnaires peuvent lire** ; pour un employé le compte restait à 0 et l'app pouvait redemander la capture à chaque modification. On revient à la règle d'avant (une preuve par journée, demandée tant que la journée dépasse 8 h et qu'aucune fiche ne l'a). **La règle « une preuve par OT » reviendra** dans la prochaine étape, avec un compte que l'employé peut lire. Rien à faire de votre côté (la migration 0143 déjà appliquée ne gêne pas).
 - ✅ **V2.4.269 — une preuve de temps supp. par OT au-delà de 8 h (Phase 9a)** : si votre journée a **plusieurs OT qui dépassent 8 h** (10 h avec « 4 jours de 10 h »), l'app demande **une capture du formulaire pour chacun** : « Capture 1 sur 2 », puis « Capture 2 sur 2 ». Ça compte l'OT qui franchit la ligne des 8 h et tous ceux d'après, dans l'ordre des heures. Elle redemande à chaque enregistrement tant qu'il manque une capture. Côté gestion, toutes les captures de la journée s'affichent sur la fiche. **La base accepte encore de soumettre la journée avec une seule capture** : la refuser quand il en manque sera la Phase 9b. **À faire : appliquer la migration 0143 AVANT que les employés utilisent cette version**, sinon l'ajout de la 2e capture donne une erreur.
 - ✅ **V2.4.268 — inventaire de fin de mois des sous-traitants (Phase 8)** : dans **Inventaire › « Inventaire fin de mois »** (vous seuls, les gestionnaires), vous choisissez le **jour** et les

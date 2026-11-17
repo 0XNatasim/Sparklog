@@ -79,3 +79,28 @@ describe("several overtime proofs on one day (0143)", () => {
     expect(requiredOnSubmitSql).toContain("message = 'overtime_evidence_required'");
   });
 });
+
+// Phase 10 (0144): each proof stays on its own work order; the employee reads and manages their own.
+describe("overtime proof per work order (0144)", () => {
+  const sql = readFileSync(fileURLToPath(new URL("../../supabase/migrations/20261118120000_0144_overtime_proof_per_job.sql", import.meta.url)), "utf8");
+  const attach = sql.slice(sql.indexOf("create or replace function public.attach_overtime_evidence_to_last_job"), sql.indexOf("-- 2. The employee's own proofs"));
+
+  it("stops moving the proofs onto the last job: it only syncs each job's flag with its own proofs", () => {
+    expect(attach).not.toMatch(/set job_id\s*=/);
+    expect(attach).not.toContain("manager_notifications");
+    expect(attach).toContain("set overtime_evidence_captured = exists (select 1 from public.overtime_evidence e where e.job_id = j.id)");
+    expect(attach).toContain("if not exists (select 1 from public.overtime_evidence e where e.user_id = p_user and e.job_date = p_date)");
+  });
+
+  it("lets an employee read only their own proofs and pictures, and change them only while the job is editable", () => {
+    expect(sql).toContain("where e.user_id = auth.uid() and e.job_date = p_date");
+    expect(sql).toMatch(/\(storage\.foldername\(name\)\)\[1\] = \(auth\.uid\(\)\)::text/);
+    expect(sql.match(/job\.status not in \('saved', 'updated'\) or coalesce\(job\.locked, false\)/g)).toHaveLength(2);
+    expect(sql).toContain("p_storage_path not like uid::text || '/' || job.job_date::text || '/%'");
+  });
+
+  it("gives employees no delete right on the bucket (a proof cannot be erased behind the managers' back)", () => {
+    expect(sql).not.toMatch(/for delete[^;]*overtime-evidence/);
+    expect(sql).toContain("revoke all on function public.save_own_overtime_proof(uuid, uuid, uuid, text, integer) from public, anon");
+  });
+});
