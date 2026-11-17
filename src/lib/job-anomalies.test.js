@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ANOMALY_LIMITS, anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies } from "./job-anomalies";
+import { ANOMALY_LIMITS, anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, mealMissingAnomalies } from "./job-anomalies";
 
 const job = (id, depart, fin, extra = {}) => ({
   id, user_id: "u1", job_date: "2026-09-24", status: "submitted", ot: "OT-1", depart, fin, km_total: 20, ...extra,
@@ -78,5 +78,17 @@ describe("anomaliesForJobs", () => {
     const anomalies = detectJobAnomalies([job("a", "08:00", "12:00"), job("b", "08:00", "12:00")]);
     expect(anomaliesForJobs(anomalies, ["b"])).toHaveLength(1);
     expect(anomaliesForJobs(anomalies, ["z"])).toHaveLength(0);
+  });
+});
+
+describe("mealMissingAnomalies", () => {
+  const longDay = [job("a", "05:00", "12:00", { km_total: 0 }), job("b", "12:00", "16:30", { ot: "OT-2", km_total: 0 })]; // 11 h 30
+  it("flags a submitted long day without a supper claim", () => {
+    expect(mealMissingAnomalies(longDay, [], new Map())).toEqual([expect.objectContaining({ type: "meal_missing", userId: "u1", jobIds: ["a", "b"] })]);
+  });
+  it("stays quiet when a claim exists, the day is short, or the day is not submitted", () => {
+    expect(mealMissingAnomalies(longDay, [{ user_id: "u1", job_date: "2026-09-24" }], new Map())).toEqual([]);
+    expect(mealMissingAnomalies([job("a", "08:00", "16:00")], [], new Map())).toEqual([]);
+    expect(mealMissingAnomalies(longDay.map((j) => ({ ...j, status: "saved" })), [], new Map())).toEqual([]);
   });
 });

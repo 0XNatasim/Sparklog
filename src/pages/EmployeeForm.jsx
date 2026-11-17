@@ -973,7 +973,8 @@ export default function EmployeeForm() {
       await createMealClaimFor(supabase, { userId: user.id, jobId, jobDate: job_date, dailyMinutes: overtimeDailyMinutes });
       return true;
     } catch (error) {
-      setErr(isOfflineError(error) ? "" : friendlyErrorMessage(error, t, "form.meal.failed"));
+      // The employee is not told: the managers see « souper manquant » in their alerts (job-anomalies.js).
+      console.error("[meal claim] could not be created", error);
       return false;
     }
   }
