@@ -9,7 +9,7 @@ import { supabase } from "@/supabaseClient";
 
 // History: the overtime proof of ONE work order. The employee sees the picture; while the sheet is still editable (saved or
 // updated) they can replace it, remove it, or add it when it is missing. A submitted sheet is only changed by the managers.
-export default function OvertimeProofDialog({ job, userId, editable, dailyMinutes = 0, onClose, onChanged }) {
+export default function OvertimeProofDialog({ job, userId, editable, dailyMinutes = 0, hours = 8, onClose, onChanged }) {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
   const input = useRef(null);
@@ -82,6 +82,7 @@ export default function OvertimeProofDialog({ job, userId, editable, dailyMinute
           <DialogTitle>{t("proofs.title", { ot: job.ot })}</DialogTitle>
           <DialogDescription>{t(editable ? "proofs.description" : "proofs.locked")}</DialogDescription>
         </DialogHeader>
+        <p className="rounded-md border border-info/30 bg-info/10 p-2 text-xs text-info">{t("proofs.rule", { hours })}</p>
         {loading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
         {!loading && proofs.length === 0 && <p className="text-sm text-muted-foreground">{t("proofs.empty")}</p>}
         {proofs.map((proof, index) => (

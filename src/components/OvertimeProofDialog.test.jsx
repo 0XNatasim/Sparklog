@@ -27,6 +27,11 @@ beforeEach(() => { h.save.mockResolvedValue("new"); h.remove.mockResolvedValue()
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("OvertimeProofDialog", () => {
+  it("explains the rule: one screenshot per work order past the line, kept on that work order", async () => {
+    setup([], { hours: 10 });
+    expect(await screen.findByText(fr("proofs.rule", { hours: 10 }))).toBeTruthy();
+  });
+
   it("shows only the proof of THIS work order", async () => {
     setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }, { id: "p9", job_id: "j3", storage_path: "u/d/p9.jpg" }]);
     const image = await screen.findByAltText(fr("proofs.pictureAlt", { n: 1 }));

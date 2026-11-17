@@ -4,7 +4,7 @@ import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // The overtime authorization the day needs (> 8 h): what the screenshot of the overtime request form must show, an example,
 // and the picker. « Réessayer » reuses the picture kept in memory after a failure.
-export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationError, error, canRetry, onRetry, busy, onSkip, progress }) {
+export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationError, error, canRetry, onRetry, busy, onSkip, progress, explain }) {
   const [showExample, setShowExample] = useState(false);
   return (
     <>
@@ -13,6 +13,7 @@ export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationEr
       </DialogHeader>
       <div className="space-y-3 text-sm">
         {progress && <p className="font-semibold" role="status">{t("form.evidence.progress", { n: progress.n, total: progress.total })}</p>}
+        {explain && <p className="rounded-md border border-info/30 bg-info/10 p-3 text-info">{t("form.evidence.perJob", { hours: explain.hours, ot: explain.ot })}</p>}
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
           {t("form.evidence.description")}
         </div>

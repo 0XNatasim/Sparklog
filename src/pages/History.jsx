@@ -103,6 +103,10 @@ export default function History() {
     }
     return ids;
   }, [jobs, dailyRegularMinutes, firstTripUnpaid]);
+  const missingProofCount = useMemo(
+    () => jobs.filter((job) => overLineIds.has(job.id) && !job.overtime_evidence_captured && ["saved", "updated"].includes(job.status) && !job.locked).length,
+    [jobs, overLineIds],
+  );
   const dayMinutesOf = (date) => jobs.filter((job) => job.job_date === date).reduce((sum, job) => sum + workedMinutes(job), 0);
   // The foreman's own notes (0136) on the CONTREMAÎTRE sheets shown: a blue icon that opens the text, kept for reference.
   const [foremanNotes, setForemanNotes] = useState(() => new Map());
@@ -442,6 +446,11 @@ export default function History() {
     <AppShell>
       <div className="space-y-3">
         {!isViewMode && <MonthEndInventoryBanner userId={user?.id} />}
+        {!isViewMode && !isAdminEmployee(role) && missingProofCount > 0 && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="status">
+            {t("proofs.missingNotice", { count: missingProofCount, hours: dailyRegularMinutes / 60 })}
+          </div>
+        )}
         {loading && (
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
         )}
@@ -630,6 +639,7 @@ export default function History() {
           userId={effectiveUserId}
           editable={isEditableStatus(proofJob.status) && !proofJob.locked}
           dailyMinutes={dayMinutesOf(proofJob.job_date)}
+          hours={dailyRegularMinutes / 60}
           onClose={() => setProofJob(null)}
           onChanged={() => load()}
         />
