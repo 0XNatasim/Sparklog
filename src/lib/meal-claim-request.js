@@ -27,7 +27,15 @@ export async function shouldRequestMealClaim(client, { userId, jobDate, jobId })
 }
 
 // The claim (30 $, pending), the job's flag and the manager notification. Throws on the first failure.
+// `dailyMinutes` is recomputed from the day's saved jobs: the form's own copy can still be 0 (the day was never
+// measured on that path) and the database refuses a claim under 615 minutes (meal_claims_daily_work_minutes_check).
 export async function createMealClaim(client, { userId, jobId, jobDate, dailyMinutes }) {
+  const [{ data: dayJobs }, { data: policy }] = await Promise.all([
+    withTimeout(client.from("jobs").select("id, job_date, depart, arrivee, fin, km_total, km_aller, km_retour, return_time_minutes").eq("user_id", userId).eq("job_date", jobDate), 10000),
+    withTimeout(client.from("profiles").select("role, first_trip_unpaid, ten_hour_days").eq("id", userId).maybeSingle(), 10000),
+  ]);
+  const measured = mealDecision(dayJobs || [], jobDate, policy).dailyWorkMinutes;
+  if (measured >= 615) dailyMinutes = measured;
   const claimId = crypto.randomUUID();
   const { error: claimError } = await withTimeout(
     client.from("meal_claims").insert({

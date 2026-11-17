@@ -15,7 +15,7 @@ import { companyDate } from "@/lib/company-time";
 import { isOffOn } from "@/lib/timeoff";
 import { notSubmittedYesterday } from "@/lib/live-crew";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
-import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
+import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, mealMissingAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
 import { proofAnomalies, proofDetailsText } from "@/lib/overtime-proof-check";
 import { unseenAnomalies, useAnomaliesFolded, useSeenAnomalies } from "@/lib/anomaly-seen";
 import EvidenceAlertBanner from "@/components/manager/EvidenceAlertBanner";
@@ -98,7 +98,11 @@ export default function TodoInbox() {
         loadManualEntryJobIds(supabase, ids),
         loadOtReuse(ids),
       ]);
+      const { data: dayMeals } = ids.length
+        ? await supabase.from("meal_claims").select("user_id, job_date").in("user_id", userIds).in("job_date", dates).limit(QUERY_BUDGETS.anomalyApprovedPeers)
+        : { data: [] };
       const anomalies = sortAnomalies([
+        ...mealMissingAnomalies([...submitted, ...(peersRes.data || [])], dayMeals || [], new Map(people.map((p) => [p.id, p]))),
         ...detectJobAnomalies(
           [...submitted, ...(peersRes.data || [])],
           anomalyLimitsFromSettings(settingsRes.data),

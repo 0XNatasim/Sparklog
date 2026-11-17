@@ -410,7 +410,7 @@ export default function History() {
       const selectedJobs = ids.map((id) => jobs.find((job) => job.id === id));
       if (selectedJobs.some((job) => !job)) throw new Error(t("history.errors.submitDayFailed"));
       if (!isAdminEmployee(role) && selectedJobs.some((job) => dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required)) {
-        // From 2026-11-17 each work order past the line has its own proof: say which ones are missing (red clock with a +).
+        // From 2026-11-16 each work order past the line has its own proof: say which ones are missing (red clock with a +).
         const missing = selectedJobs.filter((job) => proofPerJob(job.job_date) && dailyOvertimeEvidenceRequirement(job, jobs, { firstTripUnpaid, dailyRegularMinutes }).required);
         if (missing.length > 0) {
           setErr(t("proofs.submitDayMissing", { count: missing.length, hours: dailyRegularMinutes / 60 }));
@@ -552,17 +552,17 @@ export default function History() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 text-sm font-bold">
                             <span>{j.ot}</span>
-                            <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id) && !proofPerJob(j.job_date), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
-                            {proofPerJob(j.job_date) && !isAdminEmployee(role) && !isViewMode && (j.overtime_evidence_captured || overLineIds.has(j.id)) && (
+                            <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id) && !proofPerJob(j.job_date) && (isAdminEmployee(role) || isViewMode), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+                            {!isAdminEmployee(role) && !isViewMode && (proofPerJob(j.job_date) ? (j.overtime_evidence_captured || overLineIds.has(j.id)) : overtimeMarkerIds.has(j.id)) && (
                               <button
                                 type="button"
                                 onClick={() => setProofJob(j)}
-                                title={t(j.overtime_evidence_captured ? "proofs.markerTitle" : "proofs.missingTitle")}
-                                aria-label={t(j.overtime_evidence_captured ? "proofs.markerTitle" : "proofs.missingTitle")}
-                                className={`inline-flex h-6 items-center gap-0.5 rounded-full px-1.5 ${j.overtime_evidence_captured ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"}`}
+                                title={t(j.overtime_evidence_captured || !proofPerJob(j.job_date) ? "proofs.markerTitle" : "proofs.missingTitle")}
+                                aria-label={t(j.overtime_evidence_captured || !proofPerJob(j.job_date) ? "proofs.markerTitle" : "proofs.missingTitle")}
+                                className={`inline-flex h-6 items-center gap-0.5 rounded-full px-1.5 ${j.overtime_evidence_captured || !proofPerJob(j.job_date) ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"}`}
                               >
                                 <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />
-                                {j.overtime_evidence_captured ? <ArrowLeft className="h-3 w-3" aria-hidden="true" /> : <span className="text-xs font-bold" aria-hidden="true">+</span>}
+                                {j.overtime_evidence_captured || !proofPerJob(j.job_date) ? <ArrowLeft className="h-3 w-3" aria-hidden="true" /> : <span className="text-xs font-bold" aria-hidden="true">+</span>}
                               </button>
                             )}
                             {foremanNotes.has(j.id) && <ForemanNoteIcon note={foremanNotes.get(j.id)} subtitle={`${j.ot} · ${dayjs(j.job_date).format("DD MMM")}`} />}

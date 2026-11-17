@@ -1,3 +1,4 @@
+import { mealDecision } from "./meal-eligibility";
 import { TEN_HOUR_DAY_MINUTES, DAILY_REGULAR_MINUTES, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "./payroll-calculations";
 
 // « 4 jours de 10 h »: overtime, hence its proof, starts 2 h later.
@@ -153,4 +154,26 @@ export function otReuseOthersText(others, { t, formatDate, max = 3 }) {
 export function anomaliesForJobs(anomalies, jobIds) {
   const ids = new Set(jobIds);
   return anomalies.filter((anomaly) => anomaly.jobIds.some((id) => ids.has(id)));
+}
+
+// « Souper manquant »: a submitted day long enough for the 30 $ supper (mealDecision, the rule of the database) with no
+// meal_claims row. `claims` = rows with user_id / job_date; `profiles` = Map of id -> { first_trip_unpaid, ten_hour_days, role }.
+export function mealMissingAnomalies(jobs, claims, profiles) {
+  const have = new Set((claims || []).map((c) => `${c.user_id}|${String(c.job_date).slice(0, 10)}`));
+  const days = new Map();
+  for (const job of jobs || []) {
+    if (!job.user_id || !job.job_date || !job.depart || !job.fin || !REVIEWABLE.has(job.status)) continue;
+    const key = `${job.user_id}|${String(job.job_date).slice(0, 10)}`;
+    if (!days.has(key)) days.set(key, []);
+    days.get(key).push(job);
+  }
+  const out = [];
+  for (const [key, dayJobs] of days) {
+    if (have.has(key) || !dayJobs.some((job) => job.status === "submitted")) continue;
+    const [first] = dayJobs;
+    if (!mealDecision(dayJobs, first.job_date, profiles?.get?.(first.user_id)).eligible) continue;
+    const jobIds = dayJobs.map((job) => job.id).sort();
+    out.push({ key: `meal_missing:${jobIds.join(",")}`, type: "meal_missing", userId: first.user_id, jobDate: first.job_date, jobIds });
+  }
+  return out;
 }

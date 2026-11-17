@@ -113,7 +113,7 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
         ) || 0), 0);
         const km = dayJobs.reduce((sum, job) => sum + getKilometreBreakdown(job).totalKm, 0);
         // Overtime proof not given yet (« Je ne l'ai pas encore »): a saved day over the daily threshold with no proof.
-        // From 2026-11-17 each work order past the line needs its own proof: red when one of them has none yet.
+        // From 2026-11-16 each work order past the line needs its own proof: red when one of them has none yet.
         const proofMissing = employee.role !== "admin" && dayJobs.some((job) => job.status === "saved" || job.status === "updated")
           && (proofPerJob(date)
             ? [...overtimeLineJobIds(dayJobs, {

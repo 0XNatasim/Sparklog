@@ -18,7 +18,7 @@ import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
 import { dateBandMap, overtimeMarkerJobIds } from "@/lib/timesheet-layout";
 import { seenCount, unseenAnomalies, useAnomaliesFolded, useSeenAnomalies } from "@/lib/anomaly-seen";
-import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
+import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, mealMissingAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
 import { proofAnomalies, proofDetailsText } from "@/lib/overtime-proof-check";
 import { loadOtReuse } from "@/lib/ot-reuse";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
@@ -247,7 +247,11 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
         .abortSignal(signal);
       proofRows.push(...(part || []));
     }
+    const { data: dayMeals } = rows.length
+      ? await supabase.from("meal_claims").select("user_id, job_date").in("user_id", userIds).in("job_date", dates).limit(QUERY_BUDGETS.anomalyApprovedPeers).abortSignal(signal)
+      : { data: [] };
     return sortAnomalies([
+      ...mealMissingAnomalies([...rows, ...(approved || [])], dayMeals || [], new Map((tripUnpaid || []).map((row) => [row.id, row]))),
       ...detectJobAnomalies(
         [...rows, ...(approved || [])],
         anomalyLimitsFromSettings(settings),
