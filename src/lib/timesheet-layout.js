@@ -1,3 +1,4 @@
+import { proofPerJob } from "./overtime-proof-rules";
 function endMinutes(job) {
   if (job.ended_at) return Date.parse(job.ended_at) / 60000;
   const time = String(job.fin || job.depart || "00:00").slice(0, 5);
@@ -16,6 +17,14 @@ export function lastOvertimeJobIds(jobs) {
     if (!latest || endMinutes(job) > endMinutes(latest)) latestByDay.set(day, job);
   }
   return new Set([...overtimeDays].map((day) => latestByDay.get(day).id));
+}
+
+// Jobs that show the overtime clock: from 2026-11-18 each job that carries its own proof; earlier days keep the clock on the
+// day's last job (their proof sits wherever it was kept).
+export function overtimeMarkerJobIds(jobs) {
+  const marked = new Set(jobs.filter((job) => job.overtime_evidence_captured && proofPerJob(job.job_date)).map((job) => job.id));
+  const legacy = lastOvertimeJobIds(jobs.filter((job) => !proofPerJob(job.job_date)));
+  return new Set([...marked, ...legacy]);
 }
 
 // Alternating band (0/1) per work date, newest date first, so the same date gets the

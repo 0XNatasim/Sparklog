@@ -37,6 +37,7 @@ import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/j
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useInventoryStep } from "@/components/employee-form/use-inventory-step";
 import { fetchMyDueMonthEnd } from "@/lib/month-end-inventory";
+import { proofPerJob } from "@/lib/overtime-proof-rules";
 import FormMessages from "@/components/employee-form/FormMessages";
 import JobEntryFields from "@/components/employee-form/JobEntryFields";
 import ParkingReceiptFields from "@/components/employee-form/ParkingReceiptFields";
@@ -1387,6 +1388,7 @@ export default function EmployeeForm() {
           onRetry: () => processEvidenceFile(failedEvidenceFile),
           busy: evidenceBusy,
           onSkip: skipEvidenceForNow,
+          explain: proofPerJob(job_date) ? { ot: ot || "—", hours: dailyRegularMinutes / 60 } : null,
         }}
         inventory={inventory}
         monthEnd={{

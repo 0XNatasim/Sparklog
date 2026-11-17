@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CircleCheck, CircleX, Images } from "lucide-react";
+import { ArrowLeft, CircleCheck, CircleX, Images, TimerReset } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
@@ -14,12 +14,15 @@ import { Badge } from "@/components/ui/badge";
 import { statusBadgeVariant } from "@/lib/status";
 import { isAdminEmployee } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
-import { dailyRegularMinutesFor, getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes as dayUnpaidTrip, getKilometreBreakdown } from "@/lib/payroll-calculations";
+import { isEditableStatus } from "@/lib/employee-form-helpers";
 import { withTimeout } from "@/lib/utils";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
+import OvertimeProofDialog from "@/components/OvertimeProofDialog";
 import MonthEndInventoryBanner from "@/components/MonthEndInventoryBanner";
-import { lastOvertimeJobIds } from "@/lib/timesheet-layout";
-import { dailyOvertimeEvidenceRequirement } from "@/lib/job-submission";
+import { overtimeMarkerJobIds } from "@/lib/timesheet-layout";
+import { dailyOvertimeEvidenceRequirement, workedMinutes } from "@/lib/job-submission";
+import { overtimeLineJobIds, proofPerJob } from "@/lib/overtime-proof-rules";
 import { submitSavedJob } from "@/lib/submit-job";
 import { isPendingManagerEntry } from "@/lib/manager-entry";
 import { inventoryCaptured, inventoryDayBadge, inventoryRequiredFor } from "@/lib/inventory-screenshots";
@@ -83,7 +86,28 @@ export default function History() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [confirm, confirmDialog] = useConfirmDialog();
-  const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
+  const overtimeMarkerIds = useMemo(() => overtimeMarkerJobIds(jobs), [jobs]);
+  // Work orders past the day's line (from 2026-11-18, one proof each): the ones still missing their proof show a red clock.
+  const [proofJob, setProofJob] = useState(null);
+  const overLineIds = useMemo(() => {
+    const byDate = new Map();
+    for (const job of jobs) {
+      if (!proofPerJob(job.job_date) || !["saved", "updated", "submitted", "approved"].includes(job.status)) continue;
+      byDate.set(job.job_date, [...(byDate.get(job.job_date) || []), job]);
+    }
+    const ids = new Set();
+    for (const dayJobs of byDate.values()) {
+      for (const id of overtimeLineJobIds(dayJobs, {
+        minutesOf: workedMinutes, thresholdMinutes: dailyRegularMinutes, unpaidTripMinutes: firstTripUnpaid ? dayUnpaidTrip(dayJobs) : 0,
+      })) ids.add(id);
+    }
+    return ids;
+  }, [jobs, dailyRegularMinutes, firstTripUnpaid]);
+  const missingProofCount = useMemo(
+    () => jobs.filter((job) => overLineIds.has(job.id) && !job.overtime_evidence_captured && ["saved", "updated"].includes(job.status) && !job.locked).length,
+    [jobs, overLineIds],
+  );
+  const dayMinutesOf = (date) => jobs.filter((job) => job.job_date === date).reduce((sum, job) => sum + workedMinutes(job), 0);
   // The foreman's own notes (0136) on the CONTREMAÎTRE sheets shown: a blue icon that opens the text, kept for reference.
   const [foremanNotes, setForemanNotes] = useState(() => new Map());
   useEffect(() => {
@@ -422,6 +446,11 @@ export default function History() {
     <AppShell>
       <div className="space-y-3">
         {!isViewMode && <MonthEndInventoryBanner userId={user?.id} />}
+        {!isViewMode && !isAdminEmployee(role) && missingProofCount > 0 && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="status">
+            {t("proofs.missingNotice", { count: missingProofCount, hours: dailyRegularMinutes / 60 })}
+          </div>
+        )}
         {loading && (
           <Card><CardContent className="p-4 text-sm">{t("common.loading")}</CardContent></Card>
         )}
@@ -517,7 +546,19 @@ export default function History() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 text-sm font-bold">
                             <span>{j.ot}</span>
-                            <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+                            <JobCaptureIcons job={{ ...j, overtime_evidence_captured: overtimeMarkerIds.has(j.id) && !proofPerJob(j.job_date), meal_claim_captured: j.meal_claim_captured || mealJobIds.has(j.id) }} />
+                            {proofPerJob(j.job_date) && !isAdminEmployee(role) && !isViewMode && (j.overtime_evidence_captured || overLineIds.has(j.id)) && (
+                              <button
+                                type="button"
+                                onClick={() => setProofJob(j)}
+                                title={t(j.overtime_evidence_captured ? "proofs.markerTitle" : "proofs.missingTitle")}
+                                aria-label={t(j.overtime_evidence_captured ? "proofs.markerTitle" : "proofs.missingTitle")}
+                                className={`inline-flex h-6 items-center gap-0.5 rounded-full px-1.5 ${j.overtime_evidence_captured ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"}`}
+                              >
+                                <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />
+                                {j.overtime_evidence_captured ? <ArrowLeft className="h-3 w-3" aria-hidden="true" /> : <span className="text-xs font-bold" aria-hidden="true">+</span>}
+                              </button>
+                            )}
                             {foremanNotes.has(j.id) && <ForemanNoteIcon note={foremanNotes.get(j.id)} subtitle={`${j.ot} · ${dayjs(j.job_date).format("DD MMM")}`} />}
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -592,6 +633,17 @@ export default function History() {
       </div>
       <InventoryPhotosDialog date={inventoryViewDate} userId={effectiveUserId} onClose={() => setInventoryViewDate(null)} />
       {confirmDialog}
+      {proofJob && (
+        <OvertimeProofDialog
+          job={proofJob}
+          userId={effectiveUserId}
+          editable={isEditableStatus(proofJob.status) && !proofJob.locked}
+          dailyMinutes={dayMinutesOf(proofJob.job_date)}
+          hours={dailyRegularMinutes / 60}
+          onClose={() => setProofJob(null)}
+          onChanged={() => load()}
+        />
+      )}
     </AppShell>
   );
 }

@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 import { cn, withRetry } from "@/lib/utils";
-import { dateBandMap, lastOvertimeJobIds } from "@/lib/timesheet-layout";
+import { dateBandMap, overtimeMarkerJobIds } from "@/lib/timesheet-layout";
 import { seenCount, unseenAnomalies, useAnomaliesFolded, useSeenAnomalies } from "@/lib/anomaly-seen";
 import { anomaliesForJobs, anomalyLimitsFromSettings, detectJobAnomalies, otReuseAnomalies, otReuseOthersText, sortAnomalies } from "@/lib/job-anomalies";
 import { proofAnomalies, proofDetailsText } from "@/lib/overtime-proof-check";
@@ -1083,7 +1083,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     markNoteRead(supabase, note.id).catch(() => undefined);
   }, []);
 
-  const overtimeMarkerIds = useMemo(() => lastOvertimeJobIds(jobs), [jobs]);
+  const overtimeMarkerIds = useMemo(() => overtimeMarkerJobIds(jobs), [jobs]);
   const dateBands = useMemo(() => dateBandMap(filtered.map((j) => j.job_date)), [filtered]);
 
   // Props for one memoized JobCard (see components/manager/JobCard.jsx).
