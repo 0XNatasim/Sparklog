@@ -235,6 +235,15 @@ describe("sub-pages opened from a button", () => {
     expect(canOpenNavItem("owner", [], page)).toBe(true);
     for (const role of ["employee", "subcontractor_1", "admin"]) expect(canOpenNavItem(role, [...GRANTABLE_ADMIN_SECTIONS], page), role).toBe(false);
   });
+
+  it("resolves Inventaire › Inventaire fin de mois the same way (managers only, out of the menu)", () => {
+    const page = findNavItem("inventory/month-end");
+    expect(page).toMatchObject({ id: "inventory-month-end", parent: "inventory" });
+    expect(MANAGER_NAV.flatMap((group) => group.items).some((item) => item.path === "inventory/month-end")).toBe(false);
+    expect(canOpenNavItem("manager", [], page)).toBe(true);
+    expect(canOpenNavItem("owner", [], page)).toBe(true);
+    for (const role of ["employee", "subcontractor_1", "admin"]) expect(canOpenNavItem(role, [...GRANTABLE_ADMIN_SECTIONS], page), role).toBe(false);
+  });
 });
 
 describe("Configuration › OT prédéfinis", () => {

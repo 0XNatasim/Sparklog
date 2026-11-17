@@ -105,6 +105,31 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Month-end inventory proof pictures (0142): the object goes, then the row is emptied (the request keeps its history).
+  const { data: expiredMonthEnd, error: expiredMonthEndError } = await admin
+    .from("month_end_inventory_files")
+    .select("id, storage_path")
+    .lte("expires_at", new Date().toISOString())
+    .is("purged_at", null)
+    .not("storage_path", "is", null)
+    .limit(500);
+  if (expiredMonthEndError) failures.push({ phase: "load_expired_month_end", detail: expiredMonthEndError.message });
+  if (expiredMonthEnd?.length) {
+    const { error: storageError } = await admin.storage
+      .from("month-end-inventory")
+      .remove(expiredMonthEnd.map((row) => row.storage_path));
+    if (storageError) {
+      failures.push({ phase: "delete_expired_month_end_objects", detail: storageError.message });
+    } else {
+      const { error: purgeError } = await admin
+        .from("month_end_inventory_files")
+        .update({ storage_path: null, purged_at: new Date().toISOString() })
+        .in("id", expiredMonthEnd.map((row) => row.id));
+      if (purgeError) failures.push({ phase: "purge_expired_month_end_rows", detail: purgeError.message });
+      else expiredDeleted += expiredMonthEnd.length;
+    }
+  }
+
   // Written inventory rows expire with their screenshots (same expires_at).
   const { error: expiredItemsError } = await admin
     .from("inventory_items")

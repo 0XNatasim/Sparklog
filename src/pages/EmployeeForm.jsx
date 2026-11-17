@@ -36,6 +36,7 @@ import { AUTO_RESEND_DELAYS_S, fmtTimeHHmm, isEditableStatus, makeDayjsFromJob, 
 import { isJobOverlapError, jobOverlapDetails, jobOverlapMessage } from "@/lib/job-overlap";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { useInventoryStep } from "@/components/employee-form/use-inventory-step";
+import { fetchMyDueMonthEnd } from "@/lib/month-end-inventory";
 import FormMessages from "@/components/employee-form/FormMessages";
 import JobEntryFields from "@/components/employee-form/JobEntryFields";
 import ParkingReceiptFields from "@/components/employee-form/ParkingReceiptFields";
@@ -200,6 +201,8 @@ export default function EmployeeForm() {
   const endShiftDateRef = useRef(null);
   const daySubmitRef = useRef(false);
   const inventory = useInventoryStep({ userId: user?.id, dayRef: endShiftDateRef, open: returnStep === "inventory", t });
+  // Month-end inventory proof still owed (0142): { requestId, dueDate, filesCount } or null. Asked before the day is submitted.
+  const [monthEndDue, setMonthEndDue] = useState(null);
   const [daySubmitBusy, setDaySubmitBusy] = useState(false);
   const [daySubmitError, setDaySubmitError] = useState("");
 
@@ -875,11 +878,23 @@ export default function EmployeeForm() {
     }
     setDaySubmitError("");
     if (officeEmployee || !inventoryEnabled) {
-      setReturnStep("dayDone");
+      await goToMonthEndOrDayDone();
       return;
     }
     // The step stays open until every list slot and the defective-products question are done.
-    setReturnStep(await inventory.start() ? "inventory" : "dayDone");
+    if (await inventory.start()) setReturnStep("inventory");
+    else await goToMonthEndOrDayDone();
+  }
+
+  // After the shift's own steps: the month-end inventory proof when one is owed (the database would refuse to submit the
+  // day without it), else straight to « submit the day ». A failed read does not block: the database is the gate.
+  async function goToMonthEndOrDayDone() {
+    let due = null;
+    if (!officeEmployee) {
+      try { due = await fetchMyDueMonthEnd(supabase); } catch { due = null; }
+    }
+    setMonthEndDue(due);
+    setReturnStep(due ? "monthEnd" : "dayDone");
   }
 
   function closeReturnDialog() {
@@ -1376,6 +1391,13 @@ export default function EmployeeForm() {
           onSkip: skipEvidenceForNow,
         }}
         inventory={inventory}
+        monthEnd={{
+          due: monthEndDue,
+          userId: user?.id,
+          afterInventory: goToMonthEndOrDayDone,
+          // « Je ne l'ai pas encore »: the sheets stay as saved; the day is submitted once the proof is sent (History).
+          onLater: () => { closeReturnDialog(); navigate("/history"); },
+        }}
         day={{
           withInventory: !officeEmployee && inventoryEnabled,
           error: daySubmitError,

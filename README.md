@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.267 (2026-11-17).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.268 (2026-11-17).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,12 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.268 — month-end subcontractor inventory (Phase 8).** In Inventory › « Inventaire fin de mois » (managers only) a manager schedules
+  the day of the month-end inventory form (a Microsoft form Sparklog cannot read) for the chosen people (the ones who run a warehouse). That day, at the end of their
+  shift (and from a banner in History), they send **5 to 10 screenshots** of the filled form; the pictures are sent as they are picked. Until the proof is sent the database
+  refuses to **submit** their work sheets dated on or after that day (drafts are never blocked; the emergency sheet submitted by the owner is not blocked). « Je ne l'ai pas
+  encore » keeps the sheets as drafts. Managers see each person's state (received / late / due / scheduled), look at and download the pictures (one ZIP per day or per person),
+  can « Débloquer » someone, and set how long the pictures are kept (60 days by default, 7–365, separate from the overtime proof). Migration 0142; `cleanup_overtime_evidence` also purges expired pictures.
 - **V2.4.267 — overtime proof asked only on the day's last work order.** Saving a job in the middle of the day no longer opens the overtime-proof pop-up when the day already passes 8 h with the jobs still to enter: the proof is asked on the last work order (« Dernier OT de la journée ? » = Oui) or when a day is submitted from History. The database rule is unchanged (the proof is required to submit the day).
 - **V2.4.266 — « Hier à 23 h 58 » removed.** The yesterday snapshot button and its window are gone from the manager's Live Crew board (the weekly snapshots stay). No database change.
 - **V2.4.265 — employee card from the week snapshot.** In the « Cette semaine » / « Semaine passée » snapshot, an employee's name is now a link: clicking it opens that employee's card (all its tabs, same fields and saves as Équipe › Employés) in the same pop-up, with a « Retour au snapshot » button that brings back the table on the same week, refreshed.

@@ -7,22 +7,25 @@ import { RETURN_TIME_OPTIONS } from "@/lib/job-contract";
 import { AUTO_RESEND_DELAYS_S, formatReturnMinutes, normalizeNumber } from "@/lib/employee-form-helpers";
 import OvertimeEvidenceStep from "./OvertimeEvidenceStep";
 import InventoryStep from "./InventoryStep";
+import MonthEndInventoryStep from "./MonthEndInventoryStep";
 
 // The save flow of the time entry, one step at a time: last work order of the day? → return to the
 // shop (time, km) → overtime proof (day > 8 h) → inventory → submit the day. `step` is the open step
 // ("closed" hides the dialog); every action is EmployeeForm's.
-export default function EndOfShiftDialog({ t, step, onStep, busy, onClose, saveError, pendingResend, returnFlow, evidence, inventory, day }) {
+export default function EndOfShiftDialog({ t, step, onStep, busy, onClose, saveError, pendingResend, returnFlow, evidence, inventory, monthEnd = {}, day }) {
   const { saving, checking, answerLastJob, saveWithReturn, minutes, setMinutes, km, setKm, kmTotal } = returnFlow;
   const total = normalizeNumber(kmTotal) || 0;
   const returnKm = normalizeNumber(km);
+  // The proof steps (overtime, month-end inventory) have no « × », no outside click and no Escape: the employee gives the
+  // proof or taps « Je ne l'ai pas encore ».
+  const proofStep = step === "evidence" || step === "monthEnd";
   return (
-    <Dialog open={step !== "closed"} onOpenChange={(open) => { if (!open && !busy && step !== "evidence") onClose(); }}>
-      {/* The overtime proof step has no « × », no outside click and no Escape: the employee gives the proof or taps « Je ne l'ai pas encore ». */}
+    <Dialog open={step !== "closed"} onOpenChange={(open) => { if (!open && !busy && !proofStep) onClose(); }}>
       <DialogContent
         className="max-w-md"
-        hideClose={step === "evidence"}
-        onInteractOutside={step === "evidence" ? (event) => event.preventDefault() : undefined}
-        onEscapeKeyDown={step === "evidence" ? (event) => event.preventDefault() : undefined}
+        hideClose={proofStep}
+        onInteractOutside={proofStep ? (event) => event.preventDefault() : undefined}
+        onEscapeKeyDown={proofStep ? (event) => event.preventDefault() : undefined}
       >
         {saveError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
@@ -122,7 +125,11 @@ export default function EndOfShiftDialog({ t, step, onStep, busy, onClose, saveE
 
         {step === "evidence" && <OvertimeEvidenceStep t={t} {...evidence} />}
 
-        {step === "inventory" && <InventoryStep t={t} inventory={inventory} onContinue={() => onStep("dayDone")} />}
+        {step === "inventory" && <InventoryStep t={t} inventory={inventory} onContinue={monthEnd.afterInventory} />}
+
+        {step === "monthEnd" && monthEnd.due && (
+          <MonthEndInventoryStep t={t} userId={monthEnd.userId} due={monthEnd.due} onSent={() => onStep("dayDone")} onLater={monthEnd.onLater} />
+        )}
 
         {step === "dayDone" && (
           <>

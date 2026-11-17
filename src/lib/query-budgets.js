@@ -33,6 +33,8 @@ export const QUERY_BUDGETS = Object.freeze({
   foremanReports: 300,
   // Justificatifs › Télécharger (0126): the pictures still kept (30 days by default) and the ones already downloaded.
   evidenceDownload: 1500,
+  // Inventaire › Inventaire fin de mois (0142): the requests read at once (a few people a month, several months).
+  monthEndInventory: 300,
 });
 
 // A narrowed timesheet search must be complete, not merely filtered from the
