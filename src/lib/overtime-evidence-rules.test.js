@@ -104,3 +104,31 @@ describe("overtime proof per work order (0144)", () => {
     expect(sql).toContain("revoke all on function public.save_own_overtime_proof(uuid, uuid, uuid, text, integer) from public, anon");
   });
 });
+
+// Phase 11 (0145): the database refuses to submit a work order past the line without its own proof.
+describe("overtime proof required per work order (0145)", () => {
+  const sql = readFileSync(fileURLToPath(new URL("../../supabase/migrations/20261118180000_0145_overtime_proof_required_per_job.sql", import.meta.url)), "utf8");
+
+  it("checks the proof of THIS job, from the same cut-over date as the app", async () => {
+    const { PER_JOB_PROOF_FROM } = await import("./overtime-proof-rules");
+    expect(sql).toContain(`new.job_date >= date '${PER_JOB_PROOF_FROM}'`);
+    expect(sql).toContain("before_minutes + duration_minutes - coalesce(unpaid_trip_minutes, 0) > daily_regular_minutes");
+    expect(sql).toContain("not exists (select 1 from public.overtime_evidence e where e.job_id = new.id)");
+    expect(sql).toContain("message = 'overtime_evidence_required'");
+  });
+
+  it("orders the day's jobs like the app (Départ, then id, byte order) and counts only the jobs before this one", () => {
+    expect(sql).toContain(`(coalesce(left(j.depart::text, 5), '') collate "C", j.id::text collate "C")`);
+    expect(sql).toContain(`< (coalesce(left(new.depart::text, 5), '') collate "C", new.id::text collate "C")`);
+  });
+
+  it("keeps the day-level rule for earlier dates, the exemptions, and every other check of the contract", () => {
+    expect(sql).toContain("elsif duration_minutes + other_minutes - coalesce(unpaid_trip_minutes, 0) > daily_regular_minutes");
+    expect(sql).toContain("if not owner_submit and not coalesce(is_office_employee, false) then");
+    for (const message of ["invalid_job_interval", "inventory_screenshots_required", "overlapping_job_interval", "return_time_exceeds_job_interval", "invalid_job_kilometres"]) {
+      expect(sql).toContain(message);
+    }
+    expect(sql).toContain("if new.status <> 'submitted' then return new; end if;");
+    expect(sql).toContain("daily_regular_minutes := 600;");
+  });
+});
