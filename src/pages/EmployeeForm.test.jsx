@@ -157,6 +157,20 @@ describe("EmployeeForm — new entry", () => {
     expect(state.fake.rpcCalls("save_own_job")).toHaveLength(0);
   });
 
+  it("does not ask for the overtime proof on a job that is not the last of the day, even over 8 h", async () => {
+    setup();
+    await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));
+    fill({ depart: "06:00", fin: "15:30" });
+    fireEvent.click(saveButton());
+    fireEvent.click(await screen.findByRole("button", { name: fr("form.manualEntryCheck.continue") }));
+    await screen.findByText(fr("form.last.title"));
+    fireEvent.click(screen.getByRole("button", { name: fr("common.no") }));
+    await screen.findByText(fr("form.return.savedTitle"));
+    expect(screen.queryByText(fr("form.evidence.title"))).toBeNull();
+    expect(state.fake.rpcCalls("save_own_job")).toHaveLength(1);
+    expect(state.fake.rpcCalls("save_own_job_with_overtime_evidence")).toHaveLength(0);
+  });
+
   it("saves the sheet as a draft, not submitted, when the proof is not there yet", async () => {
     setup();
     await waitFor(() => expect(state.fake.calls.some((c) => c.table === "company_time_settings")).toBe(true));

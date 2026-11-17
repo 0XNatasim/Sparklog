@@ -6,8 +6,8 @@ export function kilometreFieldValue(job) {
   return String(total);
 }
 
-// Overtime proof (screenshot) is requested whenever the day exceeds 8 h, both
-// when saving and when submitting, from the work form or from History.
+// Overtime proof (screenshot) is requested when the day exceeds 8 h, when saving or submitting. The work form only asks it
+// on the last work order of the day (EmployeeForm.saveWithReturn), not on an earlier job saved mid-day.
 export function requiresEvidenceBeforeSave(mode) {
   return mode === "submit" || mode === "draft";
 }
