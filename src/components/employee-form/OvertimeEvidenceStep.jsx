@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { OVERTIME_FORM_URL } from "@/lib/overtime-form-link";
 import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // The overtime authorization the day needs (> 8 h): what the screenshot of the overtime request form must show, an example,
@@ -13,16 +14,27 @@ export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationEr
       </DialogHeader>
       <div className="space-y-3 text-sm">
         {progress && <p className="font-semibold" role="status">{t("form.evidence.progress", { n: progress.n, total: progress.total })}</p>}
-        {explain && <p className="rounded-md border border-info/30 bg-info/10 p-3 text-info">{t("form.evidence.perJob", { hours: explain.hours, ot: explain.ot })}</p>}
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
-          {t("form.evidence.description")}
-        </div>
+        {explain && (
+          <div className="space-y-2 rounded-md border border-info/30 bg-info/10 p-3 text-info">
+            <p>{t("form.evidence.rule", { hours: explain.hours })}</p>
+            <p>
+              {OVERTIME_FORM_URL ? (
+                <a href={OVERTIME_FORM_URL} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">
+                  {t("form.evidence.formName")}
+                </a>
+              ) : (
+                <span className="font-semibold">{t("form.evidence.formName")}</span>
+              )}
+            </p>
+            {explain.perJob && <p>{t("form.evidence.perJob", { ot: explain.ot })}</p>}
+          </div>
+        )}
         <div className="rounded-md border bg-muted/40 p-3">
           <div className="font-semibold">{t("form.evidence.requiredContentTitle")}</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
             <li>{t("form.evidence.requiredApproval")}</li>
             <li>{t("form.evidence.requiredDuration")}</li>
-            <li>{t("form.evidence.requiredCrop")}</li>
+            <li className="font-semibold text-destructive">{t("form.evidence.requiredCrop")}</li>
           </ul>
           <Button
             type="button"
