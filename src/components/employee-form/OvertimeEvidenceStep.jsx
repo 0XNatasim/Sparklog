@@ -1,12 +1,16 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { OVERTIME_FORM_URL } from "@/lib/overtime-form-link";
+import { useLanguage } from "@/components/language-provider";
+import { useOvertimeConfirmationForm } from "@/lib/overtime-form-link";
 import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // The overtime authorization the day needs (> 8 h): what the screenshot of the overtime request form must show, an example,
 // and the picker. « Réessayer » reuses the picture kept in memory after a failure.
 export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationError, error, canRetry, onRetry, busy, onSkip, progress, explain }) {
   const [showExample, setShowExample] = useState(false);
+  const form = useOvertimeConfirmationForm();
+  const { language } = useLanguage();
+  const formName = (language === "en" ? form?.nameEn || form?.nameFr : form?.nameFr || form?.nameEn) || t("form.evidence.formName");
   return (
     <>
       <DialogHeader>
@@ -18,9 +22,9 @@ export default function OvertimeEvidenceStep({ t, inputRef, onFile, validationEr
           <div className="space-y-2 rounded-md border border-info/30 bg-info/10 p-3 text-info">
             <p>{t("form.evidence.rule", { hours: explain.hours })}</p>
             <p>
-              {OVERTIME_FORM_URL ? (
-                <a href={OVERTIME_FORM_URL} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">
-                  {t("form.evidence.formName")}
+              {form?.url ? (
+                <a href={form.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">
+                  {formName}
                 </a>
               ) : (
                 <span className="font-semibold">{t("form.evidence.formName")}</span>
