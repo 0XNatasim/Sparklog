@@ -2,11 +2,12 @@
 // to what the work order says, so a manager can see every reading and the differences at a glance. Read only.
 import { expectedProofForJob, proofDifferences } from "./overtime-proof-check";
 
-export const OCR_STATES = ["ok", "mismatch", "unread", "failed", "notRead"];
+export const OCR_STATES = ["ok", "mismatch", "unread", "failed", "queued", "notRead"];
 
 // `evidence` = overtime_evidence rows; `jobs` = the work orders of those days; `people` = Map of user id -> profile.
 // One row per proof, newest first. state: ok (nothing differs), mismatch (a value differs), unread (read, nothing found),
-// failed (the reading service did not answer, e.g. too many requests: nothing was read, it can be read again),
+// queued (waiting in the reading queue, one reading a minute),
+// failed (out of attempts: the reading service did not answer, e.g. too many requests: nothing was read, it can be read again),
 // notRead (older proof: the reader never looked at it).
 export function buildOcrRows(evidence, jobs, people) {
   const byId = new Map((jobs || []).map((job) => [job.id, job]));
@@ -27,9 +28,10 @@ export function buildOcrRows(evidence, jobs, people) {
     const expected = job
       ? expectedProofForJob(byDay.get(`${userId}|${jobDate}`) || [], job, { firstTripUnpaid: Boolean(person?.first_trip_unpaid), tenHourDay: Boolean(person?.ten_hour_days) })
       : null;
-    const diffs = proof.proof_read_at && proof.ocr_status !== "failed" && !nothingFound ? proofDifferences(found, expected) : [];
+    const diffs = proof.proof_read_at && proof.ocr_status !== "failed" && proof.ocr_status !== "pending" && !nothingFound ? proofDifferences(found, expected) : [];
     let state = "ok";
-    if (!proof.proof_read_at) state = "notRead";
+    if (proof.ocr_status === "pending") state = "queued";
+    else if (!proof.proof_read_at) state = "notRead";
     else if (proof.ocr_status === "failed") state = "failed";
     else if (nothingFound) state = "unread";
     else if (diffs.length) state = "mismatch";
@@ -49,7 +51,7 @@ export const canReread = (row) => row.state === "failed" || row.state === "unrea
 export function filterOcrRows(rows, { state = "read", query = "" } = {}) {
   const needle = String(query || "").trim().toLowerCase();
   return (rows || []).filter((row) => {
-    if (state === "read" && row.state === "notRead") return false;
+    if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
     if (state === "check" && row.state !== "mismatch" && row.state !== "unread" && row.state !== "failed") return false;
     if (state === "reread" && !canReread(row)) return false;
     if (OCR_STATES.includes(state) && row.state !== state) return false;
@@ -59,7 +61,7 @@ export function filterOcrRows(rows, { state = "read", query = "" } = {}) {
 }
 
 export function countOcrStates(rows) {
-  const counts = { ok: 0, mismatch: 0, unread: 0, failed: 0, notRead: 0 };
+  const counts = { ok: 0, mismatch: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
   for (const row of rows || []) counts[row.state] += 1;
   return counts;
 }

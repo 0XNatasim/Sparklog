@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ fake: null }));
 vi.mock("@/supabaseClient", () => ({ get supabase() { return h.fake.client; } }));
 
 const { default: OcrReadings } = await import("./OcrReadings");
-const invoked = [];
+const rpcCalls = [];
 
 const evidence = (id, extra) => ({ id, job_id: "j1", user_id: "u1", job_date: "2026-11-16", created_at: "2026-11-16T22:00:00Z", storage_path: `u1/2026-11-16/${id}.jpg`, ocr_status: "processed", proof_read_at: "2026-11-16T22:01:00Z", ...extra });
 
@@ -21,7 +21,7 @@ function setup(rows) {
       jobs: [{ id: "j1", user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "208637", depart: "06:30", fin: "17:00", return_time_minutes: 0 }],
     },
   });
-  h.fake.client.functions.invoke = async (name, options) => { invoked.push([name, options.body]); return { data: { ok: true }, error: null }; };
+  h.fake.client.rpc = async (name, args) => { rpcCalls.push([name, args]); return { data: 1, error: null }; };
   render(<OcrReadings />);
 }
 
@@ -56,15 +56,14 @@ describe("OcrReadings", () => {
 });
 
 describe("OcrReadings › Relire", () => {
-  it("shows a failed reading apart from an unreadable picture and asks the reader again for the failed proofs", async () => {
-    invoked.length = 0;
-    setup([evidence("bad", { ocr_status: "failed" }), evidence("ok1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
-    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
+  it("shows a failed reading apart from an unreadable picture and puts the failed proofs back in the queue with one call", async () => {
+    setup([evidence("bad", { ocr_status: "failed" }), evidence("wait", { ocr_status: "pending", proof_read_at: null }), evidence("ok1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
+    rpcCalls.length = 0;
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2)); // « all readings »: the queued one is not a reading yet
     expect(screen.getAllByText("Lecture échouée").length).toBeGreaterThan(0);
-    const button = screen.getByRole("button", { name: "Relire les échecs (1)" });
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    fireEvent.click(button);
-    await waitFor(() => expect(invoked).toEqual([["process_overtime_evidence", { evidence_id: "bad", reread: true }]]));
-    vi.useRealTimers();
+    expect(screen.getByText(/En file : 1/)).toBeTruthy(); // the counter counts the queued proof
+    fireEvent.click(screen.getByRole("button", { name: "Remettre les échecs en file (1)" }));
+    await waitFor(() => expect(rpcCalls).toEqual([["requeue_overtime_proofs", { p_ids: ["bad"] }]]));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("1 preuve(s) remise(s) dans la file"));
   });
 });

@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { buildOcrRows, canReread, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
-import { rereadProof } from "@/lib/overtime-proofs";
+import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { useT } from "@/lib/use-t";
@@ -16,8 +16,8 @@ import { supabase } from "@/supabaseClient";
 
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at";
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
-const BADGE = { ok: "success", mismatch: "destructive", unread: "warning", failed: "destructive", notRead: "secondary" };
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const BADGE = { ok: "success", mismatch: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
+const AUTO_REFRESH_MS = 60000;
 
 async function inChunks(ids, run) {
   const rows = [];
@@ -60,27 +60,34 @@ export default function OcrReadings() {
     return () => { alive = false; };
   }, [t, reload]);
 
-  // « Relire »: asks the reader again for the proofs it failed on or found nothing on, one at a time (the service refuses
-  // too many requests at once), then reloads the table a few seconds later (the reading itself runs in the background).
+  // « Relire »: puts the proofs back in the reading queue (one reading a minute, a refused proof goes to the bottom).
   async function reread(targets) {
     if (rereading || targets.length === 0) return;
     setRereading(true);
     setError("");
     setNotice("");
-    let refused = 0;
-    for (const row of targets) {
-      try { await rereadProof(supabase, row.id); } catch { refused += 1; }
-      await pause(1500);
+    try {
+      const moved = await requeueProofs(supabase, targets.map((row) => row.id));
+      setNotice(t("ocr.requeued", { count: moved }));
+      setReload((value) => value + 1);
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "ocr.rereadFailed"));
+    } finally {
+      setRereading(false);
     }
-    setNotice(refused ? t("ocr.rereadPartial", { refused, total: targets.length }) : t("ocr.rereadStarted", { count: targets.length }));
-    await pause(8000);
-    setRereading(false);
-    setReload((value) => value + 1);
   }
 
   const counts = useMemo(() => countOcrStates(rows), [rows]);
   const shown = useMemo(() => filterOcrRows(rows, { state, query }), [rows, state, query]);
+  const waiting = counts.queued;
   const rereadable = useMemo(() => (rows || []).filter(canReread), [rows]);
+
+  // While proofs wait in the queue the table reloads by itself every minute (one reading a minute).
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const timer = setInterval(() => setReload((value) => value + 1), AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [waiting]);
 
   async function view(row) {
     if (!row.storagePath || opening) return;
@@ -111,7 +118,7 @@ export default function OcrReadings() {
           </div>
           {rows && (
             <div className="flex flex-wrap gap-2 text-xs">
-              {["ok", "mismatch", "unread", "failed", "notRead"].map((key) => (
+              {["ok", "mismatch", "unread", "failed", "queued", "notRead"].map((key) => (
                 <Badge key={key} variant={BADGE[key]}>{t(`ocr.state.${key}`)} : {counts[key]}</Badge>
               ))}
             </div>
@@ -122,6 +129,7 @@ export default function OcrReadings() {
               <option value="check">{t("ocr.filter.check")}</option>
               <option value="ok">{t("ocr.filter.ok")}</option>
               <option value="reread">{t("ocr.filter.reread")}</option>
+              <option value="queued">{t("ocr.filter.queued")}</option>
               <option value="notRead">{t("ocr.filter.notRead")}</option>
               <option value="all">{t("ocr.filter.all")}</option>
             </Select>
