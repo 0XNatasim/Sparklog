@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.275)
+## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.276)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.276 (technique).** Onglet « OCR » de À traiter. `manager-nav.js` : `tab("ocr", "receipts", "mgr.nav.ocr")` dans l'entrée `todo` (règle de Justificatifs), `ManagerPages.TODO_TABS.ocr` → `components/manager/OcrReadings.jsx` (lecture seule : `overtime_evidence` les 300 dernières preuves — budget `ocrReadings` —, `profiles` et `jobs` des mêmes jours par morceaux, URL signée à la demande pour voir la capture). Logique pure `src/lib/ocr-readings.js` : `buildOcrRows` (état `ok` / `mismatch` / `unread` / `notRead`, valeurs lues, attendues, champs en écart), `filterOcrRows`, `countOcrStates`. `overtime-proof-check.js` : `expectedProofForJob(jours, fiche, options)` = valeurs attendues **par fiche** (OT de la fiche ; minutes chez le client = part de cette fiche au-delà de la ligne 480 / 600, retour et premier trajet non payé exclus ; retour de la fiche) — `proofAnomalies` (alertes de « À regarder d'abord ») ne l'utilise pas encore et saute toujours les journées à plusieurs preuves : **à brancher ensuite**. Tolérances inchangées (15 min client, 5 min retour). Définition de « minutes chez le client » toujours à confirmer. Tests : `ocr-readings.test.js`, `OcrReadings.test.jsx`. Aucune migration.
 
 **V2.4.275 (technique).** Texte de la demande de preuve : `OvertimeEvidenceStep.jsx` (titre `form.evidence.title`, bloc règle `form.evidence.rule` + lien `form.evidence.formName` vers la ligne `employee_forms` « Confirmation de Temps supp. » (`useOvertimeConfirmationForm` / `pickOvertimeConfirmationForm` dans `src/lib/overtime-form-link.js` : identifiant de la ligne puis nom ; l'adresse n'est jamais dans le code ; ligne absente = nom sans lien) — puis `form.evidence.perJob` « Celle-ci est pour l'OT … » ; `form.evidence.description` retiré ; ligne `requiredCrop` en rouge). `EmployeeForm` passe `explain` toujours (`perJob` selon `proofPerJob`). Test : `OvertimeEvidenceStep.test.jsx`. Aucune migration. **Phase suivante gardée en mémoire :** OCR par OT (comparer chaque preuve à sa fiche ; décisions à prendre : avertissement employé, définition de « minutes chez le client », photo illisible).
 

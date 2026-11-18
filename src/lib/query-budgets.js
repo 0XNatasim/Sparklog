@@ -3,6 +3,8 @@
 export const QUERY_BUDGETS = Object.freeze({
   managerJobsPage: 50,
   reviewQueue: 100,
+  // « À traiter › OCR »: the latest proof screenshots with what the reader found on each.
+  ocrReadings: 300,
   employeeHistoryPage: 100,
   employeeWeekLookbackWeeks: 12,
   anomalySubmittedJobs: 200,

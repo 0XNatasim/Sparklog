@@ -89,3 +89,25 @@ export function proofAnomalies(evidenceRows, jobs, { firstTripUnpaidUsers = new 
 export function proofDetailsText(anomaly, t) {
   return (anomaly?.diffs || []).map((diff) => t(`manager.anomalies.proofField.${diff.field}`, { found: diff.found, expected: diff.expected })).join(" ; ");
 }
+
+// What the form must say for ONE work order (each proof stays on its own work order since 0144): its OT, the minutes at the
+// client it adds beyond the day's line (jobs taken in Départ order, return time and the unpaid first trip left out), and its
+// own return minutes. The day's work orders are `dayJobs`; `job` is the one the proof belongs to.
+export function expectedProofForJob(dayJobs, job, { firstTripUnpaid = false, tenHourDay = false } = {}) {
+  const jobs = (dayJobs || []).filter((item) => item?.depart && item?.fin)
+    .slice().sort((a, b) => String(a.depart).slice(0, 5).localeCompare(String(b.depart).slice(0, 5)) || String(a.id).localeCompare(String(b.id)));
+  const index = jobs.findIndex((item) => item.id === job?.id);
+  if (index < 0) return null;
+  const unpaidFirst = firstTripUnpaid ? dayFirstTripUnpaidMinutes(jobs) : 0;
+  const regular = tenHourDay ? TEN_HOUR_DAY_MINUTES : DAILY_REGULAR_MINUTES;
+  let before = 0;
+  jobs.slice(0, index).forEach((item, position) => {
+    before += minutesBetween(item.depart, item.fin) - (Number(item.return_time_minutes) || 0) - (position === 0 ? unpaidFirst : 0);
+  });
+  const own = minutesBetween(job.depart, job.fin) - (Number(job.return_time_minutes) || 0) - (index === 0 ? unpaidFirst : 0);
+  return {
+    ot: otDigits(job.ot),
+    clientMinutes: Math.max(0, before + own - regular) - Math.max(0, before - regular),
+    returnMinutes: Number(job.return_time_minutes) || 0,
+  };
+}
