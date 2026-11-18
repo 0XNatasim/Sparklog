@@ -1389,7 +1389,7 @@ export default function EmployeeForm() {
           onRetry: () => processEvidenceFile(failedEvidenceFile),
           busy: evidenceBusy,
           onSkip: skipEvidenceForNow,
-          explain: proofPerJob(job_date) ? { ot: ot || "—", hours: dailyRegularMinutes / 60 } : null,
+          explain: { ot: ot || "—", hours: dailyRegularMinutes / 60, perJob: proofPerJob(job_date) },
         }}
         inventory={inventory}
         monthEnd={{

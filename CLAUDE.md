@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-17, V2.4.274)
+## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.275)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.275 (technique).** Texte de la demande de preuve : `OvertimeEvidenceStep.jsx` (titre `form.evidence.title`, bloc règle `form.evidence.rule` + lien `form.evidence.formName` vers la ligne `employee_forms` « Confirmation de Temps supp. » (`useOvertimeConfirmationForm` / `pickOvertimeConfirmationForm` dans `src/lib/overtime-form-link.js` : identifiant de la ligne puis nom ; l'adresse n'est jamais dans le code ; ligne absente = nom sans lien) — puis `form.evidence.perJob` « Celle-ci est pour l'OT … » ; `form.evidence.description` retiré ; ligne `requiredCrop` en rouge). `EmployeeForm` passe `explain` toujours (`perJob` selon `proofPerJob`). Test : `OvertimeEvidenceStep.test.jsx`. Aucune migration. **Phase suivante gardée en mémoire :** OCR par OT (comparer chaque preuve à sa fiche ; décisions à prendre : avertissement employé, définition de « minutes chez le client », photo illisible).
 
 **V2.4.274 (technique).** Date de bascule de la preuve par OT avancée au **2026-11-16** (la décision date du soir du 16, heure de Montréal ; j'avais pris la date UTC). `PER_JOB_PROOF_FROM = "2026-11-16"` ; migration 0146 = `validate_job_submission_contract` de 0145 recréée, seule la date change (`date '2026-11-16'` aux deux endroits) ; le test de parité lit désormais 0146 (le corps le plus récent). Tests des dates adaptés (15 nov = règle d'avant). **Appliquer 0146** ; sans elle la base garde 0145 (preuve par OT dès le 17).
 

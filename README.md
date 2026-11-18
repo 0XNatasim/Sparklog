@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.274 (2026-11-17).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.275 (2026-11-18).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.275 — clearer overtime-proof request.** The pop-up is titled « Preuve de temps supplémentaire requise », states the rule (every OT past 8 h — 10 h with « 4 jours de 10 h » — has its own screenshot of the « Confirmation de temps supplémentaire » form, shown as a link to the form already listed in Profil › Formulaires, so its address is edited there, never in the code), says which OT this proof is for and that it can be seen or replaced from the History clock, and shows « the whole form on the screenshot » in red. The old « your daily total exceeds 8 hours » sentence is gone. No migration.
 - **V2.4.274 — one proof per overtime work order starts on 16 November (migration 0146).** The rule had been set to start on the 17th (UTC date) while it was decided on the evening of the 16th, Montréal time: work dates from **2026-11-16** now need one proof per work order past the line, in the app and in the database. Days before the 16th keep one proof per day.
 - **V2.4.273 — supper no longer shows an error to the employee; proof visible on older days.** The automatic $30 supper failed whenever the form still held 0 minutes for the day (the database refuses a claim under 10 h 15): the minutes are now recomputed from the day's saved work orders. If a claim still cannot be created the employee sees nothing; managers get a « supper manquant » alert (À regarder d'abord / review alerts). In History the overtime clock is now a button on days before the per-order rule too (read-only for submitted days). No migration.
 - **V2.4.272 — the database now REFUSES a work order past the line without its own proof (Phase 11).** From 2026-11-17, submitting a work order that crosses the day's 8 h line (10 h with « 4 jours de 10 h ») or comes after it is refused unless **that work order** has its own overtime screenshot: 2 work orders past the line = 2 proofs required, 3 = 3. The rule is checked in the database (not only in the app) and a capture claimed by another job does not count. Earlier dates keep one proof per day; drafts are never blocked; office staff and the owner's emergency submission stay exempt. « Soumettre la journée » in History names how many work orders still miss their screenshot (red clock with a +), and the error message explains what to do. Migration 0145.
