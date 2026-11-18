@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.279)
+## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.280)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.280 (technique).** Mauvaise capture. Constat (2026-11-18) : une fiche de travail (page « Bilan », en-tête « OT-198909 ») envoyée comme preuve était `processed` / « conforme », car le lecteur ne demandait qu'un nombre d'OT trouvé ; 7 preuves sur 34 lues n'avaient que l'OT. `_shared/overtime_form.js` : `isOvertimeFormText(texte)` (au moins 2 des marques : « chez le client », « retour à l'entrepôt », « combien de minute(s) », « numéro du OT », « confirmation de temps supp » ; ré-exporté par `src/lib/overtime-form.js`). `process_overtime_evidence/index.ts` (**à redéployer, après 0148**) : texte vide → `needs_review` ; formulaire reconnu → `processed` si au moins un nombre, sinon `needs_review` ; ancien SMS → `processed` ; **autre chose → `wrong_document`, chiffres lus abandonnés (null)**. Migration 0148 : contrainte `overtime_evidence_ocr_status_check` + `wrong_document` ; `requeue_overtime_proofs` accepte aussi `wrong_document`. Écran : état `wrongDoc` (« Mauvaise capture », dans `check`, relisible) ; `proofAnomalies` : anomalie `proof_wrong` (`manager.anomalies.proof_wrong`) pour une fiche `submitted` dont une preuve est `wrong_document`. **Non fait — blocage de l'employé :** la lecture est asynchrone (1 / min), donc elle ne peut pas refuser l'envoi ; options étudiées : refuser la soumission en base tant que la seule preuve est `wrong_document` (ne joue que si la lecture a eu lieu avant la soumission), renvoi automatique de la fiche soumise à l'employé (`submitted` → `updated`, drapeau de preuve retiré, audit), ou lecture immédiate à l'envoi. Tests : `overtime-form.test.js` (fiche de travail réelle), `overtime-proof-check.test.js`, `ocr-readings.test.js` (verrous du SQL 0148 et de la fonction).
 
 **V2.4.279 (technique).** L'onglet OCR ne lit que `job_date >= OCR_FIRST_DAY` (`ocr-readings.js`, 2026-11-16, décision du 2026-11-18) : `OcrReadings.jsx` ajoute `.gte("job_date", OCR_FIRST_DAY)`. Donnée corrigée à la main le même jour : les 76 preuves `pending` d'avant le 16 (remises en file par le rattrapage de la 0147) sont repassées `failed` (`proof_read_at` posé, hors file) ; la file ne garde que celles depuis le 16. Pas de migration : la 0147 reste telle quelle (son rattrapage de 14 jours n'est plus pertinent). Test : `OcrReadings.test.jsx`.
 

@@ -68,3 +68,12 @@ describe("migration 0141", () => {
     expect(sql).toMatch(/before insert\s+on public\.overtime_evidence/);
   });
 });
+
+describe("proofAnomalies › wrong screenshot", () => {
+  it("flags a submitted job whose proof is not the overtime form, whatever the numbers", () => {
+    const jobs = [{ id: "j1", user_id: "u1", job_date: "2026-11-18", status: "submitted", ot: "198909", depart: "08:00", fin: "17:00", return_time_minutes: 0 }];
+    const rows = [{ id: "e1", job_id: "j1", ocr_status: "wrong_document", proof_read_at: "2026-11-18T20:00:00Z", proof_ot: null, proof_client_minutes: null, proof_return_minutes: null }];
+    expect(proofAnomalies(rows, jobs)).toEqual([expect.objectContaining({ type: "proof_wrong", jobIds: ["j1"], userId: "u1" })]);
+    expect(proofAnomalies(rows, jobs.map((job) => ({ ...job, status: "approved" })))).toEqual([]);
+  });
+});

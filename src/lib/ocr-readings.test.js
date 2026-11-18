@@ -35,11 +35,12 @@ describe("buildOcrRows", () => {
       proof("p4", "b", { proof_read_at: null }),
       proof("p5", "b", { ocr_status: "failed" }),
       proof("p6", "b", { ocr_status: "pending", proof_read_at: null }),
+      proof("p7", "b", { ocr_status: "wrong_document" }),
     ], jobs, people);
     const state = Object.fromEntries(rows.map((row) => [row.id, row.state]));
     // p5: the reading service did not answer (« failed »): nothing was read, which is not the same as an unreadable picture.
-    expect(state).toEqual({ p1: "ok", p2: "mismatch", p3: "unread", p4: "notRead", p5: "failed", p6: "queued" });
-    expect(rows.filter(canReread).map((row) => row.id).sort()).toEqual(["p3", "p5"]);
+    expect(state).toEqual({ p1: "ok", p2: "mismatch", p3: "unread", p4: "notRead", p5: "failed", p6: "queued", p7: "wrongDoc" });
+    expect(rows.filter(canReread).map((row) => row.id).sort()).toEqual(["p3", "p5", "p7"]); // a wrong document can be read again in case the reader was wrong
     expect(rows.find((row) => row.id === "p2").wrong.has("ot")).toBe(true);
     expect(rows.find((row) => row.id === "p1").name).toBe("Alex Test");
     expect(rows.find((row) => row.id === "p1").expected).toEqual({ ot: "208637", clientMinutes: 150, returnMinutes: 0 });
@@ -55,7 +56,25 @@ describe("buildOcrRows", () => {
     expect(filterOcrRows(rows, { state: "reread" }).map((row) => row.id)).toEqual(["p3"]);
     expect(filterOcrRows(rows, { state: "all", query: "alex" })).toHaveLength(3);
     expect(filterOcrRows(rows, { state: "all", query: "zzz" })).toHaveLength(0);
-    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+  });
+});
+
+describe("the wrong screenshot (migration 0148 and process_overtime_evidence)", () => {
+  const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  const fn = read("../../supabase/functions/process_overtime_evidence/index.ts");
+  const sql = read("../../supabase/migrations/20261118230000_0148_overtime_proof_wrong_document.sql");
+
+  it("marks anything that is not the form `wrong_document` and drops the numbers read on it", () => {
+    expect(fn).toContain("isOvertimeFormText(text)");
+    expect(fn).toContain('status = "wrong_document"');
+    expect(fn).toContain("parsed = { ot: null, clientMinutes: null, returnMinutes: null }");
+    expect(fn).not.toContain('(overtimeFormFound(parsed) || validatesOvertimeSms(text)) ? "processed"'); // the old test: an OT number alone proved nothing
+  });
+
+  it("allows the new status and lets a manager put such a proof back in the queue", () => {
+    expect(sql).toContain("check (ocr_status in ('pending', 'processed', 'needs_review', 'failed', 'wrong_document'))");
+    expect(sql).toContain("ocr_status in ('failed', 'needs_review', 'wrong_document')");
   });
 });
 
