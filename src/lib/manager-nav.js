@@ -45,6 +45,8 @@ const MENU_ONLY_ITEMS = Object.freeze([
   { id: "todo", path: "todo", grant: null, labelKey: "mgr.nav.todo", tabs: [
     Object.freeze({ key: "todo", grant: null, labelKey: "mgr.nav3.tab.toApprove" }),
     tab("receipts", "receipts", "mgr.nav.receipts"),
+    // OCR: what the reader found on each overtime proof, next to the work order (same rule as Justificatifs).
+    tab("ocr", "receipts", "mgr.nav.ocr"),
   ] },
   { id: "payroll-week", path: "payroll/week", grant: null, labelKey: "mgr.nav.payrollWeek" },
   // My own notes and reminders (0111): private to each manager / owner.

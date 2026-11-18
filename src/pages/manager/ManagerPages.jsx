@@ -48,6 +48,7 @@ const TravelRulesManager = lazyPanel(() => import("@/components/manager/TravelRu
 const AccidentRegister = lazyPanel(() => import("@/components/manager/AccidentRegister"));
 const NotesPanel = lazyPanel(() => import("@/components/manager/NotesPanel"));
 const ForemanReportsPanel = lazyPanel(() => import("@/components/manager/ForemanReportsPanel"));
+const OcrReadings = lazyPanel(() => import("@/components/manager/OcrReadings"));
 const ManagerDashboard = lazyPanel(() => import("@/pages/ManagerDashboard"));
 const CcqJsonExport = lazyPanel(() => import("@/components/CcqJsonExport"));
 
@@ -290,7 +291,7 @@ function TabbedPage({ itemId, content }) {
   );
 }
 
-const TODO_TABS = { todo: TodoPage, receipts: () => <ManagerDashboard view="receipts" reviewFilters /> };
+const TODO_TABS = { todo: TodoPage, receipts: () => <ManagerDashboard view="receipts" reviewFilters />, ocr: () => <OcrReadings /> };
 // Timesheets: cards with the employee's name first, the « Entrées à la main » filter, plain words.
 const TIME_TABS = { timesheets: () => <ManagerDashboard view="timesheet" nameFirst manualFilter plainWords />, unlock: () => <Narrow><UnlockDayManager plainWords /></Narrow>, missing: () => <Narrow><MissingDaysPanel /></Narrow> };
 // Calcul détaillé keeps the « writes » warning.
