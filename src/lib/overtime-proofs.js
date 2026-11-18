@@ -45,3 +45,13 @@ export async function removeOwnProof(client, proofId) {
   const { error } = await withTimeout(client.rpc("remove_own_overtime_proof", { p_evidence_id: proofId }), 12000);
   if (error) throw error;
 }
+
+// À traiter › OCR › « Relire »: a manager puts proofs back in the reading queue (migration 0147: one reading a minute, a refused
+// proof goes to the bottom). Returns how many were put back; only proofs that failed or found nothing count. Throws when refused.
+export async function requeueProofs(client, evidenceIds) {
+  const ids = [...new Set((evidenceIds || []).filter(Boolean))];
+  if (ids.length === 0) return 0;
+  const { data, error } = await withTimeout(client.rpc("requeue_overtime_proofs", { p_ids: ids }), 15000);
+  if (error) throw error;
+  return Number(data) || 0;
+}

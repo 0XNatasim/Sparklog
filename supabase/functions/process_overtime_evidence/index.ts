@@ -22,7 +22,10 @@ function validatesOvertimeSms(text: string) {
   return mentionsOvertime && confirmsApproval && includesDuration;
 }
 
-async function processEvidence(admin: ReturnType<typeof createClient>, evidence: { id: string; storage_path: string }) {
+// One reading, one attempt: the queue (migration 0147) decides when a proof is tried again. `attempts` = attempts already made.
+const MAX_ATTEMPTS = 5;
+
+async function processEvidence(admin: ReturnType<typeof createClient>, evidence: { id: string; storage_path: string; attempts: number }) {
   try {
     const { data: file, error: downloadError } = await admin.storage
       .from("overtime-evidence")
@@ -54,8 +57,8 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     const text = (result?.ParsedResults || []).map((item: { ParsedText?: string }) => item?.ParsedText || "").join("\n").trim();
     // The proof is now the overtime request form: keep its three numbers (OT, minutes at the client, return minutes).
     // An older app version may still send the SMS screenshot, which is classified as before.
-    const form = parseOvertimeForm(text);
-    const status = text && (overtimeFormFound(form) || validatesOvertimeSms(text)) ? "processed" : "needs_review";
+    const parsed = parseOvertimeForm(text);
+    const status = text && (overtimeFormFound(parsed) || validatesOvertimeSms(text)) ? "processed" : "needs_review";
     const { error: updateError } = await admin
       .from("overtime_evidence")
       // Persist only the classification and the three numbers. Raw text can contain names, phone
@@ -63,19 +66,34 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
       .update({
         ocr_text: null,
         ocr_status: status,
-        proof_ot: form.ot,
-        proof_client_minutes: form.clientMinutes,
-        proof_return_minutes: form.returnMinutes,
+        proof_ot: parsed.ot,
+        proof_client_minutes: parsed.clientMinutes,
+        proof_return_minutes: parsed.returnMinutes,
         proof_read_at: new Date().toISOString(),
       })
       .eq("id", evidence.id);
     if (updateError) throw updateError;
   } catch (error) {
     console.error("[process_overtime_evidence]", error);
-    await admin
-      .from("overtime_evidence")
-      .update({ ocr_status: "failed", proof_read_at: new Date().toISOString() })
-      .eq("id", evidence.id);
+    const attempts = (evidence.attempts || 0) + 1;
+    if (attempts >= MAX_ATTEMPTS) {
+      // Out of attempts: « failed » (a manager can put it back in the queue with « Relire »).
+      await admin
+        .from("overtime_evidence")
+        .update({ ocr_status: "failed", ocr_attempts: attempts, proof_read_at: new Date().toISOString() })
+        .eq("id", evidence.id);
+    } else {
+      // Back to the bottom of the queue (its last try is now), not tried again for 10 minutes × attempts.
+      await admin
+        .from("overtime_evidence")
+        .update({
+          ocr_status: "pending",
+          ocr_attempts: attempts,
+          ocr_last_try_at: new Date().toISOString(),
+          ocr_next_try_at: new Date(Date.now() + attempts * 10 * 60 * 1000).toISOString(),
+        })
+        .eq("id", evidence.id);
+    }
   }
 }
 
@@ -89,6 +107,22 @@ Deno.serve(async (req) => {
   const authorization = req.headers.get("authorization") || "";
   if (!supabaseUrl || !anonKey || !serviceRole) return json({ ok: false, error: "Server env not configured" }, 500);
 
+  const admin = createClient(supabaseUrl, serviceRole);
+
+  // The scheduled job (pg_cron, migration 0147): one proof a minute, taken from the queue.
+  const cronSecret = req.headers.get("x-cron-secret") || "";
+  if (cronSecret) {
+    const { data: allowed } = await admin.rpc("verify_cron_secret", { p_secret: cronSecret });
+    if (allowed !== true) return json({ ok: false, error: "Unauthorized" }, 401);
+    const { data: claimed, error: claimError } = await admin.rpc("claim_next_overtime_proof");
+    if (claimError) return json({ ok: false, error: claimError.message }, 500);
+    const next = Array.isArray(claimed) ? claimed[0] : null;
+    if (!next) return json({ ok: true, idle: true });
+    EdgeRuntime.waitUntil(processEvidence(admin, { id: next.proof_id, storage_path: next.proof_path, attempts: next.attempts_done }));
+    return json({ ok: true, accepted: true }, 202);
+  }
+
+  // The employee's phone after an upload: the proof is already `pending` in the queue, the scheduled job will read it.
   const caller = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data: userData, error: userError } = await caller.auth.getUser();
   if (userError || !userData.user) return json({ ok: false, error: "Unauthorized" }, 401);
@@ -97,16 +131,12 @@ Deno.serve(async (req) => {
   const evidenceId = body?.evidence_id;
   if (!evidenceId) return json({ ok: false, error: "Missing evidence_id" }, 400);
 
-  const admin = createClient(supabaseUrl, serviceRole);
   const { data: evidence, error } = await admin
     .from("overtime_evidence")
-    .select("id, user_id, storage_path, ocr_status")
+    .select("id, user_id, ocr_status")
     .eq("id", evidenceId)
     .single();
   if (error || !evidence) return json({ ok: false, error: "Evidence not found" }, 404);
   if (evidence.user_id !== userData.user.id) return json({ ok: false, error: "Forbidden" }, 403);
-  if (evidence.ocr_status !== "pending") return json({ ok: true, skipped: true });
-
-  EdgeRuntime.waitUntil(processEvidence(admin, evidence));
-  return json({ ok: true, accepted: true }, 202);
+  return json({ ok: true, queued: evidence.ocr_status === "pending" }, 202);
 });

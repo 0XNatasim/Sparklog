@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { Eye } from "lucide-react";
+import { Eye, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { buildOcrRows, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
+import { buildOcrRows, canReread, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
+import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { useT } from "@/lib/use-t";
@@ -15,7 +16,8 @@ import { supabase } from "@/supabaseClient";
 
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at";
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
-const BADGE = { ok: "success", mismatch: "destructive", unread: "warning", notRead: "secondary" };
+const BADGE = { ok: "success", mismatch: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
+const AUTO_REFRESH_MS = 60000;
 
 async function inChunks(ids, run) {
   const rows = [];
@@ -37,6 +39,10 @@ export default function OcrReadings() {
   const [query, setQuery] = useState("");
   const [opening, setOpening] = useState("");
 
+  const [reload, setReload] = useState(0);
+  const [rereading, setRereading] = useState(false);
+  const [notice, setNotice] = useState("");
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -49,13 +55,39 @@ export default function OcrReadings() {
         inChunks(userIds, (part) => supabase.from("profiles").select("id, full_name, first_trip_unpaid, ten_hour_days").in("id", part)),
         inChunks(userIds, (part) => supabase.from("jobs").select(JOB_COLUMNS).in("user_id", part).in("job_date", dates).limit(QUERY_BUDGETS.anomalyApprovedPeers)),
       ]);
-      if (alive) setRows(buildOcrRows(evidence, jobs, new Map(people.map((person) => [person.id, person]))));
+      if (alive) { setRows(buildOcrRows(evidence, jobs, new Map(people.map((person) => [person.id, person])))); setError(""); }
     })().catch((failure) => { if (alive) setError(friendlyErrorMessage(failure, t, "ocr.loadFailed")); });
     return () => { alive = false; };
-  }, [t]);
+  }, [t, reload]);
+
+  // « Relire »: puts the proofs back in the reading queue (one reading a minute, a refused proof goes to the bottom).
+  async function reread(targets) {
+    if (rereading || targets.length === 0) return;
+    setRereading(true);
+    setError("");
+    setNotice("");
+    try {
+      const moved = await requeueProofs(supabase, targets.map((row) => row.id));
+      setNotice(t("ocr.requeued", { count: moved }));
+      setReload((value) => value + 1);
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "ocr.rereadFailed"));
+    } finally {
+      setRereading(false);
+    }
+  }
 
   const counts = useMemo(() => countOcrStates(rows), [rows]);
   const shown = useMemo(() => filterOcrRows(rows, { state, query }), [rows, state, query]);
+  const waiting = counts.queued;
+  const rereadable = useMemo(() => (rows || []).filter(canReread), [rows]);
+
+  // While proofs wait in the queue the table reloads by itself every minute (one reading a minute).
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const timer = setInterval(() => setReload((value) => value + 1), AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [waiting]);
 
   async function view(row) {
     if (!row.storagePath || opening) return;
@@ -86,7 +118,7 @@ export default function OcrReadings() {
           </div>
           {rows && (
             <div className="flex flex-wrap gap-2 text-xs">
-              {["ok", "mismatch", "unread", "notRead"].map((key) => (
+              {["ok", "mismatch", "unread", "failed", "queued", "notRead"].map((key) => (
                 <Badge key={key} variant={BADGE[key]}>{t(`ocr.state.${key}`)} : {counts[key]}</Badge>
               ))}
             </div>
@@ -96,11 +128,24 @@ export default function OcrReadings() {
               <option value="read">{t("ocr.filter.read")}</option>
               <option value="check">{t("ocr.filter.check")}</option>
               <option value="ok">{t("ocr.filter.ok")}</option>
+              <option value="reread">{t("ocr.filter.reread")}</option>
+              <option value="queued">{t("ocr.filter.queued")}</option>
               <option value="notRead">{t("ocr.filter.notRead")}</option>
               <option value="all">{t("ocr.filter.all")}</option>
             </Select>
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("ocr.search")} aria-label={t("ocr.search")} />
           </div>
+          {rows && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" variant="outline" disabled={rereading} onClick={() => setReload((value) => value + 1)}>
+                <RefreshCw className="mr-1 h-4 w-4" aria-hidden="true" />{t("ocr.refresh")}
+              </Button>
+              <Button type="button" size="sm" disabled={rereading || rereadable.length === 0} onClick={() => reread(rereadable)}>
+                {rereading ? t("ocr.rereading") : t("ocr.rereadAll", { count: rereadable.length })}
+              </Button>
+            </div>
+          )}
+          {notice && <p className="text-sm text-muted-foreground" role="status">{notice}</p>}
           {error && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>}
         </CardContent>
       </Card>
@@ -137,7 +182,12 @@ export default function OcrReadings() {
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
                   <td className="whitespace-nowrap px-3 py-2"><Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge></td>
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
-                  <td className="px-3 py-2">
+                  <td className="flex gap-1 px-3 py-2">
+                    {canReread(row) && (
+                      <Button type="button" size="sm" variant="outline" disabled={rereading} onClick={() => reread([row])} aria-label={t("ocr.reread")} title={t("ocr.reread")}>
+                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    )}
                     {row.storagePath && (
                       <Button type="button" size="sm" variant="outline" disabled={opening === row.id} onClick={() => view(row)} aria-label={t("ocr.view")} title={t("ocr.view")}>
                         <Eye className="h-4 w-4" aria-hidden="true" />

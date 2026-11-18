@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildOcrRows, countOcrStates, filterOcrRows } from "./ocr-readings";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { buildOcrRows, canReread, countOcrStates, filterOcrRows } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
 const job = (id, depart, fin, extra = {}) => ({ id, user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "261821", depart, fin, return_time_minutes: 0, ...extra });
@@ -31,9 +33,13 @@ describe("buildOcrRows", () => {
       proof("p2", "b", { proof_ot: "999999", proof_client_minutes: 150, proof_return_minutes: 0 }),
       proof("p3", "b", { proof_ot: null, proof_client_minutes: null, proof_return_minutes: null }),
       proof("p4", "b", { proof_read_at: null }),
+      proof("p5", "b", { ocr_status: "failed" }),
+      proof("p6", "b", { ocr_status: "pending", proof_read_at: null }),
     ], jobs, people);
     const state = Object.fromEntries(rows.map((row) => [row.id, row.state]));
-    expect(state).toEqual({ p1: "ok", p2: "mismatch", p3: "unread", p4: "notRead" });
+    // p5: the reading service did not answer (« failed »): nothing was read, which is not the same as an unreadable picture.
+    expect(state).toEqual({ p1: "ok", p2: "mismatch", p3: "unread", p4: "notRead", p5: "failed", p6: "queued" });
+    expect(rows.filter(canReread).map((row) => row.id).sort()).toEqual(["p3", "p5"]);
     expect(rows.find((row) => row.id === "p2").wrong.has("ot")).toBe(true);
     expect(rows.find((row) => row.id === "p1").name).toBe("Alex Test");
     expect(rows.find((row) => row.id === "p1").expected).toEqual({ ot: "208637", clientMinutes: 150, returnMinutes: 0 });
@@ -46,8 +52,45 @@ describe("buildOcrRows", () => {
     ], jobs, people);
     expect(filterOcrRows(rows, { state: "read" }).map((row) => row.id).sort()).toEqual(["p1", "p3"]);
     expect(filterOcrRows(rows, { state: "check" }).map((row) => row.id)).toEqual(["p3"]);
+    expect(filterOcrRows(rows, { state: "reread" }).map((row) => row.id)).toEqual(["p3"]);
     expect(filterOcrRows(rows, { state: "all", query: "alex" })).toHaveLength(3);
     expect(filterOcrRows(rows, { state: "all", query: "zzz" })).toHaveLength(0);
-    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, unread: 1, notRead: 1 });
+    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+  });
+});
+
+describe("the reading queue (migration 0147 and process_overtime_evidence)", () => {
+  const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  const fn = read("../../supabase/functions/process_overtime_evidence/index.ts");
+  const sql = read("../../supabase/migrations/20261118210000_0147_overtime_proof_read_queue.sql");
+
+  it("reads one proof a minute, never tried first, then the one tried longest ago", () => {
+    expect(sql).toContain("cron.schedule('ocr-proofs-queue', '* * * * *'");
+    expect(sql).toContain("order by e.ocr_last_try_at nulls first, e.created_at");
+    expect(sql).toContain("for update skip locked");
+    expect(sql).toContain("ocr_next_try_at = now() + interval '5 minutes'");
+    expect(sql).toContain("grant execute on function public.claim_next_overtime_proof() to service_role");
+  });
+
+  it("puts a refused proof at the bottom, waits 10 minutes per attempt, and gives up after 5", () => {
+    expect(fn).toContain("const MAX_ATTEMPTS = 5");
+    expect(fn).toContain("ocr_last_try_at: new Date().toISOString()");
+    expect(fn).toContain("attempts * 10 * 60 * 1000");
+    expect(fn).toContain('ocr_status: "failed"');
+    expect(fn).not.toContain("attempt < 3"); // no immediate retry loop: the queue decides
+  });
+
+  it("lets only the scheduled job read, and only a manager put proofs back; the employee's call just queues", () => {
+    expect(fn).toContain('admin.rpc("verify_cron_secret"');
+    expect(fn).toContain('admin.rpc("claim_next_overtime_proof")');
+    expect(fn).toContain("evidence.user_id !== userData.user.id");
+    expect(fn).not.toContain("EdgeRuntime.waitUntil(processEvidence(admin, evidence))");
+    expect(sql).toContain("public.get_my_role()) is distinct from 'manager'");
+    expect(sql).toContain("revoke all on function public.requeue_overtime_proofs(uuid[]) from public, anon");
+  });
+
+  it("keeps the employee from choosing his place in the queue", () => {
+    expect(sql).toContain("new.ocr_attempts := 0;");
+    expect(sql).toContain("new.ocr_next_try_at := null;");
   });
 });
