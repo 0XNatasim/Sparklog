@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.278 (2026-11-18).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.279 (2026-11-18).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.279 — the OCR tab starts on 16 November.** It lists only the proofs of work dates from 2026-11-16 (the per-work-order rule), so older failures no longer clutter it nor count in « Remettre les échecs en file ». The 76 older proofs that waited in the reading queue were taken out of it (set back to « failed »). No migration.
 - **V2.4.278 — OCR proofs are read from a queue, one a minute.** The reading service refused most requests when every proof was sent at once. New proofs now wait in a queue (`pending`) and a scheduled job reads **one a minute**: the one never tried first, then the one tried longest ago. A proof the service refuses goes **back to the bottom** of the queue and is not tried again for 10 minutes × its attempts (the next one is read meanwhile); after 5 attempts it becomes « Lecture échouée ». In À traiter › OCR: new state « En file », button « Remettre les échecs en file », the table reloads by itself while proofs wait. Migration 0147 (also puts back in the queue the failures of the last 14 days); function to redeploy.
 - **V2.4.277 — OCR: failed readings are told apart and can be read again.** Most « unreadable » proofs were not unreadable: the reading service (OCR.space) refused the requests (HTTP 429, too many requests). The `process_overtime_evidence` function now tries again (3 attempts, growing pause) and, in À traiter › OCR, such a proof shows « Lecture échouée » (not « Illisible »), with a « Relire » button per line and « Relire les échecs (n) » (one at a time, manager only; a proof already read is left alone). **Function to redeploy.** The cause on the service side is the OCR.space key / quota: see the owner list (NOOB). No migration.
 - **V2.4.276 — « OCR » tab in À traiter.** Next to « À approuver » and « Justificatifs », a new **OCR** tab lists every overtime proof screenshot as one table line: date, employee, the work order's OT, and what the reader found (OT, minutes at the client, return minutes) next to what the work order expects, with a result (matching / difference / unreadable / not read) and a button to see the screenshot. Differences are in red; filter by state and search by employee, OT or date. Read only: nothing here changes a work order. Expected values are now worked out **per work order** (each proof stays on its own work order). No migration.

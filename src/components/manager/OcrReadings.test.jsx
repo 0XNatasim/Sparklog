@@ -55,6 +55,15 @@ describe("OcrReadings", () => {
   });
 });
 
+describe("OcrReadings › depuis le 16 novembre", () => {
+  it("reads only the proofs of work dates from 2026-11-16", async () => {
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    const call = h.fake.calls.find((c) => c.table === "overtime_evidence");
+    expect(call.filters).toContainEqual(["gte", "job_date", "2026-11-16"]);
+  });
+});
+
 describe("OcrReadings › Relire", () => {
   it("shows a failed reading apart from an unreadable picture and puts the failed proofs back in the queue with one call", async () => {
     setup([evidence("bad", { ocr_status: "failed" }), evidence("wait", { ocr_status: "pending", proof_read_at: null }), evidence("ok1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);

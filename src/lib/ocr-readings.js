@@ -2,6 +2,9 @@
 // to what the work order says, so a manager can see every reading and the differences at a glance. Read only.
 import { expectedProofForJob, proofDifferences } from "./overtime-proof-check";
 
+// The OCR tab starts with the per-work-order proofs (owner decision 2026-11-18: nothing before 16 November).
+export const OCR_FIRST_DAY = "2026-11-16";
+
 export const OCR_STATES = ["ok", "mismatch", "unread", "failed", "queued", "notRead"];
 
 // `evidence` = overtime_evidence rows; `jobs` = the work orders of those days; `people` = Map of user id -> profile.

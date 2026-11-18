@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { buildOcrRows, canReread, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
+import { OCR_FIRST_DAY, buildOcrRows, canReread, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
 import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -47,7 +47,7 @@ export default function OcrReadings() {
     let alive = true;
     (async () => {
       const { data: evidence, error: evidenceError } = await withTimeout(
-        supabase.from("overtime_evidence").select(EVIDENCE_COLUMNS).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.ocrReadings), 12000);
+        supabase.from("overtime_evidence").select(EVIDENCE_COLUMNS).gte("job_date", OCR_FIRST_DAY).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.ocrReadings), 12000);
       if (evidenceError) throw evidenceError;
       const userIds = [...new Set((evidence || []).map((row) => row.user_id).filter(Boolean))];
       const dates = [...new Set((evidence || []).map((row) => String(row.job_date).slice(0, 10)).filter(Boolean))];
