@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.278)
+## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.279)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.279 (technique).** L'onglet OCR ne lit que `job_date >= OCR_FIRST_DAY` (`ocr-readings.js`, 2026-11-16, décision du 2026-11-18) : `OcrReadings.jsx` ajoute `.gte("job_date", OCR_FIRST_DAY)`. Donnée corrigée à la main le même jour : les 76 preuves `pending` d'avant le 16 (remises en file par le rattrapage de la 0147) sont repassées `failed` (`proof_read_at` posé, hors file) ; la file ne garde que celles depuis le 16. Pas de migration : la 0147 reste telle quelle (son rattrapage de 14 jours n'est plus pertinent). Test : `OcrReadings.test.jsx`.
 
 **V2.4.278 (technique).** OCR : file d'attente, une lecture par minute (suite de V2.4.277, même PR). Migration 0147 : colonnes `overtime_evidence.ocr_attempts`, `ocr_last_try_at`, `ocr_next_try_at` + index partiel `ocr_status = 'pending'` ; trigger `overtime_evidence_guard_proof_fields` (insertion) remet aussi ces trois colonnes à zéro / null (l'employé ne choisit pas sa place) ; `claim_next_overtime_proof()` (service_role seulement ; `ocr_status = 'pending'`, `ocr_next_try_at` échu, ordre `ocr_last_try_at nulls first, created_at`, `for update skip locked`, bail de 5 min posé dans `ocr_next_try_at`) ; `requeue_overtime_proofs(uuid[])` (`get_my_role() = 'manager'`, 1–300 ids ; remet en `pending` les preuves `failed` / `needs_review` / lues sans rien trouver, dont l'image est encore gardée) ; rattrapage : les `failed` des 14 derniers jours sont remises en file ; tâche `pg_cron` `ocr-proofs-queue` chaque minute → `invoke_scheduled_function('process_overtime_evidence', {"queue": true})`. `process_overtime_evidence/index.ts` (**à redéployer, après 0147**) : mode cron (`x-cron-secret` vérifié par `verify_cron_secret`) = prend la prochaine preuve et la lit **une seule fois** (plus de boucle de reprises ni de paramètre `reread`) ; échec → `pending`, `ocr_attempts + 1`, `ocr_last_try_at = maintenant` (bas de la file), `ocr_next_try_at = maintenant + 10 min × essais` ; au 5e échec → `failed` + `proof_read_at` ; l'appel du téléphone de l'employé (après envoi) ne lit plus rien : il vérifie le propriétaire et répond 202 (la tâche lira). **Ordre de déploiement : appliquer 0147, puis redéployer la fonction** (la fonction écrit les nouvelles colonnes) ; avant 0147, ne pas redéployer. Écran : état `queued` (`ocr_status = pending`), `requeueProofs` (RPC, remplace `rereadProof`), « Remettre les échecs en file (n) », rechargement automatique chaque minute tant qu'il y a des preuves en file. Testé dans un Postgres jetable (ordre de lecture : jamais essayée d'abord puis la plus anciennement essayée ; une preuve refusée passe derrière les autres et n'est pas reprise avant 10 min ; bail ; rattrapage ; employé refusé / gestionnaire accepté / liste vide refusée). Tests : `ocr-readings.test.js` (verrous du SQL et de la fonction), `OcrReadings.test.jsx`.
 
