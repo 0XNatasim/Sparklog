@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.276 (2026-11-18).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.277 (2026-11-18).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.277 — OCR: failed readings are told apart and can be read again.** Most « unreadable » proofs were not unreadable: the reading service (OCR.space) refused the requests (HTTP 429, too many requests). The `process_overtime_evidence` function now tries again (3 attempts, growing pause) and, in À traiter › OCR, such a proof shows « Lecture échouée » (not « Illisible »), with a « Relire » button per line and « Relire les échecs (n) » (one at a time, manager only; a proof already read is left alone). **Function to redeploy.** The cause on the service side is the OCR.space key / quota: see the owner list (NOOB). No migration.
 - **V2.4.276 — « OCR » tab in À traiter.** Next to « À approuver » and « Justificatifs », a new **OCR** tab lists every overtime proof screenshot as one table line: date, employee, the work order's OT, and what the reader found (OT, minutes at the client, return minutes) next to what the work order expects, with a result (matching / difference / unreadable / not read) and a button to see the screenshot. Differences are in red; filter by state and search by employee, OT or date. Read only: nothing here changes a work order. Expected values are now worked out **per work order** (each proof stays on its own work order). No migration.
 - **V2.4.275 — clearer overtime-proof request.** The pop-up is titled « Preuve de temps supplémentaire requise », states the rule (every OT past 8 h — 10 h with « 4 jours de 10 h » — has its own screenshot of the « Confirmation de temps supplémentaire » form, shown as a link to the form already listed in Profil › Formulaires, so its address is edited there, never in the code), says which OT this proof is for and that it can be seen or replaced from the History clock, and shows « the whole form on the screenshot » in red. The old « your daily total exceeds 8 hours » sentence is gone. No migration.
 - **V2.4.274 — one proof per overtime work order starts on 16 November (migration 0146).** The rule had been set to start on the 17th (UTC date) while it was decided on the evening of the 16th, Montréal time: work dates from **2026-11-16** now need one proof per work order past the line, in the app and in the database. Days before the 16th keep one proof per day.

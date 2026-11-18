@@ -45,3 +45,11 @@ export async function removeOwnProof(client, proofId) {
   const { error } = await withTimeout(client.rpc("remove_own_overtime_proof", { p_evidence_id: proofId }), 12000);
   if (error) throw error;
 }
+
+// À traiter › OCR › « Relire »: a manager asks the reader to look again at a proof it failed on (the answer is 202: the reading
+// runs in the background, the table is reloaded a little later). Throws when the request is refused.
+export async function rereadProof(client, evidenceId) {
+  const { data, error } = await withTimeout(client.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId, reread: true } }), 15000);
+  if (error) throw error;
+  return data;
+}

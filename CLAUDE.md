@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.276)
+## 6. À faire / à préciser (mis à jour 2026-11-18, V2.4.277)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.277 (technique).** OCR : échecs distingués et relecture. Constat (2026-11-18) : sur les 59 preuves lues les 16-17 novembre, **32 étaient `ocr_status = failed`** (journal de la fonction : `ocr.space HTTP 429`, une fois `TimeoutError`) — le service refusait les demandes, la capture n'était pas en cause ; 3 `needs_review` et 2 `processed` sans rien trouvé ; parmi les 22 lues, 13 n'ont pas la valeur « retour » (cause non établie : il faudrait un texte OCR d'exemple). `process_overtime_evidence/index.ts` : jusqu'à 3 tentatives (pauses 4 s puis 10 s) sur 429 / 5xx / délai dépassé ; paramètre `reread: true` réservé à `get_my_role() = "manager"` (aal2) qui relit une preuve `failed` ou `needs_review` (une preuve déjà lue est laissée) ; le chemin de l'employé (propriétaire, `pending`) ne change pas. **Fonction à redéployer.** `ocr-readings.js` : état `failed` (≠ `unread`), `canReread`, filtre `reread` ; `overtime-proofs.js` : `rereadProof` ; `OcrReadings.jsx` : badge « Lecture échouée », « Relire » par ligne, « Relire les échecs (n) » (une à la fois, pause de 1,5 s, rechargement après 8 s), « Actualiser ». **À faire côté propriétaire :** clé personnelle OCR.space dans le secret Edge `OCR_SPACE_API_KEY` (point de §6.3 « Vérifier `OCR_SPACE_API_KEY` » : confirmé nécessaire). Tests : `ocr-readings.test.js` (dont verrous sur la source de la fonction), `OcrReadings.test.jsx`. Aucune migration.
 
 **V2.4.276 (technique).** Onglet « OCR » de À traiter. `manager-nav.js` : `tab("ocr", "receipts", "mgr.nav.ocr")` dans l'entrée `todo` (règle de Justificatifs), `ManagerPages.TODO_TABS.ocr` → `components/manager/OcrReadings.jsx` (lecture seule : `overtime_evidence` les 300 dernières preuves — budget `ocrReadings` —, `profiles` et `jobs` des mêmes jours par morceaux, URL signée à la demande pour voir la capture). Logique pure `src/lib/ocr-readings.js` : `buildOcrRows` (état `ok` / `mismatch` / `unread` / `notRead`, valeurs lues, attendues, champs en écart), `filterOcrRows`, `countOcrStates`. `overtime-proof-check.js` : `expectedProofForJob(jours, fiche, options)` = valeurs attendues **par fiche** (OT de la fiche ; minutes chez le client = part de cette fiche au-delà de la ligne 480 / 600, retour et premier trajet non payé exclus ; retour de la fiche) — `proofAnomalies` (alertes de « À regarder d'abord ») ne l'utilise pas encore et saute toujours les journées à plusieurs preuves : **à brancher ensuite**. Tolérances inchangées (15 min client, 5 min retour). Définition de « minutes chez le client » toujours à confirmer. Tests : `ocr-readings.test.js`, `OcrReadings.test.jsx`. Aucune migration.
 
@@ -619,7 +621,7 @@ Ce qui est fait est dans l'historique Git (V2.4.104 → V2.4.195). Ouvert, du pl
   fonction ni vue ne la lit).
 - [ ] **Google Sheet** : nouveau fichier en janvier 2027 (200 onglets max, un « SemXX » par semaine). Le `doPost` de
   `apps-script-doPost.js` (65 km) a été collé et redéployé par la propriétaire le 2026-11-02.
-- [ ] **Vérifier** `OCR_SPACE_API_KEY` dans les secrets Edge (sinon clé « helloworld ») et le forfait Vercel (Hobby =
+- [ ] **`OCR_SPACE_API_KEY`** dans les secrets Edge : le service répond 429 (constaté le 2026-11-18, V2.4.277) → clé personnelle à saisir (sinon clé « helloworld » partagée) ; vérifier aussi le forfait Vercel (Hobby =
   usage commercial interdit).
 - [ ] P-5 (optionnel) : agrégation des coûts côté serveur — voir §2.
 

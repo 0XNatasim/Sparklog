@@ -37,13 +37,25 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     form.append("scale", "true");
     form.append("isTable", "true");
 
-    const response = await fetch("https://api.ocr.space/parse/image", {
-      method: "POST",
-      headers: { apikey: apiKey },
-      body: form,
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!response.ok) throw new Error(`ocr.space HTTP ${response.status}`);
+    // OCR.space answers 429 (too many requests) when its quota is reached, and sometimes 5xx or a slow reply: try again a
+    // few times with a growing pause before giving up (the proof is then « failed » and a manager can read it again).
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 4000 : 10000));
+      try {
+        response = await fetch("https://api.ocr.space/parse/image", {
+          method: "POST",
+          headers: { apikey: apiKey },
+          body: form,
+          signal: AbortSignal.timeout(30000),
+        });
+      } catch (fetchError) {
+        if (attempt === 2) throw fetchError;
+        continue;
+      }
+      if (response.ok || (response.status !== 429 && response.status < 500)) break;
+    }
+    if (!response || !response.ok) throw new Error(`ocr.space HTTP ${response?.status ?? "none"}`);
 
     const result = await response.json();
     if (result?.IsErroredOnProcessing) {
@@ -104,8 +116,16 @@ Deno.serve(async (req) => {
     .eq("id", evidenceId)
     .single();
   if (error || !evidence) return json({ ok: false, error: "Evidence not found" }, 404);
-  if (evidence.user_id !== userData.user.id) return json({ ok: false, error: "Forbidden" }, 403);
-  if (evidence.ocr_status !== "pending") return json({ ok: true, skipped: true });
+  if (body?.reread === true) {
+    // « Relire » (À traiter › OCR): a manager (get_my_role = manager, which needs the second factor) reads again a proof the
+    // reader failed or found nothing on. A proof already read is left alone.
+    const { data: role } = await caller.rpc("get_my_role");
+    if (role !== "manager") return json({ ok: false, error: "Forbidden" }, 403);
+    if (evidence.ocr_status !== "failed" && evidence.ocr_status !== "needs_review") return json({ ok: true, skipped: true });
+  } else {
+    if (evidence.user_id !== userData.user.id) return json({ ok: false, error: "Forbidden" }, 403);
+    if (evidence.ocr_status !== "pending") return json({ ok: true, skipped: true });
+  }
 
   EdgeRuntime.waitUntil(processEvidence(admin, evidence));
   return json({ ok: true, accepted: true }, 202);

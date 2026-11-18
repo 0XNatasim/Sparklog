@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({ fake: null }));
 vi.mock("@/supabaseClient", () => ({ get supabase() { return h.fake.client; } }));
 
 const { default: OcrReadings } = await import("./OcrReadings");
+const invoked = [];
 
 const evidence = (id, extra) => ({ id, job_id: "j1", user_id: "u1", job_date: "2026-11-16", created_at: "2026-11-16T22:00:00Z", storage_path: `u1/2026-11-16/${id}.jpg`, ocr_status: "processed", proof_read_at: "2026-11-16T22:01:00Z", ...extra });
 
@@ -20,6 +21,7 @@ function setup(rows) {
       jobs: [{ id: "j1", user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "208637", depart: "06:30", fin: "17:00", return_time_minutes: 0 }],
     },
   });
+  h.fake.client.functions.invoke = async (name, options) => { invoked.push([name, options.body]); return { data: { ok: true }, error: null }; };
   render(<OcrReadings />);
 }
 
@@ -50,5 +52,19 @@ describe("OcrReadings", () => {
     expect(screen.getAllByText("Alex Test")).toHaveLength(1);
     fireEvent.change(screen.getByLabelText("Afficher"), { target: { value: "all" } });
     expect(screen.getAllByText("Alex Test")).toHaveLength(3);
+  });
+});
+
+describe("OcrReadings › Relire", () => {
+  it("shows a failed reading apart from an unreadable picture and asks the reader again for the failed proofs", async () => {
+    invoked.length = 0;
+    setup([evidence("bad", { ocr_status: "failed" }), evidence("ok1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
+    expect(screen.getAllByText("Lecture échouée").length).toBeGreaterThan(0);
+    const button = screen.getByRole("button", { name: "Relire les échecs (1)" });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fireEvent.click(button);
+    await waitFor(() => expect(invoked).toEqual([["process_overtime_evidence", { evidence_id: "bad", reread: true }]]));
+    vi.useRealTimers();
   });
 });
