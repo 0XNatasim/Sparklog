@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { resolve, dirname } from "node:path";
 import { buildOcrRows, canReread, countOcrStates, filterOcrRows } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
@@ -35,11 +36,12 @@ describe("buildOcrRows", () => {
       proof("p4", "b", { proof_read_at: null }),
       proof("p5", "b", { ocr_status: "failed" }),
       proof("p6", "b", { ocr_status: "pending", proof_read_at: null }),
+      proof("p7", "b", { ocr_status: "wrong_document" }),
     ], jobs, people);
     const state = Object.fromEntries(rows.map((row) => [row.id, row.state]));
     // p5: the reading service did not answer (« failed »): nothing was read, which is not the same as an unreadable picture.
-    expect(state).toEqual({ p1: "ok", p2: "mismatch", p3: "unread", p4: "notRead", p5: "failed", p6: "queued" });
-    expect(rows.filter(canReread).map((row) => row.id).sort()).toEqual(["p3", "p5"]);
+    expect(state).toEqual({ p1: "ok", p2: "mismatch", p3: "unread", p4: "notRead", p5: "failed", p6: "queued", p7: "wrongDoc" });
+    expect(rows.filter(canReread).map((row) => row.id).sort()).toEqual(["p3", "p5", "p7"]); // a wrong document can be read again in case the reader was wrong
     expect(rows.find((row) => row.id === "p2").wrong.has("ot")).toBe(true);
     expect(rows.find((row) => row.id === "p1").name).toBe("Alex Test");
     expect(rows.find((row) => row.id === "p1").expected).toEqual({ ot: "208637", clientMinutes: 150, returnMinutes: 0 });
@@ -55,7 +57,25 @@ describe("buildOcrRows", () => {
     expect(filterOcrRows(rows, { state: "reread" }).map((row) => row.id)).toEqual(["p3"]);
     expect(filterOcrRows(rows, { state: "all", query: "alex" })).toHaveLength(3);
     expect(filterOcrRows(rows, { state: "all", query: "zzz" })).toHaveLength(0);
-    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+  });
+});
+
+describe("the wrong screenshot (migration 0148 and process_overtime_evidence)", () => {
+  const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  const fn = read("../../supabase/functions/process_overtime_evidence/index.ts");
+  const sql = read("../../supabase/migrations/20261118230000_0148_overtime_proof_wrong_document.sql");
+
+  it("marks anything that is not the form `wrong_document` and drops the numbers read on it", () => {
+    expect(fn).toContain("isOvertimeFormText(text)");
+    expect(fn).toContain('status = "wrong_document"');
+    expect(fn).toContain("parsed = { ot: null, clientMinutes: null, returnMinutes: null }");
+    expect(fn).not.toContain('(overtimeFormFound(parsed) || validatesOvertimeSms(text)) ? "processed"'); // the old test: an OT number alone proved nothing
+  });
+
+  it("allows the new status and lets a manager put such a proof back in the queue", () => {
+    expect(sql).toContain("check (ocr_status in ('pending', 'processed', 'needs_review', 'failed', 'wrong_document'))");
+    expect(sql).toContain("ocr_status in ('failed', 'needs_review', 'wrong_document')");
   });
 });
 
@@ -92,5 +112,23 @@ describe("the reading queue (migration 0147 and process_overtime_evidence)", () 
   it("keeps the employee from choosing his place in the queue", () => {
     expect(sql).toContain("new.ocr_attempts := 0;");
     expect(sql).toContain("new.ocr_next_try_at := null;");
+  });
+});
+
+describe("renvoi automatique d'une mauvaise preuve (0149)", () => {
+  const sql = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/20261119120000_0149_auto_return_wrong_proof.sql"), "utf8");
+  const fn = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/functions/process_overtime_evidence/index.ts"), "utf8");
+  it("l'interrupteur est coupé par défaut et la fonction est réservée au service", () => {
+    expect(sql).toMatch(/auto_return_wrong_proof boolean not null default false/);
+    expect(sql).toMatch(/grant execute on function public\.auto_return_wrong_proof\(uuid\) to service_role/);
+    expect(sql).toMatch(/revoke all on function public\.auto_return_wrong_proof\(uuid\) from public, anon, authenticated/);
+  });
+  it("ne touche qu'une fiche soumise et seulement si l'interrupteur est actif", () => {
+    expect(sql).toMatch(/enabled is not true/);
+    expect(sql).toMatch(/current_job\.status <> 'submitted'/);
+    expect(sql).toMatch(/'job_returned_wrong_proof'/);
+  });
+  it("la fonction Edge l'appelle seulement pour wrong_document", () => {
+    expect(fn).toMatch(/status === "wrong_document"[\s\S]*auto_return_wrong_proof/);
   });
 });

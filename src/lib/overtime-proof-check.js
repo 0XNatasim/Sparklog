@@ -68,6 +68,11 @@ export function proofAnomalies(evidenceRows, jobs, { firstTripUnpaidUsers = new 
     if (!row?.proof_read_at) continue;
     const job = byId.get(row.job_id);
     if (!job || job.status !== "submitted") continue;
+    // The picture is not the overtime form (a work order, a receipt…): said before anything else, whatever else the day holds.
+    if (row.ocr_status === "wrong_document") {
+      anomalies.push({ key: `proof_wrong:${row.id || job.id}`, type: "proof_wrong", userId: job.user_id, jobDate: job.job_date, jobIds: [job.id] });
+      continue;
+    }
     if ((proofsPerDay.get(`${job.user_id}|${job.job_date}`) || 0) > 1) continue;
     const base = { userId: job.user_id, jobDate: job.job_date, jobIds: [job.id] };
     const found = { ot: row.proof_ot ?? null, clientMinutes: row.proof_client_minutes ?? null, returnMinutes: row.proof_return_minutes ?? null };

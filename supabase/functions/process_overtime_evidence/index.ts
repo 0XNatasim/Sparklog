@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { overtimeFormFound, parseOvertimeForm } from "../_shared/overtime_form.js";
+import { isOvertimeFormText, overtimeFormFound, parseOvertimeForm } from "../_shared/overtime_form.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,8 +57,17 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     const text = (result?.ParsedResults || []).map((item: { ParsedText?: string }) => item?.ParsedText || "").join("\n").trim();
     // The proof is now the overtime request form: keep its three numbers (OT, minutes at the client, return minutes).
     // An older app version may still send the SMS screenshot, which is classified as before.
-    const parsed = parseOvertimeForm(text);
-    const status = text && (overtimeFormFound(parsed) || validatesOvertimeSms(text)) ? "processed" : "needs_review";
+    let parsed = parseOvertimeForm(text);
+    // What the picture is: the overtime form (its own questions are there), an old SMS screenshot, something else (a work order,
+    // a receipt…: « wrong_document », the numbers read on it mean nothing and are dropped), or nothing readable.
+    let status: string;
+    if (!text) status = "needs_review";
+    else if (isOvertimeFormText(text)) status = overtimeFormFound(parsed) ? "processed" : "needs_review";
+    else if (validatesOvertimeSms(text)) status = "processed";
+    else {
+      status = "wrong_document";
+      parsed = { ot: null, clientMinutes: null, returnMinutes: null };
+    }
     const { error: updateError } = await admin
       .from("overtime_evidence")
       // Persist only the classification and the three numbers. Raw text can contain names, phone
@@ -73,6 +82,12 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
       })
       .eq("id", evidence.id);
     if (updateError) throw updateError;
+    // A wrong picture on a submitted job: give the job back to the employee, if the manager switched that control on
+    // (overtime_settings.auto_return_wrong_proof, migration 0149). Best effort: the reading itself is already saved.
+    if (status === "wrong_document") {
+      const { error: returnError } = await admin.rpc("auto_return_wrong_proof", { p_proof_id: evidence.id });
+      if (returnError) console.error("[process_overtime_evidence] auto return", returnError);
+    }
   } catch (error) {
     console.error("[process_overtime_evidence]", error);
     const attempts = (evidence.attempts || 0) + 1;

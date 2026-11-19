@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, Clock, ShieldCheck, TriangleAlert } from "lucide-react";
+import { CalendarDays, Clock, ScanSearch, ShieldCheck, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,6 +30,8 @@ function GeneralSettings() {
   const [anomalySaving, setAnomalySaving] = useState(false);
   const [retentionDays, setRetentionDays] = useState(30);
   const [retentionSaving, setRetentionSaving] = useState(false);
+  const [autoReturn, setAutoReturn] = useState(false);
+  const [autoReturnSaving, setAutoReturnSaving] = useState(false);
   const [deadline, setDeadline] = useState("23:59");
   const [holidays, setHolidays] = useState([]);
 
@@ -37,7 +39,7 @@ function GeneralSettings() {
     (async () => {
       const [{ data: settings }, { data: overtimeSettings }, { data: holidayRows }] = await Promise.all([
         supabase.from("company_time_settings").select("*").eq("id", true).single(),
-        supabase.from("overtime_settings").select("evidence_retention_days").eq("id", true).single(),
+        supabase.from("overtime_settings").select("*").eq("id", true).single(),
         supabase.from("company_holidays").select("holiday_date,label").gte("holiday_date", companyDate()).order("holiday_date").limit(40),
       ]);
       const limits = anomalyLimitsFromSettings(settings);
@@ -45,6 +47,7 @@ function GeneralSettings() {
       setHighKm(String(limits.highKm));
       setDeadline(String(settings?.daily_deadline || "23:59").slice(0, 5));
       setRetentionDays(overtimeSettings?.evidence_retention_days || 30);
+      setAutoReturn(overtimeSettings?.auto_return_wrong_proof === true);
       setHolidays(holidayRows || []);
     })();
   }, []);
@@ -72,6 +75,14 @@ function GeneralSettings() {
     const { error } = await supabase.from("overtime_settings").update({ evidence_retention_days: value, updated_at: new Date().toISOString() }).eq("id", true);
     setMessage(error?.message || t("employees.retentionSaved"));
     setRetentionSaving(false);
+  }
+
+  async function toggleAutoReturn(next) {
+    setAutoReturnSaving(true);
+    const { error } = await supabase.from("overtime_settings").update({ auto_return_wrong_proof: next, updated_at: new Date().toISOString() }).eq("id", true);
+    if (!error) setAutoReturn(next);
+    setMessage(error?.message || t(next ? "settings.proofCheck.on" : "settings.proofCheck.off"));
+    setAutoReturnSaving(false);
   }
 
   async function saveDeadline() {
@@ -115,6 +126,16 @@ function GeneralSettings() {
               <span className="text-sm text-muted-foreground">{t("employees.days")}</span>
               <Button type="button" size="sm" disabled={retentionSaving} onClick={saveRetentionDays}>{retentionSaving ? t("common.saving") : t("common.save")}</Button>
             </div>
+          </div>
+        </Fold>
+
+        <Fold icon={ScanSearch} title={t("settings.proofCheck.title")}>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">{t("settings.proofCheck.help")}</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="h-4 w-4" checked={autoReturn} disabled={autoReturnSaving} onChange={(e) => toggleAutoReturn(e.target.checked)} />
+              <span>{autoReturn ? t("settings.proofCheck.stateOn") : t("settings.proofCheck.stateOff")}</span>
+            </label>
           </div>
         </Fold>
 

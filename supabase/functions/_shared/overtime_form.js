@@ -27,6 +27,22 @@ export function parseOvertimeForm(text) {
   return result;
 }
 
+// Is this text the overtime request form itself? The form has its own questions; a work order, a supper receipt or any other
+// screenshot does not (it may still carry an « OT-198909 » in its header, which is why an OT number alone proves nothing).
+// At least 2 of these marks must be present.
+const FORM_MARKS = [
+  /chez\s+le\s+client/i,
+  /retour\s+[àa]\s+l.?entrep[oô]t/i,
+  /combien\s+de\s+minutes?/i,
+  /num[eé]ro\s+du\s+OT/i,
+  /confirmation\s+de\s+temps\s+supp/i,
+];
+
+export function isOvertimeFormText(text) {
+  const source = String(text || "");
+  return FORM_MARKS.filter((mark) => mark.test(source)).length >= 2;
+}
+
 export function overtimeFormFound(parsed) {
   return Boolean(parsed) && (parsed.ot !== null || parsed.clientMinutes !== null || parsed.returnMinutes !== null);
 }

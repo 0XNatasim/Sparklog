@@ -16,7 +16,7 @@ import { supabase } from "@/supabaseClient";
 
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at";
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
-const BADGE = { ok: "success", mismatch: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
+const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
 
 async function inChunks(ids, run) {
@@ -118,7 +118,7 @@ export default function OcrReadings() {
           </div>
           {rows && (
             <div className="flex flex-wrap gap-2 text-xs">
-              {["ok", "mismatch", "unread", "failed", "queued", "notRead"].map((key) => (
+              {["ok", "mismatch", "wrongDoc", "unread", "failed", "queued", "notRead"].map((key) => (
                 <Badge key={key} variant={BADGE[key]}>{t(`ocr.state.${key}`)} : {counts[key]}</Badge>
               ))}
             </div>
