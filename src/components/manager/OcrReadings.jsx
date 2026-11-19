@@ -14,8 +14,9 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { supabase } from "@/supabaseClient";
 
-const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at";
+const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
+const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
 
@@ -180,7 +181,15 @@ export default function OcrReadings() {
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.clientMinutes)}</td>
                   {cell(row, "return", row.found.returnMinutes, minutes)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
-                  <td className="whitespace-nowrap px-3 py-2"><Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge></td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge>
+                    {row.state === "queued" && (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {row.attempts > 0 ? t("ocr.queueTried", { count: row.attempts, max: 5 }) : t("ocr.queueNever")}
+                        {row.nextTryAt && new Date(row.nextTryAt) > new Date() ? ` · ${t("ocr.queueNext", { time: queueTime(row.nextTryAt) })}` : ""}
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
                   <td className="flex gap-1 px-3 py-2">
                     {canReread(row) && (

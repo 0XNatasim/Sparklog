@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.281 (2026-11-19).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.282 (2026-11-19).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.282 — Queue status in the OCR tab.** A queued proof shows « n of 5 tries failed » and the time of its next try (or « Not yet tried »). No migration.
 - **V2.4.281 — Automatic return of a wrong proof (switch).** Settings › General › « Proof check »: when on, a submitted job whose proof was read as `wrong_document` goes back to the employee (status `updated`, unlocked, the wrong picture removed, audit `job_returned_wrong_proof`); approved jobs are never touched. Off by default. Migration 0149; function to redeploy.
 - **V2.4.280 — « Wrong screenshot » is recognised.** An employee sent a work order as his overtime proof and the reader called it conforming (the work order carries an OT number in its header; an OT number alone proved nothing). The reader now checks that the picture IS the overtime form (its own questions are there) and marks anything else `wrong_document` — shown as « Mauvaise capture » in À traiter › OCR (counted in « À vérifier »), and as a red alert in « À regarder d'abord » for a submitted day; the numbers read on it are dropped. A manager can still put it back in the queue if the reader was wrong. Migration 0148; function to redeploy. Not yet: blocking the employee (see NOOB).
 - **V2.4.279 — the OCR tab starts on 16 November.** It lists only the proofs of work dates from 2026-11-16 (the per-work-order rule), so older failures no longer clutter it nor count in « Remettre les échecs en file ». The 76 older proofs that waited in the reading queue were taken out of it (set back to « failed »). No migration.

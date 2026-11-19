@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-19, V2.4.281)
+## 6. À faire / à préciser (mis à jour 2026-11-19, V2.4.282)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.282 (technique).** Onglet OCR : état de la file. `OcrReadings.jsx` lit aussi `ocr_attempts` / `ocr_next_try_at` (`buildOcrRows` : `attempts`, `nextTryAt`) et affiche sous « En file » « n essai(s) sur 5 refusé(s) » ou « Pas encore essayée » + « prochain essai vers HH:mm » (`ocr.queue*`). Constat du 2026-11-19 : toutes les lectures échouent en `ocr.space HTTP 429` (clé partagée « helloworld ») : la file et la reprise fonctionnent, c'est le service qui refuse → clé personnelle dans `OCR_SPACE_API_KEY` (§6.3). Aucune migration.
 
 **V2.4.281 (technique).** Renvoi automatique d'une mauvaise preuve, derrière un interrupteur. Migration 0149 : `overtime_settings.auto_return_wrong_proof` (défaut faux ; lecture tous comptes connectés, écriture gestionnaires par les politiques existantes) ; `auto_return_wrong_proof(p_proof_id)` (`security definer`, `service_role` seulement) : réglage coupé → `disabled` ; preuve non `wrong_document` → `not_wrong_document` ; fiche pas `submitted` → `job_not_submitted` (brouillon, approuvée ou exportée jamais touchée) ; sinon supprime la ligne de preuve (la règle de soumission cherche une ligne), si une autre preuve reste → `other_proof_kept`, sinon fiche `updated` + déverrouillée + `overtime_evidence_captured` faux, audit `job_returned_wrong_proof` (acteur « Système ») → `returned`. `process_overtime_evidence/index.ts` (**à redéployer, après 0148 et 0149**) l'appelle après avoir écrit `wrong_document` (erreur journalisée, jamais bloquante). Interrupteur : `SettingsPanel` › Paramètres généraux (`settings.proofCheck.*`). Limite : ne joue qu'à la lecture ; une preuve lue avant l'activation ou avant la soumission n'est pas renvoyée (remettre en file dans l'onglet OCR). Tests : `ocr-readings.test.js` (verrous du SQL 0149 et de la fonction). Objet du stockage retiré par le nettoyage des orphelins.
 
