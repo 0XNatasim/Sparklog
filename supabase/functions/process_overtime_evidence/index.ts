@@ -82,6 +82,12 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
       })
       .eq("id", evidence.id);
     if (updateError) throw updateError;
+    // A wrong picture on a submitted job: give the job back to the employee, if the manager switched that control on
+    // (overtime_settings.auto_return_wrong_proof, migration 0149). Best effort: the reading itself is already saved.
+    if (status === "wrong_document") {
+      const { error: returnError } = await admin.rpc("auto_return_wrong_proof", { p_proof_id: evidence.id });
+      if (returnError) console.error("[process_overtime_evidence] auto return", returnError);
+    }
   } catch (error) {
     console.error("[process_overtime_evidence]", error);
     const attempts = (evidence.attempts || 0) + 1;

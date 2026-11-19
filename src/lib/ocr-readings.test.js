@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { resolve, dirname } from "node:path";
 import { buildOcrRows, canReread, countOcrStates, filterOcrRows } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
@@ -111,5 +112,23 @@ describe("the reading queue (migration 0147 and process_overtime_evidence)", () 
   it("keeps the employee from choosing his place in the queue", () => {
     expect(sql).toContain("new.ocr_attempts := 0;");
     expect(sql).toContain("new.ocr_next_try_at := null;");
+  });
+});
+
+describe("renvoi automatique d'une mauvaise preuve (0149)", () => {
+  const sql = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/20261119120000_0149_auto_return_wrong_proof.sql"), "utf8");
+  const fn = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/functions/process_overtime_evidence/index.ts"), "utf8");
+  it("l'interrupteur est coupé par défaut et la fonction est réservée au service", () => {
+    expect(sql).toMatch(/auto_return_wrong_proof boolean not null default false/);
+    expect(sql).toMatch(/grant execute on function public\.auto_return_wrong_proof\(uuid\) to service_role/);
+    expect(sql).toMatch(/revoke all on function public\.auto_return_wrong_proof\(uuid\) from public, anon, authenticated/);
+  });
+  it("ne touche qu'une fiche soumise et seulement si l'interrupteur est actif", () => {
+    expect(sql).toMatch(/enabled is not true/);
+    expect(sql).toMatch(/current_job\.status <> 'submitted'/);
+    expect(sql).toMatch(/'job_returned_wrong_proof'/);
+  });
+  it("la fonction Edge l'appelle seulement pour wrong_document", () => {
+    expect(fn).toMatch(/status === "wrong_document"[\s\S]*auto_return_wrong_proof/);
   });
 });
