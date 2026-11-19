@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-19, V2.4.282)
+## 6. À faire / à préciser (mis à jour 2026-11-19, V2.4.283)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.283 (technique).** Onglet OCR : liens et aperçu double. `OcrReadings.jsx` : le nom (`DropdownMenu`) ouvre la fiche employé (`Dialog` + `EmployeesPanel tabbed onlyId`, chargé par `lazyPanel`) ou `/manager/v3/time?tab=timesheets&emp=<id>&date=<jour>` ; l'OT ouvre la même page avec `&job=<id>` (cette fiche) ou sans (la journée). L'œil ouvre un `Dialog` : image (URL signée 10 min) + `JobSummary` (fiche liée : OT, état, départ → fin, retour, km, lu / attendu avec `row.wrong` en rouge) ; `buildOcrRows` renvoie aussi `job`. Le composant utilise `useNavigate` : tests dans un `MemoryRouter`. Aucune migration.
 
 **V2.4.282 (technique).** Onglet OCR : état de la file. `OcrReadings.jsx` lit aussi `ocr_attempts` / `ocr_next_try_at` (`buildOcrRows` : `attempts`, `nextTryAt`) et affiche sous « En file » « n essai(s) sur 5 refusé(s) » ou « Pas encore essayée » + « prochain essai vers HH:mm » (`ocr.queue*`). Constat du 2026-11-19 : toutes les lectures échouent en `ocr.space HTTP 429` (clé partagée « helloworld ») : la file et la reprise fonctionnent, c'est le service qui refuse → clé personnelle dans `OCR_SPACE_API_KEY` (§6.3). Aucune migration.
 

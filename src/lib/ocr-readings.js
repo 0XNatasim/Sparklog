@@ -43,7 +43,7 @@ export function buildOcrRows(evidence, jobs, people) {
     rows.push({
       id: proof.id, jobId: proof.job_id, userId, name: (person?.full_name || "").trim(), jobDate, createdAt: proof.created_at,
       readAt: proof.proof_read_at || null, storagePath: proof.storage_path || "", jobOt: job?.ot ? String(job.ot) : "", jobStatus: job?.status || "",
-      ocrStatus: proof.ocr_status || "", attempts: Number(proof.ocr_attempts) || 0, nextTryAt: proof.ocr_next_try_at || null, found, expected, state, wrong: new Set(diffs.map((diff) => diff.field)),
+      ocrStatus: proof.ocr_status || "", job, attempts: Number(proof.ocr_attempts) || 0, nextTryAt: proof.ocr_next_try_at || null, found, expected, state, wrong: new Set(diffs.map((diff) => diff.field)),
     });
   }
   return rows.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
