@@ -3,6 +3,7 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { createFakeSupabase } from "@/test/fake-supabase";
 
 const h = vi.hoisted(() => ({ fake: null }));
@@ -22,7 +23,8 @@ function setup(rows) {
     },
   });
   h.fake.client.rpc = async (name, args) => { rpcCalls.push([name, args]); return { data: 1, error: null }; };
-  render(<OcrReadings />);
+  h.fake.client.storage = { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: "https://files.test/proof.jpg" }, error: null }) }) };
+  render(<MemoryRouter><OcrReadings /></MemoryRouter>);
 }
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -74,5 +76,24 @@ describe("OcrReadings › Relire", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remettre les échecs en file (1)" }));
     await waitFor(() => expect(rpcCalls).toEqual([["requeue_overtime_proofs", { p_ids: ["bad"] }]]));
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("1 preuve(s) remise(s) dans la file"));
+  });
+});
+
+describe("OcrReadings › aperçu et liens", () => {
+  it("shows the screenshot next to its work order, with the gaps in red", async () => {
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 99, proof_return_minutes: 0 })]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: "Voir la capture" }));
+    await waitFor(() => expect(screen.getByText("Capture et fiche de travail")).toBeTruthy());
+    expect(screen.getByRole("img").getAttribute("src")).toBe("https://files.test/proof.jpg");
+    expect(screen.getByText("06:30 → 17:00")).toBeTruthy();
+    expect(screen.getByText(/99 min \//).className).toContain("text-destructive");
+  });
+
+  it("makes the employee name and the OT clickable", async () => {
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    expect(screen.getByRole("button", { name: "Alex Test" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "208637" })).toBeTruthy();
   });
 });

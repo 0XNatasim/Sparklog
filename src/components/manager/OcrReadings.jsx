@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 import { Eye, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { lazyPanel } from "@/components/lazy-panel";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { OCR_FIRST_DAY, buildOcrRows, canReread, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
@@ -14,8 +18,10 @@ import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { supabase } from "@/supabaseClient";
 
-const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at";
+const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
+const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
+const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
 
@@ -31,6 +37,39 @@ async function inChunks(ids, run) {
 
 // À traiter › OCR: one line per overtime proof screenshot — what the reader found (OT, minutes at the client, return minutes)
 // next to what the work order says — so the readings can be checked at a glance. Read only; nothing here changes a job.
+// The work order the proof belongs to, beside the screenshot: what the reader found against what the job says (gaps in red).
+function JobSummary({ row, t }) {
+  const job = row.job;
+  const mins = (value) => (value == null ? "—" : `${value} min`);
+  const line = (label, value, bad = false) => (
+    <div className="flex justify-between gap-3 border-b py-1.5 text-sm last:border-0">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={`text-right ${bad ? "font-bold text-destructive" : ""}`}>{value}</dd>
+    </div>
+  );
+  if (!job) return <p className="text-sm text-muted-foreground">{t("ocr.preview.noJob")}</p>;
+  const km = job.km_total ?? ((Number(job.km_aller) || 0) + (Number(job.km_retour) || 0));
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold">{t("ocr.preview.job")}</h3>
+      <dl>
+        {line(t("ocr.col.jobOt"), job.ot || "—")}
+        {line(t("ocr.preview.status"), job.status || "—")}
+        {line(t("ocr.preview.hours"), `${String(job.depart || "").slice(0, 5) || "—"} → ${String(job.fin || "").slice(0, 5) || "—"}`)}
+        {line(t("ocr.preview.return"), mins(job.return_time_minutes))}
+        {line(t("ocr.preview.km"), km == null ? "—" : `${km} km`)}
+      </dl>
+      <h3 className="font-semibold">{t("ocr.preview.compare")}</h3>
+      <dl>
+        {line(t("ocr.col.otRead"), `${row.found.ot ?? "—"} / ${job.ot || "—"}`, row.wrong.has("ot"))}
+        {line(t("ocr.col.clientRead"), `${mins(row.found.clientMinutes)} / ${mins(row.expected?.clientMinutes)}`, row.wrong.has("client"))}
+        {line(t("ocr.col.returnRead"), `${mins(row.found.returnMinutes)} / ${mins(row.expected?.returnMinutes)}`, row.wrong.has("return"))}
+      </dl>
+      <p className="text-xs text-muted-foreground">{t("ocr.preview.legend")}</p>
+    </div>
+  );
+}
+
 export default function OcrReadings() {
   const t = useT();
   const [rows, setRows] = useState(null);
@@ -38,6 +77,9 @@ export default function OcrReadings() {
   const [state, setState] = useState("read");
   const [query, setQuery] = useState("");
   const [opening, setOpening] = useState("");
+  const navigate = useNavigate();
+  const [preview, setPreview] = useState(null); // { row, url } — the screenshot next to its job
+  const [cardId, setCardId] = useState(null); // employee whose card is open
 
   const [reload, setReload] = useState(0);
   const [rereading, setRereading] = useState(false);
@@ -95,13 +137,15 @@ export default function OcrReadings() {
     try {
       const { data, error: signError } = await withTimeout(supabase.storage.from("overtime-evidence").createSignedUrl(row.storagePath, 600), 12000);
       if (signError || !data?.signedUrl) throw signError || new Error("no_url");
-      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      setPreview({ row, url: data.signedUrl });
     } catch {
       setError(t("ocr.imageUnavailable"));
     } finally {
       setOpening("");
     }
   }
+
+  const timesheetLink = (row, jobId) => `/manager/v3/time?tab=timesheets&emp=${row.userId}&date=${row.jobDate}${jobId ? `&job=${jobId}` : ""}`;
 
   const minutes = (value) => (value == null ? "—" : `${value} min`);
   const cell = (row, field, value, format = (v) => (v == null ? "—" : v)) => (
@@ -173,14 +217,46 @@ export default function OcrReadings() {
               {shown.map((row) => (
                 <tr key={row.id}>
                   <td className="whitespace-nowrap px-3 py-2">{row.jobDate ? dayjs(row.jobDate).format("DD MMM") : "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-medium">{row.name || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2">{row.jobOt || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium">
+                    {row.name && row.userId ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className="font-medium text-primary hover:underline">{row.name}</button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => setCardId(row.userId)}>{t("ocr.link.card")}</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.timesheet")}</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (row.name || "—")}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    {row.jobOt && row.userId ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className="text-primary hover:underline">{row.jobOt}</button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => navigate(timesheetLink(row, row.jobId))}>{t("ocr.link.job")}</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.day")}</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (row.jobOt || "—")}
+                  </td>
                   {cell(row, "ot", row.found.ot)}
                   {cell(row, "client", row.found.clientMinutes, minutes)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.clientMinutes)}</td>
                   {cell(row, "return", row.found.returnMinutes, minutes)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
-                  <td className="whitespace-nowrap px-3 py-2"><Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge></td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge>
+                    {row.state === "queued" && (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {row.attempts > 0 ? t("ocr.queueTried", { count: row.attempts, max: 5 }) : t("ocr.queueNever")}
+                        {row.nextTryAt && new Date(row.nextTryAt) > new Date() ? ` · ${t("ocr.queueNext", { time: queueTime(row.nextTryAt) })}` : ""}
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
                   <td className="flex gap-1 px-3 py-2">
                     {canReread(row) && (
@@ -203,6 +279,31 @@ export default function OcrReadings() {
           </table>
         </div>
       )}
+      <Dialog open={Boolean(preview)} onOpenChange={(open) => { if (!open) setPreview(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          {preview && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("ocr.preview.title")}</DialogTitle>
+                <DialogDescription>{preview.row.name || "—"} · {preview.row.jobDate ? dayjs(preview.row.jobDate).format("DD MMM YYYY") : "—"}</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 md:grid-cols-[1fr,20rem]">
+                <img src={preview.url} alt={t("ocr.view")} className="max-h-[70vh] w-full rounded-md border object-contain" />
+                <JobSummary row={preview.row} t={t} />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(cardId)} onOpenChange={(open) => { if (!open) setCardId(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("ocr.link.card")}</DialogTitle>
+            <DialogDescription>{(rows || []).find((row) => row.userId === cardId)?.name || ""}</DialogDescription>
+          </DialogHeader>
+          {cardId && <EmployeesPanel tabbed onlyId={cardId} />}
+        </DialogContent>
+      </Dialog>
       {rows && <p className="text-xs text-muted-foreground">{t("ocr.footnote", { max: QUERY_BUDGETS.ocrReadings })}</p>}
     </div>
   );
