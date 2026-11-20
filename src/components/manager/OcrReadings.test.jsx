@@ -14,12 +14,13 @@ const rpcCalls = [];
 
 const evidence = (id, extra) => ({ id, job_id: "j1", user_id: "u1", job_date: "2026-11-16", created_at: "2026-11-16T22:00:00Z", storage_path: `u1/2026-11-16/${id}.jpg`, ocr_status: "processed", proof_read_at: "2026-11-16T22:01:00Z", ...extra });
 
-function setup(rows) {
+function setup(rows, { sendBack = true } = {}) {
   h.fake = createFakeSupabase({
     tables: {
+      overtime_settings: [{ id: true, send_back_enabled: sendBack }],
       overtime_evidence: rows,
       profiles: [{ id: "u1", full_name: "Alex Test", first_trip_unpaid: false, ten_hour_days: false }],
-      jobs: [{ id: "j1", user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "208637", depart: "06:30", fin: "17:00", return_time_minutes: 0 }],
+      jobs: [{ id: "j1", user_id: "u1", job_date: "2026-11-16", updated_at: "2026-11-16T22:00:00Z", status: "submitted", ot: "208637", depart: "06:30", fin: "17:00", return_time_minutes: 0 }],
     },
   });
   h.fake.client.rpc = async (name, args) => { rpcCalls.push([name, args]); return { data: 1, error: null }; };
@@ -84,7 +85,7 @@ describe("OcrReadings › aperçu et liens", () => {
     setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 99, proof_return_minutes: 0 })]);
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
     fireEvent.click(screen.getByRole("button", { name: "Voir la capture" }));
-    await waitFor(() => expect(screen.getByText("Capture et fiche de travail")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Capture et fiche de travail · OT 208637/)).toBeTruthy());
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://files.test/proof.jpg");
     expect(screen.getByText("06:30 → 17:00")).toBeTruthy();
     expect(screen.getByText(/99 min \//).className).toContain("text-destructive");
@@ -107,5 +108,24 @@ describe("OcrReadings › tout relire", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tout relire (1)" }));
     fireEvent.click(await screen.findByRole("button", { name: /Confirmer|Oui|OK/i }));
     await waitFor(() => expect(rpcCalls).toEqual([["requeue_overtime_proofs", { p_ids: ["p1"] }]]));
+  });
+});
+
+describe("OcrReadings › renvoyer pour correction", () => {
+  it("gives a submitted job back to the employee after a confirmation, with the state the job was read in", async () => {
+    rpcCalls.length = 0;
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 99, proof_return_minutes: 0 })]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: "Renvoyer pour correction" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Confirmer|Oui|OK/i }));
+    await waitFor(() => expect(rpcCalls).toEqual([["return_job_for_correction", { p_job_id: "j1", p_expected_updated_at: "2026-11-16T22:00:00Z" }]]));
+  });
+});
+
+describe("OcrReadings › interrupteur du retour pour correction", () => {
+  it("hides the send-back button while the switch is off in Configuration", async () => {
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })], { sendBack: false });
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: "Renvoyer pour correction" })).toBeNull();
   });
 });

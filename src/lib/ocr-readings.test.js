@@ -142,3 +142,11 @@ describe("tout relire (0150)", () => {
     expect(sql).toMatch(/array_length\(p_ids, 1\) > 300/);
   });
 });
+
+describe("interrupteur du retour pour correction (0151)", () => {
+  const sql = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/20261120140000_0151_ocr_send_back_setting.sql"), "utf8");
+  it("is off by default and lives on the overtime settings row", () => {
+    expect(sql).toMatch(/add column if not exists send_back_enabled boolean not null default false/);
+    expect(sql).toMatch(/alter table public\.overtime_settings/);
+  });
+});
