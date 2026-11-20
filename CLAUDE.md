@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.289)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.290)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.290 (technique).** Aperçu OCR : début de journée et heure des 8 h. `expectedProofForJob` renvoie aussi `dayStart` (Départ de la 1re fiche), `lineMinutes` (480 / 600) et `lineAt` (`dayLineTime(jobs, regular, unpaidFirst)` : heure d'horloge où les minutes payées du jour atteignent la ligne, dans la fiche qui la franchit, Départ + ce qui manquait, premier trajet non payé ajouté ; null si jamais atteinte). `proofSheetLines` (`ocr-sheet.js`) ajoute « Début de la journée » et « 8 h atteintes à » (`ocr.sheet.dayStart` / `lineAt`) : visibles dans l'aperçu et l'image téléchargée. Aucune migration. Tests : `ocr-sheet.test.js`.
 
 **V2.4.289 (technique).** Onglet OCR : téléchargement. `OcrDownload.jsx` (bouton à côté de « Tout relire ») : même principe que `EvidenceDownload` (`evidenceWeeks`, `selectEvidence`, `downloadEvidenceZip`, marques `evidence_downloads` du bucket `overtime-evidence`), sur les lignes déjà chargées du tableau ; `downloadEvidenceZip` reçoit une option `transform(file, blob, bytes)` : chaque preuve devient **une image JPEG** (`renderProofSheet` de `src/lib/ocr-sheet.js`, canvas : capture à gauche, fiche à droite). `ocr-sheet.js` (pur, testé) : `proofSheetLines` (OT, état, **départ → arrivée → fin**, retour en minutes seulement s'il est déclaré — minutes ou km —, km total, km aller, km retour si retour), `proofCompareLines` (lu / attendu, écarts en rouge), `hasReturn`, `jobKilometres` ; l'aperçu (`JobSummary`) utilise les mêmes lignes ; `JOB_COLUMNS` lit `arrivee`. Les marques sont partagées avec Justificatifs (une preuve téléchargée ici ne revient pas en brut là-bas). Aucune migration. Tests : `ocr-sheet.test.js`, `OcrReadings.test.jsx`.
 

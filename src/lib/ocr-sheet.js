@@ -27,6 +27,9 @@ export function proofSheetLines(row, t) {
     { key: "status", label: t("ocr.preview.status"), value: t(`status.${job.status}`) },
     { key: "hours", label: t("ocr.preview.hours"), value: `${hhmm(job.depart)} → ${hhmm(job.arrivee)} → ${hhmm(job.fin)}` },
   ];
+  // Why the minutes at the client are what they are: when the day began, and when the line (8 h / 10 h) was reached.
+  if (row.expected?.dayStart) lines.push({ key: "dayStart", label: t("ocr.sheet.dayStart"), value: row.expected.dayStart });
+  if (row.expected?.lineAt) lines.push({ key: "lineAt", label: t("ocr.sheet.lineAt", { hours: Math.round((row.expected.lineMinutes || 480) / 60) }), value: row.expected.lineAt });
   if (hasReturn(job)) lines.push({ key: "return", label: t("ocr.preview.return"), value: mins(num(job.return_time_minutes)) });
   const kmValue = km.total == null ? "—" : `${km.total} km`;
   lines.push({ key: "km", label: t("ocr.preview.km"), value: kmValue });

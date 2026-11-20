@@ -114,5 +114,26 @@ export function expectedProofForJob(dayJobs, job, { firstTripUnpaid = false, ten
     ot: otDigits(job.ot),
     clientMinutes: Math.max(0, before + own - regular) - Math.max(0, before - regular),
     returnMinutes: Number(job.return_time_minutes) || 0,
+    // To read the figure: when the day began and the clock time at which the line (8 h, or 10 h) is reached.
+    dayStart: String(jobs[0].depart).slice(0, 5),
+    lineMinutes: regular,
+    lineAt: dayLineTime(jobs, regular, unpaidFirst),
   };
+}
+
+const toHHmm = (total) => `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+
+// Clock time at which the day's paid minutes reach `regular` (null if they never do): inside the job that crosses it,
+// at its Départ + what was still missing (the first job's unpaid first trip is not paid, so it is added back).
+export function dayLineTime(jobs, regular, unpaidFirst = 0) {
+  let total = 0;
+  for (let i = 0; i < jobs.length; i += 1) {
+    const own = minutesBetween(jobs[i].depart, jobs[i].fin) - (Number(jobs[i].return_time_minutes) || 0) - (i === 0 ? unpaidFirst : 0);
+    if (total + own > regular) {
+      const [h, m] = String(jobs[i].depart).slice(0, 5).split(":").map(Number);
+      return toHHmm(h * 60 + m + (i === 0 ? unpaidFirst : 0) + (regular - total));
+    }
+    total += own;
+  }
+  return null;
 }
