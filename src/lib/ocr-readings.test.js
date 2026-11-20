@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve, dirname } from "node:path";
-import { buildOcrRows, canReread, countOcrStates, filterOcrRows } from "./ocr-readings";
+import { buildOcrRows, canReread, countOcrStates, filterOcrRows, ocrDays } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
 const job = (id, depart, fin, extra = {}) => ({ id, user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "261821", depart, fin, return_time_minutes: 0, ...extra });
@@ -148,5 +148,16 @@ describe("interrupteur du retour pour correction (0151)", () => {
   it("is off by default and lives on the overtime settings row", () => {
     expect(sql).toMatch(/add column if not exists send_back_enabled boolean not null default false/);
     expect(sql).toMatch(/alter table public\.overtime_settings/);
+  });
+});
+
+describe("filtre par jour", () => {
+  const rows = [{ id: "a", jobDate: "2026-11-18", state: "ok", name: "", jobOt: "", found: {} }, { id: "b", jobDate: "2026-11-19", state: "ok", name: "", jobOt: "", found: {} }, { id: "c", jobDate: "2026-11-19", state: "ok", name: "", jobOt: "", found: {} }];
+  it("lists the days present, most recent first, with their count", () => {
+    expect(ocrDays(rows)).toEqual([{ date: "2026-11-19", count: 2 }, { date: "2026-11-18", count: 1 }]);
+  });
+  it("keeps only the readings of the chosen day (or all when empty)", () => {
+    expect(filterOcrRows(rows, { state: "all", day: "2026-11-19" }).map((row) => row.id)).toEqual(["b", "c"]);
+    expect(filterOcrRows(rows, { state: "all", day: "" })).toHaveLength(3);
   });
 });

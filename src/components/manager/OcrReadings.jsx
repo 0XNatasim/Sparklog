@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { lazyPanel } from "@/components/lazy-panel";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { OCR_FIRST_DAY, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
+import { OCR_FIRST_DAY, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, ocrDays } from "@/lib/ocr-readings";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
@@ -77,6 +77,7 @@ export default function OcrReadings() {
   const [error, setError] = useState("");
   const [state, setState] = useState("read");
   const [query, setQuery] = useState("");
+  const [day, setDay] = useState(""); // "" = every day
   const [opening, setOpening] = useState("");
   const navigate = useNavigate();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -150,7 +151,8 @@ export default function OcrReadings() {
   }
 
   const counts = useMemo(() => countOcrStates(rows), [rows]);
-  const shown = useMemo(() => filterOcrRows(rows, { state, query }), [rows, state, query]);
+  const shown = useMemo(() => filterOcrRows(rows, { state, query, day }), [rows, state, query, day]);
+  const days = useMemo(() => ocrDays(rows), [rows]);
   const waiting = counts.queued;
   const rereadable = useMemo(() => (rows || []).filter(canReread), [rows]);
   const requeueable = useMemo(() => shown.filter(canRequeue), [shown]);
@@ -204,7 +206,7 @@ export default function OcrReadings() {
               ))}
             </div>
           )}
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-3">
             <Select value={state} onChange={(event) => setState(event.target.value)} aria-label={t("ocr.filterLabel")}>
               <option value="read">{t("ocr.filter.read")}</option>
               <option value="check">{t("ocr.filter.check")}</option>
@@ -213,6 +215,12 @@ export default function OcrReadings() {
               <option value="queued">{t("ocr.filter.queued")}</option>
               <option value="notRead">{t("ocr.filter.notRead")}</option>
               <option value="all">{t("ocr.filter.all")}</option>
+            </Select>
+            <Select value={day} onChange={(event) => setDay(event.target.value)} aria-label={t("ocr.dayLabel")}>
+              <option value="">{t("ocr.allDays")}</option>
+              {days.map((entry) => (
+                <option key={entry.date} value={entry.date}>{dayjs(entry.date).format("ddd DD MMM")} ({entry.count})</option>
+              ))}
             </Select>
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("ocr.search")} aria-label={t("ocr.search")} />
           </div>

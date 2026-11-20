@@ -129,3 +129,17 @@ describe("OcrReadings › interrupteur du retour pour correction", () => {
     expect(screen.queryByRole("button", { name: "Renvoyer pour correction" })).toBeNull();
   });
 });
+
+describe("OcrReadings › filtre par jour", () => {
+  it("offers a day filter with the days present and narrows the table to the chosen day", async () => {
+    setup([
+      evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 }),
+      evidence("p2", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0, job_date: "2026-11-17", created_at: "2026-11-17T22:00:00Z" }),
+    ]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText("Jour"), { target: { value: "2026-11-17" } });
+    expect(screen.getAllByText("Alex Test")).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText("Jour"), { target: { value: "" } });
+    expect(screen.getAllByText("Alex Test")).toHaveLength(2);
+  });
+});
