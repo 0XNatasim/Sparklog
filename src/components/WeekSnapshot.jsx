@@ -10,6 +10,7 @@ import { useT } from "@/lib/use-t";
 import { addCalendarDays, companyDate } from "@/lib/company-time";
 import { ccqWeekNumber, weekStartSundayD } from "@/lib/ccq-week";
 import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { loadDayRounding, roundingFor, weekRoundingSummary } from "@/lib/day-rounding";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { lazyPanel } from "@/components/lazy-panel";
@@ -79,7 +80,8 @@ export default function WeekSnapshot({ onSelectEmployee, weekOffset = 0 }) {
     const weekEnd = days[6];
     Promise.all([
       supabase.from("profiles").select("id, full_name, email, role, is_paused, show_on_boards, start_date, ten_hour_days, first_trip_unpaid").order("full_name"),
-      supabase.from("jobs").select("id, user_id, status, depart, arrivee, fin, job_date, km_total, km_aller, km_retour, overtime_evidence_captured").gte("job_date", weekStart).lte("job_date", weekEnd),
+      // A week holds more than 1000 jobs: one request would silently drop the rest (hours missing on some days), so read it by pages.
+      fetchAllRows(() => supabase.from("jobs").select("id, user_id, status, depart, arrivee, fin, job_date, km_total, km_aller, km_retour, overtime_evidence_captured").gte("job_date", weekStart).lte("job_date", weekEnd).order("id")),
       supabase.from("employee_time_off").select("user_id, kind, start_date, end_date, start_time, weekdays, exception_dates").lte("start_date", weekEnd).or(`end_date.gte.${weekStart},end_date.is.null`),
       // The rounding counters (15 min per day): without them the squares still show, only the paid line is missing.
       loadDayRounding({ untilDate: weekEnd }).catch(() => new Map()),

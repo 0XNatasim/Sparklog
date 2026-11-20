@@ -194,3 +194,13 @@ describe("WeekSnapshot employee card", () => {
     await waitFor(() => expect(screen.getAllByText("6h00").length).toBeGreaterThan(0));
   });
 });
+
+describe("WeekSnapshot loading", () => {
+  it("reads the week's jobs by pages: a week holds more than the 1000 rows one request returns", async () => {
+    setup([job("a", "2026-10-19", "07:00", "15:07")]);
+    await screen.findByText("Employé Test");
+    const read = state.fake.calls.find((call) => call.table === "jobs" && call.op === "select");
+    expect(read.filters.some(([name]) => name === "range")).toBe(true);
+    expect(read.filters.some(([name]) => name === "order")).toBe(true);
+  });
+});
