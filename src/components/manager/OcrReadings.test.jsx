@@ -97,3 +97,15 @@ describe("OcrReadings › aperçu et liens", () => {
     expect(screen.getByRole("button", { name: "208637" })).toBeTruthy();
   });
 });
+
+describe("OcrReadings › tout relire", () => {
+  it("offers « Relire » on a reading that already has values, and a button to read every shown reading again", async () => {
+    rpcCalls.length = 0;
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    expect(screen.getByRole("button", { name: "Relire" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tout relire (1)" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Confirmer|Oui|OK/i }));
+    await waitFor(() => expect(rpcCalls).toEqual([["requeue_overtime_proofs", { p_ids: ["p1"] }]]));
+  });
+});

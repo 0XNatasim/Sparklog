@@ -10,7 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { lazyPanel } from "@/components/lazy-panel";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { OCR_FIRST_DAY, buildOcrRows, canReread, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
+import { OCR_FIRST_DAY, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows } from "@/lib/ocr-readings";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
@@ -78,6 +79,7 @@ export default function OcrReadings() {
   const [query, setQuery] = useState("");
   const [opening, setOpening] = useState("");
   const navigate = useNavigate();
+  const [confirm, confirmDialog] = useConfirmDialog();
   const [preview, setPreview] = useState(null); // { row, url } — the screenshot next to its job
   const [cardId, setCardId] = useState(null); // employee whose card is open
 
@@ -109,7 +111,10 @@ export default function OcrReadings() {
     setError("");
     setNotice("");
     try {
-      const moved = await requeueProofs(supabase, targets.map((row) => row.id));
+      // At most 300 at a time (the database refuses more).
+      const ids = targets.map((row) => row.id);
+      let moved = 0;
+      for (let i = 0; i < ids.length; i += 300) moved += await requeueProofs(supabase, ids.slice(i, i + 300));
       setNotice(t("ocr.requeued", { count: moved }));
       setReload((value) => value + 1);
     } catch (failure) {
@@ -123,6 +128,13 @@ export default function OcrReadings() {
   const shown = useMemo(() => filterOcrRows(rows, { state, query }), [rows, state, query]);
   const waiting = counts.queued;
   const rereadable = useMemo(() => (rows || []).filter(canReread), [rows]);
+  const requeueable = useMemo(() => shown.filter(canRequeue), [shown]);
+
+  async function rereadEverything() {
+    if (requeueable.length === 0) return;
+    if (!(await confirm(t("ocr.rereadEverythingConfirm", { count: requeueable.length })))) return;
+    await reread(requeueable);
+  }
 
   // While proofs wait in the queue the table reloads by itself every minute (one reading a minute).
   useEffect(() => {
@@ -186,6 +198,9 @@ export default function OcrReadings() {
               </Button>
               <Button type="button" size="sm" disabled={rereading || rereadable.length === 0} onClick={() => reread(rereadable)}>
                 {rereading ? t("ocr.rereading") : t("ocr.rereadAll", { count: rereadable.length })}
+              </Button>
+              <Button type="button" size="sm" variant="outline" disabled={rereading || requeueable.length === 0} onClick={rereadEverything}>
+                {t("ocr.rereadEverything", { count: requeueable.length })}
               </Button>
             </div>
           )}
@@ -259,7 +274,7 @@ export default function OcrReadings() {
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
                   <td className="flex gap-1 px-3 py-2">
-                    {canReread(row) && (
+                    {canRequeue(row) && (
                       <Button type="button" size="sm" variant="outline" disabled={rereading} onClick={() => reread([row])} aria-label={t("ocr.reread")} title={t("ocr.reread")}>
                         <RefreshCw className="h-4 w-4" aria-hidden="true" />
                       </Button>
@@ -304,6 +319,7 @@ export default function OcrReadings() {
           {cardId && <EmployeesPanel tabbed onlyId={cardId} />}
         </DialogContent>
       </Dialog>
+      {confirmDialog}
       {rows && <p className="text-xs text-muted-foreground">{t("ocr.footnote", { max: QUERY_BUDGETS.ocrReadings })}</p>}
     </div>
   );
