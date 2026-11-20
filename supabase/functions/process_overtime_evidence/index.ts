@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isOvertimeFormText, overtimeFormFound, parseOvertimeForm } from "../_shared/overtime_form.js";
+import { isOvertimeFormText, overtimeFormFound, readOvertimeForm } from "../_shared/overtime_form.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,6 +39,8 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     form.append("OCREngine", "2");
     form.append("scale", "true");
     form.append("isTable", "true");
+    // The position of every line: the answers are read under their questions (see readOvertimeForm).
+    form.append("isOverlayRequired", "true");
 
     const response = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
@@ -57,7 +59,13 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     const text = (result?.ParsedResults || []).map((item: { ParsedText?: string }) => item?.ParsedText || "").join("\n").trim();
     // The proof is now the overtime request form: keep its three numbers (OT, minutes at the client, return minutes).
     // An older app version may still send the SMS screenshot, which is classified as before.
-    let parsed = parseOvertimeForm(text);
+    const lines = (result?.ParsedResults || []).flatMap((item: { TextOverlay?: { Lines?: Array<{ LineText?: string; MinTop?: number; Words?: Array<{ Left?: number; Top?: number }> }> } }) =>
+      (item?.TextOverlay?.Lines || []).map((line) => ({
+        text: line?.LineText || "",
+        top: Number(line?.Words?.[0]?.Top ?? line?.MinTop),
+        left: Number(line?.Words?.[0]?.Left) || 0,
+      })));
+    let parsed = readOvertimeForm({ text, lines });
     // What the picture is: the overtime form (its own questions are there), an old SMS screenshot, something else (a work order,
     // a receipt…: « wrong_document », the numbers read on it mean nothing and are dropped), or nothing readable.
     let status: string;
