@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.290)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.291)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.291 (technique).** Feuille de temps de la gestion : filtre des états en cases à cocher. `src/lib/status-filter.js` (`STATUS_KEYS`, `parseStatusParam` : `?status=a,b`, rien de valide = les quatre ; `statusKey` : `all` ou la liste jointe par une virgule ; `toggleStatus` : on ne décoche pas le dernier). `ManagerDashboard.jsx` : état `statuses` (les quatre par défaut) à la place de `statusFilter` (maintenant dérivé) ; la requête `jobs` applique `.in("status", statuses)` dès qu'il manque un état, **aussi avec un employé choisi** (avant, le menu y était ignoré) ; colonnes et menu téléphone = les états cochés (`shownKeys`, `mobileKey`). Le compteur `manager_job_counts` reste sans total « à mettre à jour ». Aucune migration. Tests : `status-filter.test.js`.
 
 **V2.4.290 (technique).** Aperçu OCR : début de journée et heure des 8 h. `expectedProofForJob` renvoie aussi `dayStart` (Départ de la 1re fiche), `lineMinutes` (480 / 600) et `lineAt` (`dayLineTime(jobs, regular, unpaidFirst)` : heure d'horloge où les minutes payées du jour atteignent la ligne, dans la fiche qui la franchit, Départ + ce qui manquait, premier trajet non payé ajouté ; null si jamais atteinte). `proofSheetLines` (`ocr-sheet.js`) ajoute « Début de la journée » et « 8 h atteintes à » (`ocr.sheet.dayStart` / `lineAt`) : visibles dans l'aperçu et l'image téléchargée. Aucune migration. Tests : `ocr-sheet.test.js`.
 

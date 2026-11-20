@@ -38,6 +38,7 @@ import EvidenceDownload from "@/components/manager/EvidenceDownload";
 import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import { filterReceiptJobs, receiptEmployees, receiptNeedsReview } from "@/lib/receipts-review";
 import ManualEntryStar from "@/components/ManualEntryStar";
+import { STATUS_KEYS, STATUS_LABELS, parseStatusParam, statusKey, toggleStatus } from "@/lib/status-filter";
 
 dayjs.extend(isoWeek);
 
@@ -129,7 +130,9 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
   const [employeeId, setEmployeeId] = useState(searchParams.get("emp") || "all");
-  const [statusFilter, setStatusFilter] = useState(["saved", "updated", "submitted", "approved"].includes(searchParams.get("status")) ? searchParams.get("status") : "all");
+  // Statuses shown: any combination of the four, all of them by default (?status=submitted,updated in the URL).
+  const [statuses, setStatuses] = useState(() => parseStatusParam(searchParams.get("status")));
+  const statusFilter = statusKey(statuses); // "all" or the chosen ones joined by a comma
   const [dayFilter, setDayFilter] = useState(/^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") || "") ? searchParams.get("date") : "");
   // Phone only: which of the three status piles is shown when one employee is selected.
   const [mobileStatus, setMobileStatus] = useState("submitted");
@@ -183,10 +186,8 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       .order("job_date", { ascending: false })
       .order("id", { ascending: false });
     if (employeeId !== "all") q = q.eq("user_id", employeeId);
-    // When an employee is selected the UI splits into Saved / Submitted /
-    // Approved columns, so ignore the status dropdown there — otherwise
-    // the other two columns are always empty.
-    if (employeeId === "all" && statusFilter !== "all") q = q.eq("status", statusFilter);
+    // The statuses ticked above; with an employee selected only their columns are shown.
+    if (statusFilter !== "all") q = q.in("status", statuses);
     if (dayFilter) q = q.eq("job_date", dayFilter);
     return signal ? q.abortSignal(signal) : q;
   }
@@ -767,6 +768,10 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     return { saved, updated, submitted, approved };
   }, [filtered, employeeId]);
 
+  // The columns of the chosen statuses, in the usual order; the phone shows one of them.
+  const shownKeys = STATUS_KEYS.filter((key) => statuses.includes(key));
+  const mobileKey = shownKeys.includes(mobileStatus) ? mobileStatus : (shownKeys[0] || "submitted");
+
   const selectedEmployee = useMemo(() => {
     if (employeeId === "all") return null;
     const p = profiles.get(employeeId);
@@ -858,7 +863,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   function openEmployeeTimesheet(userId, date = companyDate()) {
     setEmployeeId(userId);
     setDayFilter(date);
-    setStatusFilter("all");
+    setStatuses([...STATUS_KEYS]);
     setSearchLive("");
     setSearch("");
     setSelectedWeekKey("latest");
@@ -1272,13 +1277,15 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
                 ))}
               </Select>
 
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">{t("manager.filters.allStatuses")}</option>
-                <option value="saved">{t("status.saved")}</option>
-                <option value="updated">{t("manager.updatedSection")}</option>
-                <option value="submitted">{t("status.submitted")}</option>
-                <option value="approved">{t("status.approved")}</option>
-              </Select>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border bg-card px-3 py-2 text-sm" role="group" aria-label={t("manager.filters.allStatuses")}>
+                {STATUS_KEYS.map((key) => (
+                  <label key={key} className="flex items-center gap-1.5">
+                    <input type="checkbox" className="h-4 w-4 accent-primary" checked={statuses.includes(key)}
+                      onChange={() => setStatuses((current) => toggleStatus(current, key))} />
+                    {t(STATUS_LABELS[key])}
+                  </label>
+                ))}
+              </div>
 
               <div className="flex items-center gap-1">
                 <Input
@@ -1492,34 +1499,26 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
           <>
             {/* Phone: one status selector above a single list. Desktop keeps the three piles. */}
             <Select
-              value={mobileStatus}
+              value={mobileKey}
               onChange={(e) => setMobileStatus(e.target.value)}
               className="lg:hidden"
               aria-label={t("manager.filters.allStatuses")}
             >
-              <option value="saved">{t("manager.savedSection")} ({split.saved.length})</option>
-              <option value="updated">{t("manager.updatedSection")} ({split.updated.length})</option>
-              <option value="submitted">{t("manager.submittedSection")} ({split.submitted.length})</option>
-              <option value="approved">{t("status.approved")} ({split.approved.length})</option>
+              {shownKeys.map((key) => <option key={key} value={key}>{t(STATUS_LABELS[key])} ({split[key].length})</option>)}
             </Select>
 
-            <div className="hidden grid-cols-4 gap-3 lg:grid">
-              {[
-                ["saved", t("manager.savedSection")],
-                ["updated", t("manager.updatedSection")],
-                ["submitted", t("manager.submittedSection")],
-                ["approved", t("status.approved")],
-              ].map(([key, label]) => (
+            <div className="hidden gap-3 lg:grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, shownKeys.length)}, minmax(0, 1fr))` }}>
+              {shownKeys.map((key) => (
                 <div key={key} className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm font-bold">
-                  {label}
+                  {t(STATUS_LABELS[key])}
                   <span className="rounded-full border bg-muted px-2 py-0.5 text-xs">{split[key].length}</span>
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-4">
-              {["saved", "updated", "submitted", "approved"].map((key) => (
-                <div key={key} className={cn("flex-col gap-2 self-start", mobileStatus === key ? "flex" : "hidden", "lg:flex")}>
+            <div className="grid grid-cols-1 items-start gap-3 lg:[grid-template-columns:var(--cols)]" style={{ "--cols": `repeat(${Math.max(1, shownKeys.length)}, minmax(0, 1fr))` }}>
+              {shownKeys.map((key) => (
+                <div key={key} className={cn("flex-col gap-2 self-start", mobileKey === key ? "flex" : "hidden", "lg:flex")}>
                   {split[key].map((j) => <JobCard key={j.id} {...jobCardProps(j)} />)}
                 </div>
               ))}

@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.290).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.291).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -38,6 +38,7 @@
 - [ ] **Migrations 0148 et 0149 + fonction (V2.4.281)** : appliquer la 0148 puis la 0149, puis redéployer `process_overtime_evidence` (je le fais sur demande). Je remets ensuite en file les 7 preuves « conformes » où seul le numéro d'OT avait été lu, pour qu'elles soient relues avec la nouvelle règle.
 - [ ] **Migration 0150 (V2.4.285)** : à appliquer (« Applique la 0150 »), sinon « Relire » ne marche que sur les échecs.
 - [ ] **Migration 0151 (V2.4.286)** : à appliquer (« Applique la 0151 ») pour pouvoir activer le bouton « Renvoyer pour correction ».
+- ✅ **V2.4.291 — Feuille de temps : filtre des états en cases à cocher** : au lieu d'un menu, quatre cases **Enregistrés / À mettre à jour / Soumis / Approuvés**. Tu coches la combinaison que tu veux ; **les quatre sont cochées par défaut** (tu vois tout). Avec un seul employé choisi, seules les colonnes cochées s'affichent. Rien à appliquer.
 - ✅ **V2.4.290 — Aperçu OCR : début de journée et heure des 8 h** : l'aperçu (et l'image téléchargée) montre **à quelle heure la journée a commencé** et **à quelle heure elle a atteint 8 h** (10 h pour une journée de 10 h). Ça explique les minutes « Sparklog » attendues chez le client (ex. départ à 6 h 52 au lieu de 7 h). Rien à appliquer.
 - ✅ **V2.4.289 — Télécharger les preuves de l'onglet OCR** : un bouton **« Télécharger »** (comme dans Justificatifs : une semaine à la fois, un ZIP, ce qui a déjà été pris est mémorisé) donne **une image par preuve** : la capture avec sa fiche à côté, comme l'aperçu. L'aperçu et l'image montrent maintenant **départ → arrivée → fin**, le **retour** (minutes et km) quand il y en a un, et les km aller / retour. Rien à appliquer.
 - ✅ **V2.4.288 — « À mettre à jour »** : une fiche renvoyée pour correction s'appelle maintenant **« À mettre à jour »** (chez l'employé et chez vous). Dans la feuille de temps de la gestion, il y a un filtre et une colonne **« À mettre à jour »** : vous voyez les fiches renvoyées, même quand vous choisissez un seul employé. Rien à appliquer.
