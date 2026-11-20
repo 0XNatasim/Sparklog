@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-19, V2.4.283)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.284)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.284 (technique).** Lecteur OCR : une date n'est plus lue comme des minutes. Constat : `proof_return_minutes = 2026` (date « 2026-11-19 » de la question 6, lue quand la réponse du retour était vide : le saut de 12 caractères atteignait la date). `_shared/overtime_form.js` : `ANSWER` = `(\d{1,3})(?!\d)(?![-/.]\d)` + garde sur le numéro de question suivant (au plus 3 chiffres, jamais suivi d'un autre chiffre ni d'un séparateur de date). **Fonction `process_overtime_evidence` à redéployer.** Donnée corrigée à la main : la seule ligne touchée (retour 2026) remise à `null`. Test : `overtime-form.test.js`. Aucune migration.
 
 **V2.4.283 (technique).** Onglet OCR : liens et aperçu double. `OcrReadings.jsx` : le nom (`DropdownMenu`) ouvre la fiche employé (`Dialog` + `EmployeesPanel tabbed onlyId`, chargé par `lazyPanel`) ou `/manager/v3/time?tab=timesheets&emp=<id>&date=<jour>` ; l'OT ouvre la même page avec `&job=<id>` (cette fiche) ou sans (la journée). L'œil ouvre un `Dialog` : image (URL signée 10 min) + `JobSummary` (fiche liée : OT, état, départ → fin, retour, km, lu / attendu avec `row.wrong` en rouge) ; `buildOcrRows` renvoie aussi `job`. Le composant utilise `useNavigate` : tests dans un `MemoryRouter`. Aucune migration.
 

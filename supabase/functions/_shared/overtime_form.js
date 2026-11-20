@@ -6,8 +6,9 @@
 // Every value is null when it cannot be found, so an unreadable picture is never taken for a zero.
 // Shared by the Edge function `process_overtime_evidence` and the browser (src/lib/overtime-form.js).
 
-// A number that is not the « 5. » numbering of the next question.
-const ANSWER = String.raw`(\d{1,4})(?!\s*[.)]\s*[A-Za-zÀ-ÿ])`;
+// A number that is not the « 5. » numbering of the next question, nor part of the date answered further down the form
+// (« 2026-11-19 » must never be read as 2026 minutes): at most 3 digits, not followed by another digit or by a date separator.
+const ANSWER = String.raw`(\d{1,3})(?!\d)(?![-/.]\d)(?!\s*[.)]\s*[A-Za-zÀ-ÿ])`;
 
 export function parseOvertimeForm(text) {
   const source = String(text || "").replace(/\r/g, "\n");

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.283 (2026-11-19).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.284 (2026-11-20).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.284 — OCR reader: a date is no longer read as minutes.** A form screenshot whose return answer was empty had its date answer (2026-11-19) read as 2026 min of return. The reader now takes at most 3 digits and never a number followed by another digit or a date separator. Function `process_overtime_evidence` to redeploy. No migration.
 - **V2.4.283 — OCR tab: links and side-by-side preview.** The employee name opens a menu (employee card in a window, or the timesheet on that day); the OT opens a menu (this job only, or the whole day). The eye button now shows the screenshot next to a summary of the linked work order (status, hours, return, km) with the gaps against the reading in red. No migration.
 - **V2.4.282 — Queue status in the OCR tab.** A queued proof shows « n of 5 tries failed » and the time of its next try (or « Not yet tried »). No migration.
 - **V2.4.281 — Automatic return of a wrong proof (switch).** Settings › General › « Proof check »: when on, a submitted job whose proof was read as `wrong_document` goes back to the employee (status `updated`, unlocked, the wrong picture removed, audit `job_returned_wrong_proof`); approved jobs are never touched. Off by default. Migration 0149; function to redeploy.

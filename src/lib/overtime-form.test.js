@@ -36,6 +36,13 @@ describe("reading the overtime request form from the OCR text", () => {
     expect(parsed.returnMinutes).toBe(20);
   });
 
+  it("never reads the date answered further down the form as the return minutes", () => {
+    const parsed = parseOvertimeForm("4. Combien de minute chez le client *\n90\n5. Combien de minute retour à l'entrepôt si applicable sinon inscrire 0 *\ndate *\n2026-11-19");
+    expect(parsed.clientMinutes).toBe(90);
+    expect(parsed.returnMinutes).toBeNull();
+    expect(parseOvertimeForm("Combien de minute chez le client\n2026-11-19").clientMinutes).toBeNull();
+  });
+
   it("copes with accents lost by the OCR and a space instead of the dash", () => {
     const parsed = parseOvertimeForm("Numero du OT 209210 *\nCombien de minute chez le client\n45\nCombien de minute retour a l'entrepot si applicable sinon inscrire 0\n15");
     expect(parsed).toEqual({ ot: "209210", clientMinutes: 45, returnMinutes: 15 });
