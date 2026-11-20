@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.291 (2026-11-20).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.292 (2026-11-20).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.292 — OCR preview wording.** The comparison title reads « Form capture / Sparklog time » (FR « Capture form / temps Sparklog ») and the legend line under it is removed.
 - **V2.4.291 — Timesheet: status filter.** The status menu becomes four tick boxes (Saved, To update, Submitted, Approved): any combination, all four shown by default; with one employee selected only the ticked columns appear (before, that menu did nothing there). `?status=submitted,updated` in the URL still works.
 - **V2.4.290 — OCR preview: day start and the 8 h line.** The preview and the downloaded image show when the day began and the clock time at which the day reached 8 h (10 h on a 10-hour day), so the « minutes at the client » expected can be followed.
 - **V2.4.289 — OCR tab: download.** A « Download » button (same principle as Proofs › Download: one week, one ZIP, what was already taken is remembered) gives one image per proof: the screenshot with its sheet beside it, like the preview. The preview and the image now show start → arrival → end, the return (minutes and km) when there is one, and the km out / return.

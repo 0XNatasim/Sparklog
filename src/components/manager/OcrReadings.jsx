@@ -63,7 +63,6 @@ function JobSummary({ row, t }) {
         {line(t("ocr.preview.clientLine"), `${mins(row.found.clientMinutes)} / ${mins(row.expected?.clientMinutes)}`, row.wrong.has("client"))}
         {line(t("ocr.preview.returnLine"), `${mins(row.found.returnMinutes)} / ${mins(row.expected?.returnMinutes)}`, row.wrong.has("return"))}
       </dl>
-      <p className="text-xs text-muted-foreground">{t("ocr.preview.legend")}</p>
     </div>
   );
 }

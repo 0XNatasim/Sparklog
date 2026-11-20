@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.291)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.292)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.292 (technique).** Aperçu OCR : `ocr.preview.compare` = « Capture form / temps Sparklog » (EN « Form capture / Sparklog time ») ; `ocr.preview.legend` et sa ligne dans `JobSummary` retirés (les écarts restent en rouge). Aucune migration.
 
 **V2.4.291 (technique).** Feuille de temps de la gestion : filtre des états en cases à cocher. `src/lib/status-filter.js` (`STATUS_KEYS`, `parseStatusParam` : `?status=a,b`, rien de valide = les quatre ; `statusKey` : `all` ou la liste jointe par une virgule ; `toggleStatus` : on ne décoche pas le dernier). `ManagerDashboard.jsx` : état `statuses` (les quatre par défaut) à la place de `statusFilter` (maintenant dérivé) ; la requête `jobs` applique `.in("status", statuses)` dès qu'il manque un état, **aussi avec un employé choisi** (avant, le menu y était ignoré) ; colonnes et menu téléphone = les états cochés (`shownKeys`, `mobileKey`). Le compteur `manager_job_counts` reste sans total « à mettre à jour ». Aucune migration. Tests : `status-filter.test.js`.
 
