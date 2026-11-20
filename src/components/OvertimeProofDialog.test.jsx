@@ -32,6 +32,20 @@ describe("OvertimeProofDialog", () => {
     expect(await screen.findByText(fr("proofs.rule", { hours: 10 }))).toBeTruthy();
   });
 
+  it("tells the employee how to redo a screenshot, with the example: retake it, do not send the form again, take it before sending", async () => {
+    setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }]);
+    expect(await screen.findByText(fr("proofs.redo.retake"))).toBeTruthy();
+    expect(screen.getByText(fr("proofs.redo.dontSend"))).toBeTruthy();
+    expect(screen.getByText(fr("proofs.redo.before"))).toBeTruthy();
+    expect(screen.getByAltText(fr("form.evidence.exampleAlt")).getAttribute("src")).toBe("/overtime-form-example.webp");
+  });
+
+  it("does not show the redo instructions on a submitted (read-only) job", async () => {
+    setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }], { editable: false });
+    await screen.findByAltText(fr("proofs.pictureAlt", { n: 1 }));
+    expect(screen.queryByText(fr("proofs.redo.retake"))).toBeNull();
+  });
+
   it("shows only the proof of THIS work order", async () => {
     setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }, { id: "p9", job_id: "j3", storage_path: "u/d/p9.jpg" }]);
     const image = await screen.findByAltText(fr("proofs.pictureAlt", { n: 1 }));
