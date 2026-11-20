@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.292)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.293)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.293 (technique).** Feuille de temps : le menu des états remplace les cases de la V2.4.291 (`ManagerDashboard.jsx` : `<Select>` « Tout » (`manager.filters.everything`) / un état ; l'état `statuses` et `src/lib/status-filter.js` restent : un seul état = une seule colonne, aussi avec un employé choisi). Aucune migration.
 
 **V2.4.292 (technique).** Aperçu OCR : `ocr.preview.compare` = « Capture form / temps Sparklog » (EN « Form capture / Sparklog time ») ; `ocr.preview.legend` et sa ligne dans `JobSummary` retirés (les écarts restent en rouge). Aucune migration.
 

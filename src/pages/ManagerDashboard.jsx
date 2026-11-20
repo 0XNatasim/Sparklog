@@ -38,7 +38,7 @@ import EvidenceDownload from "@/components/manager/EvidenceDownload";
 import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import { filterReceiptJobs, receiptEmployees, receiptNeedsReview } from "@/lib/receipts-review";
 import ManualEntryStar from "@/components/ManualEntryStar";
-import { STATUS_KEYS, STATUS_LABELS, parseStatusParam, statusKey, toggleStatus } from "@/lib/status-filter";
+import { STATUS_KEYS, STATUS_LABELS, parseStatusParam, statusKey } from "@/lib/status-filter";
 
 dayjs.extend(isoWeek);
 
@@ -1277,15 +1277,14 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
                 ))}
               </Select>
 
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border bg-card px-3 py-2 text-sm" role="group" aria-label={t("manager.filters.allStatuses")}>
-                {STATUS_KEYS.map((key) => (
-                  <label key={key} className="flex items-center gap-1.5">
-                    <input type="checkbox" className="h-4 w-4 accent-primary" checked={statuses.includes(key)}
-                      onChange={() => setStatuses((current) => toggleStatus(current, key))} />
-                    {t(STATUS_LABELS[key])}
-                  </label>
-                ))}
-              </div>
+              <Select
+                value={statuses.length === 1 ? statuses[0] : "all"}
+                onChange={(e) => setStatuses(e.target.value === "all" ? [...STATUS_KEYS] : [e.target.value])}
+                aria-label={t("manager.filters.allStatuses")}
+              >
+                <option value="all">{t("manager.filters.everything")}</option>
+                {STATUS_KEYS.map((key) => <option key={key} value={key}>{t(STATUS_LABELS[key])}</option>)}
+              </Select>
 
               <div className="flex items-center gap-1">
                 <Input
