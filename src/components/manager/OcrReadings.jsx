@@ -10,6 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { lazyPanel } from "@/components/lazy-panel";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import OcrDownload from "@/components/manager/OcrDownload";
+import { proofSheetLines } from "@/lib/ocr-sheet";
 import { OCR_FIRST_DAY, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, ocrDays } from "@/lib/ocr-readings";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { requeueProofs } from "@/lib/overtime-proofs";
@@ -21,7 +23,7 @@ import { supabase } from "@/supabaseClient";
 
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
-const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
+const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
@@ -43,22 +45,17 @@ function JobSummary({ row, t }) {
   const job = row.job;
   const mins = (value) => (value == null ? "—" : `${value} min`);
   const line = (label, value, bad = false) => (
-    <div className="flex justify-between gap-3 border-b py-1.5 text-sm last:border-0">
+    <div key={label} className="flex justify-between gap-3 border-b py-1.5 text-sm last:border-0">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className={`text-right ${bad ? "font-bold text-destructive" : ""}`}>{value}</dd>
     </div>
   );
   if (!job) return <p className="text-sm text-muted-foreground">{t("ocr.preview.noJob")}</p>;
-  const km = job.km_total ?? ((Number(job.km_aller) || 0) + (Number(job.km_retour) || 0));
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">{t("ocr.preview.job")}</h3>
       <dl>
-        {line(t("ocr.col.jobOt"), job.ot || "—")}
-        {line(t("ocr.preview.status"), job.status || "—")}
-        {line(t("ocr.preview.hours"), `${String(job.depart || "").slice(0, 5) || "—"} → ${String(job.fin || "").slice(0, 5) || "—"}`)}
-        {line(t("ocr.preview.return"), mins(job.return_time_minutes))}
-        {line(t("ocr.preview.km"), km == null ? "—" : `${km} km`)}
+        {proofSheetLines(row, t).map((item) => line(item.label, item.value))}
       </dl>
       <h3 className="font-semibold">{t("ocr.preview.compare")}</h3>
       <dl>
@@ -235,6 +232,7 @@ export default function OcrReadings() {
               <Button type="button" size="sm" variant="outline" disabled={rereading || requeueable.length === 0} onClick={rereadEverything}>
                 {t("ocr.rereadEverything", { count: requeueable.length })}
               </Button>
+              <OcrDownload rows={rows} />
             </div>
           )}
           {notice && <p className="text-sm text-muted-foreground" role="status">{notice}</p>}

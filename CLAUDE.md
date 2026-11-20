@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.288)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.289)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.289 (technique).** Onglet OCR : téléchargement. `OcrDownload.jsx` (bouton à côté de « Tout relire ») : même principe que `EvidenceDownload` (`evidenceWeeks`, `selectEvidence`, `downloadEvidenceZip`, marques `evidence_downloads` du bucket `overtime-evidence`), sur les lignes déjà chargées du tableau ; `downloadEvidenceZip` reçoit une option `transform(file, blob, bytes)` : chaque preuve devient **une image JPEG** (`renderProofSheet` de `src/lib/ocr-sheet.js`, canvas : capture à gauche, fiche à droite). `ocr-sheet.js` (pur, testé) : `proofSheetLines` (OT, état, **départ → arrivée → fin**, retour en minutes seulement s'il est déclaré — minutes ou km —, km total, km aller, km retour si retour), `proofCompareLines` (lu / attendu, écarts en rouge), `hasReturn`, `jobKilometres` ; l'aperçu (`JobSummary`) utilise les mêmes lignes ; `JOB_COLUMNS` lit `arrivee`. Les marques sont partagées avec Justificatifs (une preuve téléchargée ici ne revient pas en brut là-bas). Aucune migration. Tests : `ocr-sheet.test.js`, `OcrReadings.test.jsx`.
 
 **V2.4.288 (technique).** Statut `updated` visible côté gestion. `ManagerDashboard.jsx` : l'option « À mettre à jour » (`manager.updatedSection`) du filtre d'état (et `?status=updated`) ; `split` ne jetait plus les fiches `updated` quand un employé est choisi : 4e pile `updated` (menu mobile, en-têtes et grille `grid-cols-4`). `status.updated` : FR « à mettre à jour », EN « to update » (`history.updated` inchangé). Le compteur `manager_job_counts` n'a pas de total `updated`. Aucune migration.
 

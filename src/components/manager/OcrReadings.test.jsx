@@ -20,7 +20,7 @@ function setup(rows, { sendBack = true } = {}) {
       overtime_settings: [{ id: true, send_back_enabled: sendBack }],
       overtime_evidence: rows,
       profiles: [{ id: "u1", full_name: "Alex Test", first_trip_unpaid: false, ten_hour_days: false }],
-      jobs: [{ id: "j1", user_id: "u1", job_date: "2026-11-16", updated_at: "2026-11-16T22:00:00Z", status: "submitted", ot: "208637", depart: "06:30", fin: "17:00", return_time_minutes: 0 }],
+      jobs: [{ id: "j1", user_id: "u1", job_date: "2026-11-16", updated_at: "2026-11-16T22:00:00Z", status: "submitted", ot: "208637", depart: "06:30", arrivee: "07:00", fin: "17:00", return_time_minutes: 0 }],
     },
   });
   h.fake.client.rpc = async (name, args) => { rpcCalls.push([name, args]); return { data: 1, error: null }; };
@@ -87,7 +87,7 @@ describe("OcrReadings › aperçu et liens", () => {
     fireEvent.click(screen.getByRole("button", { name: "Voir la capture" }));
     await waitFor(() => expect(screen.getByText(/Capture et fiche de travail · OT 208637/)).toBeTruthy());
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://files.test/proof.jpg");
-    expect(screen.getByText("06:30 → 17:00")).toBeTruthy();
+    expect(screen.getByText("06:30 → 07:00 → 17:00")).toBeTruthy();
     expect(screen.getByText(/99 min \//).className).toContain("text-destructive");
   });
 
