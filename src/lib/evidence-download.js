@@ -103,7 +103,7 @@ function saveBlob(bytes, filename) {
 
 // Downloads `files` (at most MAX_FILES_PER_ZIP), saves the ZIP, then marks as downloaded the pictures that are in
 // it. A picture that cannot be read is skipped and NOT marked, so the next download brings it again.
-export async function downloadEvidenceZip(client, files, { labels, folders, onProgress, filename } = {}) {
+export async function downloadEvidenceZip(client, files, { labels, folders, onProgress, filename, transform } = {}) {
   const batch = files.slice(0, MAX_FILES_PER_ZIP);
   const names = zipEntryNames(batch, labels, folders);
   const entries = [];
@@ -114,7 +114,9 @@ export async function downloadEvidenceZip(client, files, { labels, folders, onPr
     try {
       const { data, error } = await withTimeout(client.storage.from(batch[i].bucket).download(batch[i].path), 20000);
       if (error || !data) throw error || new Error("empty");
-      entries.push({ name: names[i], data: new Uint8Array(await data.arrayBuffer()) });
+      const bytes = new Uint8Array(await data.arrayBuffer());
+      // `transform(file, blob, bytes)` can return other bytes for the same entry (the OCR download draws the sheet next to the picture).
+      entries.push({ name: names[i], data: transform ? await transform(batch[i], data, bytes) : bytes });
       saved.push(batch[i]);
     } catch {
       skipped += 1;
