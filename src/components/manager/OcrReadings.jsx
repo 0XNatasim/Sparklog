@@ -83,6 +83,7 @@ export default function OcrReadings() {
   const [preview, setPreview] = useState(null); // { row, url } — the screenshot next to its job
   const [cardId, setCardId] = useState(null); // employee whose card is open
   const [sendingBack, setSendingBack] = useState("");
+  const [sendBackOn, setSendBackOn] = useState(false); // Configuration › « Retour pour correction »
 
   const [reload, setReload] = useState(0);
   const [rereading, setRereading] = useState(false);
@@ -94,6 +95,9 @@ export default function OcrReadings() {
       const { data: evidence, error: evidenceError } = await withTimeout(
         supabase.from("overtime_evidence").select(EVIDENCE_COLUMNS).gte("job_date", OCR_FIRST_DAY).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.ocrReadings), 12000);
       if (evidenceError) throw evidenceError;
+      // The switch of the « Send back for correction » button (a missing column = off).
+      const { data: setting } = await withTimeout(supabase.from("overtime_settings").select("*").eq("id", true).maybeSingle(), 12000).catch(() => ({ data: null }));
+      if (alive) setSendBackOn(setting?.send_back_enabled === true);
       const userIds = [...new Set((evidence || []).map((row) => row.user_id).filter(Boolean))];
       const dates = [...new Set((evidence || []).map((row) => String(row.job_date).slice(0, 10)).filter(Boolean))];
       const [people, jobs] = await Promise.all([
@@ -295,7 +299,7 @@ export default function OcrReadings() {
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
                   <td className="flex gap-1 px-3 py-2">
-                    {row.job?.status === "submitted" && (
+                    {sendBackOn && row.job?.status === "submitted" && (
                       <Button type="button" size="sm" variant="outline" disabled={Boolean(sendingBack)} onClick={() => sendBack(row)} aria-label={t("ocr.sendBack")} title={t("ocr.sendBack")}>
                         <Undo2 className="h-4 w-4" aria-hidden="true" />
                       </Button>
@@ -332,7 +336,7 @@ export default function OcrReadings() {
                 <img src={preview.url} alt={t("ocr.view")} className="max-h-[70vh] w-full rounded-md border object-contain" />
                 <div className="space-y-3">
                   <JobSummary row={preview.row} t={t} />
-                  {preview.row.job?.status === "submitted" && (
+                  {sendBackOn && preview.row.job?.status === "submitted" && (
                     <Button type="button" variant="outline" className="w-full" disabled={Boolean(sendingBack)} onClick={() => sendBack(preview.row)}>
                       <Undo2 className="mr-1 h-4 w-4" aria-hidden="true" />{t("ocr.sendBack")}
                     </Button>

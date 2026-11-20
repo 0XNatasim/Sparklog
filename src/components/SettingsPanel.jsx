@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarDays, Clock, ScanSearch, ShieldCheck, TriangleAlert } from "lucide-react";
+import { CalendarDays, Clock, ScanSearch, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +32,8 @@ function GeneralSettings() {
   const [retentionSaving, setRetentionSaving] = useState(false);
   const [autoReturn, setAutoReturn] = useState(false);
   const [autoReturnSaving, setAutoReturnSaving] = useState(false);
+  const [sendBack, setSendBack] = useState(false);
+  const [sendBackSaving, setSendBackSaving] = useState(false);
   const [deadline, setDeadline] = useState("23:59");
   const [holidays, setHolidays] = useState([]);
 
@@ -48,6 +50,7 @@ function GeneralSettings() {
       setDeadline(String(settings?.daily_deadline || "23:59").slice(0, 5));
       setRetentionDays(overtimeSettings?.evidence_retention_days || 30);
       setAutoReturn(overtimeSettings?.auto_return_wrong_proof === true);
+      setSendBack(overtimeSettings?.send_back_enabled === true);
       setHolidays(holidayRows || []);
     })();
   }, []);
@@ -83,6 +86,14 @@ function GeneralSettings() {
     if (!error) setAutoReturn(next);
     setMessage(error?.message || t(next ? "settings.proofCheck.on" : "settings.proofCheck.off"));
     setAutoReturnSaving(false);
+  }
+
+  async function toggleSendBack(next) {
+    setSendBackSaving(true);
+    const { error } = await supabase.from("overtime_settings").update({ send_back_enabled: next, updated_at: new Date().toISOString() }).eq("id", true);
+    if (!error) setSendBack(next);
+    setMessage(error?.message || t(next ? "settings.sendBack.on" : "settings.sendBack.off"));
+    setSendBackSaving(false);
   }
 
   async function saveDeadline() {
@@ -135,6 +146,16 @@ function GeneralSettings() {
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" className="h-4 w-4" checked={autoReturn} disabled={autoReturnSaving} onChange={(e) => toggleAutoReturn(e.target.checked)} />
               <span>{autoReturn ? t("settings.proofCheck.stateOn") : t("settings.proofCheck.stateOff")}</span>
+            </label>
+          </div>
+        </Fold>
+
+        <Fold icon={Undo2} title={t("settings.sendBack.title")}>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">{t("settings.sendBack.help")}</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="h-4 w-4" checked={sendBack} disabled={sendBackSaving} onChange={(e) => toggleSendBack(e.target.checked)} />
+              <span>{sendBack ? t("settings.sendBack.stateOn") : t("settings.sendBack.stateOff")}</span>
             </label>
           </div>
         </Fold>
