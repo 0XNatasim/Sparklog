@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { expectedProofForJob, dayLineTime } from "./overtime-proof-check";
 import { hasReturn, jobKilometres, proofCompareLines, proofSheetLines } from "./ocr-sheet";
 
 const t = (key) => key;
@@ -30,5 +31,26 @@ describe("ocr-sheet", () => {
     const cmp = proofCompareLines(row(base), t);
     expect(cmp.find((l) => l.key === "cmpClient")).toMatchObject({ value: "90 min / 100 min", bad: true });
     expect(cmp.find((l) => l.key === "cmpOt").bad).toBe(false);
+  });
+});
+
+describe("ocr-sheet: day start and line", () => {
+  it("shows when the day began and when the 8 h were reached", () => {
+    const jobs = [
+      { id: "a", ot: "1", depart: "06:52", fin: "12:00", return_time_minutes: 0 },
+      { id: "b", ot: "2", depart: "12:30", fin: "17:00", return_time_minutes: 0 },
+    ];
+    const expected = expectedProofForJob(jobs, jobs[1], {});
+    expect(expected.dayStart).toBe("06:52");
+    // 308 min in the 1st job, 172 still missing at 12:30 → 15:22
+    expect(expected.lineAt).toBe("15:22");
+    expect(expected.clientMinutes).toBe(98);
+    const lines = proofSheetLines(row(jobs[1], { expected }), t);
+    expect(lines.find((l) => l.key === "dayStart").value).toBe("06:52");
+    expect(lines.find((l) => l.key === "lineAt").value).toBe("15:22");
+  });
+  it("shows no line time when the day never reaches it", () => {
+    const jobs = [{ id: "a", ot: "1", depart: "07:00", fin: "12:00", return_time_minutes: 0 }];
+    expect(dayLineTime(jobs, 480)).toBeNull();
   });
 });
