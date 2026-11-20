@@ -2808,6 +2808,7 @@ export const dictionaries = {
     "manager.unlock": "Unlock",
     "manager.unlock.plain": "Return for correction",
     "manager.savedSection": "Saved",
+    "manager.updatedSection": "To update",
     "manager.submittedSection": "Submitted",
     "manager.noSaved": "No saved jobs.",
     "manager.noSubmitted": "No submitted jobs.",
@@ -2838,7 +2839,7 @@ export const dictionaries = {
     "status.saved": "saved",
     "status.submitted": "submitted",
     "status.approved": "approved",
-    "status.updated": "updated",
+    "status.updated": "to update",
     "status.new": "new",
 
     // common labels
@@ -5650,6 +5651,7 @@ export const dictionaries = {
     "manager.unlock": "Déverrouiller",
     "manager.unlock.plain": "Retourner pour correction",
     "manager.savedSection": "Enregistrés",
+    "manager.updatedSection": "À mettre à jour",
     "manager.submittedSection": "Soumis",
     "manager.noSaved": "Aucun job enregistré.",
     "manager.noSubmitted": "Aucun job soumis.",
@@ -5679,7 +5681,7 @@ export const dictionaries = {
     "status.saved": "enregistré",
     "status.submitted": "soumis",
     "status.approved": "approuvé",
-    "status.updated": "mis à jour",
+    "status.updated": "à mettre à jour",
     "status.new": "nouveau",
 
     "common.totalShort": "Total",

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.287 (2026-11-20).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.288 (2026-11-20).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.288 — « To update » status.** A job sent back for correction (status `updated`) is now labelled « To update » (FR « À mettre à jour ») for employees and managers, and the management timesheet has a « To update » filter and column, so returned jobs are no longer hidden when one employee is selected.
 - **V2.4.287 — OCR tab: day filter.** A « Day » menu (« All days » or one of the work days present, with its count) narrows the table; « Read all again » then applies to that day only. The client / return columns are now named « Form », « Sparklog », « Return form » and « Return Sparklog » (what the employee wrote in the form, against what the timesheet says). No migration.
 - **V2.4.286 — OCR tab: send a job back for correction.** Behind a switch (Configuration › Settings › « Send back for correction (OCR tab) », off by default, migration 0151), a « Send back for correction » button (table row and screenshot preview) gives a submitted job back to the employee, who can fix it and replace the proof (same call as the other manager screens: `return_job_for_correction`). The preview title now shows the OT number. The proof window of a job that can still be edited now says how to redo a screenshot (retake it, do not send the form again, always take it BEFORE pressing « Submit ») with the same example picture. Migration 0151.
 - **V2.4.285 — OCR tab: read again, one or all.** Every reading now has a « Read again » button (not only failed ones) and « Read all again (n) » puts every reading shown back in the queue (after a confirmation, 300 at a time). Migration 0150 (`requeue_overtime_proofs` accepts any reading that is not already waiting) — apply it first.
