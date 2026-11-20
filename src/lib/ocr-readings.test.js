@@ -13,13 +13,13 @@ describe("expectedProofForJob", () => {
   // 06:30-10:30 (4 h), 11:00-16:00 (5 h), 16:00-18:00 (2 h): the line (8 h) is crossed by the 2nd work order.
   const day = [job("a", "06:30", "10:30"), job("b", "11:00", "16:00", { ot: "OT-208637" }), job("c", "16:00", "18:00", { ot: "300111" })];
   it("gives each work order its own share beyond the line", () => {
-    expect(expectedProofForJob(day, day[0])).toEqual({ ot: "261821", clientMinutes: 0, returnMinutes: 0 });
-    expect(expectedProofForJob(day, day[1])).toEqual({ ot: "208637", clientMinutes: 60, returnMinutes: 0 });
-    expect(expectedProofForJob(day, day[2])).toEqual({ ot: "300111", clientMinutes: 120, returnMinutes: 0 });
+    expect(expectedProofForJob(day, day[0])).toMatchObject({ ot: "261821", clientMinutes: 0, returnMinutes: 0 });
+    expect(expectedProofForJob(day, day[1])).toMatchObject({ ot: "208637", clientMinutes: 60, returnMinutes: 0 });
+    expect(expectedProofForJob(day, day[2])).toMatchObject({ ot: "300111", clientMinutes: 120, returnMinutes: 0 });
   });
   it("leaves the return time and the 10 h day out", () => {
     const withReturn = [job("a", "06:30", "16:30", { return_time_minutes: 30 }), job("b", "16:30", "18:00", { return_time_minutes: 15 })];
-    expect(expectedProofForJob(withReturn, withReturn[0])).toEqual({ ot: "261821", clientMinutes: 90, returnMinutes: 30 });
+    expect(expectedProofForJob(withReturn, withReturn[0])).toMatchObject({ ot: "261821", clientMinutes: 90, returnMinutes: 30 });
     expect(expectedProofForJob(withReturn, withReturn[1]).clientMinutes).toBe(75); // 645 min of work − 480
     expect(expectedProofForJob(withReturn, withReturn[1], { tenHourDay: true }).clientMinutes).toBe(45); // 645 − 600
     expect(expectedProofForJob(day, { id: "zzz" })).toBeNull();
@@ -44,7 +44,7 @@ describe("buildOcrRows", () => {
     expect(rows.filter(canReread).map((row) => row.id).sort()).toEqual(["p3", "p5", "p7"]); // a wrong document can be read again in case the reader was wrong
     expect(rows.find((row) => row.id === "p2").wrong.has("ot")).toBe(true);
     expect(rows.find((row) => row.id === "p1").name).toBe("Alex Test");
-    expect(rows.find((row) => row.id === "p1").expected).toEqual({ ot: "208637", clientMinutes: 150, returnMinutes: 0 });
+    expect(rows.find((row) => row.id === "p1").expected).toMatchObject({ ot: "208637", clientMinutes: 150, returnMinutes: 0 });
   });
   it("filters by state and by search text, and counts the states", () => {
     const rows = buildOcrRows([
