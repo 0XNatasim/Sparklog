@@ -129,7 +129,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
   const [employeeId, setEmployeeId] = useState(searchParams.get("emp") || "all");
-  const [statusFilter, setStatusFilter] = useState(["saved", "submitted", "approved"].includes(searchParams.get("status")) ? searchParams.get("status") : "all");
+  const [statusFilter, setStatusFilter] = useState(["saved", "updated", "submitted", "approved"].includes(searchParams.get("status")) ? searchParams.get("status") : "all");
   const [dayFilter, setDayFilter] = useState(/^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") || "") ? searchParams.get("date") : "");
   // Phone only: which of the three status piles is shown when one employee is selected.
   const [mobileStatus, setMobileStatus] = useState("submitted");
@@ -744,10 +744,12 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const split = useMemo(() => {
     if (employeeId === "all") return null;
     const saved = [];
+    const updated = []; // sent back for correction: the employee has to fix them
     const submitted = [];
     const approved = [];
     for (const j of filtered) {
       if (j.status === "saved") saved.push(j);
+      else if (j.status === "updated") updated.push(j);
       else if (j.status === "submitted") submitted.push(j);
       else if (j.status === "approved") approved.push(j);
     }
@@ -759,9 +761,10 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       return String(a.depart || "").localeCompare(String(b.depart || ""));
     };
     saved.sort(byDayThenDepart);
+    updated.sort(byDayThenDepart);
     submitted.sort(byDayThenDepart);
     approved.sort(byDayThenDepart);
-    return { saved, submitted, approved };
+    return { saved, updated, submitted, approved };
   }, [filtered, employeeId]);
 
   const selectedEmployee = useMemo(() => {
@@ -1272,6 +1275,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
               <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="all">{t("manager.filters.allStatuses")}</option>
                 <option value="saved">{t("status.saved")}</option>
+                <option value="updated">{t("manager.updatedSection")}</option>
                 <option value="submitted">{t("status.submitted")}</option>
                 <option value="approved">{t("status.approved")}</option>
               </Select>
@@ -1494,13 +1498,15 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
               aria-label={t("manager.filters.allStatuses")}
             >
               <option value="saved">{t("manager.savedSection")} ({split.saved.length})</option>
+              <option value="updated">{t("manager.updatedSection")} ({split.updated.length})</option>
               <option value="submitted">{t("manager.submittedSection")} ({split.submitted.length})</option>
               <option value="approved">{t("status.approved")} ({split.approved.length})</option>
             </Select>
 
-            <div className="hidden grid-cols-3 gap-3 lg:grid">
+            <div className="hidden grid-cols-4 gap-3 lg:grid">
               {[
                 ["saved", t("manager.savedSection")],
+                ["updated", t("manager.updatedSection")],
                 ["submitted", t("manager.submittedSection")],
                 ["approved", t("status.approved")],
               ].map(([key, label]) => (
@@ -1511,8 +1517,8 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
               ))}
             </div>
 
-            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-              {["saved", "submitted", "approved"].map((key) => (
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-4">
+              {["saved", "updated", "submitted", "approved"].map((key) => (
                 <div key={key} className={cn("flex-col gap-2 self-start", mobileStatus === key ? "flex" : "hidden", "lg:flex")}>
                   {split[key].map((j) => <JobCard key={j.id} {...jobCardProps(j)} />)}
                 </div>

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.287)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.288)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.288 (technique).** Statut `updated` visible côté gestion. `ManagerDashboard.jsx` : l'option « À mettre à jour » (`manager.updatedSection`) du filtre d'état (et `?status=updated`) ; `split` ne jetait plus les fiches `updated` quand un employé est choisi : 4e pile `updated` (menu mobile, en-têtes et grille `grid-cols-4`). `status.updated` : FR « à mettre à jour », EN « to update » (`history.updated` inchangé). Le compteur `manager_job_counts` n'a pas de total `updated`. Aucune migration.
 
 **V2.4.287 (technique).** Onglet OCR : filtre par jour. `ocr-readings.js` : `filterOcrRows(rows, { state, query, day })` (`day` = `jobDate` AAAA-MM-JJ, vide = tous) et `ocrDays(rows)` (jours présents, du plus récent au plus ancien, avec leur nombre) ; `OcrReadings.jsx` : menu « Jour » (`ocr.dayLabel` / `ocr.allDays`) ; « Tout relire » agit sur les lignes affichées, donc sur le jour choisi. En-têtes renommés (`ocr.col.clientRead` « Form », `clientExpected` « Sparklog », `returnRead` « Retour form », `returnExpected` « Retour Sparklog ») ; l'aperçu garde des libellés explicites (`ocr.preview.clientLine` / `returnLine`, titre « Form (capture) / Sparklog (feuille de temps) »). Aucune migration. Tests : `ocr-readings.test.js`, `OcrReadings.test.jsx`.
 
