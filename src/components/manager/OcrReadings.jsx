@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
-import { Eye, RefreshCw } from "lucide-react";
+import { Eye, RefreshCw, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +21,7 @@ import { supabase } from "@/supabaseClient";
 
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
-const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
+const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, fin, return_time_minutes, km_total, km_aller, km_retour";
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
@@ -82,6 +82,7 @@ export default function OcrReadings() {
   const [confirm, confirmDialog] = useConfirmDialog();
   const [preview, setPreview] = useState(null); // { row, url } — the screenshot next to its job
   const [cardId, setCardId] = useState(null); // employee whose card is open
+  const [sendingBack, setSendingBack] = useState("");
 
   const [reload, setReload] = useState(0);
   const [rereading, setRereading] = useState(false);
@@ -103,6 +104,26 @@ export default function OcrReadings() {
     })().catch((failure) => { if (alive) setError(friendlyErrorMessage(failure, t, "ocr.loadFailed")); });
     return () => { alive = false; };
   }, [t, reload]);
+
+  // « Renvoyer pour correction »: gives the submitted job back to the employee (same call as the other manager screens: the job
+  // becomes editable again, so the proof can be replaced from the Historique clock). Refused if the job changed since it was read.
+  async function sendBack(row) {
+    if (!row.job || row.job.status !== "submitted" || sendingBack) return;
+    if (!(await confirm(t("ocr.sendBackConfirm", { name: row.name || "—", ot: row.jobOt || "—" })))) return;
+    setSendingBack(row.id);
+    setError("");
+    try {
+      const { error: rpcError } = await withTimeout(supabase.rpc("return_job_for_correction", { p_job_id: row.job.id, p_expected_updated_at: row.job.updated_at || null }), 12000);
+      if (rpcError) throw rpcError;
+      setNotice(t("ocr.sentBack", { name: row.name || "—", ot: row.jobOt || "—" }));
+      setPreview(null);
+      setReload((value) => value + 1);
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "ocr.sendBackFailed"));
+    } finally {
+      setSendingBack("");
+    }
+  }
 
   // « Relire »: puts the proofs back in the reading queue (one reading a minute, a refused proof goes to the bottom).
   async function reread(targets) {
@@ -274,6 +295,11 @@ export default function OcrReadings() {
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
                   <td className="flex gap-1 px-3 py-2">
+                    {row.job?.status === "submitted" && (
+                      <Button type="button" size="sm" variant="outline" disabled={Boolean(sendingBack)} onClick={() => sendBack(row)} aria-label={t("ocr.sendBack")} title={t("ocr.sendBack")}>
+                        <Undo2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    )}
                     {canRequeue(row) && (
                       <Button type="button" size="sm" variant="outline" disabled={rereading} onClick={() => reread([row])} aria-label={t("ocr.reread")} title={t("ocr.reread")}>
                         <RefreshCw className="h-4 w-4" aria-hidden="true" />
@@ -299,12 +325,19 @@ export default function OcrReadings() {
           {preview && (
             <>
               <DialogHeader>
-                <DialogTitle>{t("ocr.preview.title")}</DialogTitle>
+                <DialogTitle>{t("ocr.preview.title")}{preview.row.jobOt ? ` · OT ${preview.row.jobOt}` : ""}</DialogTitle>
                 <DialogDescription>{preview.row.name || "—"} · {preview.row.jobDate ? dayjs(preview.row.jobDate).format("DD MMM YYYY") : "—"}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 md:grid-cols-[1fr,20rem]">
                 <img src={preview.url} alt={t("ocr.view")} className="max-h-[70vh] w-full rounded-md border object-contain" />
-                <JobSummary row={preview.row} t={t} />
+                <div className="space-y-3">
+                  <JobSummary row={preview.row} t={t} />
+                  {preview.row.job?.status === "submitted" && (
+                    <Button type="button" variant="outline" className="w-full" disabled={Boolean(sendingBack)} onClick={() => sendBack(preview.row)}>
+                      <Undo2 className="mr-1 h-4 w-4" aria-hidden="true" />{t("ocr.sendBack")}
+                    </Button>
+                  )}
+                </div>
               </div>
             </>
           )}

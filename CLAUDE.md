@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.285)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.286)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.286 (technique).** Onglet OCR : renvoyer pour correction. `OcrReadings.jsx` : bouton « Renvoyer pour correction » (`sendBack`, icône `Undo2` sur la ligne et bouton dans l'aperçu) visible pour une fiche `submitted` ; après `useConfirmDialog`, appelle `return_job_for_correction(p_job_id, p_expected_updated_at)` (le même RPC que `TodoInbox` / `ManagerDashboard` ; `JOB_COLUMNS` lit `updated_at` ; refus si la fiche a changé : `ocr.sendBackFailed`). La preuve reste ; l'employé la remplace par l'horloge de l'Historique (0144). Titre de l'aperçu : `· OT <numéro>`. Constat à l'origine : un employé avait déclaré 167 min chez le client (capture lue correctement) pour une fiche de 148 min. Aucune migration. Test : `OcrReadings.test.jsx`.
 
 **V2.4.285 (technique).** Onglet OCR : tout relire. Migration 0150 : `requeue_overtime_proofs` accepte toute preuve qui n'est pas déjà `pending` (image encore gardée, non échue ; même contrôle gestionnaire, 1–300 ids) au lieu de seulement `failed` / `needs_review` / `wrong_document` / lue sans rien. `ocr-readings.js` : `canRequeue(row)` (image gardée, pas en file) ; `OcrReadings.jsx` : bouton « Relire » sur toute ligne `canRequeue`, « Tout relire (n) » = les lignes affichées (filtre + recherche) après `useConfirmDialog`, par paquets de 300. **Appliquer la 0150 avant d'utiliser « Relire » sur une lecture déjà lue** (avant : la base les ignore, « 0 remise »). Tests : `OcrReadings.test.jsx`, `ocr-readings.test.js` (verrou du SQL 0150).
 
