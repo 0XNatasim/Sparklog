@@ -38,7 +38,7 @@ import EvidenceDownload from "@/components/manager/EvidenceDownload";
 import { PARKING_BUCKET, parkingReceiptPaths } from "@/lib/parking-receipts";
 import { filterReceiptJobs, receiptEmployees, receiptNeedsReview } from "@/lib/receipts-review";
 import ManualEntryStar from "@/components/ManualEntryStar";
-import { STATUS_KEYS, STATUS_LABELS, parseStatusParam, statusKey } from "@/lib/status-filter";
+import { STATUS_KEYS, STATUS_LABELS, initialPile } from "@/lib/status-filter";
 
 dayjs.extend(isoWeek);
 
@@ -130,12 +130,9 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
   const [employeeId, setEmployeeId] = useState(searchParams.get("emp") || "all");
-  // Statuses shown: any combination of the four, all of them by default (?status=submitted,updated in the URL).
-  const [statuses, setStatuses] = useState(() => parseStatusParam(searchParams.get("status")));
-  const statusFilter = statusKey(statuses); // "all" or the chosen ones joined by a comma
   const [dayFilter, setDayFilter] = useState(/^\d{4}-\d{2}-\d{2}$/.test(searchParams.get("date") || "") ? searchParams.get("date") : "");
   // Phone only: which of the three status piles is shown when one employee is selected.
-  const [mobileStatus, setMobileStatus] = useState("submitted");
+  const [mobileStatus, setMobileStatus] = useState(() => initialPile(searchParams.get("status"))); // "all" (Tout) by default
   const [manualOnly, setManualOnly] = useState(manualFilter && searchParams.get("manual") === "1");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
@@ -159,12 +156,11 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     const next = new URLSearchParams(searchParams);
     const put = (key, value, empty) => (value && value !== empty ? next.set(key, value) : next.delete(key));
     put("emp", employeeId, "all");
-    put("status", statusFilter, "all");
     put("date", dayFilter, "");
     if (manualFilter) put("manual", manualOnly ? "1" : "", "");
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, employeeId, statusFilter, dayFilter, manualOnly]);
+  }, [view, employeeId, dayFilter, manualOnly]);
 
   useEffect(() => {
     if (view !== "receipts") return;
@@ -186,8 +182,6 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
       .order("job_date", { ascending: false })
       .order("id", { ascending: false });
     if (employeeId !== "all") q = q.eq("user_id", employeeId);
-    // The statuses ticked above; with an employee selected only their columns are shown.
-    if (statusFilter !== "all") q = q.in("status", statuses);
     if (dayFilter) q = q.eq("job_date", dayFilter);
     return signal ? q.abortSignal(signal) : q;
   }
@@ -374,7 +368,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
 
   // Another filter: clear the messages and show the list as loading (adjusted while rendering); the
   // effect below loads it.
-  const filtersKey = `${employeeId}|${statusFilter}|${dayFilter}`;
+  const filtersKey = `${employeeId}|${dayFilter}`;
   const [filtersFor, setFiltersFor] = useState(filtersKey);
   if (filtersFor !== filtersKey) {
     setFiltersFor(filtersKey);
@@ -384,7 +378,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   useEffect(() => {
     startJobsLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, statusFilter, dayFilter]);
+  }, [employeeId, dayFilter]);
 
   // The roster changes rarely, so load it once rather than on every filter change
   // (that kept re-pulling the whole profiles table into the per-selection burst).
@@ -768,9 +762,9 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
     return { saved, updated, submitted, approved };
   }, [filtered, employeeId]);
 
-  // The columns of the chosen statuses, in the usual order; the phone shows one of them.
-  const shownKeys = STATUS_KEYS.filter((key) => statuses.includes(key));
-  const mobileKey = shownKeys.includes(mobileStatus) ? mobileStatus : (shownKeys[0] || "submitted");
+  // Phone: "all" (Tout) shows the four piles one under the other, else one pile.
+  const shownKeys = STATUS_KEYS;
+  const mobileKey = mobileStatus;
 
   const selectedEmployee = useMemo(() => {
     if (employeeId === "all") return null;
@@ -863,7 +857,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   function openEmployeeTimesheet(userId, date = companyDate()) {
     setEmployeeId(userId);
     setDayFilter(date);
-    setStatuses([...STATUS_KEYS]);
+    setMobileStatus("all");
     setSearchLive("");
     setSearch("");
     setSelectedWeekKey("latest");
@@ -1277,15 +1271,6 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
                 ))}
               </Select>
 
-              <Select
-                value={statuses.length === 1 ? statuses[0] : "all"}
-                onChange={(e) => setStatuses(e.target.value === "all" ? [...STATUS_KEYS] : [e.target.value])}
-                aria-label={t("manager.filters.allStatuses")}
-              >
-                <option value="all">{t("manager.filters.everything")}</option>
-                {STATUS_KEYS.map((key) => <option key={key} value={key}>{t(STATUS_LABELS[key])}</option>)}
-              </Select>
-
               <div className="flex items-center gap-1">
                 <Input
                   type="date"
@@ -1503,6 +1488,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
               className="lg:hidden"
               aria-label={t("manager.filters.allStatuses")}
             >
+              <option value="all">{t("manager.filters.everything")}</option>
               {shownKeys.map((key) => <option key={key} value={key}>{t(STATUS_LABELS[key])} ({split[key].length})</option>)}
             </Select>
 
@@ -1517,7 +1503,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
 
             <div className="grid grid-cols-1 items-start gap-3 lg:[grid-template-columns:var(--cols)]" style={{ "--cols": `repeat(${Math.max(1, shownKeys.length)}, minmax(0, 1fr))` }}>
               {shownKeys.map((key) => (
-                <div key={key} className={cn("flex-col gap-2 self-start", mobileKey === key ? "flex" : "hidden", "lg:flex")}>
+                <div key={key} className={cn("flex-col gap-2 self-start", mobileKey === "all" || mobileKey === key ? "flex" : "hidden", "lg:flex")}>
                   {split[key].map((j) => <JobCard key={j.id} {...jobCardProps(j)} />)}
                 </div>
               ))}
