@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOvertimeFormText, overtimeFormFound, parseOvertimeForm } from "./overtime-form";
+import { isOvertimeFormText, overtimeFormFound, parseOvertimeForm, parseOvertimeFormLines, readOvertimeForm } from "./overtime-form";
 
 const FORM = (ot, client, back) => `
 automatiquement vos détails, tels que le nom et l'adresse de courriel, sauf si vous le fournissez vous-même.
@@ -86,5 +86,39 @@ describe("is the picture the overtime form?", () => {
     expect(isOvertimeFormText("Combien de minute")).toBe(false);
     expect(isOvertimeFormText("")).toBe(false);
     expect(isOvertimeFormText(null)).toBe(false);
+  });
+});
+
+describe("reading the answers by lines (position on the picture)", () => {
+  // The phone screenshot of the form: 15 min of return, then the date answer 2026-11-19 further down.
+  const LINES = [
+    ["1. Prénom Nom", 10], ["Roobens Louis", 40], ["2. Entreprise *", 90], ["Messier Connexion", 120],
+    ["3. Numéro du OT-XXXXXX *", 170], ["OT-202765", 200], ["4. Combien de minute chez le client *", 250], ["90", 280],
+    ["5. Combien de minute retour à l'entrepôt si", 330], ["applicable sinon inscrire 0 *", 355], ["15", 400],
+    ["6. date *", 450], ["2026-11-19", 480],
+  ].map(([text, top]) => ({ text, top, left: 20 }));
+
+  it("takes each answer from the line under its question", () => {
+    expect(parseOvertimeFormLines(LINES)).toMatchObject({ ot: "202765", clientMinutes: 90, returnMinutes: 15 });
+  });
+
+  it("does not depend on the order the lines are listed in", () => {
+    expect(parseOvertimeFormLines([...LINES].reverse())).toMatchObject({ ot: "202765", clientMinutes: 90, returnMinutes: 15 });
+  });
+
+  it("keeps a real 0 and reads nothing (not the date) when the return box is empty", () => {
+    const zero = LINES.map((line) => (line.text === "15" ? { ...line, text: "0" } : line));
+    expect(parseOvertimeFormLines(zero).returnMinutes).toBe(0);
+    const empty = LINES.filter((line) => line.text !== "15");
+    const parsed = parseOvertimeFormLines(empty);
+    expect(parsed.returnMinutes).toBeNull();
+    expect(parsed.located.back).toBe(true);
+  });
+
+  it("trusts the line reading over the text when the question is located, and falls back to the text otherwise", () => {
+    // The plain text gives the wrong order (the date first): the lines still win.
+    const text = "4. Combien de minute chez le client *\n5. Combien de minute retour à l'entrepôt si applicable sinon inscrire 0 *\n2026-11-19\n90\n15";
+    expect(readOvertimeForm({ text, lines: LINES })).toEqual({ ot: "202765", clientMinutes: 90, returnMinutes: 15 });
+    expect(readOvertimeForm({ text: FORM("OT-208637", "40", "60"), lines: [] })).toEqual({ ot: "208637", clientMinutes: 40, returnMinutes: 60 });
   });
 });
