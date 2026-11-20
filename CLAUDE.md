@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.286)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.287)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.287 (technique).** Onglet OCR : filtre par jour. `ocr-readings.js` : `filterOcrRows(rows, { state, query, day })` (`day` = `jobDate` AAAA-MM-JJ, vide = tous) et `ocrDays(rows)` (jours présents, du plus récent au plus ancien, avec leur nombre) ; `OcrReadings.jsx` : menu « Jour » (`ocr.dayLabel` / `ocr.allDays`) ; « Tout relire » agit sur les lignes affichées, donc sur le jour choisi. En-têtes renommés (`ocr.col.clientRead` « Form », `clientExpected` « Sparklog », `returnRead` « Retour form », `returnExpected` « Retour Sparklog ») ; l'aperçu garde des libellés explicites (`ocr.preview.clientLine` / `returnLine`, titre « Form (capture) / Sparklog (feuille de temps) »). Aucune migration. Tests : `ocr-readings.test.js`, `OcrReadings.test.jsx`.
 
 **V2.4.286 (technique).** Onglet OCR : renvoyer pour correction. **Interrupteur** (migration 0151 : `overtime_settings.send_back_enabled`, défaut faux ; `SettingsPanel` › Paramètres généraux, `settings.sendBack.*`) : `OcrReadings.jsx` ne montre le bouton que si la colonne est vraie (une colonne absente = caché). **Appliquer la 0151.** `OcrReadings.jsx` : bouton « Renvoyer pour correction » (`sendBack`, icône `Undo2` sur la ligne et bouton dans l'aperçu) visible pour une fiche `submitted` ; après `useConfirmDialog`, appelle `return_job_for_correction(p_job_id, p_expected_updated_at)` (le même RPC que `TodoInbox` / `ManagerDashboard` ; `JOB_COLUMNS` lit `updated_at` ; refus si la fiche a changé : `ocr.sendBackFailed`). La preuve reste ; l'employé la remplace par l'horloge de l'Historique (0144). Titre de l'aperçu : `· OT <numéro>`. Constat à l'origine : un employé avait déclaré 167 min chez le client (capture lue correctement) pour une fiche de 148 min. `OvertimeProofDialog.jsx` (quand `editable`) : bloc `proofs.redo.*` (reprendre la capture, ne pas renvoyer le formulaire, la prendre avant « Envoyer ») + l'exemple `/overtime-form-example.webp` ; `form.evidence.requiredCrop` dit « avant » (plus « ou juste après »). Tests : `OcrReadings.test.jsx`, `OvertimeProofDialog.test.jsx`, `ocr-readings.test.js` (verrou du SQL 0151).
 

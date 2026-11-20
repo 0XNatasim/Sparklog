@@ -56,9 +56,11 @@ export const canReread = (row) => row.state === "failed" || row.state === "unrea
 export const canRequeue = (row) => Boolean(row.storagePath) && row.state !== "queued";
 
 // `state`: "all" | "read" (every proof the reader looked at) | one of OCR_STATES | "check" (mismatch + wrong document + unread + failed) | "reread".
-export function filterOcrRows(rows, { state = "read", query = "" } = {}) {
+// `day`: "" (every day) or a date YYYY-MM-DD (the work date of the job).
+export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {}) {
   const needle = String(query || "").trim().toLowerCase();
   return (rows || []).filter((row) => {
+    if (day && row.jobDate !== day) return false;
     if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
     if (state === "check" && row.state !== "mismatch" && row.state !== "wrongDoc" && row.state !== "unread" && row.state !== "failed") return false;
     if (state === "reread" && !canReread(row)) return false;
@@ -72,4 +74,11 @@ export function countOcrStates(rows) {
   const counts = { ok: 0, mismatch: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
   for (const row of rows || []) counts[row.state] += 1;
   return counts;
+}
+
+// The work dates present in the readings, most recent first, with how many readings each has (for the day filter).
+export function ocrDays(rows) {
+  const counts = new Map();
+  for (const row of rows || []) if (row.jobDate) counts.set(row.jobDate, (counts.get(row.jobDate) || 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, count]) => ({ date, count }));
 }
