@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.284 (2026-11-20).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.285 (2026-11-20).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.285 — OCR tab: read again, one or all.** Every reading now has a « Read again » button (not only failed ones) and « Read all again (n) » puts every reading shown back in the queue (after a confirmation, 300 at a time). Migration 0150 (`requeue_overtime_proofs` accepts any reading that is not already waiting) — apply it first.
 - **V2.4.284 — OCR reader: a date is no longer read as minutes.** A form screenshot whose return answer was empty had its date answer (2026-11-19) read as 2026 min of return. The reader now takes at most 3 digits and never a number followed by another digit or a date separator. Beyond that, the reader now reads each answer **on the line under its question** (OCR.space line positions, `isOverlayRequired`), whatever order the plain text comes in; the text reading stays as a fallback. Function `process_overtime_evidence` to redeploy. No migration.
 - **V2.4.283 — OCR tab: links and side-by-side preview.** The employee name opens a menu (employee card in a window, or the timesheet on that day); the OT opens a menu (this job only, or the whole day). The eye button now shows the screenshot next to a summary of the linked work order (status, hours, return, km) with the gaps against the reading in red. No migration.
 - **V2.4.282 — Queue status in the OCR tab.** A queued proof shows « n of 5 tries failed » and the time of its next try (or « Not yet tried »). No migration.

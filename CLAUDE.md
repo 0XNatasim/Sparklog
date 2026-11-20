@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.284)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.285)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.285 (technique).** Onglet OCR : tout relire. Migration 0150 : `requeue_overtime_proofs` accepte toute preuve qui n'est pas déjà `pending` (image encore gardée, non échue ; même contrôle gestionnaire, 1–300 ids) au lieu de seulement `failed` / `needs_review` / `wrong_document` / lue sans rien. `ocr-readings.js` : `canRequeue(row)` (image gardée, pas en file) ; `OcrReadings.jsx` : bouton « Relire » sur toute ligne `canRequeue`, « Tout relire (n) » = les lignes affichées (filtre + recherche) après `useConfirmDialog`, par paquets de 300. **Appliquer la 0150 avant d'utiliser « Relire » sur une lecture déjà lue** (avant : la base les ignore, « 0 remise »). Tests : `OcrReadings.test.jsx`, `ocr-readings.test.js` (verrou du SQL 0150).
 
 **V2.4.284 (technique).** Lecteur OCR : une date n'est plus lue comme des minutes. Constat : `proof_return_minutes = 2026` (date « 2026-11-19 » de la question 6, lue quand la réponse du retour était vide : le saut de 12 caractères atteignait la date). `_shared/overtime_form.js` : `ANSWER` = `(\d{1,3})(?!\d)(?![-/.]\d)` + garde sur le numéro de question suivant (au plus 3 chiffres, jamais suivi d'un autre chiffre ni d'un séparateur de date). **Fonction `process_overtime_evidence` à redéployer.** Donnée corrigée à la main : la seule ligne touchée (retour 2026) remise à `null`. Lecture **par lignes** : `process_overtime_evidence` demande `isOverlayRequired` (position de chaque ligne), `parseOvertimeFormLines` (`_shared/overtime_form.js`, `{ text, top, left }`, tri par position) prend, pour chaque question repérée (OT, « chez le client », « retour à l'entrepôt » sur 1 à 3 lignes), la première ligne sous la question avant la suivante (nombre de 1 à 3 chiffres ; OT de 3 à 8) ; `readOvertimeForm({ text, lines })` : question repérée = réponse des lignes (même vide), sinon repli sur `parseOvertimeForm` (texte). Structure de `TextOverlay.Lines` d'OCR.space supposée d'après la doc, **non vérifiée sur un vrai retour** : à contrôler après redéploiement. Tests : `overtime-form.test.js` (capture du formulaire reconstruite, ordre inversé, retour vide / 0). Aucune migration.
 

@@ -52,6 +52,9 @@ export function buildOcrRows(evidence, jobs, people) {
 // A manager can ask the reader to look again at a proof it failed on or found nothing on.
 export const canReread = (row) => row.state === "failed" || row.state === "unread" || row.state === "wrongDoc";
 
+// Any reading can be read again (0150), as long as its picture is kept and it is not already waiting in the queue.
+export const canRequeue = (row) => Boolean(row.storagePath) && row.state !== "queued";
+
 // `state`: "all" | "read" (every proof the reader looked at) | one of OCR_STATES | "check" (mismatch + wrong document + unread + failed) | "reread".
 export function filterOcrRows(rows, { state = "read", query = "" } = {}) {
   const needle = String(query || "").trim().toLowerCase();

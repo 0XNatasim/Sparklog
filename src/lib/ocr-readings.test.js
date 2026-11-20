@@ -132,3 +132,13 @@ describe("renvoi automatique d'une mauvaise preuve (0149)", () => {
     expect(fn).toMatch(/status === "wrong_document"[\s\S]*auto_return_wrong_proof/);
   });
 });
+
+describe("tout relire (0150)", () => {
+  const sql = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/20261120120000_0150_requeue_any_proof.sql"), "utf8");
+  it("lets a manager put any reading back in the queue, but never one already waiting", () => {
+    expect(sql).toMatch(/ocr_status <> 'pending'/);
+    expect(sql).not.toMatch(/ocr_status in \('failed'/);
+    expect(sql).toMatch(/get_my_role\(\)\) is distinct from 'manager'/);
+    expect(sql).toMatch(/array_length\(p_ids, 1\) > 300/);
+  });
+});
