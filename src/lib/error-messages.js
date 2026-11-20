@@ -28,6 +28,8 @@ const CODE_MESSAGES = [
   [/reference_title_invalid/i, "ref.errors.title"],
   [/owner_role_required/i, "emergency.errors.ownerOnly"],
   [/job_not_editable/i, "form.errors.notEditable"],
+  [/minute_edit_disabled/i, "minuteEdit.errors.disabled"],
+  [/minute_edit_reason_required/i, "minuteEdit.errors.reason"],
   [/entry deadline for this work date has passed/i, "form.errors.dayClosed"],
   [/cannot be entered for a company holiday/i, "form.errors.holidayClosed"],
 ];

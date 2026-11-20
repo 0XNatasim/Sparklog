@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import OtField from "@/components/OtField";
+import MinuteEditPanel from "@/components/MinuteEditPanel";
 import { usePresetWorkOrders } from "@/lib/preset-work-orders";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -259,6 +260,7 @@ export default function EmergencyTimesheet() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       {confirmDialog}
+      <MinuteEditPanel people={people} />
       <Card>
         <CardContent className="space-y-4 p-4">
           <div>
