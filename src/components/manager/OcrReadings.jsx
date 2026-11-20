@@ -63,8 +63,8 @@ function JobSummary({ row, t }) {
       <h3 className="font-semibold">{t("ocr.preview.compare")}</h3>
       <dl>
         {line(t("ocr.col.otRead"), `${row.found.ot ?? "—"} / ${job.ot || "—"}`, row.wrong.has("ot"))}
-        {line(t("ocr.col.clientRead"), `${mins(row.found.clientMinutes)} / ${mins(row.expected?.clientMinutes)}`, row.wrong.has("client"))}
-        {line(t("ocr.col.returnRead"), `${mins(row.found.returnMinutes)} / ${mins(row.expected?.returnMinutes)}`, row.wrong.has("return"))}
+        {line(t("ocr.preview.clientLine"), `${mins(row.found.clientMinutes)} / ${mins(row.expected?.clientMinutes)}`, row.wrong.has("client"))}
+        {line(t("ocr.preview.returnLine"), `${mins(row.found.returnMinutes)} / ${mins(row.expected?.returnMinutes)}`, row.wrong.has("return"))}
       </dl>
       <p className="text-xs text-muted-foreground">{t("ocr.preview.legend")}</p>
     </div>
