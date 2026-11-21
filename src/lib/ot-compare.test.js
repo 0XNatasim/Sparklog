@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
-const { VERDICTS, buildOtComparison, countVerdicts, filterComparison, brittonDays } = await import("./ot-compare");
+const { VERDICTS, buildOtComparison, comparisonDays, countVerdicts, filterComparison, brittonDays } = await import("./ot-compare");
 
 const DAY = "2026-11-19";
 // A 10 h day (06:30 -> 16:30, no return): 120 minutes past the 8 h line, all of them on this one work order.
@@ -77,6 +77,19 @@ describe("buildOtComparison", () => {
     expect(entries.map((entry) => entry.name)).toEqual(["Anthony Fortin"]);
   });
 
+  it("a line that ends the next morning goes with the work order of the day before; the Sparklog day stays the work day", () => {
+    const entries = build({ britton: [line("b1", { job_date: "2026-11-20" })], proofRows: [] });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ verdict: "noProof", jobDate: DAY, ot: "211794" });
+    expect(entries[0].britton.id).toBe("b1");
+  });
+
+  it("a line three days after the work day does not match it: both sides are listed", () => {
+    const entries = build({ britton: [line("b1", { job_date: "2026-11-22" })], proofRows: [] });
+    expect(entries.map((entry) => entry.verdict).sort()).toEqual(["missingSparklog"]); // the work day is not a Britton day: no « not at Britton » noise
+    expect(entries[0].job).toBeNull();
+  });
+
   it("only compares the days Britton sent: another day with overtime is ignored", () => {
     const entries = build({ jobs: [job("j1"), job("j7", { job_date: "2026-11-20", id: "j7" })] });
     expect(entries.filter((entry) => entry.jobDate === "2026-11-20")).toEqual([]);
@@ -105,6 +118,10 @@ describe("counting, filtering, days", () => {
     expect(filterComparison(entries, { verdict: "ok" })).toHaveLength(0);
     expect(filterComparison(entries, { verdict: "all", query: "555" })).toHaveLength(1);
     expect(filterComparison(entries, { verdict: "all", day: "2026-11-20" })).toHaveLength(0);
+  });
+  it("reads the Britton days and the two days before each (a line ends the work day or shortly after)", () => {
+    expect(comparisonDays([line("a", { job_date: "2026-11-20" })])).toEqual(["2026-11-20", "2026-11-19", "2026-11-18"]);
+    expect(comparisonDays([line("a", { job_date: "2026-11-20" }), line("b", { job_date: "2026-11-19" })])).toEqual(["2026-11-20", "2026-11-19", "2026-11-18", "2026-11-17"]);
   });
   it("lists the Britton days, most recent first", () => {
     expect(brittonDays([line("a", { job_date: "2026-11-18" }), line("b"), line("c", { job_date: "2026-11-18" })])).toEqual(["2026-11-19", "2026-11-18"]);
