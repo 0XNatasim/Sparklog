@@ -8,7 +8,10 @@ import { createFakeSupabase } from "@/test/fake-supabase";
 
 const h = vi.hoisted(() => ({ fake: null }));
 vi.mock("@/supabaseClient", () => ({ get supabase() { return h.fake.client; } }));
+const download = vi.hoisted(() => ({ calls: [] }));
+vi.mock("@/lib/download-file", () => ({ downloadFile: (bytes, name, type) => download.calls.push({ bytes, name, type }), XLSX_TYPE: "xlsx" }));
 const { default: OtComparison } = await import("./OtComparison");
+const { readXlsxSheets } = await import("@/lib/xlsx-read");
 
 const DAY = "2026-11-19";
 const job = (id, userId, ot, extra = {}) => ({ id, user_id: userId, job_date: DAY, status: "submitted", ot, depart: "06:30", arrivee: "07:00", fin: "16:30", return_time_minutes: 0, ...extra });
@@ -24,7 +27,7 @@ function setup({ jobs, britton, proofRows = [], onView = () => {} }) {
   return render(<MemoryRouter><OtComparison britton={britton} proofRows={proofRows} onView={onView} /></MemoryRouter>);
 }
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); download.calls.length = 0; });
 
 describe("OtComparison", () => {
   it("asks to import the Britton table first when there is none", async () => {
@@ -63,5 +66,33 @@ describe("OtComparison", () => {
     fireEvent.change(await screen.findByLabelText("Afficher"), { target: { value: "ok" } });
     fireEvent.click(await screen.findByRole("button", { name: /voir/i }));
     expect(onView).toHaveBeenCalledWith(proof);
+  });
+
+  it("groups the columns: at the client (Britton, time proof, work sheet) then return", async () => {
+    setup({ jobs: [job("j1", "u1", "OT-111111")], britton: [line("b1", "Alex Un", "111111", 60)] });
+    await screen.findByText("Alex Un");
+    const [groups, sources] = screen.getAllByRole("row").slice(0, 2).map((row) => [...row.querySelectorAll("th")].map((cell) => cell.textContent.trim()).filter(Boolean));
+    expect(groups.slice(0, 5)).toEqual(["Date", "Employé", "OT (fiche)", "Chez le client", "Retour"]); // the two groups, side by side
+    expect(sources).toEqual(["Britton", "Preuve de temps", "Fiche de travail", "Britton", "Preuve de temps", "Fiche de travail"]); // same order in each
+  });
+
+  it("downloads the lines shown as an Excel table, without any picture, in the same column order", async () => {
+    setup({ jobs: [job("j1", "u1", "OT-111111")], britton: [line("b1", "Alex Un", "111111", 60)] });
+    await screen.findByText("Alex Un");
+    fireEvent.click(screen.getByRole("button", { name: /Télécharger \(Excel, 1 ligne/ }));
+    expect(download.calls).toHaveLength(1);
+    expect(download.calls[0].name).toBe("comparaison temps supp 2026-11-19.xlsx");
+    const [grid] = await readXlsxSheets(download.calls[0].bytes);
+    expect(grid[0].slice(3, 9)).toEqual(["Chez le client – Britton", "Chez le client – Preuve de temps", "Chez le client – Fiche de travail", "Retour – Britton", "Retour – Preuve de temps", "Retour – Fiche de travail"]);
+    expect(grid[1].slice(0, 3)).toEqual(["2026-11-19", "Alex Un", "OT-111111"]);
+    expect(grid[1][3]).toBe(60); // Britton at the client
+    expect(grid[1][5]).toBe(120); // work sheet at the client (10 h day: 2 h past the line)
+    expect(grid[1][9]).toBe("Britton diffère");
+  });
+
+  it("offers no download when nothing is shown", async () => {
+    setup({ jobs: [], britton: [line("b9", "Autre", "999999", 30, { job_date: DAY })] });
+    fireEvent.change(await screen.findByLabelText("Afficher"), { target: { value: "ok" } });
+    expect(screen.getByRole("button", { name: /Télécharger \(Excel, 0 ligne/ }).disabled).toBe(true);
   });
 });
