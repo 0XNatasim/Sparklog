@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Trash2, TriangleAlert } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Paperclip, Trash2, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { companyDate } from "@/lib/company-time";
 import {
-  MINUTE_EDIT_REASON_MAX, adjustJobTimes, deleteJobAsOwner, fetchEditableJobs, minutesBetweenTimes, setMinuteEditEnabled, timesChanged, useMinuteEditEnabled, validateTimesAdjust,
+  MINUTE_EDIT_REASON_MAX, addProofAsOwner, adjustJobTimes, deleteJobAsOwner, fetchDayProofs, fetchEditableJobs, minutesBetweenTimes, setMinuteEditEnabled, timesChanged, useMinuteEditEnabled, validateTimesAdjust,
 } from "@/lib/minute-edit";
 import { useT } from "@/lib/use-t";
 
@@ -19,7 +19,8 @@ const hhmm = (value) => String(value || "").slice(0, 5);
 const minutesLabel = (minutes) => (minutes == null ? "—" : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`);
 
 // One work sheet of the chosen day: its Départ / Fin to move, a reason, Save.
-function JobRow({ job, onSaved, t }) {
+function JobRow({ job, proofs, dayMinutes, onSaved, t }) {
+  const fileRef = useRef(null);
   const [depart, setDepart] = useState(hhmm(job.depart));
   const [fin, setFin] = useState(hhmm(job.fin));
   const [reason, setReason] = useState("");
@@ -64,6 +65,24 @@ function JobRow({ job, onSaved, t }) {
     }
   }
 
+  async function addProof(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || busy || !reasonOk) return;
+    const ok = await confirm(t("minuteEdit.confirmProof", { ot: job.ot || "—" }));
+    if (!ok) return;
+    setBusy(true);
+    setError("");
+    try {
+      await addProofAsOwner(supabase, { job, file, reason, dailyMinutes: dayMinutes });
+      onSaved(t("minuteEdit.proofAdded"));
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.proof"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-2 rounded-md border p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -80,6 +99,14 @@ function JobRow({ job, onSaved, t }) {
       <div className="grid gap-1">
         <Label htmlFor={`me-r-${job.id}`}>{t("minuteEdit.reason")}</Label>
         <Input id={`me-r-${job.id}`} value={reason} maxLength={MINUTE_EDIT_REASON_MAX} placeholder={t("minuteEdit.reasonPlaceholder")} onChange={(event) => setReason(event.target.value)} disabled={busy} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Paperclip className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <span className={proofs.length ? "" : "text-muted-foreground"}>{proofs.length ? t("minuteEdit.proofCount", { n: proofs.length }) : t("minuteEdit.proofNone")}</span>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" aria-label={t("minuteEdit.proofFile")} onChange={addProof} />
+        <Button type="button" size="sm" variant="outline" className="ml-auto" disabled={busy || !reasonOk} title={reasonOk ? undefined : t("minuteEdit.proofNeedsReason")} onClick={() => fileRef.current?.click()}>
+          {t("minuteEdit.proofAdd")}
+        </Button>
       </div>
       {problems.includes("interval") && <p className="text-xs text-destructive">{t("form.errors.invalidInterval")}</p>}
       {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
@@ -102,7 +129,7 @@ export default function MinuteEditPanel({ people = [] }) {
   const [switching, setSwitching] = useState(false);
   const [employeeId, setEmployeeId] = useState("");
   const [jobDate, setJobDate] = useState(companyDate());
-  const [loaded, setLoaded] = useState({ key: "", rows: [] });
+  const [loaded, setLoaded] = useState({ key: "", rows: [], proofs: [] });
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [reload, setReload] = useState(0);
@@ -110,12 +137,13 @@ export default function MinuteEditPanel({ people = [] }) {
   // What is shown: the sheets of the chosen employee and day once loaded (null while loading or nothing chosen).
   const key = enabled && employeeId && jobDate ? `${employeeId}|${jobDate}|${reload}` : "";
   const jobs = key && loaded.key === key ? loaded.rows : null;
+  const dayMinutes = (jobs || []).reduce((sum, row) => sum + (minutesBetweenTimes(row.depart, row.fin) || 0), 0);
   useEffect(() => {
     if (!key) return undefined;
     let alive = true;
-    fetchEditableJobs(supabase, employeeId, jobDate)
-      .then((rows) => { if (alive) setLoaded({ key, rows }); })
-      .catch((failure) => { if (alive) { setLoaded({ key, rows: [] }); setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.load")); } });
+    Promise.all([fetchEditableJobs(supabase, employeeId, jobDate), fetchDayProofs(supabase, employeeId, jobDate).catch(() => [])])
+      .then(([rows, proofs]) => { if (alive) setLoaded({ key, rows, proofs }); })
+      .catch((failure) => { if (alive) { setLoaded({ key, rows: [], proofs: [] }); setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.load")); } });
     return () => { alive = false; };
   }, [key, employeeId, jobDate, t]);
 
@@ -168,7 +196,7 @@ export default function MinuteEditPanel({ people = [] }) {
             {employeeId && jobs === null && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
             {jobs && jobs.length === 0 && employeeId && <p className="text-sm text-muted-foreground">{t("minuteEdit.none")}</p>}
             {jobs && jobs.map((job) => (
-              <JobRow key={`${job.id}-${job.depart}-${job.fin}`} job={job} t={t} onSaved={(message) => { setInfo(message); setReload((value) => value + 1); }} />
+              <JobRow key={`${job.id}-${job.depart}-${job.fin}-${loaded.proofs.length}`} job={job} proofs={loaded.proofs.filter((proof) => proof.job_id === job.id)} dayMinutes={dayMinutes} t={t} onSaved={(message) => { setInfo(message); setReload((value) => value + 1); }} />
             ))}
           </div>
         )}
