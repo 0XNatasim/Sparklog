@@ -56,6 +56,12 @@ export async function adjustJobTimes(client, { jobId, depart, fin, reason }) {
   return data;
 }
 
+// Deletes the sheet (same switch, same reasons as a change; the sheet is copied into the Journal first).
+export async function deleteJobAsOwner(client, { jobId, reason }) {
+  const { error } = await withTimeout(client.rpc("delete_job_for_employee", { p_job_id: jobId, p_reason: String(reason || "").trim() }), 15000);
+  if (error) throw error;
+}
+
 export async function fetchEditableJobs(client, userId, jobDate) {
   const { data, error } = await withTimeout(client.from("jobs").select("id, ot, depart, arrivee, fin, status, return_time_minutes, job_date")
     .eq("user_id", userId).eq("job_date", jobDate).in("status", EDITABLE_STATUSES).order("depart"), 12000);
