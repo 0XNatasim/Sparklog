@@ -14,11 +14,12 @@ const rpcCalls = [];
 
 const evidence = (id, extra) => ({ id, job_id: "j1", user_id: "u1", job_date: "2026-11-16", created_at: "2026-11-16T22:00:00Z", storage_path: `u1/2026-11-16/${id}.jpg`, ocr_status: "processed", proof_read_at: "2026-11-16T22:01:00Z", ...extra });
 
-function setup(rows, { sendBack = true } = {}) {
+function setup(rows, { sendBack = true, britton = [] } = {}) {
   h.fake = createFakeSupabase({
     tables: {
       overtime_settings: [{ id: true, send_back_enabled: sendBack }],
       overtime_evidence: rows,
+      britton_overtime: britton,
       profiles: [{ id: "u1", full_name: "Alex Test", first_trip_unpaid: false, ten_hour_days: false }],
       jobs: [{ id: "j1", user_id: "u1", job_date: "2026-11-16", updated_at: "2026-11-16T22:00:00Z", status: "submitted", ot: "208637", depart: "06:30", arrivee: "07:00", fin: "17:00", return_time_minutes: 0 }],
     },
@@ -141,5 +142,23 @@ describe("OcrReadings › filtre par jour", () => {
     expect(screen.getAllByText("Alex Test")).toHaveLength(1);
     fireEvent.change(screen.getByLabelText("Jour"), { target: { value: "" } });
     expect(screen.getAllByText("Alex Test")).toHaveLength(2);
+  });
+
+  it("shows the Britton minutes beside the proof and marks a gap with the timesheet (migration 0156)", async () => {
+    const line = (id, extra) => ({ id, job_date: "2026-11-16", ot: "208637", employee_name: "Alex Test", name_key: "alex test", client_minutes: 150, return_minutes: 0, total_minutes: 150, note: null, ...extra });
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })], { britton: [line("b1", { client_minutes: 60 }), line("b2", { ot: "424242", employee_name: "Autre", name_key: "autre" })] });
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    expect(screen.getAllByText("Britton client").length).toBeGreaterThan(0);
+    expect(screen.getByText("60 min").className).toContain("text-destructive"); // 60 at Britton, 150 on the timesheet
+    expect(screen.getByText("Britton sans preuve (1)")).toBeTruthy(); // the line of OT 424242 has no proof
+    fireEvent.change(screen.getByLabelText("Afficher"), { target: { value: "brittonGap" } });
+    expect(screen.getAllByText("Alex Test")).toHaveLength(1);
+  });
+
+  it("shows no Britton column while nothing was imported", async () => {
+    setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    expect(screen.queryByText("Britton client")).toBeNull();
+    expect(screen.getByText("Importer Britton")).toBeTruthy();
   });
 });

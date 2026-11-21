@@ -10,7 +10,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { lazyPanel } from "@/components/lazy-panel";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import BrittonImport from "@/components/manager/BrittonImport";
 import OcrDownload from "@/components/manager/OcrDownload";
+import { attachBritton, fetchBrittonRows } from "@/lib/britton";
 import { proofSheetLines } from "@/lib/ocr-sheet";
 import { OCR_FIRST_DAY, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, ocrDays } from "@/lib/ocr-readings";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
@@ -28,6 +30,7 @@ const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arri
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
+const brittonTitle = (line, t) => t("britton.cellTitle", { name: line.employee_name, total: line.total_minutes, note: line.note || "—" });
 
 async function inChunks(ids, run) {
   const rows = [];
@@ -63,6 +66,9 @@ function JobSummary({ row, t }) {
         {line(t("ocr.col.otRead"), `${row.found.ot ?? "—"} / ${job.ot || "—"}`, row.wrong.has("ot"))}
         {line(t("ocr.preview.clientLine"), `${mins(row.found.clientMinutes)} / ${mins(row.expected?.clientMinutes)}`, row.wrong.has("client"))}
         {line(t("ocr.preview.returnLine"), `${mins(row.found.returnMinutes)} / ${mins(row.expected?.returnMinutes)}`, row.wrong.has("return"))}
+        {row.britton && line(t("britton.previewClient"), `${mins(row.britton.client_minutes)} / ${mins(row.expected?.clientMinutes)}`, row.brittonWrong.has("client"))}
+        {row.britton && line(t("britton.previewReturn"), `${mins(row.britton.return_minutes)} / ${mins(row.expected?.returnMinutes)}`, row.brittonWrong.has("return"))}
+        {row.britton?.note && line(t("britton.note"), row.britton.note)}
       </dl>
     </div>
   );
@@ -70,7 +76,8 @@ function JobSummary({ row, t }) {
 
 export default function OcrReadings() {
   const t = useT();
-  const [rows, setRows] = useState(null);
+  const [baseRows, setRows] = useState(null);
+  const [britton, setBritton] = useState([]); // Britton lines (migration 0156), beside the proofs
   const [error, setError] = useState("");
   const [state, setState] = useState("read");
   const [query, setQuery] = useState("");
@@ -105,7 +112,8 @@ export default function OcrReadings() {
         inChunks(userIds, (part) => supabase.from("profiles").select("id, full_name, first_trip_unpaid, ten_hour_days").in("id", part)),
         inChunks(userIds, (part) => supabase.from("jobs").select(JOB_COLUMNS).in("user_id", part).in("job_date", dates).limit(QUERY_BUDGETS.anomalyApprovedPeers)),
       ]);
-      if (alive) { setRows(buildOcrRows(evidence, jobs, new Map(people.map((person) => [person.id, person])))); setError(""); }
+      const brittonRows = await fetchBrittonRows(supabase, OCR_FIRST_DAY).catch(() => []); // a failure here never hides the proofs
+      if (alive) { setRows(buildOcrRows(evidence, jobs, new Map(people.map((person) => [person.id, person])))); setBritton(brittonRows); setError(""); }
     })().catch((failure) => { if (alive) setError(friendlyErrorMessage(failure, t, "ocr.loadFailed")); });
     return () => { alive = false; };
   }, [t, reload]);
@@ -150,7 +158,10 @@ export default function OcrReadings() {
     }
   }
 
+  const attached = useMemo(() => (baseRows ? attachBritton(baseRows, britton) : null), [baseRows, britton]);
+  const rows = attached ? attached.rows : null;
   const counts = useMemo(() => countOcrStates(rows), [rows]);
+  const brittonGaps = useMemo(() => (rows || []).filter((row) => row.brittonWrong?.size > 0).length, [rows]);
   const shown = useMemo(() => filterOcrRows(rows, { state, query, day }), [rows, state, query, day]);
   const days = useMemo(() => ocrDays(rows), [rows]);
   const waiting = counts.queued;
@@ -212,6 +223,7 @@ export default function OcrReadings() {
               <option value="check">{t("ocr.filter.check")}</option>
               <option value="ok">{t("ocr.filter.ok")}</option>
               <option value="reread">{t("ocr.filter.reread")}</option>
+              {britton.length > 0 && <option value="brittonGap">{t("britton.filterGap", { count: brittonGaps })}</option>}
               <option value="queued">{t("ocr.filter.queued")}</option>
               <option value="notRead">{t("ocr.filter.notRead")}</option>
               <option value="all">{t("ocr.filter.all")}</option>
@@ -236,6 +248,7 @@ export default function OcrReadings() {
                 {t("ocr.rereadEverything", { count: requeueable.length })}
               </Button>
               <OcrDownload rows={rows} />
+              <BrittonImport unmatched={attached?.unmatched || []} count={britton.length} onImported={() => setReload((value) => value + 1)} />
             </div>
           )}
           {notice && <p className="text-sm text-muted-foreground" role="status">{notice}</p>}
@@ -246,7 +259,7 @@ export default function OcrReadings() {
       {rows === null && !error && <p className="py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</p>}
       {rows && (
         <div className="overflow-x-auto rounded-xl border bg-card">
-          <table className="w-full min-w-[56rem] text-left text-sm">
+          <table className="w-full min-w-[64rem] text-left text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">{t("ocr.col.date")}</th>
@@ -257,6 +270,8 @@ export default function OcrReadings() {
                 <th className="px-3 py-2">{t("ocr.col.clientExpected")}</th>
                 <th className="px-3 py-2">{t("ocr.col.returnRead")}</th>
                 <th className="px-3 py-2">{t("ocr.col.returnExpected")}</th>
+                {britton.length > 0 && <th className="px-3 py-2">{t("britton.col.client")}</th>}
+                {britton.length > 0 && <th className="px-3 py-2">{t("britton.col.return")}</th>}
                 <th className="px-3 py-2">{t("ocr.col.result")}</th>
                 <th className="px-3 py-2">{t("ocr.col.readAt")}</th>
                 <th className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
@@ -297,6 +312,12 @@ export default function OcrReadings() {
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.clientMinutes)}</td>
                   {cell(row, "return", row.found.returnMinutes, minutes)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
+                  {britton.length > 0 && (
+                    <td className={`whitespace-nowrap px-3 py-2 ${row.brittonWrong.has("client") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.client_minutes) : "—"}</td>
+                  )}
+                  {britton.length > 0 && (
+                    <td className={`whitespace-nowrap px-3 py-2 ${row.brittonWrong.has("return") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.return_minutes) : "—"}</td>
+                  )}
                   <td className="whitespace-nowrap px-3 py-2">
                     <Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge>
                     {row.notNeeded && <Badge variant="secondary" className="ml-1" title={t("ocr.notNeededHint")}>{t("ocr.notNeeded")}</Badge>}
@@ -328,7 +349,7 @@ export default function OcrReadings() {
                 </tr>
               ))}
               {shown.length === 0 && (
-                <tr><td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">{t("ocr.empty")}</td></tr>
+                <tr><td colSpan={13} className="px-3 py-6 text-center text-muted-foreground">{t("ocr.empty")}</td></tr>
               )}
             </tbody>
           </table>

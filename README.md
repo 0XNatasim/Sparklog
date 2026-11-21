@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.298 (2026-11-21).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.299 (2026-11-21).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.299 — Britton overtime table, compared with Sparklog (migration 0156).** In À traiter › OCR a manager imports the Excel table Britton sends (end time, electrician, company, OT, execution minutes = at the client, return minutes, date, note, total). Each line is shown beside the Sparklog proof of the same day and OT (« Britton client » / « Britton return » columns, gaps in red, filter « Gap with Britton »), and « Britton without a proof » lists the lines Sparklog has no proof for. Importing the same file again updates the lines, never doubles them. Read only: nothing changes a job or a pay.
 - **V2.4.298 — Add the overtime proof of a sheet (same special option, migration 0155).** With « Change the minutes » on, each sheet shows whether it carries an overtime proof and an « Add the proof » button (with the written reason): the owner picks the picture, it is stored in the employee's folder and read by the OCR queue like any proof, and the employee sees it in the History. Kept in the Journal.
 - **V2.4.297 — Delete a sheet (same special option, migration 0154).** With « Change the minutes » on (Advanced › Emergency timesheet) the owner can also delete a saved / to-update / submitted sheet (never approved or exported), with a written reason; the sheet is copied into the Journal first.
 - **V2.4.296 — Overtime proof kept when no longer needed (migration 0153).** When a day falls back to the line (8 h / 10 h) its proofs are no longer deleted: they are marked « Proof not needed » (OCR tab, preview, downloaded sheet) and kept, and the mark goes away if the day passes the line again.

@@ -64,6 +64,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
     if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
     if (state === "check" && row.state !== "mismatch" && row.state !== "wrongDoc" && row.state !== "unread" && row.state !== "failed") return false;
     if (state === "reread" && !canReread(row)) return false;
+    if (state === "brittonGap" && !(row.brittonWrong?.size > 0)) return false; // Britton table (0156): differs from the timesheet
     if (OCR_STATES.includes(state) && row.state !== state) return false;
     if (!needle) return true;
     return `${row.name} ${row.jobOt} ${row.found.ot ?? ""} ${row.jobDate}`.toLowerCase().includes(needle);
