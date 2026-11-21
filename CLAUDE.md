@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.304)
+## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.305)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.305 (technique).** Import Britton : ancien format du 16-18 nov. `COLUMN_TESTS` (`britton.js`) accepte aussi `Prénom Nom` (nom), `Entreprise` (compagnie), `Numéro du OT-XXXXXX` (OT), `client` (chez le client), `Auto` (retour) et `heure total en TS` (total) ; le jour reste la date de « Heure de fin » (jamais la colonne « date »). Limite : deux lignes du même (jour, OT, nom) se réduisent à la dernière (clé unique `britton_overtime`). Aucune migration. Test : `britton.test.js`.
 
 **V2.4.304 (technique).** Tableau comparatif : colonnes regroupées et export Excel. `OtComparison.jsx` : en-tête à deux niveaux — **Chez le client** (Britton · Preuve de temps · Fiche de travail) puis **Retour** (même ordre) — au lieu de trois blocs « client / retour » par source ; un chiffre par cellule (`Num`), en rouge quand la source s'écarte (`entry.red`). Textes : `otc.col.client` / `return` / `note`, `otc.src.britton` / `proof` / `sheet` (remplacent `otc.col.britton` / `form` / `sparklog`), verdict `formGap` = « Preuve diffère », mode « Par OT (Britton · Preuve · Fiche) ». **Bouton « Télécharger (Excel, n lignes) »** : exporte `shown` (les lignes filtrées) — `ot-compare-export.js` (`comparisonTable(entries, t)` : en-têtes `Chez le client – Britton`, `… – Preuve de temps`, `… – Fiche de travail`, puis `Retour – …`, verdict, note Britton ; cellule vide = source absente, jamais 0 ; `{ v, style: "red" }` pour le chiffre qui s'écarte ; `comparisonFileName` : « comparaison temps supp AAAA-MM-JJ au AAAA-MM-JJ.xlsx ») + `xlsx-write.js` (écrivain .xlsx **sans dépendance** : ZIP « stocké » de `zip-store.js`, chaînes `inlineStr`, nombres numériques, styles en-tête / rouge, largeurs, volet figé, filtre automatique, caractères de contrôle retirés, nom de feuille nettoyé ; relu par `readXlsxSheets` dans le test) + `download-file.js` (`downloadFile`, `XLSX_TYPE`). Aucun fichier image, aucune requête de plus. Non vérifié dans Excel lui-même (le fichier est relu par le lecteur de l'app et suit la structure minimale d'un .xlsx). Aucune migration. Tests : `xlsx-write.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`, `OcrReadings.test.jsx`.
 
