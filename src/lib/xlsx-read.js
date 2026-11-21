@@ -116,9 +116,15 @@ function sheetGrid(xml, strings, dates) {
   return Array.from(grid, (row) => row || []);
 }
 
+// A File / Blob or any typed array → Uint8Array.
+export async function fileBytes(file) {
+  if (ArrayBuffer.isView(file)) return new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
+  return new Uint8Array(await file.arrayBuffer());
+}
+
 // `file`: a File / Blob (or bytes). Returns the grids of every sheet, in file order (sheet1, sheet2…). Throws xlsx_invalid / xlsx_unsupported.
 export async function readXlsxSheets(file) {
-  const bytes = file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());
+  const bytes = await fileBytes(file);
   const entries = zipEntries(bytes);
   const names = [...entries.keys()].filter((name) => /^xl\/worksheets\/[^/]+\.xml$/.test(name))
     .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
