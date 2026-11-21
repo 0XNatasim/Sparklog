@@ -1,0 +1,184 @@
+// À traiter › OCR › « Par OT »: for each overtime work order, the three sources side by side — what Britton approved (imported
+// table, 0156), what the employee wrote on the request form (the proof screenshot, read by OCR) and what the Sparklog
+// timesheet says — with one verdict, so a manager sees at once what needs attention. Read only; pure logic + two loaders.
+import { PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN, expectedProofForJob, otDigits } from "./overtime-proof-check";
+import { DAILY_REGULAR_MINUTES, TEN_HOUR_DAY_MINUTES, dayFirstTripUnpaidMinutes, minutesBetween } from "./payroll-calculations";
+import { byDepart, overtimeLineJobIds } from "./overtime-proof-rules";
+import { nameKey } from "./britton";
+import { fetchAllRows } from "./fetch-all";
+import { QUERY_BUDGETS } from "./query-budgets";
+import { withTimeout } from "./utils";
+
+// Worst first. missingSparklog: Britton approved it, Sparklog has no such work order that day. missingBritton: Sparklog has the
+// overtime, Britton has no line (minutes we are not reimbursed for). brittonGap: Britton and the timesheet disagree.
+// formGap: Britton and the timesheet agree, the form says something else. noProof: they agree but no proof was sent. ok: all agree.
+export const VERDICTS = ["missingSparklog", "missingBritton", "brittonGap", "formGap", "noProof", "ok"];
+const RANK = Object.fromEntries(VERDICTS.map((verdict, index) => [verdict, index]));
+const FIELDS = ["client", "return"];
+const TOLERANCE = { client: PROOF_CLIENT_TOLERANCE_MIN, return: PROOF_RETURN_TOLERANCE_MIN };
+const near = (a, b, field) => Math.abs(a - b) <= TOLERANCE[field];
+const day = (value) => String(value ?? "").slice(0, 10);
+const READ_STATES = new Set(["ok", "mismatch"]);
+
+// Per field, which sources are the odd one out: a source is red when it disagrees with at least one other source and agrees with
+// fewer of them than the best-agreeing source does (two sources that differ are both red).
+function oddOnes(values, field) {
+  const present = Object.entries(values).filter(([, value]) => value && value[field] != null);
+  if (present.length < 2) return [];
+  const agree = present.map(([, value]) => present.filter(([, other]) => other !== value && near(value[field], other[field], field)).length);
+  if (agree.every((count) => count === present.length - 1)) return []; // everybody agrees with everybody
+  const best = Math.max(...agree);
+  return present.filter((_, index) => (best === 0 ? true : agree[index] < best)).map(([source]) => source);
+}
+
+// `proofRows`: rows of buildOcrRows (the proofs); `britton`: lines of britton_overtime; `jobs`: the work orders of the Britton days
+// (all employees); `people`: Map of user id -> { full_name, first_trip_unpaid, ten_hour_days }. Only days that have at least one
+// Britton line are compared (on a day Britton did not send, every overtime would look « missing »).
+export function buildOtComparison({ proofRows = [], britton = [], jobs = [], people = new Map() }) {
+  const days = new Set(britton.map((line) => day(line.job_date)));
+  const byDay = new Map();
+  for (const job of jobs) {
+    if (!days.has(day(job.job_date)) || !job.user_id) continue;
+    const key = `${job.user_id}|${day(job.job_date)}`;
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(job);
+  }
+
+  const entries = new Map();
+  const jobInfo = new Map();
+  const ensure = (key, base) => {
+    if (!entries.has(key)) entries.set(key, { key, proofs: [], britton: null, ...base });
+    return entries.get(key);
+  };
+
+  // 1. Sparklog: the work orders past the line of each employee-day, with what the timesheet says they should read.
+  for (const [key, dayJobs] of byDay) {
+    const [userId, jobDate] = key.split("|");
+    const person = people.get(userId) || null;
+    const options = { firstTripUnpaid: Boolean(person?.first_trip_unpaid), tenHourDay: Boolean(person?.ten_hour_days) };
+    const sorted = dayJobs.filter((job) => job.depart && job.fin).sort(byDepart);
+    const lineIds = overtimeLineJobIds(sorted, {
+      minutesOf: (job) => minutesBetween(job.depart, job.fin) - (Number(job.return_time_minutes) || 0),
+      thresholdMinutes: options.tenHourDay ? TEN_HOUR_DAY_MINUTES : DAILY_REGULAR_MINUTES,
+      unpaidTripMinutes: options.firstTripUnpaid ? dayFirstTripUnpaidMinutes(sorted) : 0,
+    });
+    for (const job of dayJobs) {
+      const info = { job, userId, jobDate, name: (person?.full_name || "").trim(), expected: expectedProofForJob(dayJobs, job, options) };
+      jobInfo.set(job.id, info);
+      if (lineIds.has(job.id)) ensure(`job:${job.id}`, { userId, jobDate, name: info.name, job, expected: info.expected });
+    }
+  }
+
+  // 2. The proofs (form captures), each on its own work order.
+  for (const row of proofRows) {
+    if (!days.has(day(row.jobDate))) continue;
+    const info = jobInfo.get(row.jobId);
+    const entry = info
+      ? ensure(`job:${row.jobId}`, { userId: info.userId, jobDate: info.jobDate, name: info.name, job: info.job, expected: info.expected })
+      : ensure(`proof:${row.id}`, { userId: row.userId, jobDate: day(row.jobDate), name: row.name, job: row.job || null, expected: row.expected || null });
+    entry.proofs.push(row);
+  }
+
+  // 3. Britton lines: same day and OT; the same name wins when several entries share them. A work order UNDER the line that a
+  // Britton line points at joins the comparison too (Britton approved minutes the timesheet does not count as overtime); one that
+  // no line ends up on is dropped again.
+  for (const line of britton) {
+    for (const info of jobInfo.values()) {
+      if (info.jobDate === day(line.job_date) && otDigits(info.job.ot) === line.ot) ensure(`job:${info.job.id}`, { userId: info.userId, jobDate: info.jobDate, name: info.name, job: info.job, expected: info.expected, weak: !entries.has(`job:${info.job.id}`) });
+    }
+  }
+  const index = new Map();
+  for (const entry of entries.values()) {
+    const ot = otDigits(entry.job?.ot) || otDigits(entry.proofs[0]?.jobOt) || otDigits(entry.proofs[0]?.found?.ot);
+    entry.ot = ot;
+    if (!ot) continue;
+    const key = `${entry.jobDate}|${ot}`;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(entry);
+  }
+  const lines = [...britton].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const leftover = [];
+  for (const line of lines) {
+    const candidates = (index.get(`${day(line.job_date)}|${line.ot}`) || []).filter((entry) => !entry.britton);
+    const named = candidates.find((entry) => nameKey(entry.name) === line.name_key);
+    if (named) named.britton = line; else leftover.push(line);
+  }
+  const unmatched = [];
+  for (const line of leftover) {
+    const candidates = (index.get(`${day(line.job_date)}|${line.ot}`) || []).filter((entry) => !entry.britton);
+    const sameKey = leftover.filter((other) => day(other.job_date) === day(line.job_date) && other.ot === line.ot);
+    if (candidates.length === 1 && sameKey.length === 1) candidates[0].britton = line; // names differ (spelling), day and OT agree
+    else unmatched.push(line);
+  }
+  for (const [key, entry] of entries) if (entry.weak && !entry.britton) entries.delete(key);
+  for (const line of unmatched) {
+    entries.set(`britton:${line.id}`, { key: `britton:${line.id}`, proofs: [], britton: line, userId: null, jobDate: day(line.job_date), name: line.employee_name, job: null, expected: null, ot: line.ot });
+  }
+
+  // 4. Values, odd ones out and verdict.
+  const out = [];
+  for (const entry of entries.values()) {
+    const proofs = [...entry.proofs].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    const read = proofs.find((row) => READ_STATES.has(row.state) && (row.found?.clientMinutes != null || row.found?.returnMinutes != null));
+    const sparklog = entry.job && entry.expected ? { client: entry.expected.clientMinutes, return: entry.expected.returnMinutes } : null;
+    const brittonValues = entry.britton ? { client: entry.britton.client_minutes, return: entry.britton.return_minutes } : null;
+    const form = read ? { client: read.found.clientMinutes ?? null, return: read.found.returnMinutes ?? null } : null;
+    const values = { britton: brittonValues, form, sparklog };
+    const red = { britton: new Set(), form: new Set(), sparklog: new Set() };
+    for (const field of FIELDS) for (const source of oddOnes(values, field)) red[source].add(field);
+
+    let verdict;
+    if (!sparklog) verdict = "missingSparklog";
+    else if (!brittonValues) verdict = "missingBritton";
+    else if (FIELDS.some((field) => !near(brittonValues[field], sparklog[field], field))) verdict = "brittonGap";
+    else if (form && FIELDS.some((field) => form[field] != null && !near(form[field], sparklog[field], field))) verdict = "formGap";
+    else if (proofs.length === 0) verdict = "noProof";
+    else verdict = "ok";
+
+    out.push({ ...entry, proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
+  }
+  return out.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || RANK[a.verdict] - RANK[b.verdict] || String(a.name).localeCompare(String(b.name)) || String(a.ot).localeCompare(String(b.ot)));
+}
+
+export function countVerdicts(entries) {
+  const counts = Object.fromEntries(VERDICTS.map((verdict) => [verdict, 0]));
+  for (const entry of entries || []) counts[entry.verdict] += 1;
+  return counts;
+}
+
+// `verdict`: "all" | "attention" (everything but ok) | one of VERDICTS. `day`: "" or YYYY-MM-DD.
+export function filterComparison(entries, { verdict = "attention", day: dayFilter = "", query = "" } = {}) {
+  const needle = String(query || "").trim().toLowerCase();
+  return (entries || []).filter((entry) => {
+    if (dayFilter && entry.jobDate !== dayFilter) return false;
+    if (verdict === "attention" && entry.verdict === "ok") return false;
+    if (VERDICTS.includes(verdict) && entry.verdict !== verdict) return false;
+    return !needle || `${entry.name} ${entry.ot} ${entry.jobOt}`.toLowerCase().includes(needle);
+  });
+}
+
+// The work dates that have Britton lines (from the first OCR day on), most recent first.
+export const brittonDays = (britton) => [...new Set((britton || []).map((line) => day(line.job_date)))].sort().reverse();
+
+const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
+const JOB_STATUSES = ["saved", "updated", "submitted", "approved"];
+
+// The work orders of every employee on those days (paged) and the profiles they belong to.
+export async function fetchComparisonData(client, days) {
+  if (!days.length) return { jobs: [], people: new Map(), truncated: false };
+  const { data, error, truncated } = await fetchAllRows(
+    () => client.from("jobs").select(JOB_COLUMNS).in("job_date", days).in("status", JOB_STATUSES).order("id"),
+    { maxRows: QUERY_BUDGETS.otComparisonJobs },
+  );
+  if (error) throw error;
+  const jobs = data || [];
+  const ids = [...new Set(jobs.map((job) => job.user_id).filter(Boolean))];
+  const people = new Map();
+  for (let i = 0; i < ids.length; i += QUERY_BUDGETS.inListChunk) {
+    const { data: part, error: peopleError } = await withTimeout(
+      client.from("profiles").select("id, full_name, first_trip_unpaid, ten_hour_days").in("id", ids.slice(i, i + QUERY_BUDGETS.inListChunk)), 12000);
+    if (peopleError) throw peopleError;
+    for (const person of part || []) people.set(person.id, person);
+  }
+  return { jobs, people, truncated: Boolean(truncated) };
+}
