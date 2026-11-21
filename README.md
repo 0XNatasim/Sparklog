@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.303 (2026-11-21).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.304 (2026-11-21).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.304 — Comparison table: columns grouped, downloadable.** In À traiter › OCR › « By OT », the columns are now grouped by what they measure: **at the client** (Britton → time proof → work sheet) then **return** (same order), both in the app and in the file. New button « Download (Excel) »: the lines shown (current filters), as an .xlsx table without any picture, with the odd figure in red, a frozen header and a filter. « Form » is now called « Time proof » and the Sparklog timesheet « Work sheet » on this screen.
 - **V2.4.303 — Britton import: the day is the end time's day.** The « Date » / « Date installation » column of the Britton table is the date the form was submitted: it is no longer read. The day of a line is the date of its « Heure de fin » (that column is now the one required). A Britton line goes with the Sparklog work order of the same OT whose day is the line's day or up to two days before (a form filled the next morning or after a week-end). Lines already imported are read with the date of their stored end time: no re-import needed (a re-import of the same line replaces it, never doubles it). The line that had no installation date is now read.
 - **V2.4.302 — Overtime compared per OT: Britton · Form · Sparklog.** Once a Britton table is imported, À traiter › OCR gets a second view, « By OT »: one line per overtime work order with the minutes « at the client / return » of the three sources (what Britton approved, what the employee wrote on the request form, what the Sparklog timesheet says) and one verdict — all agree, no proof, form differs, Britton differs, not at Britton (overtime in Sparklog with no Britton line), not in Sparklog (Britton line with no such work order). The odd figure is in red; the default filter shows only what needs checking. Only the days Britton sent. Read only.
 - **V2.4.301 — Britton import: the real titles are recognised.** The work-date column of the real file is « Date installation » (the import only knew « Date »): it now accepts « Date » and « Date … » (not « Date de fin »). When the columns are not found, the message now lists which ones are missing. Checked against the real 19-20 November table: header found, 38 lines read, the line without an installation date listed as skipped.

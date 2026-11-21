@@ -162,12 +162,12 @@ describe("OcrReadings › filtre par jour", () => {
     expect(screen.getByText("Importer Britton")).toBeTruthy();
   });
 
-  it("switches to the per-OT comparison (Britton · Form · Sparklog) once a Britton table was imported", async () => {
+  it("switches to the per-OT comparison (Britton · Proof · Sheet) once a Britton table was imported", async () => {
     const britton = [{ id: "b1", job_date: "2026-11-16", ot: "208637", employee_name: "Alex Test", name_key: "alex test", client_minutes: 150, return_minutes: 0, total_minutes: 150, note: null }];
     setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })], { britton });
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
-    fireEvent.click(screen.getByRole("button", { name: "Par OT (Britton · Form · Sparklog)" }));
-    expect(await screen.findByText("Temps supplémentaire comparé : Britton · Form · Sparklog")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Par OT (Britton · Preuve · Fiche)" }));
+    expect(await screen.findByText("Temps supplémentaire comparé : Britton · Preuve de temps · Fiche de travail")).toBeTruthy();
     expect(screen.queryByLabelText("Afficher")?.tagName).not.toBe(undefined); // the comparison has its own filter
     fireEvent.click(screen.getByRole("button", { name: "Par preuve" }));
     expect(await screen.findByText("Conforme")).toBeTruthy();

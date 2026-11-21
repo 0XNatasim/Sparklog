@@ -1,29 +1,33 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
-import { Eye } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { downloadFile, XLSX_TYPE } from "@/lib/download-file";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { OCR_FIRST_DAY } from "@/lib/ocr-readings";
+import { COMPARISON_WIDTHS, comparisonFileName, comparisonTable } from "@/lib/ot-compare-export";
 import { VERDICTS, brittonDays, buildOtComparison, comparisonDays, countVerdicts, fetchComparisonData, filterComparison } from "@/lib/ot-compare";
+import { buildXlsx } from "@/lib/xlsx-write";
 import { useT } from "@/lib/use-t";
 import { supabase } from "@/supabaseClient";
 
 const BADGE = { ok: "success", noProof: "secondary", formGap: "warning", brittonGap: "destructive", missingBritton: "destructive", missingSparklog: "destructive" };
 
-// Two numbers « client / retour », each in red when that source is the odd one out for that field.
-function Pair({ values, red, t }) {
-  if (!values) return <span className="text-muted-foreground">—</span>;
-  const cell = (field, value) => (
-    <span className={red.has(field) ? "font-bold text-destructive" : ""}>{value == null ? "—" : value}</span>
-  );
-  return <span title={t("otc.pairTitle")}>{cell("client", values.client)} <span className="text-muted-foreground">/</span> {cell("return", values.return)}</span>;
+// One figure, in red when this source is the odd one out for that field.
+function Num({ values, field, red }) {
+  if (!values || values[field] == null) return <span className="text-muted-foreground">—</span>;
+  return <span className={red.has(field) ? "font-bold text-destructive" : ""}>{values[field]}</span>;
 }
+
+// The columns, grouped by what they measure: « chez le client » (Britton → preuve de temps → fiche de travail), then « retour ».
+const FIELD_GROUPS = [["client", "otc.col.client"], ["return", "otc.col.return"]];
+const SOURCE_COLUMNS = [["britton", "otc.src.britton"], ["form", "otc.src.proof"], ["sparklog", "otc.src.sheet"]];
 
 // À traiter › OCR › « Par OT »: Britton · form · Sparklog side by side for each overtime work order, with one verdict.
 export default function OtComparison({ britton, proofRows, onView }) {
@@ -53,6 +57,11 @@ export default function OtComparison({ britton, proofRows, onView }) {
   const shown = useMemo(() => filterComparison(entries, { verdict, day, query }), [entries, verdict, day, query]);
   const dayOptions = useMemo(() => [...new Set(entries.map((entry) => entry.jobDate))].sort().reverse(), [entries]);
   const attention = entries.length - counts.ok;
+  function download() {
+    if (shown.length === 0) return;
+    const { header, rows } = comparisonTable(shown, t);
+    downloadFile(buildXlsx({ rows: [header, ...rows], widths: COMPARISON_WIDTHS, sheetName: t("otc.sheetName") }), comparisonFileName(shown), XLSX_TYPE);
+  }
   const timesheetLink = (entry) => `/manager/v3/time?tab=timesheets&emp=${entry.userId}&date=${entry.jobDate}${entry.job ? `&job=${entry.job.id}` : ""}`;
 
   return (
@@ -80,6 +89,13 @@ export default function OtComparison({ britton, proofRows, onView }) {
             </Select>
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("ocr.search")} aria-label={t("ocr.search")} />
           </div>
+          {loaded && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" variant="outline" disabled={shown.length === 0} onClick={download} title={t("otc.downloadHint")}>
+                <Download className="mr-1 h-4 w-4" aria-hidden="true" />{t("otc.download", { count: shown.length })}
+              </Button>
+            </div>
+          )}
           {data.truncated && <p className="text-sm text-muted-foreground" role="status">{t("otc.truncated")}</p>}
           {error && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>}
         </CardContent>
@@ -89,17 +105,20 @@ export default function OtComparison({ britton, proofRows, onView }) {
       {days.length > 0 && !loaded && !error && <p className="py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</p>}
       {loaded && (
         <div className="overflow-x-auto rounded-xl border bg-card">
-          <table className="w-full min-w-[52rem] text-left text-sm">
+          <table className="w-full min-w-[60rem] text-left text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-3 py-2">{t("ocr.col.date")}</th>
-                <th className="px-3 py-2">{t("ocr.col.employee")}</th>
-                <th className="px-3 py-2">{t("ocr.col.jobOt")}</th>
-                <th className="px-3 py-2">{t("otc.col.britton")}</th>
-                <th className="px-3 py-2">{t("otc.col.form")}</th>
-                <th className="px-3 py-2">{t("otc.col.sparklog")}</th>
-                <th className="px-3 py-2">{t("ocr.col.result")}</th>
-                <th className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.date")}</th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.employee")}</th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.jobOt")}</th>
+                {FIELD_GROUPS.map(([field, labelKey]) => <th key={field} colSpan={3} className="border-l px-3 py-2 text-center">{t(labelKey)}</th>)}
+                <th rowSpan={2} className="border-l px-3 py-2 align-bottom">{t("ocr.col.result")}</th>
+                <th rowSpan={2} className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
+              </tr>
+              <tr>
+                {FIELD_GROUPS.flatMap(([field]) => SOURCE_COLUMNS.map(([source, labelKey], index) => (
+                  <th key={`${field}-${source}`} className={`px-3 py-1 text-center normal-case ${index === 0 ? "border-l" : ""}`}>{t(labelKey)}</th>
+                )))}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -115,10 +134,12 @@ export default function OtComparison({ britton, proofRows, onView }) {
                     ) : (entry.name || "—")}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">{entry.jobOt || entry.ot || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2" title={entry.britton?.note || undefined}><Pair values={entry.brittonValues} red={entry.red.britton} t={t} /></td>
-                  <td className="whitespace-nowrap px-3 py-2"><Pair values={entry.form} red={entry.red.form} t={t} /></td>
-                  <td className="whitespace-nowrap px-3 py-2"><Pair values={entry.sparklog} red={entry.red.sparklog} t={t} /></td>
-                  <td className="whitespace-nowrap px-3 py-2"><Badge variant={BADGE[entry.verdict]} title={t(`otc.hint.${entry.verdict}`)}>{t(`otc.verdict.${entry.verdict}`)}</Badge></td>
+                  {FIELD_GROUPS.flatMap(([field]) => SOURCE_COLUMNS.map(([source], index) => (
+                    <td key={`${field}-${source}`} className={`whitespace-nowrap px-3 py-2 text-center ${index === 0 ? "border-l" : ""}`} title={source === "britton" ? entry.britton?.note || undefined : undefined}>
+                      <Num values={source === "britton" ? entry.brittonValues : entry[source]} field={field} red={entry.red[source]} />
+                    </td>
+                  )))}
+                  <td className="whitespace-nowrap border-l px-3 py-2"><Badge variant={BADGE[entry.verdict]} title={t(`otc.hint.${entry.verdict}`)}>{t(`otc.verdict.${entry.verdict}`)}</Badge></td>
                   <td className="px-3 py-2">
                     {entry.proof?.storagePath && (
                       <Button type="button" size="sm" variant="outline" onClick={() => onView?.(entry.proof)} aria-label={t("ocr.view")} title={t("ocr.view")}><Eye className="h-4 w-4" aria-hidden="true" /></Button>
@@ -126,7 +147,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
                   </td>
                 </tr>
               ))}
-              {shown.length === 0 && <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">{t("otc.empty")}</td></tr>}
+              {shown.length === 0 && <tr><td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">{t("otc.empty")}</td></tr>}
             </tbody>
           </table>
         </div>
