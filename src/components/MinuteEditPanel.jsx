@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { TriangleAlert } from "lucide-react";
+import { Trash2, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { companyDate } from "@/lib/company-time";
 import {
-  MINUTE_EDIT_REASON_MAX, adjustJobTimes, fetchEditableJobs, minutesBetweenTimes, setMinuteEditEnabled, timesChanged, useMinuteEditEnabled, validateTimesAdjust,
+  MINUTE_EDIT_REASON_MAX, adjustJobTimes, deleteJobAsOwner, fetchEditableJobs, minutesBetweenTimes, setMinuteEditEnabled, timesChanged, useMinuteEditEnabled, validateTimesAdjust,
 } from "@/lib/minute-edit";
 import { useT } from "@/lib/use-t";
 
@@ -39,9 +39,26 @@ function JobRow({ job, onSaved, t }) {
     setError("");
     try {
       await adjustJobTimes(supabase, { jobId: job.id, depart, fin, reason });
-      onSaved();
+      onSaved(t("minuteEdit.saved"));
     } catch (failure) {
       setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.save"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const reasonOk = !problems.includes("reason");
+  async function remove() {
+    if (busy || !reasonOk) return;
+    const ok = await confirm(t("minuteEdit.confirmDelete", { ot: job.ot || "—", when: `${hhmm(job.depart)} → ${hhmm(job.fin)}` }));
+    if (!ok) return;
+    setBusy(true);
+    setError("");
+    try {
+      await deleteJobAsOwner(supabase, { jobId: job.id, reason });
+      onSaved(t("minuteEdit.deleted"));
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.delete"));
     } finally {
       setBusy(false);
     }
@@ -66,7 +83,12 @@ function JobRow({ job, onSaved, t }) {
       </div>
       {problems.includes("interval") && <p className="text-xs text-destructive">{t("form.errors.invalidInterval")}</p>}
       {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
-      <Button type="button" size="sm" disabled={busy || !changed || problems.length > 0} onClick={save}>{busy ? t("common.saving") : t("minuteEdit.save")}</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" disabled={busy || !changed || problems.length > 0} onClick={save}>{busy ? t("common.saving") : t("minuteEdit.save")}</Button>
+        <Button type="button" size="sm" variant="destructive" className="ml-auto" disabled={busy || !reasonOk} onClick={remove}>
+          <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />{t("minuteEdit.delete")}
+        </Button>
+      </div>
       {confirmDialog}
     </div>
   );
@@ -146,7 +168,7 @@ export default function MinuteEditPanel({ people = [] }) {
             {employeeId && jobs === null && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
             {jobs && jobs.length === 0 && employeeId && <p className="text-sm text-muted-foreground">{t("minuteEdit.none")}</p>}
             {jobs && jobs.map((job) => (
-              <JobRow key={`${job.id}-${job.depart}-${job.fin}`} job={job} t={t} onSaved={() => { setInfo(t("minuteEdit.saved")); setReload((value) => value + 1); }} />
+              <JobRow key={`${job.id}-${job.depart}-${job.fin}`} job={job} t={t} onSaved={(message) => { setInfo(message); setReload((value) => value + 1); }} />
             ))}
           </div>
         )}

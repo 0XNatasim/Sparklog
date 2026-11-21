@@ -45,4 +45,19 @@ describe("MinuteEditPanel", () => {
     const call = state.fake.calls.find((entry) => entry.rpc === "adjust_job_times_for_employee");
     expect(call.args).toMatchObject({ p_job_id: "j1", p_depart: "07:00", p_fin: "15:00", p_reason: "3 minutes de temps supp." });
   });
+
+  it("deletes a sheet with a reason, after a confirmation", async () => {
+    setup(true);
+    await screen.findByText("Désactiver");
+    fireEvent.change(screen.getByLabelText("Employé"), { target: { value: "e1" } });
+    await screen.findByLabelText("Départ");
+    const remove = screen.getByText("Supprimer la fiche").closest("button");
+    expect(remove.disabled).toBe(true); // no reason yet
+    fireEvent.change(screen.getByLabelText("Raison (gardée au Journal)"), { target: { value: "fiche en double" } });
+    expect(remove.disabled).toBe(false);
+    fireEvent.click(remove);
+    fireEvent.click(await screen.findByRole("button", { name: /confirmer|oui|ok/i }));
+    await waitFor(() => expect(state.fake.calls.some((call) => call.rpc === "delete_job_for_employee")).toBe(true));
+    expect(state.fake.calls.find((call) => call.rpc === "delete_job_for_employee").args).toEqual({ p_job_id: "j1", p_reason: "fiche en double" });
+  });
 });

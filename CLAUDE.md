@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.296)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.297)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.297 (technique).** Supprimer une fiche avec l'option « Modifier les minutes ». Migration 0154 : `delete_job_for_employee(p_job_id, p_reason)` (`security definer`, `is_privileged()`, même interrupteur `minute_edit_enabled` que 0152 sinon `minute_edit_disabled`, raison 3–500 caractères, fiche `saved` / `updated` / `submitted` et pas `exported_to_sheet` sinon `job_not_editable`, verrou par employé) : la fiche est copiée dans `audit_log` (`job_deleted_by_owner` : date, OT, heures, km, état, raison) **avant** le `delete`. Le reste suit les règles existantes : preuves de temps supp. passées sur une autre fiche du jour par `rehome_overtime_evidence_before_job_delete` (0068), sinon supprimées avec la fiche ; souper, reçus de stationnement, notes de contremaître, notifications et `job_entry_sources` partent en cascade ; 0153 réévalue la journée (preuves gardées, marquées inutiles). App : `deleteJobAsOwner` (`minute-edit.js`), bouton « Supprimer la fiche » dans chaque ligne de `MinuteEditPanel.jsx` (raison obligatoire, confirmation). **Appliquer la migration 0154.** Tests : `minute-edit.test.js` (dont verrou du SQL), `MinuteEditPanel.test.jsx`.
 
 **V2.4.296 (technique).** Preuve gardée quand elle devient inutile. Migration 0153 : `overtime_evidence.not_needed_at` ; `reconcile_overtime_evidence` (0068) ne supprime plus les preuves d'une journée repassée à 480 min ou moins : elle pose `not_needed_at` (premier passage) et le remet à null si la journée repasse au-dessus ; le drapeau `overtime_evidence_captured` des fiches n'est plus remis à faux ; trigger `overtime_evidence_clear_not_needed` (avant insertion : le navigateur ne marque jamais) ; rattrapage des preuves de journées déjà sous la ligne. `OcrReadings.jsx` lit `not_needed_at` (repli sans la colonne tant que la 0153 n'est pas appliquée), `buildOcrRows` : `notNeeded`, badge « Preuve inutile » (`ocr.notNeeded`) et ligne de l'aperçu / de l'image (`ocr-sheet.js`). Limite connue : `reconcile_overtime_evidence` compare toujours à 480 min (pas 600 pour « 4 jours de 10 h »). Tests : `overtime-proof-kept.test.js`. **Appliquer la 0153 avec la 0152.**
 

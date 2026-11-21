@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createFakeSupabase } from "@/test/fake-supabase";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
-const { adjustJobTimes, fetchMinuteEditEnabled, minutesBetweenTimes, timesChanged, validateTimesAdjust } = await import("./minute-edit");
+const { adjustJobTimes, deleteJobAsOwner, fetchMinuteEditEnabled, minutesBetweenTimes, timesChanged, validateTimesAdjust } = await import("./minute-edit");
 
 describe("minute-edit", () => {
   it("counts the minutes between two times, a Fin before the Départ being the next day", () => {
@@ -52,5 +52,23 @@ describe("migration 0152 (source lock)", () => {
     expect(sql).toMatch(/minute_edit_reason_required/);
     expect(sql).toMatch(/overlapping_job_interval/);
     expect(sql).toMatch(/revoke all on function public\.adjust_job_times_for_employee\(uuid, time, time, text\) from public, anon/);
+  });
+});
+
+describe("delete a sheet (migration 0154)", () => {
+  it("calls the owner-only RPC with the trimmed reason", async () => {
+    const fake = createFakeSupabase({ rpcs: { delete_job_for_employee: null } });
+    await deleteJobAsOwner(fake.client, { jobId: "j1", reason: "  doublon  " });
+    expect(fake.calls.find((call) => call.rpc === "delete_job_for_employee").args).toEqual({ p_job_id: "j1", p_reason: "doublon" });
+  });
+  const sql = readFileSync(new URL("../../supabase/migrations/20261121150000_0154_owner_delete_job.sql", import.meta.url), "utf8");
+  it("is owner-only, behind the same switch, needs a reason, spares approved / exported sheets and audits before deleting", () => {
+    expect(sql).toMatch(/not public\.is_privileged\(\)/);
+    expect(sql).toMatch(/minute_edit_disabled/);
+    expect(sql).toMatch(/minute_edit_reason_required/);
+    expect(sql).toMatch(/status not in \('saved', 'updated', 'submitted'\)/);
+    expect(sql).toMatch(/exported_to_sheet/);
+    expect(sql.indexOf("job_deleted_by_owner")).toBeLessThan(sql.indexOf("delete from public.jobs"));
+    expect(sql).toMatch(/revoke all on function public\.delete_job_for_employee\(uuid, text\) from public, anon/);
   });
 });
