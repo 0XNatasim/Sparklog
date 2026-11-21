@@ -120,6 +120,37 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     entries.set(`britton:${line.id}`, { key: `britton:${line.id}`, proofs: [], britton: line, userId: null, jobDate: day(line.job_date), name: line.employee_name, job: null, expected: null, ot: line.ot });
   }
 
+  // Why a line may not match, so a manager sees it at a glance: the OT was done the day(s) before, the employee has the OT on another
+  // day, the OT number looks wrong (the employee's other OT of those days are listed), or the other side has a line for the same person.
+  const infosByName = new Map();
+  for (const info of jobInfo.values()) {
+    const key = nameKey(info.name);
+    if (!key) continue;
+    if (!infosByName.has(key)) infosByName.set(key, []);
+    infosByName.get(key).push(info);
+  }
+  const unmatchedByName = new Map();
+  for (const line of unmatched) unmatchedByName.set(line.name_key, [...(unmatchedByName.get(line.name_key) || []), line]);
+  const remarkOf = (entry) => {
+    if (entry.britton && entry.job) {
+      const lag = dayDiff(entry.jobDate, day(entry.britton.job_date));
+      return lag > 0 ? { kind: "earlier", days: lag } : null;
+    }
+    if (entry.britton) { // a Britton line no work order matches
+      const line = entry.britton;
+      const theirs = infosByName.get(line.name_key) || [];
+      const elsewhere = theirs.find((info) => otDigits(info.job.ot) === line.ot);
+      if (elsewhere) return { kind: "otOtherDay", day: elsewhere.jobDate };
+      const nearby = [...new Set(theirs.filter((info) => inWindow(line, info.jobDate)).map((info) => String(info.job.ot || "").trim()).filter(Boolean))];
+      return nearby.length ? { kind: "wrongOt", ots: nearby.slice(0, 6) } : { kind: "noSheet" };
+    }
+    if (entry.job && !entry.britton) { // a timesheet overtime Britton has no line for, while Britton has a line for the same person nearby
+      const lines = (unmatchedByName.get(nameKey(entry.name)) || []).filter((line) => inWindow(line, entry.jobDate));
+      return lines.length ? { kind: "brittonOt", ots: [...new Set(lines.map((line) => line.ot))].slice(0, 6) } : null;
+    }
+    return null;
+  };
+
   // 4. Values, odd ones out and verdict.
   const out = [];
   for (const entry of entries.values()) {
@@ -140,7 +171,7 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     else if (proofs.length === 0) verdict = "noProof";
     else verdict = "ok";
 
-    out.push({ ...entry, brittonDay: entry.britton ? day(entry.britton.job_date) : "", proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
+    out.push({ ...entry, brittonDay: entry.britton ? day(entry.britton.job_date) : "", remark: remarkOf(entry), proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
   }
   return out.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || RANK[a.verdict] - RANK[b.verdict] || String(a.name).localeCompare(String(b.name)) || String(a.ot).localeCompare(String(b.ot)));
 }

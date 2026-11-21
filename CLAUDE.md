@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.306)
+## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.307)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.307 (technique).** Comparaison par OT : `remark` sur chaque entrée (`remarkOf` dans `buildOtComparison`) — `earlier` (ligne Britton qui finit N jours après la fiche), `otOtherDay` (ligne Britton sans fiche dans la fenêtre mais le même employé a cet OT un autre jour lu), `wrongOt` (ligne Britton sans fiche : ses OT de la fenêtre listés), `noSheet` (aucune fiche de cette personne), `brittonOt` (fiche en temps supp. sans ligne alors que Britton a une ligne non rapprochée de la même personne : ses OT). Personnes liées par `nameKey`. Jamais de rapprochement par déduction : indice seulement. `remarkText(entry, t)` (`ot-compare-export.js`), textes `otc.remark.*` / `otc.col.remark`, colonne « Remarque » ajoutée au fichier Excel (`COMPARISON_WIDTHS` à 12 colonnes). Aucune migration. Tests : `ot-compare.test.js`, `ot-compare-export.test.js`.
 
 **V2.4.306 (technique).** Comparaison par OT : `buildOtComparison` ajoute `brittonDay` (jour de fin de la ligne Britton rapprochée) ; `filterComparison({ day })` accepte `jobDate` **ou** `brittonDay` ; `OtComparison.jsx` : menu « Jour » = jours des fiches + jours de fin Britton, sous-ligne `otc.brittonEnds` dans la colonne Date quand ils diffèrent. Constat (2026-11-21) : une ligne Britton du 20 (OT fait le 19) était rangée sous le 19 seulement. Aucune migration. Test : `ot-compare.test.js`.
 

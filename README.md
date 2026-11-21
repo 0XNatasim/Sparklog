@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.306 (2026-11-21).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.307 (2026-11-21).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.307 — Comparison table: a « Remark » that says why a line does not match.** « OT done N day(s) before Britton's end date »; « this employee has this OT on another day »; « no such OT for this person: their OT in Sparklog are … — wrong OT number? »; « Britton has a line for this person on another OT »; « no work sheet these days ». Shown under the result and as a column of the Excel file. Nothing is matched by guessing: it is only a hint. No database change.
 - **V2.4.306 — Comparison table: day filter by Britton end day.** The « Day » menu of the « By OT » view now also finds a line by the day Britton's line **ends** (work done on the 19th, form filled on the 20th appears under both days); the date column shows « Britton: ends 20 Nov » when it differs. No database change.
 - **V2.4.305 — Britton import: older table layout.** The Britton import (À traiter › OCR) now also reads the table of 16-18 November (columns « First Last name », « Company », « OT number », « client », « Auto », « total hours »): « client » = minutes at the client, « Auto » = return. No database change.
 - **V2.4.304 — Comparison table: columns grouped, downloadable.** In À traiter › OCR › « By OT », the columns are now grouped by what they measure: **at the client** (Britton → time proof → work sheet) then **return** (same order), both in the app and in the file. New button « Download (Excel) »: the lines shown (current filters), as an .xlsx table without any picture, with the odd figure in red, a frozen header and a filter. « Form » is now called « Time proof » and the Sparklog timesheet « Work sheet » on this screen.
