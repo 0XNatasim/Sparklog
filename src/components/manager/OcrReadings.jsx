@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import BrittonImport from "@/components/manager/BrittonImport";
 import OcrDownload from "@/components/manager/OcrDownload";
+import OtComparison from "@/components/manager/OtComparison";
 import { attachBritton, fetchBrittonRows } from "@/lib/britton";
 import { proofSheetLines } from "@/lib/ocr-sheet";
 import { OCR_FIRST_DAY, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, ocrDays } from "@/lib/ocr-readings";
@@ -82,6 +83,7 @@ export default function OcrReadings() {
   const [state, setState] = useState("read");
   const [query, setQuery] = useState("");
   const [day, setDay] = useState(""); // "" = every day
+  const [mode, setMode] = useState("proofs"); // "proofs" (one line per proof) | "compare" (one line per OT: Britton · form · Sparklog)
   const [opening, setOpening] = useState("");
   const navigate = useNavigate();
   const [confirm, confirmDialog] = useConfirmDialog();
@@ -217,6 +219,13 @@ export default function OcrReadings() {
               ))}
             </div>
           )}
+          {britton.length > 0 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t("otc.modeLabel")}>
+              <Button type="button" size="sm" variant={mode === "proofs" ? "default" : "outline"} aria-pressed={mode === "proofs"} onClick={() => setMode("proofs")}>{t("otc.mode.proofs")}</Button>
+              <Button type="button" size="sm" variant={mode === "compare" ? "default" : "outline"} aria-pressed={mode === "compare"} onClick={() => setMode("compare")}>{t("otc.mode.compare")}</Button>
+            </div>
+          )}
+          {mode === "proofs" && (
           <div className="grid gap-2 sm:grid-cols-3">
             <Select value={state} onChange={(event) => setState(event.target.value)} aria-label={t("ocr.filterLabel")}>
               <option value="read">{t("ocr.filter.read")}</option>
@@ -236,6 +245,7 @@ export default function OcrReadings() {
             </Select>
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("ocr.search")} aria-label={t("ocr.search")} />
           </div>
+          )}
           {rows && (
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" size="sm" variant="outline" disabled={rereading} onClick={() => setReload((value) => value + 1)}>
@@ -257,7 +267,8 @@ export default function OcrReadings() {
       </Card>
 
       {rows === null && !error && <p className="py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</p>}
-      {rows && (
+      {mode === "compare" && rows && britton.length > 0 && <OtComparison britton={britton} proofRows={rows} onView={view} />}
+      {mode === "proofs" && rows && (
         <div className="overflow-x-auto rounded-xl border bg-card">
           <table className="w-full min-w-[64rem] text-left text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">

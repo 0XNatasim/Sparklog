@@ -5,6 +5,8 @@ export const QUERY_BUDGETS = Object.freeze({
   reviewQueue: 100,
   // « À traiter › OCR »: the latest proof screenshots with what the reader found on each.
   ocrReadings: 300,
+  // « À traiter › OCR › Par OT »: every work order of the days Britton sent lines for (all employees; ≈ 200 a day).
+  otComparisonJobs: 4000,
   employeeHistoryPage: 100,
   employeeWeekLookbackWeeks: 12,
   anomalySubmittedJobs: 200,
