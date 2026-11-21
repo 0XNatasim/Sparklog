@@ -55,7 +55,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
   const entries = useMemo(() => (loaded ? buildOtComparison({ proofRows, britton, jobs: data.jobs, people: data.people }) : []), [loaded, proofRows, britton, data]);
   const counts = useMemo(() => countVerdicts(entries), [entries]);
   const shown = useMemo(() => filterComparison(entries, { verdict, day, query }), [entries, verdict, day, query]);
-  const dayOptions = useMemo(() => [...new Set(entries.map((entry) => entry.jobDate))].sort().reverse(), [entries]);
+  const dayOptions = useMemo(() => [...new Set(entries.flatMap((entry) => [entry.jobDate, entry.brittonDay]).filter(Boolean))].sort().reverse(), [entries]);
   const attention = entries.length - counts.ok;
   function download() {
     if (shown.length === 0) return;
@@ -124,7 +124,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
             <tbody className="divide-y">
               {shown.map((entry) => (
                 <tr key={entry.key}>
-                  <td className="whitespace-nowrap px-3 py-2">{dayjs(entry.jobDate).format("DD MMM")}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{dayjs(entry.jobDate).format("DD MMM")}{entry.brittonDay && entry.brittonDay !== entry.jobDate && <div className="text-xs text-muted-foreground">{t("otc.brittonEnds", { date: dayjs(entry.brittonDay).format("DD MMM") })}</div>}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
                     {entry.userId && entry.name ? (
                       <DropdownMenu>

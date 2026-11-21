@@ -126,4 +126,11 @@ describe("counting, filtering, days", () => {
   it("lists the Britton days, most recent first", () => {
     expect(brittonDays([line("a", { job_date: "2026-11-18" }), line("b"), line("c", { job_date: "2026-11-18" })])).toEqual(["2026-11-19", "2026-11-18"]);
   });
+  it("the day filter also finds a line by the day Britton's line ends (work done the 19th, form filled the 20th)", () => {
+    const entries = build({ proofRows: [], britton: [line("b1", { job_date: "2026-11-20", client_minutes: 60 })] });
+    expect(entries[0]).toMatchObject({ jobDate: DAY, brittonDay: "2026-11-20" });
+    expect(filterComparison(entries, { verdict: "all", day: "2026-11-20" })).toHaveLength(1);
+    expect(filterComparison(entries, { verdict: "all", day: DAY })).toHaveLength(1);
+    expect(filterComparison(entries, { verdict: "all", day: "2026-11-21" })).toHaveLength(0);
+  });
 });

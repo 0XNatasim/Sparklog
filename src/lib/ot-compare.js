@@ -140,7 +140,7 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     else if (proofs.length === 0) verdict = "noProof";
     else verdict = "ok";
 
-    out.push({ ...entry, proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
+    out.push({ ...entry, brittonDay: entry.britton ? day(entry.britton.job_date) : "", proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
   }
   return out.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || RANK[a.verdict] - RANK[b.verdict] || String(a.name).localeCompare(String(b.name)) || String(a.ot).localeCompare(String(b.ot)));
 }
@@ -155,7 +155,7 @@ export function countVerdicts(entries) {
 export function filterComparison(entries, { verdict = "attention", day: dayFilter = "", query = "" } = {}) {
   const needle = String(query || "").trim().toLowerCase();
   return (entries || []).filter((entry) => {
-    if (dayFilter && entry.jobDate !== dayFilter) return false;
+    if (dayFilter && entry.jobDate !== dayFilter && entry.brittonDay !== dayFilter) return false; // the work day or the day Britton's line ends
     if (verdict === "attention" && entry.verdict === "ok") return false;
     if (VERDICTS.includes(verdict) && entry.verdict !== verdict) return false;
     return !needle || `${entry.name} ${entry.ot} ${entry.jobOt}`.toLowerCase().includes(needle);

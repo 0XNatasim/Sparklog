@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.305)
+## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.306)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.306 (technique).** Comparaison par OT : `buildOtComparison` ajoute `brittonDay` (jour de fin de la ligne Britton rapprochée) ; `filterComparison({ day })` accepte `jobDate` **ou** `brittonDay` ; `OtComparison.jsx` : menu « Jour » = jours des fiches + jours de fin Britton, sous-ligne `otc.brittonEnds` dans la colonne Date quand ils diffèrent. Constat (2026-11-21) : une ligne Britton du 20 (OT fait le 19) était rangée sous le 19 seulement. Aucune migration. Test : `ot-compare.test.js`.
 
 **V2.4.305 (technique).** Import Britton : ancien format du 16-18 nov. `COLUMN_TESTS` (`britton.js`) accepte aussi `Prénom Nom` (nom), `Entreprise` (compagnie), `Numéro du OT-XXXXXX` (OT), `client` (chez le client), `Auto` (retour) et `heure total en TS` (total) ; le jour reste la date de « Heure de fin » (jamais la colonne « date »). Limite : deux lignes du même (jour, OT, nom) se réduisent à la dernière (clé unique `britton_overtime`). Aucune migration. Test : `britton.test.js`.
 
