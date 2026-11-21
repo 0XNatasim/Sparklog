@@ -23,14 +23,16 @@ const COLUMN_TESTS = {
   ot: (h) => h === "ot" || h === "# ot" || h === "no ot" || h === "numero ot",
   client: (h) => /^temps d'?\s?exe/.test(h),
   returned: (h) => /^temps de(?!x)\b/.test(h),
-  date: (h) => h === "date",
+  date: (h) => h === "date" || /^date (?!de fin)/.test(h), // « Date », « Date installation »
   note: (h) => h.startsWith("note"),
   total: (h) => h.startsWith("duree"),
 };
 const REQUIRED = ["name", "ot", "client", "returned", "date"];
 
 // Finds the header row (within the first 30 rows): { row, columns: { name: 1, ot: 3, … } } or null.
-export function findHeader(grid) {
+// When no row has every required column, `missingColumns` says which ones the closest row lacks.
+function scanHeader(grid) {
+  let best = { missing: REQUIRED };
   for (let r = 0; r < Math.min(grid.length, 30); r += 1) {
     const columns = {};
     (grid[r] || []).forEach((cell, index) => {
@@ -38,10 +40,20 @@ export function findHeader(grid) {
       if (!text) return;
       for (const [field, test] of Object.entries(COLUMN_TESTS)) if (columns[field] === undefined && test(text)) { columns[field] = index; break; }
     });
-    if (REQUIRED.every((field) => columns[field] !== undefined)) return { row: r, columns };
+    const missing = REQUIRED.filter((field) => columns[field] === undefined);
+    if (missing.length === 0) return { row: r, columns, missing };
+    if (missing.length < best.missing.length) best = { missing };
   }
-  return null;
+  return { row: null, columns: null, missing: best.missing };
 }
+
+export function findHeader(grid) {
+  const { row, columns } = scanHeader(grid);
+  return row === null ? null : { row, columns };
+}
+
+// Required columns the closest row of the grid lacks (names of COLUMN_TESTS: name, ot, client, returned, date).
+export const missingColumns = (grid) => scanHeader(grid || []).missing;
 
 const pad = (value) => String(value).padStart(2, "0");
 const validDay = (y, m, d) => {
@@ -83,7 +95,7 @@ function minutesCell(value) {
 // The same (day, OT, name) twice in the file keeps the last one.
 export function parseBrittonGrid(grid) {
   const found = findHeader(grid || []);
-  if (!found) return { rows: [], skipped: [], headerFound: false };
+  if (!found) return { rows: [], skipped: [], headerFound: false, missing: missingColumns(grid) };
   const { row: headerRow, columns } = found;
   const byKey = new Map();
   const skipped = [];
@@ -122,20 +134,26 @@ export function parseBrittonGrid(grid) {
 // name. → parseBrittonGrid of the first sheet / separator that has the Britton header. The old .xls (binary) is refused: xlsx_unsupported.
 export async function readBrittonFile(file) {
   const bytes = await fileBytes(file);
+  let closest = { rows: [], skipped: [], headerFound: false, missing: REQUIRED };
+  const consider = (parsed) => {
+    if (parsed.headerFound) return parsed;
+    if (parsed.missing.length < closest.missing.length) closest = parsed;
+    return null;
+  };
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
     for (const grid of await readXlsxSheets(bytes)) {
-      const parsed = parseBrittonGrid(grid);
-      if (parsed.headerFound) return parsed;
+      const found = consider(parseBrittonGrid(grid));
+      if (found) return found;
     }
-    return { rows: [], skipped: [], headerFound: false };
+    return closest;
   }
   if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) throw new Error("xlsx_unsupported");
   const text = decodeCsvBytes(bytes);
   for (const delimiter of CSV_DELIMITERS) {
-    const parsed = parseBrittonGrid(parseCsv(text, delimiter));
-    if (parsed.headerFound) return parsed;
+    const found = consider(parseBrittonGrid(parseCsv(text, delimiter)));
+    if (found) return found;
   }
-  return { rows: [], skipped: [], headerFound: false };
+  return closest;
 }
 
 // Sends the lines by chunks of 500. Returns { inserted, updated }. Throws when the database refuses (nothing after that chunk is sent).
