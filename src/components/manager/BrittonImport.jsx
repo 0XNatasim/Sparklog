@@ -27,7 +27,7 @@ export default function BrittonImport({ unmatched = [], count = 0, onImported })
     setMessage("");
     try {
       const parsed = await readBrittonFile(file);
-      if (!parsed.headerFound) { setError(t("britton.errors.header")); return; }
+      if (!parsed.headerFound) { setError(t("britton.errors.header", { missing: (parsed.missing || []).map((field) => t(`britton.field.${field}`)).join(", ") })); return; }
       if (parsed.rows.length === 0) { setError(t("britton.errors.empty")); return; }
       const result = await importBrittonRows(supabase, parsed.rows);
       const skipped = parsed.skipped.length ? ` ${t("britton.skipped", { count: parsed.skipped.length, lines: parsed.skipped.slice(0, 8).map((item) => item.line).join(", ") })}` : "";

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.300)
+## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.301)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.301 (technique).** Import Britton : titres réels. Constat (2026-11-21) : le fichier réel a pour colonne de date « Date installation » (et « Temps d'éxécution » avec la faute) ; `COLUMN_TESTS.date` n'acceptait que `"date"` → « colonnes introuvables ». Maintenant `date` = `"date"` ou `^date ` sauf « date de fin ». `scanHeader` / `missingColumns(grid)` : quand aucune ligne n'a toutes les colonnes requises, la plus proche dit lesquelles manquent (`parseBrittonGrid` renvoie `missing`, `readBrittonFile` garde la tentative — feuille ou séparateur — qui en manque le moins) ; `BrittonImport.jsx` : `britton.errors.header` = « Colonnes introuvables : … » (`britton.field.*`). **Vérifié sur le vrai fichier** (export CSV de la feuille Drive du 19-20 nov., lu par `readBrittonFile` dans un test jetable non versionné) : en-tête reconnu, 38 lignes lues sur 5 jours, totaux = exécution + retour, 1 ligne ignorée (`date` vide : jamais déduite de l'heure de fin, qui n'est pas le jour de travail : une fin le 20 à 9 h 27 porte la date du 19). Un Google Sheets natif doit être téléchargé en .xlsx / .csv. Un ancien tableau (16-18 nov. : « Prénom Nom », « Entreprise », « Numéro du OT-XXXXXX », « client », « Auto », « date ») a d'autres titres et n'est pas reconnu. Aucune migration. Tests : `britton.test.js` (titres réels, colonnes manquantes, « Date de fin » refusée comme date).
 
 **V2.4.300 (technique).** Tableau Britton aussi en .csv. `src/lib/csv-read.js` (lecteur sans dépendance : guillemets, `""`, retours à la ligne entre guillemets, `\r\n` / `\n` / `\r`, BOM ; `decodeCsvBytes` : UTF-8 sinon Windows-1252 pour les accents d'un « CSV » Excel ; `CSV_DELIMITERS` = `;` puis `,` puis tabulation, on garde le premier qui fait apparaître l'en-tête Britton). `readBrittonFile` reconnaît le type **par les premiers octets** (`PK` = .xlsx ; `D0 CF 11 E0` = ancien .xls, refusé `xlsx_unsupported` ; sinon texte CSV), pas par le nom ; `fileBytes` (`xlsx-read.js`) remplace `instanceof Uint8Array` par `ArrayBuffer.isView` (octets d'un autre contexte JS). Le reste (colonnes, dates américaines, lignes illisibles listées, import par paquets) est inchangé : un CSV passe par `parseBrittonGrid`. `BrittonImport.jsx` : `accept=".xlsx,.csv"`, textes `britton.file` / `britton.errors.file`. Aucune migration. Tests : `csv-read.test.js`, `britton.test.js` (CSV français en Windows-1252 avec virgule décimale, anglais avec guillemets et BOM, tabulation, ligne illisible, .xls refusé).
 

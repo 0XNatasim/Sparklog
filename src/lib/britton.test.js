@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildZip } from "@/lib/zip-store";
 import { createFakeSupabase } from "@/test/fake-supabase";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
-const { attachBritton, brittonOt, fetchBrittonRows, findHeader, importBrittonRows, nameKey, parseBrittonDate, parseBrittonGrid, readBrittonFile } = await import("./britton");
+const { attachBritton, missingColumns, brittonOt, fetchBrittonRows, findHeader, importBrittonRows, nameKey, parseBrittonDate, parseBrittonGrid, readBrittonFile } = await import("./britton");
 
 const HEAD = ["Heure de fin", "Nom et Prénom Électricien", "Compagnie", "OT", "Temps d'exécution (min)", "Temps de retour (min)", "Date", "Note", "Durée du temps supp"];
 // Lines of the Britton table of 19-20 November (names changed to neutral ones).
@@ -15,6 +15,31 @@ const SAMPLE = [
   ["11/20/26 9:30", "Cedrick Bertin", "Messier Connexion", "OT-212306", 105, 45, "11/19/2026", null, 150],
   ["11/19/26 18:31", "Vanessa Mcgraw-robichaud", "Messier Connexion", "OT-234262", 58, 60, "11/18/2026", "à vérifier", 118],
 ];
+
+// The real titles of the file Britton sends (19-20 November): « Temps d'éxécution » (typo included), « Date installation ».
+const REAL_HEAD = ["Heure de fin", "Nom et Prénom Électricien", "Compagnie", "OT", "Temps d'éxécution", "Temps de retour", "Date installation", "Note", "Durée du temps supplémentaire réelle - minutes"];
+
+describe("Britton table: the real file", () => {
+  it("recognises the real titles (« Date installation », « éxécution ») and reads its lines", () => {
+    expect(findHeader([REAL_HEAD])).toMatchObject({ row: 0, columns: { name: 1, ot: 3, client: 4, returned: 5, date: 6, total: 8 } });
+    const { rows, skipped } = parseBrittonGrid([
+      REAL_HEAD,
+      ["11/19/26 14:17", "Personne Un ", "Messier Connexion", "OT-211794", 15, 15, "11/19/2026", null, 30],
+      ["11/20/26 9:30", "Personne Deux", "Messier Connexion", "OT-212306", 105, 45, "11/19/2026", null, 150],
+      ["11/16/26 15:54", "Personne Trois", "Messier Connexion", "OT-202694", 75, 45, null, null, 120],
+    ]);
+    expect(rows.map((row) => [row.ot, row.job_date, row.client_minutes, row.return_minutes])).toEqual([["211794", "2026-11-19", 15, 15], ["212306", "2026-11-19", 105, 45]]);
+    expect(rows[0].employee_name).toBe("Personne Un"); // trailing space dropped
+    expect(skipped).toEqual([{ line: 4, reason: "date" }]); // no installation date: listed, never guessed from the end time
+  });
+
+  it("says which columns are missing, and does not take « Date de fin » for the work date", () => {
+    expect(missingColumns([["Nom", "OT", "Temps d'exécution", "Temps de retour", "Heure"]])).toEqual(["date"]);
+    expect(missingColumns([["Nom", "OT", "Temps d'exécution", "Temps de retour", "Date de fin"]])).toEqual(["date"]);
+    expect(missingColumns([["a", "b"]])).toEqual(["name", "ot", "client", "returned", "date"]);
+    expect(parseBrittonGrid([["Nom", "OT", "Temps d'exécution", "Temps de retour"]])).toMatchObject({ headerFound: false, missing: ["date"] });
+  });
+});
 
 describe("Britton table", () => {
   it("finds the header whatever the cut titles are, and reads the lines (month first dates)", () => {
