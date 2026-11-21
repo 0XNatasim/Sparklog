@@ -28,6 +28,7 @@ import RegionOnboarding from "@/components/RegionOnboarding";
 import BroadcastPopup from "@/components/BroadcastPopup";
 import OfflineBanner from "@/components/OfflineBanner";
 import UpdateBanner from "@/components/UpdateBanner";
+import MinuteEditBanner from "@/components/manager/MinuteEditBanner";
 import PushPrompt from "@/components/PushPrompt";
 import { PanelLoading } from "@/components/LazyLoading";
 import { useMissingScaleAlert, usePayrollRateAlerts, usePayrollRatesReady } from "@/lib/payroll-rates";
@@ -451,6 +452,7 @@ export default function ManagerLayout() {
     <div className="min-h-screen bg-background text-foreground">
       <OfflineBanner />
       <UpdateBanner />
+      <MinuteEditBanner />
       <PushPrompt />
       <RegionOnboarding />
       <BroadcastPopup />

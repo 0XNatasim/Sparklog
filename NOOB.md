@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.295).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.296).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -38,6 +38,8 @@
 - [ ] **Migrations 0148 et 0149 + fonction (V2.4.281)** : appliquer la 0148 puis la 0149, puis redéployer `process_overtime_evidence` (je le fais sur demande). Je remets ensuite en file les 7 preuves « conformes » où seul le numéro d'OT avait été lu, pour qu'elles soient relues avec la nouvelle règle.
 - [ ] **Migration 0150 (V2.4.285)** : à appliquer (« Applique la 0150 »), sinon « Relire » ne marche que sur les échecs.
 - [ ] **Migration 0151 (V2.4.286)** : à appliquer (« Applique la 0151 ») pour pouvoir activer le bouton « Renvoyer pour correction ».
+- 🟡 **V2.4.296 — Preuve gardée quand elle devient inutile** : quand une journée repasse sous 8 h (fiche modifiée, supprimée ou déplacée), la preuve **n'est plus supprimée** : elle est marquée **« Preuve inutile »** (onglet OCR, aperçu, image téléchargée) et conservée ; la marque disparaît si la journée repasse au-dessus de la ligne. **À faire : appliquer la migration 0153** (avec la 0152).
+- 🟡 **V2.4.296 — « Modifier les minutes » (option spéciale, à toi seule)** : dans **Avancé › Feuille de temps d'urgence**, une case **Activer** (désactivée par défaut). Une fois activée : une **bannière rouge** s'affiche sur toutes les pages de gestion pour te le rappeler, et tu peux, pour un employé et un jour, **changer le Départ et la Fin** d'une fiche (enregistrée, à mettre à jour ou soumise ; jamais approuvée) en écrivant une raison. Pratique pour 6 h 57 → 15 h 00 (3 minutes de temps supp.) : pas de formulaire de preuve pour 3 minutes. Chaque changement est gardé au **Journal** (avant / après / raison). **À faire : appliquer la migration 0152** (dis « Applique la 0152 »). Désactive l'option quand tu as fini.
 - ✅ **V2.4.295 — Snapshot de la semaine : « aucune heure » à tort** : le snapshot ne lisait que **les 1000 premières fiches** de la semaine (la semaine du 15 au 21 nov. en compte 1054), donc certaines journées (ex. le lundi de Martin Fillion, d'Anthony Rivera, de Daniel) apparaissaient vides ou incomplètes. Les fiches n'étaient pas perdues : l'affichage est corrigé, il lit maintenant **toute** la semaine. Rien à appliquer.
 - ✅ **V2.4.294 — Feuille de temps : « Tout » dans le menu qui existait déjà** : j'ai retiré la boîte ajoutée en trop dans la ligne des filtres. Le menu **« Soumis (2) »** (sous la légende de l'étoile, quand un employé est choisi) a maintenant l'option **« Tout »** en premier et par défaut : les quatre colonnes (Enregistrés, À mettre à jour, Soumis, Approuvés) l'une sous l'autre sur téléphone. Rien à appliquer.
 - ✅ **V2.4.293 — Feuille de temps : menu des états avec « Tout »** : les quatre cases de la V2.4.291 sont remplacées par le **menu des états**, avec **« Tout »** en premier (choix par défaut), puis Enregistrés, À mettre à jour, Soumis, Approuvés. Un état choisi s'applique aussi quand un seul employé est choisi (seule cette colonne s'affiche). Rien à appliquer.

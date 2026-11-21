@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.295)
+## 6. À faire / à préciser (mis à jour 2026-11-20, V2.4.296)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,10 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.296 (technique).** Preuve gardée quand elle devient inutile. Migration 0153 : `overtime_evidence.not_needed_at` ; `reconcile_overtime_evidence` (0068) ne supprime plus les preuves d'une journée repassée à 480 min ou moins : elle pose `not_needed_at` (premier passage) et le remet à null si la journée repasse au-dessus ; le drapeau `overtime_evidence_captured` des fiches n'est plus remis à faux ; trigger `overtime_evidence_clear_not_needed` (avant insertion : le navigateur ne marque jamais) ; rattrapage des preuves de journées déjà sous la ligne. `OcrReadings.jsx` lit `not_needed_at` (repli sans la colonne tant que la 0153 n'est pas appliquée), `buildOcrRows` : `notNeeded`, badge « Preuve inutile » (`ocr.notNeeded`) et ligne de l'aperçu / de l'image (`ocr-sheet.js`). Limite connue : `reconcile_overtime_evidence` compare toujours à 480 min (pas 600 pour « 4 jours de 10 h »). Tests : `overtime-proof-kept.test.js`. **Appliquer la 0153 avec la 0152.**
+
+**V2.4.296 (technique).** « Modifier les minutes » (option spéciale du propriétaire). Migration 0152 : `overtime_settings.minute_edit_enabled` (défaut faux) ; `set_minute_edit_enabled(boolean)` (`is_privileged()`, audit `minute_edit_enabled` / `minute_edit_disabled`) ; `adjust_job_times_for_employee(p_job_id, p_depart, p_fin, p_reason)` (`security definer`, `is_privileged()` = propriétaire + aal2, interrupteur actif sinon `minute_edit_disabled`, raison de 3 à 500 caractères, fiche `saved` / `updated` / `submitted` et pas `exported_to_sheet` sinon `job_not_editable`, verrou par employé, **aucune limite de taille du changement** (décision du 2026-11-20) mais durée (0, 16 h], retour ≤ durée, aucun chevauchement avec les autres fiches soumises / approuvées de l'employé (`started_at` / `ended_at` recalculés par `trg_00`) ; audit `job_times_adjusted_by_owner` avec avant / après / raison). Le validateur de soumission ignore déjà les mises à jour d'une fiche non brouillon : le RPC fait lui-même les contrôles. Les preuves suivent la règle existante (`reconcile_overtime_evidence` : une journée repassée sous la ligne n'a plus de preuve). App : `src/lib/minute-edit.js` (`useMinuteEditEnabled`, `adjustJobTimes`, `validateTimesAdjust`, `MINUTE_EDIT_EVENT`), `MinuteEditPanel.jsx` (en tête d'`EmergencyTimesheet`, page déjà réservée au propriétaire : interrupteur avec confirmation, employé + jour, une ligne par fiche avec Départ / Fin / raison) et `manager/MinuteEditBanner.jsx` (bannière rouge dans `ManagerLayout` tant que l'option est active). **Appliquer la migration 0152 avant d'utiliser l'option** (avant : la colonne est absente = option désactivée). Tests : `minute-edit.test.js` (dont verrou du SQL), `MinuteEditPanel.test.jsx`, `MinuteEditBanner.test.jsx`.
 
 **V2.4.295 (technique).** Snapshot de la semaine : `WeekSnapshot.jsx` lisait `jobs` de la semaine en une requête (PostgREST renvoie 1000 lignes au plus, sans ordre, le reste est abandonné sans erreur) : la semaine du 15 au 21 nov. 2026 compte 1054 fiches, donc des fiches (dont un lundi complet de plusieurs employés) manquaient dans les cases. Lecture par pages (`fetchAllRows`, `.order("id")`). Les autres lectures de fiches d'une semaine entière passaient déjà par `fetchAllRows` ou `limit` budgété. Aucune migration. Test : `WeekSnapshot.test.jsx` (lecture paginée).
 

@@ -1,0 +1,157 @@
+import React, { useEffect, useState } from "react";
+import { TriangleAlert } from "lucide-react";
+import { supabase } from "../supabaseClient";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
+import { friendlyErrorMessage } from "@/lib/error-messages";
+import { companyDate } from "@/lib/company-time";
+import {
+  MINUTE_EDIT_REASON_MAX, adjustJobTimes, fetchEditableJobs, minutesBetweenTimes, setMinuteEditEnabled, timesChanged, useMinuteEditEnabled, validateTimesAdjust,
+} from "@/lib/minute-edit";
+import { useT } from "@/lib/use-t";
+
+const hhmm = (value) => String(value || "").slice(0, 5);
+const minutesLabel = (minutes) => (minutes == null ? "—" : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`);
+
+// One work sheet of the chosen day: its Départ / Fin to move, a reason, Save.
+function JobRow({ job, onSaved, t }) {
+  const [depart, setDepart] = useState(hhmm(job.depart));
+  const [fin, setFin] = useState(hhmm(job.fin));
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirm, confirmDialog] = useConfirmDialog();
+  const problems = validateTimesAdjust({ depart, fin, reason });
+  const changed = timesChanged(job, depart, fin);
+  const before = minutesBetweenTimes(job.depart, job.fin);
+  const after = minutesBetweenTimes(depart, fin);
+
+  async function save() {
+    if (busy || !changed || problems.length) return;
+    const ok = await confirm(t("minuteEdit.confirmSave", { ot: job.ot || "—", from: `${hhmm(job.depart)} → ${hhmm(job.fin)}`, to: `${depart} → ${fin}` }));
+    if (!ok) return;
+    setBusy(true);
+    setError("");
+    try {
+      await adjustJobTimes(supabase, { jobId: job.id, depart, fin, reason });
+      onSaved();
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.save"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-semibold">{job.ot || "—"}</span>
+        <Badge variant="outline">{t(`status.${job.status}`)}</Badge>
+        <span className="ml-auto text-muted-foreground">{minutesLabel(before)} → {minutesLabel(after)}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="grid gap-1"><Label htmlFor={`me-d-${job.id}`}>{t("minuteEdit.depart")}</Label>
+          <Input id={`me-d-${job.id}`} type="time" value={depart} onChange={(event) => setDepart(event.target.value)} disabled={busy} /></div>
+        <div className="grid gap-1"><Label htmlFor={`me-f-${job.id}`}>{t("minuteEdit.fin")}</Label>
+          <Input id={`me-f-${job.id}`} type="time" value={fin} onChange={(event) => setFin(event.target.value)} disabled={busy} /></div>
+      </div>
+      <div className="grid gap-1">
+        <Label htmlFor={`me-r-${job.id}`}>{t("minuteEdit.reason")}</Label>
+        <Input id={`me-r-${job.id}`} value={reason} maxLength={MINUTE_EDIT_REASON_MAX} placeholder={t("minuteEdit.reasonPlaceholder")} onChange={(event) => setReason(event.target.value)} disabled={busy} />
+      </div>
+      {problems.includes("interval") && <p className="text-xs text-destructive">{t("form.errors.invalidInterval")}</p>}
+      {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
+      <Button type="button" size="sm" disabled={busy || !changed || problems.length > 0} onClick={save}>{busy ? t("common.saving") : t("minuteEdit.save")}</Button>
+      {confirmDialog}
+    </div>
+  );
+}
+
+// Avancé › Feuille de temps d'urgence › « Modifier les minutes » (owner only, migration 0152).
+export default function MinuteEditPanel({ people = [] }) {
+  const t = useT();
+  const enabled = useMinuteEditEnabled();
+  const [confirm, confirmDialog] = useConfirmDialog();
+  const [switching, setSwitching] = useState(false);
+  const [employeeId, setEmployeeId] = useState("");
+  const [jobDate, setJobDate] = useState(companyDate());
+  const [loaded, setLoaded] = useState({ key: "", rows: [] });
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [reload, setReload] = useState(0);
+
+  // What is shown: the sheets of the chosen employee and day once loaded (null while loading or nothing chosen).
+  const key = enabled && employeeId && jobDate ? `${employeeId}|${jobDate}|${reload}` : "";
+  const jobs = key && loaded.key === key ? loaded.rows : null;
+  useEffect(() => {
+    if (!key) return undefined;
+    let alive = true;
+    fetchEditableJobs(supabase, employeeId, jobDate)
+      .then((rows) => { if (alive) setLoaded({ key, rows }); })
+      .catch((failure) => { if (alive) { setLoaded({ key, rows: [] }); setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.load")); } });
+    return () => { alive = false; };
+  }, [key, employeeId, jobDate, t]);
+
+  async function toggle() {
+    if (switching) return;
+    const turnOn = !enabled;
+    if (turnOn && !(await confirm(t("minuteEdit.confirmOn")))) return;
+    setSwitching(true);
+    setError("");
+    setInfo("");
+    try {
+      await setMinuteEditEnabled(supabase, turnOn);
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.switch"));
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  return (
+    <Card className={enabled ? "border-red-600" : ""}>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-start gap-2">
+          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden="true" />
+          <div className="flex-1">
+            <div className="font-semibold">{t("minuteEdit.title")}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{t("minuteEdit.description")}</p>
+          </div>
+          <Button type="button" size="sm" variant={enabled ? "destructive" : "outline"} disabled={switching} onClick={toggle} aria-pressed={enabled}>
+            {enabled ? t("minuteEdit.turnOff") : t("minuteEdit.turnOn")}
+          </Button>
+        </div>
+        {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{error}</div>}
+        {info && <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary" role="status">{info}</div>}
+        {enabled && (
+          <div className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="me-employee">{t("emergency.employee")}</Label>
+                <Select id="me-employee" value={employeeId} onChange={(event) => { setEmployeeId(event.target.value); setInfo(""); }}>
+                  <option value="">{t("emergency.employeePlaceholder")}</option>
+                  {people.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="me-date">{t("form.date")}</Label>
+                <Input id="me-date" type="date" value={jobDate} onChange={(event) => { setJobDate(event.target.value); setInfo(""); }} />
+              </div>
+            </div>
+            {employeeId && jobs === null && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
+            {jobs && jobs.length === 0 && employeeId && <p className="text-sm text-muted-foreground">{t("minuteEdit.none")}</p>}
+            {jobs && jobs.map((job) => (
+              <JobRow key={`${job.id}-${job.depart}-${job.fin}`} job={job} t={t} onSaved={() => { setInfo(t("minuteEdit.saved")); setReload((value) => value + 1); }} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+      {confirmDialog}
+    </Card>
+  );
+}
