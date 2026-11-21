@@ -1,9 +1,11 @@
 // « Modifier les minutes » (migration 0152): a very special owner-only switch. While it is on, the owner can move the Départ / Fin
-// of a work sheet (saved / updated / submitted, never approved) from Avancé › Feuille de temps d'urgence, and every management
+// of a work sheet (saved / updated / submitted, never approved), delete it, or add its overtime proof (0155) from Avancé › Feuille de temps d'urgence, and every management
 // page shows a red banner. Every change is audited (before / after / reason).
 import { useEffect, useState } from "react";
 import { supabase } from "@/supabaseClient";
 import { withTimeout } from "@/lib/utils";
+import { prepareEvidenceImage, readPickedFile } from "@/lib/evidence-file";
+import { uploadOvertimeEvidence } from "@/lib/overtime-evidence-check";
 
 export const MINUTE_EDIT_EVENT = "sparklog:minute-edit";
 export const EDITABLE_STATUSES = ["saved", "updated", "submitted"];
@@ -63,10 +65,37 @@ export async function deleteJobAsOwner(client, { jobId, reason }) {
 }
 
 export async function fetchEditableJobs(client, userId, jobDate) {
-  const { data, error } = await withTimeout(client.from("jobs").select("id, ot, depart, arrivee, fin, status, return_time_minutes, job_date")
+  const { data, error } = await withTimeout(client.from("jobs").select("id, user_id, ot, depart, arrivee, fin, status, return_time_minutes, job_date")
     .eq("user_id", userId).eq("job_date", jobDate).in("status", EDITABLE_STATUSES).order("depart"), 12000);
   if (error) throw error;
   return data || [];
+}
+
+// The overtime proofs already recorded for the day (managers read the table): [{ id, job_id, ocr_status, not_needed_at }].
+export async function fetchDayProofs(client, userId, jobDate) {
+  const { data, error } = await withTimeout(client.from("overtime_evidence").select("id, job_id, ocr_status, not_needed_at, created_at")
+    .eq("user_id", userId).eq("job_date", jobDate).order("created_at"), 12000);
+  if (error) throw error;
+  return data || [];
+}
+
+// Adds the overtime proof of a sheet for the employee (migration 0155, same switch and reason as a change). The picture goes
+// into the EMPLOYEE's folder (the owner may write there since 0155), then the function records it; a refused record removes
+// the picture again. The reading of the form is queued by the OCR queue (the owner's phone does not trigger it).
+export async function addProofAsOwner(client, { job, file, reason, dailyMinutes = 0 }) {
+  const evidenceId = crypto.randomUUID();
+  const path = `${job.user_id}/${job.job_date}/${evidenceId}.jpg`;
+  const source = file instanceof File ? await readPickedFile(file) : file;
+  const image = await prepareEvidenceImage(source);
+  await uploadOvertimeEvidence(client, path, image);
+  const { error } = await withTimeout(client.rpc("add_overtime_proof_for_employee", {
+    p_job_id: job.id, p_evidence_id: evidenceId, p_storage_path: path, p_daily_minutes: Math.max(0, Math.round(dailyMinutes)), p_reason: String(reason || "").trim(),
+  }), 15000);
+  if (error) {
+    await client.storage.from("overtime-evidence").remove([path]).catch(() => undefined);
+    throw error;
+  }
+  return evidenceId;
 }
 
 // Is the switch on? Read on mount, when the owner changes it (event) and when the window comes back to the front.

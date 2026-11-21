@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createFakeSupabase } from "@/test/fake-supabase";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
-const { adjustJobTimes, deleteJobAsOwner, fetchMinuteEditEnabled, minutesBetweenTimes, timesChanged, validateTimesAdjust } = await import("./minute-edit");
+vi.mock("@/lib/evidence-file", () => ({ readPickedFile: async (file) => file, prepareEvidenceImage: async (file) => file }));
+const { addProofAsOwner, adjustJobTimes, deleteJobAsOwner, fetchMinuteEditEnabled, minutesBetweenTimes, timesChanged, validateTimesAdjust } = await import("./minute-edit");
 
 describe("minute-edit", () => {
   it("counts the minutes between two times, a Fin before the Départ being the next day", () => {
@@ -70,5 +71,35 @@ describe("delete a sheet (migration 0154)", () => {
     expect(sql).toMatch(/exported_to_sheet/);
     expect(sql.indexOf("job_deleted_by_owner")).toBeLessThan(sql.indexOf("delete from public.jobs"));
     expect(sql).toMatch(/revoke all on function public\.delete_job_for_employee\(uuid, text\) from public, anon/);
+  });
+});
+
+describe("add the overtime proof (migration 0155)", () => {
+  const job = { id: "j1", user_id: "e1", job_date: "2026-11-20" };
+  it("uploads into the employee's folder then records it with the reason", async () => {
+    const fake = createFakeSupabase({ rpcs: { add_overtime_proof_for_employee: "id" } });
+    const id = await addProofAsOwner(fake.client, { job, file: new Blob(["x"]), reason: "  3 min  ", dailyMinutes: 483.4 });
+    const upload = fake.calls.find((call) => call.op === "upload");
+    expect(upload.path).toBe(`e1/2026-11-20/${id}.jpg`);
+    expect(fake.calls.find((call) => call.rpc === "add_overtime_proof_for_employee").args)
+      .toEqual({ p_job_id: "j1", p_evidence_id: id, p_storage_path: upload.path, p_daily_minutes: 483, p_reason: "3 min" });
+  });
+  it("removes the picture again when the record is refused", async () => {
+    const fake = createFakeSupabase({ rpcs: { add_overtime_proof_for_employee: () => { throw new Error("x"); } } });
+    fake.client.rpc = () => Promise.resolve({ data: null, error: { message: "minute_edit_disabled" } });
+    await expect(addProofAsOwner(fake.client, { job, file: new Blob(["x"]), reason: "abc" })).rejects.toBeTruthy();
+    expect(fake.calls.some((call) => call.op === "remove")).toBe(true);
+  });
+  const sql = readFileSync(new URL("../../supabase/migrations/20261121180000_0155_owner_add_overtime_proof.sql", import.meta.url), "utf8");
+  it("is owner-only, behind the switch, needs a reason, checks the path and the file, and audits", () => {
+    expect(sql).toMatch(/for insert to authenticated\s+with check \(bucket_id = 'overtime-evidence' and public\.is_privileged\(\)\)/);
+    expect(sql).toMatch(/not public\.is_privileged\(\)/);
+    expect(sql).toMatch(/minute_edit_disabled/);
+    expect(sql).toMatch(/minute_edit_reason_required/);
+    expect(sql).toMatch(/status not in \('saved', 'updated', 'submitted'\)/);
+    expect(sql).toMatch(/invalid_evidence_path/);
+    expect(sql).toMatch(/evidence_file_missing/);
+    expect(sql).toMatch(/overtime_proof_added_by_owner/);
+    expect(sql).toMatch(/revoke all on function public\.add_overtime_proof_for_employee\(uuid, uuid, text, integer, text\) from public, anon/);
   });
 });
