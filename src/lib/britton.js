@@ -3,7 +3,8 @@
 // each line is shown beside the Sparklog sheet of the same OT and day. Read only: nothing here changes a job or a pay.
 import { PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN } from "./overtime-proof-check";
 import { fetchAllRows } from "./fetch-all";
-import { readXlsxSheets } from "./xlsx-read";
+import { CSV_DELIMITERS, decodeCsvBytes, parseCsv } from "./csv-read";
+import { fileBytes, readXlsxSheets } from "./xlsx-read";
 import { withTimeout } from "./utils";
 
 export const BRITTON_IMPORT_CHUNK = 500; // the database takes at most 1000 lines per call
@@ -117,11 +118,21 @@ export function parseBrittonGrid(grid) {
   return { rows: [...byKey.values()], skipped, headerFound: true };
 }
 
-// The .xlsx file → parseBrittonGrid of the first sheet that has the Britton header.
+// The file as Britton sent it: an .xlsx (a ZIP, starts with "PK") or a .csv (any other text), told apart by the first bytes, not by the
+// name. → parseBrittonGrid of the first sheet / separator that has the Britton header. The old .xls (binary) is refused: xlsx_unsupported.
 export async function readBrittonFile(file) {
-  const sheets = await readXlsxSheets(file);
-  for (const grid of sheets) {
-    const parsed = parseBrittonGrid(grid);
+  const bytes = await fileBytes(file);
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+    for (const grid of await readXlsxSheets(bytes)) {
+      const parsed = parseBrittonGrid(grid);
+      if (parsed.headerFound) return parsed;
+    }
+    return { rows: [], skipped: [], headerFound: false };
+  }
+  if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) throw new Error("xlsx_unsupported");
+  const text = decodeCsvBytes(bytes);
+  for (const delimiter of CSV_DELIMITERS) {
+    const parsed = parseBrittonGrid(parseCsv(text, delimiter));
     if (parsed.headerFound) return parsed;
   }
   return { rows: [], skipped: [], headerFound: false };

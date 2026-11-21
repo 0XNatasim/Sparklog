@@ -42,7 +42,7 @@ export default function BrittonImport({ unmatched = [], count = 0, onImported })
 
   return (
     <>
-      <input ref={fileRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" aria-label={t("britton.file")} onChange={pick} />
+      <input ref={fileRef} type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" aria-label={t("britton.file")} onChange={pick} />
       <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}>
         <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden="true" />{busy ? t("britton.importing") : t("britton.import")}
       </Button>

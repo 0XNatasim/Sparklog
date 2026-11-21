@@ -87,8 +87,39 @@ describe("readBrittonFile", () => {
       ended_at: "2026-11-19 14:17", client_minutes: 15, return_minutes: 15, total_minutes: 30, note: "ok",
     }]);
   });
-  it("refuses something that is not an .xlsx", async () => {
-    await expect(readBrittonFile(new Uint8Array([1, 2, 3, 4]))).rejects.toThrow(/xlsx_invalid/);
+  it("refuses the old binary .xls and finds nothing in a file that is not the Britton table", async () => {
+    await expect(readBrittonFile(new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0, 0]))).rejects.toThrow(/xlsx_unsupported/);
+    expect((await readBrittonFile(new Uint8Array([1, 2, 3, 4]))).headerFound).toBe(false);
+    await expect(readBrittonFile(new Uint8Array([0x50, 0x4b, 1, 2]))).rejects.toThrow(/xlsx_invalid/); // starts like a ZIP but is not one
+  });
+});
+
+describe("readBrittonFile (.csv)", () => {
+  const expected = { job_date: "2026-11-19", ot: "211794", employee_name: "Anthony Fortin", name_key: "anthony fortin", client_minutes: 15, return_minutes: 15, total_minutes: 30 };
+  const frenchHeader = "Heure de fin;Nom et Prénom Électricien;Compagnie;OT;Temps d'exécution;Temps de retour;Date;Note;Durée du temps supp";
+
+  it("reads a French Excel CSV (semicolons, Windows-1252 accents, decimal commas)", async () => {
+    const text = `${frenchHeader}\r\n11/19/26 14:17;Anthony Fortin;Messier Connexion;OT-211794;15,0;15;11/19/2026;;30\r\n`;
+    const bytes = new Uint8Array([...text].map((ch) => (ch.charCodeAt(0) < 256 ? ch.charCodeAt(0) : 63))); // Latin-1 / Windows-1252: « é » is one byte
+    const parsed = await readBrittonFile(bytes);
+    expect(parsed.headerFound).toBe(true);
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]).toMatchObject({ ...expected, ended_at: "2026-11-19 14:17", company: "Messier Connexion" });
+  });
+
+  it("reads an English CSV with quotes and a UTF-8 byte-order mark, and a tab-separated one", async () => {
+    const comma = '\uFEFF"Heure de fin","Nom et Prénom Électricien","Compagnie","OT","Temps d\'exécution","Temps de retour","Date","Note","Durée"\n"11/19/26 14:17","Anthony Fortin","Messier, Connexion","OT-211794",15,15,"2026-11-19","dit ""ok""",30\n';
+    const a = await readBrittonFile(new TextEncoder().encode(comma));
+    expect(a.rows[0]).toMatchObject({ ...expected, company: "Messier, Connexion", note: 'dit "ok"' });
+    const tab = frenchHeader.replaceAll(";", "\t") + "\n11/19/26 14:17\tAnthony Fortin\tM\tOT-211794\t15\t15\t11/19/2026\t\t30\n";
+    expect((await readBrittonFile(new TextEncoder().encode(tab))).rows[0]).toMatchObject(expected);
+  });
+
+  it("lists a line it cannot read like the Excel file does", async () => {
+    const text = `${frenchHeader}\n11/19/26 14:17;Anthony Fortin;M;FORMATION;15;15;11/19/2026;;30\n`;
+    const parsed = await readBrittonFile(new TextEncoder().encode(text));
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.skipped).toEqual([{ line: 2, reason: "ot" }]);
   });
 });
 
