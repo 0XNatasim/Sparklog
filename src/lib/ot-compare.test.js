@@ -126,4 +126,26 @@ describe("counting, filtering, days", () => {
   it("lists the Britton days, most recent first", () => {
     expect(brittonDays([line("a", { job_date: "2026-11-18" }), line("b"), line("c", { job_date: "2026-11-18" })])).toEqual(["2026-11-19", "2026-11-18"]);
   });
+  it("the day filter also finds a line by the day Britton's line ends (work done the 19th, form filled the 20th)", () => {
+    const entries = build({ proofRows: [], britton: [line("b1", { job_date: "2026-11-20", client_minutes: 60 })] });
+    expect(entries[0]).toMatchObject({ jobDate: DAY, brittonDay: "2026-11-20" });
+    expect(filterComparison(entries, { verdict: "all", day: "2026-11-20" })).toHaveLength(1);
+    expect(filterComparison(entries, { verdict: "all", day: DAY })).toHaveLength(1);
+    expect(filterComparison(entries, { verdict: "all", day: "2026-11-21" })).toHaveLength(0);
+  });
+
+  it("remarks: OT done the day before; wrong OT number (the person's other OT listed); Britton line on another OT; no sheet", () => {
+    // done the 19th, Britton ends the 20th
+    const [early] = build({ proofRows: [], britton: [line("b1", { job_date: "2026-11-20", client_minutes: 60 })] });
+    expect(early.remark).toEqual({ kind: "earlier", days: 1 });
+    // Britton writes another OT than the one of the sheet: the person's sheet OT are listed on the Britton-only line
+    const wrong = build({ proofRows: [], britton: [line("b1", { ot: "999999" })] });
+    const britton = wrong.find((entry) => !entry.job);
+    expect(britton.remark).toEqual({ kind: "wrongOt", ots: ["OT-211794"] });
+    // ... and the sheet's overtime points at Britton's line of the same person on another OT
+    expect(wrong.find((entry) => entry.job).remark).toEqual({ kind: "brittonOt", ots: ["999999"] });
+    // nobody of that name worked
+    const none = build({ proofRows: [], jobs: [], britton: [line("b1")] });
+    expect(none[0].remark).toEqual({ kind: "noSheet" });
+  });
 });

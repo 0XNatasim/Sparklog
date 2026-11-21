@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { downloadFile, XLSX_TYPE } from "@/lib/download-file";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { OCR_FIRST_DAY } from "@/lib/ocr-readings";
-import { COMPARISON_WIDTHS, comparisonFileName, comparisonTable } from "@/lib/ot-compare-export";
+import { COMPARISON_WIDTHS, comparisonFileName, comparisonTable, remarkText } from "@/lib/ot-compare-export";
 import { VERDICTS, brittonDays, buildOtComparison, comparisonDays, countVerdicts, fetchComparisonData, filterComparison } from "@/lib/ot-compare";
 import { buildXlsx } from "@/lib/xlsx-write";
 import { useT } from "@/lib/use-t";
@@ -55,7 +55,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
   const entries = useMemo(() => (loaded ? buildOtComparison({ proofRows, britton, jobs: data.jobs, people: data.people }) : []), [loaded, proofRows, britton, data]);
   const counts = useMemo(() => countVerdicts(entries), [entries]);
   const shown = useMemo(() => filterComparison(entries, { verdict, day, query }), [entries, verdict, day, query]);
-  const dayOptions = useMemo(() => [...new Set(entries.map((entry) => entry.jobDate))].sort().reverse(), [entries]);
+  const dayOptions = useMemo(() => [...new Set(entries.flatMap((entry) => [entry.jobDate, entry.brittonDay]).filter(Boolean))].sort().reverse(), [entries]);
   const attention = entries.length - counts.ok;
   function download() {
     if (shown.length === 0) return;
@@ -124,7 +124,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
             <tbody className="divide-y">
               {shown.map((entry) => (
                 <tr key={entry.key}>
-                  <td className="whitespace-nowrap px-3 py-2">{dayjs(entry.jobDate).format("DD MMM")}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{dayjs(entry.jobDate).format("DD MMM")}{entry.brittonDay && entry.brittonDay !== entry.jobDate && <div className="text-xs text-muted-foreground">{t("otc.brittonEnds", { date: dayjs(entry.brittonDay).format("DD MMM") })}</div>}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
                     {entry.userId && entry.name ? (
                       <DropdownMenu>
@@ -139,7 +139,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
                       <Num values={source === "britton" ? entry.brittonValues : entry[source]} field={field} red={entry.red[source]} />
                     </td>
                   )))}
-                  <td className="whitespace-nowrap border-l px-3 py-2"><Badge variant={BADGE[entry.verdict]} title={t(`otc.hint.${entry.verdict}`)}>{t(`otc.verdict.${entry.verdict}`)}</Badge></td>
+                  <td className="whitespace-nowrap border-l px-3 py-2"><Badge variant={BADGE[entry.verdict]} title={t(`otc.hint.${entry.verdict}`)}>{t(`otc.verdict.${entry.verdict}`)}</Badge>{entry.remark && <div className="mt-1 max-w-[16rem] whitespace-normal text-xs text-muted-foreground">{remarkText(entry, t)}</div>}</td>
                   <td className="px-3 py-2">
                     {entry.proof?.storagePath && (
                       <Button type="button" size="sm" variant="outline" onClick={() => onView?.(entry.proof)} aria-label={t("ocr.view")} title={t("ocr.view")}><Eye className="h-4 w-4" aria-hidden="true" /></Button>

@@ -18,15 +18,17 @@ const header = (value) => String(value ?? "").normalize("NFD").replace(/[̀-ͯ]/
 
 const COLUMN_TESTS = {
   endedAt: (h) => h.startsWith("heure de fin"),
-  name: (h) => h.startsWith("nom"),
-  company: (h) => h.startsWith("compagnie"),
-  ot: (h) => h === "ot" || h === "# ot" || h === "no ot" || h === "numero ot",
-  client: (h) => /^temps d'?\s?exe/.test(h),
-  returned: (h) => /^temps de(?!x)\b/.test(h),
+  // Two layouts: the current one (« Nom », « Compagnie », « OT », « Temps d'exécution », « Temps de retour », « Durée ») and the
+  // older one of 16-18 Nov. (« Prénom Nom », « Entreprise », « Numéro du OT-XXXXXX », « client », « Auto », « heure total en TS »).
+  name: (h) => h.startsWith("nom") || h === "prenom nom",
+  company: (h) => h.startsWith("compagnie") || h.startsWith("entreprise"),
+  ot: (h) => h === "ot" || h === "# ot" || h === "no ot" || h === "numero ot" || h.startsWith("numero du ot"),
+  client: (h) => /^temps d'?\s?exe/.test(h) || h === "client",
+  returned: (h) => /^temps de(?!x)\b/.test(h) || h === "auto",
   // The « Date » / « Date installation » column is NOT read: it is the date the form was submitted, not the work day (owner,
   // 2026-11-21). The day of a line is the date of its « Heure de fin ».
   note: (h) => h.startsWith("note"),
-  total: (h) => h.startsWith("duree"),
+  total: (h) => h.startsWith("duree") || h.startsWith("heure total"),
 };
 const REQUIRED = ["name", "ot", "client", "returned", "endedAt"];
 

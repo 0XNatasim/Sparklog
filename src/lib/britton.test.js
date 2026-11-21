@@ -19,6 +19,29 @@ const SAMPLE = [
 // The real titles of the file Britton sends (19-20 November): « Temps d'éxécution » (typo included), « Date installation ».
 const REAL_HEAD = ["Heure de fin", "Nom et Prénom Électricien", "Compagnie", "OT", "Temps d'éxécution", "Temps de retour", "Date installation", "Note", "Durée du temps supplémentaire réelle - minutes"];
 
+describe("Britton table: the older layout of 16-18 November", () => {
+  const OLD_HEAD = ["Heure de fin", "Prénom Nom", "Entreprise", "Numéro du OT-XXXXXX", "client ", "Auto", "date ", "Note", "Colonne1", "heure total en TS"];
+  it("reads « client » = at the client, « Auto » = return, « heure total en TS » = total, and the day of the end time", () => {
+    const grid = [
+      OLD_HEAD,
+      ["11/16/2026 16:22", "Personne Un", "Messier Connexion", "OT-216481", "75", "15", "", "", "#NAME?", "90"],
+      ["11/18/26 15:43", "Personne Deux", "Messier Connexion", "OT-269789", "45", "15", "11/18/2026", "", "#NAME?", "60"],
+    ];
+    const parsed = parseBrittonGrid(grid);
+    expect(parsed.headerFound).toBe(true);
+    expect(parsed.skipped).toEqual([]);
+    expect(parsed.rows[0]).toMatchObject({ job_date: "2026-11-16", ot: "216481", client_minutes: 75, return_minutes: 15, total_minutes: 90, company: "Messier Connexion" });
+    expect(parsed.rows[1]).toMatchObject({ job_date: "2026-11-18", ot: "269789", client_minutes: 45, return_minutes: 15 });
+  });
+
+  it("reads it from a comma-separated CSV", async () => {
+    const text = `${OLD_HEAD.join(",")}\r\n11/16/2026 16:22,Personne Un,Messier Connexion,OT-216481,75,15,,,#NAME?,90\r\n`;
+    const parsed = await readBrittonFile(new TextEncoder().encode(text));
+    expect(parsed.headerFound).toBe(true);
+    expect(parsed.rows).toHaveLength(1);
+  });
+});
+
 describe("Britton table: the real file", () => {
   it("recognises the real titles (« éxécution ») and takes the day from « Heure de fin », not from the « Date installation » column", () => {
     expect(findHeader([REAL_HEAD])).toMatchObject({ row: 0, columns: { endedAt: 0, name: 1, ot: 3, client: 4, returned: 5, total: 8 } });

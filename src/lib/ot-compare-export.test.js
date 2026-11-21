@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { COMPARISON_WIDTHS, comparisonFileName, comparisonTable } from "./ot-compare-export";
+import { COMPARISON_WIDTHS, comparisonFileName, comparisonTable, remarkText } from "./ot-compare-export";
 
 const labels = {
-  "ocr.col.date": "Date", "ocr.col.employee": "Employé", "ocr.col.jobOt": "OT", "ocr.col.result": "Résultat", "otc.col.note": "Note Britton",
+  "ocr.col.date": "Date", "ocr.col.employee": "Employé", "ocr.col.jobOt": "OT", "ocr.col.result": "Résultat", "otc.col.note": "Note Britton", "otc.col.remark": "Remarque",
   "otc.col.client": "Chez le client", "otc.col.return": "Retour", "otc.src.britton": "Britton", "otc.src.proof": "Preuve de temps", "otc.src.sheet": "Fiche de travail",
   "otc.verdict.brittonGap": "Britton diffère", "otc.verdict.ok": "Tout concorde", "otc.verdict.missingSparklog": "Pas dans Sparklog",
 };
@@ -21,20 +21,31 @@ describe("comparisonTable", () => {
       "Date", "Employé", "OT",
       "Chez le client – Britton", "Chez le client – Preuve de temps", "Chez le client – Fiche de travail",
       "Retour – Britton", "Retour – Preuve de temps", "Retour – Fiche de travail",
-      "Résultat", "Note Britton",
+      "Résultat", "Remarque", "Note Britton",
     ]);
     expect(header).toHaveLength(COMPARISON_WIDTHS.length);
     expect(rows[0]).toEqual([
       "2026-11-19", "Anthony Fortin", "OT-211794",
       { v: 60, style: "red" }, 120, 120, // client: Britton (odd, red) → proof → work sheet
       15, 15, { v: 10, style: "red" }, // return: Britton → proof → work sheet (odd, red)
-      "Britton diffère", "à vérifier",
+      "Britton diffère", "", "à vérifier",
     ]);
   });
 
   it("leaves a missing source empty (never a zero) and a Britton-only line without work sheet", () => {
     const { rows } = comparisonTable([entry({ verdict: "missingSparklog", job: null, jobOt: "", form: null, sparklog: null, red: { britton: new Set(), form: new Set(), sparklog: new Set() }, britton: { note: null } })], t);
-    expect(rows[0]).toEqual(["2026-11-19", "Anthony Fortin", "211794", 60, "", "", 15, "", "", "Pas dans Sparklog", ""]);
+    expect(rows[0]).toEqual(["2026-11-19", "Anthony Fortin", "211794", 60, "", "", 15, "", "", "Pas dans Sparklog", "", ""]);
+  });
+});
+
+describe("remarkText", () => {
+  it("writes the remark as a sentence and a column of the file", () => {
+    const words = (key, vars = {}) => `${key}:${Object.values(vars).join("|")}`;
+    expect(remarkText({ remark: { kind: "earlier", days: 1 } }, words)).toBe("otc.remark.earlier:1");
+    expect(remarkText({ remark: { kind: "wrongOt", ots: ["OT-1", "OT-2"] } }, words)).toBe("otc.remark.wrongOt:OT-1, OT-2");
+    expect(remarkText({}, words)).toBe("");
+    const { rows } = comparisonTable([entry({ remark: { kind: "earlier", days: 1 } })], (key, vars) => (key === "otc.remark.earlier" ? `avant ${vars.n}` : labels[key] || key));
+    expect(rows[0][10]).toBe("avant 1");
   });
 });
 

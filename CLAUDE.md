@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.304)
+## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.307)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,12 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.307 (technique).** Comparaison par OT : `remark` sur chaque entrée (`remarkOf` dans `buildOtComparison`) — `earlier` (ligne Britton qui finit N jours après la fiche), `otOtherDay` (ligne Britton sans fiche dans la fenêtre mais le même employé a cet OT un autre jour lu), `wrongOt` (ligne Britton sans fiche : ses OT de la fenêtre listés), `noSheet` (aucune fiche de cette personne), `brittonOt` (fiche en temps supp. sans ligne alors que Britton a une ligne non rapprochée de la même personne : ses OT). Personnes liées par `nameKey`. Jamais de rapprochement par déduction : indice seulement. `remarkText(entry, t)` (`ot-compare-export.js`), textes `otc.remark.*` / `otc.col.remark`, colonne « Remarque » ajoutée au fichier Excel (`COMPARISON_WIDTHS` à 12 colonnes). Aucune migration. Tests : `ot-compare.test.js`, `ot-compare-export.test.js`.
+
+**V2.4.306 (technique).** Comparaison par OT : `buildOtComparison` ajoute `brittonDay` (jour de fin de la ligne Britton rapprochée) ; `filterComparison({ day })` accepte `jobDate` **ou** `brittonDay` ; `OtComparison.jsx` : menu « Jour » = jours des fiches + jours de fin Britton, sous-ligne `otc.brittonEnds` dans la colonne Date quand ils diffèrent. Constat (2026-11-21) : une ligne Britton du 20 (OT fait le 19) était rangée sous le 19 seulement. Aucune migration. Test : `ot-compare.test.js`.
+
+**V2.4.305 (technique).** Import Britton : ancien format du 16-18 nov. `COLUMN_TESTS` (`britton.js`) accepte aussi `Prénom Nom` (nom), `Entreprise` (compagnie), `Numéro du OT-XXXXXX` (OT), `client` (chez le client), `Auto` (retour) et `heure total en TS` (total) ; le jour reste la date de « Heure de fin » (jamais la colonne « date »). Limite : deux lignes du même (jour, OT, nom) se réduisent à la dernière (clé unique `britton_overtime`). Aucune migration. Test : `britton.test.js`.
 
 **V2.4.304 (technique).** Tableau comparatif : colonnes regroupées et export Excel. `OtComparison.jsx` : en-tête à deux niveaux — **Chez le client** (Britton · Preuve de temps · Fiche de travail) puis **Retour** (même ordre) — au lieu de trois blocs « client / retour » par source ; un chiffre par cellule (`Num`), en rouge quand la source s'écarte (`entry.red`). Textes : `otc.col.client` / `return` / `note`, `otc.src.britton` / `proof` / `sheet` (remplacent `otc.col.britton` / `form` / `sparklog`), verdict `formGap` = « Preuve diffère », mode « Par OT (Britton · Preuve · Fiche) ». **Bouton « Télécharger (Excel, n lignes) »** : exporte `shown` (les lignes filtrées) — `ot-compare-export.js` (`comparisonTable(entries, t)` : en-têtes `Chez le client – Britton`, `… – Preuve de temps`, `… – Fiche de travail`, puis `Retour – …`, verdict, note Britton ; cellule vide = source absente, jamais 0 ; `{ v, style: "red" }` pour le chiffre qui s'écarte ; `comparisonFileName` : « comparaison temps supp AAAA-MM-JJ au AAAA-MM-JJ.xlsx ») + `xlsx-write.js` (écrivain .xlsx **sans dépendance** : ZIP « stocké » de `zip-store.js`, chaînes `inlineStr`, nombres numériques, styles en-tête / rouge, largeurs, volet figé, filtre automatique, caractères de contrôle retirés, nom de feuille nettoyé ; relu par `readXlsxSheets` dans le test) + `download-file.js` (`downloadFile`, `XLSX_TYPE`). Aucun fichier image, aucune requête de plus. Non vérifié dans Excel lui-même (le fichier est relu par le lecteur de l'app et suit la structure minimale d'un .xlsx). Aucune migration. Tests : `xlsx-write.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`, `OcrReadings.test.jsx`.
 
