@@ -23,11 +23,12 @@ const COLUMN_TESTS = {
   ot: (h) => h === "ot" || h === "# ot" || h === "no ot" || h === "numero ot",
   client: (h) => /^temps d'?\s?exe/.test(h),
   returned: (h) => /^temps de(?!x)\b/.test(h),
-  date: (h) => h === "date" || /^date (?!de fin)/.test(h), // « Date », « Date installation »
+  // The « Date » / « Date installation » column is NOT read: it is the date the form was submitted, not the work day (owner,
+  // 2026-11-21). The day of a line is the date of its « Heure de fin ».
   note: (h) => h.startsWith("note"),
   total: (h) => h.startsWith("duree"),
 };
-const REQUIRED = ["name", "ot", "client", "returned", "date"];
+const REQUIRED = ["name", "ot", "client", "returned", "endedAt"];
 
 // Finds the header row (within the first 30 rows): { row, columns: { name: 1, ot: 3, … } } or null.
 // When no row has every required column, `missingColumns` says which ones the closest row lacks.
@@ -92,6 +93,7 @@ function minutesCell(value) {
 
 // grid (array of rows) → { rows, skipped: [{ line, reason }] } with rows ready for import_britton_overtime. A line without OT and
 // without name is an empty / total line and is ignored; any other line that cannot be read is listed in `skipped` (never guessed).
+// The line's day is the date of its « Heure de fin » (the « Date » column is the submission date and is ignored).
 // The same (day, OT, name) twice in the file keeps the last one.
 export function parseBrittonGrid(grid) {
   const found = findHeader(grid || []);
@@ -107,21 +109,20 @@ export function parseBrittonGrid(grid) {
     if (!rawOt && !name) continue;
     const line = r + 1;
     const ot = brittonOt(rawOt);
-    const day = parseBrittonDate(at("date"));
+    const ended = parseBrittonDate(at("endedAt"));
     const client = minutesCell(at("client"));
     const returned = minutesCell(at("returned"));
     if (!ot) { skipped.push({ line, reason: "ot" }); continue; }
     if (!name || !nameKey(name)) { skipped.push({ line, reason: "name" }); continue; }
-    if (!day) { skipped.push({ line, reason: "date" }); continue; }
+    if (!ended) { skipped.push({ line, reason: "date" }); continue; } // no readable « Heure de fin »
     if (client === null || returned === null) { skipped.push({ line, reason: "minutes" }); continue; }
-    const ended = parseBrittonDate(at("endedAt"));
     const rawTotal = at("total");
     const hasTotal = rawTotal !== undefined && rawTotal !== null && String(rawTotal).trim() !== "";
     const total = hasTotal ? minutesCell(rawTotal) : null;
     const note = String(at("note") ?? "").trim();
     const company = String(at("company") ?? "").trim();
     const row = {
-      job_date: day.day, ot, employee_name: name.slice(0, 120), name_key: nameKey(name), company: company ? company.slice(0, 120) : null,
+      job_date: ended.day, ot, employee_name: name.slice(0, 120), name_key: nameKey(name), company: company ? company.slice(0, 120) : null,
       ended_at: ended?.time ? `${ended.day} ${ended.time}` : null, client_minutes: client, return_minutes: returned,
       total_minutes: total === null ? client + returned : total, note: note ? note.slice(0, 500) : null,
     };
@@ -171,32 +172,54 @@ export async function importBrittonRows(client, rows) {
 
 const BRITTON_COLUMNS = "id, job_date, ot, employee_name, name_key, client_minutes, return_minutes, total_minutes, note, ended_at, imported_at";
 
-// The imported lines from `fromDay` on (all pages). A table that does not exist yet (migration 0156 not applied) = no lines.
+const addDays = (isoDay, count) => {
+  const date = new Date(`${isoDay}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + count);
+  return date.toISOString().slice(0, 10);
+};
+// Whole days from `from` to `to` (YYYY-MM-DD both).
+export const dayDiff = (from, to) => Math.round((Date.parse(`${String(to).slice(0, 10)}T00:00:00Z`) - Date.parse(`${String(from).slice(0, 10)}T00:00:00Z`)) / 86400000);
+// A Britton line ends the day of the work or up to two days after (a form filled the next morning or after the week-end).
+export const BRITTON_WINDOW_DAYS = 2;
+export const shiftDay = addDays;
+
+// The imported lines whose day is `fromDay` or later (all pages). The day of a line is the date of its end time (older imports took
+// the « Date » column, which is the submission date: their stored end time is used instead); the same Britton line imported twice
+// (same OT, name and end time) keeps the most recent import. A table that does not exist yet (migration 0156 not applied) = no lines.
 export async function fetchBrittonRows(client, fromDay) {
-  const { data, error } = await fetchAllRows(() => client.from("britton_overtime").select(BRITTON_COLUMNS).gte("job_date", fromDay).order("id"));
+  const { data, error } = await fetchAllRows(() => client.from("britton_overtime").select(BRITTON_COLUMNS).gte("job_date", addDays(fromDay, -3)).order("id"));
   if (error) {
     if (/britton_overtime|does not exist|schema cache|42P01|PGRST205/i.test(`${error.message || ""} ${error.code || ""}`)) return [];
     throw error;
   }
-  return data || [];
+  const latest = new Map();
+  for (const row of data || []) {
+    const ended = String(row.ended_at || "").replace(" ", "T");
+    const line = { ...row, job_date: ended ? ended.slice(0, 10) : String(row.job_date).slice(0, 10) };
+    const key = ended ? `${line.ot}|${line.name_key}|${ended.slice(0, 16)}` : `id:${line.id}`;
+    const kept = latest.get(key);
+    if (!kept || String(line.imported_at || "") > String(kept.imported_at || "")) latest.set(key, line);
+  }
+  return [...latest.values()].filter((line) => line.job_date >= fromDay);
 }
 
-// Puts each Britton line beside the Sparklog proof rows (buildOcrRows) of the same work date and OT. When several Britton lines
-// share the day and OT (two electricians on the same OT), the one with the same name wins. `britton` of a row = the line or null;
-// `brittonWrong` = fields (client / return) that differ from what the Sparklog timesheet says, with the same tolerances as the proofs.
-// `unmatched` = Britton lines no Sparklog proof row of that day and OT answers to.
+// Puts each Britton line beside the Sparklog proof rows (buildOcrRows) of the same OT whose work day is the line's day or up to
+// two days before it. When several lines qualify, the one with the same name wins, then the closest day. `britton` of a row = the
+// line or null; `brittonWrong` = fields (client / return) that differ from what the Sparklog timesheet says, with the same
+// tolerances as the proofs. `unmatched` = Britton lines no Sparklog proof row answers to.
 export function attachBritton(rows, brittonRows) {
-  const byKey = new Map();
+  const byOt = new Map();
   for (const line of brittonRows || []) {
-    const key = `${String(line.job_date).slice(0, 10)}|${line.ot}`;
-    if (!byKey.has(key)) byKey.set(key, []);
-    byKey.get(key).push(line);
+    if (!byOt.has(line.ot)) byOt.set(line.ot, []);
+    byOt.get(line.ot).push(line);
   }
   const used = new Set();
   const out = (rows || []).map((row) => {
     const ot = brittonOt(row.jobOt) || brittonOt(row.found?.ot);
-    const candidates = ot ? byKey.get(`${row.jobDate}|${ot}`) || [] : [];
-    const line = candidates.length <= 1 ? candidates[0] || null : candidates.find((item) => item.name_key === nameKey(row.name)) || null;
+    const candidates = (ot ? byOt.get(ot) || [] : []).map((line) => ({ line, lag: dayDiff(row.jobDate, line.job_date) })).filter(({ lag }) => lag >= 0 && lag <= BRITTON_WINDOW_DAYS);
+    const named = candidates.filter(({ line }) => line.name_key === nameKey(row.name));
+    const pool = named.length ? named : candidates.length === 1 ? candidates : [];
+    const line = pool.sort((a, b) => a.lag - b.lag)[0]?.line || null;
     if (!line) return { ...row, britton: null, brittonWrong: new Set() };
     used.add(line.id);
     const wrong = new Set();

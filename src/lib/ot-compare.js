@@ -4,7 +4,7 @@
 import { PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN, expectedProofForJob, otDigits } from "./overtime-proof-check";
 import { DAILY_REGULAR_MINUTES, TEN_HOUR_DAY_MINUTES, dayFirstTripUnpaidMinutes, minutesBetween } from "./payroll-calculations";
 import { byDepart, overtimeLineJobIds } from "./overtime-proof-rules";
-import { nameKey } from "./britton";
+import { BRITTON_WINDOW_DAYS, dayDiff, nameKey, shiftDay } from "./britton";
 import { fetchAllRows } from "./fetch-all";
 import { QUERY_BUDGETS } from "./query-budgets";
 import { withTimeout } from "./utils";
@@ -35,10 +35,11 @@ function oddOnes(values, field) {
 // (all employees); `people`: Map of user id -> { full_name, first_trip_unpaid, ten_hour_days }. Only days that have at least one
 // Britton line are compared (on a day Britton did not send, every overtime would look « missing »).
 export function buildOtComparison({ proofRows = [], britton = [], jobs = [], people = new Map() }) {
+  // The days Britton sent lines for (the day a line ends); the work of a line is the same day or up to BRITTON_WINDOW_DAYS earlier.
   const days = new Set(britton.map((line) => day(line.job_date)));
   const byDay = new Map();
   for (const job of jobs) {
-    if (!days.has(day(job.job_date)) || !job.user_id) continue;
+    if (!job.user_id) continue;
     const key = `${job.user_id}|${day(job.job_date)}`;
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key).push(job);
@@ -50,8 +51,10 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     if (!entries.has(key)) entries.set(key, { key, proofs: [], britton: null, ...base });
     return entries.get(key);
   };
+  const entryOf = (info, extra = {}) => ensure(`job:${info.job.id}`, { userId: info.userId, jobDate: info.jobDate, name: info.name, job: info.job, expected: info.expected, ...extra });
 
-  // 1. Sparklog: the work orders past the line of each employee-day, with what the timesheet says they should read.
+  // 1. Sparklog: the work orders past the line of each employee-day, with what the timesheet says they should read. On a day Britton
+  // sent nothing for, an entry is only kept if a Britton line ends up pointing at it (weak entry).
   for (const [key, dayJobs] of byDay) {
     const [userId, jobDate] = key.split("|");
     const person = people.get(userId) || null;
@@ -65,49 +68,51 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     for (const job of dayJobs) {
       const info = { job, userId, jobDate, name: (person?.full_name || "").trim(), expected: expectedProofForJob(dayJobs, job, options) };
       jobInfo.set(job.id, info);
-      if (lineIds.has(job.id)) ensure(`job:${job.id}`, { userId, jobDate, name: info.name, job, expected: info.expected });
+      if (lineIds.has(job.id) && days.has(jobDate)) entryOf(info);
     }
   }
 
   // 2. The proofs (form captures), each on its own work order.
   for (const row of proofRows) {
-    if (!days.has(day(row.jobDate))) continue;
     const info = jobInfo.get(row.jobId);
+    const covered = days.has(day(row.jobDate));
+    if (!info && !covered) continue;
     const entry = info
-      ? ensure(`job:${row.jobId}`, { userId: info.userId, jobDate: info.jobDate, name: info.name, job: info.job, expected: info.expected })
+      ? entryOf(info, covered || entries.has(`job:${row.jobId}`) ? {} : { weak: true })
       : ensure(`proof:${row.id}`, { userId: row.userId, jobDate: day(row.jobDate), name: row.name, job: row.job || null, expected: row.expected || null });
     entry.proofs.push(row);
   }
 
-  // 3. Britton lines: same day and OT; the same name wins when several entries share them. A work order UNDER the line that a
-  // Britton line points at joins the comparison too (Britton approved minutes the timesheet does not count as overtime); one that
-  // no line ends up on is dropped again.
+  // 3. Britton lines. A line matches the work order with the same OT whose day is the line's day or up to two days before; the same
+  // name wins, then the closest day. A work order under the line (or on a day Britton did not send) that a line points at joins the
+  // comparison too; one that no line ends up on is dropped again.
+  const inWindow = (line, jobDate) => { const lag = dayDiff(jobDate, day(line.job_date)); return lag >= 0 && lag <= BRITTON_WINDOW_DAYS; };
   for (const line of britton) {
     for (const info of jobInfo.values()) {
-      if (info.jobDate === day(line.job_date) && otDigits(info.job.ot) === line.ot) ensure(`job:${info.job.id}`, { userId: info.userId, jobDate: info.jobDate, name: info.name, job: info.job, expected: info.expected, weak: !entries.has(`job:${info.job.id}`) });
+      if (otDigits(info.job.ot) === line.ot && inWindow(line, info.jobDate)) entryOf(info, entries.has(`job:${info.job.id}`) ? {} : { weak: true });
     }
   }
-  const index = new Map();
+  const byOt = new Map();
   for (const entry of entries.values()) {
     const ot = otDigits(entry.job?.ot) || otDigits(entry.proofs[0]?.jobOt) || otDigits(entry.proofs[0]?.found?.ot);
     entry.ot = ot;
     if (!ot) continue;
-    const key = `${entry.jobDate}|${ot}`;
-    if (!index.has(key)) index.set(key, []);
-    index.get(key).push(entry);
+    if (!byOt.has(ot)) byOt.set(ot, []);
+    byOt.get(ot).push(entry);
   }
+  const candidatesOf = (line) => (byOt.get(line.ot) || []).filter((entry) => !entry.britton && inWindow(line, entry.jobDate))
+    .sort((a, b) => dayDiff(a.jobDate, day(line.job_date)) - dayDiff(b.jobDate, day(line.job_date)));
   const lines = [...britton].sort((a, b) => String(a.id).localeCompare(String(b.id)));
   const leftover = [];
   for (const line of lines) {
-    const candidates = (index.get(`${day(line.job_date)}|${line.ot}`) || []).filter((entry) => !entry.britton);
-    const named = candidates.find((entry) => nameKey(entry.name) === line.name_key);
+    const named = candidatesOf(line).find((entry) => nameKey(entry.name) === line.name_key);
     if (named) named.britton = line; else leftover.push(line);
   }
   const unmatched = [];
   for (const line of leftover) {
-    const candidates = (index.get(`${day(line.job_date)}|${line.ot}`) || []).filter((entry) => !entry.britton);
-    const sameKey = leftover.filter((other) => day(other.job_date) === day(line.job_date) && other.ot === line.ot);
-    if (candidates.length === 1 && sameKey.length === 1) candidates[0].britton = line; // names differ (spelling), day and OT agree
+    const candidates = candidatesOf(line);
+    const sameOt = leftover.filter((other) => other.ot === line.ot);
+    if (candidates.length === 1 && sameOt.length === 1) candidates[0].britton = line; // names differ (spelling), OT and days agree
     else unmatched.push(line);
   }
   for (const [key, entry] of entries) if (entry.weak && !entry.britton) entries.delete(key);
@@ -157,8 +162,11 @@ export function filterComparison(entries, { verdict = "attention", day: dayFilte
   });
 }
 
-// The work dates that have Britton lines (from the first OCR day on), most recent first.
+// The days Britton ended lines on, most recent first.
 export const brittonDays = (britton) => [...new Set((britton || []).map((line) => day(line.job_date)))].sort().reverse();
+
+// The days whose work orders are read: each Britton day and the two days before it (a line ends the work day or shortly after).
+export const comparisonDays = (britton) => [...new Set(brittonDays(britton).flatMap((date) => Array.from({ length: BRITTON_WINDOW_DAYS + 1 }, (_, back) => shiftDay(date, -back))))].sort().reverse();
 
 const JOB_COLUMNS = "id, user_id, job_date, status, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
 const JOB_STATUSES = ["saved", "updated", "submitted", "approved"];

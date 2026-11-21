@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { OCR_FIRST_DAY } from "@/lib/ocr-readings";
-import { VERDICTS, brittonDays, buildOtComparison, countVerdicts, fetchComparisonData, filterComparison } from "@/lib/ot-compare";
+import { VERDICTS, brittonDays, buildOtComparison, comparisonDays, countVerdicts, fetchComparisonData, filterComparison } from "@/lib/ot-compare";
 import { useT } from "@/lib/use-t";
 import { supabase } from "@/supabaseClient";
 
@@ -30,7 +30,8 @@ export default function OtComparison({ britton, proofRows, onView }) {
   const t = useT();
   const navigate = useNavigate();
   const days = useMemo(() => brittonDays(britton).filter((date) => date >= OCR_FIRST_DAY), [britton]);
-  const daysKey = days.join(",");
+  const loadDays = useMemo(() => comparisonDays(britton), [britton]);
+  const daysKey = loadDays.join(",");
   const [data, setData] = useState({ key: "", jobs: [], people: new Map(), truncated: false });
   const [error, setError] = useState("");
   const [verdict, setVerdict] = useState("attention");
@@ -50,6 +51,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
   const entries = useMemo(() => (loaded ? buildOtComparison({ proofRows, britton, jobs: data.jobs, people: data.people }) : []), [loaded, proofRows, britton, data]);
   const counts = useMemo(() => countVerdicts(entries), [entries]);
   const shown = useMemo(() => filterComparison(entries, { verdict, day, query }), [entries, verdict, day, query]);
+  const dayOptions = useMemo(() => [...new Set(entries.map((entry) => entry.jobDate))].sort().reverse(), [entries]);
   const attention = entries.length - counts.ok;
   const timesheetLink = (entry) => `/manager/v3/time?tab=timesheets&emp=${entry.userId}&date=${entry.jobDate}${entry.job ? `&job=${entry.job.id}` : ""}`;
 
@@ -74,7 +76,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
             </Select>
             <Select value={day} onChange={(event) => setDay(event.target.value)} aria-label={t("ocr.dayLabel")}>
               <option value="">{t("ocr.allDays")}</option>
-              {days.map((date) => <option key={date} value={date}>{dayjs(date).format("ddd DD MMM")}</option>)}
+              {dayOptions.map((date) => <option key={date} value={date}>{dayjs(date).format("ddd DD MMM")}</option>)}
             </Select>
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("ocr.search")} aria-label={t("ocr.search")} />
           </div>
