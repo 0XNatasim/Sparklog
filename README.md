@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.296 — Overtime proof kept when no longer needed (migration 0153).** When a day falls back to the line (8 h / 10 h) its proofs are no longer deleted: they are marked « Proof not needed » (OCR tab, preview, downloaded sheet) and kept, and the mark goes away if the day passes the line again.
 - **V2.4.296 — Change the minutes of a sheet (special option, owner only).** In Avancé › Emergency timesheet, a switch « Change the minutes » (off by default, migration 0152). While on, a red banner shows on every management page and the owner can move the Start / End of a sheet (saved, to update or submitted; never approved or exported) with a written reason. For cases like 6:57 → 15:00 (3 minutes of overtime) where nobody wants to fill a proof form. Each change is audited (before / after / reason).
 - **V2.4.295 — Week snapshot: all the jobs of the week.** The snapshot read the week in one request, which returns 1000 rows at most; the week of 15 → 21 Nov holds 1054 jobs, so some days showed no hours or too few. It now reads the week page by page.
 - **V2.4.294 — Timesheet: « All » in the existing menu.** The extra status menu added in V2.4.293 is removed from the filter row. The pile selector that was already there (under the ★ legend, one employee selected) gets an « All » option, first and default: the four piles one under the other on a phone (on a computer they were already side by side).

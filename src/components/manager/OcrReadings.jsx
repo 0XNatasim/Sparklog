@@ -23,6 +23,7 @@ import { supabase } from "@/supabaseClient";
 
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
+const NOT_NEEDED_COLUMN = ", not_needed_at"; // migration 0153: read when it exists
 const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
@@ -89,8 +90,11 @@ export default function OcrReadings() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const { data: evidence, error: evidenceError } = await withTimeout(
-        supabase.from("overtime_evidence").select(EVIDENCE_COLUMNS).gte("job_date", OCR_FIRST_DAY).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.ocrReadings), 12000);
+      const readEvidence = (columns) => withTimeout(
+        supabase.from("overtime_evidence").select(columns).gte("job_date", OCR_FIRST_DAY).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.ocrReadings), 12000);
+      let { data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN);
+      // Migration 0153 not applied yet: the same list without the « not needed » mark.
+      if (evidenceError && /not_needed_at/i.test(String(evidenceError.message || ""))) ({ data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS));
       if (evidenceError) throw evidenceError;
       // The switch of the « Send back for correction » button (a missing column = off).
       const { data: setting } = await withTimeout(supabase.from("overtime_settings").select("*").eq("id", true).maybeSingle(), 12000).catch(() => ({ data: null }));
@@ -295,6 +299,7 @@ export default function OcrReadings() {
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge>
+                    {row.notNeeded && <Badge variant="secondary" className="ml-1" title={t("ocr.notNeededHint")}>{t("ocr.notNeeded")}</Badge>}
                     {row.state === "queued" && (
                       <div className="mt-1 text-[11px] text-muted-foreground">
                         {row.attempts > 0 ? t("ocr.queueTried", { count: row.attempts, max: 5 }) : t("ocr.queueNever")}
