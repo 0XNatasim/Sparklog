@@ -25,12 +25,13 @@ const COLUMN_TESTS = {
   ot: (h) => h === "ot" || h === "# ot" || h === "no ot" || h === "numero ot" || h.startsWith("numero du ot"),
   client: (h) => /^temps d'?\s?exe/.test(h) || h === "client",
   returned: (h) => /^temps de(?!x)\b/.test(h) || h === "auto",
-  // The « Date » / « Date installation » column is NOT read: it is the date the form was submitted, not the work day (owner,
-  // 2026-11-21). The day of a line is the date of its « Heure de fin ».
+  // The « Date » / « Date installation » column is the day of the line (owner, 2026-11-22: the 2026-11-21 decision to use the end
+  // time instead was a mistake). « Heure de fin » only gives the end time, and the day when « Date » is blank.
+  date: (h) => (h === "date" || h.startsWith("date ")) && !h.startsWith("date de fin"),
   note: (h) => h.startsWith("note"),
   total: (h) => h.startsWith("duree") || h.startsWith("heure total"),
 };
-const REQUIRED = ["name", "ot", "client", "returned", "endedAt"];
+const REQUIRED = ["name", "ot", "client", "returned", "date", "endedAt"];
 
 // Finds the header row (within the first 30 rows): { row, columns: { name: 1, ot: 3, … } } or null.
 // When no row has every required column, `missingColumns` says which ones the closest row lacks.
@@ -95,8 +96,8 @@ function minutesCell(value) {
 
 // grid (array of rows) → { rows, skipped: [{ line, reason }] } with rows ready for import_britton_overtime. A line without OT and
 // without name is an empty / total line and is ignored; any other line that cannot be read is listed in `skipped` (never guessed).
-// The line's day is the date of its « Heure de fin » (the « Date » column is the submission date and is ignored).
-// The same (day, OT, name) twice in the file keeps the last one.
+// The line's day is its « Date » column; when that cell is blank (some lines of the older table) the date of its « Heure de fin » is
+// used. A line with neither readable is listed, never guessed. The same (day, OT, name) twice in the file keeps the last one.
 export function parseBrittonGrid(grid) {
   const found = findHeader(grid || []);
   if (!found) return { rows: [], skipped: [], headerFound: false, missing: missingColumns(grid) };
@@ -112,11 +113,13 @@ export function parseBrittonGrid(grid) {
     const line = r + 1;
     const ot = brittonOt(rawOt);
     const ended = parseBrittonDate(at("endedAt"));
+    const dated = parseBrittonDate(at("date"));
     const client = minutesCell(at("client"));
     const returned = minutesCell(at("returned"));
     if (!ot) { skipped.push({ line, reason: "ot" }); continue; }
     if (!name || !nameKey(name)) { skipped.push({ line, reason: "name" }); continue; }
-    if (!ended) { skipped.push({ line, reason: "date" }); continue; } // no readable « Heure de fin »
+    const day = dated?.day || ended?.day;
+    if (!day) { skipped.push({ line, reason: "date" }); continue; } // no readable « Date » nor « Heure de fin »
     if (client === null || returned === null) { skipped.push({ line, reason: "minutes" }); continue; }
     const rawTotal = at("total");
     const hasTotal = rawTotal !== undefined && rawTotal !== null && String(rawTotal).trim() !== "";
@@ -124,7 +127,7 @@ export function parseBrittonGrid(grid) {
     const note = String(at("note") ?? "").trim();
     const company = String(at("company") ?? "").trim();
     const row = {
-      job_date: ended.day, ot, employee_name: name.slice(0, 120), name_key: nameKey(name), company: company ? company.slice(0, 120) : null,
+      job_date: day, ot, employee_name: name.slice(0, 120), name_key: nameKey(name), company: company ? company.slice(0, 120) : null,
       ended_at: ended?.time ? `${ended.day} ${ended.time}` : null, client_minutes: client, return_minutes: returned,
       total_minutes: total === null ? client + returned : total, note: note ? note.slice(0, 500) : null,
     };
@@ -181,13 +184,13 @@ const addDays = (isoDay, count) => {
 };
 // Whole days from `from` to `to` (YYYY-MM-DD both).
 export const dayDiff = (from, to) => Math.round((Date.parse(`${String(to).slice(0, 10)}T00:00:00Z`) - Date.parse(`${String(from).slice(0, 10)}T00:00:00Z`)) / 86400000);
-// A Britton line ends the day of the work or up to two days after (a form filled the next morning or after the week-end).
+// A Britton line is dated the day of the work or up to two days after (a form filled the next morning or after the week-end).
 export const BRITTON_WINDOW_DAYS = 2;
 export const shiftDay = addDays;
 
-// The imported lines whose day is `fromDay` or later (all pages). The day of a line is the date of its end time (older imports took
-// the « Date » column, which is the submission date: their stored end time is used instead); the same Britton line imported twice
-// (same OT, name and end time) keeps the most recent import. A table that does not exist yet (migration 0156 not applied) = no lines.
+// The imported lines whose day is `fromDay` or later (all pages). The day of a line is its stored `job_date` (its « Date » column);
+// the same Britton line imported twice (same OT, name and end time) keeps the most recent import, so a re-import that changed its
+// day replaces the old one. A table that does not exist yet (migration 0156 not applied) = no lines.
 export async function fetchBrittonRows(client, fromDay) {
   const { data, error } = await fetchAllRows(() => client.from("britton_overtime").select(BRITTON_COLUMNS).gte("job_date", addDays(fromDay, -3)).order("id"));
   if (error) {
@@ -197,7 +200,7 @@ export async function fetchBrittonRows(client, fromDay) {
   const latest = new Map();
   for (const row of data || []) {
     const ended = String(row.ended_at || "").replace(" ", "T");
-    const line = { ...row, job_date: ended ? ended.slice(0, 10) : String(row.job_date).slice(0, 10) };
+    const line = { ...row, job_date: String(row.job_date).slice(0, 10) };
     const key = ended ? `${line.ot}|${line.name_key}|${ended.slice(0, 16)}` : `id:${line.id}`;
     const kept = latest.get(key);
     if (!kept || String(line.imported_at || "") > String(kept.imported_at || "")) latest.set(key, line);

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.314)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.315)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.315 (technique).** Import Britton : le jour d'une ligne est de nouveau la colonne « Date » (correction de V2.4.303, décision de la propriétaire du 2026-11-22 : « ce n'est pas Heure de fin mais bien date »). `britton.js` : `COLUMN_TESTS.date` rétabli (`date` ou `date …` sauf `date de fin`), `REQUIRED` = nom, OT, exécution, retour, **date**, heure de fin ; `parseBrittonGrid` : `job_date` = date de la colonne « Date », sinon (cellule vide : les lignes du 16 de l'ancien tableau, 1 ligne du 16 du tableau du 19-20) la date de « Heure de fin » ; ligne sans l'une ni l'autre = listée (`date`) ; `ended_at` garde l'heure de fin. `fetchBrittonRows` ne recalcule plus le jour depuis `ended_at` : `job_date` stocké, et pour une même ligne (OT + nom + heure de fin) l'import le plus récent gagne (une réimportation qui change le jour remplace l'ancienne copie). **Données en base au 2026-11-22 :** le tableau du 19-20 (importé avant V2.4.303) porte déjà la colonne « Date » ; celui du 16-18 (importé après) porte la date de fin : **réimporter les deux fichiers**. Vérifié sur le vrai fichier du 16-18 (lecture seule) : 72 lignes, 0 refusée (15 : 1, 16 : 33, 17 : 29, 18 : 9 ; la ligne de fin le 18 à 9 h 39 datée du 16 revient au 16). Texte `britton.field.date`. `BRITTON_WINDOW_DAYS = 2` inchangé. Aucune migration. Tests : `britton.test.js`.
 
 **V2.4.314 (technique).** Fichier Excel : nom et OT bons en vert. `ot-compare-export.js` : `matched = entry.britton && entry.job` (une ligne Britton rapprochée de la fiche) → nom et OT en `{ v, style: "green" }` quel que soit le verdict (ok, `brittonGap`, `formGap`, `noProof`) ; `missingBritton` inchangé (OT rouge, nom vert si `personInBritton` sinon rouge) ; `missingSparklog` (ligne Britton sans fiche) reste sans couleur. `xlsx-write.js` : `FILLED.orange.green` = style 9 de `cellXfs` (police verte sur remplissage orange pâle). Aucune migration. Tests : `ot-compare-export.test.js`, `xlsx-write.test.js`.
 
