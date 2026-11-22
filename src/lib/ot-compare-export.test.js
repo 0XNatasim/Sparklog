@@ -46,6 +46,18 @@ describe("not at Britton", () => {
   });
 });
 
+describe("name and OT that are good", () => {
+  it("writes the name and the OT in green when Britton has a line for the work order, whatever the verdict (ok, gap, no proof)", () => {
+    for (const verdict of ["ok", "brittonGap", "formGap", "noProof"]) {
+      const row = comparisonTable([entry({ verdict, job: { id: "j1" } })], t).rows[0];
+      expect(row.slice(1, 3)).toEqual([{ v: "Anthony Fortin", style: "green" }, { v: "OT-211794", style: "green" }]);
+    }
+    // a Britton line with no work sheet: left plain
+    const alone = comparisonTable([entry({ verdict: "missingSparklog", job: null })], t).rows[0];
+    expect(alone.slice(1, 3)).toEqual(["Anthony Fortin", "OT-211794"]);
+  });
+});
+
 describe("everything agrees", () => {
   it("writes the figures in green (not the empty cells) when the verdict is « ok »; the other verdicts keep plain figures", () => {
     const ok = comparisonTable([entry({ verdict: "ok", brittonValues: { client: 120, return: 0 }, form: null, sparklog: { client: 120, return: 0 }, red: { britton: new Set(), form: new Set(), sparklog: new Set() } })], t).rows[0];
