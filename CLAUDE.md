@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.315)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.316)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.316 (technique).** « Par OT » : jour, nom et OT de la ligne Britton. `buildOtComparison` ajoute à chaque entrée `day` (jour de la ligne Britton rapprochée = sa colonne « Date », sinon `jobDate`), `shownName` (nom de la ligne Britton, sinon de la fiche) et `shownOt` (`OT-<ot>` de la ligne Britton, sinon l'OT de la fiche) ; tri et `filterComparison({ day })` sur `day` (avant : jour de la fiche **ou** jour de fin Britton, V2.4.306), recherche sur les deux noms / OT. `OtComparison.jsx` : colonne Date = `day` avec « Fiche : JJ mmm » (`otc.sheetDay`, remplace `otc.brittonEnds`) quand le jour de la fiche diffère ; Employé / OT = `shownName` / `shownOt` (le lien vers la fiche du jour garde `userId` / `jobDate`) ; en-tête `otc.col.ot` (« OT »). `ot-compare-export.js` : date, nom et OT du fichier = `day` / `shownName` / `shownOt` (avec repli sur `jobDate` / `name` / `jobOt`), `comparisonFileName` sur `day`. Le rapprochement (fenêtre de 2 jours, même OT) est inchangé : c'est l'affichage et le classement par jour qui suivent Britton. Aucune migration. Tests : `ot-compare.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`.
 
 **V2.4.315 (technique).** Import Britton : le jour d'une ligne est de nouveau la colonne « Date » (correction de V2.4.303, décision de la propriétaire du 2026-11-22 : « ce n'est pas Heure de fin mais bien date »). `britton.js` : `COLUMN_TESTS.date` rétabli (`date` ou `date …` sauf `date de fin`), `REQUIRED` = nom, OT, exécution, retour, **date**, heure de fin ; `parseBrittonGrid` : `job_date` = date de la colonne « Date », sinon (cellule vide : les lignes du 16 de l'ancien tableau, 1 ligne du 16 du tableau du 19-20) la date de « Heure de fin » ; ligne sans l'une ni l'autre = listée (`date`) ; `ended_at` garde l'heure de fin. `fetchBrittonRows` ne recalcule plus le jour depuis `ended_at` : `job_date` stocké, et pour une même ligne (OT + nom + heure de fin) l'import le plus récent gagne (une réimportation qui change le jour remplace l'ancienne copie). **Données en base au 2026-11-22 :** le tableau du 19-20 (importé avant V2.4.303) porte déjà la colonne « Date » ; celui du 16-18 (importé après) porte la date de fin : **réimporter les deux fichiers**. Vérifié sur le vrai fichier du 16-18 (lecture seule) : 72 lignes, 0 refusée (15 : 1, 16 : 33, 17 : 29, 18 : 9 ; la ligne de fin le 18 à 9 h 39 datée du 16 revient au 16). Texte `britton.field.date`. `BRITTON_WINDOW_DAYS = 2` inchangé. Aucune migration. Tests : `britton.test.js`.
 

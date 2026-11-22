@@ -75,7 +75,7 @@ describe("OtComparison", () => {
     setup({ jobs: [job("j1", "u1", "OT-111111")], britton: [line("b1", "Alex Un", "111111", 60)] });
     await screen.findByText("Alex Un");
     const [groups, sources] = screen.getAllByRole("row").slice(0, 2).map((row) => [...row.querySelectorAll("th")].map((cell) => cell.textContent.trim()).filter(Boolean));
-    expect(groups.slice(0, 5)).toEqual(["Date", "Employé", "OT (fiche)", "Chez le client", "Retour"]); // the two groups, side by side
+    expect(groups.slice(0, 5)).toEqual(["Date", "Employé", "OT", "Chez le client", "Retour"]); // the two groups, side by side
     expect(sources).toEqual(["Britton", "Preuve de temps", "Fiche de travail", "Britton", "Preuve de temps", "Fiche de travail"]); // same order in each
   });
 

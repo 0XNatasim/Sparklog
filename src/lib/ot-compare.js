@@ -172,9 +172,12 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     else if (proofs.every((row) => row.state === "sms")) verdict = "noProof"; // no proof, or only the screenshot of the text message (not a valid proof)
     else verdict = "ok";
 
-    out.push({ ...entry, brittonDay: entry.britton ? day(entry.britton.job_date) : "", remark: remarkOf(entry), personInBritton: Boolean(entry.job && !entry.britton && nearLinesOf(entry).length), proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
+    // What the row shows: the Britton line's own day, name and OT when there is one (its « Date » column classifies the day), else the sheet's.
+    const brittonLine = entry.britton || null;
+    out.push({ ...entry, day: brittonLine ? day(brittonLine.job_date) : entry.jobDate, shownName: brittonLine ? brittonLine.employee_name : entry.name,
+      shownOt: brittonLine ? `OT-${brittonLine.ot}` : (entry.job?.ot ? String(entry.job.ot) : entry.ot ? `OT-${entry.ot}` : ""), brittonDay: entry.britton ? day(entry.britton.job_date) : "", remark: remarkOf(entry), personInBritton: Boolean(entry.job && !entry.britton && nearLinesOf(entry).length), proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
   }
-  return out.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || RANK[a.verdict] - RANK[b.verdict] || String(a.name).localeCompare(String(b.name)) || String(a.ot).localeCompare(String(b.ot)));
+  return out.sort((a, b) => b.day.localeCompare(a.day) || RANK[a.verdict] - RANK[b.verdict] || String(a.name).localeCompare(String(b.name)) || String(a.ot).localeCompare(String(b.ot)));
 }
 
 export function countVerdicts(entries) {
@@ -187,10 +190,10 @@ export function countVerdicts(entries) {
 export function filterComparison(entries, { verdict = "attention", day: dayFilter = "", query = "" } = {}) {
   const needle = String(query || "").trim().toLowerCase();
   return (entries || []).filter((entry) => {
-    if (dayFilter && entry.jobDate !== dayFilter && entry.brittonDay !== dayFilter) return false; // the work day or the day Britton's line ends
+    if (dayFilter && entry.day !== dayFilter) return false; // the day of the row: the Britton line's « Date » when there is one
     if (verdict === "attention" && entry.verdict === "ok") return false;
     if (VERDICTS.includes(verdict) && entry.verdict !== verdict) return false;
-    return !needle || `${entry.name} ${entry.ot} ${entry.jobOt}`.toLowerCase().includes(needle);
+    return !needle || `${entry.name} ${entry.shownName} ${entry.ot} ${entry.jobOt} ${entry.shownOt}`.toLowerCase().includes(needle);
   });
 }
 

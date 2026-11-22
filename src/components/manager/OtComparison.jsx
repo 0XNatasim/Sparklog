@@ -58,7 +58,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
   const entries = useMemo(() => (loaded ? buildOtComparison({ proofRows, britton, jobs: data.jobs, people: data.people }) : []), [loaded, proofRows, britton, data]);
   const counts = useMemo(() => countVerdicts(entries), [entries]);
   const shown = useMemo(() => filterComparison(entries, { verdict, day, query }), [entries, verdict, day, query]);
-  const dayOptions = useMemo(() => [...new Set(entries.flatMap((entry) => [entry.jobDate, entry.brittonDay]).filter(Boolean))].sort().reverse(), [entries]);
+  const dayOptions = useMemo(() => [...new Set(entries.map((entry) => entry.day).filter(Boolean))].sort().reverse(), [entries]);
   const attention = entries.length - counts.ok;
   function download() {
     if (shown.length === 0) return;
@@ -113,7 +113,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
               <tr>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.date")}</th>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.employee")}</th>
-                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.jobOt")}</th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("otc.col.ot")}</th>
                 {FIELD_GROUPS.map(([field, labelKey]) => <th key={field} colSpan={3} className="border-l px-3 py-2 text-center">{t(labelKey)}</th>)}
                 <th rowSpan={2} className="border-l px-3 py-2 align-bottom">{t("ocr.col.result")}</th>
                 <th rowSpan={2} className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
@@ -127,16 +127,16 @@ export default function OtComparison({ britton, proofRows, onView }) {
             <tbody className="divide-y">
               {shown.map((entry) => (
                 <tr key={entry.key}>
-                  <td className="whitespace-nowrap px-3 py-2">{dayjs(entry.jobDate).format("DD MMM")}{entry.brittonDay && entry.brittonDay !== entry.jobDate && <div className="text-xs text-muted-foreground">{t("otc.brittonEnds", { date: dayjs(entry.brittonDay).format("DD MMM") })}</div>}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{dayjs(entry.day).format("DD MMM")}{entry.job && entry.jobDate !== entry.day && <div className="text-xs text-muted-foreground">{t("otc.sheetDay", { date: dayjs(entry.jobDate).format("DD MMM") })}</div>}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
-                    {entry.userId && entry.name ? (
+                    {entry.userId && entry.shownName ? (
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><button type="button" className={`font-medium hover:underline ${entry.verdict === "missingBritton" ? (entry.personInBritton ? "font-bold text-green-700" : "font-bold text-destructive") : "text-primary"}`}>{entry.name}</button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><button type="button" className={`font-medium hover:underline ${entry.verdict === "missingBritton" ? (entry.personInBritton ? "font-bold text-green-700" : "font-bold text-destructive") : "text-primary"}`}>{entry.shownName}</button></DropdownMenuTrigger>
                         <DropdownMenuContent align="start"><DropdownMenuItem onSelect={() => navigate(timesheetLink(entry))}>{entry.job ? t("ocr.link.job") : t("ocr.link.timesheet")}</DropdownMenuItem></DropdownMenuContent>
                       </DropdownMenu>
-                    ) : (entry.name || "—")}
+                    ) : (entry.shownName || "—")}
                   </td>
-                  <td className={`whitespace-nowrap px-3 py-2 ${entry.verdict === "missingBritton" ? "font-bold text-destructive" : ""}`}>{entry.jobOt || entry.ot || "—"}</td>
+                  <td className={`whitespace-nowrap px-3 py-2 ${entry.verdict === "missingBritton" ? "font-bold text-destructive" : ""}`}>{entry.shownOt || "—"}</td>
                   {FIELD_GROUPS.flatMap(([field]) => SOURCE_COLUMNS.map(([source], index) => (
                     <td key={`${field}-${source}`} className={`whitespace-nowrap px-3 py-2 text-center ${index === 0 ? "border-l" : ""}`} title={source === "britton" ? entry.britton?.note || undefined : undefined}>
                       <Num values={source === "britton" ? entry.brittonValues : entry[source]} field={field} red={entry.red[source]} sms={source === "form" && hasSms(entry)} />

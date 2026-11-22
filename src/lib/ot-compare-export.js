@@ -23,7 +23,7 @@ export const VERDICT_FILLS = { ok: "green", brittonGap: "orange", formGap: "oran
 // Britton · Preuve de temps · Fiche de travail (which wraps on two lines); the other columns span both lines.
 // { headers: [line1, line2], merges: ["A1:A2", "D1:F1", …], rows: cell[][], fills } where a cell is a number, a string, "" or { v, style: "red" } (the odd figure).
 export function comparisonTable(entries, t) {
-  const solo = [t("ocr.col.date"), t("ocr.col.employee"), t("ocr.col.jobOt")];
+  const solo = [t("ocr.col.date"), t("ocr.col.employee"), t("otc.col.ot")];
   const top = [...solo];
   const bottom = ["", "", ""];
   for (const [, fieldKey] of FIELDS) {
@@ -39,7 +39,10 @@ export function comparisonTable(entries, t) {
     const missing = entry.verdict === "missingBritton";
     const matched = Boolean(entry.britton && entry.job);
     const flag = (value, style) => ((missing || matched) && value !== "" ? { v: value, style } : value);
-    const row = [entry.jobDate, flag(entry.name || "", matched || entry.personInBritton ? "green" : "red"), flag(entry.jobOt || entry.ot || "", matched ? "green" : "red")];
+    // The day, name and OT are the Britton line's when there is one (its « Date » column classifies the day), else the sheet's.
+    const shownName = entry.shownName ?? entry.name ?? "";
+    const shownOt = entry.shownOt ?? (entry.jobOt || entry.ot || "");
+    const row = [entry.day || entry.jobDate, flag(shownName, matched || entry.personInBritton ? "green" : "red"), flag(shownOt, matched ? "green" : "red")];
     for (const [field] of FIELDS) {
       for (const [source] of SOURCES) {
         const values = source === "britton" ? entry.brittonValues : entry[source];
@@ -63,7 +66,7 @@ export const COMPARISON_WIDTHS = [11, 22, 10, 10, 10, 10, 10, 10, 10, 17, 36, 24
 
 // « comparaison temps supp 2026-11-16 au 2026-11-20.xlsx » (the days of the rows), or the day alone.
 export function comparisonFileName(entries) {
-  const days = [...new Set((entries || []).map((entry) => entry.jobDate).filter(Boolean))].sort();
+  const days = [...new Set((entries || []).map((entry) => entry.day || entry.jobDate).filter(Boolean))].sort();
   const span = days.length === 0 ? "" : days.length === 1 ? ` ${days[0]}` : ` ${days[0]} au ${days[days.length - 1]}`;
   return `comparaison temps supp${span}.xlsx`;
 }

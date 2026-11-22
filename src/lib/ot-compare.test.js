@@ -126,12 +126,16 @@ describe("counting, filtering, days", () => {
   it("lists the Britton days, most recent first", () => {
     expect(brittonDays([line("a", { job_date: "2026-11-18" }), line("b"), line("c", { job_date: "2026-11-18" })])).toEqual(["2026-11-19", "2026-11-18"]);
   });
-  it("the day filter also finds a line by the day Britton's line ends (work done the 19th, form filled the 20th)", () => {
-    const entries = build({ proofRows: [], britton: [line("b1", { job_date: "2026-11-20", client_minutes: 60 })] });
-    expect(entries[0]).toMatchObject({ jobDate: DAY, brittonDay: "2026-11-20" });
+  it("the row takes the Britton line's day, name and OT (its « Date » column classifies the day); the day filter follows it", () => {
+    // sheet done the 19th (OT-211794), the Britton line is dated the 20th and spells the name differently
+    const entries = build({ proofRows: [], britton: [line("b1", { job_date: "2026-11-20", employee_name: "Anthony  Fortin-Test", client_minutes: 60 })] });
+    expect(entries[0]).toMatchObject({ jobDate: DAY, day: "2026-11-20", shownName: "Anthony  Fortin-Test", shownOt: "OT-211794" });
     expect(filterComparison(entries, { verdict: "all", day: "2026-11-20" })).toHaveLength(1);
-    expect(filterComparison(entries, { verdict: "all", day: DAY })).toHaveLength(1);
-    expect(filterComparison(entries, { verdict: "all", day: "2026-11-21" })).toHaveLength(0);
+    expect(filterComparison(entries, { verdict: "all", day: DAY })).toHaveLength(0); // classified by the Britton date, not the sheet's
+    expect(filterComparison(entries, { verdict: "all", query: "fortin-test" })).toHaveLength(1);
+    // no Britton line: the sheet's own day, name and OT
+    const alone = build({ proofRows: [], britton: [line("b9", { ot: "999999", employee_name: "Autre", name_key: "autre" })] }).find((entry) => entry.job);
+    expect(alone).toMatchObject({ day: DAY, shownName: "Anthony Fortin", shownOt: "OT-211794" });
   });
 
   it("remarks: OT done the day before; wrong OT number (the person's other OT listed); Britton line on another OT; no sheet", () => {
