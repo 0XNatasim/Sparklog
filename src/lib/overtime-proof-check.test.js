@@ -77,3 +77,11 @@ describe("proofAnomalies › wrong screenshot", () => {
     expect(proofAnomalies(rows, jobs.map((job) => ({ ...job, status: "approved" })))).toEqual([]);
   });
 });
+
+describe("proofAnomalies › SMS proof", () => {
+  it("flags the screenshot of the approval text message like a wrong screenshot: it is not the overtime form", () => {
+    const jobs = [{ id: "j1", user_id: "u1", job_date: "2026-11-20", status: "submitted", ot: "231731", depart: "08:00", fin: "17:00", return_time_minutes: 0 }];
+    const rows = [{ id: "e1", job_id: "j1", ocr_status: "sms", proof_read_at: "2026-11-20T20:00:00Z", proof_ot: null, proof_client_minutes: null, proof_return_minutes: null }];
+    expect(proofAnomalies(rows, jobs)).toEqual([expect.objectContaining({ type: "proof_wrong", jobIds: ["j1"] })]);
+  });
+});

@@ -5,10 +5,11 @@ import { expectedProofForJob, proofDifferences } from "./overtime-proof-check";
 // The OCR tab starts with the per-work-order proofs (owner decision 2026-11-18: nothing before 16 November).
 export const OCR_FIRST_DAY = "2026-11-16";
 
-export const OCR_STATES = ["ok", "mismatch", "wrongDoc", "unread", "failed", "queued", "notRead"];
+export const OCR_STATES = ["ok", "mismatch", "sms", "wrongDoc", "unread", "failed", "queued", "notRead"];
 
 // `evidence` = overtime_evidence rows; `jobs` = the work orders of those days; `people` = Map of user id -> profile.
 // One row per proof, newest first. state: ok (nothing differs), mismatch (a value differs), unread (read, nothing found),
+// sms (the screenshot of the approval TEXT MESSAGE: not the form, not a valid proof, nothing to compare),
 // wrongDoc (the picture is not the overtime form: a work order, a receipt…),
 // queued (waiting in the reading queue, one reading a minute),
 // failed (out of attempts: the reading service did not answer, e.g. too many requests: nothing was read, it can be read again),
@@ -32,9 +33,10 @@ export function buildOcrRows(evidence, jobs, people) {
     const expected = job
       ? expectedProofForJob(byDay.get(`${userId}|${jobDate}`) || [], job, { firstTripUnpaid: Boolean(person?.first_trip_unpaid), tenHourDay: Boolean(person?.ten_hour_days) })
       : null;
-    const diffs = proof.proof_read_at && !["failed", "pending", "wrong_document"].includes(proof.ocr_status) && !nothingFound ? proofDifferences(found, expected) : [];
+    const diffs = proof.proof_read_at && !["failed", "pending", "wrong_document", "sms"].includes(proof.ocr_status) && !nothingFound ? proofDifferences(found, expected) : [];
     let state = "ok";
     if (proof.ocr_status === "wrong_document") state = "wrongDoc";
+    else if (proof.ocr_status === "sms") state = "sms";
     else if (proof.ocr_status === "pending") state = "queued";
     else if (!proof.proof_read_at) state = "notRead";
     else if (proof.ocr_status === "failed") state = "failed";
@@ -62,7 +64,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
   return (rows || []).filter((row) => {
     if (day && row.jobDate !== day) return false;
     if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
-    if (state === "check" && row.state !== "mismatch" && row.state !== "wrongDoc" && row.state !== "unread" && row.state !== "failed") return false;
+    if (state === "check" && row.state !== "mismatch" && row.state !== "wrongDoc" && row.state !== "sms" && row.state !== "unread" && row.state !== "failed") return false;
     if (state === "reread" && !canReread(row)) return false;
     if (state === "brittonGap" && !(row.brittonWrong?.size > 0)) return false; // Britton table (0156): differs from the timesheet
     if (OCR_STATES.includes(state) && row.state !== state) return false;
@@ -72,7 +74,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
 }
 
 export function countOcrStates(rows) {
-  const counts = { ok: 0, mismatch: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
+  const counts = { ok: 0, mismatch: 0, sms: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
   for (const row of rows || []) counts[row.state] += 1;
   return counts;
 }

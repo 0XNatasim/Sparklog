@@ -65,4 +65,10 @@ describe("xlsx-write", () => {
     expect(grid[0][0]).toBe("Groupe");
     expect(grid[2]).toEqual(["x", 1, 2]);
   });
+
+  it("has a green bold font style for a cell", () => {
+    const text = new TextDecoder().decode(buildXlsx({ rows: [["a"], [{ v: "Alexandre", style: "green" }]] }));
+    expect(text).toContain('<color rgb="FF2E7D32"/>');
+    expect(text).toContain('<c r="A2" s="7" t="inlineStr">');
+  });
 });

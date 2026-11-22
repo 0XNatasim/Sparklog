@@ -148,4 +148,22 @@ describe("counting, filtering, days", () => {
     const none = build({ proofRows: [], jobs: [], britton: [line("b1")] });
     expect(none[0].remark).toEqual({ kind: "noSheet" });
   });
+
+  it("a work order Britton has no line for: the person is flagged as in Britton's table when another line of theirs ends in the window (name green, OT red)", () => {
+    // Britton wrote OT 231731 (done the 19th, ended the 20th); the 20th's own overtime OT is not in Britton
+    const jobs = [job("j1", { job_date: "2026-11-19", ot: "OT-231731", depart: "06:30", fin: "13:00" }), job("j2", { job_date: "2026-11-20", ot: "OT-268592" })];
+    const entries = buildOtComparison({ britton: [line("b1", { job_date: "2026-11-20", ot: "231731", client_minutes: 60 })], jobs, people });
+    const twentieth = entries.find((entry) => entry.jobOt === "OT-268592");
+    expect(twentieth.verdict).toBe("missingBritton");
+    expect(twentieth.personInBritton).toBe(true);
+    expect(twentieth.remark).toEqual({ kind: "brittonOt", ots: ["231731"] });
+    // nobody of that name in Britton: red name
+    const alone = buildOtComparison({ britton: [line("b2", { employee_name: "Autre Personne", name_key: "autre personne", job_date: "2026-11-20", ot: "999999" })], jobs: [job("j2", { job_date: "2026-11-20", ot: "OT-268592" })], people });
+    expect(alone.find((entry) => entry.job).personInBritton).toBe(false);
+  });
+
+  it("a proof that is only the screenshot of the text message is not a valid proof: noProof", () => {
+    const [entry] = build({ proofRows: [proof("p1", { state: "sms", found: { ot: null, clientMinutes: null, returnMinutes: null } })] });
+    expect(entry.verdict).toBe("noProof");
+  });
 });

@@ -129,8 +129,9 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     if (!infosByName.has(key)) infosByName.set(key, []);
     infosByName.get(key).push(info);
   }
-  const unmatchedByName = new Map();
-  for (const line of unmatched) unmatchedByName.set(line.name_key, [...(unmatchedByName.get(line.name_key) || []), line]);
+  const linesByName = new Map(); // every Britton line of a person, matched or not
+  for (const line of britton) linesByName.set(line.name_key, [...(linesByName.get(line.name_key) || []), line]);
+  const nearLinesOf = (entry) => (linesByName.get(nameKey(entry.name)) || []).filter((line) => inWindow(line, entry.jobDate));
   const remarkOf = (entry) => {
     if (entry.britton && entry.job) {
       const lag = dayDiff(entry.jobDate, day(entry.britton.job_date));
@@ -145,7 +146,7 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
       return nearby.length ? { kind: "wrongOt", ots: nearby.slice(0, 6) } : { kind: "noSheet" };
     }
     if (entry.job && !entry.britton) { // a timesheet overtime Britton has no line for, while Britton has a line for the same person nearby
-      const lines = (unmatchedByName.get(nameKey(entry.name)) || []).filter((line) => inWindow(line, entry.jobDate));
+      const lines = nearLinesOf(entry);
       return lines.length ? { kind: "brittonOt", ots: [...new Set(lines.map((line) => line.ot))].slice(0, 6) } : null;
     }
     return null;
@@ -168,10 +169,10 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     else if (!brittonValues) verdict = "missingBritton";
     else if (FIELDS.some((field) => !near(brittonValues[field], sparklog[field], field))) verdict = "brittonGap";
     else if (form && FIELDS.some((field) => form[field] != null && !near(form[field], sparklog[field], field))) verdict = "formGap";
-    else if (proofs.length === 0) verdict = "noProof";
+    else if (proofs.every((row) => row.state === "sms")) verdict = "noProof"; // no proof, or only the screenshot of the text message (not a valid proof)
     else verdict = "ok";
 
-    out.push({ ...entry, brittonDay: entry.britton ? day(entry.britton.job_date) : "", remark: remarkOf(entry), proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
+    out.push({ ...entry, brittonDay: entry.britton ? day(entry.britton.job_date) : "", remark: remarkOf(entry), personInBritton: Boolean(entry.job && !entry.britton && nearLinesOf(entry).length), proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
   }
   return out.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || RANK[a.verdict] - RANK[b.verdict] || String(a.name).localeCompare(String(b.name)) || String(a.ot).localeCompare(String(b.ot)));
 }

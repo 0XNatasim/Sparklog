@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve, dirname } from "node:path";
-import { buildOcrRows, canReread, countOcrStates, filterOcrRows, ocrDays } from "./ocr-readings";
+import { buildOcrRows, canRequeue, canReread, countOcrStates, filterOcrRows, ocrDays } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
 const job = (id, depart, fin, extra = {}) => ({ id, user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "261821", depart, fin, return_time_minutes: 0, ...extra });
@@ -57,7 +57,7 @@ describe("buildOcrRows", () => {
     expect(filterOcrRows(rows, { state: "reread" }).map((row) => row.id)).toEqual(["p3"]);
     expect(filterOcrRows(rows, { state: "all", query: "alex" })).toHaveLength(3);
     expect(filterOcrRows(rows, { state: "all", query: "zzz" })).toHaveLength(0);
-    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, sms: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
   });
 });
 
@@ -159,5 +159,35 @@ describe("filtre par jour", () => {
   it("keeps only the readings of the chosen day (or all when empty)", () => {
     expect(filterOcrRows(rows, { state: "all", day: "2026-11-19" }).map((row) => row.id)).toEqual(["b", "c"]);
     expect(filterOcrRows(rows, { state: "all", day: "" })).toHaveLength(3);
+  });
+});
+
+describe("the old SMS proof (migration 0158 and process_overtime_evidence)", () => {
+  const read = (path) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  const fn = read("../../supabase/functions/process_overtime_evidence/index.ts");
+  const sql = read("../../supabase/migrations/20261122120000_0158_overtime_proof_sms.sql");
+  const jobs = [job("a", "06:30", "14:30"), job("b", "14:30", "17:00", { ot: "208637" })];
+
+  it("shows a screenshot of the approval text message as « sms »: not a valid proof, to check, nothing to compare", () => {
+    const [row] = buildOcrRows([proof("p1", "b", { ocr_status: "sms", storage_path: "u/2026-11-20/p1.jpg", proof_ot: null, proof_client_minutes: null, proof_return_minutes: null })], jobs, people);
+    expect(row.state).toBe("sms");
+    expect(row.wrong.size).toBe(0);
+    expect(canReread(row)).toBe(false);
+    expect(canRequeue(row)).toBe(true); // a manager can still ask for another reading
+    expect(filterOcrRows([row], { state: "read" })).toHaveLength(1);
+    expect(filterOcrRows([row], { state: "check" })).toHaveLength(1); // not the form: to check
+    expect(countOcrStates([row]).sms).toBe(1);
+  });
+
+  it("the reader writes `sms` when the text names the overtime and says it is approved (no duration needed), after the form test", () => {
+    expect(fn).toContain("function isOvertimeSmsText");
+    expect(fn).toContain('status = "sms"');
+    expect(fn).not.toContain("includesDuration"); // the SMS of the screenshots carries no minutes
+    expect(fn.indexOf("isOvertimeFormText(text)")).toBeLessThan(fn.indexOf("isOvertimeSmsText(text)"));
+    expect(fn).toMatch(/surtemps/);
+  });
+
+  it("adds the status to the constraint, keeping the others", () => {
+    expect(sql).toContain("check (ocr_status in ('pending', 'processed', 'needs_review', 'failed', 'wrong_document', 'sms'))");
   });
 });

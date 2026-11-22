@@ -29,7 +29,7 @@ const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_pat
 const NOT_NEEDED_COLUMN = ", not_needed_at"; // migration 0153: read when it exists
 const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
-const BADGE = { ok: "success", mismatch: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
+const BADGE = { ok: "success", mismatch: "destructive", sms: "info", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
 const brittonTitle = (line, t) => t("britton.cellTitle", { name: line.employee_name, total: line.total_minutes, note: line.note || "—" });
 
@@ -214,7 +214,7 @@ export default function OcrReadings() {
           </div>
           {rows && (
             <div className="flex flex-wrap gap-2 text-xs">
-              {["ok", "mismatch", "wrongDoc", "unread", "failed", "queued", "notRead"].map((key) => (
+              {["ok", "mismatch", "sms", "wrongDoc", "unread", "failed", "queued", "notRead"].map((key) => (
                 <Badge key={key} variant={BADGE[key]}>{t(`ocr.state.${key}`)} : {counts[key]}</Badge>
               ))}
             </div>
