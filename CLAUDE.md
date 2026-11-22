@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.313)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.314)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.314 (technique).** Fichier Excel : nom et OT bons en vert. `ot-compare-export.js` : `matched = entry.britton && entry.job` (une ligne Britton rapprochée de la fiche) → nom et OT en `{ v, style: "green" }` quel que soit le verdict (ok, `brittonGap`, `formGap`, `noProof`) ; `missingBritton` inchangé (OT rouge, nom vert si `personInBritton` sinon rouge) ; `missingSparklog` (ligne Britton sans fiche) reste sans couleur. `xlsx-write.js` : `FILLED.orange.green` = style 9 de `cellXfs` (police verte sur remplissage orange pâle). Aucune migration. Tests : `ot-compare-export.test.js`, `xlsx-write.test.js`.
 
 **V2.4.313 (technique).** Fichier Excel : chiffres verts quand tout concorde. `ot-compare-export.js` : pour `verdict === "ok"`, chaque chiffre non vide devient `{ v, style: "green" }` (le chiffre rouge `red` de `entry.red` garde la priorité) ; `xlsx-write.js` : `FILLED.green.green` = style 8 de `cellXfs` (police gras verte `FF2E7D32` sur remplissage vert pâle `FFE2F0D9`). Aucune migration. Tests : `ot-compare-export.test.js`, `xlsx-write.test.js`.
 

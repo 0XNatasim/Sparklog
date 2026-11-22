@@ -77,4 +77,9 @@ describe("xlsx-write", () => {
     expect(text).toContain('<c r="A2" s="8"><v>5</v></c>'); // green font on the pale green fill
     expect(text).toContain('<c r="B2" s="3"><v>6</v></c>'); // plain figure on the fill
   });
+
+  it("keeps a green bold cell green on a pale orange row (style 9)", () => {
+    const text = new TextDecoder().decode(buildXlsx({ rows: [["a"], [{ v: "Alexandre", style: "green" }]], rowFills: [null, "orange"] }));
+    expect(text).toContain('<c r="A2" s="9" t="inlineStr">');
+  });
 });

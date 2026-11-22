@@ -35,9 +35,11 @@ export function comparisonTable(entries, t) {
   const rows = (entries || []).map((entry) => {
     // Not at Britton (no line for this OT): the OT is in red; the name is green when the person IS in Britton's table around
     // that day (so the OT is probably the wrong one) and red when the person is not there at all.
+    // A work order Britton has a line for (the name and the OT are good, whatever the minutes say): both in green.
     const missing = entry.verdict === "missingBritton";
-    const flag = (value, style) => (missing && value !== "" ? { v: value, style } : value);
-    const row = [entry.jobDate, flag(entry.name || "", entry.personInBritton ? "green" : "red"), flag(entry.jobOt || entry.ot || "", "red")];
+    const matched = Boolean(entry.britton && entry.job);
+    const flag = (value, style) => ((missing || matched) && value !== "" ? { v: value, style } : value);
+    const row = [entry.jobDate, flag(entry.name || "", matched || entry.personInBritton ? "green" : "red"), flag(entry.jobOt || entry.ot || "", matched ? "green" : "red")];
     for (const [field] of FIELDS) {
       for (const [source] of SOURCES) {
         const values = source === "britton" ? entry.brittonValues : entry[source];
