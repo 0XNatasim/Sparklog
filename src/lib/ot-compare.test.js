@@ -170,4 +170,18 @@ describe("counting, filtering, days", () => {
     const [entry] = build({ proofRows: [proof("p1", { state: "sms", found: { ot: null, clientMinutes: null, returnMinutes: null } })] });
     expect(entry.verdict).toBe("noProof");
   });
+
+  it("shows the OT as each source says it (Britton · proof · sheet); the one that differs from the others is red", () => {
+    const same = build()[0];
+    expect(same.ots).toEqual({ britton: "OT-211794", form: "OT-211794", sparklog: "OT-211794" });
+    expect([...same.otRed]).toEqual([]);
+    // the employee wrote another OT on the proof: the proof differs
+    const wrongProof = build({ proofRows: [proof("p1", { found: { ot: "999999", clientMinutes: 120, returnMinutes: 0 } })] })[0];
+    expect(wrongProof.ots.form).toBe("OT-999999");
+    expect([...wrongProof.otRed]).toEqual(["form"]);
+    // no proof read: nothing to compare
+    const noProof = build({ proofRows: [] })[0];
+    expect(noProof.ots.form).toBe("");
+    expect([...noProof.otRed]).toEqual([]);
+  });
 });

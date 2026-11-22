@@ -172,10 +172,25 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     else if (proofs.every((row) => row.state === "sms")) verdict = "noProof"; // no proof, or only the screenshot of the text message (not a valid proof)
     else verdict = "ok";
 
+    // The OT as each source says it (Britton's line, the number read on the proof, the work sheet): shown side by side; the one that
+    // differs from the others is in red (two sources that differ: both).
+    const otProof = proofs.find((row) => READ_STATES.has(row.state) && row.found?.ot);
+    const ots = {
+      britton: entry.britton ? `OT-${entry.britton.ot}` : "",
+      form: otProof ? `OT-${otDigits(otProof.found.ot)}` : "",
+      sparklog: entry.job?.ot ? String(entry.job.ot) : "",
+    };
+    const digitsOf = { britton: entry.britton?.ot || "", form: otProof ? otDigits(otProof.found.ot) : "", sparklog: otDigits(entry.job?.ot) };
+    const present = Object.entries(digitsOf).filter(([, digits]) => digits);
+    const otRed = new Set();
+    if (present.length >= 2) {
+      const agree = present.map(([, digits]) => present.filter(([, other]) => other === digits).length);
+      if (Math.max(...agree) < present.length) { const best = Math.max(...agree); present.forEach(([source], index) => { if (agree[index] < best || best === 1) otRed.add(source); }); }
+    }
     // What the row shows: the Britton line's own day, name and OT when there is one (its « Date » column classifies the day), else the sheet's.
     const brittonLine = entry.britton || null;
     out.push({ ...entry, day: brittonLine ? day(brittonLine.job_date) : entry.jobDate, shownName: brittonLine ? brittonLine.employee_name : entry.name,
-      shownOt: brittonLine ? `OT-${brittonLine.ot}` : (entry.job?.ot ? String(entry.job.ot) : entry.ot ? `OT-${entry.ot}` : ""), brittonDay: entry.britton ? day(entry.britton.job_date) : "", remark: remarkOf(entry), personInBritton: Boolean(entry.job && !entry.britton && nearLinesOf(entry).length), proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
+      ots, otRed, shownOt: brittonLine ? `OT-${brittonLine.ot}` : (entry.job?.ot ? String(entry.job.ot) : entry.ot ? `OT-${entry.ot}` : ""), brittonDay: entry.britton ? day(entry.britton.job_date) : "", remark: remarkOf(entry), personInBritton: Boolean(entry.job && !entry.britton && nearLinesOf(entry).length), proofs, proof: proofs[0] || null, sparklog, form, britton: entry.britton, brittonValues, red, verdict, ot: entry.ot || otDigits(entry.job?.ot) || "", jobOt: entry.job?.ot ? String(entry.job.ot) : "" });
   }
   return out.sort((a, b) => b.day.localeCompare(a.day) || RANK[a.verdict] - RANK[b.verdict] || String(a.name).localeCompare(String(b.name)) || String(a.ot).localeCompare(String(b.ot)));
 }

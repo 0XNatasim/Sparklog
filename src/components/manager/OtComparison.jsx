@@ -30,6 +30,11 @@ const hasSms = (entry) => (entry.proofs || []).some((proof) => proof.state === "
 
 // The columns, grouped by what they measure: « chez le client » (Britton → preuve de temps → fiche de travail), then « retour ».
 const FIELD_GROUPS = [["client", "otc.col.client"], ["return", "otc.col.return"]];
+// A work order number, as each source says it (red when it differs from the others).
+function OtCell({ text, red, sms = false }) {
+  if (!text) return <span className="text-muted-foreground">{sms ? "SMS" : "—"}</span>;
+  return <span className={red ? "font-bold text-destructive" : ""}>{text}</span>;
+}
 const SOURCE_COLUMNS = [["britton", "otc.src.britton"], ["form", "otc.src.proof"], ["sparklog", "otc.src.sheet"]];
 
 // À traiter › OCR › « Par OT »: Britton · form · Sparklog side by side for each overtime work order, with one verdict.
@@ -113,12 +118,13 @@ export default function OtComparison({ britton, proofRows, onView }) {
               <tr>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.date")}</th>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.employee")}</th>
-                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("otc.col.ot")}</th>
+                <th colSpan={3} className="border-l px-3 py-2 text-center">{t("otc.col.ot")}</th>
                 {FIELD_GROUPS.map(([field, labelKey]) => <th key={field} colSpan={3} className="border-l px-3 py-2 text-center">{t(labelKey)}</th>)}
                 <th rowSpan={2} className="border-l px-3 py-2 align-bottom">{t("ocr.col.result")}</th>
                 <th rowSpan={2} className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
               </tr>
               <tr>
+                {SOURCE_COLUMNS.map(([source, labelKey], index) => <th key={`ot-${source}`} className={`px-3 py-1 text-center normal-case ${index === 0 ? "border-l" : ""}`}>{t(labelKey)}</th>)}
                 {FIELD_GROUPS.flatMap(([field]) => SOURCE_COLUMNS.map(([source, labelKey], index) => (
                   <th key={`${field}-${source}`} className={`px-3 py-1 text-center normal-case ${index === 0 ? "border-l" : ""}`}>{t(labelKey)}</th>
                 )))}
@@ -136,7 +142,11 @@ export default function OtComparison({ britton, proofRows, onView }) {
                       </DropdownMenu>
                     ) : (entry.shownName || "—")}
                   </td>
-                  <td className={`whitespace-nowrap px-3 py-2 ${entry.verdict === "missingBritton" ? "font-bold text-destructive" : ""}`}>{entry.shownOt || "—"}</td>
+                  {SOURCE_COLUMNS.map(([source], index) => (
+                    <td key={`ot-${source}`} className={`whitespace-nowrap px-3 py-2 text-center ${index === 0 ? "border-l" : ""}`}>
+                      <OtCell text={entry.ots?.[source]} red={entry.otRed?.has(source) || (source === "sparklog" && entry.verdict === "missingBritton")} sms={source === "form" && hasSms(entry)} />
+                    </td>
+                  ))}
                   {FIELD_GROUPS.flatMap(([field]) => SOURCE_COLUMNS.map(([source], index) => (
                     <td key={`${field}-${source}`} className={`whitespace-nowrap px-3 py-2 text-center ${index === 0 ? "border-l" : ""}`} title={source === "britton" ? entry.britton?.note || undefined : undefined}>
                       <Num values={source === "britton" ? entry.brittonValues : entry[source]} field={field} red={entry.red[source]} sms={source === "form" && hasSms(entry)} />
@@ -150,7 +160,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
                   </td>
                 </tr>
               ))}
-              {shown.length === 0 && <tr><td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">{t("otc.empty")}</td></tr>}
+              {shown.length === 0 && <tr><td colSpan={14} className="px-3 py-6 text-center text-muted-foreground">{t("otc.empty")}</td></tr>}
             </tbody>
           </table>
         </div>

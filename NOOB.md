@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.316).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.317).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -38,6 +38,7 @@
 - [ ] **Migrations 0148 et 0149 + fonction (V2.4.281)** : appliquer la 0148 puis la 0149, puis redéployer `process_overtime_evidence` (je le fais sur demande). Je remets ensuite en file les 7 preuves « conformes » où seul le numéro d'OT avait été lu, pour qu'elles soient relues avec la nouvelle règle.
 - [ ] **Migration 0150 (V2.4.285)** : à appliquer (« Applique la 0150 »), sinon « Relire » ne marche que sur les échecs.
 - [ ] **Migration 0151 (V2.4.286)** : à appliquer (« Applique la 0151 ») pour pouvoir activer le bouton « Renvoyer pour correction ».
+- 🟢 **V2.4.317 — « Par OT » : un groupe OT (Britton · Preuve · Fiche)** : la colonne OT unique est remplacée par un groupe **OT** de trois colonnes, comme « Chez le client » et « Retour » : l'OT tel que **Britton** le dit, tel que lu sur la **preuve de temps** et tel qu'écrit sur la **fiche de travail**. Un OT qui diffère des autres est en rouge ; la colonne de la preuve dit « SMS » pour une capture de message texte. Pareil dans le fichier téléchargé. Rien à appliquer dans la base.
 - 🟢 **V2.4.316 — « Par OT » montre le nom, l'OT et le jour du tableau Britton** : quand une ligne a une ligne Britton, la **date, le nom et l'OT** affichés (dans l'app et dans le fichier téléchargé) sont ceux de **Britton** — c'est sa colonne « Date » qui range le jour, et le menu « Jour » la suit ; le jour de la fiche n'apparaît en petit dessous que s'il est différent. Une ligne sans ligne Britton garde ceux de la fiche. Rien à appliquer dans la base.
 - 🟢 **V2.4.315 — Tableau Britton : le jour d'une ligne est de nouveau la colonne « Date »** : correction de ma version du 21 nov. — le jour d'une ligne est la colonne **« Date » / « Date installation »**, pas l'heure de fin (l'heure de fin ne sert que pour l'heure, et pour le jour quand « Date » est vide). **À faire : réimporter les deux fichiers (16-18 nov. et 19-20 nov.)** pour que les jours enregistrés suivent la colonne « Date » ; une ligne réimportée remplace sa copie. Rien à appliquer dans la base.
 - 🟢 **V2.4.314 — Fichier téléchargé : nom et OT bons en vert** : quand Britton a une ligne pour la fiche (« Tout concorde », « Britton diffère », « Preuve diffère », « Sans preuve »), le **nom et l'OT sont en vert gras**. Quand Britton n'a pas de ligne : l'OT est rouge, le nom vert si la personne est dans le tableau de Britton, rouge sinon. Rien à appliquer dans la base.

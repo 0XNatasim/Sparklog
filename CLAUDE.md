@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.316)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.317)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.317 (technique).** « Par OT » : groupe de colonnes OT (Britton · Preuve · Fiche). `buildOtComparison` ajoute `ots` (`britton` = `OT-<ot>` de la ligne Britton, `form` = `OT-<chiffres>` lu sur la dernière preuve lue `ok` / `mismatch` qui porte un OT, `sparklog` = OT de la fiche tel qu'écrit) et `otRed` (sources dont les chiffres de l'OT diffèrent des autres : deux sources qui diffèrent = les deux rouges ; les OT sans chiffres, ex. « CONTREMAÎTRE », ne sont pas comparés). `OtComparison.jsx` : en-tête « OT » sur 3 colonnes (`OtCell`, « SMS » quand la preuve est une capture de message texte, `—` sinon) ; `otc.col.ot` = « OT » ; colspan du message vide 14. `ot-compare-export.js` : colonnes C–E = OT Britton / Preuve / Fiche, puis client F–H, retour I–K, Résultat L, Remarque M, Note N (`merges` : `A1:B2`…, `C1:E1`, `F1:H1`, `I1:K1`, `COMPARISON_WIDTHS` à 14) ; couleurs : OT qui diffère = rouge, ligne rapprochée = OT verts, « Pas chez Britton » = OT de la fiche rouge. L'ancien `shownOt` reste calculé (recherche). Aucune migration. Tests : `ot-compare.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`.
 
 **V2.4.316 (technique).** « Par OT » : jour, nom et OT de la ligne Britton. `buildOtComparison` ajoute à chaque entrée `day` (jour de la ligne Britton rapprochée = sa colonne « Date », sinon `jobDate`), `shownName` (nom de la ligne Britton, sinon de la fiche) et `shownOt` (`OT-<ot>` de la ligne Britton, sinon l'OT de la fiche) ; tri et `filterComparison({ day })` sur `day` (avant : jour de la fiche **ou** jour de fin Britton, V2.4.306), recherche sur les deux noms / OT. `OtComparison.jsx` : colonne Date = `day` avec « Fiche : JJ mmm » (`otc.sheetDay`, remplace `otc.brittonEnds`) quand le jour de la fiche diffère ; Employé / OT = `shownName` / `shownOt` (le lien vers la fiche du jour garde `userId` / `jobDate`) ; en-tête `otc.col.ot` (« OT »). `ot-compare-export.js` : date, nom et OT du fichier = `day` / `shownName` / `shownOt` (avec repli sur `jobDate` / `name` / `jobOt`), `comparisonFileName` sur `day`. Le rapprochement (fenêtre de 2 jours, même OT) est inchangé : c'est l'affichage et le classement par jour qui suivent Britton. Aucune migration. Tests : `ot-compare.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`.
 
