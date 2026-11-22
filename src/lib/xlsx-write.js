@@ -28,33 +28,36 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE7E6E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2F0D9"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFCE4D6"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>
+<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
 
 // rows: array of rows; the FIRST row is the header. A cell is a string, a number, null / "" (empty) or { v, style: "red" | "header" }.
+// headerRows: how many first rows are header (default 1: bold, centred, wrapped; frozen; the filter sits on the last one). merges: ranges like "D1:F1".
+// rowHeights: { rowIndex: points } for header rows that wrap on several lines.
 // rowFills: optional, one entry per row (same index as rows): "green" | "orange" | null, painting every cell of that row.
 // widths: character widths per column. Returns the file as a Uint8Array.
-export function buildXlsx({ rows, widths = [], sheetName = "Feuil1", rowFills = [] }) {
+export function buildXlsx({ rows, widths = [], sheetName = "Feuil1", rowFills = [], headerRows = 1, merges = [], rowHeights = {} }) {
   const encoder = new TextEncoder();
   const cellXml = (cell, rowIndex, colIndex) => {
     const box = cell !== null && typeof cell === "object" ? cell : { v: cell };
     const value = box.v;
-    const fill = rowIndex === 0 ? null : FILLED[rowFills[rowIndex]] || null;
+    const fill = rowIndex < headerRows ? null : FILLED[rowFills[rowIndex]] || null;
     const isRed = box.style === "red";
-    const style = rowIndex === 0 ? STYLES.header : fill ? (isRed ? fill.red : fill.plain) : STYLES[box.style] || 0;
+    const style = rowIndex < headerRows ? STYLES.header : fill ? (isRed ? fill.red : fill.plain) : STYLES[box.style] || 0;
     const ref = `${columnName(colIndex)}${rowIndex + 1}`;
-    if (value === null || value === undefined || value === "") return fill ? `<c r="${ref}" s="${style}"/>` : "";
+    if (value === null || value === undefined || value === "") return fill || rowIndex < headerRows ? `<c r="${ref}" s="${style}"/>` : "";
     const s = style ? ` s="${style}"` : "";
     if (typeof value === "number" && Number.isFinite(value)) return `<c r="${ref}"${s}><v>${value}</v></c>`;
     return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
   };
   const width = Math.max(...rows.map((row) => row.length), 1);
   // A filled row paints every column, also the ones its array does not reach.
-  const sheetRows = rows.map((row, r) => `<row r="${r + 1}">${Array.from({ length: rowFills[r] ? width : row.length }, (_, c) => cellXml(row[c], r, c)).join("")}</row>`).join("");
+  const sheetRows = rows.map((row, r) => `<row r="${r + 1}"${rowHeights[r] ? ` ht="${rowHeights[r]}" customHeight="1"` : ""}>${Array.from({ length: rowFills[r] || r < headerRows ? width : row.length }, (_, c) => cellXml(row[c], r, c)).join("")}</row>`).join("");
   const cols = widths.length ? `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols>` : "";
+  const mergeXml = merges.length ? `<mergeCells count="${merges.length}">${merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("")}</mergeCells>` : "";
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${sheetRows}</sheetData><autoFilter ref="A1:${columnName(width - 1)}${Math.max(rows.length, 1)}"/></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${headerRows}" topLeftCell="A${headerRows + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${sheetRows}</sheetData><autoFilter ref="A${headerRows}:${columnName(width - 1)}${Math.max(rows.length, headerRows)}"/>${mergeXml}</worksheet>`;
   const name = escapeXml(String(sheetName).replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Feuil1");
   const files = [
     ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.308 (2026-11-21).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.309 (2026-11-22).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.309 — Comparison table download: tighter table.** The Excel file now has a **two-line header** (« At the client » / « Return » over Britton · Time proof · Work sheet; the other columns span both lines) and much narrower figure columns (10 characters). No database change.
 - **V2.4.308 — Comparison table download: coloured rows.** In the Excel file, a line where everything agrees is **pale green**; a line where every source is there but one differs (« Britton differs », « Proof differs ») is **pale orange**; the other lines stay plain. The odd figure stays in red. No database change.
 - **V2.4.307 — Comparison table: a « Remark » that says why a line does not match.** « OT done N day(s) before Britton's end date »; « this employee has this OT on another day »; « no such OT for this person: their OT in Sparklog are … — wrong OT number? »; « Britton has a line for this person on another OT »; « no work sheet these days ». Shown under the result and as a column of the Excel file. Nothing is matched by guessing: it is only a hint. No database change.
 - **V2.4.306 — Comparison table: day filter by Britton end day.** The « Day » menu of the « By OT » view now also finds a line by the day Britton's line **ends** (work done on the 19th, form filled on the 20th appears under both days); the date column shows « Britton: ends 20 Nov » when it differs. No database change.
