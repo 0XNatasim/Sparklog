@@ -21,7 +21,7 @@ const REAL_HEAD = ["Heure de fin", "Nom et Prénom Électricien", "Compagnie", "
 
 describe("Britton table: the older layout of 16-18 November", () => {
   const OLD_HEAD = ["Heure de fin", "Prénom Nom", "Entreprise", "Numéro du OT-XXXXXX", "client ", "Auto", "date ", "Note", "Colonne1", "heure total en TS"];
-  it("reads « client » = at the client, « Auto » = return, « heure total en TS » = total, and the day of the end time", () => {
+  it("reads « client » = at the client, « Auto » = return, « heure total en TS » = total, and the day of the « date » column (the end time's day when it is blank)", () => {
     const grid = [
       OLD_HEAD,
       ["11/16/2026 16:22", "Personne Un", "Messier Connexion", "OT-216481", "75", "15", "", "", "#NAME?", "90"],
@@ -43,38 +43,42 @@ describe("Britton table: the older layout of 16-18 November", () => {
 });
 
 describe("Britton table: the real file", () => {
-  it("recognises the real titles (« éxécution ») and takes the day from « Heure de fin », not from the « Date installation » column", () => {
-    expect(findHeader([REAL_HEAD])).toMatchObject({ row: 0, columns: { endedAt: 0, name: 1, ot: 3, client: 4, returned: 5, total: 8 } });
-    expect(findHeader([REAL_HEAD]).columns.date).toBeUndefined(); // that column is the submission date: never read
+  it("recognises the real titles (« éxécution ») and takes the day from the « Date installation » column (the end time's day when it is blank)", () => {
+    expect(findHeader([REAL_HEAD])).toMatchObject({ row: 0, columns: { endedAt: 0, name: 1, ot: 3, client: 4, returned: 5, date: 6, total: 8 } });
     const { rows, skipped } = parseBrittonGrid([
       REAL_HEAD,
-      ["11/19/26 14:17", "Personne Un ", "Messier Connexion", "OT-211794", 15, 15, "11/21/2026", null, 30],
-      ["11/20/26 9:30", "Personne Deux", "Messier Connexion", "OT-212306", 105, 45, "11/19/2026", null, 150],
-      ["11/16/26 15:54", "Personne Trois", "Messier Connexion", "OT-202694", 75, 45, null, null, 120],
+      ["11/19/26 14:17", "Personne Un ", "Messier Connexion", "OT-211794", 15, 15, "11/19/2026", null, 30],
+      ["11/20/26 9:30", "Personne Deux", "Messier Connexion", "OT-212306", 105, 45, "11/19/2026", null, 150], // ended the next morning: the day stays the 19th
+      ["11/16/26 15:54", "Personne Trois", "Messier Connexion", "OT-202694", 75, 45, null, null, 120], // blank date: the end time's day
     ]);
-    // the day is the end time's day whatever the other date column says (11/21 and 11/19 above are ignored); a blank one is no problem
-    expect(rows.map((row) => [row.ot, row.job_date, row.client_minutes, row.return_minutes])).toEqual([["211794", "2026-11-19", 15, 15], ["212306", "2026-11-20", 105, 45], ["202694", "2026-11-16", 75, 45]]);
+    expect(rows.map((row) => [row.ot, row.job_date, row.client_minutes, row.return_minutes])).toEqual([["211794", "2026-11-19", 15, 15], ["212306", "2026-11-19", 105, 45], ["202694", "2026-11-16", 75, 45]]);
+    expect(rows[1].ended_at).toBe("2026-11-20 09:30"); // the end time is still kept
     expect(rows[0].employee_name).toBe("Personne Un"); // trailing space dropped
     expect(skipped).toEqual([]);
   });
 
-  it("lists a line without a readable « Heure de fin », never guessing its day from another column", () => {
-    const { rows, skipped } = parseBrittonGrid([REAL_HEAD, ["", "Personne Un", "M", "OT-211794", 15, 15, "11/19/2026", null, 30], ["n'importe quoi", "Personne Deux", "M", "OT-212306", 1, 1, "11/19/2026", null, 2]]);
-    expect(rows).toEqual([]);
-    expect(skipped).toEqual([{ line: 2, reason: "date" }, { line: 3, reason: "date" }]);
+  it("lists a line with neither a readable « Date » nor a readable « Heure de fin »; a readable date alone is enough", () => {
+    const { rows, skipped } = parseBrittonGrid([
+      REAL_HEAD,
+      ["", "Personne Un", "M", "OT-211794", 15, 15, "11/19/2026", null, 30],
+      ["n'importe quoi", "Personne Deux", "M", "OT-212306", 1, 1, "pas une date", null, 2],
+    ]);
+    expect(rows.map((row) => [row.ot, row.job_date, row.ended_at])).toEqual([["211794", "2026-11-19", null]]);
+    expect(skipped).toEqual([{ line: 3, reason: "date" }]);
   });
 
-  it("says which columns are missing: the end time is needed, the « Date » column is not", () => {
-    expect(missingColumns([["Nom", "OT", "Temps d'exécution", "Temps de retour", "Heure"]])).toEqual(["endedAt"]);
+  it("says which columns are missing: the « Date » and the end time are both needed (« Date de fin » is not the date)", () => {
+    expect(missingColumns([["Nom", "OT", "Temps d'exécution", "Temps de retour", "Heure de fin"]])).toEqual(["date"]);
     expect(missingColumns([["Nom", "OT", "Temps d'exécution", "Temps de retour", "Date installation"]])).toEqual(["endedAt"]);
-    expect(missingColumns([["a", "b"]])).toEqual(["name", "ot", "client", "returned", "endedAt"]);
-    expect(parseBrittonGrid([["Nom", "OT", "Temps d'exécution", "Temps de retour"]])).toMatchObject({ headerFound: false, missing: ["endedAt"] });
+    expect(missingColumns([["Nom", "OT", "Temps d'exécution", "Temps de retour", "Date de fin", "Heure de fin"]])).toEqual(["date"]);
+    expect(missingColumns([["a", "b"]])).toEqual(["name", "ot", "client", "returned", "date", "endedAt"]);
+    expect(parseBrittonGrid([["Nom", "OT", "Temps d'exécution", "Temps de retour"]])).toMatchObject({ headerFound: false, missing: ["date", "endedAt"] });
   });
 });
 
 describe("Britton table", () => {
   it("finds the header whatever the cut titles are, and reads the lines (month first dates)", () => {
-    expect(findHeader([[], HEAD])).toMatchObject({ row: 1, columns: { endedAt: 0, name: 1, ot: 3, client: 4, returned: 5, total: 8 } });
+    expect(findHeader([[], HEAD])).toMatchObject({ row: 1, columns: { endedAt: 0, name: 1, ot: 3, client: 4, returned: 5, date: 6, total: 8 } });
     const { rows, skipped, headerFound } = parseBrittonGrid(SAMPLE);
     expect(headerFound).toBe(true);
     expect(skipped).toEqual([]);
@@ -83,8 +87,8 @@ describe("Britton table", () => {
       job_date: "2026-11-19", ot: "211794", employee_name: "Anthony Fortin", name_key: "anthony fortin", company: "Messier Connexion",
       ended_at: "2026-11-19 14:17", client_minutes: 15, return_minutes: 15, total_minutes: 30, note: null,
     });
-    expect(rows[1].job_date).toBe("2026-11-20"); // the day is the end time's day (20 November 9:30); the « Date » column is ignored
-    expect(rows[2]).toMatchObject({ job_date: "2026-11-19", name_key: "vanessa mcgraw robichaud", note: "à vérifier", total_minutes: 118 });
+    expect(rows[1].job_date).toBe("2026-11-19"); // ended the 20th at 9:30, dated the 19th: the day is the « Date » column
+    expect(rows[2]).toMatchObject({ job_date: "2026-11-18", name_key: "vanessa mcgraw robichaud", note: "à vérifier", total_minutes: 118 });
   });
 
   it("ignores empty lines, lists what it cannot read, keeps the last of a repeated line and fills a missing total", () => {
@@ -92,7 +96,7 @@ describe("Britton table", () => {
       ["11/19/26 14:17", "Anthony Fortin", "M", "OT-211794", 15, 15, "11/19/2026", null, null],
       ["11/19/26 14:17", "Anthony Fortin", "M", "OT-211794", 20, 15, "11/19/2026", null, null],
       ["x", "Sans OT", "M", "FORMATION", 15, 15, "11/19/2026", null, 30],
-      ["13/45/26 9:00", "Date folle", "M", "OT-111111", 15, 15, "11/19/2026", null, 30],
+      ["13/45/26 9:00", "Date folle", "M", "OT-111111", 15, 15, "", null, 30],
       ["11/19/26 9:00", "Minutes folles", "M", "OT-222222", "abc", 15, "11/19/2026", null, 30],
       ["11/19/26 9:00", "", "M", "OT-333333", 1, 1, "11/19/2026", null, 2]];
     const { rows, skipped } = parseBrittonGrid(grid);
@@ -195,13 +199,13 @@ describe("attachBritton", () => {
     expect([...near.brittonWrong]).toEqual([]);
   });
 
-  it("a line ending one or two days after the work day still goes with it; three days later does not (the day is the end time's day)", () => {
+  it("a line dated one or two days after the work day still goes with it; three days later does not", () => {
     const later = (days) => line("b1", { job_date: `2026-11-${19 + days}` });
     expect(attachBritton([proof("p1")], [later(0)]).rows[0].britton?.id).toBe("b1");
     expect(attachBritton([proof("p1")], [later(1)]).rows[0].britton?.id).toBe("b1");
     expect(attachBritton([proof("p1")], [later(2)]).rows[0].britton?.id).toBe("b1");
     expect(attachBritton([proof("p1")], [later(3)]).rows[0].britton).toBeNull();
-    // a line that ended BEFORE the work day is not that work order
+    // a line dated BEFORE the work day is not that work order
     expect(attachBritton([proof("p1")], [line("b1", { job_date: "2026-11-18" })]).rows[0].britton).toBeNull();
   });
 
@@ -220,16 +224,16 @@ describe("import and read", () => {
     expect(await importBrittonRows(fake.client, rows)).toEqual({ inserted: 1200, updated: 300 });
     expect(fake.calls.filter((call) => call.rpc === "import_britton_overtime")).toHaveLength(3);
   });
-  it("takes each line's day from its stored end time (older imports used the submission date) and keeps the latest import of a line", async () => {
+  it("takes each line's day from its stored date and keeps the latest import of a line (a re-import that changed the day replaces the old one)", async () => {
     const rows = [
-      { id: "old", job_date: "2026-11-19", ot: "212306", name_key: "cedrick bertin", ended_at: "2026-11-20T09:30:00", imported_at: "2026-11-21T19:12:00Z", client_minutes: 105 }, // imported with the submission date
-      { id: "new", job_date: "2026-11-20", ot: "212306", name_key: "cedrick bertin", ended_at: "2026-11-20 09:30:00", imported_at: "2026-11-22T10:00:00Z", client_minutes: 100 }, // same line, re-imported
+      { id: "old", job_date: "2026-11-20", ot: "212306", name_key: "cedrick bertin", ended_at: "2026-11-20T09:30:00", imported_at: "2026-11-21T19:12:00Z", client_minutes: 105 }, // imported when the day was the end time's day
+      { id: "new", job_date: "2026-11-19", ot: "212306", name_key: "cedrick bertin", ended_at: "2026-11-20 09:30:00", imported_at: "2026-11-22T10:00:00Z", client_minutes: 100 }, // same line, re-imported: dated the 19th
       { id: "x", job_date: "2026-11-19", ot: "111111", name_key: "x", ended_at: null, imported_at: "2026-11-21T19:12:00Z", client_minutes: 5 },
       { id: "early", job_date: "2026-11-14", ot: "222222", name_key: "y", ended_at: "2026-11-14T10:00:00", imported_at: "2026-11-21T19:12:00Z", client_minutes: 5 },
     ];
     const client = { from: () => ({ select: () => ({ gte: () => ({ order: () => ({ range: async () => ({ data: rows, error: null }) }) }) }) }) };
     const lines = await fetchBrittonRows(client, "2026-11-16");
-    expect(lines.map((item) => [item.id, item.job_date]).sort()).toEqual([["new", "2026-11-20"], ["x", "2026-11-19"]]); // one line for the end time, no line before the first day
+    expect(lines.map((item) => [item.id, item.job_date]).sort()).toEqual([["new", "2026-11-19"], ["x", "2026-11-19"]]); // one line for the same OT / name / end time, none before the first day
   });
 
   it("reads no line when the table does not exist yet (migration not applied)", async () => {

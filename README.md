@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.314 (2026-11-22).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.315 (2026-11-22).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.315 — Britton table: the day of a line is the « Date » column again.** Correction of V2.4.303: the day of a line is its **« Date » / « Date installation » column**, not its end time (the end time is kept only as the time, and gives the day when « Date » is blank). Both columns are needed in the file. **Import the two files again (16-18 Nov. and 19-20 Nov.)** so the stored days follow the « Date » column: a line imported again replaces its old copy. No database change.
 - **V2.4.314 — Downloaded file: good name and OT in green.** When Britton has a line for the work order (« All agree », « Britton differs », « Proof differs », « No proof »), the **name and the OT are in green bold**. When Britton has no line: the OT is red, the name green if the person is in Britton's table, red if not. No database change.
 - **V2.4.313 — Downloaded file: green figures when everything agrees.** On a « All agree » row (pale green) the figures are also in **green bold**, like a name that is in Britton's table. No database change.
 - **V2.4.312 — The text-message screenshot is named « SMS »; names in green / red when not at Britton.** A screenshot of the approval **text message** (« Overtime request approved… ») instead of the form capture is no longer called « Wrong screenshot »: it is shown as **SMS** — **not a valid proof** (flagged like a wrong screenshot, « To check », and counted as « No proof » in the « By OT » table, where the proof columns say « SMS »). When Britton has no line for a work order, the **OT is red**; the **name is green** when the person IS in Britton's table around that day (the OT is probably the wrong one) and **red** when they are not there at all. A remark lists the OT Britton has for them. **Apply migration 0158 and redeploy the `process_overtime_evidence` function**, then « Read all » on the screenshots already marked wrong.
