@@ -19,11 +19,19 @@ export function remarkText(entry, t) {
 // Row colour in the file: pale green = everything agrees, pale orange = every source is there but one differs; the others stay plain.
 export const VERDICT_FILLS = { ok: "green", brittonGap: "orange", formGap: "orange" };
 
-// { header: string[], rows: cell[][] } where a cell is a number, a string, "" or { v, style: "red" } (the odd figure).
+// The file has a two-line header so the columns stay narrow: line 1 = « Chez le client » / « Retour » over three columns each, line 2 =
+// Britton · Preuve de temps · Fiche de travail (which wraps on two lines); the other columns span both lines.
+// { headers: [line1, line2], merges: ["A1:A2", "D1:F1", …], rows: cell[][], fills } where a cell is a number, a string, "" or { v, style: "red" } (the odd figure).
 export function comparisonTable(entries, t) {
-  const header = [t("ocr.col.date"), t("ocr.col.employee"), t("ocr.col.jobOt")];
-  for (const [, fieldKey] of FIELDS) for (const [, sourceKey] of SOURCES) header.push(`${t(fieldKey)} – ${t(sourceKey)}`);
-  header.push(t("ocr.col.result"), t("otc.col.remark"), t("otc.col.note"));
+  const solo = [t("ocr.col.date"), t("ocr.col.employee"), t("ocr.col.jobOt")];
+  const top = [...solo];
+  const bottom = ["", "", ""];
+  for (const [, fieldKey] of FIELDS) {
+    SOURCES.forEach(([, sourceKey], index) => { top.push(index === 0 ? t(fieldKey) : ""); bottom.push(t(sourceKey)); });
+  }
+  top.push(t("ocr.col.result"), t("otc.col.remark"), t("otc.col.note"));
+  bottom.push("", "", "");
+  const merges = ["A1:A2", "B1:B2", "C1:C2", "D1:F1", "G1:I1", "J1:J2", "K1:K2", "L1:L2"];
   const rows = (entries || []).map((entry) => {
     const row = [entry.jobDate, entry.name || "", entry.jobOt || entry.ot || ""];
     for (const [field] of FIELDS) {
@@ -37,10 +45,13 @@ export function comparisonTable(entries, t) {
     row.push(t(`otc.verdict.${entry.verdict}`), remarkText(entry, t), entry.britton?.note || "");
     return row;
   });
-  return { header, rows, fills: (entries || []).map((entry) => VERDICT_FILLS[entry.verdict] || null) };
+  return { headers: [top, bottom], merges, rows, fills: (entries || []).map((entry) => VERDICT_FILLS[entry.verdict] || null) };
 }
 
-export const COMPARISON_WIDTHS = [12, 26, 11, 16, 20, 18, 14, 20, 18, 20, 44, 30];
+// Narrow columns: the figures take 10 characters, the header lines above them wrap.
+// Row heights (points) of the two header lines: the second wraps « Preuve de temps » / « Fiche de travail » on two lines.
+export const COMPARISON_HEADER_HEIGHTS = { 0: 20, 1: 32 };
+export const COMPARISON_WIDTHS = [11, 22, 10, 10, 10, 10, 10, 10, 10, 17, 36, 24];
 
 // « comparaison temps supp 2026-11-16 au 2026-11-20.xlsx » (the days of the rows), or the day alone.
 export function comparisonFileName(entries) {

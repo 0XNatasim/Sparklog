@@ -83,11 +83,13 @@ describe("OtComparison", () => {
     expect(download.calls).toHaveLength(1);
     expect(download.calls[0].name).toBe("comparaison temps supp 2026-11-19.xlsx");
     const [grid] = await readXlsxSheets(download.calls[0].bytes);
-    expect(grid[0].slice(3, 9)).toEqual(["Chez le client – Britton", "Chez le client – Preuve de temps", "Chez le client – Fiche de travail", "Retour – Britton", "Retour – Preuve de temps", "Retour – Fiche de travail"]);
-    expect(grid[1].slice(0, 3)).toEqual(["2026-11-19", "Alex Un", "OT-111111"]);
-    expect(grid[1][3]).toBe(60); // Britton at the client
-    expect(grid[1][5]).toBe(120); // work sheet at the client (10 h day: 2 h past the line)
-    expect(grid[1][9]).toBe("Britton diffère");
+    // two header lines: the groups, then Britton · Preuve de temps · Fiche de travail under each
+    expect([grid[0][3], grid[0][6]]).toEqual(["Chez le client", "Retour"]);
+    expect(grid[1].slice(3, 9)).toEqual(["Britton", "Preuve de temps", "Fiche de travail", "Britton", "Preuve de temps", "Fiche de travail"]);
+    expect(grid[2].slice(0, 3)).toEqual(["2026-11-19", "Alex Un", "OT-111111"]);
+    expect(grid[2][3]).toBe(60); // Britton at the client
+    expect(grid[2][5]).toBe(120); // work sheet at the client (10 h day: 2 h past the line)
+    expect(grid[2][9]).toBe("Britton diffère");
   });
 
   it("offers no download when nothing is shown", async () => {

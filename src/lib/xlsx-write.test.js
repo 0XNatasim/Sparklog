@@ -46,4 +46,23 @@ describe("xlsx-write", () => {
     expect(grid[1][1] ?? null).toBeNull(); // painted but empty
     expect(grid[2][1]).toBe(5);
   });
+
+  it("writes a two-line header: both lines bold, centred and wrapped, merged ranges, frozen under line 2, filter on line 2, custom heights", async () => {
+    const bytes = buildXlsx({
+      rows: [["Groupe", "", "Autre"], ["a", "b", ""], ["x", 1, 2]],
+      headerRows: 2, merges: ["A1:B1", "C1:C2"], rowHeights: { 1: 32 },
+    });
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain('<mergeCells count="2"><mergeCell ref="A1:B1"/><mergeCell ref="C1:C2"/></mergeCells>');
+    expect(text).toContain('<pane ySplit="2" topLeftCell="A3"');
+    expect(text).toContain('<autoFilter ref="A2:C3"/>');
+    expect(text).toContain('<row r="2" ht="32" customHeight="1">');
+    expect(text).toContain('wrapText="1"');
+    expect(text).toContain('<c r="B1" s="1"/>'); // an empty header cell keeps the header look
+    expect(text).toContain('<c r="A3"') ; // body untouched
+    expect(text).not.toMatch(/<c r="A3" s="/);
+    const [grid] = await readXlsxSheets(bytes);
+    expect(grid[0][0]).toBe("Groupe");
+    expect(grid[2]).toEqual(["x", 1, 2]);
+  });
 });

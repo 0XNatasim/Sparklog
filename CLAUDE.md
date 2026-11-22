@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.308)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.309)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.309 (technique).** Fichier Excel du tableau comparatif : en-tête sur deux lignes. `xlsx-write.js` : options `headerRows` (lignes d'en-tête : gras, centré, retour à la ligne ; volet figé sous la dernière ; filtre sur la dernière), `merges` (`mergeCells`, après `autoFilter`) et `rowHeights` (`ht` / `customHeight`) ; le style 1 reçoit `alignment` centré + `wrapText`. `ot-compare-export.js` : `comparisonTable` renvoie `headers` (ligne 1 : Date, Employé, OT, « Chez le client » sur D–F, « Retour » sur G–I, Résultat, Remarque, Note Britton ; ligne 2 : Britton · Preuve de temps · Fiche de travail ×2) et `merges` (`A1:A2`, `D1:F1`, `G1:I1`…) à la place de `header` ; `COMPARISON_WIDTHS` : chiffres à 10, Résultat 17, Remarque 36 ; `COMPARISON_HEADER_HEIGHTS`. Non vérifié dans Excel lui-même. Aucune migration. Tests : `xlsx-write.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`.
 
 **V2.4.308 (technique).** Fichier Excel du tableau comparatif : couleur de ligne. `xlsx-write.js` : option `rowFills` de `buildXlsx` (une entrée par ligne : `green` / `orange` / null ; remplissage `FFE2F0D9` / `FFFCE4D6`, cellules vides de la ligne peintes aussi, chiffre rouge gardé rouge : styles 3 à 6 de `cellXfs`, en-tête jamais peint). `ot-compare-export.js` : `VERDICT_FILLS` (`ok` = vert, `brittonGap` / `formGap` = orange, les autres verdicts sans couleur) et `fills` renvoyé par `comparisonTable`, passé par `OtComparison.jsx`. Non vérifié dans Excel lui-même (structure minimale `fills` / `cellXfs`). Aucune migration. Tests : `xlsx-write.test.js`, `ot-compare-export.test.js`.
 

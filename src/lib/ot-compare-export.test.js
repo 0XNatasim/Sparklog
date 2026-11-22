@@ -15,15 +15,12 @@ const entry = (extra = {}) => ({
 });
 
 describe("comparisonTable", () => {
-  it("groups the columns by what they measure: at the client (Britton, proof, work sheet) then return (same order)", () => {
-    const { header, rows } = comparisonTable([entry()], t);
-    expect(header).toEqual([
-      "Date", "Employé", "OT",
-      "Chez le client – Britton", "Chez le client – Preuve de temps", "Chez le client – Fiche de travail",
-      "Retour – Britton", "Retour – Preuve de temps", "Retour – Fiche de travail",
-      "Résultat", "Remarque", "Note Britton",
-    ]);
-    expect(header).toHaveLength(COMPARISON_WIDTHS.length);
+  it("has a two-line header (narrow columns): « Chez le client » / « Retour » over Britton · Preuve de temps · Fiche de travail, the others spanning both lines", () => {
+    const { headers, merges, rows } = comparisonTable([entry()], t);
+    expect(headers[0]).toEqual(["Date", "Employé", "OT", "Chez le client", "", "", "Retour", "", "", "Résultat", "Remarque", "Note Britton"]);
+    expect(headers[1]).toEqual(["", "", "", "Britton", "Preuve de temps", "Fiche de travail", "Britton", "Preuve de temps", "Fiche de travail", "", "", ""]);
+    expect(merges).toEqual(["A1:A2", "B1:B2", "C1:C2", "D1:F1", "G1:I1", "J1:J2", "K1:K2", "L1:L2"]);
+    expect(headers[0]).toHaveLength(COMPARISON_WIDTHS.length);
     expect(rows[0]).toEqual([
       "2026-11-19", "Anthony Fortin", "OT-211794",
       { v: 60, style: "red" }, 120, 120, // client: Britton (odd, red) → proof → work sheet
