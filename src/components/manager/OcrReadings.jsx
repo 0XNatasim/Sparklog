@@ -273,19 +273,22 @@ export default function OcrReadings() {
           <table className="w-full min-w-[64rem] text-left text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-3 py-2">{t("ocr.col.date")}</th>
-                <th className="px-3 py-2">{t("ocr.col.employee")}</th>
-                <th className="px-3 py-2">{t("ocr.col.jobOt")}</th>
-                <th className="px-3 py-2">{t("ocr.col.otRead")}</th>
-                <th className="px-3 py-2">{t("ocr.col.clientRead")}</th>
-                <th className="px-3 py-2">{t("ocr.col.clientExpected")}</th>
-                <th className="px-3 py-2">{t("ocr.col.returnRead")}</th>
-                <th className="px-3 py-2">{t("ocr.col.returnExpected")}</th>
-                {britton.length > 0 && <th className="px-3 py-2">{t("britton.col.client")}</th>}
-                {britton.length > 0 && <th className="px-3 py-2">{t("britton.col.return")}</th>}
-                <th className="px-3 py-2">{t("ocr.col.result")}</th>
-                <th className="px-3 py-2">{t("ocr.col.readAt")}</th>
-                <th className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.date")}</th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.employee")}</th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.jobOt")}</th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.otRead")}</th>
+                <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.client")}</th>
+                <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.return")}</th>
+                <th rowSpan={2} className="border-l px-3 py-2 align-bottom">{t("ocr.col.result")}</th>
+                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.readAt")}</th>
+                <th rowSpan={2} className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
+              </tr>
+              <tr>
+                {[0, 1].flatMap((group) => [
+                  ...(britton.length > 0 ? [["britton", "otc.src.britton"]] : []), ["proof", "otc.src.proof"], ["sheet", "otc.src.sheet"],
+                ].map(([source, labelKey], index) => (
+                  <th key={`${group}-${source}`} className={`px-3 py-1 text-center normal-case ${index === 0 ? "border-l" : ""}`}>{t(labelKey)}</th>
+                )))}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -319,16 +322,16 @@ export default function OcrReadings() {
                     ) : (row.jobOt || "—")}
                   </td>
                   {cell(row, "ot", row.found.ot)}
+                  {britton.length > 0 && (
+                    <td className={`whitespace-nowrap border-l px-3 py-2 ${row.brittonWrong.has("client") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.client_minutes) : "—"}</td>
+                  )}
                   {cell(row, "client", row.found.clientMinutes, minutes)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.clientMinutes)}</td>
+                  {britton.length > 0 && (
+                    <td className={`whitespace-nowrap border-l px-3 py-2 ${row.brittonWrong.has("return") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.return_minutes) : "—"}</td>
+                  )}
                   {cell(row, "return", row.found.returnMinutes, minutes)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
-                  {britton.length > 0 && (
-                    <td className={`whitespace-nowrap px-3 py-2 ${row.brittonWrong.has("client") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.client_minutes) : "—"}</td>
-                  )}
-                  {britton.length > 0 && (
-                    <td className={`whitespace-nowrap px-3 py-2 ${row.brittonWrong.has("return") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.return_minutes) : "—"}</td>
-                  )}
                   <td className="whitespace-nowrap px-3 py-2">
                     <Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge>
                     {row.notNeeded && <Badge variant="secondary" className="ml-1" title={t("ocr.notNeededHint")}>{t("ocr.notNeeded")}</Badge>}
@@ -360,7 +363,7 @@ export default function OcrReadings() {
                 </tr>
               ))}
               {shown.length === 0 && (
-                <tr><td colSpan={13} className="px-3 py-6 text-center text-muted-foreground">{t("ocr.empty")}</td></tr>
+                <tr><td colSpan={14} className="px-3 py-6 text-center text-muted-foreground">{t("ocr.empty")}</td></tr>
               )}
             </tbody>
           </table>

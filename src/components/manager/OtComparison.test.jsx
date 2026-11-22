@@ -53,6 +53,9 @@ describe("OtComparison", () => {
     setup({ jobs: [job("j1", "u1", "OT-111111"), job("j2", "u2", "OT-222222")], britton: [line("b1", "Alex Un", "111111", 120)] });
     await screen.findByText("Blaise Deux");
     expect(screen.getAllByText(/Pas chez Britton/).length).toBeGreaterThan(0);
+    // not at Britton: the name and the OT are in red
+    expect(screen.getByText("Blaise Deux").className).toContain("text-destructive");
+    expect(screen.getByText("OT-222222").className).toContain("text-destructive");
     fireEvent.change(screen.getByLabelText("Afficher"), { target: { value: "all" } });
     expect(screen.getByText("Alex Un")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Chercher un employé, un OT ou une date"), { target: { value: "blaise" } });

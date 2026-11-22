@@ -128,12 +128,12 @@ export default function OtComparison({ britton, proofRows, onView }) {
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
                     {entry.userId && entry.name ? (
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><button type="button" className="font-medium text-primary hover:underline">{entry.name}</button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><button type="button" className={`font-medium hover:underline ${entry.verdict === "missingBritton" ? "font-bold text-destructive" : "text-primary"}`}>{entry.name}</button></DropdownMenuTrigger>
                         <DropdownMenuContent align="start"><DropdownMenuItem onSelect={() => navigate(timesheetLink(entry))}>{entry.job ? t("ocr.link.job") : t("ocr.link.timesheet")}</DropdownMenuItem></DropdownMenuContent>
                       </DropdownMenu>
                     ) : (entry.name || "—")}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2">{entry.jobOt || entry.ot || "—"}</td>
+                  <td className={`whitespace-nowrap px-3 py-2 ${entry.verdict === "missingBritton" ? "font-bold text-destructive" : ""}`}>{entry.jobOt || entry.ot || "—"}</td>
                   {FIELD_GROUPS.flatMap(([field]) => SOURCE_COLUMNS.map(([source], index) => (
                     <td key={`${field}-${source}`} className={`whitespace-nowrap px-3 py-2 text-center ${index === 0 ? "border-l" : ""}`} title={source === "britton" ? entry.britton?.note || undefined : undefined}>
                       <Num values={source === "britton" ? entry.brittonValues : entry[source]} field={field} red={entry.red[source]} />
