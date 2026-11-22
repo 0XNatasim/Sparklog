@@ -44,6 +44,15 @@ describe("not at Britton", () => {
   });
 });
 
+describe("SMS proof", () => {
+  it("writes « SMS » in the proof columns when the proof is the screenshot of the approval text message", () => {
+    const row = comparisonTable([entry({ form: null, proofs: [{ state: "sms" }] })], t).rows[0];
+    expect(row[4]).toBe("SMS"); // at the client · proof
+    expect(row[7]).toBe("SMS"); // return · proof
+    expect(comparisonTable([entry({ form: null, proofs: [] })], t).rows[0][4]).toBe("");
+  });
+});
+
 describe("row colours", () => {
   it("pale green when everything agrees, pale orange when every source is there but one differs, nothing otherwise", () => {
     const { fills } = comparisonTable([entry({ verdict: "ok" }), entry({ verdict: "brittonGap" }), entry({ verdict: "formGap" }), entry({ verdict: "missingSparklog" }), entry({ verdict: "noProof" })], t);

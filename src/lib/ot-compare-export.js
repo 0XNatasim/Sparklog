@@ -40,7 +40,8 @@ export function comparisonTable(entries, t) {
       for (const [source] of SOURCES) {
         const values = source === "britton" ? entry.brittonValues : entry[source];
         const value = values ? values[field] : null;
-        const number = value === null || value === undefined ? "" : value;
+        // The old way (screenshot of the approval text message): « SMS » where the proof's minutes would be.
+        const number = value === null || value === undefined ? (source === "form" && (entry.proofs || []).some((proof) => proof.state === "sms") ? "SMS" : "") : value;
         row.push(entry.red?.[source]?.has(field) && number !== "" ? { v: number, style: "red" } : number);
       }
     }

@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.311)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.312)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.312 (technique).** Preuve par SMS (ancienne façon) reconnue. Constat (2026-11-22) : les captures du message texte « Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp… » (Alexandre le 20, Martin…) étaient `wrong_document` : `validatesOvertimeSms` exigeait aussi une durée dans le texte, que ce SMS ne porte pas. `process_overtime_evidence/index.ts` : `isOvertimeSmsText` (« temps supplémentaire » / « surtemps » / « TS » + approuvé / autorisé / accordé, **sans durée**) évalué **après** `isOvertimeFormText` → `ocr_status = 'sms'`. Migration 0158 : contrainte `overtime_evidence_ocr_status_check` + `sms` (`requeue_overtime_proofs` accepte déjà toute lecture non en file). App : état `sms` dans `ocr-readings.js` (`OCR_STATES`, `buildOcrRows` : jamais d'écart, jamais « à relire » ; filtre « À vérifier » l'exclut ; `countOcrStates.sms`), badge « SMS (ancienne façon) » (`ocr.state.sms`), `proofAnomalies` saute une preuve `sms` (ni `proof_unread` ni écart), « Par OT » / fichier Excel : « SMS » à la place des minutes de la preuve (`hasSms`). **Appliquer 0158, puis redéployer `process_overtime_evidence`** (la fonction écrit la nouvelle valeur : avant la 0158 la base la refuserait) ; les lectures déjà `wrong_document` se corrigent par « Tout relire » (le texte OCR n'est pas gardé). Tests : `ocr-readings.test.js` (état, verrous de la fonction et du SQL), `overtime-proof-check.test.js`, `ot-compare-export.test.js`.
 
 **V2.4.311 (technique).** « Pas chez Britton » en rouge et en-tête groupé dans la vue « Par preuve ». `ot-compare-export.js` : `comparisonTable` met le nom et l'OT en `{ v, style: "red" }` quand `verdict === "missingBritton"` (aucune ligne Britton) ; `OtComparison.jsx` : même rouge (`text-destructive font-bold`) sur le nom et l'OT. `OcrReadings.jsx` (vue `proofs`) : en-tête à deux lignes comme le fichier (`rowSpan` 2 pour Date / Employé / OT / OT lu / Résultat / Lu le, « Chez le client » et « Retour » sur 3 colonnes — 2 sans tableau Britton —, sous-colonnes `otc.src.britton` / `otc.src.proof` / `otc.src.sheet`), cellules réordonnées Britton · Preuve · Fiche par groupe (anciens libellés `ocr.col.clientRead` / `clientExpected` / `returnRead` / `returnExpected` et `britton.col.client` / `return` plus utilisés par cette vue). Aucune migration. Tests : `ot-compare-export.test.js`, `OtComparison.test.jsx`, `OcrReadings.test.jsx`.
 

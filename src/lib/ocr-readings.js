@@ -5,10 +5,11 @@ import { expectedProofForJob, proofDifferences } from "./overtime-proof-check";
 // The OCR tab starts with the per-work-order proofs (owner decision 2026-11-18: nothing before 16 November).
 export const OCR_FIRST_DAY = "2026-11-16";
 
-export const OCR_STATES = ["ok", "mismatch", "wrongDoc", "unread", "failed", "queued", "notRead"];
+export const OCR_STATES = ["ok", "mismatch", "sms", "wrongDoc", "unread", "failed", "queued", "notRead"];
 
 // `evidence` = overtime_evidence rows; `jobs` = the work orders of those days; `people` = Map of user id -> profile.
 // One row per proof, newest first. state: ok (nothing differs), mismatch (a value differs), unread (read, nothing found),
+// sms (the old way: the screenshot of the approval text message, a valid proof with no minutes to compare),
 // wrongDoc (the picture is not the overtime form: a work order, a receipt…),
 // queued (waiting in the reading queue, one reading a minute),
 // failed (out of attempts: the reading service did not answer, e.g. too many requests: nothing was read, it can be read again),
@@ -32,9 +33,10 @@ export function buildOcrRows(evidence, jobs, people) {
     const expected = job
       ? expectedProofForJob(byDay.get(`${userId}|${jobDate}`) || [], job, { firstTripUnpaid: Boolean(person?.first_trip_unpaid), tenHourDay: Boolean(person?.ten_hour_days) })
       : null;
-    const diffs = proof.proof_read_at && !["failed", "pending", "wrong_document"].includes(proof.ocr_status) && !nothingFound ? proofDifferences(found, expected) : [];
+    const diffs = proof.proof_read_at && !["failed", "pending", "wrong_document", "sms"].includes(proof.ocr_status) && !nothingFound ? proofDifferences(found, expected) : [];
     let state = "ok";
     if (proof.ocr_status === "wrong_document") state = "wrongDoc";
+    else if (proof.ocr_status === "sms") state = "sms";
     else if (proof.ocr_status === "pending") state = "queued";
     else if (!proof.proof_read_at) state = "notRead";
     else if (proof.ocr_status === "failed") state = "failed";
@@ -72,7 +74,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
 }
 
 export function countOcrStates(rows) {
-  const counts = { ok: 0, mismatch: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
+  const counts = { ok: 0, mismatch: 0, sms: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
   for (const row of rows || []) counts[row.state] += 1;
   return counts;
 }

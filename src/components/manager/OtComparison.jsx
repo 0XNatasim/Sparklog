@@ -20,10 +20,13 @@ import { supabase } from "@/supabaseClient";
 const BADGE = { ok: "success", noProof: "secondary", formGap: "warning", brittonGap: "destructive", missingBritton: "destructive", missingSparklog: "destructive" };
 
 // One figure, in red when this source is the odd one out for that field.
-function Num({ values, field, red }) {
-  if (!values || values[field] == null) return <span className="text-muted-foreground">—</span>;
+function Num({ values, field, red, sms = false }) {
+  if (!values || values[field] == null) return <span className="text-muted-foreground">{sms ? "SMS" : "—"}</span>;
   return <span className={red.has(field) ? "font-bold text-destructive" : ""}>{values[field]}</span>;
 }
+
+// A proof of the old kind: the screenshot of the approval text message (no minutes on it).
+const hasSms = (entry) => (entry.proofs || []).some((proof) => proof.state === "sms");
 
 // The columns, grouped by what they measure: « chez le client » (Britton → preuve de temps → fiche de travail), then « retour ».
 const FIELD_GROUPS = [["client", "otc.col.client"], ["return", "otc.col.return"]];
@@ -136,7 +139,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
                   <td className={`whitespace-nowrap px-3 py-2 ${entry.verdict === "missingBritton" ? "font-bold text-destructive" : ""}`}>{entry.jobOt || entry.ot || "—"}</td>
                   {FIELD_GROUPS.flatMap(([field]) => SOURCE_COLUMNS.map(([source], index) => (
                     <td key={`${field}-${source}`} className={`whitespace-nowrap px-3 py-2 text-center ${index === 0 ? "border-l" : ""}`} title={source === "britton" ? entry.britton?.note || undefined : undefined}>
-                      <Num values={source === "britton" ? entry.brittonValues : entry[source]} field={field} red={entry.red[source]} />
+                      <Num values={source === "britton" ? entry.brittonValues : entry[source]} field={field} red={entry.red[source]} sms={source === "form" && hasSms(entry)} />
                     </td>
                   )))}
                   <td className="whitespace-nowrap border-l px-3 py-2"><Badge variant={BADGE[entry.verdict]} title={t(`otc.hint.${entry.verdict}`)}>{t(`otc.verdict.${entry.verdict}`)}</Badge>{entry.remark && <div className="mt-1 max-w-[16rem] whitespace-normal text-xs text-muted-foreground">{remarkText(entry, t)}</div>}</td>

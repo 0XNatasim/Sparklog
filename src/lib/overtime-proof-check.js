@@ -68,6 +68,8 @@ export function proofAnomalies(evidenceRows, jobs, { firstTripUnpaidUsers = new 
     if (!row?.proof_read_at) continue;
     const job = byId.get(row.job_id);
     if (!job || job.status !== "submitted") continue;
+    // The old way (a screenshot of the approval text message): a valid proof with no minutes, nothing to read or compare.
+    if (row.ocr_status === "sms") continue;
     // The picture is not the overtime form (a work order, a receipt…): said before anything else, whatever else the day holds.
     if (row.ocr_status === "wrong_document") {
       anomalies.push({ key: `proof_wrong:${row.id || job.id}`, type: "proof_wrong", userId: job.user_id, jobDate: job.job_date, jobIds: [job.id] });

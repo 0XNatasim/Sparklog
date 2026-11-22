@@ -14,12 +14,13 @@ function json(data: unknown, status = 200) {
   });
 }
 
-function validatesOvertimeSms(text: string) {
+// The old way: the screenshot of the approval text message (« Demande de temps supplémentaire approuvé. Quand votre surtemps est
+// complété remplissez se formulaire svp… »). It names the overtime and says it is approved; it carries no minutes.
+function isOvertimeSmsText(text: string) {
   const normalized = text.toLocaleLowerCase("fr-CA");
-  const mentionsOvertime = /temps\s+suppl[eé]mentaire|\bts\b/.test(normalized);
+  const mentionsOvertime = /temps\s+suppl[eé]mentaire|surtemps|\bts\b/.test(normalized);
   const confirmsApproval = /approuv[eé]e?|autoris[eé]e?|accord[eé]e?/.test(normalized);
-  const includesDuration = /\b\d+(?:[.,]\d+)?\s*(?:h(?:eure)?s?|min(?:ute)?s?)\b/.test(normalized);
-  return mentionsOvertime && confirmsApproval && includesDuration;
+  return mentionsOvertime && confirmsApproval;
 }
 
 // One reading, one attempt: the queue (migration 0147) decides when a proof is tried again. `attempts` = attempts already made.
@@ -71,7 +72,7 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     let status: string;
     if (!text) status = "needs_review";
     else if (isOvertimeFormText(text)) status = overtimeFormFound(parsed) ? "processed" : "needs_review";
-    else if (validatesOvertimeSms(text)) status = "processed";
+    else if (isOvertimeSmsText(text)) status = "sms"; // the old text-message proof: valid, no minutes to compare
     else {
       status = "wrong_document";
       parsed = { ot: null, clientMinutes: null, returnMinutes: null };

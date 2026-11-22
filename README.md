@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.311 (2026-11-22).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.312 (2026-11-22).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.312 — The old SMS proof is recognised.** An employee who sends the screenshot of the approval **text message** (« Overtime request approved… fill in this form ») instead of the form capture is no longer called « Wrong screenshot »: the reader writes **SMS (old way)**, a valid proof with no minutes to compare. In the « By OT » table and the downloaded file the proof columns say « SMS ». **Apply migration 0158 and redeploy the `process_overtime_evidence` function**, then « Read all » on the screenshots already marked wrong.
 - **V2.4.311 — « Not at Britton » in red; OCR tab columns grouped like the file.** When Britton has no line for a work order (« Not at Britton »), the **name and the OT are in red** in the table and in the downloaded file. The OCR tab's « By proof » view now has the same two-line header as the file: **At the client** / **Return** over Britton · Time proof · Work sheet (Britton only when a table was imported). No database change.
 - **V2.4.310 — « Change the minutes »: submit for the employee.** In the same screen (Advanced › Emergency timesheet), each saved / updated sheet has a **« Submit the sheet »** button, and a day button submits **all the unsubmitted sheets of the day** with one reason. The overtime proof and the month-end inventory are not asked (as for the emergency entry); the times, overlap and kilometres are still checked. Written in the Journal with the reason. **Apply migration 0157.**
 - **V2.4.309 — Comparison table download: tighter table.** The Excel file now has a **two-line header** (« At the client » / « Return » over Britton · Time proof · Work sheet; the other columns span both lines) and much narrower figure columns (10 characters). No database change.
