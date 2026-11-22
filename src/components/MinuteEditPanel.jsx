@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Paperclip, Trash2, TriangleAlert } from "lucide-react";
+import { Paperclip, Send, Trash2, TriangleAlert } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { companyDate } from "@/lib/company-time";
 import {
-  MINUTE_EDIT_REASON_MAX, addProofAsOwner, adjustJobTimes, deleteJobAsOwner, fetchDayProofs, fetchEditableJobs, minutesBetweenTimes, setMinuteEditEnabled, timesChanged, useMinuteEditEnabled, validateTimesAdjust,
+  MINUTE_EDIT_REASON_MAX, addProofAsOwner, adjustJobTimes, deleteJobAsOwner, fetchDayProofs, fetchEditableJobs, minutesBetweenTimes, setMinuteEditEnabled, submitJobAsOwner, submittableJobs, timesChanged, useMinuteEditEnabled, validateTimesAdjust,
 } from "@/lib/minute-edit";
 import { useT } from "@/lib/use-t";
 
@@ -65,6 +65,23 @@ function JobRow({ job, proofs, dayMinutes, onSaved, t }) {
     }
   }
 
+  const canSubmit = job.status === "saved" || job.status === "updated";
+  async function submit() {
+    if (busy || !reasonOk || !canSubmit) return;
+    const ok = await confirm(t("minuteEdit.confirmSubmit", { ot: job.ot || "—", when: `${hhmm(job.depart)} → ${hhmm(job.fin)}` }));
+    if (!ok) return;
+    setBusy(true);
+    setError("");
+    try {
+      await submitJobAsOwner(supabase, { jobId: job.id, reason });
+      onSaved(t("minuteEdit.submitted"));
+    } catch (failure) {
+      setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.submit"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function addProof(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -112,6 +129,11 @@ function JobRow({ job, proofs, dayMinutes, onSaved, t }) {
       {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" disabled={busy || !changed || problems.length > 0} onClick={save}>{busy ? t("common.saving") : t("minuteEdit.save")}</Button>
+        {canSubmit && (
+          <Button type="button" size="sm" variant="outline" disabled={busy || !reasonOk || changed} title={changed ? t("minuteEdit.submitSaveFirst") : reasonOk ? undefined : t("minuteEdit.proofNeedsReason")} onClick={submit}>
+            <Send className="mr-1 h-4 w-4" aria-hidden="true" />{t("minuteEdit.submit")}
+          </Button>
+        )}
         <Button type="button" size="sm" variant="destructive" className="ml-auto" disabled={busy || !reasonOk} onClick={remove}>
           <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />{t("minuteEdit.delete")}
         </Button>
@@ -133,6 +155,8 @@ export default function MinuteEditPanel({ people = [] }) {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [reload, setReload] = useState(0);
+  const [dayReason, setDayReason] = useState("");
+  const [daySubmitting, setDaySubmitting] = useState(false);
 
   // What is shown: the sheets of the chosen employee and day once loaded (null while loading or nothing chosen).
   const key = enabled && employeeId && jobDate ? `${employeeId}|${jobDate}|${reload}` : "";
@@ -146,6 +170,31 @@ export default function MinuteEditPanel({ people = [] }) {
       .catch((failure) => { if (alive) { setLoaded({ key, rows: [], proofs: [] }); setError(friendlyErrorMessage(failure, t, "minuteEdit.errors.load")); } });
     return () => { alive = false; };
   }, [key, employeeId, jobDate, t]);
+
+  // Submits every saved / updated sheet of the day, in the order of the Départ, with one reason; stops at the first refusal.
+  const toSubmit = submittableJobs(jobs);
+  const dayReasonOk = dayReason.trim().length >= 3;
+  async function submitDay() {
+    if (daySubmitting || !dayReasonOk || toSubmit.length === 0) return;
+    if (!(await confirm(t("minuteEdit.confirmSubmitDay", { n: toSubmit.length })))) return;
+    setDaySubmitting(true);
+    setError("");
+    setInfo("");
+    let done = 0;
+    try {
+      for (const job of toSubmit) {
+        await submitJobAsOwner(supabase, { jobId: job.id, reason: dayReason });
+        done += 1;
+      }
+      setInfo(t("minuteEdit.submittedDay", { n: done }));
+      setDayReason("");
+    } catch (failure) {
+      setError(`${friendlyErrorMessage(failure, t, "minuteEdit.errors.submit")}${done ? ` ${t("minuteEdit.submittedPartial", { n: done })}` : ""}`);
+    } finally {
+      setDaySubmitting(false);
+      setReload((value) => value + 1);
+    }
+  }
 
   async function toggle() {
     if (switching) return;
@@ -195,6 +244,18 @@ export default function MinuteEditPanel({ people = [] }) {
             </div>
             {employeeId && jobs === null && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
             {jobs && jobs.length === 0 && employeeId && <p className="text-sm text-muted-foreground">{t("minuteEdit.none")}</p>}
+            {toSubmit.length > 0 && (
+              <div className="space-y-2 rounded-md border border-dashed p-3">
+                <div className="grid gap-1">
+                  <Label htmlFor="me-day-reason">{t("minuteEdit.submitDayReason", { n: toSubmit.length })}</Label>
+                  <Input id="me-day-reason" value={dayReason} maxLength={MINUTE_EDIT_REASON_MAX} placeholder={t("minuteEdit.reasonPlaceholder")} onChange={(event) => setDayReason(event.target.value)} disabled={daySubmitting} />
+                </div>
+                <p className="text-xs text-muted-foreground">{t("minuteEdit.submitNote")}</p>
+                <Button type="button" size="sm" disabled={daySubmitting || !dayReasonOk} onClick={submitDay}>
+                  <Send className="mr-1 h-4 w-4" aria-hidden="true" />{daySubmitting ? t("common.saving") : t("minuteEdit.submitDay", { n: toSubmit.length })}
+                </Button>
+              </div>
+            )}
             {jobs && jobs.map((job) => (
               <JobRow key={`${job.id}-${job.depart}-${job.fin}-${loaded.proofs.length}`} job={job} proofs={loaded.proofs.filter((proof) => proof.job_id === job.id)} dayMinutes={dayMinutes} t={t} onSaved={(message) => { setInfo(message); setReload((value) => value + 1); }} />
             ))}

@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.309).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.310).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -38,6 +38,7 @@
 - [ ] **Migrations 0148 et 0149 + fonction (V2.4.281)** : appliquer la 0148 puis la 0149, puis redéployer `process_overtime_evidence` (je le fais sur demande). Je remets ensuite en file les 7 preuves « conformes » où seul le numéro d'OT avait été lu, pour qu'elles soient relues avec la nouvelle règle.
 - [ ] **Migration 0150 (V2.4.285)** : à appliquer (« Applique la 0150 »), sinon « Relire » ne marche que sur les échecs.
 - [ ] **Migration 0151 (V2.4.286)** : à appliquer (« Applique la 0151 ») pour pouvoir activer le bouton « Renvoyer pour correction ».
+- 🟢 **V2.4.310 — « Modifier les minutes » : soumettre pour l'employé** : dans le même écran (Avancé › Feuille de temps d'urgence), chaque fiche **enregistrée ou à mettre à jour** a un bouton **« Soumettre la fiche »**, et un bouton du haut soumet **toutes les fiches pas encore soumises du jour** avec une seule raison. La preuve de temps supp. et l'inventaire de fin de mois ne sont pas demandés (comme pour la saisie d'urgence) ; les heures, le chevauchement et les km sont quand même vérifiés. Tout est écrit au Journal avec la raison. **À faire : appliquer la migration 0157** (dites « Applique la 0157 » et je le fais).
 - 🟢 **V2.4.309 — Fichier Excel du tableau comparatif : plus serré** : l'en-tête est maintenant sur **2 lignes** (en haut « Chez le client » et « Retour », en dessous Britton · Preuve de temps · Fiche de travail ; les autres colonnes couvrent les 2 lignes) et les colonnes de chiffres sont beaucoup plus étroites. Rien à appliquer dans la base.
 - 🟢 **V2.4.308 — Fichier Excel du tableau comparatif : lignes en couleur** : dans le fichier téléchargé, une ligne où **tout concorde** est en **vert pâle** ; une ligne où **tout est là mais il y a une différence** (« Britton diffère », « Preuve diffère ») est en **orange pâle** ; les autres lignes (pas chez Britton, pas dans Sparklog, sans preuve) restent blanches. Le chiffre qui diffère reste en rouge. Rien à appliquer dans la base.
 - 🟢 **V2.4.307 — Tableau comparatif : une « Remarque » qui explique l'écart** : sous le résultat (et dans une colonne du fichier Excel), une phrase dit pourquoi une ligne ne concorde pas : « OT fait 1 jour avant la fin chez Britton » ; « cet employé a cet OT le … » ; « aucun OT comme celui-là pour cette personne : ses OT dans Sparklog sont … Mauvais numéro d'OT ? » ; « Britton a une ligne de cette personne sur un autre OT » ; « aucune fiche ces jours-là ». C'est seulement une piste : rien n'est rapproché en devinant. Rien à appliquer dans la base.
