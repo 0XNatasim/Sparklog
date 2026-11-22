@@ -148,7 +148,10 @@ describe("OcrReadings › filtre par jour", () => {
     const line = (id, extra) => ({ id, job_date: "2026-11-16", ot: "208637", employee_name: "Alex Test", name_key: "alex test", client_minutes: 150, return_minutes: 0, total_minutes: 150, note: null, ...extra });
     setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })], { britton: [line("b1", { client_minutes: 60 }), line("b2", { ot: "424242", employee_name: "Autre", name_key: "autre" })] });
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
-    expect(screen.getAllByText("Britton client").length).toBeGreaterThan(0);
+    // two-line header: « Chez le client » / « Retour » over Britton · Preuve de temps · Fiche de travail
+    expect(screen.getByRole("columnheader", { name: "Chez le client" }).colSpan).toBe(3);
+    expect(screen.getByRole("columnheader", { name: "Retour" }).colSpan).toBe(3);
+    expect(screen.getAllByRole("columnheader", { name: "Britton" })).toHaveLength(2);
     expect(screen.getByText("60 min").className).toContain("text-destructive"); // 60 at Britton, 150 on the timesheet
     expect(screen.getByText("Britton sans preuve (1)")).toBeTruthy(); // the line of OT 424242 has no proof
     fireEvent.change(screen.getByLabelText("Afficher"), { target: { value: "brittonGap" } });
@@ -158,7 +161,8 @@ describe("OcrReadings › filtre par jour", () => {
   it("shows no Britton column while nothing was imported", async () => {
     setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
-    expect(screen.queryByText("Britton client")).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Britton" })).toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Chez le client" }).colSpan).toBe(2); // proof · work sheet only
     expect(screen.getByText("Importer Britton")).toBeTruthy();
   });
 

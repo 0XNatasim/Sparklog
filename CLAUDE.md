@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.310)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.311)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.311 (technique).** « Pas chez Britton » en rouge et en-tête groupé dans la vue « Par preuve ». `ot-compare-export.js` : `comparisonTable` met le nom et l'OT en `{ v, style: "red" }` quand `verdict === "missingBritton"` (aucune ligne Britton) ; `OtComparison.jsx` : même rouge (`text-destructive font-bold`) sur le nom et l'OT. `OcrReadings.jsx` (vue `proofs`) : en-tête à deux lignes comme le fichier (`rowSpan` 2 pour Date / Employé / OT / OT lu / Résultat / Lu le, « Chez le client » et « Retour » sur 3 colonnes — 2 sans tableau Britton —, sous-colonnes `otc.src.britton` / `otc.src.proof` / `otc.src.sheet`), cellules réordonnées Britton · Preuve · Fiche par groupe (anciens libellés `ocr.col.clientRead` / `clientExpected` / `returnRead` / `returnExpected` et `britton.col.client` / `return` plus utilisés par cette vue). Aucune migration. Tests : `ot-compare-export.test.js`, `OtComparison.test.jsx`, `OcrReadings.test.jsx`.
 
 **V2.4.310 (technique).** « Modifier les minutes » : soumettre pour l'employé. Migration 0157 : `submit_job_for_employee(p_job_id, p_reason)` (`security definer`, `is_privileged()`, même interrupteur `minute_edit_enabled` sinon `minute_edit_disabled`, raison 3–500 sinon `minute_edit_reason_required`, fiche `saved` / `updated` non verrouillée et pas exportée sinon `job_not_editable`, déjà `submitted` = ne fait rien, verrou par employé) : `sparklog.owner_submit = 'on'` le temps du `update … status = 'submitted'` (remis à `off` ensuite) pour que `validate_job_submission_contract` ne saute **que** la preuve de temps supp. et l'inventaire de fin de mois (intervalle, chevauchement et km restent contrôlés) ; audit `job_submitted_by_owner` (`via = minute_edit`, `reason`). Même mécanisme que `submit_manager_entry_for_employee` (0137) mais pour toute fiche de l'employé. App : `submitJobAsOwner` et `submittableJobs` (`minute-edit.js`), bouton « Soumettre la fiche » dans chaque ligne de `MinuteEditPanel.jsx` (raison obligatoire, heures modifiées à enregistrer d'abord, confirmation) et bouton « Soumettre les n fiche(s) du jour » (une raison, ordre des Départ, arrêt au premier refus, le nombre déjà soumis est dit). **Appliquer la migration 0157.** Décision d'affaires à confirmer : le contournement de la preuve de temps supp. est le même que pour la saisie d'urgence (V2.4.254). Tests : `minute-edit.test.js` (dont verrou du SQL), `MinuteEditPanel.test.jsx`.
 

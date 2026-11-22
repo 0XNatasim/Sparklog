@@ -35,6 +35,15 @@ describe("comparisonTable", () => {
   });
 });
 
+describe("not at Britton", () => {
+  it("puts the name and the OT in red when Britton has no line for the work order, and only then", () => {
+    const missing = comparisonTable([entry({ verdict: "missingBritton", britton: null, brittonValues: null })], t).rows[0];
+    expect(missing.slice(0, 3)).toEqual(["2026-11-19", { v: "Anthony Fortin", style: "red" }, { v: "OT-211794", style: "red" }]);
+    const gap = comparisonTable([entry({ verdict: "brittonGap" })], t).rows[0];
+    expect(gap.slice(0, 3)).toEqual(["2026-11-19", "Anthony Fortin", "OT-211794"]);
+  });
+});
+
 describe("row colours", () => {
   it("pale green when everything agrees, pale orange when every source is there but one differs, nothing otherwise", () => {
     const { fills } = comparisonTable([entry({ verdict: "ok" }), entry({ verdict: "brittonGap" }), entry({ verdict: "formGap" }), entry({ verdict: "missingSparklog" }), entry({ verdict: "noProof" })], t);

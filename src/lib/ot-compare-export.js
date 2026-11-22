@@ -33,7 +33,9 @@ export function comparisonTable(entries, t) {
   bottom.push("", "", "");
   const merges = ["A1:A2", "B1:B2", "C1:C2", "D1:F1", "G1:I1", "J1:J2", "K1:K2", "L1:L2"];
   const rows = (entries || []).map((entry) => {
-    const row = [entry.jobDate, entry.name || "", entry.jobOt || entry.ot || ""];
+    // Not at Britton: the name and the OT are in red (the minutes were not reimbursed).
+    const flag = (value) => (entry.verdict === "missingBritton" && value !== "" ? { v: value, style: "red" } : value);
+    const row = [entry.jobDate, flag(entry.name || ""), flag(entry.jobOt || entry.ot || "")];
     for (const [field] of FIELDS) {
       for (const [source] of SOURCES) {
         const values = source === "britton" ? entry.brittonValues : entry[source];
