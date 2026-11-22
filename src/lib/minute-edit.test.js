@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createFakeSupabase } from "@/test/fake-supabase";
 vi.mock("@/supabaseClient", () => ({ supabase: {} }));
 vi.mock("@/lib/evidence-file", () => ({ readPickedFile: async (file) => file, prepareEvidenceImage: async (file) => file }));
-const { addProofAsOwner, adjustJobTimes, deleteJobAsOwner, fetchMinuteEditEnabled, minutesBetweenTimes, timesChanged, validateTimesAdjust } = await import("./minute-edit");
+const { addProofAsOwner, adjustJobTimes, deleteJobAsOwner, fetchMinuteEditEnabled, minutesBetweenTimes, submitJobAsOwner, submittableJobs, timesChanged, validateTimesAdjust } = await import("./minute-edit");
 
 describe("minute-edit", () => {
   it("counts the minutes between two times, a Fin before the Départ being the next day", () => {
@@ -101,5 +101,36 @@ describe("add the overtime proof (migration 0155)", () => {
     expect(sql).toMatch(/evidence_file_missing/);
     expect(sql).toMatch(/overtime_proof_added_by_owner/);
     expect(sql).toMatch(/revoke all on function public\.add_overtime_proof_for_employee\(uuid, uuid, text, integer, text\) from public, anon/);
+  });
+});
+
+describe("submit a sheet for the employee (migration 0157)", () => {
+  it("calls the owner-only RPC with the trimmed reason", async () => {
+    const fake = createFakeSupabase({ rpcs: { submit_job_for_employee: null } });
+    await submitJobAsOwner(fake.client, { jobId: "j1", reason: "  employé en vacances " });
+    expect(fake.calls.find((call) => call.rpc === "submit_job_for_employee").args).toEqual({ p_job_id: "j1", p_reason: "employé en vacances" });
+  });
+
+  it("keeps the saved / updated sheets of the day in the order of the Départ", () => {
+    const jobs = [
+      { id: "b", status: "saved", depart: "10:00:00" }, { id: "x", status: "submitted", depart: "07:00:00" },
+      { id: "a", status: "updated", depart: "08:00:00" }, { id: "c", status: "approved", depart: "06:00:00" },
+    ];
+    expect(submittableJobs(jobs).map((job) => job.id)).toEqual(["a", "b"]);
+    expect(submittableJobs(null)).toEqual([]);
+  });
+
+  const sql = readFileSync(new URL("../../supabase/migrations/20261122100000_0157_owner_submit_job.sql", import.meta.url), "utf8");
+  it("is owner-only, behind the switch, with a reason, audited, idempotent and never touches approved or exported sheets", () => {
+    expect(sql).toMatch(/not public\.is_privileged\(\)/);
+    expect(sql).toMatch(/minute_edit_disabled/);
+    expect(sql).toMatch(/minute_edit_reason_required/);
+    expect(sql).toMatch(/target\.status not in \('saved', 'updated'\)/);
+    expect(sql).toMatch(/exported_to_sheet/);
+    expect(sql).toMatch(/already submitted: nothing to do/);
+    expect(sql).toMatch(/pg_advisory_xact_lock\(hashtextextended\(target\.user_id::text, 0\)\)/);
+    expect(sql).toMatch(/set_config\('sparklog\.owner_submit', 'on', true\)[\s\S]*status = 'submitted'[\s\S]*set_config\('sparklog\.owner_submit', 'off', true\)/);
+    expect(sql).toMatch(/job_submitted_by_owner/);
+    expect(sql).toMatch(/revoke all on function public\.submit_job_for_employee\(uuid, text\) from public, anon/);
   });
 });

@@ -64,6 +64,17 @@ export async function deleteJobAsOwner(client, { jobId, reason }) {
   if (error) throw error;
 }
 
+// Submits a saved / updated sheet for the employee (migration 0157, same switch and reason as a change). The overtime proof and
+// the month-end inventory are skipped by the owner's submission; interval, overlap and kilometres are still checked by the base.
+export async function submitJobAsOwner(client, { jobId, reason }) {
+  const { error } = await withTimeout(client.rpc("submit_job_for_employee", { p_job_id: jobId, p_reason: String(reason || "").trim() }), 15000);
+  if (error) throw error;
+}
+
+// The sheets of the day the owner can still submit, in the order of their Départ.
+export const submittableJobs = (jobs) => (jobs || []).filter((job) => job.status === "saved" || job.status === "updated")
+  .sort((a, b) => String(a.depart || "").localeCompare(String(b.depart || "")) || String(a.id).localeCompare(String(b.id)));
+
 export async function fetchEditableJobs(client, userId, jobDate) {
   const { data, error } = await withTimeout(client.from("jobs").select("id, user_id, ot, depart, arrivee, fin, status, return_time_minutes, job_date")
     .eq("user_id", userId).eq("job_date", jobDate).in("status", EDITABLE_STATUSES).order("depart"), 12000);

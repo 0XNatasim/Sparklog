@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.309)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.310)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.310 (technique).** « Modifier les minutes » : soumettre pour l'employé. Migration 0157 : `submit_job_for_employee(p_job_id, p_reason)` (`security definer`, `is_privileged()`, même interrupteur `minute_edit_enabled` sinon `minute_edit_disabled`, raison 3–500 sinon `minute_edit_reason_required`, fiche `saved` / `updated` non verrouillée et pas exportée sinon `job_not_editable`, déjà `submitted` = ne fait rien, verrou par employé) : `sparklog.owner_submit = 'on'` le temps du `update … status = 'submitted'` (remis à `off` ensuite) pour que `validate_job_submission_contract` ne saute **que** la preuve de temps supp. et l'inventaire de fin de mois (intervalle, chevauchement et km restent contrôlés) ; audit `job_submitted_by_owner` (`via = minute_edit`, `reason`). Même mécanisme que `submit_manager_entry_for_employee` (0137) mais pour toute fiche de l'employé. App : `submitJobAsOwner` et `submittableJobs` (`minute-edit.js`), bouton « Soumettre la fiche » dans chaque ligne de `MinuteEditPanel.jsx` (raison obligatoire, heures modifiées à enregistrer d'abord, confirmation) et bouton « Soumettre les n fiche(s) du jour » (une raison, ordre des Départ, arrêt au premier refus, le nombre déjà soumis est dit). **Appliquer la migration 0157.** Décision d'affaires à confirmer : le contournement de la preuve de temps supp. est le même que pour la saisie d'urgence (V2.4.254). Tests : `minute-edit.test.js` (dont verrou du SQL), `MinuteEditPanel.test.jsx`.
 
 **V2.4.309 (technique).** Fichier Excel du tableau comparatif : en-tête sur deux lignes. `xlsx-write.js` : options `headerRows` (lignes d'en-tête : gras, centré, retour à la ligne ; volet figé sous la dernière ; filtre sur la dernière), `merges` (`mergeCells`, après `autoFilter`) et `rowHeights` (`ht` / `customHeight`) ; le style 1 reçoit `alignment` centré + `wrapText`. `ot-compare-export.js` : `comparisonTable` renvoie `headers` (ligne 1 : Date, Employé, OT, « Chez le client » sur D–F, « Retour » sur G–I, Résultat, Remarque, Note Britton ; ligne 2 : Britton · Preuve de temps · Fiche de travail ×2) et `merges` (`A1:A2`, `D1:F1`, `G1:I1`…) à la place de `header` ; `COMPARISON_WIDTHS` : chiffres à 10, Résultat 17, Remarque 36 ; `COMPARISON_HEADER_HEIGHTS`. Non vérifié dans Excel lui-même. Aucune migration. Tests : `xlsx-write.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`.
 

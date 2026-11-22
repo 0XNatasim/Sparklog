@@ -14,10 +14,10 @@ const { default: MinuteEditPanel } = await import("./MinuteEditPanel");
 const people = [{ id: "e1", full_name: "Employé Test" }];
 const job = { id: "j1", ot: "208637", depart: "06:57:00", arrivee: "07:20:00", fin: "15:00:00", status: "submitted", return_time_minutes: 0, job_date: "2026-11-20" };
 
-function setup(enabled, proofs = []) {
+function setup(enabled, proofs = [], status = "submitted") {
   state.fake = createFakeSupabase({
-    tables: { overtime_settings: [{ id: true, minute_edit_enabled: enabled }], jobs: [{ ...job, user_id: "e1" }], overtime_evidence: proofs },
-    rpcs: { adjust_job_times_for_employee: { ...job, depart: "07:00:00" }, set_minute_edit_enabled: true, add_overtime_proof_for_employee: "p1" },
+    tables: { overtime_settings: [{ id: true, minute_edit_enabled: enabled }], jobs: [{ ...job, status, user_id: "e1" }], overtime_evidence: proofs },
+    rpcs: { adjust_job_times_for_employee: { ...job, depart: "07:00:00" }, set_minute_edit_enabled: true, add_overtime_proof_for_employee: "p1", submit_job_for_employee: null },
   });
   return render(<MinuteEditPanel people={people} />);
 }
@@ -60,6 +60,45 @@ describe("MinuteEditPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: /confirmer|oui|ok/i }));
     await waitFor(() => expect(state.fake.calls.some((call) => call.rpc === "delete_job_for_employee")).toBe(true));
     expect(state.fake.calls.find((call) => call.rpc === "delete_job_for_employee").args).toEqual({ p_job_id: "j1", p_reason: "fiche en double" });
+  });
+
+  it("offers no submit button on a sheet that is already submitted", async () => {
+    setup(true);
+    await screen.findByText("Désactiver");
+    fireEvent.change(screen.getByLabelText("Employé"), { target: { value: "e1" } });
+    await screen.findByLabelText("Départ");
+    expect(screen.queryByText("Soumettre la fiche")).toBeNull();
+    expect(screen.queryByText(/Soumettre les \d+ fiche/)).toBeNull();
+  });
+
+  it("submits a saved sheet for the employee with a reason, after a confirmation", async () => {
+    setup(true, [], "saved");
+    await screen.findByText("Désactiver");
+    fireEvent.change(screen.getByLabelText("Employé"), { target: { value: "e1" } });
+    await screen.findByLabelText("Départ");
+    const submit = screen.getByText("Soumettre la fiche").closest("button");
+    expect(submit.disabled).toBe(true); // no reason yet
+    fireEvent.change(screen.getByLabelText("Raison (gardée au Journal)"), { target: { value: "employé en vacances" } });
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    fireEvent.click(await screen.findByRole("button", { name: /confirmer|oui|ok/i }));
+    await waitFor(() => expect(state.fake.calls.some((call) => call.rpc === "submit_job_for_employee")).toBe(true));
+    expect(state.fake.calls.find((call) => call.rpc === "submit_job_for_employee").args).toEqual({ p_job_id: "j1", p_reason: "employé en vacances" });
+  });
+
+  it("submits every unsubmitted sheet of the day with one reason", async () => {
+    setup(true, [], "updated");
+    await screen.findByText("Désactiver");
+    fireEvent.change(screen.getByLabelText("Employé"), { target: { value: "e1" } });
+    await screen.findByLabelText("Départ");
+    const day = screen.getByText("Soumettre les 1 fiche(s) du jour").closest("button");
+    expect(day.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Raison pour soumettre/), { target: { value: "fin de semaine" } });
+    expect(day.disabled).toBe(false);
+    fireEvent.click(day);
+    fireEvent.click(await screen.findByRole("button", { name: /confirmer|oui|ok/i }));
+    await waitFor(() => expect(state.fake.calls.some((call) => call.rpc === "submit_job_for_employee")).toBe(true));
+    expect(state.fake.calls.find((call) => call.rpc === "submit_job_for_employee").args).toEqual({ p_job_id: "j1", p_reason: "fin de semaine" });
   });
 
   it("says when a sheet has no proof and adds one for the employee with a reason", async () => {
