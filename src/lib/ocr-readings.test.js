@@ -168,14 +168,14 @@ describe("the old SMS proof (migration 0158 and process_overtime_evidence)", () 
   const sql = read("../../supabase/migrations/20261122120000_0158_overtime_proof_sms.sql");
   const jobs = [job("a", "06:30", "14:30"), job("b", "14:30", "17:00", { ot: "208637" })];
 
-  it("shows a screenshot of the approval text message as « sms »: a valid proof, nothing to compare, nothing to read again", () => {
+  it("shows a screenshot of the approval text message as « sms »: not a valid proof, to check, nothing to compare", () => {
     const [row] = buildOcrRows([proof("p1", "b", { ocr_status: "sms", storage_path: "u/2026-11-20/p1.jpg", proof_ot: null, proof_client_minutes: null, proof_return_minutes: null })], jobs, people);
     expect(row.state).toBe("sms");
     expect(row.wrong.size).toBe(0);
     expect(canReread(row)).toBe(false);
     expect(canRequeue(row)).toBe(true); // a manager can still ask for another reading
     expect(filterOcrRows([row], { state: "read" })).toHaveLength(1);
-    expect(filterOcrRows([row], { state: "check" })).toHaveLength(0); // nothing to check
+    expect(filterOcrRows([row], { state: "check" })).toHaveLength(1); // not the form: to check
     expect(countOcrStates([row]).sms).toBe(1);
   });
 

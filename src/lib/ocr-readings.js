@@ -9,7 +9,7 @@ export const OCR_STATES = ["ok", "mismatch", "sms", "wrongDoc", "unread", "faile
 
 // `evidence` = overtime_evidence rows; `jobs` = the work orders of those days; `people` = Map of user id -> profile.
 // One row per proof, newest first. state: ok (nothing differs), mismatch (a value differs), unread (read, nothing found),
-// sms (the old way: the screenshot of the approval text message, a valid proof with no minutes to compare),
+// sms (the screenshot of the approval TEXT MESSAGE: not the form, not a valid proof, nothing to compare),
 // wrongDoc (the picture is not the overtime form: a work order, a receipt…),
 // queued (waiting in the reading queue, one reading a minute),
 // failed (out of attempts: the reading service did not answer, e.g. too many requests: nothing was read, it can be read again),
@@ -64,7 +64,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
   return (rows || []).filter((row) => {
     if (day && row.jobDate !== day) return false;
     if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
-    if (state === "check" && row.state !== "mismatch" && row.state !== "wrongDoc" && row.state !== "unread" && row.state !== "failed") return false;
+    if (state === "check" && row.state !== "mismatch" && row.state !== "wrongDoc" && row.state !== "sms" && row.state !== "unread" && row.state !== "failed") return false;
     if (state === "reread" && !canReread(row)) return false;
     if (state === "brittonGap" && !(row.brittonWrong?.size > 0)) return false; // Britton table (0156): differs from the timesheet
     if (OCR_STATES.includes(state) && row.state !== state) return false;

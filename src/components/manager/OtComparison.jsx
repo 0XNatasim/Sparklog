@@ -131,7 +131,7 @@ export default function OtComparison({ britton, proofRows, onView }) {
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
                     {entry.userId && entry.name ? (
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><button type="button" className={`font-medium hover:underline ${entry.verdict === "missingBritton" ? "font-bold text-destructive" : "text-primary"}`}>{entry.name}</button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><button type="button" className={`font-medium hover:underline ${entry.verdict === "missingBritton" ? (entry.personInBritton ? "font-bold text-green-700" : "font-bold text-destructive") : "text-primary"}`}>{entry.name}</button></DropdownMenuTrigger>
                         <DropdownMenuContent align="start"><DropdownMenuItem onSelect={() => navigate(timesheetLink(entry))}>{entry.job ? t("ocr.link.job") : t("ocr.link.timesheet")}</DropdownMenuItem></DropdownMenuContent>
                       </DropdownMenu>
                     ) : (entry.name || "—")}

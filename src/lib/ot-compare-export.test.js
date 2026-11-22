@@ -36,9 +36,11 @@ describe("comparisonTable", () => {
 });
 
 describe("not at Britton", () => {
-  it("puts the name and the OT in red when Britton has no line for the work order, and only then", () => {
+  it("puts the OT in red when Britton has no line for the work order; the name is green if the person is in Britton's table, red if not; only then", () => {
     const missing = comparisonTable([entry({ verdict: "missingBritton", britton: null, brittonValues: null })], t).rows[0];
     expect(missing.slice(0, 3)).toEqual(["2026-11-19", { v: "Anthony Fortin", style: "red" }, { v: "OT-211794", style: "red" }]);
+    const inBritton = comparisonTable([entry({ verdict: "missingBritton", britton: null, brittonValues: null, personInBritton: true })], t).rows[0];
+    expect(inBritton.slice(0, 3)).toEqual(["2026-11-19", { v: "Anthony Fortin", style: "green" }, { v: "OT-211794", style: "red" }]);
     const gap = comparisonTable([entry({ verdict: "brittonGap" })], t).rows[0];
     expect(gap.slice(0, 3)).toEqual(["2026-11-19", "Anthony Fortin", "OT-211794"]);
   });
