@@ -38,6 +38,13 @@ describe("comparisonTable", () => {
   });
 });
 
+describe("row colours", () => {
+  it("pale green when everything agrees, pale orange when every source is there but one differs, nothing otherwise", () => {
+    const { fills } = comparisonTable([entry({ verdict: "ok" }), entry({ verdict: "brittonGap" }), entry({ verdict: "formGap" }), entry({ verdict: "missingSparklog" }), entry({ verdict: "noProof" })], t);
+    expect(fills).toEqual(["green", "orange", "orange", null, null]);
+  });
+});
+
 describe("remarkText", () => {
   it("writes the remark as a sentence and a column of the file", () => {
     const words = (key, vars = {}) => `${key}:${Object.values(vars).join("|")}`;

@@ -59,8 +59,8 @@ export default function OtComparison({ britton, proofRows, onView }) {
   const attention = entries.length - counts.ok;
   function download() {
     if (shown.length === 0) return;
-    const { header, rows } = comparisonTable(shown, t);
-    downloadFile(buildXlsx({ rows: [header, ...rows], widths: COMPARISON_WIDTHS, sheetName: t("otc.sheetName") }), comparisonFileName(shown), XLSX_TYPE);
+    const { header, rows, fills } = comparisonTable(shown, t);
+    downloadFile(buildXlsx({ rows: [header, ...rows], rowFills: [null, ...fills], widths: COMPARISON_WIDTHS, sheetName: t("otc.sheetName") }), comparisonFileName(shown), XLSX_TYPE);
   }
   const timesheetLink = (entry) => `/manager/v3/time?tab=timesheets&emp=${entry.userId}&date=${entry.jobDate}${entry.job ? `&job=${entry.job.id}` : ""}`;
 
