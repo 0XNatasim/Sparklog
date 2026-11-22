@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { COMPARISON_WIDTHS, comparisonFileName, comparisonTable, remarkText } from "./ot-compare-export";
 
 const labels = {
-  "ocr.col.date": "Date", "ocr.col.employee": "Employé", "ocr.col.jobOt": "OT", "ocr.col.result": "Résultat", "otc.col.note": "Note Britton", "otc.col.remark": "Remarque",
+  "ocr.col.date": "Date", "ocr.col.employee": "Employé", "otc.col.ot": "OT", "ocr.col.result": "Résultat", "otc.col.note": "Note Britton", "otc.col.remark": "Remarque",
   "otc.col.client": "Chez le client", "otc.col.return": "Retour", "otc.src.britton": "Britton", "otc.src.proof": "Preuve de temps", "otc.src.sheet": "Fiche de travail",
   "otc.verdict.brittonGap": "Britton diffère", "otc.verdict.ok": "Tout concorde", "otc.verdict.missingSparklog": "Pas dans Sparklog",
 };
@@ -80,6 +80,14 @@ describe("row colours", () => {
   it("pale green when everything agrees, pale orange when every source is there but one differs, nothing otherwise", () => {
     const { fills } = comparisonTable([entry({ verdict: "ok" }), entry({ verdict: "brittonGap" }), entry({ verdict: "formGap" }), entry({ verdict: "missingSparklog" }), entry({ verdict: "noProof" })], t);
     expect(fills).toEqual(["green", "orange", "orange", null, null]);
+  });
+});
+
+describe("what the row shows: the Britton line's day, name and OT", () => {
+  it("writes the day, the name and the OT of the Britton line when the row has one, else the sheet's", () => {
+    const withLine = comparisonTable([entry({ verdict: "brittonGap", job: { id: "j1" }, day: "2026-11-20", shownName: "Alexandre Brouillard", shownOt: "OT-231731", jobDate: "2026-11-19" })], t).rows[0];
+    expect(withLine.slice(0, 3)).toEqual(["2026-11-20", { v: "Alexandre Brouillard", style: "green" }, { v: "OT-231731", style: "green" }]);
+    expect(comparisonFileName([{ day: "2026-11-20", jobDate: "2026-11-19" }])).toBe("comparaison temps supp 2026-11-20.xlsx");
   });
 });
 
