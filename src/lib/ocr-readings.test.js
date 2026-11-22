@@ -169,7 +169,7 @@ describe("the old SMS proof (migration 0158 and process_overtime_evidence)", () 
   const jobs = [job("a", "06:30", "14:30"), job("b", "14:30", "17:00", { ot: "208637" })];
 
   it("shows a screenshot of the approval text message as « sms »: a valid proof, nothing to compare, nothing to read again", () => {
-    const [row] = buildOcrRows([proof("p1", "b", { ocr_status: "sms", proof_ot: null, proof_client_minutes: null, proof_return_minutes: null })], jobs, people);
+    const [row] = buildOcrRows([proof("p1", "b", { ocr_status: "sms", storage_path: "u/2026-11-20/p1.jpg", proof_ot: null, proof_client_minutes: null, proof_return_minutes: null })], jobs, people);
     expect(row.state).toBe("sms");
     expect(row.wrong.size).toBe(0);
     expect(canReread(row)).toBe(false);
