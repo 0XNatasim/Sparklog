@@ -75,8 +75,9 @@ describe("OtComparison", () => {
     setup({ jobs: [job("j1", "u1", "OT-111111")], britton: [line("b1", "Alex Un", "111111", 60)] });
     await screen.findByText("Alex Un");
     const [groups, sources] = screen.getAllByRole("row").slice(0, 2).map((row) => [...row.querySelectorAll("th")].map((cell) => cell.textContent.trim()).filter(Boolean));
-    expect(groups.slice(0, 5)).toEqual(["Date", "Employé", "OT", "Chez le client", "Retour"]); // the two groups, side by side
-    expect(sources).toEqual(["Britton", "Preuve de temps", "Fiche de travail", "Britton", "Preuve de temps", "Fiche de travail"]); // same order in each
+    expect(groups.slice(0, 5)).toEqual(["Date", "Employé", "OT", "Chez le client", "Retour"]); // the groups, side by side
+    const three = ["Britton", "Preuve de temps", "Fiche de travail"];
+    expect(sources).toEqual([...three, ...three, ...three]); // OT, then at the client, then return: same order in each
   });
 
   it("downloads the lines shown as an Excel table, without any picture, in the same column order", async () => {
@@ -87,12 +88,14 @@ describe("OtComparison", () => {
     expect(download.calls[0].name).toBe("comparaison temps supp 2026-11-19.xlsx");
     const [grid] = await readXlsxSheets(download.calls[0].bytes);
     // two header lines: the groups, then Britton · Preuve de temps · Fiche de travail under each
-    expect([grid[0][3], grid[0][6]]).toEqual(["Chez le client", "Retour"]);
-    expect(grid[1].slice(3, 9)).toEqual(["Britton", "Preuve de temps", "Fiche de travail", "Britton", "Preuve de temps", "Fiche de travail"]);
-    expect(grid[2].slice(0, 3)).toEqual(["2026-11-19", "Alex Un", "OT-111111"]);
-    expect(grid[2][3]).toBe(60); // Britton at the client
-    expect(grid[2][5]).toBe(120); // work sheet at the client (10 h day: 2 h past the line)
-    expect(grid[2][9]).toBe("Britton diffère");
+    expect([grid[0][2], grid[0][5], grid[0][8]]).toEqual(["OT", "Chez le client", "Retour"]);
+    const three = ["Britton", "Preuve de temps", "Fiche de travail"];
+    expect(grid[1].slice(2, 11)).toEqual([...three, ...three, ...three]);
+    expect(grid[2].slice(0, 2)).toEqual(["2026-11-19", "Alex Un"]);
+    expect([grid[2][2], grid[2][4]]).toEqual(["OT-111111", "OT-111111"]); // the OT as Britton and as the work sheet say it
+    expect(grid[2][5]).toBe(60); // Britton at the client
+    expect(grid[2][7]).toBe(120); // work sheet at the client (10 h day: 2 h past the line)
+    expect(grid[2][11]).toBe("Britton diffère");
   });
 
   it("offers no download when nothing is shown", async () => {
