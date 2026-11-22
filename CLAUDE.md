@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.307)
+## 6. À faire / à préciser (mis à jour 2026-11-21, V2.4.308)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.308 (technique).** Fichier Excel du tableau comparatif : couleur de ligne. `xlsx-write.js` : option `rowFills` de `buildXlsx` (une entrée par ligne : `green` / `orange` / null ; remplissage `FFE2F0D9` / `FFFCE4D6`, cellules vides de la ligne peintes aussi, chiffre rouge gardé rouge : styles 3 à 6 de `cellXfs`, en-tête jamais peint). `ot-compare-export.js` : `VERDICT_FILLS` (`ok` = vert, `brittonGap` / `formGap` = orange, les autres verdicts sans couleur) et `fills` renvoyé par `comparisonTable`, passé par `OtComparison.jsx`. Non vérifié dans Excel lui-même (structure minimale `fills` / `cellXfs`). Aucune migration. Tests : `xlsx-write.test.js`, `ot-compare-export.test.js`.
 
 **V2.4.307 (technique).** Comparaison par OT : `remark` sur chaque entrée (`remarkOf` dans `buildOtComparison`) — `earlier` (ligne Britton qui finit N jours après la fiche), `otOtherDay` (ligne Britton sans fiche dans la fenêtre mais le même employé a cet OT un autre jour lu), `wrongOt` (ligne Britton sans fiche : ses OT de la fenêtre listés), `noSheet` (aucune fiche de cette personne), `brittonOt` (fiche en temps supp. sans ligne alors que Britton a une ligne non rapprochée de la même personne : ses OT). Personnes liées par `nameKey`. Jamais de rapprochement par déduction : indice seulement. `remarkText(entry, t)` (`ot-compare-export.js`), textes `otc.remark.*` / `otc.col.remark`, colonne « Remarque » ajoutée au fichier Excel (`COMPARISON_WIDTHS` à 12 colonnes). Aucune migration. Tests : `ot-compare.test.js`, `ot-compare-export.test.js`.
 

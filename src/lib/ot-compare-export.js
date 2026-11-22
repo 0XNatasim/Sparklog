@@ -16,6 +16,9 @@ export function remarkText(entry, t) {
   return "";
 }
 
+// Row colour in the file: pale green = everything agrees, pale orange = every source is there but one differs; the others stay plain.
+export const VERDICT_FILLS = { ok: "green", brittonGap: "orange", formGap: "orange" };
+
 // { header: string[], rows: cell[][] } where a cell is a number, a string, "" or { v, style: "red" } (the odd figure).
 export function comparisonTable(entries, t) {
   const header = [t("ocr.col.date"), t("ocr.col.employee"), t("ocr.col.jobOt")];
@@ -34,7 +37,7 @@ export function comparisonTable(entries, t) {
     row.push(t(`otc.verdict.${entry.verdict}`), remarkText(entry, t), entry.britton?.note || "");
     return row;
   });
-  return { header, rows };
+  return { header, rows, fills: (entries || []).map((entry) => VERDICT_FILLS[entry.verdict] || null) };
 }
 
 export const COMPARISON_WIDTHS = [12, 26, 11, 16, 20, 18, 14, 20, 18, 20, 44, 30];

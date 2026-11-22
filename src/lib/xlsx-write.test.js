@@ -28,4 +28,22 @@ describe("xlsx-write", () => {
     expect(text).toContain('<autoFilter ref="A1:A2"/>');
     expect(text).toContain('state="frozen"');
   });
+
+  it("paints a whole row pale green / pale orange (also its empty cells), keeps the red figure red, and leaves the others plain", async () => {
+    const bytes = buildXlsx({
+      rows: [["a", "b", "c"], ["x", "", ""], ["y", { v: 5, style: "red" }], ["z", 1, 2]],
+      rowFills: [null, "green", "orange", null],
+    });
+    const text = new TextDecoder().decode(bytes);
+    expect(text).toContain('<fgColor rgb="FFE2F0D9"/>'); // pale green
+    expect(text).toContain('<fgColor rgb="FFFCE4D6"/>'); // pale orange
+    expect(text).toContain('<c r="C2" s="3"/>'); // green row: an empty cell is painted too
+    expect(text).toContain('<c r="B3" s="6"><v>5</v></c>'); // orange row: red figure on orange
+    expect(text).toContain('<c r="C3" s="4"/>'); // orange row shorter than the table: still painted
+    expect(text).not.toMatch(/<c r="[A-C]4" s=/); // plain row: no style
+    const [grid] = await readXlsxSheets(bytes);
+    expect(grid[1][0]).toBe("x");
+    expect(grid[1][1] ?? null).toBeNull(); // painted but empty
+    expect(grid[2][1]).toBe(5);
+  });
 });
