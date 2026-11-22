@@ -44,7 +44,8 @@ export function comparisonTable(entries, t) {
         const value = values ? values[field] : null;
         // The old way (screenshot of the approval text message): « SMS » where the proof's minutes would be.
         const number = value === null || value === undefined ? (source === "form" && (entry.proofs || []).some((proof) => proof.state === "sms") ? "SMS" : "") : value;
-        row.push(entry.red?.[source]?.has(field) && number !== "" ? { v: number, style: "red" } : number);
+        // The odd figure is red; when everything agrees (« ok », pale green row) the figures are green.
+        row.push(number === "" ? number : entry.red?.[source]?.has(field) ? { v: number, style: "red" } : entry.verdict === "ok" ? { v: number, style: "green" } : number);
       }
     }
     row.push(t(`otc.verdict.${entry.verdict}`), remarkText(entry, t), entry.britton?.note || "");

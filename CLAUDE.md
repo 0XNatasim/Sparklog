@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.312)
+## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.313)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.313 (technique).** Fichier Excel : chiffres verts quand tout concorde. `ot-compare-export.js` : pour `verdict === "ok"`, chaque chiffre non vide devient `{ v, style: "green" }` (le chiffre rouge `red` de `entry.red` garde la priorité) ; `xlsx-write.js` : `FILLED.green.green` = style 8 de `cellXfs` (police gras verte `FF2E7D32` sur remplissage vert pâle `FFE2F0D9`). Aucune migration. Tests : `ot-compare-export.test.js`, `xlsx-write.test.js`.
 
 **V2.4.312 (technique).** Capture du SMS = « SMS » (pas une preuve valable) ; nom vert / rouge quand pas chez Britton. Constat (2026-11-22) : les captures du message texte « Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp… » (Alexandre le 20, Martin…) étaient `wrong_document` : `validatesOvertimeSms` exigeait aussi une durée dans le texte, que ce SMS ne porte pas. Décision de la propriétaire : ce n'est **pas une preuve valable**, on écrit seulement « SMS ». `process_overtime_evidence/index.ts` : `isOvertimeSmsText` (« temps supplémentaire » / « surtemps » / « TS » + approuvé / autorisé / accordé, sans durée) évalué **après** `isOvertimeFormText` → `ocr_status = 'sms'` (l'ancien « processed » des SMS avec durée disparaît). Migration 0158 : contrainte `overtime_evidence_ocr_status_check` + `sms` (`requeue_overtime_proofs` accepte déjà toute lecture non en file). App : état `sms` (`ocr-readings.js`, badge « SMS », dans le filtre « À vérifier »), `proofAnomalies` traite `sms` comme `wrong_document` (`proof_wrong`), `buildOtComparison` : une fiche dont les preuves sont toutes `sms` = `noProof`, « SMS » à la place des minutes de la preuve (`OtComparison.jsx`, fichier Excel). **Pas chez Britton** (`missingBritton`) : OT en rouge ; `personInBritton` (une ligne Britton du même nom — `nameKey` — se termine dans la fenêtre de la fiche, rapprochée ou non) → nom **vert** (style `green` de `xlsx-write.js`, police gras vert `FF2E7D32`, index 7 de `cellXfs`) sinon **rouge** ; la remarque `brittonOt` liste maintenant toutes les lignes de la personne dans la fenêtre (rapprochées ou non). Cas d'origine : ligne Britton « OT-231731, fin le 20 » rapprochée de la fiche du 19, alors que sa fiche du 20 (autre OT, au-delà de la ligne) est « pas chez Britton » : nom vert, OT rouge. **Appliquer 0158, puis redéployer `process_overtime_evidence`** (avant la 0158 la base refuserait `sms`) ; les lectures déjà `wrong_document` se corrigent par « Tout relire » (le texte OCR n'est pas gardé). Tests : `ocr-readings.test.js`, `overtime-proof-check.test.js`, `ot-compare.test.js`, `ot-compare-export.test.js`, `xlsx-write.test.js`.
 

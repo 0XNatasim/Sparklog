@@ -46,6 +46,15 @@ describe("not at Britton", () => {
   });
 });
 
+describe("everything agrees", () => {
+  it("writes the figures in green (not the empty cells) when the verdict is « ok »; the other verdicts keep plain figures", () => {
+    const ok = comparisonTable([entry({ verdict: "ok", brittonValues: { client: 120, return: 0 }, form: null, sparklog: { client: 120, return: 0 }, red: { britton: new Set(), form: new Set(), sparklog: new Set() } })], t).rows[0];
+    expect(ok.slice(3, 9)).toEqual([{ v: 120, style: "green" }, "", { v: 120, style: "green" }, { v: 0, style: "green" }, "", { v: 0, style: "green" }]);
+    const gap = comparisonTable([entry({ verdict: "noProof", red: { britton: new Set(), form: new Set(), sparklog: new Set() } })], t).rows[0];
+    expect(gap[3]).toBe(60);
+  });
+});
+
 describe("SMS proof", () => {
   it("writes « SMS » in the proof columns when the proof is the screenshot of the approval text message", () => {
     const row = comparisonTable([entry({ form: null, proofs: [{ state: "sms" }] })], t).rows[0];
