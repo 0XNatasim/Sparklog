@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.319 (2026-11-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.322 (2026-11-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,8 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.322 — Two captures at the proof step.** The overtime proof step now asks for **two captures** at once (« Durée réelle du temps supplémentaire » and « Durée du retour »), each with its own button; « Send the 2 captures » is enabled when both are chosen. Both are saved with the job in one transaction (before the job is submitted), no more adding the second one afterwards from the clock. Needs migration 0160 (apply it before the app update).
+- **V2.4.321 — New overtime form (« Confirmation de surtemps »).** The form changed: two multiple-choice questions, « Durée réelle du temps supplémentaire » and « Durée du retour » (0, 15 … 120, « + de 120 minutes »). The reader now finds the ticked circle on the screenshot and takes the minutes written on its line; the OT is no longer read from the form (it comes from the work sheet the proof belongs to). The two answers may be on one long screenshot or on two captures of the same OT. « + de 120 » shows as « 120+ » and agrees with anything above 120. The employee text and the example picture are updated. Function `process_overtime_evidence` redeployed (v16); then « Tout relire ». No database change.
 - **V2.4.319 — Download the week.** In the timesheet page, a **Download the week** button (left of « Week snapshot ») gives the whole week as a spreadsheet: one row per employee, hours and km for each day, week totals and paid (rounded) time. The same button is in the snapshot, for the week chosen there. No database change.
 - **V2.4.318 — Open in a separate tab.** The tabs of every manager page (À traiter › OCR, Time, Payroll…) and the two buttons « Week snapshot » / « Last week » are real links: right-click, middle-click or Ctrl-click opens them in their own browser tab, so several can be open side by side. A normal click behaves as before. No database change.
 - **V2.4.317 — « By OT »: an OT group (Britton · Proof · Sheet).** The single OT column is replaced by a group **OT** with three columns, like « At the client » and « Return »: the OT as **Britton** says it, as read on the **time proof**, and as written on the **work sheet**. An OT that differs from the others is in red; the proof column says « SMS » for a text-message screenshot. Same in the downloaded file. No database change.

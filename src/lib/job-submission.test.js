@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildJobSaveRpcArgs, buildJobSaveWithEvidenceRpcArgs, dailyOvertimeEvidenceRequirement, kilometreFieldValue, requiresEvidenceBeforeSave } from "./job-submission";
 
@@ -157,5 +158,28 @@ describe("buildJobSaveWithEvidenceRpcArgs", () => {
       p_daily_minutes: 630,
     });
     expect(args).not.toHaveProperty("p_overtime_evidence_captured");
+  });
+});
+
+describe("two captures with the job (migration 0160)", () => {
+  const job = { editId: null, newJobId: "j1", submissionKey: "k1", submit: true, jobDate: "2026-11-23", ot: "OT-1", depart: "06:00", arrivee: "06:30", fin: "17:00", kmTotal: 10, kmAller: 5, returnMinutes: 0, kmRetour: 0 };
+  it("sends the second proof only when both its id and its path are given, and keeps the old call shape otherwise", () => {
+    const one = buildJobSaveWithEvidenceRpcArgs({ ...job, evidenceId: "e1", storagePath: "u/2026-11-23/e1.jpg", dailyMinutes: 120 });
+    expect(one).not.toHaveProperty("p_evidence_id_2");
+    expect(one).not.toHaveProperty("p_storage_path_2");
+    const two = buildJobSaveWithEvidenceRpcArgs({ ...job, evidenceId: "e1", storagePath: "u/2026-11-23/e1.jpg", dailyMinutes: 120, secondEvidenceId: "e2", secondStoragePath: "u/2026-11-23/e2.jpg" });
+    expect(two).toMatchObject({ p_evidence_id: "e1", p_evidence_id_2: "e2", p_storage_path_2: "u/2026-11-23/e2.jpg", p_submit: true });
+    expect(buildJobSaveWithEvidenceRpcArgs({ ...job, evidenceId: "e1", storagePath: "p", dailyMinutes: 0, secondEvidenceId: "e2" })).not.toHaveProperty("p_evidence_id_2");
+  });
+
+  it("migration 0160 records the second proof before the job is submitted, checks its file, and drops the old signature first", () => {
+    const sql = readFileSync(new URL("../../supabase/migrations/20261123200000_0160_two_captures_with_job.sql", import.meta.url), "utf8");
+    expect(sql.indexOf("drop function if exists public.save_own_job_with_overtime_evidence")).toBeLessThan(sql.indexOf("create or replace function"));
+    expect(sql).toMatch(/p_evidence_id_2 uuid DEFAULT null, p_storage_path_2 text DEFAULT null/);
+    expect(sql.indexOf("-- 2b.")).toBeGreaterThan(sql.indexOf("insert into public.overtime_evidence (id, job_id"));
+    expect(sql.indexOf("-- 2b.")).toBeLessThan(sql.indexOf("-- 4. Submit"));
+    expect(sql).toMatch(/o\.name = p_storage_path_2/);
+    expect(sql).toMatch(/revoke all on function public\.save_own_job_with_overtime_evidence\(.*uuid, text\) from public, anon/);
+    expect(sql).toMatch(/grant execute on function public\.save_own_job_with_overtime_evidence\(.*uuid, text\) to authenticated/);
   });
 });

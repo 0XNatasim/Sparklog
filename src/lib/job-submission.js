@@ -93,12 +93,18 @@ export function buildJobSaveRpcArgs({
 // Same job fields for save_own_job_with_overtime_evidence (migration 0084): the job, its
 // overtime proof row and the manager notification are written in one transaction, after
 // the server checks the uploaded file. The proof flag is not sent: the server sets it.
-export function buildJobSaveWithEvidenceRpcArgs({ evidenceId, storagePath, dailyMinutes, ...job }) {
+// The second proof (migration 0160: the form of November 2026 has two answers, so two captures) goes in the same call.
+export function buildJobSaveWithEvidenceRpcArgs({ evidenceId, storagePath, dailyMinutes, secondEvidenceId = null, secondStoragePath = null, ...job }) {
   const { p_overtime_evidence_captured: _flag, ...args } = buildJobSaveRpcArgs(job);
-  return {
+  const withProofs = {
     ...args,
     p_evidence_id: evidenceId,
     p_storage_path: storagePath,
     p_daily_minutes: Math.max(0, Math.round(Number(dailyMinutes) || 0)),
   };
+  if (secondEvidenceId && secondStoragePath) {
+    withProofs.p_evidence_id_2 = secondEvidenceId;
+    withProofs.p_storage_path_2 = secondStoragePath;
+  }
+  return withProofs;
 }

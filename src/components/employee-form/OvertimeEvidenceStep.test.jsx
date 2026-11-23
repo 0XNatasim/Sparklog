@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   rows: [{ form_id: "other", name_fr: "Demande de temps supp.", name_en: "Overtime Request", url: "https://forms.example/a", enabled: true },
@@ -17,7 +17,7 @@ import { dictionaries } from "@/lib/i18n";
 
 const t = (key, values = {}) => String(dictionaries.fr[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => values[name] ?? "");
 const wrap = (node) => <Dialog open><DialogContent>{node}</DialogContent></Dialog>;
-const props = { t, inputRef: { current: null }, onFile: () => {}, busy: false };
+const props = { t, onFiles: () => {}, busy: false };
 
 afterEach(cleanup);
 
@@ -35,7 +35,7 @@ describe("OvertimeEvidenceStep texts", () => {
 
   it("shows the « both questions visible » requirement in red", () => {
     render(wrap(<OvertimeEvidenceStep {...props} explain={{ ot: "1", hours: 8, perJob: true }} />));
-    expect(screen.getByText(/Les deux questions bien visibles/).className).toContain("text-destructive");
+    expect(screen.getByText(/Les deux captures sont obligatoires/).className).toContain("text-destructive");
   });
 });
 
@@ -47,5 +47,23 @@ describe("pickOvertimeConfirmationForm", () => {
     expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de Temps supp.", enabled: false })])).toBeNull();
     expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de Temps supp.", url: "" })])).toBeNull();
     expect(pickOvertimeConfirmationForm([form()])).toBeNull();
+  });
+});
+
+describe("OvertimeEvidenceStep: two captures", () => {
+  const png = (name) => new File(["x"], name, { type: "image/png" });
+  it("only sends once BOTH captures are chosen, and hands them over in order (real duration, then return)", () => {
+    const onFiles = vi.fn();
+    render(wrap(<OvertimeEvidenceStep {...props} onFiles={onFiles} />));
+    const send = screen.getByRole("button", { name: "Envoyer les 2 captures" });
+    expect(send.disabled).toBe(true);
+    const first = png("q2.png");
+    const second = png("q3.png");
+    fireEvent.change(screen.getByLabelText("Capture 1 — Durée réelle du temps supplémentaire"), { target: { files: [first] } });
+    expect(send.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Capture 2 — Durée du retour"), { target: { files: [second] } });
+    expect(send.disabled).toBe(false);
+    fireEvent.click(send);
+    expect(onFiles).toHaveBeenCalledWith(first, second);
   });
 });
