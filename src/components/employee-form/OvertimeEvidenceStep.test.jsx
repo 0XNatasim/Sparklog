@@ -33,9 +33,9 @@ describe("OvertimeEvidenceStep texts", () => {
     expect(screen.queryByText(/Votre total quotidien dépasse/)).toBeNull();
   });
 
-  it("shows the « whole form » requirement in red", () => {
+  it("shows the « both questions visible » requirement in red", () => {
     render(wrap(<OvertimeEvidenceStep {...props} explain={{ ot: "1", hours: 8, perJob: true }} />));
-    expect(screen.getByText(/Tout le formulaire sur la capture/).className).toContain("text-destructive");
+    expect(screen.getByText(/Les deux questions bien visibles/).className).toContain("text-destructive");
   });
 });
 
