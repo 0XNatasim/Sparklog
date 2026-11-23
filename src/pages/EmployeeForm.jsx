@@ -116,7 +116,6 @@ export default function EmployeeForm() {
   const [locked, setLocked] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const imageInputRef = useRef(null);
-  const overtimeInputRef = useRef(null);
   const parkingInputRef = useRef(null);
   const parkingModeRef = useRef("replace");
   const lastSaveErrorRef = useRef("");
@@ -1003,15 +1002,15 @@ export default function EmployeeForm() {
     }
   }
 
-  function handleOvertimeEvidence(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    return processEvidenceFile(file);
+  // Two captures (the form of November 2026: « Durée réelle du temps supplémentaire » and « Durée du retour »): both files are
+  // uploaded, then the job and BOTH proofs are saved in one transaction (migration 0160) before the job is submitted.
+  function handleOvertimeEvidence(first, second) {
+    return processEvidenceFiles(first, second);
   }
 
-  async function processEvidenceFile(file) {
-    if (!file) {
-      setErr(t("form.evidence.fileMissing"));
+  async function processEvidenceFiles(firstFile, secondFile) {
+    if (!firstFile || !secondFile) {
+      setErr(t("form.evidence.bothRequired"));
       return;
     }
     if (!pendingReturn) {
@@ -1026,33 +1025,40 @@ export default function EmployeeForm() {
     setFailedEvidenceFile(null);
 
     const jobId = editId || crypto.randomUUID();
-    // A proof already committed with its job (only the parking receipt failed afterwards)
-    // is not uploaded or recorded again.
+    // Proofs already committed with their job (only the parking receipt failed afterwards)
+    // are not uploaded or recorded again.
     const committed = pendingEvidenceJobId ? pendingEvidence.current : null;
-    const evidenceId = committed?.evidenceId || crypto.randomUUID();
-    const storagePath = `${user.id}/${job_date}/${evidenceId}.jpg`;
-    let evidenceUploaded = false;
-    // In-memory copy of the picked screenshot: « Réessayer » reuses it instead of reading the phone's
-    // file again. It stays null when the phone refused to read the file (no retry button then).
-    let source = null;
+    const evidenceIds = committed?.evidenceIds || [crypto.randomUUID(), crypto.randomUUID()];
+    const storagePaths = evidenceIds.map((id) => `${user.id}/${job_date}/${id}.jpg`);
+    let uploaded = [false, false];
+    // In-memory copies of the picked screenshots: « Réessayer » reuses them instead of reading the phone's
+    // files again. They stay null when the phone refused to read a file (no retry button then).
+    let sources = [null, null];
     try {
       let savedJobId = committed?.jobId || null;
       if (!committed) {
-        try {
-          source = file instanceof File ? await readPickedFile(file) : file;
-          const image = await prepareEvidenceImage(source);
-          await uploadOvertimeEvidence(supabase, storagePath, image);
-          evidenceUploaded = true;
-        } catch (error) {
-          console.error("[overtime evidence] Screenshot upload failed", error);
-          if (isFileFailure(error)) reportFileReadError("overtime", file, error);
-          const failure = evidenceUploadFailure(error);
-          throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`, { cause: error });
+        const picked = [firstFile, secondFile];
+        for (let index = 0; index < picked.length; index += 1) {
+          const file = picked[index];
+          try {
+            sources[index] = file instanceof File ? await readPickedFile(file) : file;
+            const image = await prepareEvidenceImage(sources[index]);
+            await uploadOvertimeEvidence(supabase, storagePaths[index], image);
+            uploaded[index] = true;
+          } catch (error) {
+            console.error("[overtime evidence] Screenshot upload failed", error);
+            if (isFileFailure(error)) reportFileReadError("overtime", file, error);
+            const failure = evidenceUploadFailure(error);
+            throw new Error(`${t("form.evidence.uploadFailed")} ${t("form.evidence.reasonLabel")} ${t(`form.evidence.reason.${failure.key}`)}${failure.detail ? ` (${failure.detail})` : ""}`, { cause: error });
+          }
         }
 
-        // Job + proof row + manager notification in ONE transaction (migration 0084): a
+        // Job + both proof rows + manager notifications in ONE transaction (migrations 0084 / 0160): a
         // failure leaves none of them, so a job can never claim a proof that was not recorded.
-        savedJobId = await saveJob(pendingReturn.mode || pendingSaveMode, pendingReturn, jobId, { evidenceId, storagePath, dailyMinutes: overtimeDailyMinutes });
+        savedJobId = await saveJob(pendingReturn.mode || pendingSaveMode, pendingReturn, jobId, {
+          evidenceId: evidenceIds[0], storagePath: storagePaths[0], dailyMinutes: overtimeDailyMinutes,
+          secondEvidenceId: evidenceIds[1], secondStoragePath: storagePaths[1],
+        });
         if (!savedJobId) {
           // saveJob also fails when only the parking receipt (sent after the commit) fails.
           const { data: committedJob } = await withTimeout(
@@ -1060,14 +1066,14 @@ export default function EmployeeForm() {
             8000
           ).catch(() => ({ data: null }));
           if (committedJob?.overtime_evidence_captured) {
-            pendingEvidence.current = { jobId: committedJob.id, evidenceId };
+            pendingEvidence.current = { jobId: committedJob.id, evidenceIds };
             setPendingEvidenceJobId(committedJob.id);
-            evidenceUploaded = false; // the file now belongs to a committed proof
+            uploaded = [false, false]; // the files now belong to committed proofs
           } else if (isOfflineError(lastSaveFailureRef.current)) {
-            // The request may still commit: keep the file (the cleanup worker removes it if not).
-            evidenceUploaded = false;
+            // The request may still commit: keep the files (the cleanup worker removes them if not).
+            uploaded = [false, false];
           }
-          console.error("[overtime evidence] Atomic job + proof save failed", { jobId, reason: lastSaveErrorRef.current });
+          console.error("[overtime evidence] Atomic job + proofs save failed", { jobId, reason: lastSaveErrorRef.current });
           throw new Error(lastSaveErrorRef.current || t("form.evidence.jobSaveFailed"));
         }
       } else if (parkingRequested && parkingFiles.length > 0) {
@@ -1085,11 +1091,13 @@ export default function EmployeeForm() {
 
       // Server-side OCR receives only the normalized JPEG and persists only its
       // classification, never the extracted conversation text.
-      const { error: processingError } = await withTimeout(
-        supabase.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId } }),
-        12000
-      );
-      if (processingError) console.error("[overtime evidence] OCR queue failed", processingError);
+      for (const evidenceId of evidenceIds) {
+        const { error: processingError } = await withTimeout(
+          supabase.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId } }),
+          12000
+        );
+        if (processingError) console.error("[overtime evidence] OCR queue failed", processingError);
+      }
 
       setPendingReturn(null);
       setPendingEvidenceJobId(null);
@@ -1107,12 +1115,11 @@ export default function EmployeeForm() {
       await finishAfterSave();
       navigate("/form", { replace: true });
     } catch (error) {
-      if (evidenceUploaded) {
-        await supabase.storage.from("overtime-evidence").remove([storagePath]).catch(() => undefined);
-      }
+      const toRemove = storagePaths.filter((_, index) => uploaded[index]);
+      if (toRemove.length) await supabase.storage.from("overtime-evidence").remove(toRemove).catch(() => undefined);
       setErr(error?.message || t("form.evidence.failed"));
-      // A proof already committed retries without a file; otherwise only a picture the app could read.
-      setFailedEvidenceFile(committed ? file : source);
+      // Proofs already committed retry without files; otherwise only pictures the app could read.
+      setFailedEvidenceFile(committed ? [firstFile, secondFile] : (sources[0] && sources[1] ? sources : null));
       setReturnStep("evidence");
     } finally {
       setEvidenceBusy(false);
@@ -1381,12 +1388,11 @@ export default function EmployeeForm() {
           minutes: returnMinutes, setMinutes: setReturnMinutes, km: returnKm, setKm: setReturnKm, kmTotal: km_aller,
         }}
         evidence={{
-          inputRef: overtimeInputRef,
-          onFile: handleOvertimeEvidence,
+          onFiles: handleOvertimeEvidence,
           validationError: evidenceValidationError,
           error: err,
           canRetry: Boolean(failedEvidenceFile),
-          onRetry: () => processEvidenceFile(failedEvidenceFile),
+          onRetry: () => processEvidenceFiles(failedEvidenceFile[0], failedEvidenceFile[1]),
           busy: evidenceBusy,
           onSkip: skipEvidenceForNow,
           explain: { ot: ot || "—", hours: dailyRegularMinutes / 60, perJob: proofPerJob(job_date) },

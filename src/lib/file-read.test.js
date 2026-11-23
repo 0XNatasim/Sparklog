@@ -80,8 +80,8 @@ describe("reading a picked picture (V2.4.170)", () => {
 
   it("reads the screenshot once, reuses the copy for « Réessayer », and reports each kind of picture", () => {
     const form = readFileSync(new URL("../pages/EmployeeForm.jsx", import.meta.url), "utf8");
-    expect(form).toContain("source = file instanceof File ? await readPickedFile(file) : file;");
-    expect(form).toContain("setFailedEvidenceFile(committed ? file : source);");
+    expect(form).toContain("sources[index] = file instanceof File ? await readPickedFile(file) : file;");
+    expect(form).toContain("setFailedEvidenceFile(committed ? [firstFile, secondFile]");
     // The inventory step and the parking upload moved out of the form (V2.4.178).
     const inventory = readFileSync(new URL("../components/employee-form/use-inventory-step.js", import.meta.url), "utf8");
     const parking = readFileSync(new URL("./parking-upload.js", import.meta.url), "utf8");
