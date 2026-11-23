@@ -23,6 +23,7 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { supabase } from "@/supabaseClient";
+import { minutesText } from "@/lib/overtime-proof-check";
 
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
@@ -48,7 +49,7 @@ async function inChunks(ids, run) {
 // The work order the proof belongs to, beside the screenshot: what the reader found against what the job says (gaps in red).
 function JobSummary({ row, t }) {
   const job = row.job;
-  const mins = (value) => (value == null ? "—" : `${value} min`);
+  const mins = (value) => (value == null ? "—" : `${minutesText(value)} min`);
   const line = (label, value, bad = false) => (
     <div key={label} className="flex justify-between gap-3 border-b py-1.5 text-sm last:border-0">
       <dt className="text-muted-foreground">{label}</dt>
@@ -199,7 +200,7 @@ export default function OcrReadings() {
 
   const timesheetLink = (row, jobId) => `/manager/v3/time?tab=timesheets&emp=${row.userId}&date=${row.jobDate}${jobId ? `&job=${jobId}` : ""}`;
 
-  const minutes = (value) => (value == null ? "—" : `${value} min`);
+  const minutes = (value) => (value == null ? "—" : `${minutesText(value)} min`);
   const cell = (row, field, value, format = (v) => (v == null ? "—" : v)) => (
     <td className={`whitespace-nowrap px-3 py-2 ${row.wrong.has(field) ? "font-bold text-destructive" : ""}`}>{format(value)}</td>
   );

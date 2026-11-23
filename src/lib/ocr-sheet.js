@@ -1,7 +1,8 @@
+import { minutesText } from "@/lib/overtime-proof-check";
 // The « fiche » of an overtime proof: the job it belongs to (Départ → Arrivée → Fin → Retour, kilometres) and what the reader
 // found against what the timesheet says. Shown in the OCR preview and drawn next to the picture in the downloaded image.
 const hhmm = (value) => String(value || "").slice(0, 5) || "—";
-const mins = (value) => (value == null ? "—" : `${value} min`);
+const mins = (value) => (value == null ? "—" : `${minutesText(value)} min`);
 const num = (value) => (value == null || value === "" ? null : Number(value));
 
 // Is there a return to show? Only when it was declared: minutes or kilometres.

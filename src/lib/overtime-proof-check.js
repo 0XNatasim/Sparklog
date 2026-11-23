@@ -1,3 +1,4 @@
+import { OVER_120_MINUTES } from "./overtime-form";
 import { DAILY_REGULAR_MINUTES, TEN_HOUR_DAY_MINUTES, dayFirstTripUnpaidMinutes, minutesBetween } from "./payroll-calculations";
 
 // What the overtime request form (screenshot kept as the day's proof) must say, worked out from the day's jobs the way
@@ -10,6 +11,16 @@ import { DAILY_REGULAR_MINUTES, TEN_HOUR_DAY_MINUTES, dayFirstTripUnpaidMinutes,
 // « À vérifier avant d'approuver », it never blocks anything.
 export const PROOF_CLIENT_TOLERANCE_MIN = 15; // the day is paid rounded to 15 minutes
 export const PROOF_RETURN_TOLERANCE_MIN = 5; // return minutes are entered in steps of 5
+
+// « + de 120 minutes » (the last choice of the form, read as 121) agrees with anything above the limit, within the tolerance.
+export function minutesClose(a, b, tolerance) {
+  if (a === OVER_120_MINUTES) return b >= OVER_120_MINUTES - tolerance;
+  if (b === OVER_120_MINUTES) return a >= OVER_120_MINUTES - tolerance;
+  return Math.abs(a - b) <= tolerance;
+}
+
+// What is shown for a minutes figure: « + de 120 minutes » (121) reads « 120+ ».
+export const minutesText = (value) => (value === OVER_120_MINUTES ? "120+" : value);
 
 const REVIEWABLE = new Set(["submitted", "approved"]);
 
@@ -41,10 +52,10 @@ export function proofDifferences(found, expected) {
   if (found.ot != null && expected.ot != null && String(found.ot).replace(/^0+/, "") !== String(expected.ot).replace(/^0+/, "")) {
     diffs.push({ field: "ot", found: found.ot, expected: expected.ot });
   }
-  if (found.clientMinutes != null && Math.abs(found.clientMinutes - expected.clientMinutes) > PROOF_CLIENT_TOLERANCE_MIN) {
+  if (found.clientMinutes != null && !minutesClose(found.clientMinutes, expected.clientMinutes, PROOF_CLIENT_TOLERANCE_MIN)) {
     diffs.push({ field: "client", found: found.clientMinutes, expected: expected.clientMinutes });
   }
-  if (found.returnMinutes != null && Math.abs(found.returnMinutes - expected.returnMinutes) > PROOF_RETURN_TOLERANCE_MIN) {
+  if (found.returnMinutes != null && !minutesClose(found.returnMinutes, expected.returnMinutes, PROOF_RETURN_TOLERANCE_MIN)) {
     diffs.push({ field: "return", found: found.returnMinutes, expected: expected.returnMinutes });
   }
   return diffs;

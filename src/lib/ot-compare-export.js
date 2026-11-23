@@ -1,3 +1,4 @@
+import { minutesText } from "@/lib/overtime-proof-check";
 // The comparison table (Britton · proof · work sheet) as the rows of a spreadsheet, columns grouped by what they measure:
 // « chez le client » (Britton → preuve de temps → fiche de travail) then « retour » (same order). No picture, no proof file.
 // `entries` = rows of buildOtComparison (already filtered); `t` = the i18n function.
@@ -53,7 +54,7 @@ export function comparisonTable(entries, t) {
         const values = source === "britton" ? entry.brittonValues : entry[source];
         const value = values ? values[field] : null;
         // The old way (screenshot of the approval text message): « SMS » where the proof's minutes would be.
-        const number = value === null || value === undefined ? (source === "form" && (entry.proofs || []).some((proof) => proof.state === "sms") ? "SMS" : "") : value;
+        const number = value === null || value === undefined ? (source === "form" && (entry.proofs || []).some((proof) => proof.state === "sms") ? "SMS" : "") : minutesText(value);
         // The odd figure is red; when everything agrees (« ok », pale green row) the figures are green.
         row.push(number === "" ? number : entry.red?.[source]?.has(field) ? { v: number, style: "red" } : entry.verdict === "ok" ? { v: number, style: "green" } : number);
       }

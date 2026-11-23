@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOvertimeFormText, overtimeFormFound, parseOvertimeForm, parseOvertimeFormLines, readOvertimeForm } from "./overtime-form";
+import { OVER_120_MINUTES, isOvertimeFormText, overtimeFormFound, parseOvertimeForm, parseOvertimeFormLines, parseRadioAnswers, readOvertimeForm } from "./overtime-form";
 
 const FORM = (ot, client, back) => `
 automatiquement vos détails, tels que le nom et l'adresse de courriel, sauf si vous le fournissez vous-même.
@@ -120,5 +120,63 @@ describe("reading the answers by lines (position on the picture)", () => {
     const text = "4. Combien de minute chez le client *\n5. Combien de minute retour à l'entrepôt si applicable sinon inscrire 0 *\n2026-11-19\n90\n15";
     expect(readOvertimeForm({ text, lines: LINES })).toEqual({ ot: "202765", clientMinutes: 90, returnMinutes: 15 });
     expect(readOvertimeForm({ text: FORM("OT-208637", "40", "60"), lines: [] })).toEqual({ ot: "208637", clientMinutes: 40, returnMinutes: 60 });
+  });
+});
+
+// ── The form of November 2026 (« Confirmation de surtemps »): multiple choice, selected circle found on the picture ─────────────
+describe("new form: selected circle → minutes", () => {
+  const CHOICES = ["0", "15", "30", "45", "60", "75", "90", "105", "120", "+ de 120 minutes"];
+  // Lines as OCR.space returns them for the screenshot of question 2 (pixel positions of a 1080 × 2340 picture).
+  const question2 = [
+    { text: "Confirmation de surtemps - D...", top: 120, height: 40 },
+    { text: "2. Durée réelle du temps supplémentaire", top: 700, height: 52 },
+    { text: "(Minutes) *", top: 770, height: 52 },
+    { text: "60 minutes = 1h, 75 minutes =1h15, 90 minutes =", top: 900, height: 40 },
+    ...CHOICES.map((text, i) => ({ text, top: 1000 + i * 148, height: 44 })),
+  ];
+  const question3 = [
+    { text: "3. Durée du retour *", top: 160, height: 52 },
+    ...CHOICES.map((text, i) => ({ text, top: 280 + i * 148, height: 44 })),
+    { text: "4. Commentaire *", top: 1900, height: 52 },
+  ];
+
+  it("reads the choice written on the line of the selected circle (question 2: 30, question 3: 60)", () => {
+    // « 30 » is the 3rd choice: centre 1000 + 2 × 148 + 22; « 60 » is the 5th choice: 280 + 4 × 148 + 22.
+    expect(parseRadioAnswers(question2, [{ x: 80, y: 1000 + 2 * 148 + 22 }])).toMatchObject({ clientMinutes: 30, returnMinutes: null, located: { client: true, back: false } });
+    expect(parseRadioAnswers(question3, [{ x: 80, y: 280 + 4 * 148 + 22 }])).toMatchObject({ clientMinutes: null, returnMinutes: 60, located: { client: false, back: true } });
+  });
+
+  it("reads « 0 » and « + de 120 minutes » (stored as 121)", () => {
+    expect(parseRadioAnswers(question3, [{ x: 80, y: 280 + 22 }]).returnMinutes).toBe(0);
+    expect(parseRadioAnswers(question3, [{ x: 80, y: 280 + 9 * 148 + 22 }]).returnMinutes).toBe(OVER_120_MINUTES);
+  });
+
+  it("reads both questions of one long screenshot, each circle going to its own question", () => {
+    const longShot = [...question2, ...question3.map((line) => ({ ...line, top: line.top + 2500 }))];
+    const circles = [{ x: 80, y: 1000 + 3 * 148 + 22 }, { x: 80, y: 2500 + 280 + 1 * 148 + 22 }];
+    expect(parseRadioAnswers(longShot, circles)).toMatchObject({ clientMinutes: 45, returnMinutes: 15 });
+  });
+
+  it("never guesses: no circle, two circles in one question, a circle off every line, or a missing heading give null", () => {
+    expect(parseRadioAnswers(question2, []).clientMinutes).toBeNull();
+    expect(parseRadioAnswers(question2, [{ x: 80, y: 1000 + 22 }, { x: 80, y: 1300 }]).clientMinutes).toBeNull();
+    expect(parseRadioAnswers(question2, [{ x: 80, y: 1000 + 0.5 * 148 + 22 }]).clientMinutes).toBeNull();
+    expect(parseRadioAnswers(question2.filter((line) => !/Durée réelle/.test(line.text)), [{ x: 80, y: 1370 }]).located.client).toBe(false);
+  });
+
+  it("tolerates the empty circle read as a letter in front of a choice", () => {
+    const noisy = question3.map((line) => (/^\d+$/.test(line.text) ? { ...line, text: `O ${line.text}` } : line));
+    expect(parseRadioAnswers(noisy, [{ x: 80, y: 280 + 4 * 148 + 22 }]).returnMinutes).toBe(60);
+  });
+
+  it("readOvertimeForm uses the circles for the new form, leaves the OT to the work sheet, and still reads the old form by text", () => {
+    expect(readOvertimeForm({ text: "", lines: question2, circles: [{ x: 80, y: 1318 }] })).toEqual({ ot: null, clientMinutes: 30, returnMinutes: null });
+    expect(readOvertimeForm({ text: "3. Numéro du OT-XXXXXX\nOT-208637\n4. Combien de minute chez le client\n60", lines: [], circles: [] }).clientMinutes).toBe(60);
+  });
+
+  it("recognises the new form as the overtime form, and a text message as not being it", () => {
+    expect(isOvertimeFormText("Confirmation de surtemps - D...\n2. Durée réelle du temps supplémentaire (Minutes) *\n0\n15")).toBe(true);
+    expect(isOvertimeFormText("3. Durée du retour *\n0\n15\n4. Commentaire *")).toBe(false); // one mark only: refused rather than trusted
+    expect(isOvertimeFormText("Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp")).toBe(false);
   });
 });

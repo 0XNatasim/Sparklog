@@ -185,3 +185,27 @@ describe("counting, filtering, days", () => {
     expect([...noProof.otRed]).toEqual([]);
   });
 });
+
+describe("the form of November 2026: the two answers may sit on two captures", () => {
+  it("takes the client minutes from one proof and the return minutes from the other", () => {
+    const clientShot = proof("p1", { createdAt: "2026-11-19T22:00:00Z", found: { ot: null, clientMinutes: 120, returnMinutes: null } });
+    const returnShot = proof("p2", { createdAt: "2026-11-19T22:01:00Z", found: { ot: null, clientMinutes: null, returnMinutes: 0 } });
+    const [entry] = build({ proofRows: [clientShot, returnShot] });
+    expect(entry.form).toEqual({ client: 120, return: 0 });
+    expect(entry.verdict).toBe("ok");
+  });
+
+  it("« + de 120 minutes » (121) agrees with 150 minutes of the timesheet and Britton", () => {
+    const longJob = job("j1", { depart: "06:00", fin: "16:30" }); // 10 h 30 → 150 minutes past the line
+    const [entry] = build({ jobs: [longJob], britton: [line("b1", { client_minutes: 150, total_minutes: 150 })], proofRows: [proof("p1", { found: { ot: null, clientMinutes: 121, returnMinutes: 0 } })] });
+    expect(entry.sparklog.client).toBe(150);
+    expect(entry.verdict).toBe("ok");
+    expect([...entry.red.form]).toEqual([]);
+  });
+
+  it("no OT on the form: the OT of the work sheet is not marked as differing", () => {
+    const [entry] = build({ proofRows: [proof("p1", { found: { ot: null, clientMinutes: 120, returnMinutes: 0 } })] });
+    expect(entry.ots.form).toBe("");
+    expect([...entry.otRed]).toEqual([]);
+  });
+});
