@@ -103,8 +103,8 @@ describe("new hire and first day of work (0110)", () => {
     expect(read("../components/LiveCrew.jsx")).toMatch(/offUserIds: offToday,\s+date: today/);
     expect(read("../components/LiveCrew.jsx")).toContain("offUserIds: offYesterday, date: yesterday");
     expect(read("../components/manager/TodoInbox.jsx")).toContain("offUserIds: off, date: day");
-    expect(read("../components/WeekSnapshot.jsx")).toContain("date: days[6]");
-    for (const file of ["../components/LiveCrew.jsx", "../components/WeekSnapshot.jsx", "../components/manager/TodoInbox.jsx", "../components/EmployeeActivityLog.jsx"]) {
+    expect(read("../lib/week-rows.js")).toContain("date: days[6]");
+    for (const file of ["../components/LiveCrew.jsx", "../lib/week-rows.js", "../components/manager/TodoInbox.jsx", "../components/EmployeeActivityLog.jsx"]) {
       expect(read(file)).toMatch(/show_on_boards, start_date/);
     }
   });

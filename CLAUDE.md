@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-23, V2.4.318)
+## 6. À faire / à préciser (mis à jour 2026-11-23, V2.4.319)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.319 (technique).** Télécharger la semaine. `src/lib/week-rows.js` (extrait de `WeekSnapshot.jsx`, comportement inchangé) : `loadWeekData(weekStart, weekEnd)` (profils, fiches par pages, absences, compteurs d'arrondi) et `buildWeekRows(...)`. `week-export.js` : `weekTable` (en-tête sur 2 lignes : jour fusionné sur Heures · Km, puis Total et Payé arrondi ; jour sans fiche = cellule vide, jamais 0), `weekFileName` (« semaine AAAA-MM-JJ au AAAA-MM-JJ.xlsx »), écrit par `xlsx-write.js`. `manager/WeekDownload.jsx` (`weekOffset`) : bouton dans `ManagerDashboard` (à gauche des boutons du snapshot, semaine courante) et dans `WeekSnapshot` (semaine choisie). Textes `week.export.*`. Aucune migration. Tests : `week-export.test.js`, `WeekSnapshot.test.jsx`, `signups.test.js` (lit maintenant `week-rows.js`).
 
 **V2.4.318 (technique).** Ouvrir dans un onglet séparé. `ManagerPages.jsx` (`TabbedPage`) : chaque `TabsTrigger` est rendu `asChild` avec un `<Link to={{ search: "?tab=…" }}>` (clic simple : `preventDefault`, Radix change l'onglet ; clic droit / molette / Ctrl / Maj : le navigateur ouvre l'adresse `#/manager/…?tab=…`). `ManagerDashboard.jsx` : l'ouverture du snapshot de la semaine est dans l'URL (`?snapshot=week` / `lastweek`, états `weekSnapshotOpen` / `lastWeekSnapshotOpen` dérivés du paramètre) et ses deux boutons sont des `<Link>` ; un nouvel onglet ouvre donc directement le snapshot. Aucune migration. Test : `TabbedPage.test.jsx`.
 
