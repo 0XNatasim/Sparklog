@@ -24,6 +24,7 @@ import { loadOtReuse } from "@/lib/ot-reuse";
 import { monthlyReportPeriod } from "@/lib/monthly-report-period";
 import LiveCrew from "@/components/LiveCrew";
 import WeekSnapshot from "@/components/WeekSnapshot";
+import WeekDownload from "@/components/manager/WeekDownload";
 import { dailyRegularMinutesFor, dayFirstTripUnpaidMinutes, getKilometreBreakdown, minutesBetween } from "@/lib/payroll-calculations";
 import JobCaptureIcons from "@/components/JobCaptureIcons";
 import JobCard from "@/components/manager/JobCard";
@@ -1264,6 +1265,7 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
                 </Button>
               )}
               <div className="ml-auto flex flex-wrap items-center gap-2">
+                <WeekDownload />
                 <Button asChild size="sm" variant="outline">
                   <Link to={{ search: snapshotSearch("week") }} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { event.preventDefault(); setWeekSnapshotOpen(true); } }}>
                     <Radio className="mr-1.5 h-4 w-4" />{t("live.week.open")}
