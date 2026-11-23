@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.322).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.323).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -38,6 +38,7 @@
 - [ ] **Migrations 0148 et 0149 + fonction (V2.4.281)** : appliquer la 0148 puis la 0149, puis redéployer `process_overtime_evidence` (je le fais sur demande). Je remets ensuite en file les 7 preuves « conformes » où seul le numéro d'OT avait été lu, pour qu'elles soient relues avec la nouvelle règle.
 - [ ] **Migration 0150 (V2.4.285)** : à appliquer (« Applique la 0150 »), sinon « Relire » ne marche que sur les échecs.
 - [ ] **Migration 0151 (V2.4.286)** : à appliquer (« Applique la 0151 ») pour pouvoir activer le bouton « Renvoyer pour correction ».
+- 🟠 **V2.4.323 — Onglets consultés par les gestionnaires** : dans Avancé › Journal, un nouvel onglet **Onglets consultés** (visible par toi seulement) montre, pour chaque gestionnaire et chaque jour, les pages et onglets ouverts et combien de fois. Rien n'est connu avant l'activation : le compte commence à partir de la migration. **À faire : appliquer la migration 0159.** Seuls les noms des pages sont gardés. Pense à en parler aux gestionnaires (politique de confidentialité).
 - 🟠 **V2.4.322 — Deux captures d'un coup** : à l'étape de la preuve de temps supp., l'employé choisit **deux captures** (« Durée réelle du temps supplémentaire » et « Durée du retour »), chacune avec son bouton ; « Envoyer les 2 captures » s'allume quand les deux sont choisies. Les deux partent avec la fiche en une seule opération, avant la soumission : plus besoin de passer par l'horloge de l'Historique pour la deuxième. **À faire : appliquer la migration 0160 avant de publier** (dis « Applique la 0160 »).
 - 🟢 **V2.4.321 — Nouveau formulaire de surtemps** : le formulaire a changé (deux questions à choix : « Durée réelle du temps supplémentaire » et « Durée du retour »). Sparklog lit maintenant le cercle coché sur la capture et en tire les minutes ; l'OT ne vient plus du formulaire (il vient de la fiche). « + de 120 minutes » s'affiche « 120+ ». Fonction `process_overtime_evidence` redéployée (v16) ; ensuite « Tout relire » dans l'onglet OCR et contrôle de 2 ou 3 vraies captures (pas encore vérifié sur une vraie lecture du service OCR).
 - 🟢 **V2.4.319 — Télécharger la semaine** : dans la feuille de temps, un bouton **Télécharger la semaine** (à gauche de « Snapshot de la semaine ») donne toute la semaine en tableau Excel : une ligne par employé, heures et km de chaque jour, totaux de la semaine et temps payé (arrondi). Le même bouton est dans le snapshot, pour la semaine choisie. Rien à appliquer dans la base.
