@@ -136,8 +136,19 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
   const [manualOnly, setManualOnly] = useState(manualFilter && searchParams.get("manual") === "1");
   const [searchLive, setSearchLive] = useState("");
   const [search, setSearch] = useState("");
-  const [weekSnapshotOpen, setWeekSnapshotOpen] = useState(false);
-  const [lastWeekSnapshotOpen, setLastWeekSnapshotOpen] = useState(false);
+  // The week snapshot lives in the URL (?snapshot=week | lastweek): a right-click / middle-click « open in a new tab » on its
+  // button opens the same screen in a separate tab.
+  const snapshotParam = searchParams.get("snapshot");
+  const weekSnapshotOpen = snapshotParam === "week";
+  const lastWeekSnapshotOpen = snapshotParam === "lastweek";
+  const snapshotSearch = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set("snapshot", value); else next.delete("snapshot");
+    return `?${next.toString()}`;
+  };
+  const setSnapshot = (value) => setSearchParams(new URLSearchParams(snapshotSearch(value)));
+  const setWeekSnapshotOpen = (open) => setSnapshot(open ? "week" : "");
+  const setLastWeekSnapshotOpen = (open) => setSnapshot(open ? "lastweek" : "");
 
   const [selectedWeekKey, setSelectedWeekKey] = useState("latest");
 
@@ -1253,11 +1264,15 @@ export default function ManagerDashboard({ view = "timesheet", nameFirst = false
                 </Button>
               )}
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => setWeekSnapshotOpen(true)}>
-                  <Radio className="mr-1.5 h-4 w-4" />{t("live.week.open")}
+                <Button asChild size="sm" variant="outline">
+                  <Link to={{ search: snapshotSearch("week") }} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { event.preventDefault(); setWeekSnapshotOpen(true); } }}>
+                    <Radio className="mr-1.5 h-4 w-4" />{t("live.week.open")}
+                  </Link>
                 </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => setLastWeekSnapshotOpen(true)}>
-                  <Radio className="mr-1.5 h-4 w-4" />{t("live.week.openLast")}
+                <Button asChild size="sm" variant="outline">
+                  <Link to={{ search: snapshotSearch("lastweek") }} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { event.preventDefault(); setLastWeekSnapshotOpen(true); } }}>
+                    <Radio className="mr-1.5 h-4 w-4" />{t("live.week.openLast")}
+                  </Link>
                 </Button>
               </div>
             </div>

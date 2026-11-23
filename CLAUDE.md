@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-22, V2.4.317)
+## 6. À faire / à préciser (mis à jour 2026-11-23, V2.4.318)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.318 (technique).** Ouvrir dans un onglet séparé. `ManagerPages.jsx` (`TabbedPage`) : chaque `TabsTrigger` est rendu `asChild` avec un `<Link to={{ search: "?tab=…" }}>` (clic simple : `preventDefault`, Radix change l'onglet ; clic droit / molette / Ctrl / Maj : le navigateur ouvre l'adresse `#/manager/…?tab=…`). `ManagerDashboard.jsx` : l'ouverture du snapshot de la semaine est dans l'URL (`?snapshot=week` / `lastweek`, états `weekSnapshotOpen` / `lastWeekSnapshotOpen` dérivés du paramètre) et ses deux boutons sont des `<Link>` ; un nouvel onglet ouvre donc directement le snapshot. Aucune migration. Test : `TabbedPage.test.jsx`.
 
 **V2.4.317 (technique).** « Par OT » : groupe de colonnes OT (Britton · Preuve · Fiche). `buildOtComparison` ajoute `ots` (`britton` = `OT-<ot>` de la ligne Britton, `form` = `OT-<chiffres>` lu sur la dernière preuve lue `ok` / `mismatch` qui porte un OT, `sparklog` = OT de la fiche tel qu'écrit) et `otRed` (sources dont les chiffres de l'OT diffèrent des autres : deux sources qui diffèrent = les deux rouges ; les OT sans chiffres, ex. « CONTREMAÎTRE », ne sont pas comparés). `OtComparison.jsx` : en-tête « OT » sur 3 colonnes (`OtCell`, « SMS » quand la preuve est une capture de message texte, `—` sinon) ; `otc.col.ot` = « OT » ; colspan du message vide 14. `ot-compare-export.js` : colonnes C–E = OT Britton / Preuve / Fiche, puis client F–H, retour I–K, Résultat L, Remarque M, Note N (`merges` : `A1:B2`…, `C1:E1`, `F1:H1`, `I1:K1`, `COMPARISON_WIDTHS` à 14) ; couleurs : OT qui diffère = rouge, ligne rapprochée = OT verts, « Pas chez Britton » = OT de la fiche rouge. L'ancien `shownOt` reste calculé (recherche). Aucune migration. Tests : `ot-compare.test.js`, `ot-compare-export.test.js`, `OtComparison.test.jsx`.
 
