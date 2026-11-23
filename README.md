@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.317 (2026-11-22).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.318 (2026-11-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.318 — Open in a separate tab.** The tabs of every manager page (À traiter › OCR, Time, Payroll…) and the two buttons « Week snapshot » / « Last week » are real links: right-click, middle-click or Ctrl-click opens them in their own browser tab, so several can be open side by side. A normal click behaves as before. No database change.
 - **V2.4.317 — « By OT »: an OT group (Britton · Proof · Sheet).** The single OT column is replaced by a group **OT** with three columns, like « At the client » and « Return »: the OT as **Britton** says it, as read on the **time proof**, and as written on the **work sheet**. An OT that differs from the others is in red; the proof column says « SMS » for a text-message screenshot. Same in the downloaded file. No database change.
 - **V2.4.316 — « By OT » shows the Britton table's name, OT and day.** When a row has a Britton line, the **date, the name and the OT** shown (in the app and in the downloaded file) are those of the Britton line — its « Date » column classifies the day, and the « Day » menu follows it; the sheet's own day appears underneath only when it differs. A row with no Britton line keeps the sheet's. No database change.
 - **V2.4.315 — Britton table: the day of a line is the « Date » column again.** Correction of V2.4.303: the day of a line is its **« Date » / « Date installation » column**, not its end time (the end time is kept only as the time, and gives the day when « Date » is blank). Both columns are needed in the file. **Import the two files again (16-18 Nov. and 19-20 Nov.)** so the stored days follow the « Date » column: a line imported again replaces its old copy. No database change.

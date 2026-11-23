@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Info, Save } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
@@ -283,7 +283,22 @@ function TabbedPage({ itemId, content }) {
     <Tabs value={active} onValueChange={select} className="w-full">
       {tabs.length > 1 && (
         <TabsList className={cn("h-auto max-w-full flex-wrap justify-start", nested && menuShown && "md:hidden")}>
-          {tabs.map((tabItem) => <TabsTrigger key={tabItem.key} value={tabItem.key}>{t(tabItem.labelKey)}</TabsTrigger>)}
+          {tabs.map((tabItem) => {
+            // A real link: right-click / middle-click / Ctrl-click opens the tab in a separate browser tab.
+            const search = new URLSearchParams(params);
+            search.set("tab", tabItem.key);
+            search.delete("snapshot");
+            return (
+              <TabsTrigger key={tabItem.key} value={tabItem.key} asChild>
+                <Link
+                  to={{ search: `?${search.toString()}` }}
+                  onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) event.preventDefault(); }}
+                >
+                  {t(tabItem.labelKey)}
+                </Link>
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
       )}
       <div className={tabs.length > 1 ? cn("mt-3", nested && menuShown && "md:mt-0") : undefined}>{Content ? <Content /> : null}</div>

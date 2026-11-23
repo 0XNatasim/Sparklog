@@ -76,3 +76,15 @@ describe("Rapports › Semaine / Mois and Sommaire", () => {
     expect(screen.getByRole("tab", { name: fr("mgr.nav3.tab.period") }).getAttribute("aria-selected")).toBe("true");
   });
 });
+
+describe("tabs are real links (open in a separate tab)", () => {
+  it("gives every tab an address with its ?tab= and still switches on a plain click", () => {
+    show(ReportsHubPage, "/manager/v3/reports?tab=costs", true);
+    const tab = screen.getByRole("tab", { name: fr("mgr.nav3.tab.period") });
+    expect(tab.tagName).toBe("A");
+    expect(tab.getAttribute("href")).toContain("tab=period");
+    fireEvent.mouseDown(tab, { button: 0 });
+    fireEvent.click(tab, { button: 0 });
+    expect(screen.getByRole("tab", { name: fr("mgr.nav3.tab.period") }).getAttribute("aria-selected")).toBe("true");
+  });
+});
