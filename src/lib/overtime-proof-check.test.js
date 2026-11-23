@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { expectedProof, otDigits, proofAnomalies, proofDetailsText, proofDifferences } from "./overtime-proof-check";
+import { expectedProof, minutesClose, minutesText, otDigits, proofAnomalies, proofDetailsText, proofDifferences } from "./overtime-proof-check";
 
 // Friday 2026-11-06 of the support case: 3 h 13 + 1 h 37 + 4 h 50 = 580 min, 60 min of return on the last job.
 const day = [
@@ -83,5 +83,18 @@ describe("proofAnomalies › SMS proof", () => {
     const jobs = [{ id: "j1", user_id: "u1", job_date: "2026-11-20", status: "submitted", ot: "231731", depart: "08:00", fin: "17:00", return_time_minutes: 0 }];
     const rows = [{ id: "e1", job_id: "j1", ocr_status: "sms", proof_read_at: "2026-11-20T20:00:00Z", proof_ot: null, proof_client_minutes: null, proof_return_minutes: null }];
     expect(proofAnomalies(rows, jobs)).toEqual([expect.objectContaining({ type: "proof_wrong", jobIds: ["j1"] })]);
+  });
+});
+
+describe("« + de 120 minutes » (121) of the form of November 2026", () => {
+  const expected = { ot: null, clientMinutes: 150, returnMinutes: 0 };
+  it("agrees with an expected figure above the limit and differs from one far below", () => {
+    expect(minutesClose(121, 150, 15)).toBe(true);
+    expect(minutesClose(121, 106, 15)).toBe(true);
+    expect(minutesClose(121, 60, 15)).toBe(false);
+    expect(proofDifferences({ ot: null, clientMinutes: 121, returnMinutes: null }, expected)).toEqual([]);
+    expect(proofDifferences({ ot: null, clientMinutes: 121, returnMinutes: null }, { ...expected, clientMinutes: 60 })).toHaveLength(1);
+    expect(minutesText(121)).toBe("120+");
+    expect(minutesText(45)).toBe(45);
   });
 });

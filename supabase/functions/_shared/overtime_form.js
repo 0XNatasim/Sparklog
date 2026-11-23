@@ -32,6 +32,10 @@ export function parseOvertimeForm(text) {
 // screenshot does not (it may still carry an « OT-198909 » in its header, which is why an OT number alone proves nothing).
 // At least 2 of these marks must be present.
 const FORM_MARKS = [
+  // The form of November 2026 (« Confirmation de surtemps »): multiple choice questions, no typed answer.
+  /confirmation\s+de\s+surtemps/i,
+  /dur[eé]e\s+r[eé]elle\s+du\s+temps\s+suppl/i,
+  /dur[eé]e\s+du\s+retour/i,
   /chez\s+le\s+client/i,
   /retour\s+[àa]\s+l.?entrep[oô]t/i,
   /combien\s+de\s+minutes?/i,
@@ -112,8 +116,67 @@ export function parseOvertimeFormLines(rawLines) {
   return result;
 }
 
+// ── The form of November 2026: « 2. Durée réelle du temps supplémentaire (Minutes) » and « 3. Durée du retour », each a list of
+// round choices (0, 15, 30 … 120, « + de 120 minutes »). The text says nothing about which circle is filled, so the selected circles
+// are found on the picture (radio_circles.js) and matched to the choice written on the same line.
+export const OVER_120_MINUTES = 121; // « + de 120 minutes »: stored as 121 = « more than 120 »
+const CHOICES = new Set([0, 15, 30, 45, 60, 75, 90, 105, 120]);
+const RADIO_QUESTION = {
+  client: /dur[eé]e\s+r[eé]elle\s+du\s+temps\s+suppl/i,
+  back: /dur[eé]e\s+du\s+retour/i,
+  end: /commentaire/i,
+};
+
+function choiceValue(text) {
+  const clean = String(text || "").trim();
+  if (/^\W*\+\s*de\s*120/i.test(clean)) return OVER_120_MINUTES;
+  // OCR may read the empty circle in front of the choice as a letter O, a 0 or a bracket: « O 30 », « () 45 ».
+  const match = clean.match(/^\W*(?:[Oo0()○◯]\s+)?(\d{1,3})\W*$/);
+  return match && CHOICES.has(Number(match[1])) ? Number(match[1]) : null;
+}
+
+// `rawLines` = [{ text, top, left, height }] (OCR overlay), `circles` = [{ x, y }] (selected radio buttons). `located` says which
+// of the two questions are on the picture; a located question with no selected circle in its block is a real « nothing selected » (null).
+export function parseRadioAnswers(rawLines, circles) {
+  const lines = (rawLines || [])
+    .map((line) => ({ text: String(line?.text || "").trim(), top: Number(line?.top), height: Number(line?.height) || 0 }))
+    .filter((line) => line.text && Number.isFinite(line.top))
+    .sort((a, b) => a.top - b.top);
+  const result = { clientMinutes: null, returnMinutes: null, located: { client: false, back: false } };
+  const find = (re) => lines.findIndex((line) => re.test(line.text));
+  const starts = { client: find(RADIO_QUESTION.client), back: find(RADIO_QUESTION.back) };
+  const comment = find(RADIO_QUESTION.end);
+  for (const [name, key, located] of [["client", "clientMinutes", "client"], ["back", "returnMinutes", "back"]]) {
+    const start = starts[name];
+    if (start < 0) continue;
+    result.located[located] = true;
+    // The block of the question: from its heading to the next heading (or « Commentaire »), or the end of the picture.
+    const stops = [starts.client, starts.back, comment].filter((index) => index > start);
+    const stop = stops.length ? Math.min(...stops) : lines.length;
+    const choices = [];
+    for (let i = start + 1; i < stop; i += 1) {
+      const value = choiceValue(lines[i].text);
+      if (value !== null) choices.push({ value, center: lines[i].top + lines[i].height / 2 });
+    }
+    if (choices.length < 3) continue;
+    const from = lines[start].top;
+    const to = stop < lines.length ? lines[stop].top : Infinity;
+    const inBlock = (circles || []).filter((circle) => circle.y > from && circle.y < to);
+    if (inBlock.length !== 1) continue; // none selected, or the picture is ambiguous: never guessed
+    const pitch = choices.length > 1 ? (choices[choices.length - 1].center - choices[0].center) / (choices.length - 1) : 0;
+    const best = choices.reduce((a, b) => (Math.abs(b.center - inBlock[0].y) < Math.abs(a.center - inBlock[0].y) ? b : a));
+    // The circle must really sit on a choice line (a picture whose coordinates do not match is refused, not guessed).
+    if (pitch > 0 && Math.abs(best.center - inBlock[0].y) > pitch * 0.35) continue;
+    result[key] = best.value;
+  }
+  return result;
+}
+
 // Both readings together: a question found on the picture takes the answer read under it; the others fall back to the text.
-export function readOvertimeForm({ text, lines }) {
+export function readOvertimeForm({ text, lines, circles }) {
+  // The new form (multiple choice): its two answers come from the selected circles; the OT is not on it (the work sheet has it).
+  const radio = parseRadioAnswers(lines, circles);
+  if (radio.located.client || radio.located.back) return { ot: null, clientMinutes: radio.clientMinutes, returnMinutes: radio.returnMinutes };
   const byText = parseOvertimeForm(text);
   const byLines = parseOvertimeFormLines(lines);
   return {

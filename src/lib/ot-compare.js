@@ -1,7 +1,7 @@
 // À traiter › OCR › « Par OT »: for each overtime work order, the three sources side by side — what Britton approved (imported
 // table, 0156), what the employee wrote on the request form (the proof screenshot, read by OCR) and what the Sparklog
 // timesheet says — with one verdict, so a manager sees at once what needs attention. Read only; pure logic + two loaders.
-import { PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN, expectedProofForJob, otDigits } from "./overtime-proof-check";
+import { PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN, expectedProofForJob, minutesClose, otDigits } from "./overtime-proof-check";
 import { DAILY_REGULAR_MINUTES, TEN_HOUR_DAY_MINUTES, dayFirstTripUnpaidMinutes, minutesBetween } from "./payroll-calculations";
 import { byDepart, overtimeLineJobIds } from "./overtime-proof-rules";
 import { BRITTON_WINDOW_DAYS, dayDiff, nameKey, shiftDay } from "./britton";
@@ -16,7 +16,7 @@ export const VERDICTS = ["missingSparklog", "missingBritton", "brittonGap", "for
 const RANK = Object.fromEntries(VERDICTS.map((verdict, index) => [verdict, index]));
 const FIELDS = ["client", "return"];
 const TOLERANCE = { client: PROOF_CLIENT_TOLERANCE_MIN, return: PROOF_RETURN_TOLERANCE_MIN };
-const near = (a, b, field) => Math.abs(a - b) <= TOLERANCE[field];
+const near = (a, b, field) => minutesClose(a, b, TOLERANCE[field]);
 const day = (value) => String(value ?? "").slice(0, 10);
 const READ_STATES = new Set(["ok", "mismatch"]);
 
@@ -156,7 +156,11 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
   const out = [];
   for (const entry of entries.values()) {
     const proofs = [...entry.proofs].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-    const read = proofs.find((row) => READ_STATES.has(row.state) && (row.found?.clientMinutes != null || row.found?.returnMinutes != null));
+    // The two answers may be on two different captures (the form of November 2026: one screen each): each comes from the newest proof that has it.
+    const readProofs = proofs.filter((row) => READ_STATES.has(row.state));
+    const clientRead = readProofs.find((row) => row.found?.clientMinutes != null);
+    const returnRead = readProofs.find((row) => row.found?.returnMinutes != null);
+    const read = clientRead || returnRead ? { found: { clientMinutes: clientRead?.found.clientMinutes ?? null, returnMinutes: returnRead?.found.returnMinutes ?? null } } : null;
     const sparklog = entry.job && entry.expected ? { client: entry.expected.clientMinutes, return: entry.expected.returnMinutes } : null;
     const brittonValues = entry.britton ? { client: entry.britton.client_minutes, return: entry.britton.return_minutes } : null;
     const form = read ? { client: read.found.clientMinutes ?? null, return: read.found.returnMinutes ?? null } : null;

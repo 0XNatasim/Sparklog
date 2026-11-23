@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import jpeg from "https://esm.sh/jpeg-js@0.4.4";
 import { isOvertimeFormText, overtimeFormFound, readOvertimeForm } from "../_shared/overtime_form.js";
+import { findSelectedCircles } from "../_shared/radio_circles.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,13 +62,23 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     const text = (result?.ParsedResults || []).map((item: { ParsedText?: string }) => item?.ParsedText || "").join("\n").trim();
     // The proof is now the overtime request form: keep its three numbers (OT, minutes at the client, return minutes).
     // An older app version may still send the SMS screenshot, which is classified as before.
-    const lines = (result?.ParsedResults || []).flatMap((item: { TextOverlay?: { Lines?: Array<{ LineText?: string; MinTop?: number; Words?: Array<{ Left?: number; Top?: number }> }> } }) =>
+    const lines = (result?.ParsedResults || []).flatMap((item: { TextOverlay?: { Lines?: Array<{ LineText?: string; MinTop?: number; MaxHeight?: number; Words?: Array<{ Left?: number; Top?: number; Height?: number }> }> } }) =>
       (item?.TextOverlay?.Lines || []).map((line) => ({
         text: line?.LineText || "",
         top: Number(line?.Words?.[0]?.Top ?? line?.MinTop),
         left: Number(line?.Words?.[0]?.Left) || 0,
+        height: Number(line?.MaxHeight ?? line?.Words?.[0]?.Height) || 0,
       })));
-    let parsed = readOvertimeForm({ text, lines });
+    // The form of November 2026 is made of multiple choice questions: the text does not say which circle is filled, so the picture
+    // is decoded and its selected (teal) circles are found. Any failure here only leaves the two answers empty (needs_review).
+    let circles: Array<{ x: number; y: number }> = [];
+    try {
+      const decoded = jpeg.decode(new Uint8Array(await file.arrayBuffer()), { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 256 });
+      circles = findSelectedCircles({ width: decoded.width, height: decoded.height, data: decoded.data });
+    } catch (decodeError) {
+      console.error("[process_overtime_evidence] decode", decodeError);
+    }
+    let parsed = readOvertimeForm({ text, lines, circles });
     // What the picture is: the overtime form (its own questions are there), an old SMS screenshot, something else (a work order,
     // a receipt…: « wrong_document », the numbers read on it mean nothing and are dropped), or nothing readable.
     let status: string;

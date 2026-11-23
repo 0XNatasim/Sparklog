@@ -16,13 +16,14 @@ import { VERDICTS, brittonDays, buildOtComparison, comparisonDays, countVerdicts
 import { buildXlsx } from "@/lib/xlsx-write";
 import { useT } from "@/lib/use-t";
 import { supabase } from "@/supabaseClient";
+import { minutesText } from "@/lib/overtime-proof-check";
 
 const BADGE = { ok: "success", noProof: "secondary", formGap: "warning", brittonGap: "destructive", missingBritton: "destructive", missingSparklog: "destructive" };
 
 // One figure, in red when this source is the odd one out for that field.
 function Num({ values, field, red, sms = false }) {
   if (!values || values[field] == null) return <span className="text-muted-foreground">{sms ? "SMS" : "—"}</span>;
-  return <span className={red.has(field) ? "font-bold text-destructive" : ""}>{values[field]}</span>;
+  return <span className={red.has(field) ? "font-bold text-destructive" : ""}>{minutesText(values[field])}</span>;
 }
 
 // A proof of the old kind: the screenshot of the approval text message (no minutes on it).
