@@ -37,6 +37,7 @@ const PeriodSummary = lazyPanel(() => import("@/components/PeriodSummary"));
 const WeekViewTab = lazyPanel(() => import("@/components/WeekViewTab"));
 const CcqRatesPanel = lazyPanel(() => import("@/components/CcqRatesPanel"));
 const AuditLog = lazyPanel(() => import("@/components/AuditLog"));
+const PageViewsLog = lazyPanel(() => import("@/components/PageViewsLog"));
 const EmployeeActivityLog = lazyPanel(() => import("@/components/EmployeeActivityLog"));
 const InfraHealthCard = lazyPanel(() => import("@/components/InfraHealthCard"));
 const InventoryMinimums = lazyPanel(() => import("@/components/InventoryMinimums"));
@@ -221,8 +222,10 @@ export function PayrollRoePage() {
 // ── Avancé › Journal: manager actions · employee activity ───────────────────
 export function AuditPage() {
   const t = useT();
+  const { role } = useAuth();
   const [params, setParams] = useSearchParams();
-  const view = params.get("view") === "employees" ? "employees" : "managers";
+  const requestedView = params.get("view");
+  const view = requestedView === "employees" || requestedView === "pages" ? requestedView : "managers";
   function setView(value) {
     const next = new URLSearchParams(params);
     if (value === "managers") next.delete("view"); else next.set("view", value);
@@ -233,9 +236,11 @@ export function AuditPage() {
       <TabsList>
         <TabsTrigger value="managers">{t("audit.tabs.managers")}</TabsTrigger>
         <TabsTrigger value="employees">{t("audit.tabs.employees")}</TabsTrigger>
+        {role === "owner" && <TabsTrigger value="pages">{t("audit.tabs.pages")}</TabsTrigger>}
       </TabsList>
       <TabsContent value="managers" className="mt-3"><AuditLog /></TabsContent>
       <TabsContent value="employees" className="mt-3"><EmployeeActivityLog /></TabsContent>
+      {role === "owner" && <TabsContent value="pages" className="mt-3"><PageViewsLog /></TabsContent>}
     </Tabs>
   );
 }

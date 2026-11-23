@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
+import { useLogPageView } from "@/lib/page-views";
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   BarChart3, BookOpen, Calculator, CalendarCheck, CalendarDays, ChevronDown, ClipboardList, Clock3, Coins,
@@ -296,6 +297,8 @@ export default function ManagerLayout() {
 
   const activePath = location.pathname.replace(/^\/manager\/?/, "").replace(/\/+$/, "");
   const current = findNavItem(activePath);
+  // Which page / tab this manager opens each day (Journal › Onglets consultés, migration 0159).
+  useLogPageView(activePath, new URLSearchParams(location.search).get("tab") || "", isManagerRole(role));
 
   // Another page closes the phone drawer (adjusted while rendering).
   const [drawerPath, setDrawerPath] = useState(location.pathname);

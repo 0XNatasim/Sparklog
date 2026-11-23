@@ -18,6 +18,8 @@ export const QUERY_BUDGETS = Object.freeze({
   // ids per `.in(...)` request, keeps the PostgREST URL short
   inListChunk: 150,
   employeeActivityPage: 200,
+  // Journal › Onglets consultés: one row per (manager, day, page, tab); 30 days × a few managers × ~30 tabs.
+  pageViews: 1500,
   inventoryPeople: 500,
   inventoryRows: 600,
   inventoryItems: 3000,
