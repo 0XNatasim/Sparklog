@@ -23,7 +23,7 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { useT } from "@/lib/use-t";
 import { withTimeout } from "@/lib/utils";
 import { supabase } from "@/supabaseClient";
-import { minutesText } from "@/lib/overtime-proof-check";
+import { minutesText, otDigits } from "@/lib/overtime-proof-check";
 
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
@@ -278,8 +278,7 @@ export default function OcrReadings() {
               <tr>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.date")}</th>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.employee")}</th>
-                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.jobOt")}</th>
-                <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.otRead")}</th>
+                <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.ot")}</th>
                 <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.client")}</th>
                 <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.return")}</th>
                 <th rowSpan={2} className="border-l px-3 py-2 align-bottom">{t("ocr.col.result")}</th>
@@ -287,7 +286,7 @@ export default function OcrReadings() {
                 <th rowSpan={2} className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
               </tr>
               <tr>
-                {[0, 1].flatMap((group) => [
+                {[0, 1, 2].flatMap((group) => [
                   ...(britton.length > 0 ? [["britton", "otc.src.britton"]] : []), ["proof", "otc.src.proof"], ["sheet", "otc.src.sheet"],
                 ].map(([source, labelKey], index) => (
                   <th key={`${group}-${source}`} className={`px-3 py-1 text-center normal-case ${index === 0 ? "border-l" : ""}`}>{t(labelKey)}</th>
@@ -311,20 +310,37 @@ export default function OcrReadings() {
                       </DropdownMenu>
                     ) : (row.name || "—")}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    {row.jobOt && row.userId ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button type="button" className="text-primary hover:underline">{row.jobOt}</button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuItem onSelect={() => navigate(timesheetLink(row, row.jobId))}>{t("ocr.link.job")}</DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.day")}</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (row.jobOt || "—")}
-                  </td>
-                  {cell(row, "ot", row.found.ot)}
+                  {(() => {
+                    // The OT as each source says it: Britton's line, the number read on the proof, the work sheet (red = differs from the others).
+                    const digits = { britton: row.britton ? String(row.britton.ot) : "", proof: otDigits(row.found?.ot), sheet: otDigits(row.jobOt) };
+                    const present = Object.entries(digits).filter(([, value]) => value);
+                    const agreeing = (source) => present.filter(([, other]) => other === digits[source]).length;
+                    const best = Math.max(0, ...present.map(([source]) => agreeing(source)));
+                    const red = (source) => present.length >= 2 && best < present.length && Boolean(digits[source]) && (agreeing(source) < best || best === 1);
+                    const first = britton.length > 0 ? "britton" : "proof";
+                    const plain = (source, text) => (
+                      <td className={`whitespace-nowrap px-3 py-2 text-center ${source === first ? "border-l" : ""} ${red(source) ? "font-bold text-destructive" : ""}`}>{text}</td>
+                    );
+                    return (
+                      <>
+                        {britton.length > 0 && plain("britton", digits.britton ? `OT-${digits.britton}` : "—")}
+                        {plain("proof", digits.proof ? `OT-${digits.proof}` : row.state === "sms" ? "SMS" : "—")}
+                        <td className={`whitespace-nowrap px-3 py-2 text-center ${red("sheet") ? "font-bold text-destructive" : ""}`}>
+                          {row.jobOt && row.userId ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button type="button" className={red("sheet") ? "hover:underline" : "text-primary hover:underline"}>{row.jobOt}</button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                <DropdownMenuItem onSelect={() => navigate(timesheetLink(row, row.jobId))}>{t("ocr.link.job")}</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.day")}</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (row.jobOt || "—")}
+                        </td>
+                      </>
+                    );
+                  })()}
                   {britton.length > 0 && (
                     <td className={`whitespace-nowrap border-l px-3 py-2 ${row.brittonWrong.has("client") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.client_minutes) : "—"}</td>
                   )}

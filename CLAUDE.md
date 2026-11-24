@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-24, V2.4.325)
+## 6. À faire / à préciser (mis à jour 2026-11-24, V2.4.326)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.326 (technique).** OCR, vue « Par preuve » : les colonnes « OT fiche » et « OT lu » deviennent un groupe `otc.col.ot` à trois sous-colonnes Britton · Preuve · Fiche (`OcrReadings.jsx`, Britton cachée sans tableau importé). Britton = `OT-<ot>` de la ligne rapprochée (`attachBritton`), Preuve = `OT-<chiffres>` de `found.ot` (« SMS » si l'état est `sms`), Fiche = OT de la fiche (menu vers la fiche / la journée) ; un OT dont les chiffres (`otDigits`) diffèrent des autres est en rouge (même règle que `otRed` de `ot-compare.js` : deux sources qui diffèrent = les deux). Aucune migration, aucune fonction Edge. Test : `OcrReadings.test.jsx`.
 
 **V2.4.325 (technique).** Colonne « Résultat » de l'onglet OCR. Migration 0161 : `overtime_evidence.form_kind` (`new` / `old` / `field` / `sms` / `other`, null = pas lue ; contrainte `overtime_evidence_form_kind_check`) ; le déclencheur d'insertion `overtime_evidence_guard_proof_fields` la remet à `null` (seule la fonction, par UPDATE avec la clé de service, l'écrit). `_shared/overtime_form.js` : `formKindOf(texte)` (`new` : ≥ 2 marques du nouveau formulaire, ou 1 + l'adresse Microsoft Forms si aucune marque de l'ancien ; `old` : marques de l'ancien — « Temps réel de TS », « Numéro du OT », « Combien de minute », « chez le client »… ; `field` : ≥ 2 marques de la fiche Field Service — « Statut de la réservation », « Heure de début / de fin / d'arrivée », « Distance parcourue », « Soutien et suivis » ; sinon null) ; `isOvertimeFormText` = `new` ou `old`. `process_overtime_evidence/index.ts` écrit `form_kind` (sms → `sms`, autre image → `field` ou `other`). App : états `field` (« Field ») et `oldForm` (« Vieux Form », seulement pour `job_date >= OLD_FORM_INVALID_FROM` = 2026-11-23 ; avant, l'ancien formulaire reste une preuve normale), `INVALID_PROOF_STATES` (sms, field, oldForm, wrongDoc : rien n'est comparé ; « Par OT » = `noProof`) ; `gapOf(row)` : `both` quand la ligne de Britton diffère de la fiche (« Écart / fiche / Britton »), sinon `fiche` quand la preuve diffère de la fiche, sinon `britton` quand la preuve diffère de Britton, sinon aucun écart ; `allAgree(row)` = lecture valable sans écart → seul cas où le nom de l'employé est vert (`text-primary`, sinon `text-foreground`). `OcrReadings.jsx` lit `form_kind` (repli sans la colonne tant que la 0161 n'est pas appliquée). **Ordre : appliquer la migration 0161, redéployer `process_overtime_evidence`, puis « Tout relire ».** Hypothèse à confirmer : le sens exact des trois libellés d'écart. Tests : `ocr-readings.test.js`, `overtime-form.test.js`.
 
