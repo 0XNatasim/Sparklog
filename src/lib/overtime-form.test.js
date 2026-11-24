@@ -180,3 +180,37 @@ describe("new form: selected circle → minutes", () => {
     expect(isOvertimeFormText("Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp")).toBe(false);
   });
 });
+
+describe("new form: partial captures (no title, one question, half-hidden circle)", () => {
+  const Q2_ONLY = "forms.cloud.microsoft\n1. Ordre de travail *\nOT-270185\n2. Durée réelle du temps supplémentaire (Minutes) *\n60 minutes = 1h, 75 minutes =1h15, 90 minutes =\n0\n15\n30\n45";
+  const Q3_ONLY = "3. Durée du retour *\n0\n15\n30\n45\n60\n75\n90\n105\n120\n+ de 120 minutes\n4. Commentaire *\nBeaucoup de temps avec SALC";
+
+  it("recognises a capture that shows only question 2 (no title) or only question 3 as the form, not as a wrong document", () => {
+    expect(isOvertimeFormText(Q2_ONLY)).toBe(true);
+    expect(isOvertimeFormText(Q3_ONLY)).toBe(true);
+    expect(isOvertimeFormText("Ordre de travail OT-198909\nBilan\nTemps total 5 h")).toBe(false); // a work order is still refused
+  });
+
+  it("reads the OT of question 1 together with the ticked answer", () => {
+    const lines = [
+      { text: "1. Ordre de travail *", top: 230, height: 30 },
+      { text: "OT-270185", top: 290, height: 30 },
+      { text: "2. Durée réelle du temps supplémentaire", top: 380, height: 30 },
+      { text: "(Minutes) *", top: 410, height: 30 },
+      ...["0", "15", "30", "45", "60", "75", "90", "105"].map((text, i) => ({ text, top: 505 + i * 60, height: 24 })),
+    ];
+    const read = readOvertimeForm({ text: Q2_ONLY, lines, circles: [{ x: 150, y: 697 }] });
+    expect(read).toEqual({ ot: "270185", clientMinutes: 45, returnMinutes: null });
+  });
+
+  it("takes a half-hidden circle (two possible centres) when both land on the same choice", () => {
+    const lines = [
+      { text: "2. Durée réelle du temps supplémentaire", top: 100, height: 30 },
+      ...["0", "15", "30", "45", "60", "75", "90", "105", "120"].map((text, i) => ({ text, top: 200 + i * 60, height: 24 })),
+    ];
+    // « 120 » is the 9th choice: centre 200 + 8 × 60 + 12 = 692; the circle is cut by the bottom bar: two centres 8 px apart.
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 696, altY: 686 }]).clientMinutes).toBe(120);
+    // two centres that land on two different choices: not guessed
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 692, altY: 632 }]).clientMinutes).toBeNull();
+  });
+});

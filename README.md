@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.323 (2026-11-23).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.324 (2026-11-24).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.324 — Better reading of the new overtime form.** Captures of only part of the form (no title, question 2 alone, question 3 alone) are no longer refused as « wrong capture »: every visible piece of the form counts (its questions, the hint under question 2, « + de 120 minutes », the question 1 label, the Microsoft Forms address). The OT written in question 1 is read again (shown next to the ticked answer). Thin or half-hidden ticked circles (cut by the phone's bottom bar, compressed pictures) are found too. **Redeploy `process_overtime_evidence`, then « Tout relire ».** No database change.
 - **V2.4.323 — Pages viewed by managers (Journal).** New **Pages viewed** tab in Advanced › Journal (owner only): for each manager and each day, the pages and tabs opened and how many times. Recorded from the moment migration 0159 is applied; only page names are kept. **Apply migration 0159.**
 - **V2.4.322 — Two captures at the proof step.** The overtime proof step now asks for **two captures** at once (« Durée réelle du temps supplémentaire » and « Durée du retour »), each with its own button; « Send the 2 captures » is enabled when both are chosen. Both are saved with the job in one transaction (before the job is submitted), no more adding the second one afterwards from the clock. Needs migration 0160 (apply it before the app update).
 - **V2.4.321 — New overtime form (« Confirmation de surtemps »).** The form changed: two multiple-choice questions, « Durée réelle du temps supplémentaire » and « Durée du retour » (0, 15 … 120, « + de 120 minutes »). The reader now finds the ticked circle on the screenshot and takes the minutes written on its line; the OT is no longer read from the form (it comes from the work sheet the proof belongs to). The two answers may be on one long screenshot or on two captures of the same OT. « + de 120 » shows as « 120+ » and agrees with anything above 120. The employee text and the example picture are updated. Function `process_overtime_evidence` redeployed (v16); then « Tout relire ». No database change.

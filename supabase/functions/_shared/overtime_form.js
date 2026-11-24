@@ -32,10 +32,16 @@ export function parseOvertimeForm(text) {
 // screenshot does not (it may still carry an « OT-198909 » in its header, which is why an OT number alone proves nothing).
 // At least 2 of these marks must be present.
 const FORM_MARKS = [
-  // The form of November 2026 (« Confirmation de surtemps »): multiple choice questions, no typed answer.
+  // The form of November 2026 (« Confirmation de surtemps »): multiple choice questions. A screenshot often shows only part of it
+  // (no title, one question), so every visible piece counts: its title, its questions, the hint under question 2, the last choice,
+  // the question 1 label and the Microsoft Forms address bar.
   /confirmation\s+de\s+surtemps/i,
-  /dur[eé]e\s+r[eé]elle\s+du\s+temps\s+suppl/i,
+  /dur[eé]e\s+r[eé]elle/i,
   /dur[eé]e\s+du\s+retour/i,
+  /\+\s*de\s*120\s*minutes?/i,
+  /\d+\s*minutes?\s*=\s*\d\s*h/i,
+  /ordre\s+de\s+travail\s*\*/i,
+  /forms\.(?:cloud\.)?(?:microsoft|office)/i,
   /chez\s+le\s+client/i,
   /retour\s+[àa]\s+l.?entrep[oô]t/i,
   /combien\s+de\s+minutes?/i,
@@ -161,23 +167,31 @@ export function parseRadioAnswers(rawLines, circles) {
     if (choices.length < 3) continue;
     const from = lines[start].top;
     const to = stop < lines.length ? lines[stop].top : Infinity;
-    const inBlock = (circles || []).filter((circle) => circle.y > from && circle.y < to);
+    // A circle half hidden by the phone's bottom bar has two possible centres (y and altY): both are tried.
+    const inside = (y) => y != null && y > from && y < to;
+    const inBlock = (circles || []).filter((circle) => inside(circle.y) || inside(circle.altY));
     if (inBlock.length !== 1) continue; // none selected, or the picture is ambiguous: never guessed
     const pitch = choices.length > 1 ? (choices[choices.length - 1].center - choices[0].center) / (choices.length - 1) : 0;
-    const best = choices.reduce((a, b) => (Math.abs(b.center - inBlock[0].y) < Math.abs(a.center - inBlock[0].y) ? b : a));
-    // The circle must really sit on a choice line (a picture whose coordinates do not match is refused, not guessed).
-    if (pitch > 0 && Math.abs(best.center - inBlock[0].y) > pitch * 0.35) continue;
-    result[key] = best.value;
+    const matches = [inBlock[0].y, inBlock[0].altY].filter(inside).map((y) => {
+      const best = choices.reduce((a, b) => (Math.abs(b.center - y) < Math.abs(a.center - y) ? b : a));
+      // The circle must really sit on a choice line (a picture whose coordinates do not match is refused, not guessed).
+      return pitch > 0 && Math.abs(best.center - y) > pitch * 0.35 ? null : best;
+    });
+    const values = new Set(matches.filter(Boolean).map((match) => match.value));
+    if (matches.some((match) => !match) && values.size === 0) continue;
+    if (values.size !== 1) continue;
+    result[key] = [...values][0];
   }
   return result;
 }
 
 // Both readings together: a question found on the picture takes the answer read under it; the others fall back to the text.
 export function readOvertimeForm({ text, lines, circles }) {
-  // The new form (multiple choice): its two answers come from the selected circles; the OT is not on it (the work sheet has it).
+  // The new form (multiple choice): its two answers come from the selected circles; the OT is question 1, read from the text.
   const radio = parseRadioAnswers(lines, circles);
-  if (radio.located.client || radio.located.back) return { ot: null, clientMinutes: radio.clientMinutes, returnMinutes: radio.returnMinutes };
   const byText = parseOvertimeForm(text);
+  // Question 1 « Ordre de travail » holds « OT-270185 » (typed in the form): read from the text when it is on the capture.
+  if (radio.located.client || radio.located.back) return { ot: byText.ot, clientMinutes: radio.clientMinutes, returnMinutes: radio.returnMinutes };
   const byLines = parseOvertimeFormLines(lines);
   return {
     ot: byLines.located.ot ? (byLines.ot ?? byText.ot) : byText.ot,

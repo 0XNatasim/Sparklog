@@ -10,7 +10,7 @@ export function findSelectedCircles({ width, height, data }) {
   const xMax = Math.floor(width * 0.35); // the circles sit at the left edge, before their label
   const seen = new Uint8Array(width * height);
   const circles = [];
-  const minSize = width * 0.02;
+  const minSize = width * 0.008;
   const maxSize = width * 0.1;
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < xMax; x += 1) {
@@ -44,9 +44,17 @@ export function findSelectedCircles({ width, height, data }) {
       }
       const w = maxX - minX + 1;
       const h = maxY - minY + 1;
-      const round = w >= minSize && w <= maxSize && h >= minSize && h <= maxSize && w / h > 0.7 && w / h < 1.4;
+      // A circle half hidden by the phone's bottom bar (or the browser header) is a flat blob: its width is still the diameter.
+      // Its centre is then ambiguous (hidden at the bottom or at the top): both are given, the reader keeps the one that sits on a choice.
+      const whole = w / h > 0.7 && w / h < 1.4 && h >= minSize;
+      const clipped = !whole && w / h >= 1.4 && w / h < 3 && h >= w * 0.3 && h < w * 0.85;
+      const sized = w >= minSize && w <= maxSize && h <= maxSize;
       const fill = count / (w * h);
-      if (round && fill > 0.3 && fill < 0.95) circles.push({ x: (minX + maxX) / 2, y: (minY + maxY) / 2, size: Math.max(w, h) });
+      if (sized && (whole || clipped) && fill > 0.15 && fill < 0.95) {
+        const circle = { x: (minX + maxX) / 2, y: (minY + maxY) / 2, size: Math.max(w, h) };
+        if (clipped) { circle.y = minY + w / 2; circle.altY = maxY - w / 2; }
+        circles.push(circle);
+      }
     }
   }
   // A selected radio button is a ring AND a dot: both are teal blobs with the same centre. Keep the larger one of each pair.
