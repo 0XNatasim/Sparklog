@@ -131,6 +131,7 @@ const RADIO_QUESTION = {
   client: /dur[eé]e\s+r[eé]elle\s+du\s+temps\s+suppl/i,
   back: /dur[eé]e\s+du\s+retour/i,
   end: /commentaire/i,
+  hint: /\d+\s*minutes?\s*=\s*\d\s*h/i,
 };
 
 function choiceValue(text) {
@@ -152,9 +153,15 @@ export function parseRadioAnswers(rawLines, circles) {
   const find = (re) => lines.findIndex((line) => re.test(line.text));
   const starts = { client: find(RADIO_QUESTION.client), back: find(RADIO_QUESTION.back) };
   const comment = find(RADIO_QUESTION.end);
+  // The heading can be scrolled out of the capture. Question 2 is still told by the hint under it (« 60 minutes = 1h, 75 minutes … »),
+  // question 3 by the « Commentaire » question that follows it when no question 2 is on the picture. Their choices then start at
+  // the top of the picture (start = -1).
+  const hint = find(RADIO_QUESTION.hint);
+  if (starts.client < 0 && hint >= 0) starts.client = hint;
+  if (starts.client < 0 && starts.back < 0 && comment >= 0) starts.back = -1;
   for (const [name, key, located] of [["client", "clientMinutes", "client"], ["back", "returnMinutes", "back"]]) {
     const start = starts[name];
-    if (start < 0) continue;
+    if (start === undefined || (start < 0 && !(name === "back" && comment >= 0 && starts.client < 0))) continue;
     result.located[located] = true;
     // The block of the question: from its heading to the next heading (or « Commentaire »), or the end of the picture.
     const stops = [starts.client, starts.back, comment].filter((index) => index > start);
@@ -165,7 +172,7 @@ export function parseRadioAnswers(rawLines, circles) {
       if (value !== null) choices.push({ value, center: lines[i].top + lines[i].height / 2 });
     }
     if (choices.length < 3) continue;
-    const from = lines[start].top;
+    const from = start >= 0 ? lines[start].top : -Infinity;
     const to = stop < lines.length ? lines[stop].top : Infinity;
     // A circle half hidden by the phone's bottom bar has two possible centres (y and altY): both are tried.
     const inside = (y) => y != null && y > from && y < to;

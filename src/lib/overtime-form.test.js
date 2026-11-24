@@ -161,7 +161,7 @@ describe("new form: selected circle → minutes", () => {
     expect(parseRadioAnswers(question2, []).clientMinutes).toBeNull();
     expect(parseRadioAnswers(question2, [{ x: 80, y: 1000 + 22 }, { x: 80, y: 1300 }]).clientMinutes).toBeNull();
     expect(parseRadioAnswers(question2, [{ x: 80, y: 1000 + 0.5 * 148 + 22 }]).clientMinutes).toBeNull();
-    expect(parseRadioAnswers(question2.filter((line) => !/Durée réelle/.test(line.text)), [{ x: 80, y: 1370 }]).located.client).toBe(false);
+    expect(parseRadioAnswers(question2.filter((line) => !/Durée réelle|minutes =/.test(line.text)), [{ x: 80, y: 1370 }]).located.client).toBe(false);
   });
 
   it("tolerates the empty circle read as a letter in front of a choice", () => {
@@ -212,5 +212,29 @@ describe("new form: partial captures (no title, one question, half-hidden circle
     expect(parseRadioAnswers(lines, [{ x: 140, y: 696, altY: 686 }]).clientMinutes).toBe(120);
     // two centres that land on two different choices: not guessed
     expect(parseRadioAnswers(lines, [{ x: 140, y: 692, altY: 632 }]).clientMinutes).toBeNull();
+  });
+});
+
+describe("new form: heading scrolled out of the capture", () => {
+  const CHOICES = ["0", "15", "30", "45", "60", "75", "90", "105", "120", "+ de 120 minutes"];
+  const hint = [
+    { text: "60 minutes = 1h, 75 minutes =1h15, 90", top: 10, height: 24 },
+    { text: "minutes = 1h30, 105 minutes = 1h45, 120", top: 44, height: 24 },
+    { text: "minutes = 2h", top: 78, height: 24 },
+  ];
+
+  it("question 2 told by the hint under it when its heading is not on the picture (105 ticked)", () => {
+    const lines = [...hint, ...CHOICES.map((text, i) => ({ text, top: 150 + i * 68, height: 26 }))];
+    expect(parseRadioAnswers(lines, [{ x: 150, y: 150 + 7 * 68 + 13 }])).toMatchObject({ clientMinutes: 105, returnMinutes: null, located: { client: true, back: false } });
+  });
+
+  it("question 3 told by the « Commentaire » under it when no heading and no question 2 are on the picture (15 ticked)", () => {
+    const lines = [...CHOICES.map((text, i) => ({ text, top: 100 + i * 50, height: 22 })), { text: "4. Commentaire *", top: 700, height: 30 }];
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 100 + 50 + 11 }])).toMatchObject({ clientMinutes: null, returnMinutes: 15, located: { client: false, back: true } });
+  });
+
+  it("a list of numbers with neither a hint nor a Commentaire is not guessed", () => {
+    const lines = CHOICES.map((text, i) => ({ text, top: 100 + i * 50, height: 22 }));
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 161 }])).toMatchObject({ clientMinutes: null, returnMinutes: null, located: { client: false, back: false } });
   });
 });
