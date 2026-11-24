@@ -1,11 +1,39 @@
 // « À traiter › OCR »: what the reader (Edge function process_overtime_evidence) found on each overtime proof screenshot, next
 // to what the work order says, so a manager can see every reading and the differences at a glance. Read only.
-import { expectedProofForJob, proofDifferences } from "./overtime-proof-check";
+import { expectedProofForJob, minutesClose, proofDifferences, PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN } from "./overtime-proof-check";
 
 // The OCR tab starts with the per-work-order proofs (owner decision 2026-11-18: nothing before 16 November).
 export const OCR_FIRST_DAY = "2026-11-16";
 
-export const OCR_STATES = ["ok", "mismatch", "sms", "wrongDoc", "unread", "failed", "queued", "notRead"];
+// The form « Temps réel de TS » was replaced on 2026-11-23: from that day an old-form capture is not a valid proof (« Vieux Form »).
+// Earlier days keep reading it as a normal proof.
+export const OLD_FORM_INVALID_FROM = "2026-11-23";
+
+export const OCR_STATES = ["ok", "mismatch", "sms", "field", "oldForm", "wrongDoc", "unread", "failed", "queued", "notRead"];
+
+// States where the picture is NOT a valid proof of the overtime: nothing is compared.
+export const INVALID_PROOF_STATES = new Set(["sms", "field", "oldForm", "wrongDoc"]);
+
+// Which sources disagree, for the result column: "fiche" (the proof differs from the timesheet), "britton" (the proof differs from
+// Britton's line) or "both" (Britton's line and the timesheet differ from each other: « Écart / fiche / Britton »), null = all agree.
+// Only the sources that are there are compared.
+export function gapOf(row) {
+  if (!row || INVALID_PROOF_STATES.has(row.state)) return null;
+  const britton = row.britton || null;
+  const fieldBritton = { client: row.brittonWrong?.has?.("client"), return: row.brittonWrong?.has?.("return") };
+  if (britton && (fieldBritton.client || fieldBritton.return)) return "both"; // Britton against the timesheet
+  const proofFiche = row.state === "mismatch" || (row.wrong?.size ?? 0) > 0;
+  const found = row.found || {};
+  const proofBritton = Boolean(britton) && (
+    (found.clientMinutes != null && britton.client_minutes != null && !minutesClose(found.clientMinutes, britton.client_minutes, PROOF_CLIENT_TOLERANCE_MIN))
+    || (found.returnMinutes != null && britton.return_minutes != null && !minutesClose(found.returnMinutes, britton.return_minutes, PROOF_RETURN_TOLERANCE_MIN)));
+  if (proofFiche) return "fiche";
+  if (proofBritton) return "britton";
+  return null;
+}
+
+// The employee's name is green only when everything agrees (the proof is a valid, read one and no source differs).
+export const allAgree = (row) => row?.state === "ok" && !gapOf(row);
 
 // `evidence` = overtime_evidence rows; `jobs` = the work orders of those days; `people` = Map of user id -> profile.
 // One row per proof, newest first. state: ok (nothing differs), mismatch (a value differs), unread (read, nothing found),
@@ -33,10 +61,12 @@ export function buildOcrRows(evidence, jobs, people) {
     const expected = job
       ? expectedProofForJob(byDay.get(`${userId}|${jobDate}`) || [], job, { firstTripUnpaid: Boolean(person?.first_trip_unpaid), tenHourDay: Boolean(person?.ten_hour_days) })
       : null;
-    const diffs = proof.proof_read_at && !["failed", "pending", "wrong_document", "sms"].includes(proof.ocr_status) && !nothingFound ? proofDifferences(found, expected) : [];
+    const oldForm = proof.form_kind === "old" && jobDate >= OLD_FORM_INVALID_FROM;
+    const diffs = proof.proof_read_at && !["failed", "pending", "wrong_document", "sms"].includes(proof.ocr_status) && !oldForm && !nothingFound ? proofDifferences(found, expected) : [];
     let state = "ok";
-    if (proof.ocr_status === "wrong_document") state = "wrongDoc";
+    if (proof.ocr_status === "wrong_document") state = proof.form_kind === "field" ? "field" : "wrongDoc";
     else if (proof.ocr_status === "sms") state = "sms";
+    else if (oldForm && proof.proof_read_at) state = "oldForm";
     else if (proof.ocr_status === "pending") state = "queued";
     else if (!proof.proof_read_at) state = "notRead";
     else if (proof.ocr_status === "failed") state = "failed";
@@ -45,7 +75,7 @@ export function buildOcrRows(evidence, jobs, people) {
     rows.push({
       id: proof.id, jobId: proof.job_id, userId, name: (person?.full_name || "").trim(), jobDate, createdAt: proof.created_at,
       readAt: proof.proof_read_at || null, storagePath: proof.storage_path || "", jobOt: job?.ot ? String(job.ot) : "", jobStatus: job?.status || "",
-      ocrStatus: proof.ocr_status || "", notNeeded: Boolean(proof.not_needed_at), job, attempts: Number(proof.ocr_attempts) || 0, nextTryAt: proof.ocr_next_try_at || null, found, expected, state, wrong: new Set(diffs.map((diff) => diff.field)),
+      ocrStatus: proof.ocr_status || "", formKind: proof.form_kind || null, notNeeded: Boolean(proof.not_needed_at), job, attempts: Number(proof.ocr_attempts) || 0, nextTryAt: proof.ocr_next_try_at || null, found, expected, state, wrong: new Set(diffs.map((diff) => diff.field)),
     });
   }
   return rows.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
@@ -64,7 +94,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
   return (rows || []).filter((row) => {
     if (day && row.jobDate !== day) return false;
     if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
-    if (state === "check" && row.state !== "mismatch" && row.state !== "wrongDoc" && row.state !== "sms" && row.state !== "unread" && row.state !== "failed") return false;
+    if (state === "check" && row.state !== "mismatch" && !INVALID_PROOF_STATES.has(row.state) && row.state !== "unread" && row.state !== "failed" && !gapOf(row)) return false;
     if (state === "reread" && !canReread(row)) return false;
     if (state === "brittonGap" && !(row.brittonWrong?.size > 0)) return false; // Britton table (0156): differs from the timesheet
     if (OCR_STATES.includes(state) && row.state !== state) return false;
@@ -74,7 +104,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
 }
 
 export function countOcrStates(rows) {
-  const counts = { ok: 0, mismatch: 0, sms: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
+  const counts = { ok: 0, mismatch: 0, sms: 0, field: 0, oldForm: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
   for (const row of rows || []) counts[row.state] += 1;
   return counts;
 }

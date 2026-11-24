@@ -42,7 +42,7 @@ describe("OcrReadings", () => {
     expect(screen.getAllByText("208637").length).toBeGreaterThanOrEqual(3); // the work order's OT (twice) and the OT read on the first proof
     expect(screen.getAllByText("150 min").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Conforme").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Écart").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Écart / fiche").length).toBeGreaterThan(0);
   });
 
   it("hides the older proofs (never read) until asked, and filters the readings to check", async () => {

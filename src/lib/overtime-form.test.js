@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OVER_120_MINUTES, isOvertimeFormText, overtimeFormFound, parseOvertimeForm, parseOvertimeFormLines, parseRadioAnswers, readOvertimeForm } from "./overtime-form";
+import { OVER_120_MINUTES, formKindOf, isOvertimeFormText, overtimeFormFound, parseOvertimeForm, parseOvertimeFormLines, parseRadioAnswers, readOvertimeForm } from "./overtime-form";
 
 const FORM = (ot, client, back) => `
 automatiquement vos détails, tels que le nom et l'adresse de courriel, sauf si vous le fournissez vous-même.
@@ -161,7 +161,7 @@ describe("new form: selected circle → minutes", () => {
     expect(parseRadioAnswers(question2, []).clientMinutes).toBeNull();
     expect(parseRadioAnswers(question2, [{ x: 80, y: 1000 + 22 }, { x: 80, y: 1300 }]).clientMinutes).toBeNull();
     expect(parseRadioAnswers(question2, [{ x: 80, y: 1000 + 0.5 * 148 + 22 }]).clientMinutes).toBeNull();
-    expect(parseRadioAnswers(question2.filter((line) => !/Durée réelle/.test(line.text)), [{ x: 80, y: 1370 }]).located.client).toBe(false);
+    expect(parseRadioAnswers(question2.filter((line) => !/Durée réelle|minutes =/.test(line.text)), [{ x: 80, y: 1370 }]).located.client).toBe(false);
   });
 
   it("tolerates the empty circle read as a letter in front of a choice", () => {
@@ -178,5 +178,77 @@ describe("new form: selected circle → minutes", () => {
     expect(isOvertimeFormText("Confirmation de surtemps - D...\n2. Durée réelle du temps supplémentaire (Minutes) *\n0\n15")).toBe(true);
     expect(isOvertimeFormText("3. Durée du retour *\n0\n15\n4. Commentaire *")).toBe(false); // one mark only: refused rather than trusted
     expect(isOvertimeFormText("Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp")).toBe(false);
+  });
+});
+
+describe("new form: partial captures (no title, one question, half-hidden circle)", () => {
+  const Q2_ONLY = "forms.cloud.microsoft\n1. Ordre de travail *\nOT-270185\n2. Durée réelle du temps supplémentaire (Minutes) *\n60 minutes = 1h, 75 minutes =1h15, 90 minutes =\n0\n15\n30\n45";
+  const Q3_ONLY = "3. Durée du retour *\n0\n15\n30\n45\n60\n75\n90\n105\n120\n+ de 120 minutes\n4. Commentaire *\nBeaucoup de temps avec SALC";
+
+  it("recognises a capture that shows only question 2 (no title) or only question 3 as the form, not as a wrong document", () => {
+    expect(isOvertimeFormText(Q2_ONLY)).toBe(true);
+    expect(isOvertimeFormText(Q3_ONLY)).toBe(true);
+    expect(isOvertimeFormText("Ordre de travail OT-198909\nBilan\nTemps total 5 h")).toBe(false); // a work order is still refused
+  });
+
+  it("reads the OT of question 1 together with the ticked answer", () => {
+    const lines = [
+      { text: "1. Ordre de travail *", top: 230, height: 30 },
+      { text: "OT-270185", top: 290, height: 30 },
+      { text: "2. Durée réelle du temps supplémentaire", top: 380, height: 30 },
+      { text: "(Minutes) *", top: 410, height: 30 },
+      ...["0", "15", "30", "45", "60", "75", "90", "105"].map((text, i) => ({ text, top: 505 + i * 60, height: 24 })),
+    ];
+    const read = readOvertimeForm({ text: Q2_ONLY, lines, circles: [{ x: 150, y: 697 }] });
+    expect(read).toEqual({ ot: "270185", clientMinutes: 45, returnMinutes: null });
+  });
+
+  it("takes a half-hidden circle (two possible centres) when both land on the same choice", () => {
+    const lines = [
+      { text: "2. Durée réelle du temps supplémentaire", top: 100, height: 30 },
+      ...["0", "15", "30", "45", "60", "75", "90", "105", "120"].map((text, i) => ({ text, top: 200 + i * 60, height: 24 })),
+    ];
+    // « 120 » is the 9th choice: centre 200 + 8 × 60 + 12 = 692; the circle is cut by the bottom bar: two centres 8 px apart.
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 696, altY: 686 }]).clientMinutes).toBe(120);
+    // two centres that land on two different choices: not guessed
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 692, altY: 632 }]).clientMinutes).toBeNull();
+  });
+});
+
+describe("new form: heading scrolled out of the capture", () => {
+  const CHOICES = ["0", "15", "30", "45", "60", "75", "90", "105", "120", "+ de 120 minutes"];
+  const hint = [
+    { text: "60 minutes = 1h, 75 minutes =1h15, 90", top: 10, height: 24 },
+    { text: "minutes = 1h30, 105 minutes = 1h45, 120", top: 44, height: 24 },
+    { text: "minutes = 2h", top: 78, height: 24 },
+  ];
+
+  it("question 2 told by the hint under it when its heading is not on the picture (105 ticked)", () => {
+    const lines = [...hint, ...CHOICES.map((text, i) => ({ text, top: 150 + i * 68, height: 26 }))];
+    expect(parseRadioAnswers(lines, [{ x: 150, y: 150 + 7 * 68 + 13 }])).toMatchObject({ clientMinutes: 105, returnMinutes: null, located: { client: true, back: false } });
+  });
+
+  it("question 3 told by the « Commentaire » under it when no heading and no question 2 are on the picture (15 ticked)", () => {
+    const lines = [...CHOICES.map((text, i) => ({ text, top: 100 + i * 50, height: 22 })), { text: "4. Commentaire *", top: 700, height: 30 }];
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 100 + 50 + 11 }])).toMatchObject({ clientMinutes: null, returnMinutes: 15, located: { client: false, back: true } });
+  });
+
+  it("a list of numbers with neither a hint nor a Commentaire is not guessed", () => {
+    const lines = CHOICES.map((text, i) => ({ text, top: 100 + i * 50, height: 22 }));
+    expect(parseRadioAnswers(lines, [{ x: 140, y: 161 }])).toMatchObject({ clientMinutes: null, returnMinutes: null, located: { client: false, back: false } });
+  });
+});
+
+describe("formKindOf: which picture is it", () => {
+  it("tells the old form (« Temps réel de TS »), the new form, a Field Service page and anything else", () => {
+    const old = "Temps réel de TS\nforms.cloud.microsoft\n1. Prénom Nom\n3. Numéro du OT-XXXXXX *\nOT-209555\n4. Combien de minute chez le client *\n60\n5. Combien de minute retour à l'entrepôt si applicable sinon inscrire 0 *\n30\n6. date *";
+    const field = "OT-201318\nes et signature Soutien et suivis Bilan\nStatut de la réservation* Terminé\nHeure de début* 2026-11-23 13:30\nHeure de fin* 17:00\nDurée* 3,5 heures\nHeure d'arrivée (info)\nDéplacement Distance parcourue (miles)";
+    const fresh = "forms.cloud.microsoft\n1. Ordre de travail *\nOT-270185\n2. Durée réelle du temps supplémentaire (Minutes) *\n60 minutes = 1h, 75 minutes =1h15";
+    expect(formKindOf(old)).toBe("old");
+    expect(formKindOf(fresh)).toBe("new");
+    expect(formKindOf(field)).toBe("field");
+    expect(isOvertimeFormText(field)).toBe(false);
+    expect(formKindOf("Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp")).toBeNull();
+    expect(formKindOf("")).toBeNull();
   });
 });

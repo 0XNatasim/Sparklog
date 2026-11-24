@@ -44,10 +44,48 @@ describe("findSelectedCircles", () => {
     const pic = picture((set) => {
       for (let x = 20; x < 380; x += 1) for (let y = 50; y < 56; y += 1) set(x, y, TEAL); // a long bar
       disc(set, 340, 300, 12, TEAL); // right side
-      disc(set, 30, 200, 2, TEAL); // a speck
+      disc(set, 30, 200, 1, TEAL); // a speck
       disc(set, 30, 400, 12, WHITE);
     });
     expect(findSelectedCircles(pic)).toEqual([]);
     expect(findSelectedCircles({ width: 0, height: 0, data: new Uint8Array() })).toEqual([]);
+  });
+});
+
+describe("findSelectedCircles: real-world pictures", () => {
+  it("finds a thin, anti-aliased ring (compressed screenshot) and a circle cut by the bottom bar", () => {
+    const pic = picture((set) => {
+      ring(set, 30, 200, 12, 1, TEAL); // thin ring only
+      disc(set, 30, 300, 6, TEAL);
+      // a circle whose lower part is hidden by a white bar
+      disc(set, 30, 500, 12, TEAL);
+      for (let y = 499; y < 530; y += 1) for (let x = 0; x < 100; x += 1) set(x, y, WHITE);
+    });
+    const found = findSelectedCircles(pic);
+    expect(found.length).toBeGreaterThanOrEqual(2);
+    const clipped = found.find((c) => c.altY !== undefined);
+    expect(clipped).toBeTruthy();
+    expect(Math.abs(clipped.y - 500)).toBeLessThanOrEqual(12);
+  });
+});
+
+describe("findSelectedCircles: read-only form after sending (grey filled disc)", () => {
+  const GREY_FILL = [189, 189, 189];
+  const RING = [160, 160, 160];
+  it("finds the filled grey disc among empty rings, and nothing when every circle is an empty ring", () => {
+    const pic = picture((set) => {
+      for (const y of [100, 200, 400, 500]) ring(set, 30, y, 12, 1, RING); // empty rings
+      disc(set, 30, 300, 11, GREY_FILL); // the chosen one
+    });
+    const found = findSelectedCircles(pic);
+    expect(found).toHaveLength(1);
+    expect(Math.abs(found[0].y - 300)).toBeLessThanOrEqual(1);
+    const none = picture((set) => { for (const y of [100, 200, 300]) ring(set, 30, y, 12, 1, RING); });
+    expect(findSelectedCircles(none)).toEqual([]);
+  });
+
+  it("prefers the teal discs when there are some (grey is only for the read-only form)", () => {
+    const pic = picture((set) => { disc(set, 30, 150, 11, TEAL); disc(set, 30, 350, 11, GREY_FILL); });
+    expect(findSelectedCircles(pic).map((c) => Math.round(c.y))).toEqual([150]);
   });
 });

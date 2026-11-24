@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import jpeg from "https://esm.sh/jpeg-js@0.4.4";
-import { isOvertimeFormText, overtimeFormFound, readOvertimeForm } from "../_shared/overtime_form.js";
+import { formKindOf, overtimeFormFound, readOvertimeForm } from "../_shared/overtime_form.js";
 import { findSelectedCircles } from "../_shared/radio_circles.js";
 
 const corsHeaders = {
@@ -81,12 +81,20 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
     let parsed = readOvertimeForm({ text, lines, circles });
     // What the picture is: the overtime form (its own questions are there), an old SMS screenshot, something else (a work order,
     // a receipt…: « wrong_document », the numbers read on it mean nothing and are dropped), or nothing readable.
+    // form_kind (migration 0161): "new" / "old" (the two versions of the form), "field" (a Field Service work order), "sms", "other".
+    const kind = formKindOf(text);
     let status: string;
+    let formKind: string | null = null;
     if (!text) status = "needs_review";
-    else if (isOvertimeFormText(text)) status = overtimeFormFound(parsed) ? "processed" : "needs_review";
-    else if (isOvertimeSmsText(text)) status = "sms"; // the old text-message proof: valid, no minutes to compare
-    else {
+    else if (kind === "new" || kind === "old") {
+      status = overtimeFormFound(parsed) ? "processed" : "needs_review";
+      formKind = kind;
+    } else if (isOvertimeSmsText(text)) {
+      status = "sms"; // the old text-message proof: not a valid proof, no minutes to compare
+      formKind = "sms";
+    } else {
       status = "wrong_document";
+      formKind = kind === "field" ? "field" : "other";
       parsed = { ot: null, clientMinutes: null, returnMinutes: null };
     }
     const { error: updateError } = await admin
@@ -96,6 +104,7 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
       .update({
         ocr_text: null,
         ocr_status: status,
+        form_kind: formKind,
         proof_ot: parsed.ot,
         proof_client_minutes: parsed.clientMinutes,
         proof_return_minutes: parsed.returnMinutes,
