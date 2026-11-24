@@ -4,6 +4,7 @@
 import { PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN, expectedProofForJob, minutesClose, otDigits } from "./overtime-proof-check";
 import { DAILY_REGULAR_MINUTES, TEN_HOUR_DAY_MINUTES, dayFirstTripUnpaidMinutes, minutesBetween } from "./payroll-calculations";
 import { byDepart, overtimeLineJobIds } from "./overtime-proof-rules";
+import { INVALID_PROOF_STATES } from "./ocr-readings";
 import { BRITTON_WINDOW_DAYS, dayDiff, nameKey, shiftDay } from "./britton";
 import { fetchAllRows } from "./fetch-all";
 import { QUERY_BUDGETS } from "./query-budgets";
@@ -173,7 +174,7 @@ export function buildOtComparison({ proofRows = [], britton = [], jobs = [], peo
     else if (!brittonValues) verdict = "missingBritton";
     else if (FIELDS.some((field) => !near(brittonValues[field], sparklog[field], field))) verdict = "brittonGap";
     else if (form && FIELDS.some((field) => form[field] != null && !near(form[field], sparklog[field], field))) verdict = "formGap";
-    else if (proofs.every((row) => row.state === "sms")) verdict = "noProof"; // no proof, or only the screenshot of the text message (not a valid proof)
+    else if (proofs.every((row) => INVALID_PROOF_STATES.has(row.state))) verdict = "noProof"; // no proof, or only pictures that are not a valid proof (text message, old form, Field Service page, wrong picture)
     else verdict = "ok";
 
     // The OT as each source says it (Britton's line, the number read on the proof, the work sheet): shown side by side; the one that

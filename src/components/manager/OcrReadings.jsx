@@ -15,7 +15,7 @@ import OcrDownload from "@/components/manager/OcrDownload";
 import OtComparison from "@/components/manager/OtComparison";
 import { attachBritton, fetchBrittonRows } from "@/lib/britton";
 import { proofSheetLines } from "@/lib/ocr-sheet";
-import { OCR_FIRST_DAY, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, ocrDays } from "@/lib/ocr-readings";
+import { OCR_FIRST_DAY, OCR_STATES, allAgree, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, gapOf, ocrDays } from "@/lib/ocr-readings";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
@@ -28,9 +28,10 @@ import { minutesText } from "@/lib/overtime-proof-check";
 const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
 const NOT_NEEDED_COLUMN = ", not_needed_at"; // migration 0153: read when it exists
+const FORM_KIND_COLUMN = ", form_kind"; // migration 0161 (what the picture is: new form / old form / Field Service / SMS): read when it exists
 const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
-const BADGE = { ok: "success", mismatch: "destructive", sms: "info", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
+const BADGE = { ok: "success", mismatch: "destructive", sms: "info", field: "destructive", oldForm: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
 const brittonTitle = (line, t) => t("britton.cellTitle", { name: line.employee_name, total: line.total_minutes, note: line.note || "—" });
 
@@ -102,8 +103,9 @@ export default function OcrReadings() {
     (async () => {
       const readEvidence = (columns) => withTimeout(
         supabase.from("overtime_evidence").select(columns).gte("job_date", OCR_FIRST_DAY).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.ocrReadings), 12000);
-      let { data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN);
-      // Migration 0153 not applied yet: the same list without the « not needed » mark.
+      let { data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN + FORM_KIND_COLUMN);
+      // Migration 0153 / 0161 not applied yet: the same list without the « not needed » mark / the picture kind.
+      if (evidenceError && /form_kind/i.test(String(evidenceError.message || ""))) ({ data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN));
       if (evidenceError && /not_needed_at/i.test(String(evidenceError.message || ""))) ({ data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS));
       if (evidenceError) throw evidenceError;
       // The switch of the « Send back for correction » button (a missing column = off).
@@ -215,7 +217,7 @@ export default function OcrReadings() {
           </div>
           {rows && (
             <div className="flex flex-wrap gap-2 text-xs">
-              {["ok", "mismatch", "sms", "wrongDoc", "unread", "failed", "queued", "notRead"].map((key) => (
+              {OCR_STATES.map((key) => (
                 <Badge key={key} variant={BADGE[key]}>{t(`ocr.state.${key}`)} : {counts[key]}</Badge>
               ))}
             </div>
@@ -300,7 +302,7 @@ export default function OcrReadings() {
                     {row.name && row.userId ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button type="button" className="font-medium text-primary hover:underline">{row.name}</button>
+                          <button type="button" className={`font-medium hover:underline ${allAgree(row) ? "text-primary" : "text-foreground"}`}>{row.name}</button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
                           <DropdownMenuItem onSelect={() => setCardId(row.userId)}>{t("ocr.link.card")}</DropdownMenuItem>
@@ -334,7 +336,7 @@ export default function OcrReadings() {
                   {cell(row, "return", row.found.returnMinutes, minutes)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    <Badge variant={BADGE[row.state]}>{t(`ocr.state.${row.state}`)}</Badge>
+                    <Badge variant={gapOf(row) ? "destructive" : BADGE[row.state]} title={gapOf(row) ? t("ocr.gap.hint") : undefined}>{gapOf(row) ? t(`ocr.gap.${gapOf(row)}`) : t(`ocr.state.${row.state}`)}</Badge>
                     {row.notNeeded && <Badge variant="secondary" className="ml-1" title={t("ocr.notNeededHint")}>{t("ocr.notNeeded")}</Badge>}
                     {row.state === "queued" && (
                       <div className="mt-1 text-[11px] text-muted-foreground">

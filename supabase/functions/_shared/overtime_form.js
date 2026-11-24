@@ -28,30 +28,59 @@ export function parseOvertimeForm(text) {
   return result;
 }
 
-// Is this text the overtime request form itself? The form has its own questions; a work order, a supper receipt or any other
-// screenshot does not (it may still carry an « OT-198909 » in its header, which is why an OT number alone proves nothing).
-// At least 2 of these marks must be present.
-const FORM_MARKS = [
-  // The form of November 2026 (« Confirmation de surtemps »): multiple choice questions. A screenshot often shows only part of it
-  // (no title, one question), so every visible piece counts: its title, its questions, the hint under question 2, the last choice,
-  // the question 1 label and the Microsoft Forms address bar.
+// The form of November 2026 (« Confirmation de surtemps »): multiple choice questions. A screenshot often shows only part of it
+// (no title, one question), so every visible piece counts: its questions, the hint under question 2, the last choice and the
+// question 1 label.
+const NEW_FORM_MARKS = [
   /confirmation\s+de\s+surtemps/i,
-  /dur[eé]e\s+r[eé]elle/i,
-  /dur[eé]e\s+du\s+retour/i,
+  /dur[e\u00e9]e\s+r[e\u00e9]elle/i,
+  /dur[e\u00e9]e\s+du\s+retour/i,
   /\+\s*de\s*120\s*minutes?/i,
   /\d+\s*minutes?\s*=\s*\d\s*h/i,
   /ordre\s+de\s+travail\s*\*/i,
-  /forms\.(?:cloud\.)?(?:microsoft|office)/i,
+];
+// The OLD form (« Temps réel de TS »): typed answers.
+const OLD_FORM_MARKS = [
+  /temps\s+r[e\u00e9]el\s+de\s+TS/i,
   /chez\s+le\s+client/i,
-  /retour\s+[àa]\s+l.?entrep[oô]t/i,
+  /retour\s+[\u00e0a]\s+l.?entrep[o\u00f4]t/i,
   /combien\s+de\s+minutes?/i,
-  /num[eé]ro\s+du\s+OT/i,
+  /num[e\u00e9]ro\s+du\s+OT/i,
   /confirmation\s+de\s+temps\s+supp/i,
 ];
+// The Microsoft Forms address bar: on both forms, so it only backs up a form that already shows one of its own marks.
+const FORMS_ADDRESS = /forms\.(?:cloud\.)?(?:microsoft|office)/i;
+// The Field Service work order (page « Bilan » of the booking): not the overtime form.
+const FIELD_SERVICE_MARKS = [
+  /statut\s+de\s+la\s+r[e\u00e9]servation/i,
+  /heure\s+de\s+d[e\u00e9]but/i,
+  /heure\s+de\s+fin/i,
+  /heure\s+d.arriv[e\u00e9]e/i,
+  /distance\s+parcourue/i,
+  /soutien\s+et\s+suivis/i,
+];
 
-export function isOvertimeFormText(text) {
+const countMarks = (marks, source) => marks.filter((mark) => mark.test(source)).length;
+
+// What the picture is, from its text: "new" (the form of November 2026), "old" (the form « Temps réel de TS »), "field" (a Field Service
+// work order) or null (anything else, unreadable). A work order or a receipt is never taken for the form: at least 2 marks are needed
+// (1 when the Microsoft Forms address backs it up and the other form shows none).
+export function formKindOf(text) {
   const source = String(text || "");
-  return FORM_MARKS.filter((mark) => mark.test(source)).length >= 2;
+  const news = countMarks(NEW_FORM_MARKS, source);
+  const olds = countMarks(OLD_FORM_MARKS, source);
+  const address = FORMS_ADDRESS.test(source);
+  if (news >= 2 || (news >= 1 && olds === 0 && address)) return "new";
+  if (olds >= 2 || (olds >= 1 && news === 0 && address)) return "old";
+  if (countMarks(FIELD_SERVICE_MARKS, source) >= 2) return "field";
+  return null;
+}
+
+// Is this text the overtime request form itself (either version)? A work order, a supper receipt or any other screenshot is not
+// (it may still carry an « OT-198909 » in its header, which is why an OT number alone proves nothing).
+export function isOvertimeFormText(text) {
+  const kind = formKindOf(text);
+  return kind === "new" || kind === "old";
 }
 
 export function overtimeFormFound(parsed) {

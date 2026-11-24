@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OVER_120_MINUTES, isOvertimeFormText, overtimeFormFound, parseOvertimeForm, parseOvertimeFormLines, parseRadioAnswers, readOvertimeForm } from "./overtime-form";
+import { OVER_120_MINUTES, formKindOf, isOvertimeFormText, overtimeFormFound, parseOvertimeForm, parseOvertimeFormLines, parseRadioAnswers, readOvertimeForm } from "./overtime-form";
 
 const FORM = (ot, client, back) => `
 automatiquement vos détails, tels que le nom et l'adresse de courriel, sauf si vous le fournissez vous-même.
@@ -236,5 +236,19 @@ describe("new form: heading scrolled out of the capture", () => {
   it("a list of numbers with neither a hint nor a Commentaire is not guessed", () => {
     const lines = CHOICES.map((text, i) => ({ text, top: 100 + i * 50, height: 22 }));
     expect(parseRadioAnswers(lines, [{ x: 140, y: 161 }])).toMatchObject({ clientMinutes: null, returnMinutes: null, located: { client: false, back: false } });
+  });
+});
+
+describe("formKindOf: which picture is it", () => {
+  it("tells the old form (« Temps réel de TS »), the new form, a Field Service page and anything else", () => {
+    const old = "Temps réel de TS\nforms.cloud.microsoft\n1. Prénom Nom\n3. Numéro du OT-XXXXXX *\nOT-209555\n4. Combien de minute chez le client *\n60\n5. Combien de minute retour à l'entrepôt si applicable sinon inscrire 0 *\n30\n6. date *";
+    const field = "OT-201318\nes et signature Soutien et suivis Bilan\nStatut de la réservation* Terminé\nHeure de début* 2026-11-23 13:30\nHeure de fin* 17:00\nDurée* 3,5 heures\nHeure d'arrivée (info)\nDéplacement Distance parcourue (miles)";
+    const fresh = "forms.cloud.microsoft\n1. Ordre de travail *\nOT-270185\n2. Durée réelle du temps supplémentaire (Minutes) *\n60 minutes = 1h, 75 minutes =1h15";
+    expect(formKindOf(old)).toBe("old");
+    expect(formKindOf(fresh)).toBe("new");
+    expect(formKindOf(field)).toBe("field");
+    expect(isOvertimeFormText(field)).toBe(false);
+    expect(formKindOf("Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp")).toBeNull();
+    expect(formKindOf("")).toBeNull();
   });
 });

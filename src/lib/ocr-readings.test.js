@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve, dirname } from "node:path";
-import { buildOcrRows, canRequeue, canReread, countOcrStates, filterOcrRows, ocrDays } from "./ocr-readings";
+import { allAgree, buildOcrRows, canRequeue, canReread, countOcrStates, filterOcrRows, gapOf, ocrDays } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
 const job = (id, depart, fin, extra = {}) => ({ id, user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "261821", depart, fin, return_time_minutes: 0, ...extra });
@@ -57,7 +57,7 @@ describe("buildOcrRows", () => {
     expect(filterOcrRows(rows, { state: "reread" }).map((row) => row.id)).toEqual(["p3"]);
     expect(filterOcrRows(rows, { state: "all", query: "alex" })).toHaveLength(3);
     expect(filterOcrRows(rows, { state: "all", query: "zzz" })).toHaveLength(0);
-    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, sms: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, sms: 0, field: 0, oldForm: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
   });
 });
 
@@ -67,7 +67,7 @@ describe("the wrong screenshot (migration 0148 and process_overtime_evidence)", 
   const sql = read("../../supabase/migrations/20261118230000_0148_overtime_proof_wrong_document.sql");
 
   it("marks anything that is not the form `wrong_document` and drops the numbers read on it", () => {
-    expect(fn).toContain("isOvertimeFormText(text)");
+    expect(fn).toContain("formKindOf(text)");
     expect(fn).toContain('status = "wrong_document"');
     expect(fn).toContain("parsed = { ot: null, clientMinutes: null, returnMinutes: null }");
     expect(fn).not.toContain('(overtimeFormFound(parsed) || validatesOvertimeSms(text)) ? "processed"'); // the old test: an OT number alone proved nothing
@@ -183,11 +183,56 @@ describe("the old SMS proof (migration 0158 and process_overtime_evidence)", () 
     expect(fn).toContain("function isOvertimeSmsText");
     expect(fn).toContain('status = "sms"');
     expect(fn).not.toContain("includesDuration"); // the SMS of the screenshots carries no minutes
-    expect(fn.indexOf("isOvertimeFormText(text)")).toBeLessThan(fn.indexOf("isOvertimeSmsText(text)"));
+    expect(fn.indexOf("formKindOf(text)")).toBeLessThan(fn.indexOf("isOvertimeSmsText(text)"));
     expect(fn).toMatch(/surtemps/);
   });
 
   it("adds the status to the constraint, keeping the others", () => {
     expect(sql).toContain("check (ocr_status in ('pending', 'processed', 'needs_review', 'failed', 'wrong_document', 'sms'))");
+  });
+});
+
+describe("what the picture is (migration 0161) and the result column", () => {
+  const day = (date) => [job("a", "06:30", "16:30", { job_date: date })]; // 10 h: 120 minutes past the line
+  const row = (date, extra) => buildOcrRows([proof("p1", "a", { job_date: date, ...extra })], day(date), people)[0];
+
+  it("names a Field Service page, an old-form capture (from 2026-11-23 only) and a text message", () => {
+    expect(row("2026-11-23", { ocr_status: "wrong_document", form_kind: "field" }).state).toBe("field");
+    expect(row("2026-11-23", { ocr_status: "wrong_document", form_kind: "other" }).state).toBe("wrongDoc");
+    expect(row("2026-11-23", { ocr_status: "sms", form_kind: "sms" }).state).toBe("sms");
+    const old = row("2026-11-23", { ocr_status: "processed", form_kind: "old", proof_client_minutes: 120, proof_return_minutes: 0 });
+    expect(old.state).toBe("oldForm");
+    expect(old.wrong.size).toBe(0); // nothing is compared on an invalid proof
+    // before the form changed, an old-form capture was a valid proof
+    expect(row("2026-11-20", { ocr_status: "processed", form_kind: "old", proof_client_minutes: 120, proof_return_minutes: 0 }).state).toBe("ok");
+  });
+
+  it("gapOf: proof against the timesheet, proof against Britton, Britton against the timesheet", () => {
+    const ok = row("2026-11-23", { ocr_status: "processed", form_kind: "new", proof_client_minutes: 120, proof_return_minutes: 0 });
+    expect(gapOf(ok)).toBeNull();
+    expect(allAgree(ok)).toBe(true);
+    const gapFiche = row("2026-11-23", { ocr_status: "processed", form_kind: "new", proof_client_minutes: 60, proof_return_minutes: 0 });
+    expect(gapOf(gapFiche)).toBe("fiche");
+    expect(allAgree(gapFiche)).toBe(false);
+    const britton = (client) => ({ client_minutes: client, return_minutes: 0 });
+    // the proof and the timesheet agree (120) but Britton says 60 → Britton and the timesheet differ
+    expect(gapOf({ ...ok, britton: britton(60), brittonWrong: new Set(["client"]) })).toBe("both");
+    // Britton agrees with the timesheet, the proof says something else
+    expect(gapOf({ ...gapFiche, britton: britton(120), brittonWrong: new Set() })).toBe("fiche");
+    // no timesheet gap on the proof but the proof differs from Britton only (timesheet and Britton agree within the tolerance)
+    expect(gapOf({ ...ok, found: { ...ok.found, clientMinutes: 100 }, britton: britton(135), brittonWrong: new Set() })).toBe("britton");
+    // an invalid proof compares nothing
+    expect(gapOf(row("2026-11-23", { ocr_status: "wrong_document", form_kind: "field" }))).toBeNull();
+    expect(allAgree(row("2026-11-23", { ocr_status: "sms", form_kind: "sms" }))).toBe(false);
+  });
+
+  it("migration 0161 adds form_kind, limits its values and lets the function alone write it", () => {
+    const sql = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/migrations/20261124100000_0161_overtime_proof_form_kind.sql"), "utf8");
+    expect(sql).toMatch(/add column if not exists form_kind text/);
+    expect(sql).toMatch(/form_kind in \('new', 'old', 'field', 'sms', 'other'\)/);
+    expect(sql).toMatch(/new\.form_kind := null;/);
+    const fn = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/functions/process_overtime_evidence/index.ts"), "utf8");
+    expect(fn).toContain("form_kind: formKind");
+    expect(fn).toMatch(/formKind = kind === "field" \? "field" : "other"/);
   });
 });
