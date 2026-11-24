@@ -38,8 +38,9 @@ describe("OcrReadings", () => {
       evidence("p2", { proof_ot: "111111", proof_client_minutes: 150, proof_return_minutes: 0, created_at: "2026-11-16T21:00:00Z" }),
     ]);
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
-    expect(screen.getByText("111111").className).toContain("text-destructive");
-    expect(screen.getAllByText("208637").length).toBeGreaterThanOrEqual(3); // the work order's OT (twice) and the OT read on the first proof
+    expect(screen.getByText("OT-111111").className).toContain("text-destructive"); // the OT read on the proof differs from the sheet's
+    expect(screen.getAllByText("OT-208637").length).toBe(1); // the OT read on the first proof (the sheet's own OT is a button)
+    expect(screen.getAllByText("208637").length).toBeGreaterThanOrEqual(2); // the work order's OT, twice
     expect(screen.getAllByText("150 min").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Conforme").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Écart / fiche").length).toBeGreaterThan(0);
@@ -151,7 +152,8 @@ describe("OcrReadings › filtre par jour", () => {
     // two-line header: « Chez le client » / « Retour » over Britton · Preuve de temps · Fiche de travail
     expect(screen.getByRole("columnheader", { name: "Chez le client" }).colSpan).toBe(3);
     expect(screen.getByRole("columnheader", { name: "Retour" }).colSpan).toBe(3);
-    expect(screen.getAllByRole("columnheader", { name: "Britton" })).toHaveLength(2);
+    expect(screen.getByRole("columnheader", { name: "OT" }).colSpan).toBe(3);
+    expect(screen.getAllByRole("columnheader", { name: "Britton" })).toHaveLength(3);
     expect(screen.getByText("60 min").className).toContain("text-destructive"); // 60 at Britton, 150 on the timesheet
     expect(screen.getByText("Britton sans preuve (1)")).toBeTruthy(); // the line of OT 424242 has no proof
     fireEvent.change(screen.getByLabelText("Afficher"), { target: { value: "brittonGap" } });

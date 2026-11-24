@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.325 (2026-11-24).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.326 (2026-11-24).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.326 — OT group in the OCR « By proof » view.** The OT is now three columns, **Britton · Proof · Sheet**, like in « By OT »; an OT that differs from the others is red; an SMS proof shows « SMS ».
 - **V2.4.325 — Result column of the OCR tab.** The reader now says what the picture is: **Field** (a Field Service work order), **SMS**, **Old form** (the form « Temps réel de TS », from 2026-11-23), or the new form. For a valid proof the column says **Gap / sheet** (the proof differs from the timesheet), **Gap / Britton** (differs from Britton's line) or **Gap / sheet / Britton** (Britton's line and the timesheet differ). An employee's name is green only when everything agrees. Pictures that are not a valid proof count as « no proof » in the By-OT comparison. **Apply migration 0161, then redeploy `process_overtime_evidence`, then « Tout relire ».**
 - **V2.4.324 — Better reading of the new overtime form.** Captures of only part of the form (no title, question 2 alone, question 3 alone) are no longer refused as « wrong capture »: every visible piece of the form counts (its questions, the hint under question 2, « + de 120 minutes », the question 1 label, the Microsoft Forms address). The OT written in question 1 is read again (shown next to the ticked answer). Thin or half-hidden ticked circles (cut by the phone's bottom bar, compressed pictures) are found too, and so is the chosen answer of a form already sent (iPhone: grey filled circle, read-only). A capture whose question heading is scrolled out is still read (question 2 by the hint under it, question 3 by « Commentaire » under it). **Redeploy `process_overtime_evidence`, then « Tout relire ».** No database change.
 - **V2.4.323 — Pages viewed by managers (Journal).** New **Pages viewed** tab in Advanced › Journal (owner only): for each manager and each day, the pages and tabs opened and how many times. Recorded from the moment migration 0159 is applied; only page names are kept. **Apply migration 0159.**
