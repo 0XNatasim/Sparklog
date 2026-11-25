@@ -15,7 +15,7 @@ import OcrDownload from "@/components/manager/OcrDownload";
 import OtComparison from "@/components/manager/OtComparison";
 import { attachBritton, fetchBrittonRows } from "@/lib/britton";
 import { proofSheetLines } from "@/lib/ocr-sheet";
-import { OCR_FIRST_DAY, OCR_STATES, allAgree, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, gapOf, ocrDays } from "@/lib/ocr-readings";
+import { OCR_FIRST_DAY, OCR_STATES, allAgree, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, gapOf, groupProofRows, ocrDays } from "@/lib/ocr-readings";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
@@ -33,7 +33,6 @@ const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arri
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", mismatch: "destructive", sms: "info", field: "destructive", oldForm: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
-const brittonTitle = (line, t) => t("britton.cellTitle", { name: line.employee_name, total: line.total_minutes, note: line.note || "—" });
 
 async function inChunks(ids, run) {
   const rows = [];
@@ -69,9 +68,6 @@ function JobSummary({ row, t }) {
         {line(t("ocr.col.otRead"), `${row.found.ot ?? "—"} / ${job.ot || "—"}`, row.wrong.has("ot"))}
         {line(t("ocr.preview.clientLine"), `${mins(row.found.clientMinutes)} / ${mins(row.expected?.clientMinutes)}`, row.wrong.has("client"))}
         {line(t("ocr.preview.returnLine"), `${mins(row.found.returnMinutes)} / ${mins(row.expected?.returnMinutes)}`, row.wrong.has("return"))}
-        {row.britton && line(t("britton.previewClient"), `${mins(row.britton.client_minutes)} / ${mins(row.expected?.clientMinutes)}`, row.brittonWrong.has("client"))}
-        {row.britton && line(t("britton.previewReturn"), `${mins(row.britton.return_minutes)} / ${mins(row.expected?.returnMinutes)}`, row.brittonWrong.has("return"))}
-        {row.britton?.note && line(t("britton.note"), row.britton.note)}
       </dl>
     </div>
   );
@@ -164,10 +160,10 @@ export default function OcrReadings() {
   }
 
   const attached = useMemo(() => (baseRows ? attachBritton(baseRows, britton) : null), [baseRows, britton]);
-  const rows = attached ? attached.rows : null;
+  const rows = baseRows; // the proofs are compared with the Sparklog timesheet only; Britton is compared in « Par OT »
   const counts = useMemo(() => countOcrStates(rows), [rows]);
-  const brittonGaps = useMemo(() => (rows || []).filter((row) => row.brittonWrong?.size > 0).length, [rows]);
   const shown = useMemo(() => filterOcrRows(rows, { state, query, day }), [rows, state, query, day]);
+  const groups = useMemo(() => groupProofRows(shown), [shown]);
   const days = useMemo(() => ocrDays(rows), [rows]);
   const waiting = counts.queued;
   const rereadable = useMemo(() => (rows || []).filter(canReread), [rows]);
@@ -203,8 +199,8 @@ export default function OcrReadings() {
   const timesheetLink = (row, jobId) => `/manager/v3/time?tab=timesheets&emp=${row.userId}&date=${row.jobDate}${jobId ? `&job=${jobId}` : ""}`;
 
   const minutes = (value) => (value == null ? "—" : `${minutesText(value)} min`);
-  const cell = (row, field, value, format = (v) => (v == null ? "—" : v)) => (
-    <td className={`whitespace-nowrap px-3 py-2 ${row.wrong.has(field) ? "font-bold text-destructive" : ""}`}>{format(value)}</td>
+  const cell = (row, field, value, format = (v) => (v == null ? "—" : v), border = false) => (
+    <td className={`whitespace-nowrap px-3 py-2 ${border ? "border-l" : ""} ${row.wrong.has(field) ? "font-bold text-destructive" : ""}`}>{format(value)}</td>
   );
 
   return (
@@ -235,7 +231,6 @@ export default function OcrReadings() {
               <option value="check">{t("ocr.filter.check")}</option>
               <option value="ok">{t("ocr.filter.ok")}</option>
               <option value="reread">{t("ocr.filter.reread")}</option>
-              {britton.length > 0 && <option value="brittonGap">{t("britton.filterGap", { count: brittonGaps })}</option>}
               <option value="queued">{t("ocr.filter.queued")}</option>
               <option value="notRead">{t("ocr.filter.notRead")}</option>
               <option value="all">{t("ocr.filter.all")}</option>
@@ -278,23 +273,25 @@ export default function OcrReadings() {
               <tr>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.date")}</th>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.employee")}</th>
-                <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.ot")}</th>
-                <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.client")}</th>
-                <th colSpan={britton.length > 0 ? 3 : 2} className="border-l px-3 py-2 text-center">{t("otc.col.return")}</th>
+                <th colSpan={2} className="border-l px-3 py-2 text-center">{t("otc.col.ot")}</th>
+                <th colSpan={2} className="border-l px-3 py-2 text-center">{t("otc.col.client")}</th>
+                <th colSpan={2} className="border-l px-3 py-2 text-center">{t("otc.col.return")}</th>
                 <th rowSpan={2} className="border-l px-3 py-2 align-bottom">{t("ocr.col.result")}</th>
                 <th rowSpan={2} className="px-3 py-2 align-bottom">{t("ocr.col.readAt")}</th>
                 <th rowSpan={2} className="px-3 py-2"><span className="sr-only">{t("ocr.view")}</span></th>
               </tr>
               <tr>
                 {[0, 1, 2].flatMap((group) => [
-                  ...(britton.length > 0 ? [["britton", "otc.src.britton"]] : []), ["proof", "otc.src.proof"], ["sheet", "otc.src.sheet"],
+                  ["proof", "otc.src.proof"], ["sheet", "otc.src.sheet"],
                 ].map(([source, labelKey], index) => (
                   <th key={`${group}-${source}`} className={`px-3 py-1 text-center normal-case ${index === 0 ? "border-l" : ""}`}>{t(labelKey)}</th>
                 )))}
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {shown.map((row) => (
+            {groups.map((group) => (
+            // The captures of one work order (1, 2) are one box: a heavier outline around them.
+            <tbody key={group.key} className={group.rows.length > 1 ? "divide-y divide-dashed border-y-2 border-primary/60 bg-primary/5" : "border-b"}>
+              {group.rows.map((row, photoIndex) => (
                 <tr key={row.id}>
                   <td className="whitespace-nowrap px-3 py-2">{row.jobDate ? dayjs(row.jobDate).format("DD MMM") : "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
@@ -309,21 +306,23 @@ export default function OcrReadings() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : (row.name || "—")}
+                    {group.rows.length > 1 && (
+                      <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground" title={t("ocr.photo", { n: photoIndex + 1, total: group.rows.length })} aria-label={t("ocr.photo", { n: photoIndex + 1, total: group.rows.length })}>{photoIndex + 1}</span>
+                    )}
                   </td>
                   {(() => {
-                    // The OT as each source says it: Britton's line, the number read on the proof, the work sheet (red = differs from the others).
-                    const digits = { britton: row.britton ? String(row.britton.ot) : "", proof: otDigits(row.found?.ot), sheet: otDigits(row.jobOt) };
+                    // The OT as each source says it: the number read on the proof, the work sheet (red = differs from the others).
+                    const digits = { proof: otDigits(row.found?.ot), sheet: otDigits(row.jobOt) };
                     const present = Object.entries(digits).filter(([, value]) => value);
                     const agreeing = (source) => present.filter(([, other]) => other === digits[source]).length;
                     const best = Math.max(0, ...present.map(([source]) => agreeing(source)));
                     const red = (source) => present.length >= 2 && best < present.length && Boolean(digits[source]) && (agreeing(source) < best || best === 1);
-                    const first = britton.length > 0 ? "britton" : "proof";
+                    const first = "proof";
                     const plain = (source, text) => (
                       <td className={`whitespace-nowrap px-3 py-2 text-center ${source === first ? "border-l" : ""} ${red(source) ? "font-bold text-destructive" : ""}`}>{text}</td>
                     );
                     return (
                       <>
-                        {britton.length > 0 && plain("britton", digits.britton ? `OT-${digits.britton}` : "—")}
                         {plain("proof", digits.proof ? `OT-${digits.proof}` : row.state === "sms" ? "SMS" : "—")}
                         <td className={`whitespace-nowrap px-3 py-2 text-center ${red("sheet") ? "font-bold text-destructive" : ""}`}>
                           {row.jobOt && row.userId ? (
@@ -341,15 +340,9 @@ export default function OcrReadings() {
                       </>
                     );
                   })()}
-                  {britton.length > 0 && (
-                    <td className={`whitespace-nowrap border-l px-3 py-2 ${row.brittonWrong.has("client") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.client_minutes) : "—"}</td>
-                  )}
-                  {cell(row, "client", row.found.clientMinutes, minutes)}
+                  {cell(row, "client", row.found.clientMinutes, minutes, true)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.clientMinutes)}</td>
-                  {britton.length > 0 && (
-                    <td className={`whitespace-nowrap border-l px-3 py-2 ${row.brittonWrong.has("return") ? "font-bold text-destructive" : ""}`} title={row.britton ? brittonTitle(row.britton, t) : undefined}>{row.britton ? minutes(row.britton.return_minutes) : "—"}</td>
-                  )}
-                  {cell(row, "return", row.found.returnMinutes, minutes)}
+                  {cell(row, "return", row.found.returnMinutes, minutes, true)}
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <Badge variant={gapOf(row) ? "destructive" : BADGE[row.state]} title={gapOf(row) ? t("ocr.gap.hint") : undefined}>{gapOf(row) ? t(`ocr.gap.${gapOf(row)}`) : t(`ocr.state.${row.state}`)}</Badge>
@@ -381,10 +374,11 @@ export default function OcrReadings() {
                   </td>
                 </tr>
               ))}
-              {shown.length === 0 && (
-                <tr><td colSpan={14} className="px-3 py-6 text-center text-muted-foreground">{t("ocr.empty")}</td></tr>
-              )}
             </tbody>
+            ))}
+            {groups.length === 0 && (
+              <tbody><tr><td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">{t("ocr.empty")}</td></tr></tbody>
+            )}
           </table>
         </div>
       )}
