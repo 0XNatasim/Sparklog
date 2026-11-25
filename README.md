@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.327 (2026-11-24).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.328 (2026-11-24).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.328 — « 1 » / « 2 » of the OCR boxes.** « 1 » is the capture that reads the OT and the time at the client, « 2 » the one with the return, whatever the order they were sent in.
 - **V2.4.327 — OCR « By proof » view: Sparklog timesheet only, captures grouped.** Britton is no longer shown or compared in this view (it stays in « By OT »): OT, at-the-client and return are each Proof · Sheet, and the result badge is only « Gap / sheet ». The two captures of one work order are one box with a heavier outline and a small « 1 » / « 2 » next to the name. The OCR download can also take **one single day** (a « Day » menu under the week), not only the whole week.
 - **V2.4.326 — OT group in the OCR « By proof » view.** The OT is now three columns, **Britton · Proof · Sheet**, like in « By OT »; an OT that differs from the others is red; an SMS proof shows « SMS ».
 - **V2.4.325 — Result column of the OCR tab.** The reader now says what the picture is: **Field** (a Field Service work order), **SMS**, **Old form** (the form « Temps réel de TS », from 2026-11-23), or the new form. For a valid proof the column says **Gap / sheet** (the proof differs from the timesheet), **Gap / Britton** (differs from Britton's line) or **Gap / sheet / Britton** (Britton's line and the timesheet differ). An employee's name is green only when everything agrees. Pictures that are not a valid proof count as « no proof » in the By-OT comparison. **Apply migration 0161, then redeploy `process_overtime_evidence`, then « Tout relire ».**

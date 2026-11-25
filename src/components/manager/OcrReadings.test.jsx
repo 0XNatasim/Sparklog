@@ -170,6 +170,18 @@ describe("OcrReadings › filtre par jour", () => {
     expect(document.querySelectorAll("tbody")).toHaveLength(1); // one box for the job
   });
 
+  it("lists capture 1 (the one that reads the OT) above capture 2 (the return), even when the return was sent first", async () => {
+    setup([
+      evidence("ret", { proof_return_minutes: 15, created_at: "2026-11-16T22:00:00Z" }),
+      evidence("first", { proof_ot: "208637", proof_client_minutes: 150, created_at: "2026-11-16T22:05:00Z" }),
+    ]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
+    const badges = [...document.querySelectorAll("tbody tr")].map((tr) => tr.querySelector("span[aria-label^='Capture']")?.textContent);
+    expect(badges).toEqual(["1", "2"]);
+    const firstRow = document.querySelector("tbody tr");
+    expect(firstRow.textContent).toContain("OT-208637"); // the first row is the one that read the OT
+  });
+
   it("shows no Britton column while nothing was imported", async () => {
     setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })]);
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));

@@ -233,9 +233,17 @@ describe("what the picture is (migration 0161) and the result column", () => {
     expect(fn).toMatch(/formKind = kind === "field" \? "field" : "other"/);
   });
 
-  it("groupProofRows: the captures of one work order go together, the oldest first", () => {
-    const proof = (id, jobId, createdAt) => ({ id, jobId, createdAt });
-    const groups = groupProofRows([proof("c", "j2", "2026-11-23T10:00:00Z"), proof("b", "j1", "2026-11-23T09:05:00Z"), proof("a", "j1", "2026-11-23T09:00:00Z"), proof("d", null, "2026-11-23T08:00:00Z")]);
-    expect(groups.map((group) => group.rows.map((item) => item.id))).toEqual([["c"], ["a", "b"], ["d"]]);
+  it("groupProofRows: capture 1 = the one that reads the OT / the time at the client, capture 2 = the return, whatever the upload order", () => {
+    const proof = (id, jobId, createdAt, found = {}) => ({ id, jobId, createdAt, found: { ot: null, clientMinutes: null, returnMinutes: null, ...found } });
+    const groups = groupProofRows([
+      proof("c", "j2", "2026-11-23T10:00:00Z", { clientMinutes: 30 }),
+      proof("ret", "j1", "2026-11-23T09:00:00Z", { returnMinutes: 15 }), // uploaded first, but it is the return
+      proof("first", "j1", "2026-11-23T09:05:00Z", { ot: "270185", clientMinutes: 45 }),
+      proof("d", null, "2026-11-23T08:00:00Z"),
+    ]);
+    expect(groups.map((group) => group.rows.map((item) => item.id))).toEqual([["c"], ["first", "ret"], ["d"]]);
+    // two captures that read nothing yet: the oldest first
+    const unread = groupProofRows([proof("b", "j3", "2026-11-23T09:05:00Z"), proof("a", "j3", "2026-11-23T09:00:00Z")]);
+    expect(unread[0].rows.map((item) => item.id)).toEqual(["a", "b"]);
   });
 });
