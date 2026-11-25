@@ -57,7 +57,7 @@ describe("buildOcrRows", () => {
     expect(filterOcrRows(rows, { state: "reread" }).map((row) => row.id)).toEqual(["p3"]);
     expect(filterOcrRows(rows, { state: "all", query: "alex" })).toHaveLength(3);
     expect(filterOcrRows(rows, { state: "all", query: "zzz" })).toHaveLength(0);
-    expect(countOcrStates(rows)).toEqual({ ok: 1, mismatch: 0, sms: 0, field: 0, oldForm: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
+    expect(countOcrStates(rows)).toEqual({ ok: 1, incomplete: 0, mismatch: 0, sms: 0, field: 0, oldForm: 0, wrongDoc: 0, unread: 1, failed: 0, queued: 0, notRead: 1 });
   });
 });
 
@@ -239,6 +239,21 @@ describe("what the picture is (migration 0161) and the result column", () => {
     expect(allAgree(otOnly)).toBe(false);
     // one minute read (here the return only) is a reading
     expect(row("2026-11-24", { ocr_status: "processed", form_kind: "new", proof_ot: null, proof_client_minutes: null, proof_return_minutes: 0 }).state).not.toBe("unread");
+  });
+
+  it("incomplete: a new-form job whose captures never gave the return (or the client time) is not conform", () => {
+    const read = { ocr_status: "processed", form_kind: "new" };
+    expect(row("2026-11-24", { ...read, proof_client_minutes: 120, proof_return_minutes: null }).state).toBe("incomplete");
+    expect(row("2026-11-24", { ...read, proof_client_minutes: null, proof_return_minutes: 0 }).state).toBe("incomplete");
+    expect(row("2026-11-24", { ...read, proof_client_minutes: 120, proof_return_minutes: 0 }).state).toBe("ok");
+    // two captures of the same job: one gave the client time, the other the return → both are fine
+    const two = buildOcrRows([
+      proof("p1", "a", { job_date: "2026-11-24", ...read, proof_client_minutes: 120, proof_return_minutes: null }),
+      proof("p2", "a", { job_date: "2026-11-24", ...read, proof_client_minutes: null, proof_return_minutes: 0 }),
+    ], day("2026-11-24"), people);
+    expect(two.map((item) => item.state)).toEqual(["ok", "ok"]);
+    // the old form is not concerned (typed answers, nothing to complete)
+    expect(row("2026-11-20", { ocr_status: "processed", form_kind: "old", proof_client_minutes: 120, proof_return_minutes: null }).state).toBe("ok");
   });
 
   it("groupProofRows: capture 1 = the one that reads the OT / the time at the client, capture 2 = the return, whatever the upload order", () => {
