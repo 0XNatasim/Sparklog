@@ -79,6 +79,16 @@ async function processEvidence(admin: ReturnType<typeof createClient>, evidence:
       console.error("[process_overtime_evidence] decode", decodeError);
     }
     let parsed = readOvertimeForm({ text, lines, circles });
+    // A circle was found but no minutes came out: log what the matching saw (positions and the numeric choice lines only, no personal text)
+    // so the cause can be read in the function logs.
+    if (circles.length > 0 && parsed.clientMinutes === null && parsed.returnMinutes === null) {
+      console.log("[process_overtime_evidence] circle without answer", JSON.stringify({
+        circles: circles.map((circle) => [Math.round(circle.x), Math.round(circle.y)]),
+        choiceLines: lines.filter((line) => /^[\s\W]*(?:[Oo0()]\s+)?\d{1,3}\W*$|^\W*\+\s*de/i.test(line.text) || /^[Oo]$/.test(line.text.trim()))
+          .map((line) => [line.text.slice(0, 20), Math.round(line.top), Math.round(line.height)]),
+        headings: lines.filter((line) => /dur[eé]e|commentaire/i.test(line.text)).map((line) => [line.text.slice(0, 40), Math.round(line.top)]),
+      }));
+    }
     // What the picture is: the overtime form (its own questions are there), an old SMS screenshot, something else (a work order,
     // a receipt…: « wrong_document », the numbers read on it mean nothing and are dropped), or nothing readable.
     // form_kind (migration 0161): "new" / "old" (the two versions of the form), "field" (a Field Service work order), "sms", "other".

@@ -171,6 +171,26 @@ function choiceValue(text) {
   return match && CHOICES.has(Number(match[1])) ? Number(match[1]) : null;
 }
 
+// The choices are always the same list, evenly spaced: 0, 15 … 120, « + de 120 ». OCR often loses one of them (the « 0 » of the first
+// line read as a letter, or dropped). A missing choice is put back where the list says it is (found choices give the spacing), so the
+// selected circle of a capture that shows « 0 » is matched instead of being refused. Only values inside the list are added.
+const CHOICE_LIST = [0, 15, 30, 45, 60, 75, 90, 105, 120, OVER_120_MINUTES];
+function fillMissingChoices(choices) {
+  const known = choices.map((choice) => ({ ...choice, index: CHOICE_LIST.indexOf(choice.value) })).filter((choice) => choice.index >= 0).sort((a, b) => a.index - b.index);
+  if (known.length < 3 || known[known.length - 1].index === known[0].index) return;
+  const first = known[0];
+  const last = known[known.length - 1];
+  const pitch = (last.center - first.center) / (last.index - first.index);
+  if (!(pitch > 0)) return;
+  CHOICE_LIST.forEach((value, index) => {
+    if (choices.some((choice) => choice.value === value)) return;
+    const center = first.center + (index - first.index) * pitch;
+    if (choices.some((choice) => Math.abs(choice.center - center) < pitch * 0.5)) return; // a line already sits there
+    choices.push({ value, center });
+  });
+  choices.sort((a, b) => a.center - b.center);
+}
+
 // `rawLines` = [{ text, top, left, height }] (OCR overlay), `circles` = [{ x, y }] (selected radio buttons). `located` says which
 // of the two questions are on the picture; a located question with no selected circle in its block is a real « nothing selected » (null).
 export function parseRadioAnswers(rawLines, circles) {
@@ -201,6 +221,7 @@ export function parseRadioAnswers(rawLines, circles) {
       if (value !== null) choices.push({ value, center: lines[i].top + lines[i].height / 2 });
     }
     if (choices.length < 3) continue;
+    fillMissingChoices(choices);
     const from = start >= 0 ? lines[start].top : -Infinity;
     const to = stop < lines.length ? lines[stop].top : Infinity;
     // A circle half hidden by the phone's bottom bar has two possible centres (y and altY): both are tried.

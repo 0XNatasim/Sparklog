@@ -146,6 +146,20 @@ describe("new form: selected circle → minutes", () => {
     expect(parseRadioAnswers(question3, [{ x: 80, y: 280 + 4 * 148 + 22 }])).toMatchObject({ clientMinutes: null, returnMinutes: 60, located: { client: false, back: true } });
   });
 
+  it("reads « 0 » even when OCR lost the « 0 » line (dropped, or read as the letter O): the list is evenly spaced", () => {
+    const centre = 280 + 22;
+    const withoutZero = question3.filter((line) => line.text !== "0");
+    expect(parseRadioAnswers(withoutZero, [{ x: 80, y: centre }]).returnMinutes).toBe(0);
+    const letterO = question3.map((line) => (line.text === "0" ? { ...line, text: "O" } : line));
+    expect(parseRadioAnswers(letterO, [{ x: 80, y: centre }]).returnMinutes).toBe(0);
+    // the other answers still read the same, and a circle between two choices is still refused
+    expect(parseRadioAnswers(withoutZero, [{ x: 80, y: 280 + 4 * 148 + 22 }]).returnMinutes).toBe(60);
+    expect(parseRadioAnswers(withoutZero, [{ x: 80, y: centre + 74 }]).returnMinutes).toBeNull();
+    // a lost line in the middle is put back as well
+    const withoutThirty = question3.filter((line) => line.text !== "30");
+    expect(parseRadioAnswers(withoutThirty, [{ x: 80, y: 280 + 2 * 148 + 22 }]).returnMinutes).toBe(30);
+  });
+
   it("reads « 0 » and « + de 120 minutes » (stored as 121)", () => {
     expect(parseRadioAnswers(question3, [{ x: 80, y: 280 + 22 }]).returnMinutes).toBe(0);
     expect(parseRadioAnswers(question3, [{ x: 80, y: 280 + 9 * 148 + 22 }]).returnMinutes).toBe(OVER_120_MINUTES);
