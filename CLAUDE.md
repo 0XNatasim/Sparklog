@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-25, V2.4.329)
+## 6. À faire / à préciser (mis à jour 2026-11-25, V2.4.330)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.330 (technique).** « Conforme » sans minutes lues (constat du 2026-11-25 : ligne de Kudzovi, OT lu mais « — » pour le client et le retour, fiche 25 / 20 min, badge « Conforme »). Cause : `buildOcrRows` comptait un OT seul comme une lecture (`nothingFound` exigeait trois valeurs nulles) et `proofDifferences` ne compare que les champs lus : rien ne différait, donc `ok`. Maintenant `nothingFound` = ni minutes chez le client ni minutes de retour → état `unread`. Vérifié en base (2026-11-25) : 10 preuves `processed` avec un OT mais aucune minute (Daniel L., Guillaume C., Kudzovi E. ×2, Roobens L., Wilfri C. D., Olivier M., Rémi D., Anthony R., Cyrille K.) ; elles passent à « Illisible », donc dans « À vérifier ». `ocr_status` en base reste `processed` pour elles (la fonction compte un OT seul comme trouvé : `overtimeFormFound`) ; non changé pour ne pas redéployer. Aucune migration. Test : `ocr-readings.test.js`.
 
 **V2.4.329 (technique).** Question 3 avec « 0 » coché lue « illisible » (constat du 2026-11-25 : plusieurs captures de Guillaume, Cedrick… avec le cercle du **0**, la 1re ligne de la liste, juste sous le titre). Vérifié sur 3 vraies captures : `findSelectedCircles` trouve bien le cercle (x ≈ 30, y ≈ 110 dans l'image recadrée) ; le défaut est dans l'appariement : la ligne « 0 » manquait ou était lue comme une lettre, le choix le plus proche (15) était à un écart entier et le garde-fou refusait (`null`). `_shared/overtime_form.js` : `fillMissingChoices(choices)` (liste fixe `CHOICE_LIST` 0 … 120, 121 ; avec au moins 3 choix lus, l'espacement donne la position de chaque choix manquant, ajouté sauf si une ligne s'y trouve déjà) avant l'appariement du cercle ; un cercle entre deux choix reste refusé. `process_overtime_evidence/index.ts` : quand un cercle est trouvé mais qu'aucune minute n'en sort, journal `circle without answer` (positions des cercles, lignes de choix numériques, titres : aucun texte personnel). **Cause exacte non confirmée** (le texte OCR n'est pas gardé) : le journal le dira si des cas restent illisibles. **Redéployer `process_overtime_evidence`, puis « Tout relire ».** Aucune migration. Test : `overtime-form.test.js`.
 

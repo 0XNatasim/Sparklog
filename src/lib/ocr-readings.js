@@ -46,7 +46,9 @@ export function buildOcrRows(evidence, jobs, people) {
     const jobDate = String(proof.job_date || job?.job_date || "").slice(0, 10);
     const person = people?.get?.(userId) || null;
     const found = { ot: proof.proof_ot ?? null, clientMinutes: proof.proof_client_minutes ?? null, returnMinutes: proof.proof_return_minutes ?? null };
-    const nothingFound = found.ot === null && found.clientMinutes === null && found.returnMinutes === null;
+    // An OT number alone is not a reading of the proof: what the proof proves is the minutes (at the client / return). A capture that
+    // gave an OT but no minutes (question 1 only, or the answers could not be read) is « unread », never « conform ».
+    const nothingFound = found.clientMinutes === null && found.returnMinutes === null;
     const expected = job
       ? expectedProofForJob(byDay.get(`${userId}|${jobDate}`) || [], job, { firstTripUnpaid: Boolean(person?.first_trip_unpaid), tenHourDay: Boolean(person?.ten_hour_days) })
       : null;

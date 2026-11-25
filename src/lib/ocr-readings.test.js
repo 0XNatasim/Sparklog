@@ -233,6 +233,14 @@ describe("what the picture is (migration 0161) and the result column", () => {
     expect(fn).toMatch(/formKind = kind === "field" \? "field" : "other"/);
   });
 
+  it("a capture that gave an OT but no minutes is « unread », never « conform » (only the minutes prove the overtime)", () => {
+    const otOnly = row("2026-11-24", { ocr_status: "processed", form_kind: "new", proof_ot: "208637", proof_client_minutes: null, proof_return_minutes: null });
+    expect(otOnly.state).toBe("unread");
+    expect(allAgree(otOnly)).toBe(false);
+    // one minute read (here the return only) is a reading
+    expect(row("2026-11-24", { ocr_status: "processed", form_kind: "new", proof_ot: null, proof_client_minutes: null, proof_return_minutes: 0 }).state).not.toBe("unread");
+  });
+
   it("groupProofRows: capture 1 = the one that reads the OT / the time at the client, capture 2 = the return, whatever the upload order", () => {
     const proof = (id, jobId, createdAt, found = {}) => ({ id, jobId, createdAt, found: { ot: null, clientMinutes: null, returnMinutes: null, ...found } });
     const groups = groupProofRows([
