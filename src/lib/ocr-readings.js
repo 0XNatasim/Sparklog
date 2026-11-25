@@ -104,8 +104,17 @@ export function ocrDays(rows) {
   return [...counts.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, count]) => ({ date, count }));
 }
 
-// The proofs of one work order (the form has two answers, often two captures) go together in the table: one group per job, the
-// oldest capture first (« 1 »), the next one « 2 ». A proof without a job stays alone. Groups keep the order of their first row.
+// The proofs of one work order (the form has two answers, often two captures) go together in the table: one group per job.
+// « 1 » is the capture that shows the OT and the time at the client (questions 1 and 2), « 2 » the one with the return
+// (question 3): a capture that reads the OT comes first, then one that reads the time at the client, then the oldest.
+// A proof without a job stays alone. Groups keep the order of their first row.
+const captureRank = (row) => {
+  if (row.found?.ot) return 0;
+  if (row.found?.clientMinutes != null) return 1;
+  if (row.found?.returnMinutes != null) return 2;
+  return 3; // nothing read yet: after the ones that told what they are
+};
+
 export function groupProofRows(rows) {
   const groups = new Map();
   for (const row of rows || []) {
@@ -115,6 +124,7 @@ export function groupProofRows(rows) {
   }
   return [...groups.entries()].map(([key, members]) => ({
     key,
-    rows: [...members].sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")) || String(a.id).localeCompare(String(b.id))),
+    rows: [...members].sort((a, b) => captureRank(a) - captureRank(b)
+      || String(a.createdAt || "").localeCompare(String(b.createdAt || "")) || String(a.id).localeCompare(String(b.id))),
   }));
 }

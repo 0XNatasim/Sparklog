@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-25, V2.4.327)
+## 6. À faire / à préciser (mis à jour 2026-11-25, V2.4.328)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.328 (technique).** Ordre « 1 » / « 2 » des captures d'une fiche (correction de V2.4.327, constat du 2026-11-25 : l'ordre par heure d'envoi inversait des cas, le retour étant parfois envoyé en premier). `groupProofRows` trie par `captureRank` : capture qui lit l'OT (0), sinon celle qui lit le temps chez le client (1), sinon celle qui lit le retour (2), sinon rien lu (3) ; à rang égal, la plus ancienne d'abord. Aucune migration, aucune fonction Edge. Test : `ocr-readings.test.js`.
 
 **V2.4.327 (technique).** OCR, vue « Par preuve » : plus de comparaison avec Britton (décision du 2026-11-25 ; Britton reste dans « Par OT »). `OcrReadings.jsx` : les lignes ne sont plus passées par `attachBritton` pour l'affichage (`rows = baseRows` ; `attached.unmatched` sert toujours à la fenêtre « Britton sans preuve »), groupes OT / client / retour = Preuve · Fiche (2 colonnes), plus de filtre `brittonGap`, plus de lignes Britton dans l'aperçu ; `gapOf` ne rend plus que `fiche` (la preuve diffère de la fiche) ou `null` (textes `ocr.gap.britton` / `ocr.gap.both` et clés `britton.filterGap` / `previewClient` / `previewReturn` / `note` / `cellTitle` supprimés). Regroupement : `groupProofRows(rows)` (`ocr-readings.js`) = une boîte par fiche (`job_id`), captures de la plus ancienne à la plus récente ; un `<tbody>` par groupe, contour `border-y-2 border-primary/60` + fond teinté quand il y a plus d'une capture, et pastille « 1 » / « 2 » à côté du nom (`ocr.photo`, « Capture n sur total »). Téléchargement OCR par jour : `OcrDownload.jsx` ajoute un menu « Jour » (`ocr.download.day` / `wholeWeek`, jours de la semaine choisie qui ont une preuve) ; un jour choisi borne `selectEvidence` (`from` = `to` = ce jour), le ZIP s'appelle `ocr.download.zipDay` (« preuves OCR AAAA-MM-JJ »), changer de semaine remet « Toute la semaine ». Les marques « déjà téléchargé » restent partagées. Aucune migration, aucune fonction Edge. Tests : `ocr-readings.test.js`, `OcrReadings.test.jsx`.
 
