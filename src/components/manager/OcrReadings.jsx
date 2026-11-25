@@ -31,7 +31,7 @@ const NOT_NEEDED_COLUMN = ", not_needed_at"; // migration 0153: read when it exi
 const FORM_KIND_COLUMN = ", form_kind"; // migration 0161 (what the picture is: new form / old form / Field Service / SMS): read when it exists
 const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
-const BADGE = { ok: "success", mismatch: "destructive", sms: "info", field: "destructive", oldForm: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
+const BADGE = { ok: "success", incomplete: "warning", mismatch: "destructive", sms: "info", field: "destructive", oldForm: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
 const AUTO_REFRESH_MS = 60000;
 
 async function inChunks(ids, run) {

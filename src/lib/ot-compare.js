@@ -19,7 +19,7 @@ const FIELDS = ["client", "return"];
 const TOLERANCE = { client: PROOF_CLIENT_TOLERANCE_MIN, return: PROOF_RETURN_TOLERANCE_MIN };
 const near = (a, b, field) => minutesClose(a, b, TOLERANCE[field]);
 const day = (value) => String(value ?? "").slice(0, 10);
-const READ_STATES = new Set(["ok", "mismatch"]);
+const READ_STATES = new Set(["ok", "incomplete", "mismatch"]); // « incomplete » = the minutes it gave are still readings
 
 // Per field, which sources are the odd one out: a source is red when it disagrees with at least one other source and agrees with
 // fewer of them than the best-agreeing source does (two sources that differ are both red).

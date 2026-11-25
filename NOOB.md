@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.330).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.331).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -38,6 +38,7 @@
 - [ ] **Migrations 0148 et 0149 + fonction (V2.4.281)** : appliquer la 0148 puis la 0149, puis redéployer `process_overtime_evidence` (je le fais sur demande). Je remets ensuite en file les 7 preuves « conformes » où seul le numéro d'OT avait été lu, pour qu'elles soient relues avec la nouvelle règle.
 - [ ] **Migration 0150 (V2.4.285)** : à appliquer (« Applique la 0150 »), sinon « Relire » ne marche que sur les échecs.
 - [ ] **Migration 0151 (V2.4.286)** : à appliquer (« Applique la 0151 ») pour pouvoir activer le bouton « Renvoyer pour correction ».
+- 🟠 **V2.4.331 — « Conforme » seulement si l'OT et les deux réponses sont lus.** Une fiche dont les captures n'ont pas donné à la fois l'OT, le temps chez le client **et** le retour est maintenant « Incomplet » (dans « À vérifier »), plus « Conforme ». Cas d'Alexandre (retour) et d'Anthony (OT jamais lu) : on voyait les cercles des questions 2 et 3, mais le retour n'était pas lu. **À faire :** dites « Déploie la fonction » (elle note maintenant dans son journal pourquoi un cercle n'a pas servi), puis « Tout relire » : je lirai le journal pour trouver pourquoi ce retour n'est pas lu.
 - 🟢 **V2.4.330 — « Conforme » à tort.** Une capture où le lecteur n'avait trouvé que le numéro d'OT (aucune minute) était marquée « Conforme ». Maintenant elle est « Illisible » : seules les minutes prouvent le temps supp. Dix captures étaient dans ce cas le 24 nov. et avant. Rien à faire de votre côté.
 - 🟠 **V2.4.329 — Captures « illisibles » alors que le 0 est coché à la question 3.** Le lecteur perdait parfois la ligne « 0 » de la liste ; il la remet maintenant à sa place. **À faire :** dites « Déploie la fonction », puis « Tout relire » dans l'onglet OCR. Si certaines restent illisibles, la fonction écrit maintenant dans son journal où elle a vu le cercle et les lignes : je pourrai trouver la cause.
 - 🟢 **V2.4.328 — Le « 1 » et le « 2 » étaient inversés.** Le « 1 » est maintenant la capture qui lit le OT (et le temps chez le client), le « 2 » celle du retour, peu importe laquelle a été envoyée en premier. Rien à faire de votre côté.

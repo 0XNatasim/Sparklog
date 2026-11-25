@@ -9,7 +9,7 @@ export const OCR_FIRST_DAY = "2026-11-16";
 // Earlier days keep reading it as a normal proof.
 export const OLD_FORM_INVALID_FROM = "2026-11-23";
 
-export const OCR_STATES = ["ok", "mismatch", "sms", "field", "oldForm", "wrongDoc", "unread", "failed", "queued", "notRead"];
+export const OCR_STATES = ["ok", "incomplete", "mismatch", "sms", "field", "oldForm", "wrongDoc", "unread", "failed", "queued", "notRead"];
 
 // States where the picture is NOT a valid proof of the overtime: nothing is compared.
 export const INVALID_PROOF_STATES = new Set(["sms", "field", "oldForm", "wrongDoc"]);
@@ -69,7 +69,28 @@ export function buildOcrRows(evidence, jobs, people) {
       ocrStatus: proof.ocr_status || "", formKind: proof.form_kind || null, notNeeded: Boolean(proof.not_needed_at), job, attempts: Number(proof.ocr_attempts) || 0, nextTryAt: proof.ocr_next_try_at || null, found, expected, state, wrong: new Set(diffs.map((diff) => diff.field)),
     });
   }
+  markIncomplete(rows);
   return rows.sort((a, b) => b.jobDate.localeCompare(a.jobDate) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+}
+
+// The form of November 2026 has two answers (question 2 « at the client », question 3 « return »), often on two captures. A capture of the
+// new form that looks « conform » is only conform when, between all the captures of its job, the OT (question 1) AND BOTH answers were read: a job whose
+// captures never gave the return (or the client time) is « incomplete », not conform. Only « ok » rows change; a difference stays a difference.
+function markIncomplete(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    if (row.formKind !== "new" || !row.jobId) continue;
+    if (!groups.has(row.jobId)) groups.set(row.jobId, []);
+    groups.get(row.jobId).push(row);
+  }
+  for (const members of groups.values()) {
+    const read = members.filter((row) => row.state === "ok" || row.state === "mismatch" || row.state === "incomplete");
+    const hasClient = read.some((row) => row.found.clientMinutes != null);
+    const hasReturn = read.some((row) => row.found.returnMinutes != null);
+    const hasOt = read.some((row) => row.found.ot); // question 1 « Ordre de travail »: the OT the employee typed on the form
+    if (hasClient && hasReturn && hasOt) continue;
+    for (const row of members) if (row.state === "ok") row.state = "incomplete";
+  }
 }
 
 // A manager can ask the reader to look again at a proof it failed on or found nothing on.
@@ -85,7 +106,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
   return (rows || []).filter((row) => {
     if (day && row.jobDate !== day) return false;
     if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
-    if (state === "check" && row.state !== "mismatch" && !INVALID_PROOF_STATES.has(row.state) && row.state !== "unread" && row.state !== "failed" && !gapOf(row)) return false;
+    if (state === "check" && row.state !== "mismatch" && row.state !== "incomplete" && !INVALID_PROOF_STATES.has(row.state) && row.state !== "unread" && row.state !== "failed" && !gapOf(row)) return false;
     if (state === "reread" && !canReread(row)) return false;
     if (OCR_STATES.includes(state) && row.state !== state) return false;
     if (!needle) return true;
@@ -94,7 +115,7 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
 }
 
 export function countOcrStates(rows) {
-  const counts = { ok: 0, mismatch: 0, sms: 0, field: 0, oldForm: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
+  const counts = { ok: 0, incomplete: 0, mismatch: 0, sms: 0, field: 0, oldForm: 0, wrongDoc: 0, unread: 0, failed: 0, queued: 0, notRead: 0 };
   for (const row of rows || []) counts[row.state] += 1;
   return counts;
 }

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.330 (2026-11-24).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.331 (2026-11-24).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.331 — « Incomplete » proofs.** A capture of the new form is « Conform » only when its job's captures gave the OT AND BOTH answers (at the client and return), together. A job whose captures never gave the OT, the return or the client time is « Incomplete » (in « To check »), no longer « Conform ». The function also logs where the circles and the choice lines were when a circle gives no answer.
 - **V2.4.330 — « Conform » only when minutes were read.** A capture that gave an OT but no minutes (question 1 only, or answers not read) is now « Unreadable », no longer « Conform ».
 - **V2.4.329 — Question 3 « 0 » now read.** When OCR loses a line of the choice list (the « 0 » read as a letter, or dropped), the missing choice is put back where the evenly spaced list says it is, so a capture with « 0 » selected is no longer « unreadable ». The function also logs where the circle and the choice lines were when a circle gives no answer.
 - **V2.4.328 — « 1 » / « 2 » of the OCR boxes.** « 1 » is the capture that reads the OT and the time at the client, « 2 » the one with the return, whatever the order they were sent in.

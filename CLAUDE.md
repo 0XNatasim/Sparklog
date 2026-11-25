@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-25, V2.4.330)
+## 6. À faire / à préciser (mis à jour 2026-11-25, V2.4.331)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.331 (technique).** État « Incomplet » (constat du 2026-11-25 : Alexandre G., deux captures de la même fiche, client 105 lu mais retour jamais lu alors que la capture montre le cercle de la question 3, badge « Conforme »). `proofDifferences` ne compare que les champs lus : rien ne différait → `ok`. `markIncomplete(rows)` (`ocr-readings.js`) : pour chaque fiche (`job_id`) dont les preuves sont `form_kind = new`, si, toutes captures lues réunies, il manque l'OT (question 1), le temps chez le client **ou** le retour (constat Anthony R. : OT lu sur aucune capture, badge « Conforme »), les lignes `ok` passent à `incomplete` (« Incomplet », badge `warning`, dans « À vérifier », `OCR_STATES`, `countOcrStates`) ; un écart reste `mismatch` ; l'ancien formulaire n'est pas concerné. `ot-compare.js` : `READ_STATES` inclut `incomplete` (les minutes lues comptent encore). **Cause du retour non lu non établie** (le texte OCR n'est pas gardé ; base : les 2 preuves d'Alexandre ont `proof_client_minutes = 105`, `proof_return_minutes = null`) : `process_overtime_evidence/index.ts` journalise maintenant `circle without answer` dès qu'il y a **plus de cercles que de réponses** (positions des cercles, lignes de choix numériques, titres), au lieu de seulement quand aucune minute n'était lue. **Redéployer la fonction, puis « Tout relire » et lire le journal.** Aucune migration. Tests : `ocr-readings.test.js`.
 
 **V2.4.330 (technique).** « Conforme » sans minutes lues (constat du 2026-11-25 : ligne de Kudzovi, OT lu mais « — » pour le client et le retour, fiche 25 / 20 min, badge « Conforme »). Cause : `buildOcrRows` comptait un OT seul comme une lecture (`nothingFound` exigeait trois valeurs nulles) et `proofDifferences` ne compare que les champs lus : rien ne différait, donc `ok`. Maintenant `nothingFound` = ni minutes chez le client ni minutes de retour → état `unread`. Vérifié en base (2026-11-25) : 10 preuves `processed` avec un OT mais aucune minute (Daniel L., Guillaume C., Kudzovi E. ×2, Roobens L., Wilfri C. D., Olivier M., Rémi D., Anthony R., Cyrille K.) ; elles passent à « Illisible », donc dans « À vérifier ». `ocr_status` en base reste `processed` pour elles (la fonction compte un OT seul comme trouvé : `overtimeFormFound`) ; non changé pour ne pas redéployer. Aucune migration. Test : `ocr-readings.test.js`.
 
