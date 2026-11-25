@@ -74,7 +74,7 @@ export function buildOcrRows(evidence, jobs, people) {
 }
 
 // The form of November 2026 has two answers (question 2 « at the client », question 3 « return »), often on two captures. A capture of the
-// new form that looks « conform » is only conform when, between all the captures of its job, BOTH answers were read: a job whose
+// new form that looks « conform » is only conform when, between all the captures of its job, the OT (question 1) AND BOTH answers were read: a job whose
 // captures never gave the return (or the client time) is « incomplete », not conform. Only « ok » rows change; a difference stays a difference.
 function markIncomplete(rows) {
   const groups = new Map();
@@ -87,7 +87,8 @@ function markIncomplete(rows) {
     const read = members.filter((row) => row.state === "ok" || row.state === "mismatch" || row.state === "incomplete");
     const hasClient = read.some((row) => row.found.clientMinutes != null);
     const hasReturn = read.some((row) => row.found.returnMinutes != null);
-    if (hasClient && hasReturn) continue;
+    const hasOt = read.some((row) => row.found.ot); // question 1 « Ordre de travail »: the OT the employee typed on the form
+    if (hasClient && hasReturn && hasOt) continue;
     for (const row of members) if (row.state === "ok") row.state = "incomplete";
   }
 }

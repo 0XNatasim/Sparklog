@@ -208,7 +208,7 @@ describe("what the picture is (migration 0161) and the result column", () => {
   });
 
   it("gapOf: the proof against the Sparklog timesheet only (Britton is not compared in this view)", () => {
-    const ok = row("2026-11-23", { ocr_status: "processed", form_kind: "new", proof_client_minutes: 120, proof_return_minutes: 0 });
+    const ok = row("2026-11-23", { ocr_status: "processed", form_kind: "new", proof_ot: "261821", proof_client_minutes: 120, proof_return_minutes: 0 });
     expect(gapOf(ok)).toBeNull();
     expect(allAgree(ok)).toBe(true);
     const gapFiche = row("2026-11-23", { ocr_status: "processed", form_kind: "new", proof_client_minutes: 60, proof_return_minutes: 0 });
@@ -242,7 +242,7 @@ describe("what the picture is (migration 0161) and the result column", () => {
   });
 
   it("incomplete: a new-form job whose captures never gave the return (or the client time) is not conform", () => {
-    const read = { ocr_status: "processed", form_kind: "new" };
+    const read = { ocr_status: "processed", form_kind: "new", proof_ot: "261821" };
     expect(row("2026-11-24", { ...read, proof_client_minutes: 120, proof_return_minutes: null }).state).toBe("incomplete");
     expect(row("2026-11-24", { ...read, proof_client_minutes: null, proof_return_minutes: 0 }).state).toBe("incomplete");
     expect(row("2026-11-24", { ...read, proof_client_minutes: 120, proof_return_minutes: 0 }).state).toBe("ok");
@@ -252,6 +252,12 @@ describe("what the picture is (migration 0161) and the result column", () => {
       proof("p2", "a", { job_date: "2026-11-24", ...read, proof_client_minutes: null, proof_return_minutes: 0 }),
     ], day("2026-11-24"), people);
     expect(two.map((item) => item.state)).toEqual(["ok", "ok"]);
+    // the OT (question 1) never read on any capture of the job → incomplete too (client and return read, OT missing)
+    const noOt = buildOcrRows([
+      proof("p1", "b", { job_date: "2026-11-24", ocr_status: "processed", form_kind: "new", proof_ot: null, proof_client_minutes: 30, proof_return_minutes: null }),
+      proof("p2", "b", { job_date: "2026-11-24", ocr_status: "processed", form_kind: "new", proof_ot: null, proof_client_minutes: null, proof_return_minutes: 0 }),
+    ], day("2026-11-24"), people);
+    expect(noOt.map((item) => item.state)).toEqual(["incomplete", "incomplete"]);
     // the old form is not concerned (typed answers, nothing to complete)
     expect(row("2026-11-20", { ocr_status: "processed", form_kind: "old", proof_client_minutes: 120, proof_return_minutes: null }).state).toBe("ok");
   });
