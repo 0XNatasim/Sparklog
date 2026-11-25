@@ -1,6 +1,6 @@
 // « À traiter › OCR »: what the reader (Edge function process_overtime_evidence) found on each overtime proof screenshot, next
 // to what the work order says, so a manager can see every reading and the differences at a glance. Read only.
-import { expectedProofForJob, minutesClose, proofDifferences, PROOF_CLIENT_TOLERANCE_MIN, PROOF_RETURN_TOLERANCE_MIN } from "./overtime-proof-check";
+import { expectedProofForJob, proofDifferences } from "./overtime-proof-check";
 
 // The OCR tab starts with the per-work-order proofs (owner decision 2026-11-18: nothing before 16 November).
 export const OCR_FIRST_DAY = "2026-11-16";
@@ -14,22 +14,11 @@ export const OCR_STATES = ["ok", "mismatch", "sms", "field", "oldForm", "wrongDo
 // States where the picture is NOT a valid proof of the overtime: nothing is compared.
 export const INVALID_PROOF_STATES = new Set(["sms", "field", "oldForm", "wrongDoc"]);
 
-// Which sources disagree, for the result column: "fiche" (the proof differs from the timesheet), "britton" (the proof differs from
-// Britton's line) or "both" (Britton's line and the timesheet differ from each other: « Écart / fiche / Britton »), null = all agree.
-// Only the sources that are there are compared.
+// The result column compares the proof with the Sparklog timesheet only (Britton is compared in the « Par OT » view):
+// "fiche" = the proof differs from the timesheet, null = no gap. Pictures that are not a valid proof are never compared.
 export function gapOf(row) {
   if (!row || INVALID_PROOF_STATES.has(row.state)) return null;
-  const britton = row.britton || null;
-  const fieldBritton = { client: row.brittonWrong?.has?.("client"), return: row.brittonWrong?.has?.("return") };
-  if (britton && (fieldBritton.client || fieldBritton.return)) return "both"; // Britton against the timesheet
-  const proofFiche = row.state === "mismatch" || (row.wrong?.size ?? 0) > 0;
-  const found = row.found || {};
-  const proofBritton = Boolean(britton) && (
-    (found.clientMinutes != null && britton.client_minutes != null && !minutesClose(found.clientMinutes, britton.client_minutes, PROOF_CLIENT_TOLERANCE_MIN))
-    || (found.returnMinutes != null && britton.return_minutes != null && !minutesClose(found.returnMinutes, britton.return_minutes, PROOF_RETURN_TOLERANCE_MIN)));
-  if (proofFiche) return "fiche";
-  if (proofBritton) return "britton";
-  return null;
+  return row.state === "mismatch" || (row.wrong?.size ?? 0) > 0 ? "fiche" : null;
 }
 
 // The employee's name is green only when everything agrees (the proof is a valid, read one and no source differs).
@@ -96,7 +85,6 @@ export function filterOcrRows(rows, { state = "read", query = "", day = "" } = {
     if (state === "read" && (row.state === "notRead" || row.state === "queued")) return false;
     if (state === "check" && row.state !== "mismatch" && !INVALID_PROOF_STATES.has(row.state) && row.state !== "unread" && row.state !== "failed" && !gapOf(row)) return false;
     if (state === "reread" && !canReread(row)) return false;
-    if (state === "brittonGap" && !(row.brittonWrong?.size > 0)) return false; // Britton table (0156): differs from the timesheet
     if (OCR_STATES.includes(state) && row.state !== state) return false;
     if (!needle) return true;
     return `${row.name} ${row.jobOt} ${row.found.ot ?? ""} ${row.jobDate}`.toLowerCase().includes(needle);
@@ -114,4 +102,19 @@ export function ocrDays(rows) {
   const counts = new Map();
   for (const row of rows || []) if (row.jobDate) counts.set(row.jobDate, (counts.get(row.jobDate) || 0) + 1);
   return [...counts.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, count]) => ({ date, count }));
+}
+
+// The proofs of one work order (the form has two answers, often two captures) go together in the table: one group per job, the
+// oldest capture first (« 1 »), the next one « 2 ». A proof without a job stays alone. Groups keep the order of their first row.
+export function groupProofRows(rows) {
+  const groups = new Map();
+  for (const row of rows || []) {
+    const key = row.jobId ? `job:${row.jobId}` : `proof:${row.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return [...groups.entries()].map(([key, members]) => ({
+    key,
+    rows: [...members].sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")) || String(a.id).localeCompare(String(b.id))),
+  }));
 }

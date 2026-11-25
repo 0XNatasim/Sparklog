@@ -145,19 +145,29 @@ describe("OcrReadings › filtre par jour", () => {
     expect(screen.getAllByText("Alex Test")).toHaveLength(2);
   });
 
-  it("shows the Britton minutes beside the proof and marks a gap with the timesheet (migration 0156)", async () => {
+  it("does not compare with Britton in the per-proof view: only proof and Sparklog timesheet (migration 0156)", async () => {
     const line = (id, extra) => ({ id, job_date: "2026-11-16", ot: "208637", employee_name: "Alex Test", name_key: "alex test", client_minutes: 150, return_minutes: 0, total_minutes: 150, note: null, ...extra });
     setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 })], { britton: [line("b1", { client_minutes: 60 }), line("b2", { ot: "424242", employee_name: "Autre", name_key: "autre" })] });
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
-    // two-line header: « Chez le client » / « Retour » over Britton · Preuve de temps · Fiche de travail
-    expect(screen.getByRole("columnheader", { name: "Chez le client" }).colSpan).toBe(3);
-    expect(screen.getByRole("columnheader", { name: "Retour" }).colSpan).toBe(3);
-    expect(screen.getByRole("columnheader", { name: "OT" }).colSpan).toBe(3);
-    expect(screen.getAllByRole("columnheader", { name: "Britton" })).toHaveLength(3);
-    expect(screen.getByText("60 min").className).toContain("text-destructive"); // 60 at Britton, 150 on the timesheet
+    // two-line header: OT / « Chez le client » / « Retour » over Preuve de temps · Fiche de travail
+    expect(screen.getByRole("columnheader", { name: "Chez le client" }).colSpan).toBe(2);
+    expect(screen.getByRole("columnheader", { name: "Retour" }).colSpan).toBe(2);
+    expect(screen.getByRole("columnheader", { name: "OT" }).colSpan).toBe(2);
+    expect(screen.queryByRole("columnheader", { name: "Britton" })).toBeNull();
+    expect(screen.queryByText("60 min")).toBeNull(); // Britton's 60 is not shown here
     expect(screen.getByText("Britton sans preuve (1)")).toBeTruthy(); // the line of OT 424242 has no proof
-    fireEvent.change(screen.getByLabelText("Afficher"), { target: { value: "brittonGap" } });
-    expect(screen.getAllByText("Alex Test")).toHaveLength(1);
+    expect(screen.queryByRole("option", { name: /Écart avec Britton/ })).toBeNull();
+  });
+
+  it("puts the two captures of one work order in one box, numbered 1 and 2", async () => {
+    setup([
+      evidence("p1", { proof_client_minutes: 150, created_at: "2026-11-16T22:00:00Z" }),
+      evidence("p2", { proof_return_minutes: 0, created_at: "2026-11-16T22:05:00Z" }),
+    ]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
+    expect(screen.getByLabelText("Capture 1 sur 2").textContent).toBe("1");
+    expect(screen.getByLabelText("Capture 2 sur 2").textContent).toBe("2");
+    expect(document.querySelectorAll("tbody")).toHaveLength(1); // one box for the job
   });
 
   it("shows no Britton column while nothing was imported", async () => {

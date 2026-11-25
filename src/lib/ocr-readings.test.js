@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve, dirname } from "node:path";
-import { allAgree, buildOcrRows, canRequeue, canReread, countOcrStates, filterOcrRows, gapOf, ocrDays } from "./ocr-readings";
+import { allAgree, buildOcrRows, canRequeue, canReread, countOcrStates, filterOcrRows, gapOf, groupProofRows, ocrDays } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
 const job = (id, depart, fin, extra = {}) => ({ id, user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "261821", depart, fin, return_time_minutes: 0, ...extra });
@@ -207,20 +207,17 @@ describe("what the picture is (migration 0161) and the result column", () => {
     expect(row("2026-11-20", { ocr_status: "processed", form_kind: "old", proof_client_minutes: 120, proof_return_minutes: 0 }).state).toBe("ok");
   });
 
-  it("gapOf: proof against the timesheet, proof against Britton, Britton against the timesheet", () => {
+  it("gapOf: the proof against the Sparklog timesheet only (Britton is not compared in this view)", () => {
     const ok = row("2026-11-23", { ocr_status: "processed", form_kind: "new", proof_client_minutes: 120, proof_return_minutes: 0 });
     expect(gapOf(ok)).toBeNull();
     expect(allAgree(ok)).toBe(true);
     const gapFiche = row("2026-11-23", { ocr_status: "processed", form_kind: "new", proof_client_minutes: 60, proof_return_minutes: 0 });
     expect(gapOf(gapFiche)).toBe("fiche");
     expect(allAgree(gapFiche)).toBe(false);
-    const britton = (client) => ({ client_minutes: client, return_minutes: 0 });
-    // the proof and the timesheet agree (120) but Britton says 60 → Britton and the timesheet differ
-    expect(gapOf({ ...ok, britton: britton(60), brittonWrong: new Set(["client"]) })).toBe("both");
-    // Britton agrees with the timesheet, the proof says something else
-    expect(gapOf({ ...gapFiche, britton: britton(120), brittonWrong: new Set() })).toBe("fiche");
-    // no timesheet gap on the proof but the proof differs from Britton only (timesheet and Britton agree within the tolerance)
-    expect(gapOf({ ...ok, found: { ...ok.found, clientMinutes: 100 }, britton: britton(135), brittonWrong: new Set() })).toBe("britton");
+    // a Britton line attached to the row changes nothing here
+    const britton = { client_minutes: 60, return_minutes: 0 };
+    expect(gapOf({ ...ok, britton, brittonWrong: new Set(["client"]) })).toBeNull();
+    expect(gapOf({ ...gapFiche, britton })).toBe("fiche");
     // an invalid proof compares nothing
     expect(gapOf(row("2026-11-23", { ocr_status: "wrong_document", form_kind: "field" }))).toBeNull();
     expect(allAgree(row("2026-11-23", { ocr_status: "sms", form_kind: "sms" }))).toBe(false);
@@ -234,5 +231,11 @@ describe("what the picture is (migration 0161) and the result column", () => {
     const fn = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../supabase/functions/process_overtime_evidence/index.ts"), "utf8");
     expect(fn).toContain("form_kind: formKind");
     expect(fn).toMatch(/formKind = kind === "field" \? "field" : "other"/);
+  });
+
+  it("groupProofRows: the captures of one work order go together, the oldest first", () => {
+    const proof = (id, jobId, createdAt) => ({ id, jobId, createdAt });
+    const groups = groupProofRows([proof("c", "j2", "2026-11-23T10:00:00Z"), proof("b", "j1", "2026-11-23T09:05:00Z"), proof("a", "j1", "2026-11-23T09:00:00Z"), proof("d", null, "2026-11-23T08:00:00Z")]);
+    expect(groups.map((group) => group.rows.map((item) => item.id))).toEqual([["c"], ["a", "b"], ["d"]]);
   });
 });
