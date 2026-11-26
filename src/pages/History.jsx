@@ -653,6 +653,14 @@ export default function History() {
           userId={effectiveUserId}
           editable={isEditableStatus(shownProofJob.status) && !shownProofJob.locked}
           dailyMinutes={dayMinutesOf(shownProofJob.job_date)}
+          dayJobs={jobs.filter((item) => item.job_date === shownProofJob.job_date)}
+          firstTripUnpaid={firstTripUnpaid}
+          tenHourDay={dailyRegularMinutes > 480}
+          onResubmit={() => {
+            const day = grouped.find((group) => group.date === dayjs(shownProofJob.job_date).format("YYYY-MM-DD"));
+            closeProof();
+            if (day) submitDay(day.date, day.submittableIds);
+          }}
           onClose={closeProof}
           onChanged={() => load()}
         />
