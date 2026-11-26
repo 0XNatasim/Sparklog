@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { useEmployeeBroadcasts } from "@/lib/use-employee-broadcasts";
+import ProofReturnedNotice, { PROOF_RETURNED } from "@/components/ProofReturnedNotice";
 
 export { BROADCASTS_REFRESH_EVENT } from "@/lib/use-employee-broadcasts";
 
@@ -47,7 +48,9 @@ export function BroadcastDialog({ opened, onClose }) {
           <DialogTitle>{t("broadcast.popupTitle")}</DialogTitle>
         </DialogHeader>
         <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
-          {opened?.manager_broadcasts?.body && <p className="whitespace-pre-wrap text-sm">{opened.manager_broadcasts.body}</p>}
+          {opened?.manager_broadcasts?.kind === PROOF_RETURNED
+            ? <ProofReturnedNotice broadcast={opened.manager_broadcasts} />
+            : opened?.manager_broadcasts?.body && <p className="whitespace-pre-wrap text-sm">{opened.manager_broadcasts.body}</p>}
           {opened && <BroadcastAttachments broadcast={opened.manager_broadcasts} />}
           {opened && (
             <p className="text-xs text-muted-foreground">

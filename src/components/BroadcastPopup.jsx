@@ -4,6 +4,8 @@ import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useT } from "@/lib/use-t";
 import { BROADCASTS_REFRESH_EVENT } from "@/components/EmployeeNotificationsBell";
+import { queryBroadcasts } from "@/lib/use-employee-broadcasts";
+import ProofReturnedNotice, { PROOF_RETURNED } from "@/components/ProofReturnedNotice";
 import { Button } from "@/components/ui/button";
 import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -23,11 +25,7 @@ export default function BroadcastPopup() {
     if (!user?.id) return undefined;
     let cancelled = false;
     const load = async () => {
-      const { data } = await supabase
-        .from("broadcast_recipients")
-        .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments, edited_at)")
-        .eq("employee_id", user.id)
-        .is("acknowledged_at", null);
+      const data = await queryBroadcasts(user.id, { unreadOnly: true });
       if (cancelled) return;
       const rows = (data || [])
         .filter((r) => r.manager_broadcasts)
@@ -69,7 +67,9 @@ export default function BroadcastPopup() {
           <DialogTitle>{t("broadcast.popupTitle")}</DialogTitle>
         </DialogHeader>
         <div className="-mx-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6">
-          {current.manager_broadcasts.body && <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>}
+          {current.manager_broadcasts.kind === PROOF_RETURNED
+            ? <ProofReturnedNotice broadcast={current.manager_broadcasts} />
+            : current.manager_broadcasts.body && <p className="whitespace-pre-wrap text-sm">{current.manager_broadcasts.body}</p>}
           <BroadcastAttachments broadcast={current.manager_broadcasts} />
           <p className="text-xs text-muted-foreground">
             {dayjs(current.manager_broadcasts.created_at).format("DD MMM YYYY HH:mm")}

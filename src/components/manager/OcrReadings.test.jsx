@@ -114,13 +114,13 @@ describe("OcrReadings › tout relire", () => {
 });
 
 describe("OcrReadings › renvoyer pour correction", () => {
-  it("gives a submitted job back to the employee after a confirmation, with the state the job was read in", async () => {
+  it("gives a submitted job back to the employee after a confirmation (with the notification: return_job_for_proof, and the reason = how the proof was read)", async () => {
     rpcCalls.length = 0;
     setup([evidence("p1", { proof_ot: "208637", proof_client_minutes: 99, proof_return_minutes: 0 })]);
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
     fireEvent.click(screen.getByRole("button", { name: "Renvoyer pour correction" }));
     fireEvent.click(await screen.findByRole("button", { name: /Confirmer|Oui|OK/i }));
-    await waitFor(() => expect(rpcCalls).toEqual([["return_job_for_correction", { p_job_id: "j1", p_expected_updated_at: "2026-11-16T22:00:00Z" }]]));
+    await waitFor(() => expect(rpcCalls).toEqual([["return_job_for_proof", { p_job_id: "j1", p_expected_updated_at: "2026-11-16T22:00:00Z", p_reason: "mismatch" }]]));
   });
 });
 
