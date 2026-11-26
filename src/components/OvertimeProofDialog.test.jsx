@@ -92,4 +92,34 @@ describe("OvertimeProofDialog", () => {
     expect(screen.queryByRole("button", { name: fr("proofs.remove") })).toBeNull();
     expect(screen.getByText(fr("proofs.locked"))).toBeTruthy();
   });
+
+  describe("reading of the new captures (returned sheet)", () => {
+    const returned = { id: "j2", ot: "200452", job_date: "2026-11-18", status: "updated", locked: false, depart: "06:00", fin: "16:00", return_time_minutes: 0 };
+    const read = (extra = {}) => ({ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg", ocr_status: "processed", form_kind: "new", proof_ot: "200452", proof_client_minutes: 120, proof_return_minutes: 0, proof_read_at: "2026-11-26T15:00:00Z", ...extra });
+    const withJob = (proofs, onResubmit = vi.fn()) => {
+      h.fake = createFakeSupabase({ rpcs: { my_overtime_proofs: proofs } });
+      render(<OvertimeProofDialog job={returned} userId="u" editable dayJobs={[returned]} onResubmit={onResubmit} onClose={() => {}} onChanged={() => {}} />);
+      return onResubmit;
+    };
+
+    it("says it is reading while a capture waits in the queue, with no submit button yet", async () => {
+      withJob([read({ ocr_status: "pending", proof_read_at: null, proof_client_minutes: null, proof_return_minutes: null })]);
+      expect(await screen.findAllByText(fr("proofs.check.reading"))).not.toHaveLength(0);
+      expect(screen.queryByRole("button", { name: fr("proofs.resubmit") })).toBeNull();
+    });
+
+    it("offers « Soumettre de nouveau » once every capture matches the sheet", async () => {
+      const onResubmit = withJob([read()]);
+      expect(await screen.findByText(fr("proofs.check.ok"))).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: fr("proofs.resubmit") }));
+      expect(onResubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the button away and names the problem when the minutes differ", async () => {
+      withJob([read({ proof_client_minutes: 45 })]);
+      expect(await screen.findByText(fr("proofs.check.bad"))).toBeTruthy();
+      expect(screen.getByText(fr("proofs.check.state.mismatch"))).toBeTruthy();
+      expect(screen.queryByRole("button", { name: fr("proofs.resubmit") })).toBeNull();
+    });
+  });
 });
