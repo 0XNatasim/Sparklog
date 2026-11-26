@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.336 (2026-11-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.337 (2026-11-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.337 — Scheduled communications.** In Communications, « Schedule the sending time » picks a Montréal date and time (1 minute to 90 days ahead): the message is saved but invisible to the recipients until then; at that time they get it (bell, pop-up) and their phone is notified. The list shows it as « Scheduled: date » while it waits; deleting it before then cancels it. Migration 0163 + the `send_push` function.
 - **V2.4.336 — Clock dialog shortened + persistent banner.** The overtime-proof dialog opened from the History clock is now short: the same « Take 2 screenshots of the form… » block with the two new example photos (the old example image and the long rule are gone); a second capture can be added. When a manager sends a proof back, a red banner stays at the top of every page (« Overtime proof refused (OT …): provide the refused screenshots ») until the work sheet is submitted again; its button opens that work order's clock.
 - **V2.4.335 — Proof message reworded.** « Take 2 screenshots of the <form> BEFORE pressing Submit »: the word « form » opens the overtime confirmation form in another window; then the two example photos with what each shows (photo 1: question 1 OT number, question 2 time at the client; photo 2: question 3 return time, if any). Same block in the pop-up of the proof-sent-back notification.
 - **V2.4.334 — Notification when a proof is sent back.** When a manager sends a job back because of its overtime proof (« Renvoyer pour correction » of the OCR tab, or the automatic return of a wrong picture), the employee gets a notification (bell, pop-up until OK, phone push for the manual return): the OT and the day, the reason (incomplete / unreadable / does not match / wrong picture), how to fix it (History › the clock of that OT) and the two example captures with how to take them. Migration 0162.

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { ArrowDown, ArrowUp, Bell, BookmarkPlus, Check, ChevronDown, EyeOff, FileText, History, Image as ImageIcon, Paperclip, Pencil, RotateCcw, Send, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, BookmarkPlus, CalendarClock, Check, ChevronDown, EyeOff, FileText, History, Image as ImageIcon, Paperclip, Pencil, RotateCcw, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import BroadcastEditForm from "@/components/BroadcastEditForm";
 import { MAX_BROADCAST_ATTACHMENTS, addPickedFiles, broadcastAttachmentColumns, broadcastAttachments, isPdfFile } from "@/lib/broadcast-attachments";
 import { recipientState, recipientStatus } from "@/lib/broadcast-edit";
 import { uploadBroadcastFiles } from "@/lib/broadcast-upload";
+import { isScheduledPending, parseScheduledAt, scheduleMinDate } from "@/lib/broadcast-schedule";
 import { addTemplate, loadTemplates, moveTemplate, removeTemplate, resolveTemplates, saveTemplates } from "@/lib/broadcast-templates";
 
 // Ready-made messages a manager can click to fill the message box (recipients are
@@ -82,11 +83,13 @@ Sans cette capture, le temps supplémentaire ne peut pas être approuvé. Appuye
 ];
 
 // Messages sent (newest first) and their recipients.
-function fetchBroadcastLog() {
-  return Promise.all([
-    supabase.from("manager_broadcasts").select("id, body, audience, image_path, attachments, created_at, edited_at").order("created_at", { ascending: false }),
-    supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at, withdrawn_at"),
-  ]);
+// `scheduled_for` (migration 0163) is read when the column exists: before the migration the same query without it is used.
+async function fetchBroadcastLog() {
+  const base = "id, body, audience, image_path, attachments, created_at, edited_at";
+  const recipients = supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at, withdrawn_at");
+  let log = await supabase.from("manager_broadcasts").select(`${base}, scheduled_for`).order("created_at", { ascending: false });
+  if (log.error) log = await supabase.from("manager_broadcasts").select(base).order("created_at", { ascending: false });
+  return [log, await recipients];
 }
 
 export default function BroadcastManager() {
@@ -109,6 +112,10 @@ export default function BroadcastManager() {
   // « Envoyer aussi aux nouveaux en attente ? » — { people, resolve } while the question is open.
   const [newHireQuestion, setNewHireQuestion] = useState(null);
   const [sending, setSending] = useState(false);
+  // « Programmer l'envoi »: the message is sent at this Montréal date and time instead of now.
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("08:00");
   const [message, setMessage] = useState("");
 
   const [broadcasts, setBroadcasts] = useState([]);
@@ -298,6 +305,13 @@ export default function BroadcastManager() {
       }
     }
 
+    let scheduledFor = null;
+    if (scheduleOn) {
+      const parsed = parseScheduledAt(scheduleDate, scheduleTime);
+      if (!parsed.ok) { setMessage(t(`broadcast.schedule.error.${parsed.error}`)); return; }
+      scheduledFor = parsed.iso;
+    }
+
     setSending(true);
     try {
       const attachments = await uploadBroadcastFiles(files.map((f) => f.file));
@@ -305,7 +319,7 @@ export default function BroadcastManager() {
       const { data: created, error: insertError } = await supabase
         .from("manager_broadcasts")
         // A group send is stored as « selected »: its recipients are listed one by one.
-        .insert({ sender_id: user?.id, body: body.trim(), audience: audience === "groups" ? "selected" : audience, ...broadcastAttachmentColumns(attachments) })
+        .insert({ sender_id: user?.id, body: body.trim(), audience: audience === "groups" ? "selected" : audience, ...broadcastAttachmentColumns(attachments), ...(scheduledFor ? { scheduled_for: scheduledFor } : {}) })
         .select("id")
         .single();
       if (insertError) throw insertError;
@@ -314,14 +328,17 @@ export default function BroadcastManager() {
       const { error: recipError } = await supabase.from("broadcast_recipients").insert(rows);
       if (recipError) throw recipError;
       // Phone push in the background; its outcome shows under the message when it is known.
-      notifyBroadcastPush(created.id).then((result) => setPushNote(pushOutcome(result)));
+      // A scheduled message is pushed by the scheduled task when its time comes, never now.
+      if (!scheduledFor) notifyBroadcastPush(created.id).then((result) => setPushNote(pushOutcome(result)));
 
       setBody("");
+      setScheduleOn(false);
+      setScheduleDate("");
       clearFiles();
       setSelected(new Set());
       setSelectedGroups(new Set());
       setAudience("selected");
-      setMessage(t("broadcast.sent"));
+      setMessage(scheduledFor ? t("broadcast.schedule.saved", { when: dayjs(scheduledFor).format("DD MMM YYYY HH:mm") }) : t("broadcast.sent"));
       await loadLog();
     } catch (e) {
       setMessage(e?.message || "Error");
@@ -561,7 +578,23 @@ export default function BroadcastManager() {
             )}
           </div>
 
-          <Button type="button" disabled={sending} onClick={send}>{sending ? t("broadcast.sending") : t("broadcast.send")}</Button>
+          <div className="space-y-2 rounded-md border p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={scheduleOn} onChange={(e) => { setScheduleOn(e.target.checked); if (e.target.checked && !scheduleDate) setScheduleDate(scheduleMinDate()); }} className="h-4 w-4 accent-primary" />
+              <CalendarClock className="h-4 w-4" aria-hidden="true" />{t("broadcast.schedule.toggle")}
+            </label>
+            {scheduleOn && (
+              <div className="space-y-1">
+                <div className="flex flex-wrap gap-2">
+                  <Input type="date" value={scheduleDate} min={scheduleMinDate()} onChange={(e) => setScheduleDate(e.target.value)} aria-label={t("broadcast.schedule.date")} className="h-10 w-44" />
+                  <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} aria-label={t("broadcast.schedule.time")} className="h-10 w-32" />
+                </div>
+                <p className="text-xs text-muted-foreground">{t("broadcast.schedule.hint")}</p>
+              </div>
+            )}
+          </div>
+
+          <Button type="button" disabled={sending} onClick={send}>{sending ? t("broadcast.sending") : scheduleOn ? t("broadcast.schedule.button") : t("broadcast.send")}</Button>
           </div>
         </details>
       </Card>
@@ -607,11 +640,16 @@ export default function BroadcastManager() {
                         {broadcastAttachments(b).some((a) => a.kind !== "pdf") && <ImageIcon className="h-3.5 w-3.5" />}
                         {broadcastAttachments(b).some((a) => a.kind === "pdf") && <FileText className="h-3.5 w-3.5" />}
                         {dayjs(b.created_at).format("DD MMM YYYY HH:mm")} · {b.audience === "all" ? t("broadcast.everyone") : t("broadcast.audienceSelected")}
+                        {isScheduledPending(b) && (
+                          <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-info/40 bg-info/10 px-2 py-0.5 font-semibold text-info">
+                            <CalendarClock className="h-3 w-3" aria-hidden="true" />{t("broadcast.schedule.tag", { when: dayjs(b.scheduled_for).format("DD MMM YYYY HH:mm") })}
+                          </span>
+                        )}
                         {b.edited_at && <EditedTag at={b.edited_at} />}
                       </div>
                     </div>
                     <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
-                      {t("broadcast.viewedCount", { acked: status.acked, total: status.total })}
+                      {isScheduledPending(b) ? t("broadcast.schedule.waiting", { total: status.total }) : t("broadcast.viewedCount", { acked: status.acked, total: status.total })}
                       {status.withdrawn > 0 && <span className="text-warning">· {t("broadcast.withdrawnCount", { count: status.withdrawn })}</span>}
                       <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                     </span>
