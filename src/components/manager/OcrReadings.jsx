@@ -18,6 +18,7 @@ import { proofSheetLines } from "@/lib/ocr-sheet";
 import { OCR_FIRST_DAY, OCR_STATES, allAgree, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, gapOf, groupAllOk, groupProofRows, mergeGroupRows, ocrDays } from "@/lib/ocr-readings";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { requeueProofs } from "@/lib/overtime-proofs";
+import { notifyBroadcastPush } from "@/lib/push";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { useT } from "@/lib/use-t";
@@ -128,8 +129,11 @@ export default function OcrReadings() {
     setSendingBack(row.id);
     setError("");
     try {
-      const { error: rpcError } = await withTimeout(supabase.rpc("return_job_for_correction", { p_job_id: row.job.id, p_expected_updated_at: row.job.updated_at || null }), 12000);
+      // return_job_for_proof (0162): the same return, plus a notification to the employee (OT, reason, the two example captures).
+      const { data, error: rpcError } = await withTimeout(supabase.rpc("return_job_for_proof", { p_job_id: row.job.id, p_expected_updated_at: row.job.updated_at || null, p_reason: row.state || null }), 12000);
       if (rpcError) throw rpcError;
+      const broadcastId = (Array.isArray(data) ? data[0] : data)?.broadcast_id;
+      if (broadcastId) notifyBroadcastPush(broadcastId); // phone push, best effort: the bell and the pop-up already have it
       setNotice(t("ocr.sentBack", { name: row.name || "—", ot: row.jobOt || "—" }));
       setPreview(null);
       setReload((value) => value + 1);

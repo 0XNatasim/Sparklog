@@ -9,12 +9,25 @@ import { setAppBadgeCount } from "@/lib/push-support";
 export const BROADCASTS_REFRESH_EVENT = "sparklog:broadcasts-refresh";
 const LIST_LIMIT = 30;
 
+const BASE_COLUMNS = "body, created_at, image_path, attachments, edited_at";
+
+// The messages sent to this employee. `kind` / `meta` (migration 0162: a « proof sent back » message) are read when they exist:
+// before the migration the same query without them is used, so the bell never breaks.
+export async function queryBroadcasts(userId, { unreadOnly = false } = {}) {
+  const run = (columns) => {
+    let query = supabase.from("broadcast_recipients").select(`broadcast_id, acknowledged_at, manager_broadcasts(${columns})`).eq("employee_id", userId);
+    if (unreadOnly) query = query.is("acknowledged_at", null);
+    return query;
+  };
+  const first = await run(`${BASE_COLUMNS}, kind, meta`);
+  if (!first.error) return first.data || [];
+  const fallback = await run(BASE_COLUMNS);
+  return fallback.data || [];
+}
+
 // The latest announcements sent to this employee, newest first.
 async function fetchEmployeeBroadcasts(userId) {
-  const { data } = await supabase
-    .from("broadcast_recipients")
-    .select("broadcast_id, acknowledged_at, manager_broadcasts(body, created_at, image_path, attachments, edited_at)")
-    .eq("employee_id", userId);
+  const data = await queryBroadcasts(userId);
   return (data || [])
     .filter((row) => row.manager_broadcasts)
     .sort((a, b) => new Date(b.manager_broadcasts.created_at) - new Date(a.manager_broadcasts.created_at))
