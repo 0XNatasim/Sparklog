@@ -6,7 +6,7 @@ import { QUERY_BUDGETS } from "@/lib/query-budgets";
 
 // Internal id of that form's row, then its name as a fallback if the row is ever recreated.
 export const OVERTIME_CONFIRMATION_FORM_ID = "3786f813-675c-4f6a-87ad-ebf8f7654e7c";
-const NAME_PATTERN = /confirmation de temps supp|real-time overtime/i;
+const NAME_PATTERN = /confirmation de temps supp|confirmation de surtemps|real-time overtime|overtime confirmation/i;
 
 // The enabled form with an address that is the overtime confirmation form, or null. Pure.
 export function pickOvertimeConfirmationForm(forms) {

@@ -22,15 +22,21 @@ const props = { t, onFiles: () => {}, busy: false };
 afterEach(cleanup);
 
 describe("OvertimeEvidenceStep texts", () => {
-  it("is short: the form link with the OT, two short sentences and the two example captures", async () => {
+  it("is short: « Prenez 2 captures du formulaire AVANT… » (the word opens the form in another window), the two examples with what each shows", async () => {
     render(wrap(<OvertimeEvidenceStep {...props} explain={{ ot: "261821", hours: 8, perJob: true }} />));
     expect(screen.getByText("Preuve de temps supplémentaire requise")).toBeTruthy();
-    // The form is the one listed in Profil › Formulaires: its own name, linked to its own address (not coded here).
-    const link = await screen.findByRole("link", { name: "Confirmation de Temps supp." });
+    // The form is the one listed in Profil › Formulaires: its own address (not coded here), opened in a new window.
+    const link = await screen.findByRole("link", { name: "formulaire" });
     expect(link.getAttribute("href")).toBe("https://forms.example/confirm");
-    expect(screen.getByText(/OT 261821/)).toBeTruthy();
-    expect(screen.getByText(/Prenez 2 captures du formulaire AVANT/)).toBeTruthy();
-    expect(screen.getByText(/le numéro d’OT \(question 1\), le temps coché \(question 2\)/).className).toContain("text-destructive");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.parentElement.textContent).toBe("Prenez 2 captures du formulaire AVANT de faire « Envoyer ».");
+    expect(screen.getByText(/Pour l’OT 261821/)).toBeTruthy();
+    expect(screen.getByText("On doit voir les 2 photos comme celles-ci :").className).toContain("text-destructive");
+    expect(screen.getByText("Photo 1 :")).toBeTruthy();
+    expect(screen.getByText("Question 1 : le numéro d’OT")).toBeTruthy();
+    expect(screen.getByText("Question 2 : le temps chez le client")).toBeTruthy();
+    expect(screen.getByText("Photo 2 :")).toBeTruthy();
+    expect(screen.getByText("Question 3 : le temps de retour, si applicable")).toBeTruthy();
     expect(screen.getByAltText(/Exemple de capture 1/).getAttribute("src")).toBe("/overtime-example-1.webp");
     expect(screen.getByAltText(/Exemple de capture 2/).getAttribute("src")).toBe("/overtime-example-2.webp");
     expect(screen.queryByText(/chaque OT qui dépasse/)).toBeNull();
@@ -44,6 +50,7 @@ describe("pickOvertimeConfirmationForm", () => {
     expect(pickOvertimeConfirmationForm([form({ name_fr: "confirmation de temps SUPP." })])).not.toBeNull();
     expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de Temps supp.", enabled: false })])).toBeNull();
     expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de Temps supp.", url: "" })])).toBeNull();
+    expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de surtemps" })])).not.toBeNull(); // the name in Profil › Formulaires today
     expect(pickOvertimeConfirmationForm([form()])).toBeNull();
   });
 });

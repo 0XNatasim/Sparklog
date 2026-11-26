@@ -3,7 +3,12 @@ import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/supabaseClient", () => ({
+  supabase: { from: () => ({ select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) },
+}));
+
 import ProofReturnedNotice from "./ProofReturnedNotice";
 
 afterEach(cleanup);
@@ -14,7 +19,8 @@ describe("ProofReturnedNotice", () => {
     expect(screen.getByText(/OT 202618 du 25 /)).toBeTruthy();
     expect(screen.getByText(/il manque l’OT, le temps coché ou le retour/)).toBeTruthy();
     expect(screen.getByText(/touchez l’horloge de cet OT/)).toBeTruthy();
-    expect(screen.getByText(/Prenez 2 captures du formulaire AVANT/)).toBeTruthy();
+    expect(screen.getByText("On doit voir les 2 photos comme celles-ci :")).toBeTruthy();
+    expect(screen.getByText("Question 3 : le temps de retour, si applicable")).toBeTruthy();
     expect(screen.getByAltText(/Exemple de capture 1/).getAttribute("src")).toBe("/overtime-example-1.webp");
     expect(screen.getByAltText(/Exemple de capture 2/).getAttribute("src")).toBe("/overtime-example-2.webp");
   });
