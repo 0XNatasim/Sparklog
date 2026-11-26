@@ -9,7 +9,6 @@ import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 // The form of November 2026 has two answers (« Durée réelle du temps supplémentaire », « Durée du retour »), on two screens: the
 // employee gives TWO captures here, both sent together with the job (`onFiles(first, second)`).
 export default function OvertimeEvidenceStep({ t, onFiles, validationError, error, canRetry, onRetry, busy, onSkip, progress, explain }) {
-  const [showExample, setShowExample] = useState(false);
   const [files, setFiles] = useState([null, null]);
   const inputs = [useRef(null), useRef(null)];
   const pick = (index) => (event) => {
@@ -32,47 +31,28 @@ export default function OvertimeEvidenceStep({ t, onFiles, validationError, erro
       <div className="space-y-3 text-sm">
         {progress && <p className="font-semibold" role="status">{t("form.evidence.progress", { n: progress.n, total: progress.total })}</p>}
         {explain && (
-          <div className="space-y-2 rounded-md border border-info/30 bg-info/10 p-3 text-info">
-            <p>{t("form.evidence.rule", { hours: explain.hours })}</p>
-            <p>
-              {form?.url ? (
-                <a href={form.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">
-                  {formName}
-                </a>
-              ) : (
-                <span className="font-semibold">{t("form.evidence.formName")}</span>
-              )}
-            </p>
-            {explain.perJob && <p>{t("form.evidence.perJob", { ot: explain.ot })}</p>}
-          </div>
+          <p className="text-info">
+            {form?.url ? (
+              <a href={form.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">
+                {formName}
+              </a>
+            ) : (
+              <span className="font-semibold">{t("form.evidence.formName")}</span>
+            )}
+            {explain.perJob && <> — {t("form.evidence.perJob", { ot: explain.ot })}</>}
+          </p>
         )}
         <div className="rounded-md border bg-muted/40 p-3">
-          <div className="font-semibold">{t("form.evidence.requiredContentTitle")}</div>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-            <li>{t("form.evidence.requiredApproval")}</li>
-            <li>{t("form.evidence.requiredDuration")}</li>
-            <li className="font-semibold text-destructive">{t("form.evidence.requiredCrop")}</li>
-          </ul>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="mt-3"
-            aria-expanded={showExample}
-            aria-controls="overtime-evidence-example"
-            onClick={() => setShowExample((visible) => !visible)}
-          >
-            {showExample ? t("form.evidence.hideExample") : t("form.evidence.showExample")}
-          </Button>
-          {showExample && (
-            <div id="overtime-evidence-example" className="mt-3 rounded-md border bg-background p-2">
-              <img
-                src="/overtime-form-example.webp"
-                alt={t("form.evidence.exampleAlt")}
-                className="max-h-96 w-full rounded object-contain"
-              />
-            </div>
-          )}
+          <p className="font-semibold">{t("form.evidence.short1")}</p>
+          <p className="mt-1 font-semibold text-destructive">{t("form.evidence.short2")}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {[1, 2].map((n) => (
+              <figure key={n} className="space-y-1">
+                <img src={`/overtime-example-${n}.webp`} alt={t(`form.evidence.exampleAlt${n}`)} className="w-full rounded border bg-background" />
+                <figcaption className="text-xs font-semibold">{t(`form.evidence.caption${n}`)}</figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
         {validationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{validationError}</div>}
         {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{error}</div>}
