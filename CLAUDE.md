@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-26, V2.4.335)
+## 6. À faire / à préciser (mis à jour 2026-11-26, V2.4.336)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.336 (technique).** Fenêtre de l'horloge raccourcie + bannière « preuve refusée » (demande du 2026-11-26). `OvertimeProofDialog.jsx` : plus de description, de règle `proofs.rule` ni de bloc `proofs.redo.*` / ancienne image `overtime-form-example.webp` ; quand la fiche est modifiable, le composant partagé `OvertimeProofHowTo` (V2.4.335) ; fiche soumise = seulement `proofs.locked` ; le bouton « Ajouter la capture » reste visible tant que la fiche a moins de 2 preuves (la prop `hours` est retirée). Textes `proofs.rule` / `description` / `redo.*` supprimés. Bannière : `src/lib/returned-proofs.js` (`fetchReturnedProofJobs(client, userId)` : messages `kind = proof_returned` de l'employé (`queryBroadcasts`, même après « OK »), puis ses fiches `saved` / `updated` portant `meta.job_id` ; jamais d'exception) et `ProofReturnedBanner.jsx` (monté par `AppShell` hors « Vue en tant que », employés seulement, `sticky top-0 z-40`, rouge ; relue au chargement, au retour de focus, à chaque changement de page et sur `BROADCASTS_REFRESH_EVENT` ; disparaît dès que la fiche est soumise de nouveau) ; son bouton va à `/history?proof=<id de la fiche>` : `History.jsx` ouvre alors l'horloge de cette fiche (`shownProofJob` = état ou paramètre, `closeProof` retire le paramètre). Textes `proofReturned.banner` / `bannerMany` / `bannerOpen`. Aucune migration (lit les colonnes de la 0162 déjà appliquée), aucune fonction Edge. Tests : `OvertimeProofDialog.test.jsx`, `ProofReturnedBanner.test.jsx`.
 
 **V2.4.335 (technique).** Texte de la demande de preuve reformulé (demande du 2026-11-26). Nouveau composant partagé `OvertimeProofHowTo.jsx` (utilisé par `OvertimeEvidenceStep` et `ProofReturnedNotice`) : `form.evidence.howIntro` « Prenez 2 captures du {form} AVANT de faire « Envoyer » » où le mot `form.evidence.formWord` est un lien `target="_blank"` vers la ligne `employee_forms` « Confirmation de Temps supp. » (`useOvertimeConfirmationForm`, adresse jamais dans le code ; ligne absente = mot sans lien ; le repli par nom reconnaît aussi « Confirmation de surtemps », le nom actuel dans Profil › Formulaires), `howSee` (en rouge), puis les deux exemples avec `photo1` / `photo1q1` / `photo1q2` et `photo2` / `photo2q3` ; `perJob` devient « Pour l'OT {ot} » (ligne au-dessus). Textes `form.evidence.short1/short2/caption1/caption2` et le bloc lien + « règle » de `OvertimeEvidenceStep` supprimés. Aucune migration, aucune fonction Edge. Tests : `OvertimeEvidenceStep.test.jsx`, `ProofReturnedNotice.test.jsx`.
 

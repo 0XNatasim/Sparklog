@@ -27,23 +27,26 @@ beforeEach(() => { h.save.mockResolvedValue("new"); h.remove.mockResolvedValue()
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("OvertimeProofDialog", () => {
-  it("explains the rule: one screenshot per work order past the line, kept on that work order", async () => {
-    setup([], { hours: 10 });
-    expect(await screen.findByText(fr("proofs.rule", { hours: 10 }))).toBeTruthy();
-  });
-
-  it("tells the employee how to redo a screenshot, with the example: retake it, do not send the form again, take it before sending", async () => {
+  it("is short: the how-to with the two example captures (no long rule, no old example image)", async () => {
     setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }]);
-    expect(await screen.findByText(fr("proofs.redo.retake"))).toBeTruthy();
-    expect(screen.getByText(fr("proofs.redo.dontSend"))).toBeTruthy();
-    expect(screen.getByText(fr("proofs.redo.before"))).toBeTruthy();
-    expect(screen.getByAltText(fr("form.evidence.exampleAlt")).getAttribute("src")).toBe("/overtime-form-example.webp");
+    expect(await screen.findByText("On doit voir les 2 photos comme celles-ci :")).toBeTruthy();
+    expect(screen.getByText("Question 3 : le temps de retour, si applicable")).toBeTruthy();
+    expect(screen.getByAltText(/Exemple de capture 1/).getAttribute("src")).toBe("/overtime-example-1.webp");
+    expect(screen.getByAltText(/Exemple de capture 2/).getAttribute("src")).toBe("/overtime-example-2.webp");
+    expect(screen.queryByText(/chaque OT qui dépasse/)).toBeNull();
+    expect(screen.queryByAltText(fr("form.evidence.exampleAlt"))).toBeNull();
   });
 
-  it("does not show the redo instructions on a submitted (read-only) job", async () => {
+  it("does not show the how-to on a submitted (read-only) job, only the lock message", async () => {
     setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }], { editable: false });
     await screen.findByAltText(fr("proofs.pictureAlt", { n: 1 }));
-    expect(screen.queryByText(fr("proofs.redo.retake"))).toBeNull();
+    expect(screen.queryByText("On doit voir les 2 photos comme celles-ci :")).toBeNull();
+    expect(screen.getByText(fr("proofs.locked"))).toBeTruthy();
+  });
+
+  it("lets the employee add a second capture while the job holds only one", async () => {
+    setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }]);
+    expect(await screen.findByRole("button", { name: fr("proofs.add") })).toBeTruthy();
   });
 
   it("shows only the proof of THIS work order", async () => {

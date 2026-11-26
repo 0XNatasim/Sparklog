@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import OvertimeProofHowTo from "@/components/OvertimeProofHowTo";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { fetchMyProofs, removeOwnProof, saveOwnProof, signedProofUrls } from "@/lib/overtime-proofs";
 import { useT } from "@/lib/use-t";
@@ -9,7 +10,7 @@ import { supabase } from "@/supabaseClient";
 
 // History: the overtime proof of ONE work order. The employee sees the picture; while the sheet is still editable (saved or
 // updated) they can replace it, remove it, or add it when it is missing. A submitted sheet is only changed by the managers.
-export default function OvertimeProofDialog({ job, userId, editable, dailyMinutes = 0, hours = 8, onClose, onChanged }) {
+export default function OvertimeProofDialog({ job, userId, editable, dailyMinutes = 0, onClose, onChanged }) {
   const t = useT();
   const [confirm, confirmDialog] = useConfirmDialog();
   const input = useRef(null);
@@ -80,20 +81,9 @@ export default function OvertimeProofDialog({ job, userId, editable, dailyMinute
       <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("proofs.title", { ot: job.ot })}</DialogTitle>
-          <DialogDescription>{t(editable ? "proofs.description" : "proofs.locked")}</DialogDescription>
+          {!editable && <DialogDescription>{t("proofs.locked")}</DialogDescription>}
         </DialogHeader>
-        <p className="rounded-md border border-info/30 bg-info/10 p-2 text-xs text-info">{t("proofs.rule", { hours })}</p>
-        {editable && (
-          <div className="space-y-2 rounded-md border bg-muted/40 p-2 text-xs">
-            <p className="font-semibold">{t("proofs.redo.title")}</p>
-            <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-              <li>{t("proofs.redo.retake")}</li>
-              <li className="font-semibold text-destructive">{t("proofs.redo.dontSend")}</li>
-              <li className="font-semibold text-destructive">{t("proofs.redo.before")}</li>
-            </ul>
-            <img src="/overtime-form-example.webp" alt={t("form.evidence.exampleAlt")} className="max-h-64 w-full rounded border bg-background object-contain" />
-          </div>
-        )}
+        {editable && <OvertimeProofHowTo />}
         {loading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
         {!loading && proofs.length === 0 && <p className="text-sm text-muted-foreground">{t("proofs.empty")}</p>}
         {proofs.map((proof, index) => (
@@ -109,7 +99,7 @@ export default function OvertimeProofDialog({ job, userId, editable, dailyMinute
             )}
           </div>
         ))}
-        {editable && !loading && proofs.length === 0 && (
+        {editable && !loading && proofs.length < 2 && (
           <Button type="button" disabled={busy} onClick={() => choose(null)}>{busy ? t("proofs.uploading") : t("proofs.add")}</Button>
         )}
         <input ref={input} type="file" accept="image/*" className="hidden" onChange={picked} aria-label={t("proofs.add")} />
