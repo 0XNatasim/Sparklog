@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-26, V2.4.332)
+## 6. À faire / à préciser (mis à jour 2026-11-26, V2.4.333)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.333 (technique).** OCR, vue « Par preuve » : fiches conformes repliées (demande du 2026-11-26 : la colonne retour de la ligne 1 est toujours vide, la valeur est sur la capture 2). `ocr-readings.js` : `groupAllOk(rows)` (au moins 2 captures, toutes `ok` sans écart `gapOf`) et `mergeGroupRows(rows)` (ligne fusionnée : OT, minutes chez le client et retour pris sur la capture qui les porte, `wrong` réunis, dernière lecture). `OcrReadings.jsx` : `groupOpen(group)` = conforme → repliée sauf si l'utilisateur l'a dépliée, sinon dépliée par défaut (`flipped`, `toggleGroup`) ; `renderRow(row, opts)` (ligne d'une capture, ou ligne fusionnée avec les pastilles 1 et 2 à côté du nom, bouton `ocr.viewBoth` qui ouvre les deux images côte à côte — `view(row, group)` signe toutes les URL — et flèche `ocr.fold` / `ocr.unfold`) ; « Relire » d'une ligne fusionnée remet les deux captures en file. Écarts toujours en rouge (`row.wrong`). Aucune migration, aucune fonction Edge. Tests : `ocr-readings.test.js`, `OcrReadings.test.jsx`.
 
 **V2.4.332 (technique).** Message de la preuve de temps supp. raccourci (demande du 2026-11-26 : « ils ne lisent pas »). `OvertimeEvidenceStep.jsx` : plus de bloc « Règle… », de liste « La capture doit montrer » ni de bouton « Afficher l'exemple » ; une ligne (lien du formulaire `useOvertimeConfirmationForm` + « OT {ot} » `form.evidence.perJob`), deux phrases (`form.evidence.short1` / `short2`, la 2e en rouge) et les deux exemples toujours visibles (`public/overtime-example-1.webp` : questions 1 + 2 avec le temps coché ; `overtime-example-2.webp` : question 3 avec le retour coché ; légendes `caption1` / `caption2`, textes alternatifs `exampleAlt1` / `exampleAlt2`). Emplacement 1 = « Capture 1 — OT et durée réelle » (`slotClient`). `overtime-form-example.webp` reste pour `OvertimeProofDialog` (Historique). Aucune migration, aucune fonction Edge. Test : `OvertimeEvidenceStep.test.jsx`.
 

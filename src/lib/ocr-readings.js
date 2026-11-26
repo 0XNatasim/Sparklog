@@ -138,6 +138,27 @@ const captureRank = (row) => {
   return 3; // nothing read yet: after the ones that told what they are
 };
 
+// A work order whose captures are ALL conform and readable (two or more): shown folded on one line. Anything else stays open.
+export const groupAllOk = (rows) => rows.length > 1 && rows.every((row) => row.state === "ok" && gapOf(row) === null);
+
+// One line for a folded work order: each value comes from the capture that carries it (the OT and the time at the client on
+// capture 1, the return on capture 2); the other fields are those of the first capture.
+export function mergeGroupRows(rows) {
+  const first = rows[0];
+  const pick = (field) => {
+    for (const row of rows) if (row.found?.[field] != null && row.found[field] !== "") return row.found[field];
+    return null;
+  };
+  const readAt = rows.map((row) => row.readAt).filter(Boolean).sort().pop() || first.readAt;
+  return {
+    ...first,
+    found: { ...first.found, ot: pick("ot"), clientMinutes: pick("clientMinutes"), returnMinutes: pick("returnMinutes") },
+    wrong: new Set(rows.flatMap((row) => [...(row.wrong || [])])),
+    state: rows.every((row) => row.state === "ok") ? "ok" : first.state,
+    readAt,
+  };
+}
+
 export function groupProofRows(rows) {
   const groups = new Map();
   for (const row of rows || []) {

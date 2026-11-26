@@ -136,7 +136,7 @@ describe("OcrReadings › filtre par jour", () => {
   it("offers a day filter with the days present and narrows the table to the chosen day", async () => {
     setup([
       evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0 }),
-      evidence("p2", { proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0, job_date: "2026-11-17", created_at: "2026-11-17T22:00:00Z" }),
+      evidence("p2", { job_id: "j2", proof_ot: "208637", proof_client_minutes: 150, proof_return_minutes: 0, job_date: "2026-11-17", created_at: "2026-11-17T22:00:00Z" }),
     ]);
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
     fireEvent.change(screen.getByLabelText("Jour"), { target: { value: "2026-11-17" } });
@@ -159,15 +159,33 @@ describe("OcrReadings › filtre par jour", () => {
     expect(screen.queryByRole("option", { name: /Écart avec Britton/ })).toBeNull();
   });
 
-  it("puts the two captures of one work order in one box, numbered 1 and 2", async () => {
+  it("puts the two captures of one work order in one box, numbered 1 and 2, OPEN when one of them does not fit", async () => {
     setup([
-      evidence("p1", { proof_client_minutes: 150, created_at: "2026-11-16T22:00:00Z" }),
+      evidence("p1", { proof_client_minutes: 120, created_at: "2026-11-16T22:00:00Z" }),
       evidence("p2", { proof_return_minutes: 0, created_at: "2026-11-16T22:05:00Z" }),
     ]);
     await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(2));
     expect(screen.getByLabelText("Capture 1 sur 2").textContent).toBe("1");
     expect(screen.getByLabelText("Capture 2 sur 2").textContent).toBe("2");
     expect(document.querySelectorAll("tbody")).toHaveLength(1); // one box for the job
+  });
+
+  it("folds a work order whose captures are ALL conform on one line (1 and 2 beside the name, one button for both pictures); unfolds on demand", async () => {
+    setup([
+      evidence("p1", { proof_ot: "208637", proof_client_minutes: 150, created_at: "2026-11-16T22:00:00Z" }),
+      evidence("p2", { proof_return_minutes: 0, created_at: "2026-11-16T22:05:00Z" }),
+    ]);
+    await waitFor(() => expect(screen.getAllByText("Alex Test")).toHaveLength(1));
+    expect(document.querySelectorAll("tbody tr")).toHaveLength(1);
+    const line = document.querySelector("tbody tr");
+    expect(line.textContent).toContain("OT-208637"); // the OT and the client time come from capture 1…
+    expect(screen.getByLabelText("Capture 1 sur 2")).toBeTruthy();
+    expect(screen.getByLabelText("Capture 2 sur 2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Voir les captures" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Voir les captures une par une" }));
+    await waitFor(() => expect(document.querySelectorAll("tbody tr")).toHaveLength(2));
+    fireEvent.click(screen.getAllByRole("button", { name: "Replier" })[0]);
+    await waitFor(() => expect(document.querySelectorAll("tbody tr")).toHaveLength(1));
   });
 
   it("lists capture 1 (the one that reads the OT) above capture 2 (the return), even when the return was sent first", async () => {

@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.332 (2026-11-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.333 (2026-11-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.333 — Folded conform proofs (OCR tab).** In « Per proof », a work order whose captures are ALL conform and readable is folded on one line: the OT and time at the client come from capture 1, the return from capture 2, small 1 and 2 beside the name, one button to see both pictures and a chevron to show the captures one by one. A work order where one capture (or both) does not fit stays open by default, the values that do not match in red.
 - **V2.4.332 — Short overtime-proof message.** The pop-up that asks for the overtime proof is now one line (form link + OT), two short sentences and the two example screenshots (1: OT and ticked time; 2: ticked return time) instead of the long text.
 - **V2.4.331 — « Incomplete » proofs.** A capture of the new form is « Conform » only when its job's captures gave the OT AND BOTH answers (at the client and return), together. A job whose captures never gave the OT, the return or the client time is « Incomplete » (in « To check »), no longer « Conform ». The function also logs where the circles and the choice lines were when a circle gives no answer.
 - **V2.4.330 — « Conform » only when minutes were read.** A capture that gave an OT but no minutes (question 1 only, or answers not read) is now « Unreadable », no longer « Conform ».

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
-import { Eye, RefreshCw, Undo2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, RefreshCw, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import OcrDownload from "@/components/manager/OcrDownload";
 import OtComparison from "@/components/manager/OtComparison";
 import { attachBritton, fetchBrittonRows } from "@/lib/britton";
 import { proofSheetLines } from "@/lib/ocr-sheet";
-import { OCR_FIRST_DAY, OCR_STATES, allAgree, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, gapOf, groupProofRows, ocrDays } from "@/lib/ocr-readings";
+import { OCR_FIRST_DAY, OCR_STATES, allAgree, buildOcrRows, canReread, canRequeue, countOcrStates, filterOcrRows, gapOf, groupAllOk, groupProofRows, mergeGroupRows, ocrDays } from "@/lib/ocr-readings";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import { requeueProofs } from "@/lib/overtime-proofs";
 import { friendlyErrorMessage } from "@/lib/error-messages";
@@ -87,6 +87,7 @@ export default function OcrReadings() {
   const [confirm, confirmDialog] = useConfirmDialog();
   const [preview, setPreview] = useState(null); // { row, url } — the screenshot next to its job
   const [cardId, setCardId] = useState(null); // employee whose card is open
+  const [flipped, setFlipped] = useState(() => new Set()); // work orders the manager folded / unfolded by hand
   const [sendingBack, setSendingBack] = useState("");
   const [sendBackOn, setSendBackOn] = useState(false); // Configuration › « Retour pour correction »
 
@@ -164,6 +165,9 @@ export default function OcrReadings() {
   const counts = useMemo(() => countOcrStates(rows), [rows]);
   const shown = useMemo(() => filterOcrRows(rows, { state, query, day }), [rows, state, query, day]);
   const groups = useMemo(() => groupProofRows(shown), [shown]);
+  // Conform work orders (all their captures) are folded on one line; one that does not fit — or only one of its captures — stays open.
+  const groupOpen = (group) => (groupAllOk(group.rows) ? flipped.has(group.key) : !flipped.has(group.key));
+  const toggleGroup = (key) => setFlipped((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   const days = useMemo(() => ocrDays(rows), [rows]);
   const waiting = counts.queued;
   const rereadable = useMemo(() => (rows || []).filter(canReread), [rows]);
@@ -182,13 +186,17 @@ export default function OcrReadings() {
     return () => clearInterval(timer);
   }, [waiting]);
 
-  async function view(row) {
-    if (!row.storagePath || opening) return;
+  async function view(row, group = [row]) {
+    const targets = group.filter((item) => item.storagePath);
+    if (targets.length === 0 || opening) return;
     setOpening(row.id);
     try {
-      const { data, error: signError } = await withTimeout(supabase.storage.from("overtime-evidence").createSignedUrl(row.storagePath, 600), 12000);
-      if (signError || !data?.signedUrl) throw signError || new Error("no_url");
-      setPreview({ row, url: data.signedUrl });
+      const urls = await Promise.all(targets.map(async (item) => {
+        const { data, error: signError } = await withTimeout(supabase.storage.from("overtime-evidence").createSignedUrl(item.storagePath, 600), 12000);
+        if (signError || !data?.signedUrl) throw signError || new Error("no_url");
+        return data.signedUrl;
+      }));
+      setPreview({ row, url: urls[0], urls });
     } catch {
       setError(t("ocr.imageUnavailable"));
     } finally {
@@ -201,6 +209,96 @@ export default function OcrReadings() {
   const minutes = (value) => (value == null ? "—" : `${minutesText(value)} min`);
   const cell = (row, field, value, format = (v) => (v == null ? "—" : v), border = false) => (
     <td className={`whitespace-nowrap px-3 py-2 ${border ? "border-l" : ""} ${row.wrong.has(field) ? "font-bold text-destructive" : ""}`}>{format(value)}</td>
+  );
+
+  // One line of the table: a capture, or (merged) a whole work order whose captures are all conform, folded.
+  const renderRow = (row, opts) => (
+                <tr key={opts.merged ? `merged-${opts.group.key}` : row.id}>
+                  <td className="whitespace-nowrap px-3 py-2">{row.jobDate ? dayjs(row.jobDate).format("DD MMM") : "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium">
+                    {row.name && row.userId ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button type="button" className={`font-medium hover:underline ${allAgree(row) ? "text-primary" : "text-foreground"}`}>{row.name}</button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => setCardId(row.userId)}>{t("ocr.link.card")}</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.timesheet")}</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (row.name || "—")}
+                    {opts.total > 1 && (opts.merged ? [1, 2, 3].slice(0, opts.total) : [opts.photoIndex + 1]).map((n) => (
+                      <span key={n} className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground" title={t("ocr.photo", { n, total: opts.total })} aria-label={t("ocr.photo", { n, total: opts.total })}>{n}</span>
+                    ))}
+                  </td>
+                  {(() => {
+                    // The OT as each source says it: the number read on the proof, the work sheet (red = differs from the others).
+                    const digits = { proof: otDigits(row.found?.ot), sheet: otDigits(row.jobOt) };
+                    const present = Object.entries(digits).filter(([, value]) => value);
+                    const agreeing = (source) => present.filter(([, other]) => other === digits[source]).length;
+                    const best = Math.max(0, ...present.map(([source]) => agreeing(source)));
+                    const red = (source) => present.length >= 2 && best < present.length && Boolean(digits[source]) && (agreeing(source) < best || best === 1);
+                    const first = "proof";
+                    const plain = (source, text) => (
+                      <td className={`whitespace-nowrap px-3 py-2 text-center ${source === first ? "border-l" : ""} ${red(source) ? "font-bold text-destructive" : ""}`}>{text}</td>
+                    );
+                    return (
+                      <>
+                        {plain("proof", digits.proof ? `OT-${digits.proof}` : row.state === "sms" ? "SMS" : "—")}
+                        <td className={`whitespace-nowrap px-3 py-2 text-center ${red("sheet") ? "font-bold text-destructive" : ""}`}>
+                          {row.jobOt && row.userId ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button type="button" className={red("sheet") ? "hover:underline" : "text-primary hover:underline"}>{row.jobOt}</button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                <DropdownMenuItem onSelect={() => navigate(timesheetLink(row, row.jobId))}>{t("ocr.link.job")}</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.day")}</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (row.jobOt || "—")}
+                        </td>
+                      </>
+                    );
+                  })()}
+                  {cell(row, "client", row.found.clientMinutes, minutes, true)}
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.clientMinutes)}</td>
+                  {cell(row, "return", row.found.returnMinutes, minutes, true)}
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <Badge variant={gapOf(row) ? "destructive" : BADGE[row.state]} title={gapOf(row) ? t("ocr.gap.hint") : undefined}>{gapOf(row) ? t(`ocr.gap.${gapOf(row)}`) : t(`ocr.state.${row.state}`)}</Badge>
+                    {row.notNeeded && <Badge variant="secondary" className="ml-1" title={t("ocr.notNeededHint")}>{t("ocr.notNeeded")}</Badge>}
+                    {row.state === "queued" && (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {row.attempts > 0 ? t("ocr.queueTried", { count: row.attempts, max: 5 }) : t("ocr.queueNever")}
+                        {row.nextTryAt && new Date(row.nextTryAt) > new Date() ? ` · ${t("ocr.queueNext", { time: queueTime(row.nextTryAt) })}` : ""}
+                      </div>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
+                  <td className="flex gap-1 px-3 py-2">
+                    {sendBackOn && row.job?.status === "submitted" && (
+                      <Button type="button" size="sm" variant="outline" disabled={Boolean(sendingBack)} onClick={() => sendBack(row)} aria-label={t("ocr.sendBack")} title={t("ocr.sendBack")}>
+                        <Undo2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    )}
+                    {canRequeue(row) && (
+                      <Button type="button" size="sm" variant="outline" disabled={rereading} onClick={() => reread(opts.merged ? opts.group.rows : [row])} aria-label={t("ocr.reread")} title={t("ocr.reread")}>
+                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    )}
+                    {row.storagePath && (
+                      <Button type="button" size="sm" variant="outline" disabled={opening === row.id} onClick={() => view(row, opts.merged ? opts.group.rows : [row])} aria-label={opts.merged ? t("ocr.viewBoth") : t("ocr.view")} title={opts.merged ? t("ocr.viewBoth") : t("ocr.view")}>
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    )}
+                    {opts.total > 1 && (
+                      <Button type="button" size="sm" variant="ghost" onClick={() => toggleGroup(opts.group.key)} aria-expanded={!opts.merged} aria-label={opts.merged ? t("ocr.unfold") : t("ocr.fold")} title={opts.merged ? t("ocr.unfold") : t("ocr.fold")}>
+                        {opts.merged ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronUp className="h-4 w-4" aria-hidden="true" />}
+                      </Button>
+                    )}
+                  </td>
+                </tr>
   );
 
   return (
@@ -291,89 +389,7 @@ export default function OcrReadings() {
             {groups.map((group) => (
             // The captures of one work order (1, 2) are one box: a heavier outline around them.
             <tbody key={group.key} className={group.rows.length > 1 ? "divide-y divide-dashed border-y-2 border-primary/60 bg-primary/5" : "border-b"}>
-              {group.rows.map((row, photoIndex) => (
-                <tr key={row.id}>
-                  <td className="whitespace-nowrap px-3 py-2">{row.jobDate ? dayjs(row.jobDate).format("DD MMM") : "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-medium">
-                    {row.name && row.userId ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button type="button" className={`font-medium hover:underline ${allAgree(row) ? "text-primary" : "text-foreground"}`}>{row.name}</button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuItem onSelect={() => setCardId(row.userId)}>{t("ocr.link.card")}</DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.timesheet")}</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (row.name || "—")}
-                    {group.rows.length > 1 && (
-                      <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground" title={t("ocr.photo", { n: photoIndex + 1, total: group.rows.length })} aria-label={t("ocr.photo", { n: photoIndex + 1, total: group.rows.length })}>{photoIndex + 1}</span>
-                    )}
-                  </td>
-                  {(() => {
-                    // The OT as each source says it: the number read on the proof, the work sheet (red = differs from the others).
-                    const digits = { proof: otDigits(row.found?.ot), sheet: otDigits(row.jobOt) };
-                    const present = Object.entries(digits).filter(([, value]) => value);
-                    const agreeing = (source) => present.filter(([, other]) => other === digits[source]).length;
-                    const best = Math.max(0, ...present.map(([source]) => agreeing(source)));
-                    const red = (source) => present.length >= 2 && best < present.length && Boolean(digits[source]) && (agreeing(source) < best || best === 1);
-                    const first = "proof";
-                    const plain = (source, text) => (
-                      <td className={`whitespace-nowrap px-3 py-2 text-center ${source === first ? "border-l" : ""} ${red(source) ? "font-bold text-destructive" : ""}`}>{text}</td>
-                    );
-                    return (
-                      <>
-                        {plain("proof", digits.proof ? `OT-${digits.proof}` : row.state === "sms" ? "SMS" : "—")}
-                        <td className={`whitespace-nowrap px-3 py-2 text-center ${red("sheet") ? "font-bold text-destructive" : ""}`}>
-                          {row.jobOt && row.userId ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button type="button" className={red("sheet") ? "hover:underline" : "text-primary hover:underline"}>{row.jobOt}</button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start">
-                                <DropdownMenuItem onSelect={() => navigate(timesheetLink(row, row.jobId))}>{t("ocr.link.job")}</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => navigate(timesheetLink(row))}>{t("ocr.link.day")}</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : (row.jobOt || "—")}
-                        </td>
-                      </>
-                    );
-                  })()}
-                  {cell(row, "client", row.found.clientMinutes, minutes, true)}
-                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.clientMinutes)}</td>
-                  {cell(row, "return", row.found.returnMinutes, minutes, true)}
-                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{minutes(row.expected?.returnMinutes)}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    <Badge variant={gapOf(row) ? "destructive" : BADGE[row.state]} title={gapOf(row) ? t("ocr.gap.hint") : undefined}>{gapOf(row) ? t(`ocr.gap.${gapOf(row)}`) : t(`ocr.state.${row.state}`)}</Badge>
-                    {row.notNeeded && <Badge variant="secondary" className="ml-1" title={t("ocr.notNeededHint")}>{t("ocr.notNeeded")}</Badge>}
-                    {row.state === "queued" && (
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {row.attempts > 0 ? t("ocr.queueTried", { count: row.attempts, max: 5 }) : t("ocr.queueNever")}
-                        {row.nextTryAt && new Date(row.nextTryAt) > new Date() ? ` · ${t("ocr.queueNext", { time: queueTime(row.nextTryAt) })}` : ""}
-                      </div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{row.readAt ? dayjs(row.readAt).format("DD MMM HH:mm") : "—"}</td>
-                  <td className="flex gap-1 px-3 py-2">
-                    {sendBackOn && row.job?.status === "submitted" && (
-                      <Button type="button" size="sm" variant="outline" disabled={Boolean(sendingBack)} onClick={() => sendBack(row)} aria-label={t("ocr.sendBack")} title={t("ocr.sendBack")}>
-                        <Undo2 className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    )}
-                    {canRequeue(row) && (
-                      <Button type="button" size="sm" variant="outline" disabled={rereading} onClick={() => reread([row])} aria-label={t("ocr.reread")} title={t("ocr.reread")}>
-                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    )}
-                    {row.storagePath && (
-                      <Button type="button" size="sm" variant="outline" disabled={opening === row.id} onClick={() => view(row)} aria-label={t("ocr.view")} title={t("ocr.view")}>
-                        <Eye className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {groupOpen(group) ? group.rows.map((row, photoIndex) => renderRow(row, { photoIndex, total: group.rows.length, group })) : renderRow(mergeGroupRows(group.rows), { merged: true, total: group.rows.length, group })}
             </tbody>
             ))}
             {groups.length === 0 && (
@@ -391,7 +407,11 @@ export default function OcrReadings() {
                 <DialogDescription>{preview.row.name || "—"} · {preview.row.jobDate ? dayjs(preview.row.jobDate).format("DD MMM YYYY") : "—"}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 md:grid-cols-[1fr,20rem]">
-                <img src={preview.url} alt={t("ocr.view")} className="max-h-[70vh] w-full rounded-md border object-contain" />
+                <div className={`grid gap-2 ${(preview.urls || []).length > 1 ? "grid-cols-2" : ""}`}>
+                  {(preview.urls || [preview.url]).map((src, index) => (
+                    <img key={src} src={src} alt={`${t("ocr.view")} ${index + 1}`} className="max-h-[70vh] w-full rounded-md border object-contain" />
+                  ))}
+                </div>
                 <div className="space-y-3">
                   <JobSummary row={preview.row} t={t} />
                   {sendBackOn && preview.row.job?.status === "submitted" && (

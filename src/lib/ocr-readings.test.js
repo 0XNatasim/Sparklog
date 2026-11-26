@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve, dirname } from "node:path";
-import { allAgree, buildOcrRows, canRequeue, canReread, countOcrStates, filterOcrRows, gapOf, groupProofRows, ocrDays } from "./ocr-readings";
+import { allAgree, buildOcrRows, canRequeue, canReread, countOcrStates, filterOcrRows, gapOf, groupAllOk, groupProofRows, mergeGroupRows, ocrDays } from "./ocr-readings";
 import { expectedProofForJob } from "./overtime-proof-check";
 
 const job = (id, depart, fin, extra = {}) => ({ id, user_id: "u1", job_date: "2026-11-16", status: "submitted", ot: "261821", depart, fin, return_time_minutes: 0, ...extra });
@@ -274,5 +274,19 @@ describe("what the picture is (migration 0161) and the result column", () => {
     // two captures that read nothing yet: the oldest first
     const unread = groupProofRows([proof("b", "j3", "2026-11-23T09:05:00Z"), proof("a", "j3", "2026-11-23T09:00:00Z")]);
     expect(unread[0].rows.map((item) => item.id)).toEqual(["a", "b"]);
+  });
+
+  it("groupAllOk / mergeGroupRows: folded only when every capture is conform; the merged line takes each value from the capture that has it", () => {
+    const r = (id, found, state = "ok") => ({ id, state, found: { ot: null, clientMinutes: null, returnMinutes: null, ...found }, wrong: new Set(), readAt: `2026-11-24T10:0${id}:00Z` });
+    const one = r(1, { ot: "208637", clientMinutes: 150 });
+    const two = r(2, { returnMinutes: 0 });
+    expect(groupAllOk([one, two])).toBe(true);
+    expect(groupAllOk([one])).toBe(false); // a single capture is not folded
+    expect(groupAllOk([one, { ...two, state: "incomplete" }])).toBe(false);
+    expect(groupAllOk([one, { ...two, state: "mismatch" }])).toBe(false);
+    const merged = mergeGroupRows([one, two]);
+    expect(merged.found).toEqual({ ot: "208637", clientMinutes: 150, returnMinutes: 0 });
+    expect(merged.state).toBe("ok");
+    expect(merged.readAt).toBe("2026-11-24T10:02:00Z");
   });
 });
