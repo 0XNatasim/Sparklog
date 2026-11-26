@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-25, V2.4.331)
+## 6. À faire / à préciser (mis à jour 2026-11-26, V2.4.332)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.332 (technique).** Message de la preuve de temps supp. raccourci (demande du 2026-11-26 : « ils ne lisent pas »). `OvertimeEvidenceStep.jsx` : plus de bloc « Règle… », de liste « La capture doit montrer » ni de bouton « Afficher l'exemple » ; une ligne (lien du formulaire `useOvertimeConfirmationForm` + « OT {ot} » `form.evidence.perJob`), deux phrases (`form.evidence.short1` / `short2`, la 2e en rouge) et les deux exemples toujours visibles (`public/overtime-example-1.webp` : questions 1 + 2 avec le temps coché ; `overtime-example-2.webp` : question 3 avec le retour coché ; légendes `caption1` / `caption2`, textes alternatifs `exampleAlt1` / `exampleAlt2`). Emplacement 1 = « Capture 1 — OT et durée réelle » (`slotClient`). `overtime-form-example.webp` reste pour `OvertimeProofDialog` (Historique). Aucune migration, aucune fonction Edge. Test : `OvertimeEvidenceStep.test.jsx`.
 
 **V2.4.331 (technique).** État « Incomplet » (constat du 2026-11-25 : Alexandre G., deux captures de la même fiche, client 105 lu mais retour jamais lu alors que la capture montre le cercle de la question 3, badge « Conforme »). `proofDifferences` ne compare que les champs lus : rien ne différait → `ok`. `markIncomplete(rows)` (`ocr-readings.js`) : pour chaque fiche (`job_id`) dont les preuves sont `form_kind = new`, si, toutes captures lues réunies, il manque l'OT (question 1), le temps chez le client **ou** le retour (constat Anthony R. : OT lu sur aucune capture, badge « Conforme »), les lignes `ok` passent à `incomplete` (« Incomplet », badge `warning`, dans « À vérifier », `OCR_STATES`, `countOcrStates`) ; un écart reste `mismatch` ; l'ancien formulaire n'est pas concerné. `ot-compare.js` : `READ_STATES` inclut `incomplete` (les minutes lues comptent encore). **Cause du retour non lu non établie** (le texte OCR n'est pas gardé ; base : les 2 preuves d'Alexandre ont `proof_client_minutes = 105`, `proof_return_minutes = null`) : `process_overtime_evidence/index.ts` journalise maintenant `circle without answer` dès qu'il y a **plus de cercles que de réponses** (positions des cercles, lignes de choix numériques, titres), au lieu de seulement quand aucune minute n'était lue. **Redéployer la fonction, puis « Tout relire » et lire le journal.** Aucune migration. Tests : `ocr-readings.test.js`.
 
