@@ -1,6 +1,6 @@
 # NOOB.md — Ce qu'il reste à faire, en clair
 
-> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.334).
+> Version simple de la liste détaillée dans `CLAUDE.md` §6. Mise à jour : 2026-11-17 (V2.4.335).
 > `README.md`, `NOOB.md` et `CLAUDE.md` sont mis à jour **ensemble à chaque version** (un test le vérifie).
 > Seulement ce qui reste à faire : ce qui est terminé est retiré (voir l'historique Git). Ce que fait l'app : `README.md`.
 
@@ -38,6 +38,7 @@
 - [ ] **Migrations 0148 et 0149 + fonction (V2.4.281)** : appliquer la 0148 puis la 0149, puis redéployer `process_overtime_evidence` (je le fais sur demande). Je remets ensuite en file les 7 preuves « conformes » où seul le numéro d'OT avait été lu, pour qu'elles soient relues avec la nouvelle règle.
 - [ ] **Migration 0150 (V2.4.285)** : à appliquer (« Applique la 0150 »), sinon « Relire » ne marche que sur les échecs.
 - [ ] **Migration 0151 (V2.4.286)** : à appliquer (« Applique la 0151 ») pour pouvoir activer le bouton « Renvoyer pour correction ».
+- 🟢 **V2.4.335 — Message de la preuve reformulé.** « Prenez 2 captures du **formulaire** AVANT de faire « Envoyer » » : le mot **formulaire** est cliquable et ouvre le formulaire « Confirmation de temps supp. » dans une autre fenêtre ; dessous, les 2 photos d'exemple avec ce que chacune doit montrer (photo 1 : question 1 numéro d'OT, question 2 temps chez le client ; photo 2 : question 3 temps de retour si applicable). Même bloc dans la notification « preuve renvoyée ». Rien à faire de votre côté.
 - 🟠 **V2.4.334 — Notification à l'employé quand sa preuve est renvoyée.** Quand vous renvoyez une fiche à cause de sa preuve de temps supp. (bouton « Renvoyer pour correction » de l'onglet OCR) l'employé reçoit une notification (cloche + fenêtre qui revient jusqu'à « OK » + notification téléphone) : l'**OT et la date**, la **raison** (incomplète, illisible, ne correspond pas à la fiche, mauvaise capture), **où la refaire** (Historique › l'horloge de cet OT) et les **2 captures d'exemple** avec comment les prendre. Même chose, sans notification téléphone, quand le renvoi automatique d'une mauvaise capture est activé. **À faire : dites « Applique la 0162 » (ou appliquez-la) avant de publier.** Avant la migration, le bouton « Renvoyer » ne marche pas.
 - 🟢 **V2.4.333 — Preuves conformes repliées (onglet OCR).** Dans « Par preuve », une fiche dont les **2 captures sont conformes** s'affiche sur **une seule ligne** (OT et « chez le client » viennent de la capture 1, le retour de la capture 2 ; petits 1 et 2 à côté du nom ; un bouton pour voir les 2 photos ; une flèche pour les déplier une par une). Si une des 2 captures (ou les deux) ne colle pas, la fiche reste **dépliée** par défaut, avec en rouge ce qui ne colle pas. Rien à faire de votre côté.
 - 🟢 **V2.4.332 — Message de la preuve raccourci.** La fenêtre qui demande la preuve de temps supp. n'a plus le long texte : une ligne (lien du formulaire + OT), deux phrases courtes (2 captures AVANT « Envoyer » ; on doit voir l'OT, le temps coché, le retour coché) et **les deux images d'exemple** affichées directement. Rien à faire de votre côté.

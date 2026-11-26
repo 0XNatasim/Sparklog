@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useLanguage } from "@/components/language-provider";
-import { useOvertimeConfirmationForm } from "@/lib/overtime-form-link";
+import OvertimeProofHowTo from "@/components/OvertimeProofHowTo";
 import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // The overtime authorization the day needs (> 8 h): what the screenshot of the overtime request form must show, an example,
@@ -20,9 +19,6 @@ export default function OvertimeEvidenceStep({ t, onFiles, validationError, erro
     { label: t("form.evidence.pickClient"), title: t("form.evidence.slotClient") },
     { label: t("form.evidence.pickReturn"), title: t("form.evidence.slotReturn") },
   ];
-  const form = useOvertimeConfirmationForm();
-  const { language } = useLanguage();
-  const formName = (language === "en" ? form?.nameEn || form?.nameFr : form?.nameFr || form?.nameEn) || t("form.evidence.formName");
   return (
     <>
       <DialogHeader>
@@ -30,30 +26,8 @@ export default function OvertimeEvidenceStep({ t, onFiles, validationError, erro
       </DialogHeader>
       <div className="space-y-3 text-sm">
         {progress && <p className="font-semibold" role="status">{t("form.evidence.progress", { n: progress.n, total: progress.total })}</p>}
-        {explain && (
-          <p className="text-info">
-            {form?.url ? (
-              <a href={form.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">
-                {formName}
-              </a>
-            ) : (
-              <span className="font-semibold">{t("form.evidence.formName")}</span>
-            )}
-            {explain.perJob && <> — {t("form.evidence.perJob", { ot: explain.ot })}</>}
-          </p>
-        )}
-        <div className="rounded-md border bg-muted/40 p-3">
-          <p className="font-semibold">{t("form.evidence.short1")}</p>
-          <p className="mt-1 font-semibold text-destructive">{t("form.evidence.short2")}</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {[1, 2].map((n) => (
-              <figure key={n} className="space-y-1">
-                <img src={`/overtime-example-${n}.webp`} alt={t(`form.evidence.exampleAlt${n}`)} className="w-full rounded border bg-background" />
-                <figcaption className="text-xs font-semibold">{t(`form.evidence.caption${n}`)}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
+        {explain?.perJob && <p className="text-info">{t("form.evidence.perJob", { ot: explain.ot })}</p>}
+        <OvertimeProofHowTo />
         {validationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{validationError}</div>}
         {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{error}</div>}
         <div className="space-y-2">

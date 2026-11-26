@@ -1,5 +1,6 @@
 import React from "react";
 import dayjs from "dayjs";
+import OvertimeProofHowTo from "@/components/OvertimeProofHowTo";
 import { useT } from "@/lib/use-t";
 
 // The body of a « proof sent back » message (manager_broadcasts.kind = proof_returned, migration 0162): the OT and the day it
@@ -18,18 +19,7 @@ export default function ProofReturnedNotice({ broadcast }) {
       </p>
       {reason && <p>{t("proofReturned.why", { reason })}</p>}
       <p>{t("proofReturned.how")}</p>
-      <div className="rounded-md border bg-muted/40 p-3">
-        <p className="font-semibold">{t("form.evidence.short1")}</p>
-        <p className="mt-1 font-semibold text-destructive">{t("form.evidence.short2")}</p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {[1, 2].map((n) => (
-            <figure key={n} className="space-y-1">
-              <img src={`/overtime-example-${n}.webp`} alt={t(`form.evidence.exampleAlt${n}`)} className="w-full rounded border bg-background" />
-              <figcaption className="text-xs font-semibold">{t(`form.evidence.caption${n}`)}</figcaption>
-            </figure>
-          ))}
-        </div>
-      </div>
+      <OvertimeProofHowTo />
     </div>
   );
 }
