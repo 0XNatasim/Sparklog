@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CircleCheck, CircleX, Images, TimerReset } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/en";
 import { supabase } from "../supabaseClient";
@@ -89,6 +89,14 @@ export default function History() {
   const overtimeMarkerIds = useMemo(() => overtimeMarkerJobIds(jobs), [jobs]);
   // Work orders past the day's line (from 2026-11-18, one proof each): the ones still missing their proof show a red clock.
   const [proofJob, setProofJob] = useState(null);
+  // The « proof sent back » banner opens the clock of its work order: /history?proof=<job id>.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const proofParam = searchParams.get("proof");
+  const shownProofJob = proofJob || (proofParam ? jobs.find((job) => job.id === proofParam) : null) || null;
+  function closeProof() {
+    setProofJob(null);
+    if (proofParam) setSearchParams((current) => { const next = new URLSearchParams(current); next.delete("proof"); return next; }, { replace: true });
+  }
   const overLineIds = useMemo(() => {
     const byDate = new Map();
     for (const job of jobs) {
@@ -639,14 +647,13 @@ export default function History() {
       </div>
       <InventoryPhotosDialog date={inventoryViewDate} userId={effectiveUserId} onClose={() => setInventoryViewDate(null)} />
       {confirmDialog}
-      {proofJob && (
+      {shownProofJob && (
         <OvertimeProofDialog
-          job={proofJob}
+          job={shownProofJob}
           userId={effectiveUserId}
-          editable={isEditableStatus(proofJob.status) && !proofJob.locked}
-          dailyMinutes={dayMinutesOf(proofJob.job_date)}
-          hours={dailyRegularMinutes / 60}
-          onClose={() => setProofJob(null)}
+          editable={isEditableStatus(shownProofJob.status) && !shownProofJob.locked}
+          dailyMinutes={dayMinutesOf(shownProofJob.job_date)}
+          onClose={closeProof}
           onChanged={() => load()}
         />
       )}
