@@ -50,6 +50,7 @@ describe("pickOvertimeConfirmationForm", () => {
     expect(pickOvertimeConfirmationForm([form({ name_fr: "confirmation de temps SUPP." })])).not.toBeNull();
     expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de Temps supp.", enabled: false })])).toBeNull();
     expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de Temps supp.", url: "" })])).toBeNull();
+    expect(pickOvertimeConfirmationForm([form({ name_fr: "Confirmation de surtemps" })])).not.toBeNull(); // the name in Profil › Formulaires today
     expect(pickOvertimeConfirmationForm([form()])).toBeNull();
   });
 });
