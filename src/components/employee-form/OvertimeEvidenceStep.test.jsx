@@ -28,6 +28,8 @@ describe("OvertimeEvidenceStep texts", () => {
     // « Temps supplémentaire pour quel OT ? » comes first, alone: no photo instructions yet.
     expect(screen.getByText("Temps supplémentaire pour quel OT ?")).toBeTruthy();
     expect(screen.queryByText("On doit voir les 2 photos comme celles-ci :")).toBeNull();
+    // the box stands alone: no explanatory line under it
+    expect(screen.queryByText(/ne le demande plus/)).toBeNull();
     fireEvent.change(screen.getByLabelText("Temps supplémentaire pour quel OT ?"), { target: { value: "261821" } });
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     // The form is the one listed in Profil › Formulaires: its own address (not coded here), opened in a new window.
