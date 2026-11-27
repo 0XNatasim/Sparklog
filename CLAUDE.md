@@ -126,7 +126,7 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 ---
 
-## 6. À faire / à préciser (mis à jour 2026-11-26, V2.4.338)
+## 6. À faire / à préciser (mis à jour 2026-11-27, V2.4.339)
 
 > Version vulgarisée, point par point : [`NOOB.md`](NOOB.md).
 > Fiche de toutes les règles de paie (valeurs lues dans le code, options, état, sources) : Gestion › Configuration ›
@@ -138,6 +138,8 @@ Lots 1 à 6 livrés (V2.4.94 → V2.4.99, V2.4.178 ; détail : historique Git, P
 
 Liste unique des points ouverts. Ce qui est fait est retiré (historique Git) ; ici, ce qu'il reste à **fournir**,
 à **trancher** ou à **coder**, par priorité.
+
+**V2.4.339 (technique).** Erreur Field Service contournée en quittant la fiche (constat du 2026-11-27 : un employé voyait l'erreur de km, « revenait en arrière », puis l'enregistrement fonctionnait). Cause : V2.4.235 ne restaurait plus `workOrderProblems` avec le brouillon (pour ne pas bloquer une fiche saisie à la main), donc quitter puis revenir levait le blocage tout en gardant `fromScreenshot`. `EmployeeForm.jsx` : le brouillon garde de nouveau `workOrderProblems` **seulement quand `fromScreenshot` est vrai**, et `restoreLocalDraft` les remet seulement dans ce cas ; une fiche saisie à la main n'en a pas, un OT prédéfini les ignore toujours (V2.4.233). `work-order-parse.js` : quand l'étiquette « Miles Traveled » est mal lue par l'OCR, la valeur est lue comme le nombre décimal sous « Déplacement » (avant « Distance … ») pour comparer quand même les deux distances ; **cause du cas de test du propriétaire (45,00 contre 14,00 sans erreur) non établie** : sur le texte propre le parseur signale `kmMismatch` (vérifié), donc la lecture réelle manquait probablement l'étiquette ; si le cas revient, ouvrir « texte lu » dans la fenêtre de vérification. Aucune migration. Tests : `EmployeeForm.test.jsx`, `work-order-parse.test.js`.
 
 **V2.4.338 (technique).** Preuve renvoyée : lecture immédiate et « Soumettre de nouveau » (demande du 2026-11-26 : après avoir remplacé les 2 preuves, aucun bouton pour soumettre). Migration 0164 : `my_overtime_proofs(date)` (0144) rend aussi `ocr_status`, `form_kind`, `proof_ot`, `proof_client_minutes`, `proof_return_minutes`, `proof_read_at` (les données de l'employé lui-même ; la table reste réservée aux gestionnaires ; ni essais ni file exposés) ; la fonction est supprimée puis recréée (le type de retour change), droits `authenticated` redonnés. `OvertimeProofDialog.jsx` : nouvelles props `dayJobs`, `firstTripUnpaid`, `tenHourDay`, `onResubmit` ; l'état de chaque capture vient de `buildOcrRows` (la même comparaison que l'onglet OCR des gestionnaires, `markIncomplete` compris : OT, temps chez le client et retour réunis sur les captures de la fiche) ; relecture toutes les 15 s tant qu'une capture est `queued` / `notRead` (la file lit une preuve par minute) ; message « Lecture… » / « Concordent » / « Ne concordent pas encore » + une ligne par capture (`proofs.check.*`) ; **« Soumettre de nouveau »** seulement quand la fiche est `updated`, que tout concorde (`ok`, ou `failed` = refus du service de lecture, pas la faute de l'employé) et qu'aucune lecture n'est en cours ; `History.jsx` ferme la fenêtre et appelle `submitDay` (les mêmes contrôles que le bouton « Soumettre la journée »). Pas de nouvelle fonction Edge ; Britton jamais exposé à l'employé. **Appliquer la migration 0164 avant de publier le code** (sans elle l'état de lecture est absent : « Lecture… » sans fin). Tests : `OvertimeProofDialog.test.jsx`.
 

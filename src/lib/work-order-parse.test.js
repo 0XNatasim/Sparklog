@@ -212,4 +212,15 @@ describe("workOrderIssues with km typed by hand (km_apart_from_capture)", () => 
     expect(workOrderIssues({ ot: "1", depart: "08:00", arrivee: "08:10", fin: "10:00", km_aller: 30, miles_traveled: 34.29 }, { kmOptional: true }))
       .toEqual([{ code: "kmMismatch", miles: 34.29, km: 30 }]);
   });
+
+  it("still compares the two distances when the OCR misreads the « Miles Traveled » label (value under « Déplacement »)", () => {
+    const text = "Duration* 1,73 hours Actual Arrival Time 26/11/2026 12:15 Déplacement Mlles Travelec - 45,00 + Distance réelle parcourue (km) 14,00";
+    const parsed = parseExtractedText(`OT-270825 Start Time* 26/11/2026 11:01 End Time* 26/11/2026 12:45 ${text}`);
+    expect(parsed.km_aller).toBe(14);
+    expect(parsed.miles_traveled).toBe(45);
+    expect(workOrderIssues(parsed)).toEqual([{ code: "kmMismatch", miles: 45, km: 14 }]);
+    // Same distance twice: no problem.
+    const same = parseExtractedText(`OT-270825 Start Time* 26/11/2026 11:01 End Time* 26/11/2026 12:45 Duration* 1,73 hours Actual Arrival Time 26/11/2026 12:15 Déplacement Mlles Travelec - 14,00 + Distance réelle parcourue (km) 14,00`);
+    expect(workOrderIssues(same)).toEqual([]);
+  });
 });
