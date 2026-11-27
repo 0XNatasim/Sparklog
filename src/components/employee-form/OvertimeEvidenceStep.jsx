@@ -1,14 +1,18 @@
 import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import OvertimeOtAsk from "@/components/OvertimeOtAsk";
 import OvertimeProofHowTo from "@/components/OvertimeProofHowTo";
 import { DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // The overtime authorization the day needs (> 8 h): what the screenshot of the overtime request form must show, an example,
 // and the picker. « Réessayer » reuses the picture kept in memory after a failure.
-// The form of November 2026 has two answers (« Durée réelle du temps supplémentaire », « Durée du retour »), on two screens: the
-// employee gives TWO captures here, both sent together with the job (`onFiles(first, second)`).
+// The form of 27 November 2026 has two answers (« Durée réelle du temps supplémentaire chez le client », « Durée du retour »), on
+// two screens, and no OT question any more: the step first asks « Temps supplémentaire pour quel OT ? » (one box), then the two
+// captures, both sent together with the job (`onFiles(first, second, declaredOt)`).
 export default function OvertimeEvidenceStep({ t, onFiles, validationError, error, canRetry, onRetry, busy, onSkip, progress, explain }) {
   const [files, setFiles] = useState([null, null]);
+  // The OT the overtime is for, typed before the proof page (migration 0166); null until confirmed.
+  const [declaredOt, setDeclaredOt] = useState(null);
   const inputs = [useRef(null), useRef(null)];
   const pick = (index) => (event) => {
     const file = event.target.files?.[0] || null;
@@ -19,6 +23,24 @@ export default function OvertimeEvidenceStep({ t, onFiles, validationError, erro
     { label: t("form.evidence.pickClient"), title: t("form.evidence.slotClient") },
     { label: t("form.evidence.pickReturn"), title: t("form.evidence.slotReturn") },
   ];
+  if (declaredOt === null) {
+    return (
+      <>
+        <DialogHeader>
+          <DialogTitle>{t("form.evidence.title")}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          {progress && <p className="font-semibold" role="status">{t("form.evidence.progress", { n: progress.n, total: progress.total })}</p>}
+          <OvertimeOtAsk sheetOt={explain?.ot} onConfirm={setDeclaredOt} />
+        </div>
+        {onSkip && (
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={busy} onClick={onSkip}>{t("form.evidence.notYet")}</Button>
+          </DialogFooter>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <DialogHeader>
@@ -26,7 +48,10 @@ export default function OvertimeEvidenceStep({ t, onFiles, validationError, erro
       </DialogHeader>
       <div className="space-y-3 text-sm">
         {progress && <p className="font-semibold" role="status">{t("form.evidence.progress", { n: progress.n, total: progress.total })}</p>}
-        {explain?.perJob && <p className="text-info">{t("form.evidence.perJob", { ot: explain.ot })}</p>}
+        <p className="flex flex-wrap items-center gap-2 text-info">
+          <span>{t("form.evidence.perJob", { ot: declaredOt })}</span>
+          <button type="button" className="text-xs underline underline-offset-2" disabled={busy} onClick={() => setDeclaredOt(null)}>{t("form.evidence.askOtChange")}</button>
+        </p>
         <OvertimeProofHowTo />
         {validationError && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{validationError}</div>}
         {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">{error}</div>}
@@ -58,7 +83,7 @@ export default function OvertimeEvidenceStep({ t, onFiles, validationError, erro
             {t("form.evidence.retry")}
           </Button>
         )}
-        <Button type="button" disabled={busy || !files[0] || !files[1]} onClick={() => onFiles(files[0], files[1])}>
+        <Button type="button" disabled={busy || !files[0] || !files[1]} onClick={() => onFiles(files[0], files[1], declaredOt)}>
           {busy ? t("form.evidence.processing") : t("form.evidence.sendBoth")}
         </Button>
       </DialogFooter>

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import OvertimeOtAsk from "@/components/OvertimeOtAsk";
 import OvertimeProofHowTo from "@/components/OvertimeProofHowTo";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { buildOcrRows } from "@/lib/ocr-readings";
@@ -21,6 +22,8 @@ export default function OvertimeProofDialog({ job, userId, editable, dailyMinute
   const [confirm, confirmDialog] = useConfirmDialog();
   const input = useRef(null);
   const replacing = useRef(null); // the proof the next picked file replaces, or null
+  const declaredOt = useRef(null); // the OT typed for the next picked file (0166)
+  const [asking, setAsking] = useState(null); // { proofId } while « Temps supplémentaire pour quel OT ? » is shown
   const [proofs, setProofs] = useState([]);
   const [urls, setUrls] = useState(new Map());
   const [loading, setLoading] = useState(true);
@@ -64,8 +67,15 @@ export default function OvertimeProofDialog({ job, userId, editable, dailyMinute
     return () => clearInterval(timer);
   }, [reading]);
 
+  // « Temps supplémentaire pour quel OT ? » comes first, then the file picker.
   function choose(proof) {
-    replacing.current = proof?.id || null;
+    setAsking({ proofId: proof?.id || null });
+  }
+
+  function otConfirmed(ot) {
+    declaredOt.current = ot;
+    replacing.current = asking?.proofId || null;
+    setAsking(null);
     input.current?.click();
   }
 
@@ -76,7 +86,7 @@ export default function OvertimeProofDialog({ job, userId, editable, dailyMinute
     setBusy(true);
     setMessage("");
     try {
-      await saveOwnProof(supabase, { userId, job, oldProofId: replacing.current, file, dailyMinutes });
+      await saveOwnProof(supabase, { userId, job, oldProofId: replacing.current, file, dailyMinutes, declaredOt: declaredOt.current });
       setReload((n) => n + 1);
       onChanged?.();
     } catch (error) {
@@ -110,6 +120,11 @@ export default function OvertimeProofDialog({ job, userId, editable, dailyMinute
           {!editable && <DialogDescription>{t("proofs.locked")}</DialogDescription>}
         </DialogHeader>
         {editable && <OvertimeProofHowTo />}
+        {editable && asking && (
+          <div className="rounded-md border p-3">
+            <OvertimeOtAsk sheetOt={job.ot} busy={busy} onConfirm={otConfirmed} onCancel={() => setAsking(null)} />
+          </div>
+        )}
         {loading && <p className="text-sm text-muted-foreground">{t("common.loading")}</p>}
         {!loading && proofs.length === 0 && <p className="text-sm text-muted-foreground">{t("proofs.empty")}</p>}
         {proofs.map((proof, index) => (

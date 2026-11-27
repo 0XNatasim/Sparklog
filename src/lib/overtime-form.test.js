@@ -265,4 +265,21 @@ describe("formKindOf: which picture is it", () => {
     expect(formKindOf("Demande de temps supplémentaire approuvé. Quand votre surtemps est complété remplissez se formulaire svp")).toBeNull();
     expect(formKindOf("")).toBeNull();
   });
+
+  it("reads the form of 27 November 2026: no OT question, question 2 now says « chez le client »", () => {
+    const CH = ["0", "15", "30", "45", "60", "75", "90", "105", "120", "+ de 120 minutes"];
+    // Question 2 screen: the title wraps on two lines and holds « chez le client », an old-form mark.
+    const q2 = "forms.cloud.microsoft\n2. Durée réelle du temps supplémentaire\nchez le client (Minutes) *\n60 minutes = 1h, 75 minutes =1h15, 90 minutes =\n1h30, 105 minutes = 1h45, 120 minutes = 2h\n0\n15\n30\n45\n60\n75\n90\n105\n120\n+ de 120 minutes";
+    const q3 = "forms.cloud.microsoft\n3. Durée du retour *\n0\n15\n30\n+ de 120 minutes\n4. Commentaire *\nEntrez votre réponse";
+    expect(formKindOf(q2)).toBe("new"); // not mistaken for the old form because of « chez le client »
+    expect(formKindOf(q3)).toBe("new");
+    expect(isOvertimeFormText(q2)).toBe(true);
+    const lines = [
+      { text: "2. Durée réelle du temps supplémentaire", top: 700, height: 52 },
+      { text: "chez le client (Minutes) *", top: 770, height: 52 },
+      { text: "60 minutes = 1h, 75 minutes =1h15, 90 minutes =", top: 900, height: 40 },
+      ...CH.map((text, i) => ({ text, top: 1000 + i * 148, height: 44 })),
+    ];
+    expect(parseRadioAnswers(lines, [{ x: 80, y: 1000 + 4 * 148 + 22 }])).toMatchObject({ clientMinutes: 60, located: { client: true } });
+  });
 });
