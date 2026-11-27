@@ -16,6 +16,7 @@ import { useConfirmDialog } from "@/components/ConfirmDialog";
 import BroadcastAttachments, { EditedTag } from "@/components/BroadcastAttachments";
 import BroadcastEditForm from "@/components/BroadcastEditForm";
 import { MAX_BROADCAST_ATTACHMENTS, addPickedFiles, broadcastAttachmentColumns, broadcastAttachments, isPdfFile } from "@/lib/broadcast-attachments";
+import { fetchBroadcastLog as readBroadcastLog } from "@/lib/broadcast-log";
 import { recipientState, recipientStatus } from "@/lib/broadcast-edit";
 import { uploadBroadcastFiles } from "@/lib/broadcast-upload";
 import { isScheduledPending, parseScheduledAt, scheduleMinDate } from "@/lib/broadcast-schedule";
@@ -82,15 +83,8 @@ Sans cette capture, le temps supplémentaire ne peut pas être approuvé. Appuye
 • Vérifier vos km avant de soumettre.`,
 ];
 
-// Messages sent (newest first) and their recipients.
-// `scheduled_for` (migration 0163) is read when the column exists: before the migration the same query without it is used.
-async function fetchBroadcastLog() {
-  const base = "id, body, audience, image_path, attachments, created_at, edited_at";
-  const recipients = supabase.from("broadcast_recipients").select("broadcast_id, employee_id, acknowledged_at, withdrawn_at");
-  let log = await supabase.from("manager_broadcasts").select(`${base}, scheduled_for`).order("created_at", { ascending: false });
-  if (log.error) log = await supabase.from("manager_broadcasts").select(base).order("created_at", { ascending: false });
-  return [log, await recipients];
-}
+// Messages sent (newest first) and their recipients: see src/lib/broadcast-log.js (recipients are read page by page).
+const fetchBroadcastLog = () => readBroadcastLog(supabase);
 
 export default function BroadcastManager() {
   const t = useT();
