@@ -11,7 +11,7 @@ export default function OvertimeProofHowTo() {
   const [before, after] = t("form.evidence.howIntro").split("{form}");
   const word = t("form.evidence.formWord");
   const photos = [
-    { n: 1, lines: ["form.evidence.photo1q1", "form.evidence.photo1q2"] },
+    { n: 1, lines: ["form.evidence.photo1q2"] },
     { n: 2, lines: ["form.evidence.photo2q3"] },
   ];
   return (

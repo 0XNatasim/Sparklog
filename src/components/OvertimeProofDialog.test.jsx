@@ -59,10 +59,13 @@ describe("OvertimeProofDialog", () => {
   it("replaces the proof of the job, naming the one it replaces", async () => {
     const { onChanged } = setup([{ id: "p1", job_id: "j2", storage_path: "u/d/p1.jpg" }]);
     fireEvent.click(await screen.findByRole("button", { name: fr("proofs.replace") }));
+    // « Temps supplémentaire pour quel OT ? » comes before the file picker (the form has no OT question any more)
+    fireEvent.change(screen.getByLabelText(fr("form.evidence.askOt")), { target: { value: "200452" } });
+    fireEvent.click(screen.getByRole("button", { name: fr("form.evidence.askOtContinue") }));
     const file = new File(["x"], "capture.png", { type: "image/png" });
-    fireEvent.change(screen.getByLabelText(fr("proofs.add")), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText(fr("proofs.add"), { selector: "input" }), { target: { files: [file] } });
     await waitFor(() => expect(h.save).toHaveBeenCalled());
-    expect(h.save.mock.calls[0][1]).toMatchObject({ userId: "u", job: { id: "j2" }, oldProofId: "p1", dailyMinutes: 540 });
+    expect(h.save.mock.calls[0][1]).toMatchObject({ userId: "u", job: { id: "j2" }, oldProofId: "p1", dailyMinutes: 540, declaredOt: "200452" });
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
@@ -80,6 +83,8 @@ describe("OvertimeProofDialog", () => {
   it("offers « Ajouter la capture » when the job has no proof, and adds it (no old proof)", async () => {
     setup([]);
     fireEvent.click(await screen.findByRole("button", { name: fr("proofs.add") }));
+    fireEvent.change(screen.getByLabelText(fr("form.evidence.askOt")), { target: { value: "200452" } });
+    fireEvent.click(screen.getByRole("button", { name: fr("form.evidence.askOtContinue") }));
     fireEvent.change(screen.getByLabelText(fr("proofs.add"), { selector: "input" }), { target: { files: [new File(["x"], "c.png", { type: "image/png" })] } });
     await waitFor(() => expect(h.save).toHaveBeenCalled());
     expect(h.save.mock.calls[0][1].oldProofId).toBeNull();

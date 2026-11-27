@@ -47,6 +47,7 @@ import WorkOrderCheckDialog from "@/components/employee-form/WorkOrderCheckDialo
 import ManualEntryCheckDialog from "@/components/employee-form/ManualEntryCheckDialog";
 import ForemanNotesDialog from "@/components/employee-form/ForemanNotesDialog";
 import { fetchJobNote, isForemanOt, saveJobNote } from "@/lib/foreman-reports";
+import { setProofDeclaredOt } from "@/lib/declared-ot";
 import { uploadNoteFiles } from "@/lib/note-files";
 import { dailyRegularMinutesFor } from "@/lib/payroll-calculations";
 
@@ -179,6 +180,8 @@ export default function EmployeeForm() {
   // The foreman's optional note on this work sheet (0136): { auditedName, body, saved }. Sent with the job when it is saved.
   const [foremanNote, setForemanNote] = useState(null);
   const foremanNoteKeyRef = useRef(null);
+  // The OT typed before the overtime proof page (0166), kept for « Réessayer ».
+  const declaredOtRef = useRef(null);
   // An existing job: its note, to edit it with the job.
   useEffect(() => {
     if (!editId || !foremanEmployee || isViewMode) return undefined;
@@ -1010,7 +1013,9 @@ export default function EmployeeForm() {
 
   // Two captures (the form of November 2026: « Durée réelle du temps supplémentaire » and « Durée du retour »): both files are
   // uploaded, then the job and BOTH proofs are saved in one transaction (migration 0160) before the job is submitted.
-  function handleOvertimeEvidence(first, second) {
+  function handleOvertimeEvidence(first, second, declaredOt) {
+    // The OT typed before the proof page (0166) is kept for « Réessayer » too.
+    declaredOtRef.current = declaredOt || null;
     return processEvidenceFiles(first, second);
   }
 
@@ -1104,6 +1109,8 @@ export default function EmployeeForm() {
         );
         if (processingError) console.error("[overtime evidence] OCR queue failed", processingError);
       }
+      // The OT the employee typed before the proof page: best effort, never fails the proofs.
+      await setProofDeclaredOt(supabase, evidenceIds, declaredOtRef.current);
 
       setPendingReturn(null);
       setPendingEvidenceJobId(null);

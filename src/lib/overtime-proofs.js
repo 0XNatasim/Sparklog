@@ -2,6 +2,7 @@
 // is still editable. The table cannot be read by an employee, so every read and write goes through a function.
 import { readPickedFile, prepareEvidenceImage } from "@/lib/evidence-file";
 import { uploadOvertimeEvidence } from "@/lib/overtime-evidence-check";
+import { setProofDeclaredOt } from "@/lib/declared-ot";
 import { withTimeout } from "@/lib/utils";
 
 const BUCKET = "overtime-evidence";
@@ -24,7 +25,7 @@ export async function signedProofUrls(client, paths) {
 
 // Adds the proof of a job, or replaces `oldProofId`. The picture is sent first, then recorded (job still editable, own
 // folder, file really there: checked by the database); the reading of the form is then queued, best effort.
-export async function saveOwnProof(client, { userId, job, oldProofId = null, file, dailyMinutes = 0 }) {
+export async function saveOwnProof(client, { userId, job, oldProofId = null, file, dailyMinutes = 0, declaredOt = null }) {
   const evidenceId = crypto.randomUUID();
   const path = `${userId}/${job.job_date}/${evidenceId}.jpg`;
   const source = file instanceof File ? await readPickedFile(file) : file;
@@ -38,6 +39,8 @@ export async function saveOwnProof(client, { userId, job, oldProofId = null, fil
     throw error;
   }
   await withTimeout(client.functions.invoke("process_overtime_evidence", { body: { evidence_id: evidenceId } }), 12000).catch(() => undefined);
+  // The OT typed before the file is chosen (0166): best effort.
+  await setProofDeclaredOt(client, [evidenceId], declaredOt);
   return evidenceId;
 }
 

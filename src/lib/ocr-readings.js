@@ -45,7 +45,8 @@ export function buildOcrRows(evidence, jobs, people) {
     const userId = proof.user_id || job?.user_id || null;
     const jobDate = String(proof.job_date || job?.job_date || "").slice(0, 10);
     const person = people?.get?.(userId) || null;
-    const found = { ot: proof.proof_ot ?? null, clientMinutes: proof.proof_client_minutes ?? null, returnMinutes: proof.proof_return_minutes ?? null };
+    // The OT is the one read on an older form, else the one the employee typed before the proof page (0166: the form has no OT question any more).
+    const found = { ot: proof.proof_ot ?? proof.declared_ot ?? null, clientMinutes: proof.proof_client_minutes ?? null, returnMinutes: proof.proof_return_minutes ?? null };
     // An OT number alone is not a reading of the proof: what the proof proves is the minutes (at the client / return). A capture that
     // gave an OT but no minutes (question 1 only, or the answers could not be read) is « unread », never « conform ».
     const nothingFound = found.clientMinutes === null && found.returnMinutes === null;
@@ -87,8 +88,8 @@ function markIncomplete(rows) {
     const read = members.filter((row) => row.state === "ok" || row.state === "mismatch" || row.state === "incomplete");
     const hasClient = read.some((row) => row.found.clientMinutes != null);
     const hasReturn = read.some((row) => row.found.returnMinutes != null);
-    const hasOt = read.some((row) => row.found.ot); // question 1 « Ordre de travail »: the OT the employee typed on the form
-    if (hasClient && hasReturn && hasOt) continue;
+    // The OT is not required here: since 27 November 2026 the form has no OT question (the employee types it before the proof page).
+    if (hasClient && hasReturn) continue;
     for (const row of members) if (row.state === "ok") row.state = "incomplete";
   }
 }

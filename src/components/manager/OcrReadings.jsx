@@ -30,6 +30,7 @@ const EmployeesPanel = lazyPanel(() => import("@/components/EmployeesPanel"));
 const EVIDENCE_COLUMNS = "id, job_id, user_id, job_date, created_at, storage_path, ocr_status, proof_ot, proof_client_minutes, proof_return_minutes, proof_read_at, ocr_attempts, ocr_next_try_at";
 const NOT_NEEDED_COLUMN = ", not_needed_at"; // migration 0153: read when it exists
 const FORM_KIND_COLUMN = ", form_kind"; // migration 0161 (what the picture is: new form / old form / Field Service / SMS): read when it exists
+const DECLARED_OT_COLUMN = ", declared_ot"; // migration 0166 (the OT the employee typed before the proof page): read when it exists
 const JOB_COLUMNS = "id, user_id, job_date, status, updated_at, ot, depart, arrivee, fin, return_time_minutes, km_total, km_aller, km_retour";
 const queueTime = (iso) => new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" });
 const BADGE = { ok: "success", incomplete: "warning", mismatch: "destructive", sms: "info", field: "destructive", oldForm: "destructive", wrongDoc: "destructive", unread: "warning", failed: "destructive", queued: "info", notRead: "secondary" };
@@ -101,7 +102,9 @@ export default function OcrReadings() {
     (async () => {
       const readEvidence = (columns) => withTimeout(
         supabase.from("overtime_evidence").select(columns).gte("job_date", OCR_FIRST_DAY).order("created_at", { ascending: false }).limit(QUERY_BUDGETS.ocrReadings), 12000);
-      let { data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN + FORM_KIND_COLUMN);
+      let { data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN + FORM_KIND_COLUMN + DECLARED_OT_COLUMN);
+      // Migration 0166 not applied yet: the same list without the typed OT.
+      if (evidenceError && /declared_ot/i.test(String(evidenceError.message || ""))) ({ data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN + FORM_KIND_COLUMN));
       // Migration 0153 / 0161 not applied yet: the same list without the « not needed » mark / the picture kind.
       if (evidenceError && /form_kind/i.test(String(evidenceError.message || ""))) ({ data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS + NOT_NEEDED_COLUMN));
       if (evidenceError && /not_needed_at/i.test(String(evidenceError.message || ""))) ({ data: evidence, error: evidenceError } = await readEvidence(EVIDENCE_COLUMNS));

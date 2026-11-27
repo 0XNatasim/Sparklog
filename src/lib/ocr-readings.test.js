@@ -252,12 +252,15 @@ describe("what the picture is (migration 0161) and the result column", () => {
       proof("p2", "a", { job_date: "2026-11-24", ...read, proof_client_minutes: null, proof_return_minutes: 0 }),
     ], day("2026-11-24"), people);
     expect(two.map((item) => item.state)).toEqual(["ok", "ok"]);
-    // the OT (question 1) never read on any capture of the job → incomplete too (client and return read, OT missing)
+    // since 27 November 2026 the form has no OT question: no OT read on the picture is not a missing part
     const noOt = buildOcrRows([
       proof("p1", "b", { job_date: "2026-11-24", ocr_status: "processed", form_kind: "new", proof_ot: null, proof_client_minutes: 30, proof_return_minutes: null }),
       proof("p2", "b", { job_date: "2026-11-24", ocr_status: "processed", form_kind: "new", proof_ot: null, proof_client_minutes: null, proof_return_minutes: 0 }),
     ], day("2026-11-24"), people);
-    expect(noOt.map((item) => item.state)).toEqual(["incomplete", "incomplete"]);
+    expect(noOt.map((item) => item.state)).not.toContain("incomplete");
+    // the OT shown for the proof is the one read on an older form, else the one the employee typed before the proof page (0166)
+    expect(row("2026-11-24", { ocr_status: "processed", form_kind: "new", proof_ot: null, declared_ot: "270825", proof_client_minutes: 120, proof_return_minutes: 0 }).found.ot).toBe("270825");
+    expect(row("2026-11-24", { ocr_status: "processed", form_kind: "new", proof_ot: "261821", declared_ot: "270825", proof_client_minutes: 120, proof_return_minutes: 0 }).found.ot).toBe("261821");
     // the old form is not concerned (typed answers, nothing to complete)
     expect(row("2026-11-20", { ocr_status: "processed", form_kind: "old", proof_client_minutes: 120, proof_return_minutes: null }).state).toBe("ok");
   });
