@@ -22,6 +22,7 @@ export function cleanReport({ auditedName, body }) {
   return { auditedName: name || null, body: text };
 }
 
+// Returns the id of the note (its pictures, 0165, are sent with it).
 // Attaches the note to its job: one note per job, created the first time and edited afterwards. `submissionKey` is
 // created once per note, so a retry after a lost response is the same note, not a second one.
 export async function saveJobNote(client, { userId, jobId, submissionKey, reportDate, auditedName, body }) {
@@ -38,9 +39,9 @@ export async function saveJobNote(client, { userId, jobId, submissionKey, report
       12000,
     );
     if (error) throw error;
-    return;
+    return existing.id;
   }
-  const { error } = await withTimeout(
+  const { data: created, error } = await withTimeout(
     client.from("foreman_reports").insert({
       user_id: userId,
       job_id: jobId,
@@ -48,20 +49,24 @@ export async function saveJobNote(client, { userId, jobId, submissionKey, report
       report_date: reportDate,
       audited_name: clean.auditedName,
       body: clean.body,
-    }),
+    }).select("id").single(),
     12000,
   );
   if (error && error.code !== "23505") throw error;
+  if (created?.id) return created.id;
+  // A repeated key is the same note (a retry after a lost response): its id is read back so its pictures can follow.
+  const { data: again } = await withTimeout(client.from("foreman_reports").select("id").eq("job_id", jobId).maybeSingle(), 12000);
+  return again?.id || null;
 }
 
 // The note of a job (to edit it from the work sheet), or null.
 export async function fetchJobNote(client, jobId) {
   const { data, error } = await withTimeout(
-    client.from("foreman_reports").select("audited_name, body").eq("job_id", jobId).maybeSingle(),
+    client.from("foreman_reports").select("id, audited_name, body").eq("job_id", jobId).maybeSingle(),
     12000,
   );
   if (error) throw error;
-  return data ? { auditedName: data.audited_name || "", body: data.body || "" } : null;
+  return data ? { id: data.id, auditedName: data.audited_name || "", body: data.body || "" } : null;
 }
 
 // A manager deletes a note on its own (the job stays).

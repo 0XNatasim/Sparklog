@@ -24,19 +24,20 @@ describe("foreman reports", () => {
 
   it("attaches a new note to its job, edits the existing one, and treats a repeated key as the same note", async () => {
     const args = { userId: "u", jobId: "j1", submissionKey: "k", reportDate: "2026-11-10", auditedName: "", body: "texte" };
-    const insert = vi.fn().mockResolvedValue({ error: null });
+    const insert = vi.fn(() => ({ select: () => ({ single: async () => ({ data: { id: "r-new" }, error: null }) }) }));
     const noNote = { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }), insert };
-    await saveJobNote({ from: () => noNote }, args);
+    // The id of the note comes back, so its pictures (0165) can follow.
+    await expect(saveJobNote({ from: () => noNote }, args)).resolves.toBe("r-new");
     expect(insert).toHaveBeenCalledWith({ user_id: "u", job_id: "j1", submission_key: "k", report_date: "2026-11-10", audited_name: null, body: "texte" });
 
     const update = vi.fn(() => ({ eq: async () => ({ error: null }) }));
     const hasNote = { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "r1" }, error: null }) }) }), update };
-    await saveJobNote({ from: () => hasNote }, { ...args, auditedName: "Paul", body: "corrigé" });
+    await expect(saveJobNote({ from: () => hasNote }, { ...args, auditedName: "Paul", body: "corrigé" })).resolves.toBe("r1");
     expect(update).toHaveBeenCalledWith({ audited_name: "Paul", body: "corrigé" });
 
-    const dup = { ...noNote, insert: async () => ({ error: { code: "23505" } }) };
-    await expect(saveJobNote({ from: () => dup }, args)).resolves.toBeUndefined();
-    const refused = { ...noNote, insert: async () => ({ error: { code: "42501", message: "no" } }) };
+    const dup = { ...noNote, insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { code: "23505" } }) }) }) };
+    await expect(saveJobNote({ from: () => dup }, args)).resolves.toBeNull();
+    const refused = { ...noNote, insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { code: "42501", message: "no" } }) }) }) };
     await expect(saveJobNote({ from: () => refused }, args)).rejects.toMatchObject({ code: "42501" });
     await expect(saveJobNote({ from: () => noNote }, { ...args, body: " " })).rejects.toThrow("foreman_report_invalid");
     await expect(saveJobNote({ from: () => noNote }, { ...args, jobId: null })).rejects.toThrow("foreman_report_invalid");

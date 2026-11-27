@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   AlarmClock, BellRing, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, Clock, Lock, MessageCircle, Pencil, Plus, RotateCcw,
-  StickyNote, Trash2, Users,
+  Image as ImageIcon, StickyNote, Trash2, Users,
 } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,13 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import NoteThread from "@/components/manager/NoteThread";
+import NoteFilesDownload from "@/components/NoteFilesDownload";
+import NoteImages from "@/components/NoteImages";
+import StagedNoteImages from "@/components/StagedNoteImages";
 import { useAuth } from "@/contexts/AuthContext";
+import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
+import { fetchNoteFiles, removeNoteObjects, uploadNoteFiles } from "@/lib/note-files";
 import {
   DEFAULT_REMIND_TIME, MAX_NOTE, NOTE_COLUMNS, NOTE_SCOPES, REPLY_COLUMNS, cleanNoteBody, fetchNotes, fetchReplies,
   fetchUnreadReplies, inScope, isMine, markNotesRead, newReplyIds, noteState, notesChanged, otherPeopleIds, reminderFields,
@@ -55,7 +60,7 @@ function ShareChoice({ shared, onChange }) {
 }
 
 // Text + private / shared + optional reminder (date, and a time that defaults to 8:00).
-function NoteEditor({ initial, onSave, onCancel, busy, submitLabel, canShare = true }) {
+function NoteEditor({ initial, onSave, onCancel, busy, submitLabel, canShare = true, withImages = false }) {
   const t = useT();
   const start = reminderFields(initial?.remind_at);
   const [body, setBody] = useState(initial?.body || "");
@@ -64,6 +69,7 @@ function NoteEditor({ initial, onSave, onCancel, busy, submitLabel, canShare = t
   const [date, setDate] = useState(start.date || dayjs().add(1, "day").format("YYYY-MM-DD"));
   const [time, setTime] = useState(start.time || DEFAULT_REMIND_TIME);
   const [error, setError] = useState("");
+  const [images, setImages] = useState([]);
 
   async function submit(event) {
     event.preventDefault();
@@ -72,7 +78,7 @@ function NoteEditor({ initial, onSave, onCancel, busy, submitLabel, canShare = t
     const remindAt = remind ? reminderInstant(date, time) : null;
     if (remind && !remindAt) { setError(t("notes.errors.date")); return; }
     setError("");
-    await onSave({ body: text, remind_at: remindAt, ...(canShare ? { shared } : {}) });
+    await onSave({ body: text, remind_at: remindAt, ...(canShare ? { shared } : {}) }, images);
   }
 
   return (
@@ -85,6 +91,7 @@ function NoteEditor({ initial, onSave, onCancel, busy, submitLabel, canShare = t
         aria-label={t("notes.placeholder")}
         onChange={(e) => setBody(e.target.value)}
       />
+      {withImages && <StagedNoteImages files={images} onChange={setImages} disabled={busy} />}
       <div className="flex flex-wrap items-end gap-3">
         {canShare && <ShareChoice shared={shared} onChange={setShared} />}
         <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm font-medium">
@@ -146,6 +153,8 @@ export default function NotesPanel() {
   const [confirm, confirmDialog] = useConfirmDialog();
   const [notes, setNotes] = useState([]);
   const [names, setNames] = useState(() => new Map());
+  // The pictures of the notes (0165): { note id → pictures }.
+  const [pictures, setPictures] = useState(() => new Map());
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("open");
@@ -225,6 +234,19 @@ export default function NotesPanel() {
     return () => { cancelled = true; };
   }, [otherIds]);
 
+  const noteIds = useMemo(() => notes.map((n) => n.id).join(","), [notes]);
+  useEffect(() => {
+    if (!noteIds) return undefined;
+    let cancelled = false;
+    fetchNoteFiles(supabase, "manager", noteIds.split(",")).then((loaded) => { if (!cancelled) setPictures(loaded); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [noteIds]);
+  const changePictures = (noteId, change) => setPictures((current) => {
+    const next = new Map(current);
+    next.set(noteId, change(next.get(noteId) || []));
+    return next;
+  });
+
   // A reminder turns « due » while the page is open: re-check every 30 s.
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30000);
@@ -250,6 +272,10 @@ export default function NotesPanel() {
     return [...sorted.filter((n) => fresh.get(n.id)?.size), ...sorted.filter((n) => !fresh.get(n.id)?.size)];
   }, [scoped, filter, now, fresh]);
   const nameOf = (id) => (id === me ? t("notes.you") : names.get(id) || t("notes.someone"));
+  // What the picture download covers: the notes shown here, dated by the day they were written (company time).
+  const downloadNotes = useMemo(() => notes.map((n) => ({
+    id: n.id, date: companyDate(new Date(n.created_at)), author: n.user_id === me ? "" : (names.get(n.user_id) || ""), ot: "", text: n.body,
+  })), [notes, names, me]);
 
   // One write, then the row as stored replaces the local one (and the side-menu badge refreshes).
   async function write(id, run) {
@@ -275,8 +301,24 @@ export default function NotesPanel() {
 
   const update = (note, values) => write(note.id, () => supabase.from("manager_notes").update(values).eq("id", note.id).select(NOTE_COLUMNS).single());
 
-  async function create(values) {
-    if (await write("new", () => supabase.from("manager_notes").insert(values).select(NOTE_COLUMNS).single())) setFormKey((k) => k + 1);
+  async function create(values, images = []) {
+    let createdId = null;
+    const created = await write("new", async () => {
+      const result = await supabase.from("manager_notes").insert(values).select(NOTE_COLUMNS).single();
+      createdId = result.data?.id || null;
+      return result;
+    });
+    if (!created) return;
+    setFormKey((k) => k + 1);
+    if (createdId && images.length) {
+      // The note is saved first: a picture that cannot be sent never loses the note.
+      setBusyId("new");
+      const outcome = await uploadNoteFiles(supabase, { kind: "manager", noteId: createdId, userId: me, files: images });
+      const loaded = await fetchNoteFiles(supabase, "manager", [createdId]).catch(() => null);
+      if (loaded) changePictures(createdId, () => loaded.get(createdId) || []);
+      if (outcome.failed) setErr(t("noteFiles.someFailed", { count: outcome.failed }));
+      setBusyId(null);
+    }
   }
 
   async function save(note, values) {
@@ -321,6 +363,7 @@ export default function NotesPanel() {
 
   async function remove(note) {
     if (!(await confirm(t("notes.deleteConfirm")))) return;
+    await removeNoteObjects(supabase, "manager", note.id).catch(() => undefined);
     await write(note.id, () => supabase.from("manager_notes").delete().eq("id", note.id).then((res) => ({ ...res, data: null })));
   }
 
@@ -331,7 +374,7 @@ export default function NotesPanel() {
         <CardContent className="space-y-2 p-4 sm:p-5">
           <div className="flex items-center gap-2 font-semibold"><Plus className="h-4 w-4" />{t("notes.new")}</div>
           <p className="text-xs text-muted-foreground">{t("notes.privateHint")}</p>
-          <NoteEditor key={formKey} onSave={create} busy={busyId === "new"} submitLabel={t("notes.add")} />
+          <NoteEditor key={formKey} onSave={create} busy={busyId === "new"} submitLabel={t("notes.add")} withImages />
         </CardContent>
       </Card>
 
@@ -356,6 +399,9 @@ export default function NotesPanel() {
             </button>
           );
         })}
+        <span className="ms-auto">
+          <NoteFilesDownload kind="manager" notes={downloadNotes} />
+        </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -433,6 +479,11 @@ export default function NotesPanel() {
                       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       {!note.shared && <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={t("notes.private")} />}
                       <span className={cn("min-w-0 flex-1 truncate text-base font-semibold sm:text-lg", state === "done" && "line-through decoration-muted-foreground/50")}>{title}</span>
+                      {(pictures.get(note.id) || []).length > 0 && (
+                        <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground" aria-label={t("noteFiles.count", { count: pictures.get(note.id).length })}>
+                          <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />{pictures.get(note.id).length}
+                        </span>
+                      )}
                     </button>
                     {(note.remind_at && state !== "done") || newCount > 0 || thread.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-1.5 ps-6 text-xs">
@@ -484,6 +535,11 @@ export default function NotesPanel() {
                         {rest}
                       </p>
                     )}
+                    <NoteImages
+                      kind="manager" noteId={note.id} userId={me} files={pictures.get(note.id) || []} canAdd={mine} canRemove={mine}
+                      onAdded={(file) => changePictures(note.id, (list) => [...list, file])}
+                      onRemoved={(file) => changePictures(note.id, (list) => list.filter((item) => item.id !== file.id))}
+                    />
                     <NoteThread
                       note={note}
                       replies={thread}

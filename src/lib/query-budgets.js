@@ -37,6 +37,8 @@ export const QUERY_BUDGETS = Object.freeze({
   accidentLog: 500,
   // Gestion › Notes › Contremaître (0134): the most recent foreman reports.
   foremanReports: 300,
+  // Pictures on the notes (0165): the rows read per request of up to inListChunk notes (10 pictures at most per note).
+  noteFiles: 3000,
   // Justificatifs › Télécharger (0126): the pictures still kept (30 days by default) and the ones already downloaded.
   evidenceDownload: 1500,
   // Inventaire › Inventaire fin de mois (0142): the requests read at once (a few people a month, several months).

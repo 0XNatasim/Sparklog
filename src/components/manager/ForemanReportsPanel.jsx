@@ -8,9 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import NoteFilesDownload from "@/components/NoteFilesDownload";
+import NoteImages from "@/components/NoteImages";
 import { companyDate } from "@/lib/company-time";
 import { friendlyErrorMessage } from "@/lib/error-messages";
 import { deleteForemanReport, fetchForemanReports, fetchNoteReads, filterReports, foremanReportsCsv, isNoteReturned, isNoteUnread, markNoteRead, MAX_RETURN_REASON, returnReportedJob } from "@/lib/foreman-reports";
+import { fetchNoteFiles, removeNoteObjects } from "@/lib/note-files";
 import { statusBadgeVariant } from "@/lib/status";
 import { useT } from "@/lib/use-t";
 
@@ -29,6 +32,8 @@ export default function ForemanReportsPanel() {
   // This manager's readings (0138): { report id → read_at }. A note is unread for him until he opens it.
   const [reads, setReads] = useState(() => new Map());
   const [query, setQuery] = useState("");
+  // The pictures of the notes (0165): { report id → pictures }.
+  const [pictures, setPictures] = useState(() => new Map());
   // The note whose sheet is being returned, and the optional reason typed for it.
   const [returning, setReturning] = useState(null);
   const [returnReason, setReturnReason] = useState("");
@@ -47,6 +52,24 @@ export default function ForemanReportsPanel() {
   }, [t, reloads]);
 
   const shown = useMemo(() => filterReports(reports || [], query), [reports, query]);
+
+  const reportIds = useMemo(() => (reports || []).map((report) => report.id).join(","), [reports]);
+  useEffect(() => {
+    if (!reportIds) return undefined;
+    let cancelled = false;
+    fetchNoteFiles(supabase, "foreman", reportIds.split(",")).then((loaded) => { if (!cancelled) setPictures(loaded); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [reportIds]);
+  // What the download covers: the notes as the screen shows them (date of the work sheet, else of the note).
+  const downloadNotes = useMemo(() => (reports || []).map((report) => ({
+    id: report.id, date: String(report.job?.job_date || report.report_date || report.created_at || "").slice(0, 10), author: report.author, ot: report.job?.ot || "", text: report.body,
+  })), [reports]);
+
+  const changePictures = (reportId, change) => setPictures((current) => {
+    const next = new Map(current);
+    next.set(reportId, change(next.get(reportId) || []));
+    return next;
+  });
 
   async function act(report, run, doneKey) {
     setBusyId(report.id);
@@ -70,7 +93,8 @@ export default function ForemanReportsPanel() {
 
   async function remove(report) {
     if (!(await confirm(t("foremanNotes.confirmDelete")))) return;
-    await act(report, () => deleteForemanReport(supabase, report.id), "foremanNotes.deleted");
+    // The pictures' rows go with the note; their objects are removed first (a manager may, while the rows still exist).
+    await act(report, async () => { await removeNoteObjects(supabase, "foreman", report.id); await deleteForemanReport(supabase, report.id); }, "foremanNotes.deleted");
   }
 
   function giveBack(report) {
@@ -105,6 +129,7 @@ export default function ForemanReportsPanel() {
         <Input className="max-w-sm" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("foremanNotes.search")} aria-label={t("foremanNotes.search")} />
         <Button type="button" variant="outline" size="sm" onClick={() => setReloads((n) => n + 1)}><RefreshCw className="mr-1.5 h-4 w-4" />{t("live.refresh")}</Button>
         <Button type="button" variant="outline" size="sm" disabled={!shown.length} onClick={exportCsv}><Download className="mr-1.5 h-4 w-4" />{t("foremanNotes.export")}</Button>
+        <NoteFilesDownload kind="foreman" notes={downloadNotes} disabled={!downloadNotes.length} />
         {reports && <span className="text-sm text-muted-foreground">{t("foremanNotes.count", { n: shown.length })}</span>}
       </div>
       {info && <p className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary" role="status">{info}</p>}
@@ -145,6 +170,10 @@ export default function ForemanReportsPanel() {
               )}
               {report.audited_name && <div className="text-sm"><span className="text-muted-foreground">{t("foremanNotes.audited")} : </span><b>{report.audited_name}</b></div>}
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{report.body}</p>
+              <NoteImages
+                kind="foreman" noteId={report.id} files={pictures.get(report.id) || []} canRemove
+                onRemoved={(file) => changePictures(report.id, (list) => list.filter((item) => item.id !== file.id))}
+              />
               <div className="flex flex-wrap justify-end gap-2">
                 {isNoteUnread(report, reads.get(report.id)) && (
                   <Button type="button" size="sm" variant="outline" onClick={() => markRead(report)}>{t("foremanNotes.markRead")}</Button>

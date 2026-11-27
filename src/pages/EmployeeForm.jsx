@@ -47,6 +47,7 @@ import WorkOrderCheckDialog from "@/components/employee-form/WorkOrderCheckDialo
 import ManualEntryCheckDialog from "@/components/employee-form/ManualEntryCheckDialog";
 import ForemanNotesDialog from "@/components/employee-form/ForemanNotesDialog";
 import { fetchJobNote, isForemanOt, saveJobNote } from "@/lib/foreman-reports";
+import { uploadNoteFiles } from "@/lib/note-files";
 import { dailyRegularMinutesFor } from "@/lib/payroll-calculations";
 
 dayjs.locale("en");
@@ -661,9 +662,14 @@ export default function EmployeeForm() {
       if (foremanEmployee && foremanNote && !foremanNote.saved && isForemanOt(ot)) {
         try {
           if (!foremanNoteKeyRef.current) foremanNoteKeyRef.current = crypto.randomUUID();
-          await saveJobNote(supabase, { userId: user.id, jobId: savedJobId, submissionKey: foremanNoteKeyRef.current, reportDate: job_date, auditedName: foremanNote.auditedName, body: foremanNote.body });
+          const noteId = await saveJobNote(supabase, { userId: user.id, jobId: savedJobId, submissionKey: foremanNoteKeyRef.current, reportDate: job_date, auditedName: foremanNote.auditedName, body: foremanNote.body });
           foremanNoteKeyRef.current = null;
-          setForemanNote(editId ? { ...foremanNote, saved: true } : null);
+          setForemanNote(editId ? { ...foremanNote, id: noteId || foremanNote.id, images: [], saved: true } : null);
+          // The pictures follow the note (0165); one that cannot be sent never fails the sheet or the note.
+          if (noteId && foremanNote.images?.length) {
+            const outcome = await uploadNoteFiles(supabase, { kind: "foreman", noteId, userId: user.id, files: foremanNote.images });
+            if (outcome.failed) setWarning(t("noteFiles.someFailed", { count: outcome.failed }));
+          }
         } catch {
           setWarning(t("foremanNotes.errors.attachFailed"));
         }
@@ -1426,6 +1432,7 @@ export default function EmployeeForm() {
         open={showForemanNotes}
         onOpenChange={setShowForemanNotes}
         note={foremanNote}
+        userId={user?.id}
         onSave={(note) => { setForemanNote({ ...note, saved: false }); setDirty(true); }}
       />
       <ManualEntryCheckDialog
