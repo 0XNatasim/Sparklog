@@ -23,7 +23,6 @@ export default function OvertimeOtAsk({ initial = "", sheetOt = "", onConfirm, o
           onChange={(e) => setValue(e.target.value)} aria-label={t("form.evidence.askOt")}
         />
       </label>
-      <p className="text-xs text-muted-foreground">{t("form.evidence.askOtHint")}</p>
       {value.trim() !== "" && !clean && <p className="text-sm text-destructive" role="alert">{t("form.evidence.askOtInvalid")}</p>}
       {differs && <p className="text-sm text-warning" role="status">{t("form.evidence.askOtDiffers", { ot: sheetOt })}</p>}
       <div className="flex flex-wrap justify-end gap-2">
