@@ -12,7 +12,7 @@ import { cn, withTimeout } from "@/lib/utils";
 import { isManagerRole } from "@/lib/roles";
 import { useT } from "@/lib/use-t";
 import { Button } from "@/components/ui/button";
-import { calculateDailyTotals, dailyRegularMinutesFor } from "@/lib/payroll-calculations";
+import { calculateDailyTotals, dailyRegularMinutesFor, overtimeOptionsFromProfile } from "@/lib/payroll-calculations";
 import { loadDayRounding, roundingFor } from "@/lib/day-rounding";
 import { QUERY_BUDGETS } from "@/lib/query-budgets";
 import { companyDate } from "@/lib/company-time";
@@ -81,6 +81,7 @@ export default function Week() {
   const holidayDates = useHolidayDates();
   const [firstTripUnpaid, setFirstTripUnpaid] = useState(false);
   const [dailyRegularMinutes, setDailyRegularMinutes] = useState(480); // 600 with « 4 jours de 10 h »
+  const [isForeman, setIsForeman] = useState(false); // contremaître : 8 h minimum payées chaque jour de semaine
   const [rounding, setRounding] = useState(null); // day-rounding counter (15 min)
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -93,6 +94,7 @@ export default function Week() {
     setReturnWithBenefitsTo8h(Boolean(prof?.return_with_benefits_to_8h));
     setFirstTripUnpaid(Boolean(prof?.first_trip_unpaid));
     setDailyRegularMinutes(dailyRegularMinutesFor(prof));
+    setIsForeman(prof?.role === "foreman");
     setRounding(nextRounding);
   }
   function failWeeks(e) {
@@ -132,7 +134,11 @@ export default function Week() {
   }, [effectiveUserId]);
 
   const { weekly, dailyByKey } = useMemo(() => {
-    const calculatedDays = calculateDailyTotals(jobs, { firstOtHourDouble: otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, dailyRegularMinutes, holidayDates, rounding });
+    const baseOptions = { firstOtHourDouble: otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, dailyRegularMinutes, holidayDates, rounding };
+    // Contremaître : le même moteur que la paie (8 h minimum chaque jour de semaine, pas de retour à part).
+    const foremanOptions = isForeman ? overtimeOptionsFromProfile({ role: "foreman", overtime_first_hour_double: otFirstHourDouble }) : null;
+    const calculatedDays = calculateDailyTotals(jobs, { ...baseOptions, ...(foremanOptions || {}) });
+    const withoutTopUp = foremanOptions ? calculateDailyTotals(jobs, { ...baseOptions, ...foremanOptions, minDayMinutes: 0 }) : null;
     const dailyMap = new Map([...calculatedDays].map(([dayKey, totals]) => [dayKey, {
       ...totals,
       date: parseJobDate(dayKey),
@@ -141,6 +147,7 @@ export default function Week() {
       ot15: totals.overtime50Minutes / 60,
       ot20: totals.overtime100Minutes / 60,
       returnNb: totals.returnNoBenefitMinutes / 60,
+      topUp: withoutTopUp ? Math.max(0, totals.regularWorkMinutes - (withoutTopUp.get(dayKey)?.regularWorkMinutes || 0)) / 60 : 0,
       km: totals.totalKm,
       otCount: jobs.filter((job) => job.job_date === dayKey && isNonEmptyOT(job.ot)).length,
     }]));
@@ -157,6 +164,7 @@ export default function Week() {
           ot15: 0,
           ot20: 0,
           returnNb: 0,
+          topUp: 0,
           totalKm: 0,
           dayKeys: [],
         });
@@ -166,6 +174,7 @@ export default function Week() {
       w.ot15 += day.ot15;
       w.ot20 += day.ot20;
       w.returnNb += day.returnNb;
+      w.topUp += day.topUp;
       w.totalKm += day.km;
       w.dayKeys.push(day.date.format("YYYY-MM-DD"));
     }
@@ -183,7 +192,7 @@ export default function Week() {
 
     weeklyArr.sort((a, b) => (a.start.isAfter(b.start) ? -1 : 1));
     return { weekly: weeklyArr, dailyByKey: dailyMap };
-  }, [jobs, otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, dailyRegularMinutes, holidayDates, rounding]);
+  }, [jobs, otFirstHourDouble, returnWithBenefitsTo8h, firstTripUnpaid, dailyRegularMinutes, isForeman, holidayDates, rounding]);
 
   function toggleWeek(weekKey) {
     setOpenWeekKey((prev) => (prev === weekKey ? null : weekKey));
@@ -246,6 +255,12 @@ export default function Week() {
                         <span className="font-bold text-muted-foreground">{t("week.regular")}:</span>
                         <span className="font-bold text-lg">{formatHoursHM(w.regularHours)}</span>
                       </div>
+                      {w.topUp > 0 && (
+                        <div className="flex items-baseline justify-between gap-3 text-sm text-muted-foreground">
+                          <span>{t("week.foremanTopUp")}:</span>
+                          <span className="font-bold">{formatHoursHM(w.topUp)}</span>
+                        </div>
+                      )}
                       {w.ot15 > 0 && (
                         <div className="flex items-baseline justify-between gap-3">
                           <span className="font-bold text-muted-foreground">{t("week.ot15")}:</span>

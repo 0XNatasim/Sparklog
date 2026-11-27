@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.341 (2026-11-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.343 (2026-11-27).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.343 — « Week » tab for foremen.** A foreman's weekday minimum of 8 h (the pay top-up) is now counted in the « 1x » line, so the week shows what is actually paid (e.g. 40h00 regular + 2h15 overtime), with a « incl. 8 h minimum top-up » line. The « Return (no benefits) » label is now just « Return ».
 - **V2.4.341 — Overtime proof: the OT is asked first.** The Microsoft overtime form no longer asks for the work order (only « 2. Real overtime duration at the client » and « 3. Return duration »). Before the proof page, a single box asks « Overtime for which OT? » (3 to 8 digits); it is kept next to the proof and shown to the managers in the OCR tab. The two example pictures are replaced by the new form (question 2, question 3). An OT that the reader no longer finds on the picture no longer makes a proof « incomplete ». Needs migration 0166.
 - **V2.4.340 — Pictures on the notes.** « My notes » and « Foreman » notes can carry up to 10 pictures or screenshots each (a private note's pictures are seen only by its author, a shared note's by every manager, a foreman note's by the foreman and the managers). Each screen has a « Download pictures » button: one day or one week as a ZIP (pictures named by date / author / work order + a notes.txt with the text of each note). Needs migration 0165. The one-shot weekly bundle (overtime proofs, accident-register pictures, weekly summary…) is the next step: its content list is set item by item.
 - **V2.4.339 — Field Service check can no longer be bypassed.** Leaving the work-order form and coming back (restored draft) used to clear the « Field Service values differ / missing » block, so Save worked again; the block now comes back with the draft. The two distances (« Miles Traveled » and « Distance réelle parcourue ») are also compared when the OCR misreads the « Miles Traveled » label. No migration.
