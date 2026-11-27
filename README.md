@@ -2,7 +2,7 @@
 
 SparkLog is a bilingual, mobile-first time-tracking application for Québec electrical contractors. Employees record daily jobs and supporting evidence; managers review work, manage employee settings, approve time sheets, and prepare CCQ-oriented weekly exports.
 
-> **Documentation current as of V2.4.338 (2026-11-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
+> **Documentation current as of V2.4.339 (2026-11-26).** `README.md`, `NOOB.md` (plain-language to-do list) and
 > `CLAUDE.md` (detailed tracker) are updated together in every version; `src/lib/docs-sync.test.js` fails when one
 > of them does not name the current `APP_VERSION`. NOOB.md and CLAUDE.md list **open items only** (V2.4.195 removed
 > every finished entry; the history is in Git); this README describes what the app does.
@@ -53,6 +53,7 @@ Roles are stored lowercase in `profiles.role`:
 
 ### Managers
 
+- **V2.4.339 — Field Service check can no longer be bypassed.** Leaving the work-order form and coming back (restored draft) used to clear the « Field Service values differ / missing » block, so Save worked again; the block now comes back with the draft. The two distances (« Miles Traveled » and « Distance réelle parcourue ») are also compared when the OCR misreads the « Miles Traveled » label. No migration.
 - **V2.4.338 — Proof read right after it is replaced.** When an employee replaces the overtime captures of a returned sheet, the dialog reads them (about a minute), says for each one whether it matches the sheet (or what is wrong: minutes differ, something missing, text message, wrong page…) and, once everything matches, shows **« Submit again »** (the day's usual submission). Needs migration 0164.
 - **V2.4.337 — Scheduled communications.** In Communications, « Schedule the sending time » picks a Montréal date and time (1 minute to 90 days ahead): the message is saved but invisible to the recipients until then; at that time they get it (bell, pop-up) and their phone is notified. The list shows it as « Scheduled: date » while it waits; deleting it before then cancels it. Migration 0163 + the `send_push` function.
 - **V2.4.336 — Clock dialog shortened + persistent banner.** The overtime-proof dialog opened from the History clock is now short: the same « Take 2 screenshots of the form… » block with the two new example photos (the old example image and the long rule are gone); a second capture can be added. When a manager sends a proof back, a red banner stays at the top of every page (« Overtime proof refused (OT …): provide the refused screenshots ») until the work sheet is submitted again; its button opens that work order's clock.

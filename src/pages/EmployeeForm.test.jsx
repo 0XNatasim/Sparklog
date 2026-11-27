@@ -230,19 +230,25 @@ describe("EmployeeForm — new entry", () => {
     expect(field("fin").value).toBe("12:00");
   });
 
-  it("never brings back a Field Service screenshot problem from a restored draft", async () => {
-    const draft = (ot) => ({ userId: "emp-1", submissionKey: "k", updatedAt: new Date().toISOString(), data: { job_date: TODAY, ot, depart: "06:29", arrivee: "07:00", fin: "14:29", km_aller: "0", fromScreenshot: true, workOrderProblems: [{ code: "km" }] } });
+  it("brings back the Field Service screenshot problem of a restored draft (leaving and coming back must not unblock Save)", async () => {
+    const draft = (ot, extra = {}) => ({ userId: "emp-1", submissionKey: "k", updatedAt: new Date().toISOString(), data: { job_date: TODAY, ot, depart: "06:29", arrivee: "07:00", fin: "14:29", km_aller: "14", fromScreenshot: true, workOrderProblems: [{ code: "kmMismatch", miles: 45, km: 14 }], ...extra } });
+    state.drafts.set("emp-1:new", draft("270825"));
+    setup();
+    await screen.findByText(fr("form.toasts.draftRestored"));
+    expect(saveButton().disabled).toBe(true);
+    expect(screen.getAllByText(fr("form.workOrderCheck.blocked")).length).toBeGreaterThan(0);
+    cleanup();
+    // A preset OT (formation, réunion…) is entered by hand: an old screenshot problem never blocks it.
     state.drafts.set("emp-1:new", draft("FORMATION BRITTON"));
     setup();
     await screen.findByText(fr("form.toasts.draftRestored"));
     expect(saveButton().disabled).toBe(false);
     expect(screen.queryByText(fr("form.workOrderCheck.blocked"))).toBeNull();
     cleanup();
-    // Typed by hand (not a preset, e.g. "FORMATION HILO"): an old draft problem does not block it either.
-    state.drafts.set("emp-1:new", draft("FORMATION HILO"));
+    // A hand-entered card (no screenshot used) has no problem to bring back.
+    state.drafts.set("emp-1:new", draft("270825", { fromScreenshot: false }));
     setup();
     await screen.findByText(fr("form.toasts.draftRestored"));
-    expect(saveButton().disabled).toBe(false);
     expect(screen.queryByText(fr("form.workOrderCheck.blocked"))).toBeNull();
   });
 

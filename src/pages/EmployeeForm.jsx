@@ -231,9 +231,9 @@ export default function EmployeeForm() {
     setParkingRequested(Boolean(draft.parkingRequested));
     setParkingAmount(draft.parkingAmount || "");
     setPendingSaveMode(draft.pendingSaveMode || "draft");
-    // The Field Service check belongs to the screenshot just read in this session: a restored draft never
-    // brings it back (it would block a hand-entered card with no screenshot).
-    setWorkOrderProblems([]);
+    // The Field Service check follows the screenshot it came from: a draft that used a screenshot brings its problems back
+    // (leaving the form and coming back must not unblock Save). A hand-entered card has none, and a preset OT ignores them.
+    setWorkOrderProblems(draft.fromScreenshot && Array.isArray(draft.workOrderProblems) ? draft.workOrderProblems : []);
     setFromScreenshot(Boolean(draft.fromScreenshot));
     if (record.submissionKey) submissionKeyRef.current = record.submissionKey;
     setDirty(true);
@@ -424,12 +424,12 @@ export default function EmployeeForm() {
         submissionKey: submissionKeyRef.current,
         data: {
           job_date, ot, depart, arrivee, fin, km_aller,
-          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, fromScreenshot,
+          returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, fromScreenshot, workOrderProblems: fromScreenshot ? workOrderProblems : [],
         },
       }).catch((error) => console.warn("[draft] local save failed", error));
     }, 350);
     return () => window.clearTimeout(timeoutId);
-  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, fromScreenshot]);
+  }, [draftReady, dirty, effectiveUserId, editId, isViewMode, locked, job_date, ot, depart, arrivee, fin, km_aller, returnMinutes, returnKm, parkingRequested, parkingAmount, pendingSaveMode, fromScreenshot, workOrderProblems]);
 
   useEffect(() => {
     if (!effectiveUserId) return;

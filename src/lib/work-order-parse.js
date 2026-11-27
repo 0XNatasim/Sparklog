@@ -90,7 +90,14 @@ export function parseExtractedText(text) {
 
   // "Miles Traveled" / "Distance parcourue (miles)" (the value is in km despite the name): only
   // used to check that it matches "Distance réelle parcourue (km)", never to fill the form.
-  const miles = numberIn(first("miles") ?? milesDistance?.segment);
+  let miles = numberIn(first("miles") ?? milesDistance?.segment);
+  // The label itself is sometimes misread by the OCR ("Miles Travelec"): the value is still the decimal number under the
+  // « Déplacement » heading, before « Distance réelle parcourue ».
+  if (miles === null && km !== null) {
+    const block = text.match(/D[eé]placement([\s\S]{0,160}?)(?=Distance|$)/i);
+    const value = block?.[1].match(/\d+[.,]\d+/);
+    if (value) miles = parseFloat(value[0].replace(",", "."));
+  }
   if (miles !== null) out.miles_traveled = miles;
 
   return out;
